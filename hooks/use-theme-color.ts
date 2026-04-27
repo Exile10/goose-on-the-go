@@ -1,21 +1,25 @@
 /**
- * Learn more about light and dark modes:
- * https://docs.expo.dev/guides/color-schemes/
+ * useThemeColor — resolve a single Jarida color token for the active scheme.
+ *
+ * Accepts optional per-scheme overrides via `props`. Falls back to the
+ * token value from LightColors / DarkColors.
  */
 
-import { Colors } from '@/constants/theme';
+import { Colors, type ThemeColors } from '@/constants/colors';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
+type ThemeColorName = keyof ThemeColors;
+
+/**
+ * Returns the resolved color string for `colorName` under the current scheme.
+ * If `props.light` or `props.dark` is provided, that override takes precedence.
+ */
 export function useThemeColor(
   props: { light?: string; dark?: string },
-  colorName: keyof typeof Colors.light & keyof typeof Colors.dark
-) {
-  const theme = useColorScheme() ?? 'light';
-  const colorFromProps = props[theme];
+  colorName: ThemeColorName,
+): string {
+  const scheme = useColorScheme() ?? 'light';
+  const override = props[scheme];
 
-  if (colorFromProps) {
-    return colorFromProps;
-  } else {
-    return Colors[theme][colorName];
-  }
+  return override ?? Colors[scheme][colorName];
 }
