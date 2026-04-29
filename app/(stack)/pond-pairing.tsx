@@ -1,15 +1,18 @@
 /**
- * PondPairingScreen — 4-step wizard (Find -> WiFi -> Name -> Done).
+ * PondPairingScreen — 4-step pairing wizard:
+ *   0. Enter the GIAP server URL (LAN address from the dashboard)
+ *   1. Enter the 6-digit pairing code shown on the GIAP host
+ *   2. Name this device
+ *   3. Run the two-phase handshake and confirm
  */
 
-import React, { useState, useCallback } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import {
-  View,
-  Text,
+  ActivityIndicator,
   StyleSheet,
-  Pressable,
+  Text,
   TextInput,
-  Animated,
+  View,
 } from 'react-native';
 
 import { useRouter } from 'expo-router';
@@ -19,10 +22,20 @@ import { Grey, JaridaPurple, Brand, Semantic } from '@/constants/colors';
 import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
 import { Spacing } from '@/constants/spacing';
 import { Radii } from '@/constants/radii';
-
+import { useServer } from '@/providers/server-provider';
 
 type Step = 0 | 1 | 2 | 3;
-const STEP_LABELS = ['Find Device', 'WiFi Setup', 'Name Device', 'Complete'];
+const STEP_LABELS = ['Server', 'Pairing Code', 'Name Device', 'Complete'];
+
+function randomClientId(): string {
+  // RFC4122-ish v4 (sufficient for a stable per-install identifier).
+  const bytes = new Uint8Array(16);
+  for (let i = 0; i < 16; i++) bytes[i] = Math.floor(Math.random() * 256);
+  bytes[6] = (bytes[6] & 0x0f) | 0x40;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
 
 /** Step indicator */
 function StepIndicator({ current }: { current: Step }) {
@@ -58,74 +71,88 @@ function StepIndicator({ current }: { current: Step }) {
   );
 }
 
-/** Step 0: Find Device */
-function FindStep({ onNext }: { onNext: () => void }) {
+/** Step 0: Server URL */
+function ServerStep({
+  initial,
+  onNext,
+}: {
+  initial: string;
+  onNext: (url: string) => void;
+}) {
+  const [url, setUrl] = useState(initial);
   return (
     <View style={styles.stepContent}>
       <GIcon name="search" size={28} color={JaridaPurple[500]} />
-      <Text style={styles.stepTitle}>Searching for Pond devices...</Text>
+      <Text style={styles.stepTitle}>Connect to GIAP</Text>
       <Text style={styles.stepDesc}>
-        Make sure your Pond device is powered on and within Bluetooth range.
+        Enter the URL of your Goose In A Pond server — shown in the dashboard
+        banner on the host machine.
       </Text>
-      <View style={styles.deviceFound}>
-        <View style={styles.foundDot} />
-        <Text style={styles.foundText}>Pond Hub v2 found</Text>
+      <View style={styles.inputGroup}>
+        <Text style={styles.inputLabel}>Server URL</Text>
+        <TextInput
+          style={styles.textInput}
+          value={url}
+          onChangeText={setUrl}
+          placeholder="http://pond.local:4000"
+          placeholderTextColor={Grey[400]}
+          autoCapitalize="none"
+          autoCorrect={false}
+        />
       </View>
-      <GButton variant="primary" size="lg" onPress={onNext}>
-        Connect
+      <GButton variant="primary" size="lg" onPress={() => onNext(url)}>
+        Continue
       </GButton>
     </View>
   );
 }
 
-/** Step 1: WiFi Setup */
-function WifiStep({ onNext }: { onNext: () => void }) {
-  const [ssid, setSsid] = useState('');
-  const [password, setPassword] = useState('');
+/** Step 1: Pairing code */
+function PairingCodeStep({ onNext }: { onNext: (code: string) => void }) {
+  const [code, setCode] = useState('');
+  const valid = /^\d{6}$/.test(code);
   return (
     <View style={styles.stepContent}>
       <GIcon name="wifi" size={28} color={JaridaPurple[500]} />
-      <Text style={styles.stepTitle}>Connect to WiFi</Text>
+      <Text style={styles.stepTitle}>Enter Pairing Code</Text>
       <Text style={styles.stepDesc}>
-        Enter your home WiFi credentials so Pond can connect to the internet.
+        The 6-digit code is shown on the GIAP host's dashboard or terminal
+        when the server starts. It expires after 10 minutes.
       </Text>
       <View style={styles.inputGroup}>
-        <Text style={styles.inputLabel}>Network Name</Text>
+        <Text style={styles.inputLabel}>Code</Text>
         <TextInput
           style={styles.textInput}
-          value={ssid}
-          onChangeText={setSsid}
-          placeholder="e.g., MyHomeWiFi"
+          value={code}
+          onChangeText={(t) => setCode(t.replace(/\D/g, '').slice(0, 6))}
+          placeholder="123456"
           placeholderTextColor={Grey[400]}
+          keyboardType="number-pad"
+          autoFocus
         />
       </View>
-      <View style={styles.inputGroup}>
-        <Text style={styles.inputLabel}>Password</Text>
-        <TextInput
-          style={styles.textInput}
-          value={password}
-          onChangeText={setPassword}
-          placeholder="WiFi password"
-          placeholderTextColor={Grey[400]}
-          secureTextEntry
-        />
-      </View>
-      <GButton variant="primary" size="lg" onPress={onNext}>
-        Connect to WiFi
+      <GButton
+        variant="primary"
+        size="lg"
+        disabled={!valid}
+        onPress={() => onNext(code)}
+      >
+        Continue
       </GButton>
     </View>
   );
 }
 
 /** Step 2: Name Device */
-function NameStep({ onNext }: { onNext: () => void }) {
+function NameStep({ onNext }: { onNext: (name: string) => void }) {
   const [name, setName] = useState('');
   return (
     <View style={styles.stepContent}>
       <GIcon name="edit" size={28} color={JaridaPurple[500]} />
-      <Text style={styles.stepTitle}>Name Your Device</Text>
+      <Text style={styles.stepTitle}>Name This Phone</Text>
       <Text style={styles.stepDesc}>
-        Give your Pond device a friendly name so you can identify it later.
+        This name shows up in the GIAP devices list — pick something you'll
+        recognize.
       </Text>
       <View style={styles.inputGroup}>
         <Text style={styles.inputLabel}>Device Name</Text>
@@ -133,25 +160,66 @@ function NameStep({ onNext }: { onNext: () => void }) {
           style={styles.textInput}
           value={name}
           onChangeText={setName}
-          placeholder="e.g., Living Room Pond"
+          placeholder="e.g., Emmanuel's iPhone"
           placeholderTextColor={Grey[400]}
         />
       </View>
-      <GButton variant="primary" size="lg" onPress={onNext}>
-        Save Name
+      <GButton
+        variant="primary"
+        size="lg"
+        disabled={!name.trim()}
+        onPress={() => onNext(name.trim())}
+      >
+        Pair Device
       </GButton>
     </View>
   );
 }
 
-/** Step 3: Complete */
-function CompleteStep({ onDone }: { onDone: () => void }) {
+/** Step 3: Run handshake + show outcome. */
+function CompleteStep({
+  state,
+  reason,
+  onDone,
+  onRetry,
+}: {
+  state: 'pending' | 'ok' | 'error';
+  reason: string | null;
+  onDone: () => void;
+  onRetry: () => void;
+}) {
+  if (state === 'pending') {
+    return (
+      <View style={styles.stepContent}>
+        <ActivityIndicator size="large" color={JaridaPurple[500]} />
+        <Text style={styles.stepTitle}>Pairing…</Text>
+        <Text style={styles.stepDesc}>
+          Verifying the code and exchanging tokens with your GIAP server.
+        </Text>
+      </View>
+    );
+  }
+  if (state === 'error') {
+    return (
+      <View style={styles.stepContent}>
+        <GIcon name="x" size={28} color={Semantic.danger} />
+        <Text style={styles.stepTitle}>Pairing failed</Text>
+        <Text style={styles.stepDesc}>
+          {reason ?? 'The server rejected the pairing attempt. Double-check the code and try again.'}
+        </Text>
+        <GButton variant="primary" size="lg" onPress={onRetry}>
+          Try again
+        </GButton>
+      </View>
+    );
+  }
   return (
     <View style={styles.stepContent}>
       <GIcon name="check" size={28} color={Semantic.success} />
       <Text style={styles.stepTitle}>All Set!</Text>
       <Text style={styles.stepDesc}>
-        Your Pond device is connected and ready. Goose can now control your smart home devices.
+        Your phone is paired. The session token is stored securely on this
+        device and used for every API call.
       </Text>
       <GButton variant="primary" size="lg" onPress={onDone}>
         Go to Home
@@ -162,24 +230,69 @@ function CompleteStep({ onDone }: { onDone: () => void }) {
 
 export default function PondPairingScreen() {
   const router = useRouter();
-  const [step, setStep] = useState<Step>(0);
+  const { serverUrl, setServerUrl, pair } = useServer();
+  const clientIdRef = useRef<string>(randomClientId());
 
-  const next = useCallback(() => {
-    setStep((prev) => Math.min(prev + 1, 3) as Step);
+  const [step, setStep] = useState<Step>(0);
+  const [code, setCode] = useState('');
+  const [completionState, setCompletionState] =
+    useState<'pending' | 'ok' | 'error'>('pending');
+  const [completionReason, setCompletionReason] = useState<string | null>(null);
+
+  const runPair = useCallback(
+    async (deviceName: string) => {
+      setStep(3);
+      setCompletionState('pending');
+      setCompletionReason(null);
+      try {
+        const resp = await pair({
+          clientId: clientIdRef.current,
+          pairingCode: code,
+          deviceName,
+        });
+        if (resp.accepted) {
+          setCompletionState('ok');
+        } else {
+          setCompletionState('error');
+          setCompletionReason(resp.rejection_reason ?? 'unknown_error');
+        }
+      } catch (e) {
+        setCompletionState('error');
+        setCompletionReason((e as Error).message);
+      }
+    },
+    [code, pair],
+  );
+
+  const onServerNext = useCallback(
+    (url: string) => {
+      setServerUrl(url);
+      setStep(1);
+    },
+    [setServerUrl],
+  );
+
+  const onCodeNext = useCallback((nextCode: string) => {
+    setCode(nextCode);
+    setStep(2);
   }, []);
 
-  const done = useCallback(() => {
-    router.back();
-  }, [router]);
+  const done = useCallback(() => router.back(), [router]);
 
   return (
     <View style={styles.container}>
       <StepIndicator current={step} />
-
-      {step === 0 && <FindStep onNext={next} />}
-      {step === 1 && <WifiStep onNext={next} />}
-      {step === 2 && <NameStep onNext={next} />}
-      {step === 3 && <CompleteStep onDone={done} />}
+      {step === 0 && <ServerStep initial={serverUrl} onNext={onServerNext} />}
+      {step === 1 && <PairingCodeStep onNext={onCodeNext} />}
+      {step === 2 && <NameStep onNext={runPair} />}
+      {step === 3 && (
+        <CompleteStep
+          state={completionState}
+          reason={completionReason}
+          onDone={done}
+          onRetry={() => setStep(1)}
+        />
+      )}
     </View>
   );
 }
