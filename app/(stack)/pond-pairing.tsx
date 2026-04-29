@@ -6,7 +6,7 @@
  *   3. Run the two-phase handshake and confirm
  */
 
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   StyleSheet,
@@ -23,19 +23,10 @@ import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
 import { Spacing } from '@/constants/spacing';
 import { Radii } from '@/constants/radii';
 import { useServer } from '@/providers/server-provider';
+import { getInstallId } from '@/services/install-id';
 
 type Step = 0 | 1 | 2 | 3;
 const STEP_LABELS = ['Server', 'Pairing Code', 'Name Device', 'Complete'];
-
-function randomClientId(): string {
-  // RFC4122-ish v4 (sufficient for a stable per-install identifier).
-  const bytes = new Uint8Array(16);
-  for (let i = 0; i < 16; i++) bytes[i] = Math.floor(Math.random() * 256);
-  bytes[6] = (bytes[6] & 0x0f) | 0x40;
-  bytes[8] = (bytes[8] & 0x3f) | 0x80;
-  const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
-  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
-}
 
 /** Step indicator */
 function StepIndicator({ current }: { current: Step }) {
@@ -231,7 +222,15 @@ function CompleteStep({
 export default function PondPairingScreen() {
   const router = useRouter();
   const { serverUrl, setServerUrl, pair } = useServer();
-  const clientIdRef = useRef<string>(randomClientId());
+  // Stable per-install client_id, hydrated from SecureStorage on mount. The
+  // server uses this to recognize a returning device and revoke prior tokens
+  // instead of creating a duplicate entry on every re-pair.
+  const clientIdRef = useRef<string>('');
+  useEffect(() => {
+    void getInstallId().then((id) => {
+      clientIdRef.current = id;
+    });
+  }, []);
 
   const [step, setStep] = useState<Step>(0);
   const [code, setCode] = useState('');
@@ -245,8 +244,10 @@ export default function PondPairingScreen() {
       setCompletionState('pending');
       setCompletionReason(null);
       try {
+        const clientId = clientIdRef.current || (await getInstallId());
+        clientIdRef.current = clientId;
         const resp = await pair({
-          clientId: clientIdRef.current,
+          clientId,
           pairingCode: code,
           deviceName,
         });

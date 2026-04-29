@@ -36,6 +36,8 @@ try {
 const KEYS = {
   sessionToken: 'goose.sessionToken',
   refreshToken: 'goose.refreshToken',
+  /** Stable per-install identifier used as `client_id` in every handshake. */
+  installId: 'goose.installId',
 } as const;
 
 export type SecureKey = keyof typeof KEYS;
