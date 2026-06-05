@@ -18,7 +18,8 @@ export function useThemeColor(
   props: { light?: string; dark?: string },
   colorName: ThemeColorName,
 ): string {
-  const scheme = useColorScheme() ?? 'light';
+  // RN 0.85's useColorScheme may return 'unspecified'; collapse to light/dark.
+  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const override = props[scheme];
 
   return override ?? Colors[scheme][colorName];

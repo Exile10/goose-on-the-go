@@ -23,7 +23,8 @@ const ThemeContext = createContext<ThemeContextValue | null>(null);
 
 export function ThemeProvider({ children }: PropsWithChildren) {
   const systemScheme = useColorScheme();
-  const colorScheme: ColorScheme = systemScheme ?? 'light';
+  // RN 0.85's useColorScheme may return 'unspecified'; collapse to light/dark.
+  const colorScheme: ColorScheme = systemScheme === 'dark' ? 'dark' : 'light';
 
   const value = useMemo<ThemeContextValue>(
     () => ({

@@ -1,8 +1,10 @@
-import { BottomTabBarButtonProps } from '@react-navigation/bottom-tabs';
 import { PlatformPressable } from '@react-navigation/elements';
 import * as Haptics from 'expo-haptics';
 
-export function HapticTab(props: BottomTabBarButtonProps) {
+// expo-router 56 and @react-navigation ship divergent BottomTabBarButtonProps
+// definitions; the runtime props are just pressable props, so accept loosely.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function HapticTab(props: any) {
   return (
     <PlatformPressable
       {...props}
