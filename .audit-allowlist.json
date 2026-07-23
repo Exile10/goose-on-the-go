@@ -1,0 +1,13 @@
+{
+  "$schema": "See scripts/audit-check.mjs. Every entry needs a reason and a reviewBy date.",
+  "$policy": "Exceptions are deferrals, not pardons. An entry is only justified when the advisory cannot be fixed without a breaking upgrade AND the exposure does not reach a shipped build or a user's device. Anything reachable from the app bundle gets fixed, not listed.",
+  "allow": [
+    {
+      "advisory": "GHSA-96hv-2xvq-fx4p",
+      "package": "ws",
+      "severity": "high",
+      "reason": "Memory-exhaustion DoS in ws, reached only via expo > @expo/cli > @react-native/dev-middleware — the Metro dev server that runs on a developer's own machine. It is not part of any release build, so nothing a user installs contains it. The fix needs a breaking @expo/cli bump, which belongs to an SDK upgrade rather than a security patch.",
+      "reviewBy": "2026-10-31"
+    }
+  ]
+}
