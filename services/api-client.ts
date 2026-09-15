@@ -19,6 +19,7 @@ import type {
   CommissionDeviceResponse,
   CreateDeviceRequest,
   Device,
+  DeviceStatePatch,
   EventCategory,
   Extension,
   LogEntry,
@@ -35,6 +36,7 @@ import type {
   ScheduleRun,
   SessionMessage,
   SessionSummary,
+  ToolCallResult,
   UpdateDeviceRequest,
   UsageSummary,
 } from './types';
@@ -370,6 +372,37 @@ export class PondApiClient {
 
   matterStatus(): Promise<MatterStatus> {
     return this.get<MatterStatus>('/api/v1/matter/status');
+  }
+
+  /**
+   * Actuate a device.
+   *
+   * There is no REST control route. Actuation goes through the LLM-free MCP
+   * dispatch path, which is deny-by-default: `DIRECT_DISPATCH_ALLOWLIST` on the
+   * server permits `set_device_state` and `get_device_state` and little else, so
+   * this is the only shape that works.
+   */
+  setDeviceState(deviceId: string, patch: DeviceStatePatch): Promise<ToolCallResult> {
+    return this.post<ToolCallResult>('/api/v1/tools/invoke', {
+      server: 'giap-device-control',
+      tool: 'set_device_state',
+      args: { device_id: deviceId, ...patch },
+    });
+  }
+
+  /**
+   * Read a device's current state.
+   *
+   * The counterpart to the above, and the reason it exists: `is_online` is
+   * reachability, not power. Labelling a button from it is what once offered
+   * "Turn on" to a contact sensor.
+   */
+  getDeviceState(deviceId: string): Promise<ToolCallResult> {
+    return this.post<ToolCallResult>('/api/v1/tools/invoke', {
+      server: 'giap-device-control',
+      tool: 'get_device_state',
+      args: { device_id: deviceId },
+    });
   }
 
   // ── Sessions ────────────────────────────────────────────────

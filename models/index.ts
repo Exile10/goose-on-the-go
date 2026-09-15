@@ -1,7 +1,5 @@
 /** Models barrel export — Goose On The Go v2 */
 
-export type { Device, Room } from './device';
-export { HOME_DEVICES, DEVICE_ROOMS } from './device';
 
 export type { MemoryFragment, MemoryCategory } from './memory';
 export { SAMPLE_MEMORIES } from './memory';
