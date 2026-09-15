@@ -1,37 +1,27 @@
 /**
- * SecureStorage — wrapper for sensitive values (auth tokens).
+ * SecureStorage — the only place a credential is allowed to be persisted.
  *
- * Prefers `expo-secure-store` (Keychain on iOS, EncryptedSharedPreferences
- * on Android). Falls back to AsyncStorage when SecureStore is not installed
- * — in that case a console warning is emitted on first use so the operator
- * can choose to upgrade the dependency.
+ * Session and refresh tokens go to the iOS Keychain / Android
+ * EncryptedSharedPreferences via `expo-secure-store`, never to AsyncStorage.
+ * AsyncStorage is unencrypted, so a token there is readable by anything with
+ * filesystem access to the app's sandbox — a rooted or jailbroken device, or a
+ * backup extraction.
  *
- * To enable hardware-backed storage:
- *   npx expo install expo-secure-store
+ * `expo-secure-store` is a hard dependency (package.json, and a plugin in
+ * app.json). It is imported statically and deliberately has no fallback: a
+ * missing native module raises, rather than silently downgrading token storage
+ * to plaintext. Silence is the failure mode worth preventing here — the app
+ * would look fine and the tokens would be in the clear.
+ *
+ * Web is the exception, and holds tokens in memory only. There is no keychain in
+ * a browser, and the alternatives (localStorage, AsyncStorage) are exactly what
+ * this module exists to avoid. Tokens therefore do not survive a reload there.
+ * That is acceptable because web is a development preview, not a shipping
+ * target; see `docs/TESTING.md`.
  */
 
-import AsyncStorage from '@react-native-async-storage/async-storage';
-
-type SecureStoreModule = {
-  getItemAsync(key: string): Promise<string | null>;
-  setItemAsync(key: string, value: string): Promise<void>;
-  deleteItemAsync(key: string): Promise<void>;
-};
-
-let secureStore: SecureStoreModule | null = null;
-try {
-  // Optional dep — resolved at runtime, not at bundle time.
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  secureStore = require('expo-secure-store') as SecureStoreModule;
-} catch {
-  if (__DEV__) {
-    // eslint-disable-next-line no-console
-    console.warn(
-      'expo-secure-store not installed — falling back to AsyncStorage for tokens. ' +
-        'Run `npx expo install expo-secure-store` to enable hardware-backed storage.',
-    );
-  }
-}
+import { Platform } from 'react-native';
+import * as SecureStore from 'expo-secure-store';
 
 const KEYS = {
   sessionToken: 'goose.sessionToken',
@@ -42,17 +32,46 @@ const KEYS = {
 
 export type SecureKey = keyof typeof KEYS;
 
+const isWeb = Platform.OS === 'web';
+
+/** Web-only, deliberately not persisted. See the module comment. */
+const ephemeral = new Map<string, string>();
+
+let warnedAboutWeb = false;
+function warnOnceOnWeb(): void {
+  if (warnedAboutWeb || !__DEV__) return;
+  warnedAboutWeb = true;
+  // eslint-disable-next-line no-console
+  console.warn(
+    '[secure-storage] Running on web: tokens are held in memory only and will ' +
+      'not survive a reload. A browser has no keychain, and writing them to ' +
+      'localStorage would defeat the point. Pair again after reloading.',
+  );
+}
+
 export const SecureStorage = {
   async get(key: SecureKey): Promise<string | null> {
-    if (secureStore) return secureStore.getItemAsync(KEYS[key]);
-    return AsyncStorage.getItem(KEYS[key]);
+    if (isWeb) {
+      warnOnceOnWeb();
+      return ephemeral.get(KEYS[key]) ?? null;
+    }
+    return SecureStore.getItemAsync(KEYS[key]);
   },
+
   async set(key: SecureKey, value: string): Promise<void> {
-    if (secureStore) return secureStore.setItemAsync(KEYS[key], value);
-    return AsyncStorage.setItem(KEYS[key], value);
+    if (isWeb) {
+      warnOnceOnWeb();
+      ephemeral.set(KEYS[key], value);
+      return;
+    }
+    return SecureStore.setItemAsync(KEYS[key], value);
   },
+
   async remove(key: SecureKey): Promise<void> {
-    if (secureStore) return secureStore.deleteItemAsync(KEYS[key]);
-    return AsyncStorage.removeItem(KEYS[key]);
+    if (isWeb) {
+      ephemeral.delete(KEYS[key]);
+      return;
+    }
+    return SecureStore.deleteItemAsync(KEYS[key]);
   },
 };

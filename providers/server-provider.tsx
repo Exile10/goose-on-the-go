@@ -21,7 +21,7 @@ import React, {
   type PropsWithChildren,
 } from 'react';
 
-import { Storage } from '@/services/storage';
+import { Storage, purgeLegacyStorage } from '@/services/storage';
 import { SecureStorage } from '@/services/secure-storage';
 import { api, type HandshakeResponse } from '@/services/api-client';
 
@@ -61,6 +61,15 @@ export function ServerProvider({ children }: PropsWithChildren) {
     if (hydrated.current) return;
     hydrated.current = true;
     (async () => {
+      // Before reading anything, clear what an older build may have left in
+      // plaintext. Upgrades are the only path onto this code, so a device that
+      // once held a token in AsyncStorage still holds it until something deletes
+      // it — and nothing else ever would.
+      await purgeLegacyStorage().catch((e) => {
+        // eslint-disable-next-line no-console
+        console.warn('[storage] could not purge legacy plaintext keys:', e);
+      });
+
       const [storedUrl, storedToken, storedRefresh] = await Promise.all([
         Storage.get('serverUrl'),
         SecureStorage.get('sessionToken'),
