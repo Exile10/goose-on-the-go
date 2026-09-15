@@ -1,11 +1,16 @@
 /**
- * AIModelsScreen — Model selection cards with Speed/Quality/Privacy ratings.
+ * AIModelsScreen — the models this Pond actually has, and which one is serving.
  *
- * Temperature slider, context window display, model cards with badges.
+ * The cards used to show invented Speed/Quality/Privacy ratings. Nothing in the
+ * API produces those numbers, so they have been replaced by facts the server
+ * does report: where the model runs, its context window, its size on disk and
+ * its quantisation. "Runs on your Pond" is the one privacy claim that can be
+ * made honestly, and it is derived from the provider rather than asserted.
  */
 
-import React, { useState, useCallback } from 'react';
+import React, { useCallback } from 'react';
 import {
+  ActivityIndicator,
   View,
   Text,
   StyleSheet,
@@ -13,27 +18,26 @@ import {
   Pressable,
 } from 'react-native';
 
-import { GSlider } from '@/components/ui/g-slider';
-import { AI_MODELS, type AIModel } from '@/models/model';
+import {
+  formatContextWindow,
+  formatSize,
+  isLocalProvider,
+  useModels,
+} from '@/view-models/use-models';
+import type { ModelEntry } from '@/services/types';
 import { Grey, JaridaPurple, Brand, Semantic } from '@/constants/colors';
 import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
 import { Spacing } from '@/constants/spacing';
 import { Radii } from '@/constants/radii';
 
 
-/** Star rating bar */
-function RatingBar({ label, value, max = 5 }: { label: string; value: number; max?: number }) {
+/** One reported fact about a model. Rendered only when the server sent it. */
+function FactRow({ label, value }: { label: string; value: string | null }) {
+  if (!value) return null;
   return (
     <View style={styles.ratingRow}>
       <Text style={styles.ratingLabel}>{label}</Text>
-      <View style={styles.ratingDots}>
-        {Array.from({ length: max }).map((_, i) => (
-          <View
-            key={i}
-            style={[styles.ratingDot, i < value && styles.ratingDotFilled]}
-          />
-        ))}
-      </View>
+      <Text style={styles.factValue}>{value}</Text>
     </View>
   );
 }
@@ -41,41 +45,63 @@ function RatingBar({ label, value, max = 5 }: { label: string; value: number; ma
 /** Model card */
 const ModelCard = React.memo(function ModelCard({
   model,
-  isSelected,
+  isActive,
   onSelect,
 }: {
-  model: AIModel;
-  isSelected: boolean;
-  onSelect: (id: string) => void;
+  model: ModelEntry;
+  isActive: boolean;
+  onSelect: (model: ModelEntry) => void;
 }) {
-  const handlePress = useCallback(() => onSelect(model.id), [model.id, onSelect]);
+  const handlePress = useCallback(() => onSelect(model), [model, onSelect]);
+  const local = isLocalProvider(model.provider);
 
   return (
     <Pressable
-      style={[styles.modelCard, isSelected && styles.modelCardSelected]}
+      style={[styles.modelCard, isActive && styles.modelCardSelected]}
       onPress={handlePress}
+      // A model that is not on disk cannot be activated from here; downloading
+      // one is the Pond's own job, not the phone's.
+      disabled={model.downloaded === false}
     >
       <View style={styles.modelCardHeader}>
         <View>
-          <Text style={styles.modelName}>{model.name}</Text>
+          <Text style={styles.modelName}>{model.display_name ?? model.name}</Text>
           <Text style={styles.modelProvider}>{model.provider}</Text>
         </View>
-        <View style={[styles.modelBadge, { backgroundColor: model.badgeColor + '18' }]}>
-          <Text style={[styles.modelBadgeText, { color: model.badgeColor }]}>
-            {model.badge}
+        <View
+          style={[
+            styles.modelBadge,
+            { backgroundColor: (local ? Semantic.success : JaridaPurple[500]) + '18' },
+          ]}
+        >
+          <Text
+            style={[
+              styles.modelBadgeText,
+              { color: local ? Semantic.success : JaridaPurple[500] },
+            ]}
+          >
+            {local ? 'On your Pond' : 'Cloud'}
           </Text>
         </View>
       </View>
 
-      <Text style={styles.modelDesc}>{model.description}</Text>
+      {model.description ? <Text style={styles.modelDesc}>{model.description}</Text> : null}
 
       <View style={styles.ratingsSection}>
-        <RatingBar label="Speed" value={model.speed} />
-        <RatingBar label="Quality" value={model.quality} />
-        <RatingBar label="Privacy" value={model.privacy} />
+        <FactRow label="Context" value={formatContextWindow(model.context_length)} />
+        <FactRow label="Size" value={formatSize(model.size_mb)} />
+        <FactRow label="Quantisation" value={model.quantization ?? null} />
+        <FactRow
+          label="Memory"
+          value={model.ram_estimate_mb ? `${formatSize(model.ram_estimate_mb)} needed` : null}
+        />
       </View>
 
-      {isSelected && (
+      {model.downloaded === false ? (
+        <Text style={styles.notDownloaded}>Not downloaded on this Pond</Text>
+      ) : null}
+
+      {isActive && (
         <View style={styles.selectedIndicator}>
           <Text style={styles.selectedText}>Active</Text>
         </View>
@@ -85,8 +111,7 @@ const ModelCard = React.memo(function ModelCard({
 });
 
 export default function AIModelsScreen() {
-  const [selectedModel, setSelectedModel] = useState('goose-2');
-  const [temperature, setTemperature] = useState(0.7);
+  const { data, loading, error, actions } = useModels();
 
   return (
     <ScrollView
@@ -94,32 +119,46 @@ export default function AIModelsScreen() {
       contentContainerStyle={styles.scroll}
       showsVerticalScrollIndicator={false}
     >
-      {/* Temperature slider */}
-      <View style={styles.sliderCard}>
-        <GSlider
-          label="Temperature"
-          value={temperature}
-          onValueChange={setTemperature}
-          min={0}
-          max={2}
-          step={0.1}
-        />
-      </View>
+      {data.activeModel ? (
+        <View style={styles.contextRow}>
+          <Text style={styles.contextLabel}>Context Window</Text>
+          <Text style={styles.contextValue}>
+            {formatContextWindow(data.activeModel.context_length) ?? 'Not reported'}
+          </Text>
+        </View>
+      ) : null}
 
-      {/* Context window info */}
-      <View style={styles.contextRow}>
-        <Text style={styles.contextLabel}>Context Window</Text>
-        <Text style={styles.contextValue}>128K tokens</Text>
-      </View>
-
-      {/* Model cards */}
       <Text style={styles.sectionLabel}>AVAILABLE MODELS</Text>
-      {AI_MODELS.map((m) => (
+
+      {loading ? (
+        <View style={styles.stateBlock}>
+          <ActivityIndicator color={JaridaPurple[500]} />
+        </View>
+      ) : null}
+
+      {error ? (
+        <View style={styles.stateBlock}>
+          <Text style={styles.stateError}>{error}</Text>
+          <Pressable onPress={actions.refresh} hitSlop={8}>
+            <Text style={styles.stateAction}>Try again</Text>
+          </Pressable>
+        </View>
+      ) : null}
+
+      {!loading && !error && data.models.length === 0 ? (
+        <View style={styles.stateBlock}>
+          <Text style={styles.stateEmpty}>
+            This Pond has no models installed yet. Add one from the Pond dashboard.
+          </Text>
+        </View>
+      ) : null}
+
+      {data.models.map((m) => (
         <ModelCard
           key={m.id}
           model={m}
-          isSelected={selectedModel === m.id}
-          onSelect={setSelectedModel}
+          isActive={m.is_active}
+          onSelect={actions.activate}
         />
       ))}
 
@@ -133,14 +172,6 @@ const styles = StyleSheet.create({
   scroll: { paddingHorizontal: Spacing.lg, paddingTop: Spacing.lg },
 
   /* Slider card */
-  sliderCard: {
-    backgroundColor: Brand.white,
-    borderRadius: Radii.xl,
-    padding: Spacing.lg,
-    borderWidth: 1,
-    borderColor: Grey[200],
-    marginBottom: Spacing.lg,
-  },
 
   /* Context window */
   contextRow: {
@@ -239,18 +270,40 @@ const styles = StyleSheet.create({
     color: Grey[500],
     width: 60,
   },
-  ratingDots: {
-    flexDirection: 'row',
-    gap: 4,
+  factValue: {
+    fontFamily: FontFamily.body,
+    fontSize: FontSize.sm,
+    fontWeight: FontWeight.semibold,
+    color: Grey[700],
   },
-  ratingDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: Grey[200],
+  notDownloaded: {
+    fontFamily: FontFamily.body,
+    fontSize: FontSize.sm,
+    color: Grey[500],
+    marginTop: Spacing.sm,
   },
-  ratingDotFilled: {
-    backgroundColor: JaridaPurple[500],
+  stateBlock: {
+    alignItems: 'center',
+    gap: Spacing.sm,
+    paddingVertical: Spacing['2xl'],
+  },
+  stateError: {
+    fontFamily: FontFamily.body,
+    fontSize: FontSize.base,
+    color: Semantic.danger,
+    textAlign: 'center',
+  },
+  stateAction: {
+    fontFamily: FontFamily.body,
+    fontSize: FontSize.base,
+    fontWeight: FontWeight.semibold,
+    color: JaridaPurple[500],
+  },
+  stateEmpty: {
+    fontFamily: FontFamily.body,
+    fontSize: FontSize.base,
+    color: Grey[500],
+    textAlign: 'center',
   },
 
   /* Selected indicator */

@@ -6,8 +6,6 @@ export { HOME_DEVICES, DEVICE_ROOMS } from './device';
 export type { MemoryFragment, MemoryCategory } from './memory';
 export { SAMPLE_MEMORIES } from './memory';
 
-export type { AIModel } from './model';
-export { AI_MODELS } from './model';
 
 export type { LogEntry, LogType, LogLevel } from './log';
 export { SAMPLE_LOGS } from './log';
