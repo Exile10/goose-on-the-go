@@ -16,8 +16,6 @@ export { INITIAL_APPS, INITIAL_SERVERS } from './mcp';
 export type { ScheduleEvent, Routine, EventType } from './schedule';
 export { SAMPLE_EVENTS, SAMPLE_ROUTINES } from './schedule';
 
-export type { HouseholdUser } from './user';
-export { INITIAL_USERS } from './user';
 
 export type { Message, MessageRole, SessionSummary, ChatState } from './chat';
 export type { VoiceState, VoiceSession } from './voice';
