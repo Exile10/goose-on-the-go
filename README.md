@@ -48,6 +48,7 @@ npx expo start
 - [Component Guide](docs/COMPONENT-GUIDE.md)
 - [Design System](docs/DESIGN-SYSTEM.md)
 - [Navigation](docs/NAVIGATION.md)
+- [Testing](docs/TESTING.md)
 
 ## Tech Stack
 
