@@ -230,6 +230,35 @@ function NameStep({ onNext }: { onNext: (name: string) => void }) {
 }
 
 /** Step 3: Run handshake + show outcome. */
+/**
+ * Turn the server's rejection code into something a person can act on.
+ *
+ * `rejection_reason` is a closed set from pond-core's handshake verifier, and it
+ * was rendered raw — someone who mistyped a digit was shown "invalid_mac". The
+ * cases are split because they call for different things: a stale challenge only
+ * needs the same code re-sent, while an expired code needs a new one fetched
+ * from the Pond.
+ *
+ * The 60-second challenge lifetime is worth naming rather than folding into a
+ * generic retry message. It is far shorter than the code's ten minutes, so it is
+ * the limit a user actually hits.
+ */
+function explainRejection(reason: string | null): string {
+  switch (reason) {
+    case 'invalid_mac':
+    case 'bad_mac_hex':
+      return 'That pairing code did not match. Check the six digits on your Pond and try again \u2014 a wrong code costs nothing but this attempt.';
+    case 'challenge_expired':
+    case 'challenge_used':
+    case 'unknown_challenge':
+      return 'This attempt took too long \u2014 the server holds a challenge for only 60 seconds. Enter the same code again; you do not need a new one.';
+    case 'no_active_pairing_code':
+      return 'Your Pond has no pairing code right now. Codes last 10 minutes \u2014 open the dashboard on the host machine to show a fresh one.';
+    default:
+      return 'The server rejected the pairing attempt. Double-check the code and try again.';
+  }
+}
+
 function CompleteStep({
   state,
   reason,
@@ -257,9 +286,7 @@ function CompleteStep({
       <View style={styles.stepContent}>
         <GIcon name="x" size={28} color={Semantic.danger} />
         <Text style={styles.stepTitle}>Pairing failed</Text>
-        <Text style={styles.stepDesc}>
-          {reason ?? 'The server rejected the pairing attempt. Double-check the code and try again.'}
-        </Text>
+        <Text style={styles.stepDesc}>{explainRejection(reason)}</Text>
         <GButton variant="primary" size="lg" onPress={onRetry}>
           Try again
         </GButton>
@@ -430,29 +457,6 @@ const styles = StyleSheet.create({
     color: Semantic.danger,
     textAlign: 'center',
     lineHeight: FontSize.sm * 1.5,
-  },
-
-  /* Device found */
-  deviceFound: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
-    backgroundColor: Semantic.successSoft,
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.md,
-    borderRadius: Radii.pill,
-  },
-  foundDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: Semantic.success,
-  },
-  foundText: {
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.base,
-    fontWeight: FontWeight.semibold,
-    color: Semantic.success,
   },
 
   /* Input groups */
