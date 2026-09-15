@@ -40,7 +40,13 @@ interface ServerContextValue {
   refreshToken: string | null;
   setServerUrl: (url: string) => void;
   setToken: (token: string | null) => void;
-  setOnline: (online: boolean) => void;
+  /**
+   * Probe `/health` and update `online` from the answer.
+   *
+   * `online` has no manual setter on purpose: it should say whether the Pond
+   * actually answered, not whether something once believed it would.
+   */
+  checkHealth: () => Promise<boolean>;
   /** Execute the GIAP two-phase handshake. Returns the server response. */
   pair: (opts: PairOptions) => Promise<HandshakeResponse>;
   /** Revoke the current session token (server-side + local). */
@@ -55,6 +61,21 @@ export function ServerProvider({ children }: PropsWithChildren) {
   const [token, setTokenState] = useState<string | null>(null);
   const [refreshToken, setRefreshTokenState] = useState<string | null>(null);
   const hydrated = useRef(false);
+
+  /**
+   * Guards against an older probe landing after a newer one. Changing the server
+   * URL starts a second check while the first is still in flight, and without a
+   * sequence number the slower answer — about the previous address — wins.
+   */
+  const healthSeq = useRef(0);
+
+  const checkHealth = useCallback(async () => {
+    const seq = ++healthSeq.current;
+    const { ok } = await api.health();
+    if (seq === healthSeq.current) setOnline(ok);
+    return ok;
+  }, []);
+
 
   // Hydrate from persistent storage on first mount.
   useEffect(() => {
@@ -78,8 +99,10 @@ export function ServerProvider({ children }: PropsWithChildren) {
         setRefreshTokenState(storedRefresh);
         api.setRefreshToken(storedRefresh);
       }
+      // Only worth probing once there is an address to probe.
+      if (storedUrl) void checkHealth();
     })();
-  }, []);
+  }, [checkHealth]);
 
   // Persist token rotations triggered inside the api client (refresh flow).
   useEffect(() => {
@@ -92,12 +115,16 @@ export function ServerProvider({ children }: PropsWithChildren) {
     return () => api.setOnTokensRotated(null);
   }, []);
 
-  const setServerUrl = useCallback((url: string) => {
-    const trimmed = url.replace(/\/+$/, '');
-    setServerUrlRaw(trimmed);
-    api.setBaseUrl(trimmed);
-    void Storage.set('serverUrl', trimmed);
-  }, []);
+  const setServerUrl = useCallback(
+    (url: string) => {
+      const trimmed = url.replace(/\/+$/, '');
+      setServerUrlRaw(trimmed);
+      api.setBaseUrl(trimmed);
+      void Storage.set('serverUrl', trimmed);
+      void checkHealth();
+    },
+    [checkHealth],
+  );
 
   const setToken = useCallback((next: string | null) => {
     setTokenState(next);
@@ -140,11 +167,11 @@ export function ServerProvider({ children }: PropsWithChildren) {
       refreshToken,
       setServerUrl,
       setToken,
-      setOnline,
+      checkHealth,
       pair,
       signOut,
     }),
-    [serverUrl, online, token, refreshToken, setServerUrl, setToken, pair, signOut],
+    [serverUrl, online, token, refreshToken, setServerUrl, setToken, checkHealth, pair, signOut],
   );
 
   return <ServerContext.Provider value={value}>{children}</ServerContext.Provider>;

@@ -12,6 +12,32 @@
  */
 
 import { concat, fromBase64, hmacSha256, toHex, utf8 } from './hmac';
+import type {
+  ActivityResponse,
+  ActivitySummary,
+  CommissionDeviceRequest,
+  CommissionDeviceResponse,
+  CreateDeviceRequest,
+  Device,
+  EventCategory,
+  Extension,
+  LogEntry,
+  MarketplaceExtension,
+  MatterStatus,
+  MemoryFragment,
+  ModelActiveRoles,
+  ModelCapabilities,
+  ModelEntry,
+  ModelMemoryStatus,
+  OAuthProvider,
+  Profile,
+  Schedule,
+  ScheduleRun,
+  SessionMessage,
+  SessionSummary,
+  UpdateDeviceRequest,
+  UsageSummary,
+} from './types';
 
 /**
  * A non-2xx response, carrying the pieces a caller needs to react properly —
@@ -64,6 +90,30 @@ interface ChallengeResponse {
 /** How long to wait for /health before calling the Pond unreachable. */
 const HEALTH_TIMEOUT_MS = 3_000;
 
+/** Default ceiling for an ordinary request. A Pond on the LAN is close by. */
+const REQUEST_TIMEOUT_MS = 15_000;
+
+/**
+ * Matter commissioning gets its own, far longer budget: the server allows itself
+ * 180s for the radio work, so anything shorter here would abandon a commission
+ * that was still going to succeed.
+ */
+const COMMISSION_TIMEOUT_MS = 190_000;
+
+/**
+ * Read a response body, tolerating the ones that have none.
+ *
+ * DELETE and the action routes answer 204, and `res.json()` throws on an empty
+ * body — which would have turned every successful delete into an error the
+ * caller had to special-case.
+ */
+async function parseBody<T>(res: Response): Promise<T | undefined> {
+  if (res.status === 204) return undefined;
+  const text = await res.text();
+  if (text.length === 0) return undefined;
+  return JSON.parse(text) as T;
+}
+
 /**
  * `AbortSignal.timeout()` stand-in.
  *
@@ -85,6 +135,8 @@ export class PondApiClient {
   private refreshToken: string | null = null;
   /** Called after a refresh succeeds so the caller can re-persist the pair. */
   private onTokensRotated: ((session: string, refresh: string) => void) | null = null;
+  /** The refresh every concurrent 401 waits on, rather than each starting its own. */
+  private refreshInFlight: Promise<HandshakeResponse | null> | null = null;
 
   constructor(baseUrl = 'http://127.0.0.1:4000') {
     this.baseUrl = baseUrl.replace(/\/+$/, '');
@@ -236,6 +288,11 @@ export class PondApiClient {
   /**
    * Wrapper around `fetch` that attaches the bearer token and transparently
    * refreshes once on 401. Returns the parsed JSON body.
+   *
+   * Concurrent 401s share one refresh. Without that, a screen firing several
+   * requests at once on a stale token would send a refresh per request, and
+   * every one but the first would present an already-rotated refresh token —
+   * turning one recoverable expiry into a forced re-pair.
    */
   async request<T>(path: string, init: RequestInit = {}): Promise<T> {
     const url = `${this.baseUrl}${path}`;
@@ -243,10 +300,12 @@ export class PondApiClient {
       fetch(url, {
         ...init,
         headers: { ...this.headers(), ...(init.headers ?? {}) },
+        signal: init.signal ?? timeoutSignal(REQUEST_TIMEOUT_MS),
       });
+
     let res = await doFetch();
     if (res.status === 401 && this.refreshToken) {
-      const refreshed = await this.handshakeRefresh();
+      const refreshed = await this.refreshOnce();
       if (refreshed?.accepted) res = await doFetch();
     }
     if (!res.ok) {
@@ -257,7 +316,288 @@ export class PondApiClient {
         parseRetryAfter(res),
       );
     }
-    return (await res.json()) as T;
+    return (await parseBody<T>(res)) as T;
+  }
+
+  /** Coalesce concurrent refreshes into the single in-flight attempt. */
+  private refreshOnce(): Promise<HandshakeResponse | null> {
+    if (!this.refreshInFlight) {
+      this.refreshInFlight = this.handshakeRefresh().finally(() => {
+        this.refreshInFlight = null;
+      });
+    }
+    return this.refreshInFlight;
+  }
+
+  // ── Devices and Matter ──────────────────────────────────────
+
+  /** `GET /devices`. The server wraps the list in an envelope; callers get the list. */
+  async listDevices(): Promise<Device[]> {
+    const res = await this.request<{ devices: Device[] } | Device[]>('/api/v1/devices');
+    return Array.isArray(res) ? res : res.devices;
+  }
+
+  registerDevice(req: CreateDeviceRequest): Promise<Device> {
+    return this.post<Device>('/api/v1/devices', req);
+  }
+
+  updateDevice(id: string, req: UpdateDeviceRequest): Promise<Device> {
+    return this.put<Device>(`/api/v1/devices/${encodeURIComponent(id)}`, req);
+  }
+
+  /**
+   * `DELETE /devices/{id}`. The server refuses bridged Matter endpoints — ids
+   * shaped `matter-<node>-<endpoint>` — because one node is not one device.
+   */
+  deleteDevice(id: string): Promise<void> {
+    return this.del<void>(`/api/v1/devices/${encodeURIComponent(id)}`);
+  }
+
+  /**
+   * `POST /devices/commission`. Accepts a QR payload (`MT:…`), an 11/21-digit
+   * manual code, or a bare 8-digit passcode.
+   *
+   * The setup code is a credential — never log the request. The server budgets
+   * 180s for this, so it gets its own longer timeout rather than the default.
+   */
+  commissionDevice(req: CommissionDeviceRequest): Promise<CommissionDeviceResponse> {
+    return this.request<CommissionDeviceResponse>('/api/v1/devices/commission', {
+      method: 'POST',
+      body: JSON.stringify(req),
+      signal: timeoutSignal(COMMISSION_TIMEOUT_MS),
+    });
+  }
+
+  matterStatus(): Promise<MatterStatus> {
+    return this.get<MatterStatus>('/api/v1/matter/status');
+  }
+
+  // ── Sessions ────────────────────────────────────────────────
+
+  async listSessions(): Promise<SessionSummary[]> {
+    const res = await this.request<{ sessions: SessionSummary[] } | SessionSummary[]>(
+      '/api/v1/sessions',
+    );
+    return Array.isArray(res) ? res : res.sessions;
+  }
+
+  getSession(id: string): Promise<SessionSummary> {
+    return this.get<SessionSummary>(`/api/v1/sessions/${encodeURIComponent(id)}`);
+  }
+
+  async listSessionMessages(id: string, limit?: number): Promise<SessionMessage[]> {
+    const q = limit ? `?limit=${limit}` : '';
+    const res = await this.request<{ messages: SessionMessage[] } | SessionMessage[]>(
+      `/api/v1/sessions/${encodeURIComponent(id)}/messages${q}`,
+    );
+    return Array.isArray(res) ? res : res.messages;
+  }
+
+  deleteSession(id: string): Promise<void> {
+    return this.del<void>(`/api/v1/sessions/${encodeURIComponent(id)}`);
+  }
+
+  usageSummary(): Promise<UsageSummary> {
+    return this.get<UsageSummary>('/api/v1/usage/summary');
+  }
+
+  // ── Memory ──────────────────────────────────────────────────
+
+  async listMemories(limit?: number): Promise<MemoryFragment[]> {
+    const q = limit ? `?limit=${limit}` : '';
+    const res = await this.request<{ memories: MemoryFragment[] } | MemoryFragment[]>(
+      `/api/v1/memories${q}`,
+    );
+    return Array.isArray(res) ? res : res.memories;
+  }
+
+  addMemory(content: string, tags?: string[]): Promise<MemoryFragment> {
+    return this.post<MemoryFragment>('/api/v1/memories', { content, tags });
+  }
+
+  deleteMemory(id: string): Promise<void> {
+    return this.del<void>(`/api/v1/memories/${encodeURIComponent(id)}`);
+  }
+
+  // ── Models ──────────────────────────────────────────────────
+
+  async listModels(): Promise<ModelEntry[]> {
+    const res = await this.request<{ models: ModelEntry[] } | ModelEntry[]>('/api/v1/models');
+    return Array.isArray(res) ? res : res.models;
+  }
+
+  modelCapabilities(): Promise<ModelCapabilities> {
+    return this.get<ModelCapabilities>('/api/v1/models/capabilities');
+  }
+
+  activeModelRoles(): Promise<ModelActiveRoles> {
+    return this.get<ModelActiveRoles>('/api/v1/models/active-roles');
+  }
+
+  modelMemoryStatus(): Promise<ModelMemoryStatus> {
+    return this.get<ModelMemoryStatus>('/api/v1/models/memory-status');
+  }
+
+  activateModel(provider: string, name: string): Promise<void> {
+    return this.post<void>(
+      `/api/v1/models/${encodeURIComponent(provider)}/${encodeURIComponent(name)}/activate`,
+      {},
+    );
+  }
+
+  // ── Schedules ───────────────────────────────────────────────
+
+  async listSchedules(): Promise<Schedule[]> {
+    const res = await this.request<{ schedules: Schedule[] } | Schedule[]>('/api/v1/schedules');
+    return Array.isArray(res) ? res : res.schedules;
+  }
+
+  createSchedule(req: Omit<Schedule, 'id'>): Promise<Schedule> {
+    return this.post<Schedule>('/api/v1/schedules', req);
+  }
+
+  deleteSchedule(id: string): Promise<void> {
+    return this.del<void>(`/api/v1/schedules/${encodeURIComponent(id)}`);
+  }
+
+  pauseSchedule(id: string): Promise<void> {
+    return this.post<void>(`/api/v1/schedules/${encodeURIComponent(id)}/pause`, {});
+  }
+
+  resumeSchedule(id: string): Promise<void> {
+    return this.post<void>(`/api/v1/schedules/${encodeURIComponent(id)}/resume`, {});
+  }
+
+  runScheduleNow(id: string): Promise<void> {
+    return this.post<void>(`/api/v1/schedules/${encodeURIComponent(id)}/run-now`, {});
+  }
+
+  async listScheduleRuns(id: string, limit = 20): Promise<ScheduleRun[]> {
+    const res = await this.request<{ runs: ScheduleRun[] } | ScheduleRun[]>(
+      `/api/v1/schedules/${encodeURIComponent(id)}/runs?limit=${limit}`,
+    );
+    return Array.isArray(res) ? res : res.runs;
+  }
+
+  // ── Logs and activity ───────────────────────────────────────
+
+  async listLogs(params?: { limit?: number; level?: string }): Promise<LogEntry[]> {
+    const qs = new URLSearchParams();
+    if (params?.limit) qs.set('limit', String(params.limit));
+    if (params?.level) qs.set('level', params.level);
+    const q = qs.toString();
+    const res = await this.request<{ logs: LogEntry[] } | LogEntry[]>(
+      `/api/v1/logs${q ? `?${q}` : ''}`,
+    );
+    return Array.isArray(res) ? res : res.logs;
+  }
+
+  listActivity(params?: {
+    limit?: number;
+    since?: string;
+    category?: EventCategory;
+    session_id?: string;
+  }): Promise<ActivityResponse> {
+    const qs = new URLSearchParams();
+    if (params?.limit) qs.set('limit', String(params.limit));
+    if (params?.since) qs.set('since', params.since);
+    if (params?.category) qs.set('category', params.category);
+    if (params?.session_id) qs.set('session_id', params.session_id);
+    const q = qs.toString();
+    return this.get<ActivityResponse>(`/api/v1/activity${q ? `?${q}` : ''}`);
+  }
+
+  activitySummary(): Promise<ActivitySummary> {
+    return this.get<ActivitySummary>('/api/v1/activity/summary');
+  }
+
+  // ── Extensions and the marketplace ──────────────────────────
+
+  async listExtensions(): Promise<Extension[]> {
+    const res = await this.request<{ extensions: Extension[] } | Extension[]>(
+      '/api/v1/extensions',
+    );
+    return Array.isArray(res) ? res : res.extensions;
+  }
+
+  setExtensionEnabled(name: string, enabled: boolean): Promise<void> {
+    return this.put<void>(`/api/v1/extensions/${encodeURIComponent(name)}`, { enabled });
+  }
+
+  async listMarketplace(): Promise<MarketplaceExtension[]> {
+    const res = await this.get<{ extensions: MarketplaceExtension[] }>('/api/v1/marketplace');
+    return res.extensions;
+  }
+
+  installMarketplaceExtension(id: string): Promise<void> {
+    return this.post<void>(`/api/v1/marketplace/${encodeURIComponent(id)}/install`, {});
+  }
+
+  // ── Secrets and OAuth ───────────────────────────────────────
+
+  /**
+   * The names of the secrets the pond holds, never their values. The client is
+   * deliberately incapable of reading one back: it stores references, and the
+   * server keeps the material.
+   */
+  async listSecretKeys(): Promise<string[]> {
+    const res = await this.get<{ keys: string[] }>('/api/v1/secrets');
+    return res.keys;
+  }
+
+  setSecret(key: string, value: string): Promise<void> {
+    return this.put<void>(`/api/v1/secrets/${encodeURIComponent(key)}`, { value });
+  }
+
+  deleteSecret(key: string): Promise<void> {
+    return this.del<void>(`/api/v1/secrets/${encodeURIComponent(key)}`);
+  }
+
+  async listOAuthProviders(): Promise<OAuthProvider[]> {
+    const res = await this.get<{ providers: OAuthProvider[] }>('/api/v1/oauth/providers');
+    return res.providers;
+  }
+
+  oauthStatus(providerId: string): Promise<{ connected: boolean }> {
+    return this.get<{ connected: boolean }>(
+      `/api/v1/oauth/status/${encodeURIComponent(providerId)}`,
+    );
+  }
+
+  // ── Profiles ────────────────────────────────────────────────
+
+  async listProfiles(): Promise<Profile[]> {
+    const res = await this.get<{ profiles: Profile[] }>('/api/v1/profiles');
+    return res.profiles;
+  }
+
+  createProfile(displayName: string, avatarEmoji?: string): Promise<Profile> {
+    return this.post<Profile>('/api/v1/profiles', {
+      display_name: displayName,
+      avatar_emoji: avatarEmoji,
+    });
+  }
+
+  deleteProfile(id: string): Promise<void> {
+    return this.del<void>(`/api/v1/profiles/${encodeURIComponent(id)}`);
+  }
+
+  // ── Verb helpers ────────────────────────────────────────────
+
+  private get<T>(path: string): Promise<T> {
+    return this.request<T>(path);
+  }
+
+  private post<T>(path: string, body: unknown): Promise<T> {
+    return this.request<T>(path, { method: 'POST', body: JSON.stringify(body) });
+  }
+
+  private put<T>(path: string, body: unknown): Promise<T> {
+    return this.request<T>(path, { method: 'PUT', body: JSON.stringify(body) });
+  }
+
+  private del<T>(path: string): Promise<T> {
+    return this.request<T>(path, { method: 'DELETE' });
   }
 }
 
