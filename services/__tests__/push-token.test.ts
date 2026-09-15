@@ -89,6 +89,23 @@ describe('registerPushToken', () => {
     await expect(registerPushToken()).resolves.toBeNull();
     expect(mockRequest).not.toHaveBeenCalled();
   });
+
+  /**
+   * `NotificationsProvider` re-runs this whenever the session token changes, so
+   * every silent refresh used to re-POST an unchanged native token against the
+   * rate-limited endpoint. The rotation listener already guarded against that;
+   * this path did not, and it shares the same per-IP budget.
+   */
+  it('does not re-post a token it has already registered', async () => {
+    const { registerPushToken } = loadModule();
+
+    await expect(registerPushToken()).resolves.toBe('token-abc');
+    expect(mockRequest).toHaveBeenCalledTimes(1);
+
+    // Same native token, second call — e.g. after a session-token refresh.
+    await expect(registerPushToken()).resolves.toBe('token-abc');
+    expect(mockRequest).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe('watchPushTokenRotation', () => {

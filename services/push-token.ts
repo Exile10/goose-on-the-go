@@ -134,6 +134,12 @@ export async function registerPushToken(): Promise<string | null> {
     return null;
   }
 
+  // Callers re-run this whenever the session token changes, so an unchanged
+  // native token would otherwise be re-POSTed on every silent refresh. The
+  // rotation listener below already guards this way; both share one per-IP
+  // budget on the Pond, so both have to.
+  if (token === lastRegistered) return token;
+
   return (await uploadToken(token, platform)) ? token : null;
 }
 
