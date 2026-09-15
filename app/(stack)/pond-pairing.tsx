@@ -22,6 +22,7 @@ import { Grey, JaridaPurple, Brand, Semantic } from '@/constants/colors';
 import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
 import { Spacing } from '@/constants/spacing';
 import { Radii } from '@/constants/radii';
+import { api } from '@/services/api-client';
 import { useServer } from '@/providers/server-provider';
 import { getInstallId } from '@/services/install-id';
 
@@ -62,6 +63,29 @@ function StepIndicator({ current }: { current: Step }) {
   );
 }
 
+/**
+ * Normalise a hand-typed server address, or return null if it cannot be one.
+ *
+ * The host machine's dashboard shows a bare `host:port`, so a missing scheme is
+ * the common case rather than a mistake; it defaults to http, which is what a
+ * Pond on the LAN actually serves.
+ */
+export function normalizeServerUrl(raw: string): string | null {
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+
+  const withScheme = /^https?:\/\//i.test(trimmed) ? trimmed : `http://${trimmed}`;
+  let parsed: URL;
+  try {
+    parsed = new URL(withScheme);
+  } catch {
+    return null;
+  }
+  if (!parsed.hostname) return null;
+
+  return `${parsed.protocol}//${parsed.host}`.replace(/\/+$/, '');
+}
+
 /** Step 0: Server URL */
 function ServerStep({
   initial,
@@ -71,6 +95,34 @@ function ServerStep({
   onNext: (url: string) => void;
 }) {
   const [url, setUrl] = useState(initial);
+  const [checking, setChecking] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Reach the Pond before advancing. Without this the address is only exercised
+  // three steps later, during the handshake, where a typo surfaces as a failed
+  // pairing rather than as a bad URL on the screen that asked for it.
+  const submit = useCallback(async () => {
+    const normalized = normalizeServerUrl(url);
+    if (!normalized) {
+      setError('That does not look like a server address. Try http://pond.local:4000');
+      return;
+    }
+
+    setChecking(true);
+    setError(null);
+    api.setBaseUrl(normalized);
+    const { ok } = await api.health();
+    setChecking(false);
+
+    if (!ok) {
+      setError(
+        `No Pond answered at ${normalized}. Check the address, and that the phone is on the same network.`,
+      );
+      return;
+    }
+    onNext(normalized);
+  }, [url, onNext]);
+
   return (
     <View style={styles.stepContent}>
       <GIcon name="search" size={28} color={JaridaPurple[500]} />
@@ -84,15 +136,25 @@ function ServerStep({
         <TextInput
           style={styles.textInput}
           value={url}
-          onChangeText={setUrl}
+          onChangeText={(t) => {
+            setUrl(t);
+            setError(null);
+          }}
           placeholder="http://pond.local:4000"
           placeholderTextColor={Grey[400]}
           autoCapitalize="none"
           autoCorrect={false}
+          editable={!checking}
         />
       </View>
-      <GButton variant="primary" size="lg" onPress={() => onNext(url)}>
-        Continue
+      {error ? <Text style={styles.stepError}>{error}</Text> : null}
+      <GButton
+        variant="primary"
+        size="lg"
+        disabled={!url.trim() || checking}
+        onPress={submit}
+      >
+        {checking ? 'Checking…' : 'Continue'}
       </GButton>
     </View>
   );
@@ -361,6 +423,13 @@ const styles = StyleSheet.create({
     color: Grey[500],
     textAlign: 'center',
     lineHeight: FontSize.base * 1.5,
+  },
+  stepError: {
+    fontFamily: FontFamily.body,
+    fontSize: FontSize.sm,
+    color: Semantic.danger,
+    textAlign: 'center',
+    lineHeight: FontSize.sm * 1.5,
   },
 
   /* Device found */
