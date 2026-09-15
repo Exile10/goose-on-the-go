@@ -30,6 +30,24 @@ interface ChallengeResponse {
   expires_at: string;
 }
 
+/** How long to wait for /health before calling the Pond unreachable. */
+const HEALTH_TIMEOUT_MS = 3_000;
+
+/**
+ * `AbortSignal.timeout()` stand-in.
+ *
+ * React Native installs abort-controller@3's `AbortSignal` as the global
+ * (react-native/Libraries/Core/setUpXHR.js), and that implementation carries no
+ * static methods at all — `AbortSignal.timeout` is `undefined` on device. Calling
+ * it threw a TypeError that `health()` then swallowed in its own catch, so the
+ * probe reported every Pond unreachable and never once returned ok.
+ */
+function timeoutSignal(ms: number): AbortSignal {
+  const controller = new AbortController();
+  setTimeout(() => controller.abort(), ms);
+  return controller.signal;
+}
+
 export class PondApiClient {
   private baseUrl: string;
   private token: string | null = null;
@@ -63,12 +81,18 @@ export class PondApiClient {
     return h;
   }
 
+  /**
+   * Probe the server's unauthenticated /health route.
+   *
+   * Never throws: an unreachable Pond is an expected state here, not an error,
+   * so callers get `ok: false` rather than a rejection to handle.
+   */
   async health(): Promise<{ ok: boolean; latencyMs: number }> {
     const start = Date.now();
     try {
       const res = await fetch(`${this.baseUrl}/health`, {
         headers: this.headers(),
-        signal: AbortSignal.timeout(3000),
+        signal: timeoutSignal(HEALTH_TIMEOUT_MS),
       });
       return { ok: res.ok, latencyMs: Date.now() - start };
     } catch {
