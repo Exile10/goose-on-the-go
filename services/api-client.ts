@@ -13,6 +13,37 @@
 
 import { concat, fromBase64, hmacSha256, toHex, utf8 } from './hmac';
 
+/**
+ * A non-2xx response, carrying the pieces a caller needs to react properly —
+ * chiefly the status and, on a 429, how long the server asked us to wait.
+ * Without `retryAfterSecs` a caller can only guess, and guessing badly is how
+ * a client ends up hammering an endpoint it has already been throttled on.
+ */
+export class ApiError extends Error {
+  readonly status: number;
+  readonly retryAfterSecs: number | null;
+
+  constructor(message: string, status: number, retryAfterSecs: number | null) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+    this.retryAfterSecs = retryAfterSecs;
+  }
+
+  /** True when retrying later could plausibly succeed. */
+  get isRetryable(): boolean {
+    return this.status === 429 || this.status >= 500;
+  }
+}
+
+/** Parse a `Retry-After` header. Only the delta-seconds form is used here. */
+function parseRetryAfter(res: Response): number | null {
+  const raw = res.headers.get('Retry-After');
+  if (!raw) return null;
+  const secs = Number(raw.trim());
+  return Number.isFinite(secs) && secs >= 0 ? secs : null;
+}
+
 export interface HandshakeResponse {
   accepted: boolean;
   session_token: string | null;
@@ -218,7 +249,14 @@ export class PondApiClient {
       const refreshed = await this.handshakeRefresh();
       if (refreshed?.accepted) res = await doFetch();
     }
-    if (!res.ok) throw new Error(`${init.method ?? 'GET'} ${path} → ${res.status}`);
+    if (!res.ok) {
+      // Message format unchanged — existing logs stay readable.
+      throw new ApiError(
+        `${init.method ?? 'GET'} ${path} → ${res.status}`,
+        res.status,
+        parseRetryAfter(res),
+      );
+    }
     return (await res.json()) as T;
   }
 }
