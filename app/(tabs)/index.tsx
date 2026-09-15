@@ -18,6 +18,7 @@ import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { GIcon } from '@/components/ui/g-icon';
+import { useRecentSessions } from '@/view-models/use-recent-sessions';
 import { GSwitch } from '@/components/ui/g-switch';
 import { HOME_DEVICES } from '@/models/device';
 import { HOME_SHORTCUTS } from '@/constants/navigation';
@@ -33,13 +34,6 @@ const STATUS_CHIPS = [
   { label: '72\u00B0F', color: Semantic.info, bg: Semantic.infoSoft },
   { label: 'Meeting 2pm', color: Semantic.warning, bg: Semantic.warningSoft },
   { label: 'Locked', color: Semantic.success, bg: Semantic.successSoft },
-];
-
-/** Recent conversations data */
-const RECENT_CONVOS = [
-  { id: '1', text: 'Set morning routine to 7 AM', time: '2h ago' },
-  { id: '2', text: 'What temperature is the bedroom?', time: '5h ago' },
-  { id: '3', text: 'Order groceries from Glovo', time: 'Yesterday' },
 ];
 
 function StatusChip({ label, color, bg }: { label: string; color: string; bg: string }) {
@@ -71,6 +65,7 @@ const DeviceGridItem = React.memo(function DeviceGridItem({
 });
 
 export default function HomeScreen() {
+  const recent = useRecentSessions();
   const router = useRouter();
   const [askText, setAskText] = useState('');
 
@@ -183,7 +178,7 @@ export default function HomeScreen() {
 
         {/* Recent conversations */}
         <Text style={styles.sectionLabel}>RECENT CONVERSATIONS</Text>
-        {RECENT_CONVOS.map((c) => (
+        {recent.data.sessions.map((c) => (
           <Pressable key={c.id} style={styles.convoRow}>
             <View style={styles.convoIcon}>
               <GIcon name="chat" size={14} color={JaridaPurple[400]} />
@@ -192,6 +187,12 @@ export default function HomeScreen() {
             <Text style={styles.convoTime}>{c.time}</Text>
           </Pressable>
         ))}
+        {/* Say why the strip is empty. A blank gap reads as a broken screen. */}
+        {!recent.loading && recent.data.sessions.length === 0 ? (
+          <Text style={styles.convoEmpty}>
+            {recent.error ?? 'No conversations yet. Ask your Pond something.'}
+          </Text>
+        ) : null}
 
         {/* Bottom spacer for tab bar */}
         <View style={{ height: 100 }} />
@@ -479,5 +480,11 @@ const styles = StyleSheet.create({
     fontSize: FontSize.xs,
     color: Grey[400],
     marginLeft: Spacing.sm,
+  },
+  convoEmpty: {
+    fontFamily: FontFamily.body,
+    fontSize: FontSize.sm,
+    color: Grey[500],
+    paddingVertical: Spacing.sm,
   },
 });
