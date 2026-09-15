@@ -71,7 +71,13 @@ for (const [name, vuln] of Object.entries(report.vulnerabilities ?? {})) {
   for (const id of ids) if (allowed.has(id)) usedAllowances.add(id);
 
   // Only excused when every advisory behind it is individually excused.
-  if (ids.size > 0 && unexcused.length === 0) continue;
+  //
+  // An empty `ids` also lands here, and must also pass: a pass-through carrier
+  // in an npm-audit v2 chain (ws -> dev-middleware -> @expo/cli -> expo) has
+  // string-only `via` entries naming another package, so it owns no GHSA id.
+  // Blocking it would demand an allowlist entry that cannot be written, while
+  // the real advisory is already gated on its own entry in this same report.
+  if (unexcused.length === 0) continue;
   blocking.push({ name, severity: vuln.severity, ids: [...ids], unexcused });
 }
 

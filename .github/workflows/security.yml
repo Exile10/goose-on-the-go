@@ -16,8 +16,10 @@
 name: Security
 
 on:
+  # No branch filter: `branches:` here matches the PR's BASE, so a PR stacked on
+  # another feature branch would never be scanned at review time — only after it
+  # had already landed, via the push trigger below. `push` stays scoped to main.
   pull_request:
-    branches: [main]
   push:
     branches: [main]
   schedule:
