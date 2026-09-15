@@ -35,6 +35,11 @@ interface StreamOptions {
   onNotification: (n: ServerNotification) => void;
   /** Called when the stream drops and a reconnect is scheduled. */
   onDisconnect?: () => void;
+  /**
+   * Called when the server rejected the token itself (401/403). The stream has
+   * stopped and will not retry: only a fresh token can recover it.
+   */
+  onAuthFailure?: () => void;
 }
 
 const INITIAL_BACKOFF_MS = 1_000;
@@ -48,7 +53,10 @@ export function parseSseChunk(
   chunk: string,
   emit: (data: string) => void,
 ): string {
-  const frames = chunk.split('\n\n');
+  // Normalise CRLF first: under strict '\r\n\r\n' framing no bare '\n\n'
+  // ever appears, so splitting on it alone emits nothing at all and grows
+  // the carried remainder without bound. The spec permits either form.
+  const frames = chunk.replace(/\r\n/g, '\n').split('\n\n');
   const remainder = frames.pop() ?? '';
   for (const frame of frames) {
     const data = frame
@@ -121,7 +129,18 @@ export class NotificationStream {
       this.backoffMs = Math.min(this.backoffMs * 2, MAX_BACKOFF_MS);
     };
     xhr.onerror = scheduleReconnect;
-    xhr.onload = scheduleReconnect; // server closed the stream → reconnect
+    xhr.onload = () => {
+      // The token is captured once at construction and never refreshed here, so
+      // a 401/403 means every reconnect would replay the same dead credential
+      // forever behind capped backoff, with nothing surfacing that notifications
+      // had stopped. Stop, and tell the caller — it owns the token.
+      if (xhr.status === 401 || xhr.status === 403) {
+        this.stop();
+        this.opts.onAuthFailure?.();
+        return;
+      }
+      scheduleReconnect(); // server closed the stream → reconnect
+    };
     xhr.ontimeout = scheduleReconnect;
 
     xhr.send();
