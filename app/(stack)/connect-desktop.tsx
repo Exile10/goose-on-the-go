@@ -17,7 +17,11 @@ import { CameraView, useCameraPermissions, type BarcodeScanningResult } from 'ex
 
 import { GIcon } from '@/components/ui/g-icon';
 import { GButton } from '@/components/ui/g-button';
-import { InvalidPairingCodeError, parsePairingPayload } from '@/models/pairing';
+import {
+  InvalidPairingCodeError,
+  looksLikeMatterSetupCode,
+  parsePairingPayload,
+} from '@/models/pairing';
 import { offerPairingPayload } from '@/services/pairing-handoff';
 import { Brand, Grey, JaridaPurple, Semantic } from '@/constants/colors';
 import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
@@ -47,10 +51,17 @@ export default function ConnectDesktopScreen() {
         offerPairingPayload(parsePairingPayload(data));
         router.back();
       } catch (e) {
+        if (!(e instanceof InvalidPairingCodeError)) {
+          setError('Could not read that code. Try again.');
+          return;
+        }
+        // Name the mistake rather than just rejecting it: a Matter device's
+        // code is valid, only in a different part of the app, and sending the
+        // user back to hunt for "the right QR" is the unhelpful outcome here.
         setError(
-          e instanceof InvalidPairingCodeError
-            ? 'That is not a Goose In A Pond pairing code. Open Pairing on your Pond and scan the code it shows.'
-            : 'Could not read that code. Try again.',
+          looksLikeMatterSetupCode(data)
+            ? 'That is a Matter device setup code, not a Pond pairing code. Use Devices, then Add device, to commission it. The pairing code is the one on your Pond dashboard.'
+            : 'That is not a Goose In A Pond pairing code. Open Pairing on your Pond and scan the code it shows.',
         );
       }
     },
