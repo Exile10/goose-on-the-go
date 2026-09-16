@@ -29,11 +29,17 @@ import { ApiError, api } from '@/services/api-client';
 import { useServer } from '@/providers/server-provider';
 import { getInstallId } from '@/services/install-id';
 import { takePairingPayload } from '@/services/pairing-handoff';
-import { type DiscoveredPond } from '@/services/discovery';
+import { findPondByHost, type DiscoveredPond } from '@/services/discovery';
 import { useDiscovery } from '@/view-models/use-discovery';
 
 type Step = 0 | 1 | 2 | 3;
 const STEP_LABELS = ['Find Pond', 'Pairing Code', 'Name Device', 'Complete'];
+
+/** The port from a normalised base URL, defaulting to http's 80 as URL does. */
+function portOf(url: string): number {
+  const parsed = new URL(url);
+  return Number(parsed.port) || 80;
+}
 
 /** Step indicator */
 function StepIndicator({ current }: { current: Step }) {
@@ -555,6 +561,20 @@ export default function PondPairingScreen() {
           if ((await api.health()).ok) {
             reached = candidate;
             break;
+          }
+        }
+
+        // Nothing in the QR was reachable. That is the ordinary outcome on
+        // Android for a Pond whose server predates the `ip=` fix, or a desktop
+        // build packaged before it: the QR carries only a `.local` name, which
+        // this phone cannot resolve, and the code in it is perfectly good.
+        // Discovery already knows that hub's numeric address, so look it up by
+        // the name the QR did give rather than sending the user back a step.
+        if (!reached) {
+          const found = await findPondByHost(scanned.host, portOf(candidates[0]));
+          if (found) {
+            api.setBaseUrl(found.url);
+            if ((await api.health()).ok) reached = found.url;
           }
         }
 

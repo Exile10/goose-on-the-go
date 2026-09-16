@@ -32,6 +32,15 @@ export interface DiscoveredPond {
   url: string;
   /** Server version from the TXT record, when it published one. */
   version?: string;
+  /**
+   * The mDNS hostname this resolved from, lowercased and without its trailing
+   * dot — e.g. `nano.local`.
+   *
+   * Not for dialling; it is the `.local` name Android cannot resolve. It is
+   * kept so a pairing QR that carries only that name can be matched to the
+   * numeric address discovery found for it. See `findPondByHost`.
+   */
+  hostname?: string;
 }
 
 /** IPv4 only. An IPv6 literal needs bracketing in a URL and buys nothing here. */
@@ -59,7 +68,14 @@ export function toPond(service: Service): DiscoveredPond | null {
     port,
     url: `http://${address}:${port}`,
     version,
+    hostname: normalizeHostname(service.host),
   };
+}
+
+/** Lowercase and drop the trailing dot, so `NANO.local.` and `nano.local` match. */
+function normalizeHostname(host: string | undefined): string | undefined {
+  const trimmed = host?.trim().replace(/\.$/, '');
+  return trimmed ? trimmed.toLowerCase() : undefined;
 }
 
 /**
@@ -121,4 +137,63 @@ export function startDiscovery(
       }
     },
   };
+}
+
+/**
+ * Find the numeric address for a `.local` hostname a pairing QR carried.
+ *
+ * The QR encodes `host=<hostname>.local` and, since the `ip=` fix, a numeric
+ * address alongside it. Two real cases still produce a QR without one: a Pond
+ * running a server older than that fix, whose `/system/info` has no
+ * `lan_address` at all, and a desktop build packaged before it. On Android both
+ * leave a QR whose only address cannot be resolved, so scanning fails with a
+ * valid code in hand.
+ *
+ * Discovery already knows the numeric address of every hub on the network, so
+ * this is a lookup rather than new machinery: browse briefly, and take the hub
+ * whose advertised hostname *is* the one the QR named. Matching on the hostname
+ * and the port together, rather than on the port alone, keeps it from silently
+ * pairing with a different hub that happens to share a port.
+ *
+ * Resolves null if nothing matches before `timeoutMs`, which is the honest
+ * answer on a network that filters multicast.
+ */
+export function findPondByHost(
+  host: string,
+  port: number,
+  timeoutMs = 6_000,
+): Promise<DiscoveredPond | null> {
+  const wanted = normalizeHostname(host);
+  if (!wanted) return Promise.resolve(null);
+
+  return new Promise((resolve) => {
+    let settled = false;
+    // `startDiscovery` reports a scan that throws synchronously, before it has
+    // returned its handle — so the handle is held in a variable that may still
+    // be null when `finish` runs, and stopped again once it exists.
+    let handle: DiscoveryHandle | null = null;
+
+    const finish = (pond: DiscoveredPond | null) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      handle?.stop();
+      resolve(pond);
+    };
+
+    const timer = setTimeout(() => finish(null), timeoutMs);
+    handle = startDiscovery(
+      (ponds) => {
+        const match = ponds.find((p) => p.hostname === wanted && p.port === port);
+        if (match) finish(match);
+      },
+      // A browse that cannot start is a null answer, not a thrown error: the
+      // caller's next move is the same either way.
+      () => finish(null),
+    );
+
+    // If the browse failed on the way out, the handle arrived after `finish`
+    // had already run and nothing has released it.
+    if (settled) handle.stop();
+  });
 }
