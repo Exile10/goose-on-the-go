@@ -50,7 +50,7 @@ jest.mock('react-native-zeroconf', () => ({
   default: jest.fn().mockImplementation(() => new MockZeroconf()),
 }));
 
-import { dedupe, startDiscovery, toPond } from '../discovery';
+import { dedupe, findPondByHost, startDiscovery, toPond } from '../discovery';
 
 /** A resolve as NsdServiceImpl reports one. */
 function resolved(overrides: Partial<Service> = {}): Service {
@@ -78,6 +78,7 @@ describe('toPond', () => {
       port: 8080,
       url: 'http://192.168.1.7:8080',
       version: '0.1.0',
+      hostname: 'nano.local',
     });
   });
 
@@ -189,5 +190,73 @@ describe('startDiscovery', () => {
 
     expect(instances[0].stopped).toBe(1);
     expect(instances[0].listenersRemoved).toBe(1);
+  });
+});
+
+describe('findPondByHost', () => {
+  // The case this exists for: a QR that carries only `<host>.local`, from a
+  // Pond whose server predates the `ip=` fix. The code in it is good; the only
+  // address in it is one Android cannot resolve.
+  it('returns the hub whose advertised hostname the QR named', async () => {
+    const pending = findPondByHost('nano.local', 8080, 1_000);
+    instances[0].emit('resolved', resolved({ host: 'nano.local.', port: 8080 }));
+
+    await expect(pending).resolves.toMatchObject({ address: '192.168.1.7', port: 8080 });
+  });
+
+  it('matches regardless of case or the trailing dot mDNS adds', async () => {
+    const pending = findPondByHost('NANO.local.', 8080, 1_000);
+    instances[0].emit('resolved', resolved({ host: 'nano.local', port: 8080 }));
+
+    await expect(pending).resolves.not.toBeNull();
+  });
+
+  it('will not take a different hub that happens to share the port', async () => {
+    // Matching on the port alone would pair with somebody else's Pond.
+    const pending = findPondByHost('nano.local', 8080, 30);
+    instances[0].emit('resolved', resolved({ host: 'other.local.', port: 8080 }));
+
+    await expect(pending).resolves.toBeNull();
+  });
+
+  it('will not take the right hub on a different port', async () => {
+    const pending = findPondByHost('nano.local', 4000, 30);
+    instances[0].emit('resolved', resolved({ host: 'nano.local.', port: 8080 }));
+
+    await expect(pending).resolves.toBeNull();
+  });
+
+  it('resolves null when nothing answers before the deadline', async () => {
+    await expect(findPondByHost('nano.local', 8080, 20)).resolves.toBeNull();
+  });
+
+  it('releases the browse once it has an answer', async () => {
+    const pending = findPondByHost('nano.local', 8080, 1_000);
+    instances[0].emit('resolved', resolved({ host: 'nano.local.', port: 8080 }));
+    await pending;
+
+    expect(instances[0].stopped).toBe(1);
+    expect(instances[0].listenersRemoved).toBe(1);
+  });
+
+  it('resolves null, and still releases, when the browse cannot start', async () => {
+    // `startDiscovery` reports this synchronously, before it has returned the
+    // handle -- the path that threw a TDZ error in the first version.
+    const zeroconf = new MockZeroconf();
+    zeroconf.scanThrows = new Error('null is not an object');
+    instances.pop();
+    const Zeroconf = jest.requireMock('react-native-zeroconf').default as jest.Mock;
+    Zeroconf.mockImplementationOnce(() => {
+      instances.push(zeroconf);
+      return zeroconf;
+    });
+
+    await expect(findPondByHost('nano.local', 8080, 1_000)).resolves.toBeNull();
+    expect(zeroconf.stopped).toBe(1);
+  });
+
+  it('does not browse at all for an empty hostname', async () => {
+    await expect(findPondByHost('  ', 8080, 1_000)).resolves.toBeNull();
+    expect(instances).toHaveLength(0);
   });
 });
