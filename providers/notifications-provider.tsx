@@ -8,6 +8,10 @@
  * sessions. Background/killed-state delivery is the server's FCM/APNs relay
  * (still stubbed server-side) — out of scope here.
  *
+ * Arrivals are presented in the phone's own notification shade
+ * (`services/local-notifications.ts`) rather than as an in-app banner, so a
+ * notice outlives the screen the user happened to be on.
+ *
  * Exposes the received list (newest first, capped), an unread count, and
  * `markAllRead()` for the notifications UI.
  */
@@ -30,6 +34,7 @@ import {
   type ServerNotification,
 } from '@/services/notification-stream';
 import { registerPushToken, watchPushTokenRotation } from '@/services/push-token';
+import { configureLocalNotifications, presentLocally } from '@/services/local-notifications';
 import { useServer } from '@/providers/server-provider';
 
 /** Newest notifications kept in memory for the UI. */
@@ -39,8 +44,6 @@ interface NotificationsContextValue {
   /** Newest first. */
   notifications: ServerNotification[];
   unreadCount: number;
-  /** The most recent notification, for transient banner display. */
-  latest: ServerNotification | null;
   markAllRead: () => void;
 }
 
@@ -50,7 +53,6 @@ export function NotificationsProvider({ children }: PropsWithChildren) {
   const { serverUrl, token } = useServer();
   const [notifications, setNotifications] = useState<ServerNotification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
-  const [latest, setLatest] = useState<ServerNotification | null>(null);
   const streamRef = useRef<NotificationStream | null>(null);
 
   useEffect(() => {
@@ -67,7 +69,10 @@ export function NotificationsProvider({ children }: PropsWithChildren) {
         onNotification: (n) => {
           setNotifications((prev) => [n, ...prev].slice(0, MAX_KEPT));
           setUnreadCount((prev) => prev + 1);
-          setLatest(n);
+          // Presentation is the phone's own notification shade. There is no
+          // in-app banner: a second, app-only copy of the same notice was one
+          // more thing to dismiss and it disappeared the moment the app did.
+          void presentLocally(n);
         },
       });
       streamRef.current = stream;
@@ -75,6 +80,10 @@ export function NotificationsProvider({ children }: PropsWithChildren) {
     };
 
     void startStream();
+
+    // Channels and the foreground handler, so a streamed notification can reach
+    // the phone's shade rather than living and dying inside the app.
+    void configureLocalNotifications();
 
     // Background push (Path B): register the native FCM/APNs token with the
     // paired server and keep it fresh across platform rotations. No-ops
@@ -105,14 +114,11 @@ export function NotificationsProvider({ children }: PropsWithChildren) {
     };
   }, [serverUrl, token]);
 
-  const markAllRead = useCallback(() => {
-    setUnreadCount(0);
-    setLatest(null);
-  }, []);
+  const markAllRead = useCallback(() => setUnreadCount(0), []);
 
   const value = useMemo<NotificationsContextValue>(
-    () => ({ notifications, unreadCount, latest, markAllRead }),
-    [notifications, unreadCount, latest, markAllRead],
+    () => ({ notifications, unreadCount, markAllRead }),
+    [notifications, unreadCount, markAllRead],
   );
 
   return (
