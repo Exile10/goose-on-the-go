@@ -13,6 +13,7 @@ import { ActivityIndicator, StyleSheet, Text, TextInput, View } from 'react-nati
 import { InkButton } from '@jarida/ink/native';
 import { useRouter } from 'expo-router';
 
+import { GKeyboardView } from '@/components/ui/g-keyboard-view';
 import { GIcon } from '@/components/ui/g-icon';
 import { useDevices } from '@/view-models/use-devices';
 import { Grey, JaridaPurple, Semantic } from '@/constants/colors';
@@ -60,7 +61,7 @@ export default function CommissionDeviceScreen() {
   }
 
   return (
-    <View style={styles.container}>
+    <GKeyboardView style={styles.container}>
       <GIcon name="device" size={28} color={JaridaPurple[500]} />
       <Text style={styles.title}>Add a Matter device</Text>
       <Text style={styles.desc}>
@@ -115,7 +116,7 @@ export default function CommissionDeviceScreen() {
         Bluetooth. If it is not found, turn on Bluetooth pairing in your Pond&apos;s Matter
         settings and try again.
       </Text>
-    </View>
+    </GKeyboardView>
   );
 }
 
