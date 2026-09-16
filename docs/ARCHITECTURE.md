@@ -52,6 +52,44 @@ TypeScript interfaces in `models/` defining the domain shapes. These are pure ty
 ### Services
 `services/api-client.ts` — HTTP client for pond-server (mock for now).
 `services/storage.ts` — typed AsyncStorage wrapper.
+`services/discovery.ts` — finds Ponds over mDNS, so step 0 of the pairing wizard
+can offer a hub rather than ask for its address. See "Finding the Pond" below.
+
+## Finding the Pond
+
+pond-server advertises `_pond._tcp.local.`; `services/discovery.ts` browses for
+it through `react-native-zeroconf`, and `view-models/use-discovery.ts` turns that
+into the `{data, loading, error, actions}` shape the wizard renders.
+
+Three things about this are load-bearing and easy to undo by accident.
+
+**Only numeric addresses are kept.** A resolved service carries both a `host`
+(`<name>.local`) and `addresses` (numeric). Android's resolver does no mDNS at
+all, so the `.local` name is unreachable there however it arrives — typed,
+scanned from the pairing QR, or discovered. A service that resolves without a
+numeric address is therefore dropped rather than shown.
+
+**The list dedupes on address and port, not on name.** mDNS records outlive the
+process that registered them, so a restarted server leaves ghosts advertising
+the same endpoint under incrementing instance names. Keying on the endpoint means
+a restart replaces its own entry.
+
+**A discovered Pond is probed with `/health` before the wizard advances**, for
+the same reason: an advertisement is not a running server, and a ghost resolves
+perfectly and answers nothing.
+
+The search ends on a clock (8 s), because mDNS has no "that is all" signal, and
+browsing continues past the deadline so a hub switched on later still appears.
+The deadline only changes what the screen says. Stopping the browse is not
+optional — it holds a multicast lock on Android for as long as it runs.
+
+Discovery is the default, not the only way in: multicast is filtered on plenty
+of guest and office networks, so scanning the QR and typing an address both
+remain on the same step.
+
+`types/react-native-zeroconf.d.ts` declares the library's browsing API, which
+ships no types of its own. Field names there are taken from its Android NSD
+implementation, which is the default backend.
 
 ## Providers
 
