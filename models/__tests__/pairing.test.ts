@@ -6,7 +6,11 @@
  * that outlives its read would let a stale code be used on a later visit.
  */
 
-import { InvalidPairingCodeError, parsePairingPayload } from '@/models/pairing';
+import {
+  InvalidPairingCodeError,
+  looksLikeMatterSetupCode,
+  parsePairingPayload,
+} from '@/models/pairing';
 import { offerPairingPayload, takePairingPayload } from '@/services/pairing-handoff';
 
 const VALID = 'pond://pair?host=pond.local&port=4000&code=123456';
@@ -81,5 +85,35 @@ describe('pairing handoff', () => {
 
   it('returns null when nothing was scanned', () => {
     expect(takePairingPayload()).toBeNull();
+  });
+});
+
+describe('looksLikeMatterSetupCode', () => {
+  // Two QR codes are in play and the wrong one is a reasonable thing to scan:
+  // the Pond's dashboard shows a pairing code, every Matter device ships with a
+  // commissioning code. This is what lets the scanner say which is which.
+  it('recognises the MT: QR payload a Matter device carries', () => {
+    expect(looksLikeMatterSetupCode('MT:Y.K9042C00KA0648G00')).toBe(true);
+  });
+
+  it('recognises the 11- and 21-digit manual codes printed beside it', () => {
+    expect(looksLikeMatterSetupCode('34970112332')).toBe(true);
+    expect(looksLikeMatterSetupCode('3497-011-2332')).toBe(true);
+    expect(looksLikeMatterSetupCode('123456789012345678901')).toBe(true);
+  });
+
+  it('does not claim a pairing URL', () => {
+    expect(looksLikeMatterSetupCode(VALID)).toBe(false);
+  });
+
+  it('does not claim a bare six-digit pairing code', () => {
+    // The wizard's own code is six digits; mistaking it for a Matter code would
+    // send the user to the wrong screen with the right code in their hand.
+    expect(looksLikeMatterSetupCode('123456')).toBe(false);
+  });
+
+  it('does not claim an empty or bare MT: prefix', () => {
+    expect(looksLikeMatterSetupCode('')).toBe(false);
+    expect(looksLikeMatterSetupCode('MT:')).toBe(false);
   });
 });
