@@ -91,6 +91,23 @@ describe('registerPushToken', () => {
   });
 
   /**
+   * The sequential guard above is not enough on its own.
+   *
+   * NotificationsProvider hydrates serverUrl and token as two separate state
+   * updates, so its effect runs twice at mount and both calls are in flight
+   * before either has finished. `lastRegistered` is still null when the second
+   * one reads it, so a check-then-act guard lets both through — which is
+   * exactly what a real device does: two POSTs, 51ms apart, same token.
+   */
+  it('posts once when two callers race at startup', async () => {
+    const { registerPushToken } = loadModule();
+
+    await Promise.all([registerPushToken(), registerPushToken()]);
+
+    expect(mockRequest).toHaveBeenCalledTimes(1);
+  });
+
+  /**
    * `NotificationsProvider` re-runs this whenever the session token changes, so
    * every silent refresh used to re-POST an unchanged native token against the
    * rate-limited endpoint. The rotation listener already guarded against that;

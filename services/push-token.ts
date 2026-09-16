@@ -39,6 +39,17 @@ const MAX_DELAY_MS = 60_000;
  */
 let lastRegistered: string | null = null;
 
+/**
+ * The registration currently in flight, so concurrent callers share it.
+ *
+ * `lastRegistered` alone is check-then-act: it is only set after the POST
+ * returns, so two callers that start before either finishes both read null and
+ * both upload. NotificationsProvider does exactly that — it hydrates serverUrl
+ * and token as separate state updates, so its effect runs twice at mount, and a
+ * real device duplicates the POST 51ms apart.
+ */
+let inFlight: Promise<string | null> | null = null;
+
 /** The platform GIAP should relay through for this device. */
 function pushPlatform(): PushPlatform | null {
   if (Platform.OS === 'android') return 'fcm';
@@ -140,7 +151,16 @@ export async function registerPushToken(): Promise<string | null> {
   // budget on the Pond, so both have to.
   if (token === lastRegistered) return token;
 
-  return (await uploadToken(token, platform)) ? token : null;
+  // Coalesce racing callers onto one upload, then clear so a later genuine
+  // rotation is not swallowed by a stale promise.
+  if (!inFlight) {
+    inFlight = uploadToken(token, platform)
+      .then((ok) => (ok ? token : null))
+      .finally(() => {
+        inFlight = null;
+      });
+  }
+  return inFlight;
 }
 
 /**
