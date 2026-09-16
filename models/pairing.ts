@@ -2,7 +2,13 @@
  * Pairing payload — decoded from the QR code shown on Goose In A Pond desktop.
  *
  * Desktop encodes: pond://pair?host=<hostname>.local&port=<port>&code=<6-digit>
- * (pond-desktop/src/sections/Pairing.tsx), refreshing it as the code expires.
+ * plus an optional &ip=<lan-address> (pond-desktop/src/sections/Pairing.tsx),
+ * refreshing it as the code expires.
+ *
+ * Both addresses are present because neither works everywhere. The mDNS name is
+ * the better identifier — it survives a DHCP lease change — but Android's
+ * resolver does no mDNS, so `<host>.local` fails outright there. Older ponds
+ * send no `ip` at all, which is why it is optional rather than required.
  *
  * The code is a short-lived secret proved via the two-phase handshake
  * (see `PondApiClient.pair` in services/api-client.ts) — it is never sent over
@@ -12,6 +18,14 @@
 export interface PairingPayload {
   /** Base URL of the pond server, e.g. http://gooses-mac.local:4000 */
   serverUrl: string;
+  /**
+   * The same server by its LAN address, when the QR carried one.
+   *
+   * Tried only after `serverUrl` fails to answer: the hostname is the better
+   * one to keep, and an address baked into a QR goes stale on the next DHCP
+   * lease.
+   */
+  fallbackUrl?: string;
   /** Hostname the hub is advertised as (for display) */
   host: string;
   /** Single-use 6-digit pairing code */
@@ -47,5 +61,11 @@ export function parsePairingPayload(raw: string): PairingPayload {
     throw new InvalidPairingCodeError();
   }
 
-  return { serverUrl: `http://${host}:${port}`, host, code };
+  const ip = url.searchParams.get('ip');
+  return {
+    serverUrl: `http://${host}:${port}`,
+    fallbackUrl: ip ? `http://${ip}:${port}` : undefined,
+    host,
+    code,
+  };
 }

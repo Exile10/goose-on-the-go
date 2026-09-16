@@ -24,6 +24,24 @@ describe('parsePairingPayload', () => {
     expect(parsePairingPayload(`  ${VALID}\n`).code).toBe('123456');
   });
 
+  /**
+   * Android resolves no mDNS, so on that platform the hostname is dead on
+   * arrival and the `ip` parameter is the only one that works. Older ponds do
+   * not send it, which is why it stays optional rather than required.
+   */
+  it('carries the LAN address as a fallback when the QR has one', () => {
+    const payload = parsePairingPayload(
+      'pond://pair?host=pond.local&port=4000&code=123456&ip=192.168.1.2',
+    );
+
+    expect(payload.serverUrl).toBe('http://pond.local:4000');
+    expect(payload.fallbackUrl).toBe('http://192.168.1.2:4000');
+  });
+
+  it('leaves the fallback undefined when an older pond sends no ip', () => {
+    expect(parsePairingPayload(VALID).fallbackUrl).toBeUndefined();
+  });
+
   it('rejects another scheme, so an arbitrary QR cannot start a handshake', () => {
     expect(() => parsePairingPayload('https://example.com/?code=123456')).toThrow(
       InvalidPairingCodeError,

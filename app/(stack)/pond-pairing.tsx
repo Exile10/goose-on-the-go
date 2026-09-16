@@ -387,25 +387,42 @@ export default function PondPairingScreen() {
    *
    * The QR carries both halves the wizard would otherwise ask for, so a
    * successful scan skips to naming the device. The server is still probed
-   * first: a QR pointing at a `.local` host the phone cannot resolve should fail
-   * here, not three steps later during the handshake.
+   * first: a QR pointing at a host the phone cannot resolve should fail here,
+   * not three steps later during the handshake.
+   *
+   * The mDNS name is tried before the raw address because it is the better one
+   * to keep — an address baked into a QR goes stale on the next DHCP lease.
+   * Android resolves no mDNS at all, so on that platform the first probe is
+   * expected to fail and the fallback is the one that works.
    */
   useFocusEffect(
     useCallback(() => {
       const scanned = takePairingPayload();
       if (!scanned) return;
 
-      const normalized = normalizeServerUrl(scanned.serverUrl);
-      if (!normalized) return;
+      const candidates = [scanned.serverUrl, scanned.fallbackUrl]
+        .map((u) => (u ? normalizeServerUrl(u) : null))
+        .filter((u): u is string => u !== null);
+      if (candidates.length === 0) return;
 
       void (async () => {
-        api.setBaseUrl(normalized);
-        const { ok } = await api.health();
-        setServerUrl(normalized);
+        let reached: string | null = null;
+        for (const candidate of candidates) {
+          api.setBaseUrl(candidate);
+          if ((await api.health()).ok) {
+            reached = candidate;
+            break;
+          }
+        }
+
+        // Fall back to showing the first candidate, so an unreachable Pond
+        // drops the user on the step that owns the address with something
+        // filled in, rather than failing later as a rejected code.
+        const chosen = reached ?? candidates[0];
+        api.setBaseUrl(chosen);
+        setServerUrl(chosen);
         setCode(scanned.code);
-        // An unreachable Pond drops the user on the step that owns the address,
-        // with it filled in, rather than failing later with a rejected code.
-        setStep(ok ? 2 : 0);
+        setStep(reached ? 2 : 0);
       })();
     }, [setServerUrl]),
   );
