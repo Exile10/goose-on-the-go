@@ -39,6 +39,26 @@ export class InvalidPairingCodeError extends Error {
   }
 }
 
+/**
+ * Does this look like a Matter device's setup code rather than a pairing code?
+ *
+ * Two different QR codes are in play and they are easy to confuse: the Pond's
+ * dashboard shows one to pair a phone, and every Matter device ships with one
+ * to commission it. Scanning the device's code here is a reasonable mistake,
+ * and "that is not a pairing code" is an unhelpful answer to it — the user is
+ * holding a code that is perfectly valid somewhere else in the app.
+ *
+ * This recognises the shapes the Matter controller accepts: the `MT:` QR
+ * payload, and the 11- or 21-digit manual codes printed beside it. It exists to
+ * pick the right sentence, so it is deliberately loose — the controller remains
+ * the authority on what actually decodes.
+ */
+export function looksLikeMatterSetupCode(raw: string): boolean {
+  const trimmed = raw.trim();
+  if (trimmed.startsWith('MT:')) return trimmed.length > 3;
+  return /^\d{11}$|^\d{21}$/.test(trimmed.replace(/[\s-]/g, ''));
+}
+
 /** Parses raw QR code text into a pairing payload. Throws `InvalidPairingCodeError` if malformed. */
 export function parsePairingPayload(raw: string): PairingPayload {
   let url: URL;
