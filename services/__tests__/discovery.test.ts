@@ -78,7 +78,7 @@ describe('toPond', () => {
       port: 8080,
       url: 'http://192.168.1.7:8080',
       version: '0.1.0',
-      hostname: 'nano.local',
+      hostname: 'nano',
     });
   });
 
@@ -209,6 +209,18 @@ describe('findPondByHost', () => {
     instances[0].emit('resolved', resolved({ host: 'nano.local', port: 8080 }));
 
     await expect(pending).resolves.not.toBeNull();
+  });
+
+  it("matches a QR's fully qualified name against the bare one Android reports", async () => {
+    // The case that actually broke on a Galaxy A57: the QR carries
+    // `<host>.local`, NsdManager reports the same host with no suffix at all.
+    const pending = findPondByHost('Emmanueyugi4525.bbrouter.local', 4000, 1_000);
+    instances[0].emit(
+      'resolved',
+      resolved({ host: 'Emmanueyugi4525.bbrouter', port: 4000, addresses: ['192.168.1.2'] }),
+    );
+
+    await expect(pending).resolves.toMatchObject({ url: 'http://192.168.1.2:4000' });
   });
 
   it('will not take a different hub that happens to share the port', async () => {

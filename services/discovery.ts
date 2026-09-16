@@ -33,11 +33,11 @@ export interface DiscoveredPond {
   /** Server version from the TXT record, when it published one. */
   version?: string;
   /**
-   * The mDNS hostname this resolved from, lowercased and without its trailing
-   * dot — e.g. `nano.local`.
+   * The machine this resolved from, normalised for comparison — lowercased,
+   * with any trailing dot and `.local` removed, e.g. `nano`.
    *
-   * Not for dialling; it is the `.local` name Android cannot resolve. It is
-   * kept so a pairing QR that carries only that name can be matched to the
+   * Not for dialling: the name it came from is the one Android cannot resolve.
+   * It is kept so a pairing QR carrying only that name can be matched to the
    * numeric address discovery found for it. See `findPondByHost`.
    */
   hostname?: string;
@@ -72,9 +72,23 @@ export function toPond(service: Service): DiscoveredPond | null {
   };
 }
 
-/** Lowercase and drop the trailing dot, so `NANO.local.` and `nano.local` match. */
+/**
+ * Reduce a hostname to the form both sides can be compared in.
+ *
+ * The two sides disagree on spelling for the same machine. A pairing QR carries
+ * the fully qualified `Emmanueyugi4525.bbrouter.local`, while Android's
+ * NsdManager reports the same host as `Emmanueyugi4525.bbrouter` — no `.local`
+ * at all — and mDNS itself writes `nano.local.` with a trailing dot. Comparing
+ * any two of those literally fails, which is what stopped a scanned QR from
+ * being matched to the hub discovery had already found.
+ *
+ * So: lowercase, drop the trailing dot, then drop a trailing `.local`.
+ */
 function normalizeHostname(host: string | undefined): string | undefined {
-  const trimmed = host?.trim().replace(/\.$/, '');
+  const trimmed = host
+    ?.trim()
+    .replace(/\.$/, '')
+    .replace(/\.local$/i, '');
   return trimmed ? trimmed.toLowerCase() : undefined;
 }
 
