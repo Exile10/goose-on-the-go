@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 
 import { GIcon } from '@/components/ui/g-icon';
+import { GKeyboardView } from '@/components/ui/g-keyboard-view';
 import { GButton } from '@/components/ui/g-button';
 import { Grey, JaridaPurple, Brand, Semantic } from '@/constants/colors';
 import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
@@ -100,50 +101,52 @@ export default function AddUsersScreen() {
   const [email, setEmail] = useState('');
 
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={styles.scroll}
-      showsVerticalScrollIndicator={false}
-    >
-      <Text style={styles.sectionLabel}>HOUSEHOLD MEMBERS</Text>
-      {USERS.map((u) => (
-        <UserCard key={u.id} user={u} />
-      ))}
+    <GKeyboardView>
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={styles.scroll}
+        showsVerticalScrollIndicator={false}
+      >
+        <Text style={styles.sectionLabel}>HOUSEHOLD MEMBERS</Text>
+        {USERS.map((u) => (
+          <UserCard key={u.id} user={u} />
+        ))}
 
-      {/* Invite section */}
-      {showInvite ? (
-        <View style={styles.inviteCard}>
-          <Text style={styles.inviteTitle}>Invite New Member</Text>
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Email Address</Text>
-            <TextInput
-              style={styles.textInput}
-              value={email}
-              onChangeText={setEmail}
-              placeholder="name@email.com"
-              placeholderTextColor={Grey[400]}
-              keyboardType="email-address"
-              autoCapitalize="none"
-            />
+        {/* Invite section */}
+        {showInvite ? (
+          <View style={styles.inviteCard}>
+            <Text style={styles.inviteTitle}>Invite New Member</Text>
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Email Address</Text>
+              <TextInput
+                style={styles.textInput}
+                value={email}
+                onChangeText={setEmail}
+                placeholder="name@email.com"
+                placeholderTextColor={Grey[400]}
+                keyboardType="email-address"
+                autoCapitalize="none"
+              />
+            </View>
+            <View style={styles.inviteActions}>
+              <GButton variant="ghost" size="sm" onPress={() => setShowInvite(false)}>
+                Cancel
+              </GButton>
+              <GButton variant="primary" size="sm" onPress={() => { setShowInvite(false); setEmail(''); }}>
+                Send Invite
+              </GButton>
+            </View>
           </View>
-          <View style={styles.inviteActions}>
-            <GButton variant="ghost" size="sm" onPress={() => setShowInvite(false)}>
-              Cancel
-            </GButton>
-            <GButton variant="primary" size="sm" onPress={() => { setShowInvite(false); setEmail(''); }}>
-              Send Invite
-            </GButton>
-          </View>
-        </View>
-      ) : (
-        <Pressable style={styles.addBtn} onPress={() => setShowInvite(true)}>
-          <GIcon name="plus" size={16} color={JaridaPurple[500]} />
-          <Text style={styles.addBtnText}>Invite Member</Text>
-        </Pressable>
-      )}
+        ) : (
+          <Pressable style={styles.addBtn} onPress={() => setShowInvite(true)}>
+            <GIcon name="plus" size={16} color={JaridaPurple[500]} />
+            <Text style={styles.addBtnText}>Invite Member</Text>
+          </Pressable>
+        )}
 
-      <View style={{ height: 32 }} />
-    </ScrollView>
+        <View style={{ height: 32 }} />
+      </ScrollView>
+    </GKeyboardView>
   );
 }
 

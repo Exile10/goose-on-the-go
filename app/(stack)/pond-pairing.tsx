@@ -10,6 +10,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -19,6 +20,7 @@ import {
 import { useFocusEffect, useRouter } from 'expo-router';
 import { GIcon } from '@/components/ui/g-icon';
 import { GButton } from '@/components/ui/g-button';
+import { GKeyboardView } from '@/components/ui/g-keyboard-view';
 import { Grey, JaridaPurple, Brand, Semantic } from '@/constants/colors';
 import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
 import { Spacing } from '@/constants/spacing';
@@ -105,7 +107,27 @@ export function normalizeServerUrl(raw: string): string | null {
   return `${parsed.protocol}//${parsed.host}`.replace(/\/+$/, '');
 }
 
-/** Step 0: Server URL */
+/**
+ * The body of one wizard step.
+ *
+ * It scrolls, which matters for two reasons. The step content is centred, so
+ * when the keyboard takes half the screen the button under the focused field
+ * ends up below the fold — `GKeyboardView` lifts the container, and this makes
+ * what it lifted reachable. And the discovery step grows with however many hubs
+ * answer, which is not a number the layout gets to assume.
+ */
+function StepBody({ children }: { children: React.ReactNode }) {
+  return (
+    <ScrollView
+      style={styles.stepScroll}
+      contentContainerStyle={[styles.stepContent, styles.stepScrollContent]}
+      keyboardShouldPersistTaps="handled"
+    >
+      {children}
+    </ScrollView>
+  );
+}
+
 /**
  * Step 0: find the Pond on this network.
  *
@@ -154,7 +176,7 @@ function DiscoverStep({
   );
 
   return (
-    <View style={styles.stepContent}>
+    <StepBody>
       {data.phase === 'searching' ? (
         <ActivityIndicator color={JaridaPurple[500]} />
       ) : (
@@ -218,7 +240,7 @@ function DiscoverStep({
         <Text style={styles.scanLinkText}>Enter address manually</Text>
       </Pressable>
       <ScanLink onPress={onScan} />
-    </View>
+    </StepBody>
   );
 }
 
@@ -261,7 +283,7 @@ function ServerStep({
   }, [url, onNext]);
 
   return (
-    <View style={styles.stepContent}>
+    <StepBody>
       <GIcon name="search" size={28} color={JaridaPurple[500]} />
       <Text style={styles.stepTitle}>Connect to GIAP</Text>
       <Text style={styles.stepDesc}>
@@ -293,7 +315,7 @@ function ServerStep({
       >
         {checking ? 'Checking…' : 'Continue'}
       </GButton>
-    </View>
+    </StepBody>
   );
 }
 
@@ -310,7 +332,7 @@ function PairingCodeStep({
   const [code, setCode] = useState(initial);
   const valid = /^\d{6}$/.test(code);
   return (
-    <View style={styles.stepContent}>
+    <StepBody>
       <GIcon name="wifi" size={28} color={JaridaPurple[500]} />
       <Text style={styles.stepTitle}>Enter Pairing Code</Text>
       <Text style={styles.stepDesc}>
@@ -338,7 +360,7 @@ function PairingCodeStep({
         Continue
       </GButton>
       <ScanLink onPress={onScan} />
-    </View>
+    </StepBody>
   );
 }
 
@@ -346,7 +368,7 @@ function PairingCodeStep({
 function NameStep({ onNext }: { onNext: (name: string) => void }) {
   const [name, setName] = useState('');
   return (
-    <View style={styles.stepContent}>
+    <StepBody>
       <GIcon name="edit" size={28} color={JaridaPurple[500]} />
       <Text style={styles.stepTitle}>Name This Phone</Text>
       <Text style={styles.stepDesc}>
@@ -371,7 +393,7 @@ function NameStep({ onNext }: { onNext: (name: string) => void }) {
       >
         Pair Device
       </GButton>
-    </View>
+    </StepBody>
   );
 }
 
@@ -445,18 +467,18 @@ function CompleteStep({
 }) {
   if (state === 'pending') {
     return (
-      <View style={styles.stepContent}>
+      <StepBody>
         <ActivityIndicator size="large" color={JaridaPurple[500]} />
         <Text style={styles.stepTitle}>Pairing…</Text>
         <Text style={styles.stepDesc}>
           Verifying the code and exchanging tokens with your GIAP server.
         </Text>
-      </View>
+      </StepBody>
     );
   }
   if (state === 'error') {
     return (
-      <View style={styles.stepContent}>
+      <StepBody>
         <GIcon name="x" size={28} color={Semantic.danger} />
         <Text style={styles.stepTitle}>Pairing failed</Text>
         <Text style={styles.stepDesc}>
@@ -465,11 +487,11 @@ function CompleteStep({
         <GButton variant="primary" size="lg" onPress={onRetry}>
           Try again
         </GButton>
-      </View>
+      </StepBody>
     );
   }
   return (
-    <View style={styles.stepContent}>
+    <StepBody>
       <GIcon name="check" size={28} color={Semantic.success} />
       <Text style={styles.stepTitle}>All Set!</Text>
       <Text style={styles.stepDesc}>
@@ -479,7 +501,7 @@ function CompleteStep({
       <GButton variant="primary" size="lg" onPress={onDone}>
         Go to Home
       </GButton>
-    </View>
+    </StepBody>
   );
 }
 
@@ -600,7 +622,7 @@ export default function PondPairingScreen() {
   const done = useCallback(() => router.back(), [router]);
 
   return (
-    <View style={styles.container}>
+    <GKeyboardView style={styles.container}>
       <StepIndicator current={step} />
       {step === 0 &&
         (manualEntry ? (
@@ -624,7 +646,7 @@ export default function PondPairingScreen() {
           onRetry={() => setStep(1)}
         />
       )}
-    </View>
+    </GKeyboardView>
   );
 }
 
@@ -711,6 +733,12 @@ const styles = StyleSheet.create({
     fontWeight: FontWeight.semibold,
     color: JaridaPurple[500],
   },
+
+  // stepContent centres with `flex: 1`, which a scroll view's content container
+  // may not use — `flexGrow` keeps the centring while letting the content grow
+  // past the screen.
+  stepScroll: { flex: 1 },
+  stepScrollContent: { flex: undefined, flexGrow: 1, paddingVertical: Spacing.lg },
 
   /* Discovered ponds */
   pondRow: {

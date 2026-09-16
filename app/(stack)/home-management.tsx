@@ -15,6 +15,7 @@ import {
 import { useRouter } from 'expo-router';
 
 import { GIcon } from '@/components/ui/g-icon';
+import { GKeyboardView } from '@/components/ui/g-keyboard-view';
 import { Grey, JaridaPurple, Brand, Semantic } from '@/constants/colors';
 import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
 import { Spacing } from '@/constants/spacing';
@@ -62,70 +63,72 @@ export default function HomeManagementScreen() {
   }, []);
 
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={styles.scroll}
-      showsVerticalScrollIndicator={false}
-    >
-      {/* Rooms */}
-      <Text style={styles.sectionLabel}>ROOMS</Text>
-      {rooms.map((room) => (
-        <View key={room.id} style={styles.roomCard}>
-          <View style={{ marginRight: Spacing.md }}>
-            <GIcon name={room.icon} size={20} color={JaridaPurple[500]} />
+    <GKeyboardView>
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={styles.scroll}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Rooms */}
+        <Text style={styles.sectionLabel}>ROOMS</Text>
+        {rooms.map((room) => (
+          <View key={room.id} style={styles.roomCard}>
+            <View style={{ marginRight: Spacing.md }}>
+              <GIcon name={room.icon} size={20} color={JaridaPurple[500]} />
+            </View>
+            <View style={styles.roomInfo}>
+              <Text style={styles.roomName}>{room.name}</Text>
+              <Text style={styles.roomDevices}>{room.deviceCount} devices</Text>
+            </View>
+            <Pressable style={styles.roomAction}>
+              <GIcon name="edit" size={16} color={Grey[400]} />
+            </Pressable>
+            <Pressable
+              style={styles.roomAction}
+              onPress={() => handleRemoveRoom(room.id)}
+            >
+              <GIcon name="trash" size={16} color={Semantic.danger} />
+            </Pressable>
           </View>
-          <View style={styles.roomInfo}>
-            <Text style={styles.roomName}>{room.name}</Text>
-            <Text style={styles.roomDevices}>{room.deviceCount} devices</Text>
-          </View>
-          <Pressable style={styles.roomAction}>
-            <GIcon name="edit" size={16} color={Grey[400]} />
-          </Pressable>
-          <Pressable
-            style={styles.roomAction}
-            onPress={() => handleRemoveRoom(room.id)}
-          >
-            <GIcon name="trash" size={16} color={Semantic.danger} />
-          </Pressable>
-        </View>
-      ))}
+        ))}
 
-      {/* Add room */}
-      <Pressable style={styles.addBtn}>
-        <GIcon name="plus" size={16} color={JaridaPurple[500]} />
-        <Text style={styles.addBtnText}>Add Room</Text>
-      </Pressable>
+        {/* Add room */}
+        <Pressable style={styles.addBtn}>
+          <GIcon name="plus" size={16} color={JaridaPurple[500]} />
+          <Text style={styles.addBtnText}>Add Room</Text>
+        </Pressable>
 
-      {/* Pond devices */}
-      <Text style={styles.sectionLabel}>POND DEVICES</Text>
-      {POND_DEVICES.map((pd) => (
-        <View key={pd.id} style={styles.pondCard}>
-          <View style={styles.pondHeader}>
-            <View style={[styles.pondDot, { backgroundColor: pd.status === 'online' ? Semantic.success : Grey[400] }]} />
-            <Text style={styles.pondName}>{pd.name}</Text>
-          </View>
-          <View style={styles.pondMeta}>
-            <Text style={styles.pondFirmware}>Firmware: {pd.firmware}</Text>
-            <View style={[styles.pondStatus, { backgroundColor: pd.status === 'online' ? Semantic.successSoft : Grey[100] }]}>
-              <Text style={[styles.pondStatusText, { color: pd.status === 'online' ? Semantic.success : Grey[500] }]}>
-                {pd.status}
-              </Text>
+        {/* Pond devices */}
+        <Text style={styles.sectionLabel}>POND DEVICES</Text>
+        {POND_DEVICES.map((pd) => (
+          <View key={pd.id} style={styles.pondCard}>
+            <View style={styles.pondHeader}>
+              <View style={[styles.pondDot, { backgroundColor: pd.status === 'online' ? Semantic.success : Grey[400] }]} />
+              <Text style={styles.pondName}>{pd.name}</Text>
+            </View>
+            <View style={styles.pondMeta}>
+              <Text style={styles.pondFirmware}>Firmware: {pd.firmware}</Text>
+              <View style={[styles.pondStatus, { backgroundColor: pd.status === 'online' ? Semantic.successSoft : Grey[100] }]}>
+                <Text style={[styles.pondStatusText, { color: pd.status === 'online' ? Semantic.success : Grey[500] }]}>
+                  {pd.status}
+                </Text>
+              </View>
             </View>
           </View>
-        </View>
-      ))}
+        ))}
 
-      {/* Pair new device */}
-      <Pressable
-        style={styles.addBtn}
-        onPress={() => router.push('/(stack)/pond-pairing')}
-      >
-        <GIcon name="plus" size={16} color={JaridaPurple[500]} />
-        <Text style={styles.addBtnText}>Pair New Pond Device</Text>
-      </Pressable>
+        {/* Pair new device */}
+        <Pressable
+          style={styles.addBtn}
+          onPress={() => router.push('/(stack)/pond-pairing')}
+        >
+          <GIcon name="plus" size={16} color={JaridaPurple[500]} />
+          <Text style={styles.addBtnText}>Pair New Pond Device</Text>
+        </Pressable>
 
-      <View style={{ height: 32 }} />
-    </ScrollView>
+        <View style={{ height: 32 }} />
+      </ScrollView>
+    </GKeyboardView>
   );
 }
 
