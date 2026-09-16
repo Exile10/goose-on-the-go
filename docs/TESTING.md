@@ -44,10 +44,17 @@ Two pieces of configuration are load-bearing and non-obvious:
   teardown, which Jest escalates into a suite failure even when every test
   passed. The setup file swaps in Node's own `fetch` before anything can
   trigger it.
-- **`moduleNameMapper` redirects `expo-modules-core`.** npm installs it under
-  `expo/node_modules` rather than hoisting it, so `jest-expo`'s preset cannot
-  resolve it by name. The mapping points at the copy `expo` itself uses, so
-  there is no second version to drift.
+- **`moduleNameMapper` redirects `expo-modules-core`, to two paths.**
+  `jest-expo`'s preset cannot resolve it by name, and *where* npm puts it is not
+  stable: it nests it under `expo/node_modules` in some resolutions and hoists it
+  to the top level in others. The mapping lists both, and jest tries them in
+  order — nested first, so that when there are two copies the tests use the one
+  `expo` itself loads rather than a second version that could drift.
+
+  A single path looks fine until the day it does not. Re-resolving the lockfile
+  hoisted the package, the nested path stopped existing, and **every suite failed
+  to run with zero tests** — a config error rather than a test failure, so the
+  output blames the mapping and not the change that moved the package.
 
 The preset is `jest-expo`, matched to the Expo SDK (`jest-expo@56` for SDK 56).
 Upgrading the SDK means upgrading `jest-expo` in step — a mismatch fails at

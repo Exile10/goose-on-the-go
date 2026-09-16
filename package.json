@@ -56,8 +56,14 @@
     "preset": "jest-expo",
     "moduleNameMapper": {
       "^@/(.*)$": "<rootDir>/$1",
-      "^expo-modules-core/(.*)$": "<rootDir>/node_modules/expo/node_modules/expo-modules-core/$1",
-      "^expo-modules-core$": "<rootDir>/node_modules/expo/node_modules/expo-modules-core"
+      "^expo-modules-core/(.*)$": [
+        "<rootDir>/node_modules/expo/node_modules/expo-modules-core/$1",
+        "<rootDir>/node_modules/expo-modules-core/$1"
+      ],
+      "^expo-modules-core$": [
+        "<rootDir>/node_modules/expo/node_modules/expo-modules-core",
+        "<rootDir>/node_modules/expo-modules-core"
+      ]
     },
     "testPathIgnorePatterns": [
       "/node_modules/",
