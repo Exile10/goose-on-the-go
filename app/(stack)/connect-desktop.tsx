@@ -13,6 +13,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Animated, Easing, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CameraView, useCameraPermissions, type BarcodeScanningResult } from 'expo-camera';
 
 import { GIcon } from '@/components/ui/g-icon';
@@ -23,6 +24,7 @@ import {
   parsePairingPayload,
 } from '@/models/pairing';
 import { offerPairingPayload } from '@/services/pairing-handoff';
+import { advanceHold, HOLD_STEADY_MS, LOST_AFTER_MS, type Hold } from '@/models/scan-hold';
 import { Brand, Grey, JaridaPurple, Semantic } from '@/constants/colors';
 import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
 import { Spacing } from '@/constants/spacing';
@@ -32,29 +34,14 @@ const FRAME_SIZE = 240;
 const CORNER_SIZE = 28;
 
 /**
- * How long the same code must stay readable before it is accepted.
- *
- * The scanner used to commit on the first frame that decoded, so a QR merely
- * passing through the lens paired the phone before the user had finished
- * aiming. QR carries its own error correction, so that read is not wrong — it is
- * just not yet a decision the user has made.
- *
- * Holding for a moment makes it one, and gives the framing something to settle
- * against. Long enough to be deliberate, short enough that a steady hand is not
- * kept waiting.
+ * The hold rule itself lives in `models/scan-hold.ts` and is unit tested there:
+ * a rule embedded in a camera callback can only be exercised by pointing a real
+ * phone at a real QR, which is how a hold that did not hold reached a device.
  */
-const HOLD_STEADY_MS = 700;
-
-/**
- * A code not seen for this long counts as gone, and the hold starts over.
- *
- * `onBarcodeScanned` simply stops firing when the code leaves the frame — there
- * is no "lost" event — so the only way to notice is the gap between frames.
- */
-const LOST_AFTER_MS = 350;
 
 export default function ConnectDesktopScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [permission, requestPermission] = useCameraPermissions();
   const [error, setError] = useState<string | null>(null);
 
@@ -69,7 +56,7 @@ export default function ConnectDesktopScreen() {
 
   // Which code is being held, and since when. A ref rather than state: it
   // changes on every camera frame and none of it belongs in a render.
-  const held = useRef<{ data: string; since: number } | null>(null);
+  const held = useRef<Hold | null>(null);
   const lostTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [progress] = useState(() => new Animated.Value(0));
 
@@ -113,11 +100,11 @@ export default function ConnectDesktopScreen() {
       }
 
       const now = Date.now();
-      const current = held.current;
+      const step = advanceHold(held.current, data, now);
+      const restarted = step.hold.since !== held.current?.since;
+      held.current = step.hold;
 
-      // Restart the hold whenever the code in frame is a different one.
-      if (!current || current.data !== data) {
-        held.current = { data, since: now };
+      if (restarted) {
         setHolding(true);
         progress.setValue(0);
         Animated.timing(progress, {
@@ -128,13 +115,13 @@ export default function ConnectDesktopScreen() {
         }).start();
       }
 
-      // Each frame pushes the deadline out; silence past it means the code left
-      // the frame, so the hold is abandoned rather than quietly completing.
+      // The rule notices a code leaving the frame from the gap between frames,
+      // but nothing arrives once it is gone — so a timer is still what clears
+      // the indicator rather than leaving it filling against a blank view.
       if (lostTimer.current) clearTimeout(lostTimer.current);
       lostTimer.current = setTimeout(abandonHold, LOST_AFTER_MS);
 
-      const heldSince = held.current?.since ?? now;
-      if (now - heldSince < HOLD_STEADY_MS) return;
+      if (!step.accept) return;
 
       if (lostTimer.current) clearTimeout(lostTimer.current);
       setScanning(false);
@@ -189,6 +176,18 @@ export default function ConnectDesktopScreen() {
         barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
         onBarcodeScanned={scanning ? handleScanned : undefined}
       />
+      {/* The screen owns its dismiss control now that it draws full bleed, and
+          it sits below the status bar rather than under it. */}
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Close scanner"
+        onPress={() => router.back()}
+        hitSlop={12}
+        style={[styles.close, { top: insets.top + Spacing.sm }]}
+      >
+        <GIcon name="arrow" size={22} color={Brand.white} />
+      </Pressable>
+
       <View style={styles.overlay}>
         <View style={styles.frame}>
           <View style={[styles.corner, styles.cornerTL, holding && styles.cornerHolding]} />
@@ -241,6 +240,21 @@ export default function ConnectDesktopScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Brand.charcoal },
+  close: {
+    position: 'absolute',
+    left: Spacing.md,
+    zIndex: 2,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    // Legible over whatever the camera happens to be pointed at.
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    // The registry's arrow points right; this is the only place that needs it
+    // pointing back, which is not worth a second path in the icon set.
+    transform: [{ rotate: '180deg' }],
+  },
 
   overlay: {
     flex: 1,
