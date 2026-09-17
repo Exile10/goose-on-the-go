@@ -223,6 +223,20 @@ describe('findPondByHost', () => {
     await expect(pending).resolves.toMatchObject({ url: 'http://192.168.1.2:4000' });
   });
 
+  it("matches when the router's domain differs from the server's own hostname", async () => {
+    // The Jetson on this LAN: its `/system/info` hostname is the bare `nano`, so
+    // the QR says `nano.local`, while Android's reverse-DNS lookup answers
+    // `nano.bbrouter`. Stripping suffixes cannot reconcile those -- only the
+    // machine name does.
+    const pending = findPondByHost('nano.local', 8080, 1_000);
+    instances[0].emit(
+      'resolved',
+      resolved({ host: 'nano.bbrouter', port: 8080, addresses: ['192.168.1.11'] }),
+    );
+
+    await expect(pending).resolves.toMatchObject({ url: 'http://192.168.1.11:8080' });
+  });
+
   it('will not take a different hub that happens to share the port', async () => {
     // Matching on the port alone would pair with somebody else's Pond.
     const pending = findPondByHost('nano.local', 8080, 30);

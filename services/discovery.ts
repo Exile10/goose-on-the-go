@@ -73,22 +73,32 @@ export function toPond(service: Service): DiscoveredPond | null {
 }
 
 /**
- * Reduce a hostname to the form both sides can be compared in.
+ * Reduce a hostname to the machine name both sides agree on.
  *
- * The two sides disagree on spelling for the same machine. A pairing QR carries
- * the fully qualified `Emmanueyugi4525.bbrouter.local`, while Android's
- * NsdManager reports the same host as `Emmanueyugi4525.bbrouter` — no `.local`
- * at all — and mDNS itself writes `nano.local.` with a trailing dot. Comparing
- * any two of those literally fails, which is what stopped a scanned QR from
- * being matched to the hub discovery had already found.
+ * The two sides do not spell the same machine the same way, and the reason is
+ * worth writing down because it makes any fuller comparison unreliable.
  *
- * So: lowercase, drop the trailing dot, then drop a trailing `.local`.
+ * A pairing QR carries whatever the server's own `hostname::get()` returned,
+ * plus `.local`. Android does not report the advertised mDNS name at all: it
+ * calls `getHostName()`, which is a *reverse DNS* lookup, so it answers with
+ * whatever the router calls that address. On this LAN those disagree per device:
+ *
+ *   Mac     QR `Emmanueyugi4525.bbrouter.local`   reverse DNS `Emmanueyugi4525.bbrouter`
+ *   Jetson  QR `nano.local`                       reverse DNS `nano.bbrouter`
+ *
+ * The Mac happens to agree once `.local` is stripped, because its own hostname
+ * already carried the router's domain. The Jetson does not, and no amount of
+ * suffix-stripping makes `nano` equal `nano.bbrouter`.
+ *
+ * What survives both is the first label — the machine's actual name. So that is
+ * what is compared, and `findPondByHost` additionally requires the port to
+ * match, which is what keeps this from being a loose match on a common name.
  */
 function normalizeHostname(host: string | undefined): string | undefined {
   const trimmed = host
     ?.trim()
     .replace(/\.$/, '')
-    .replace(/\.local$/i, '');
+    .split('.')[0];
   return trimmed ? trimmed.toLowerCase() : undefined;
 }
 
