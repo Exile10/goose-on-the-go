@@ -88,6 +88,30 @@ describe('pairing handoff', () => {
   });
 });
 
+describe('the tailnet address', () => {
+  // The address that still reaches the Pond once the phone leaves the house.
+  it('is parsed from ts= when the Pond is on a tailnet', () => {
+    const payload = parsePairingPayload(`${VALID}&ip=192.168.1.11&ts=100.101.102.103`);
+
+    expect(payload.remoteUrl).toBe('http://100.101.102.103:4000');
+    expect(payload.fallbackUrl).toBe('http://192.168.1.11:4000');
+  });
+
+  it('is absent for a Pond that is not on a tailnet', () => {
+    // An older server, or one nobody has joined to a tailnet. The QR is still
+    // valid and pairing at home still works.
+    expect(parsePairingPayload(`${VALID}&ip=192.168.1.11`).remoteUrl).toBeUndefined();
+  });
+
+  it('carries the same port as the rest of the payload', () => {
+    const payload = parsePairingPayload(
+      'pond://pair?host=nano.local&port=8080&code=123456&ts=100.64.0.7',
+    );
+
+    expect(payload.remoteUrl).toBe('http://100.64.0.7:8080');
+  });
+});
+
 describe('looksLikeMatterSetupCode', () => {
   // Two QR codes are in play and the wrong one is a reasonable thing to scan:
   // the Pond's dashboard shows a pairing code, every Matter device ships with a

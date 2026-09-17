@@ -2,13 +2,16 @@
  * Pairing payload — decoded from the QR code shown on Goose In A Pond desktop.
  *
  * Desktop encodes: pond://pair?host=<hostname>.local&port=<port>&code=<6-digit>
- * plus an optional &ip=<lan-address> (pond-desktop/src/sections/Pairing.tsx),
- * refreshing it as the code expires.
+ * plus an optional &ip=<lan-address> and &ts=<tailnet-address>
+ * (pond-desktop/src/sections/Pairing.tsx), refreshing it as the code expires.
  *
- * Both addresses are present because neither works everywhere. The mDNS name is
- * the better identifier — it survives a DHCP lease change — but Android's
- * resolver does no mDNS, so `<host>.local` fails outright there. Older ponds
- * send no `ip` at all, which is why it is optional rather than required.
+ * Three addresses, because none of them works everywhere. The mDNS name is the
+ * best identifier — it survives a DHCP lease change — but Android's resolver
+ * does no mDNS, so `<host>.local` fails outright there. The LAN address works
+ * there and nowhere else: it stops meaning anything the moment the phone leaves
+ * the house, which is what the tailnet address is for. Both extras are optional
+ * because a Pond may have neither — an older server sends no `ip`, and one that
+ * is not on a tailnet has no `ts`.
  *
  * The code is a short-lived secret proved via the two-phase handshake
  * (see `PondApiClient.pair` in services/api-client.ts) — it is never sent over
@@ -26,6 +29,14 @@ export interface PairingPayload {
    * lease.
    */
   fallbackUrl?: string;
+  /**
+   * The same server by its tailnet address, when the QR carried one.
+   *
+   * The only one of the three that still reaches the Pond from outside the
+   * house, and the last to be tried: at home the LAN address is a direct hop
+   * that needs no VPN running.
+   */
+  remoteUrl?: string;
   /** Hostname the hub is advertised as (for display) */
   host: string;
   /** Single-use 6-digit pairing code */
@@ -82,9 +93,11 @@ export function parsePairingPayload(raw: string): PairingPayload {
   }
 
   const ip = url.searchParams.get('ip');
+  const tailnet = url.searchParams.get('ts');
   return {
     serverUrl: `http://${host}:${port}`,
     fallbackUrl: ip ? `http://${ip}:${port}` : undefined,
+    remoteUrl: tailnet ? `http://${tailnet}:${port}` : undefined,
     host,
     code,
   };
