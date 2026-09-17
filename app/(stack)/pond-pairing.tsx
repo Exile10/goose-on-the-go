@@ -400,7 +400,11 @@ export default function PondPairingScreen() {
       const scanned = takePairingPayload();
       if (!scanned) return;
 
-      const candidates = [scanned.serverUrl, scanned.fallbackUrl]
+      // Order matters: the mDNS name first because it survives a DHCP lease,
+      // the LAN address next because Android cannot resolve that name, and the
+      // tailnet address last because at home the LAN hop is direct and needs no
+      // VPN running. Away from home it is the only one that answers.
+      const candidates = [scanned.serverUrl, scanned.fallbackUrl, scanned.remoteUrl]
         .map((u) => (u ? normalizeServerUrl(u) : null))
         .filter((u): u is string => u !== null);
       if (candidates.length === 0) return;
