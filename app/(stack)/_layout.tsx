@@ -39,10 +39,12 @@ export default function StackLayout() {
       <Stack.Screen
         name="connect-desktop"
         options={{
-          title: 'Scan Pairing Code',
-          headerTransparent: true,
-          headerTintColor: Brand.white,
-          headerTitleStyle: { color: Brand.white, fontFamily: 'Quicksand', fontWeight: '700' },
+          // No header at all. `headerTransparent` still reserved a white bar
+          // against the light navigation theme -- with a white tint on top of
+          // it, which is why the title was invisible and the camera started an
+          // inch down the screen. A viewfinder wants the whole screen, so the
+          // screen carries its own dismiss control instead.
+          headerShown: false,
         }}
       />
     </Stack>
