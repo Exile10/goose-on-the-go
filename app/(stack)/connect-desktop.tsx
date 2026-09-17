@@ -10,8 +10,8 @@
  * error copy never echoes it back.
  */
 
-import React, { useCallback, useState } from 'react';
-import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { Animated, Easing, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { CameraView, useCameraPermissions, type BarcodeScanningResult } from 'expo-camera';
 
@@ -31,6 +31,28 @@ import { Radii } from '@/constants/radii';
 const FRAME_SIZE = 240;
 const CORNER_SIZE = 28;
 
+/**
+ * How long the same code must stay readable before it is accepted.
+ *
+ * The scanner used to commit on the first frame that decoded, so a QR merely
+ * passing through the lens paired the phone before the user had finished
+ * aiming. QR carries its own error correction, so that read is not wrong — it is
+ * just not yet a decision the user has made.
+ *
+ * Holding for a moment makes it one, and gives the framing something to settle
+ * against. Long enough to be deliberate, short enough that a steady hand is not
+ * kept waiting.
+ */
+const HOLD_STEADY_MS = 700;
+
+/**
+ * A code not seen for this long counts as gone, and the hold starts over.
+ *
+ * `onBarcodeScanned` simply stops firing when the code leaves the frame — there
+ * is no "lost" event — so the only way to notice is the gap between frames.
+ */
+const LOST_AFTER_MS = 350;
+
 export default function ConnectDesktopScreen() {
   const router = useRouter();
   const [permission, requestPermission] = useCameraPermissions();
@@ -42,15 +64,39 @@ export default function ConnectDesktopScreen() {
    * the wizard the same payload dozens of times.
    */
   const [scanning, setScanning] = useState(true);
+  /** True while a valid code is being held in frame, before it is accepted. */
+  const [holding, setHolding] = useState(false);
+
+  // Which code is being held, and since when. A ref rather than state: it
+  // changes on every camera frame and none of it belongs in a render.
+  const held = useRef<{ data: string; since: number } | null>(null);
+  const lostTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [progress] = useState(() => new Animated.Value(0));
+
+  const abandonHold = useCallback(() => {
+    held.current = null;
+    setHolding(false);
+    progress.stopAnimation();
+    progress.setValue(0);
+  }, [progress]);
+
+  useEffect(() => () => {
+    if (lostTimer.current) clearTimeout(lostTimer.current);
+  }, []);
 
   const handleScanned = useCallback(
     ({ data }: BarcodeScanningResult) => {
       if (!scanning) return;
-      setScanning(false);
+
+      let payload;
       try {
-        offerPairingPayload(parsePairingPayload(data));
-        router.back();
+        payload = parsePairingPayload(data);
       } catch (e) {
+        // Judged immediately rather than after the hold: a QR that is not a
+        // pairing code will never become one by being held longer, and the
+        // Matter case below is worth saying at once.
+        setScanning(false);
+        abandonHold();
         if (!(e instanceof InvalidPairingCodeError)) {
           setError('Could not read that code. Try again.');
           return;
@@ -63,15 +109,47 @@ export default function ConnectDesktopScreen() {
             ? 'That is a Matter device setup code, not a Pond pairing code. Use Devices, then Add device, to commission it. The pairing code is the one on your Pond dashboard.'
             : 'That is not a Goose In A Pond pairing code. Open Pairing on your Pond and scan the code it shows.',
         );
+        return;
       }
+
+      const now = Date.now();
+      const current = held.current;
+
+      // Restart the hold whenever the code in frame is a different one.
+      if (!current || current.data !== data) {
+        held.current = { data, since: now };
+        setHolding(true);
+        progress.setValue(0);
+        Animated.timing(progress, {
+          toValue: 1,
+          duration: HOLD_STEADY_MS,
+          easing: Easing.linear,
+          useNativeDriver: false,
+        }).start();
+      }
+
+      // Each frame pushes the deadline out; silence past it means the code left
+      // the frame, so the hold is abandoned rather than quietly completing.
+      if (lostTimer.current) clearTimeout(lostTimer.current);
+      lostTimer.current = setTimeout(abandonHold, LOST_AFTER_MS);
+
+      const heldSince = held.current?.since ?? now;
+      if (now - heldSince < HOLD_STEADY_MS) return;
+
+      if (lostTimer.current) clearTimeout(lostTimer.current);
+      setScanning(false);
+      abandonHold();
+      offerPairingPayload(payload);
+      router.back();
     },
-    [router, scanning],
+    [router, scanning, abandonHold, progress],
   );
 
   const retry = useCallback(() => {
     setError(null);
+    abandonHold();
     setScanning(true);
-  }, []);
+  }, [abandonHold]);
 
   // Permission not yet determined — the hook answers on the next render.
   if (!permission) return <View style={styles.container} />;
@@ -113,11 +191,28 @@ export default function ConnectDesktopScreen() {
       />
       <View style={styles.overlay}>
         <View style={styles.frame}>
-          <View style={[styles.corner, styles.cornerTL]} />
-          <View style={[styles.corner, styles.cornerTR]} />
-          <View style={[styles.corner, styles.cornerBL]} />
-          <View style={[styles.corner, styles.cornerBR]} />
+          <View style={[styles.corner, styles.cornerTL, holding && styles.cornerHolding]} />
+          <View style={[styles.corner, styles.cornerTR, holding && styles.cornerHolding]} />
+          <View style={[styles.corner, styles.cornerBL, holding && styles.cornerHolding]} />
+          <View style={[styles.corner, styles.cornerBR, holding && styles.cornerHolding]} />
         </View>
+
+        {/* The hold made visible, so waiting reads as progress, not as a stall. */}
+        {holding && !error ? (
+          <View style={styles.progressTrack}>
+            <Animated.View
+              style={[
+                styles.progressFill,
+                {
+                  width: progress.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: ['0%', '100%'],
+                  }),
+                },
+              ]}
+            />
+          </View>
+        ) : null}
 
         {error ? (
           <View style={styles.statusCard}>
@@ -130,7 +225,9 @@ export default function ConnectDesktopScreen() {
           </View>
         ) : (
           <Text style={styles.hint}>
-            Point the camera at the QR code on your Pond&apos;s dashboard
+            {holding
+              ? 'Hold steady\u2026'
+              : "Point the camera at the QR code on your Pond's dashboard"}
           </Text>
         )}
 
@@ -157,12 +254,27 @@ const styles = StyleSheet.create({
     width: FRAME_SIZE,
     height: FRAME_SIZE,
   },
+  progressTrack: {
+    width: FRAME_SIZE,
+    height: 3,
+    marginTop: Spacing.md,
+    borderRadius: Radii.sm,
+    backgroundColor: 'rgba(255,255,255,0.25)',
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: Semantic.success,
+  },
   corner: {
     position: 'absolute',
     width: CORNER_SIZE,
     height: CORNER_SIZE,
     borderColor: JaridaPurple[400],
   },
+  // Brightens the moment a valid code is held, so the frame itself confirms the
+  // aim before any text does.
+  cornerHolding: { borderColor: Semantic.success },
   cornerTL: { top: 0, left: 0, borderTopWidth: 3, borderLeftWidth: 3, borderTopLeftRadius: Radii.md },
   cornerTR: { top: 0, right: 0, borderTopWidth: 3, borderRightWidth: 3, borderTopRightRadius: Radii.md },
   cornerBL: { bottom: 0, left: 0, borderBottomWidth: 3, borderLeftWidth: 3, borderBottomLeftRadius: Radii.md },
