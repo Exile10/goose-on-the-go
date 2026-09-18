@@ -29,6 +29,7 @@ import {
   NotificationStream,
   type ServerNotification,
 } from '@/services/notification-stream';
+import { registerPushToken, watchPushTokenRotation } from '@/services/push-token';
 import { useServer } from '@/providers/server-provider';
 
 /** Newest notifications kept in memory for the UI. */
@@ -75,6 +76,13 @@ export function NotificationsProvider({ children }: PropsWithChildren) {
 
     void startStream();
 
+    // Background push (Path B): register the native FCM/APNs token with the
+    // paired server and keep it fresh across platform rotations. No-ops
+    // cleanly where push is unavailable (Expo Go, simulators, permission
+    // denied) — foreground SSE above works regardless.
+    registerPushToken().catch((e) => console.log('[push] registration failed:', e));
+    const stopTokenWatch = watchPushTokenRotation();
+
     // The stream only needs to live while the app is foregrounded; RN kills
     // long-lived sockets in the background anyway, and the server re-flushes
     // undelivered notifications on the next connect.
@@ -91,6 +99,7 @@ export function NotificationsProvider({ children }: PropsWithChildren) {
     return () => {
       cancelled = true;
       sub.remove();
+      stopTokenWatch();
       streamRef.current?.stop();
       streamRef.current = null;
     };
