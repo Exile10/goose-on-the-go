@@ -8,7 +8,7 @@
  *   <ListeningOverlay visible={isListening} onCancel={() => setIsListening(false)} />
  */
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -43,8 +43,8 @@ export interface ListeningOverlayProps {
 
 /** Pulsing ring animation */
 function PulseRing({ delay, size }: { delay: number; size: number }) {
-  const scaleAnim = useRef(new Animated.Value(0.8)).current;
-  const opacityAnim = useRef(new Animated.Value(0.4)).current;
+  const [scaleAnim] = useState(() => new Animated.Value(0.8));
+  const [opacityAnim] = useState(() => new Animated.Value(0.4));
 
   useEffect(() => {
     const loop = Animated.loop(
@@ -98,11 +98,14 @@ function PulseRing({ delay, size }: { delay: number; size: number }) {
 
 /** Waveform bars */
 function WaveformBars() {
-  const bars = Array.from({ length: 20 });
+  // Heights are decorative. Drawing them once keeps render pure — re-rolling
+  // them on every render is what the impure-function rule objects to.
+  const [bars] = useState(() =>
+    Array.from({ length: 20 }, () => 8 + Math.random() * 24),
+  );
   return (
     <View style={styles.waveform}>
-      {bars.map((_, i) => {
-        const height = 8 + Math.random() * 24;
+      {bars.map((height, i) => {
         return (
           <View
             key={i}

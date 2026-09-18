@@ -99,6 +99,10 @@ export default function HomeScreen() {
   );
   const router = useRouter();
   const [askText, setAskText] = useState('');
+  // Decorative waveform. Rolled once so render stays pure.
+  const [waveBarHeights] = useState(() =>
+    Array.from({ length: 8 }, () => 6 + Math.random() * 14),
+  );
 
   const handleMicPress = useCallback(() => {
     // Will trigger listening overlay in future
@@ -156,13 +160,10 @@ export default function HomeScreen() {
             <Text style={styles.nowPlayingTitle}>Lo-fi Beats</Text>
             <Text style={styles.nowPlayingArtist}>Living Room Speaker</Text>
             <View style={styles.waveformRow}>
-              {Array.from({ length: 8 }).map((_, i) => (
+              {waveBarHeights.map((height, i) => (
                 <View
                   key={i}
-                  style={[
-                    styles.waveBar,
-                    { height: 6 + Math.random() * 14 },
-                  ]}
+                  style={[styles.waveBar, { height }]}
                 />
               ))}
             </View>

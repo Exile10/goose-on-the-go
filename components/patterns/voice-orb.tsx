@@ -30,38 +30,38 @@ export function VoiceOrb({ state, onPress }: VoiceOrbProps) {
 
   useEffect(() => {
     if (isActive) {
-      ringScale.value = withRepeat(
+      ringScale.set(withRepeat(
         withTiming(1.7, { duration: 1600, easing: Easing.out(Easing.ease) }),
         -1,
         false,
-      );
-      ringOpacity.value = withRepeat(
+      ));
+      ringOpacity.set(withRepeat(
         withTiming(0, { duration: 1600, easing: Easing.out(Easing.ease) }),
         -1,
         false,
-      );
+      ));
     } else {
       cancelAnimation(ringScale);
       cancelAnimation(ringOpacity);
-      ringScale.value = 0.9;
-      ringOpacity.value = 0;
+      ringScale.set(0.9);
+      ringOpacity.set(0);
     }
   }, [isActive, ringScale, ringOpacity]);
 
   const orbStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
+    transform: [{ scale: scale.get() }],
   }));
 
   const ringStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: ringScale.value }],
-    opacity: ringOpacity.value,
+    transform: [{ scale: ringScale.get() }],
+    opacity: ringOpacity.get(),
   }));
 
   return (
     <Pressable
       onPress={onPress}
-      onPressIn={() => { scale.value = withTiming(0.95, { duration: 100 }); }}
-      onPressOut={() => { scale.value = withTiming(1, { duration: 150 }); }}
+      onPressIn={() => { scale.set(withTiming(0.95, { duration: 100 })); }}
+      onPressOut={() => { scale.set(withTiming(1, { duration: 150 })); }}
       style={styles.wrapper}
     >
       {isActive && <Animated.View style={[styles.ring, ringStyle]} />}

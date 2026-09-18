@@ -342,7 +342,7 @@ function PairingCodeStep({
       <GIcon name="wifi" size={28} color={JaridaPurple[500]} />
       <Text style={styles.stepTitle}>Enter Pairing Code</Text>
       <Text style={styles.stepDesc}>
-        The 6-digit code is shown on the GIAP host's dashboard or terminal
+        The 6-digit code is shown on the GIAP host&apos;s dashboard or terminal
         when the server starts. It expires after 10 minutes.
       </Text>
       <View style={styles.inputGroup}>
@@ -378,7 +378,7 @@ function NameStep({ onNext }: { onNext: (name: string) => void }) {
       <GIcon name="edit" size={28} color={JaridaPurple[500]} />
       <Text style={styles.stepTitle}>Name This Phone</Text>
       <Text style={styles.stepDesc}>
-        This name shows up in the GIAP devices list — pick something you'll
+        This name shows up in the GIAP devices list — pick something you&apos;ll
         recognize.
       </Text>
       <View style={styles.inputGroup}>
