@@ -33,6 +33,13 @@ yarn-error.*
 # local env files
 .env*.local
 
+# IDE — per-developer, not project configuration
+.idea/
+.vscode/
+
+# Agent guidance — personal to one setup, like the Pond's own CLAUDE.md
+CLAUDE.md
+
 # Firebase client config — supplied per-developer, not committed
 # (download from Firebase console: Project settings -> your app)
 google-services.json

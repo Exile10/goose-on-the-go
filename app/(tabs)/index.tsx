@@ -20,7 +20,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { GIcon } from '@/components/ui/g-icon';
 import { useRecentSessions } from '@/view-models/use-recent-sessions';
 import { GSwitch } from '@/components/ui/g-switch';
-import { HOME_DEVICES } from '@/models/device';
+import { supports, useDevices } from '@/view-models/use-devices';
+import type { Device } from '@/services/types';
 import { HOME_SHORTCUTS } from '@/constants/navigation';
 import { Grey, JaridaPurple, Brand, Semantic } from '@/constants/colors';
 import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
@@ -44,28 +45,58 @@ function StatusChip({ label, color, bg }: { label: string; color: string; bg: st
   );
 }
 
+/**
+ * A device on the home grid. Same rules as the Devices tab: the switch appears
+ * only where `capabilities` says the device accepts one, and its position comes
+ * from what the device reported rather than from a default.
+ */
 const DeviceGridItem = React.memo(function DeviceGridItem({
-  item,
+  device,
+  power,
+  onToggle,
 }: {
-  item: (typeof HOME_DEVICES)[number];
+  device: Device;
+  power: boolean | undefined;
+  onToggle: (device: Device, on: boolean) => void;
 }) {
-  const [on, setOn] = useState(true);
+  const canPower = supports(device, 'power');
+  const on = power ?? false;
+  const handleToggle = useCallback((next: boolean) => onToggle(device, next), [device, onToggle]);
+
   return (
     <View style={styles.deviceCard}>
       <View style={styles.deviceCardTop}>
-        <View style={[styles.deviceIconWrap, { backgroundColor: item.color + '18' }]}>
-          <GIcon name={item.icon} size={17} color={on ? item.color : '#B5B5B5'} />
+        <View style={[styles.deviceIconWrap, { backgroundColor: JaridaPurple[500] + '18' }]}>
+          <GIcon
+            name="devices"
+            size={17}
+            color={on && device.is_online ? JaridaPurple[500] : '#B5B5B5'}
+          />
         </View>
-        <GSwitch value={on} onValueChange={setOn} />
+        {canPower ? (
+          <GSwitch value={on} onValueChange={handleToggle} disabled={!device.is_online} />
+        ) : null}
       </View>
-      <Text style={styles.deviceLabel} numberOfLines={1}>{item.label}</Text>
-      <Text style={styles.deviceDetail}>{item.detail}</Text>
+      <Text style={styles.deviceLabel} numberOfLines={1}>
+        {device.name}
+      </Text>
+      <Text style={styles.deviceDetail}>
+        {!device.is_online ? 'Offline' : power === undefined ? 'Online' : power ? 'On' : 'Off'}
+      </Text>
     </View>
   );
 });
 
+/** The home grid is a glance, not the full list — that is the Devices tab. */
+const HOME_GRID_LIMIT = 4;
+
 export default function HomeScreen() {
   const recent = useRecentSessions();
+  const devices = useDevices();
+  const handleDeviceToggle = useCallback(
+    (device: Device, on: boolean) => void devices.actions.setState(device, { power: on }),
+    [devices.actions],
+  );
   const router = useRouter();
   const [askText, setAskText] = useState('');
 
@@ -171,8 +202,13 @@ export default function HomeScreen() {
           </Pressable>
         </View>
         <View style={styles.devicesGrid}>
-          {HOME_DEVICES.map((d) => (
-            <DeviceGridItem key={d.idx} item={d} />
+          {devices.data.devices.slice(0, HOME_GRID_LIMIT).map((d) => (
+            <DeviceGridItem
+              key={d.id}
+              device={d}
+              power={devices.data.powerById[d.id]}
+              onToggle={handleDeviceToggle}
+            />
           ))}
         </View>
 

@@ -62,6 +62,55 @@ export interface CommissionDeviceResponse {
   node_id: string;
 }
 
+/**
+ * A device-state change, in `set_device_state`'s own field names.
+ *
+ * Deliberately a flat optional-field struct rather than `{verb, value}`. The
+ * verb/value model is the controller-facing WebSocket protocol between the Pond
+ * and its Matter sidecar; a client never speaks it.
+ *
+ * Every field is a GIAP unit, not a device one — the controller converts, and
+ * reads back what the device actually did.
+ */
+export interface DeviceStatePatch {
+  /** 0-100 percent. */
+  brightness?: number;
+  /** Degrees Celsius. */
+  target_temp?: number;
+  locked?: boolean;
+  power?: boolean;
+  /** Hue degrees 0-360. */
+  hue?: number;
+  /** 0-100 percent. */
+  saturation?: number;
+  /** Kelvin, roughly 2000 (warm) to 6500 (daylight). Not the same control as hue. */
+  color_temp?: number;
+  /** 0-100 percent. */
+  volume?: number;
+  /** 0-100 percent. */
+  fan_speed?: number;
+  /** off, low, medium, high, on, auto, smart. Preferred when a mode is named. */
+  fan_mode?: string;
+  /** 0-100 percent open, where 100 is fully open. */
+  position?: number;
+  /** Slat angle 0-100. Distinct from position: a blind can be down with slats open. */
+  tilt?: number;
+  /** Open or shut a valve. Not `power` — a valve has no on/off switch. */
+  valve?: boolean;
+}
+
+/**
+ * What `POST /tools/invoke` answers.
+ *
+ * Deliberately untyped beyond this: an MCP tool result carries text, because
+ * its first consumer is a language model. A client reading state out of it is
+ * parsing prose, which is why only the narrowest possible field is read.
+ */
+export interface ToolCallResult {
+  content: string;
+  success: boolean;
+}
+
 export interface MatterStatus {
   enabled: boolean;
   url: string;
