@@ -1,103 +1,92 @@
 /**
- * AddUsersScreen — Household user cards with permissions and invite flow.
+ * AddUsersScreen — the household profiles this Pond recognises.
+ *
+ * A profile is how the assistant tells people apart, so it can attribute memory
+ * and voice to the right person. It is deliberately not an account: the server
+ * stores a display name and an emoji, and nothing else.
+ *
+ * This screen used to show email addresses, four permission tiers and an invite
+ * flow. None of it existed — there is no email field, no role and no invite
+ * endpoint — so it has been replaced with what the API actually offers: list,
+ * add, remove.
  */
 
-import React, { useState, useCallback } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
+  ActivityIndicator,
   View,
   Text,
   StyleSheet,
   ScrollView,
   Pressable,
   TextInput,
-  Alert,
 } from 'react-native';
 
 import { GIcon } from '@/components/ui/g-icon';
 import { GButton } from '@/components/ui/g-button';
+import { useProfiles } from '@/view-models/use-profiles';
+import type { Profile } from '@/services/types';
 import { Grey, JaridaPurple, Brand, Semantic } from '@/constants/colors';
 import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
 import { Spacing } from '@/constants/spacing';
 import { Radii } from '@/constants/radii';
 
-interface HouseholdUser {
-  id: string;
-  name: string;
-  email: string;
-  role: 'Owner' | 'Admin' | 'Member' | 'Guest';
-  avatar: string;
-  status: 'active' | 'pending';
+/** Fallback when a profile has no emoji, so the avatar is never blank. */
+function initial(displayName: string): string {
+  return displayName.trim().charAt(0).toUpperCase() || '?';
 }
 
-const USERS: HouseholdUser[] = [
-  { id: '1', name: 'Jerry Ochieng', email: 'jerry@jarida.ai', role: 'Owner', avatar: 'J', status: 'active' },
-  { id: '2', name: 'Sam Kimani', email: 'sam@email.com', role: 'Admin', avatar: 'S', status: 'active' },
-  { id: '3', name: 'Guest User', email: 'guest@email.com', role: 'Guest', avatar: 'G', status: 'pending' },
-];
+/** Profile card */
+const ProfileCard = React.memo(function ProfileCard({
+  profile,
+  onRemove,
+}: {
+  profile: Profile;
+  onRemove: (id: string) => void;
+}) {
+  const handleRemove = useCallback(() => onRemove(profile.id), [profile.id, onRemove]);
 
-const ROLE_COLORS: Record<string, string> = {
-  Owner: JaridaPurple[500],
-  Admin: Semantic.info,
-  Member: Semantic.success,
-  Guest: Grey[500],
-};
-
-const PERMISSIONS = ['Control devices', 'View cameras', 'Manage routines', 'Edit settings', 'Invite users'];
-
-/** User card */
-const UserCard = React.memo(function UserCard({ user }: { user: HouseholdUser }) {
-  const roleColor = ROLE_COLORS[user.role];
   return (
     <View style={styles.userCard}>
       <View style={styles.userHeader}>
-        <View style={[styles.avatar, { backgroundColor: roleColor }]}>
-          <Text style={styles.avatarText}>{user.avatar}</Text>
+        <View style={[styles.avatar, { backgroundColor: JaridaPurple[500] }]}>
+          <Text style={styles.avatarText}>
+            {profile.avatar_emoji || initial(profile.display_name)}
+          </Text>
         </View>
         <View style={styles.userInfo}>
-          <Text style={styles.userName}>{user.name}</Text>
-          <Text style={styles.userEmail}>{user.email}</Text>
-        </View>
-        <View style={styles.badges}>
-          <View style={[styles.roleBadge, { backgroundColor: roleColor + '18' }]}>
-            <Text style={[styles.roleBadgeText, { color: roleColor }]}>{user.role}</Text>
-          </View>
-          {user.status === 'pending' && (
-            <View style={[styles.roleBadge, { backgroundColor: Semantic.warningSoft }]}>
-              <Text style={[styles.roleBadgeText, { color: Semantic.warning }]}>Pending</Text>
-            </View>
-          )}
+          <Text style={styles.userName}>{profile.display_name}</Text>
         </View>
       </View>
 
-      {/* Permissions */}
-      <View style={styles.permissionsRow}>
-        {PERMISSIONS.slice(0, user.role === 'Owner' ? 5 : user.role === 'Admin' ? 4 : 2).map((p) => (
-          <View key={p} style={styles.permBadge}>
-            <Text style={styles.permText}>{p}</Text>
-          </View>
-        ))}
+      <View style={styles.actionsRow}>
+        <Pressable style={styles.actionBtn} onPress={handleRemove}>
+          <GIcon name="trash" size={14} color={Semantic.danger} />
+          <Text style={[styles.actionText, { color: Semantic.danger }]}>Remove</Text>
+        </Pressable>
       </View>
-
-      {/* Actions */}
-      {user.role !== 'Owner' && (
-        <View style={styles.actionsRow}>
-          <Pressable style={styles.actionBtn}>
-            <GIcon name="edit" size={14} color={Grey[500]} />
-            <Text style={styles.actionText}>Edit</Text>
-          </Pressable>
-          <Pressable style={styles.actionBtn}>
-            <GIcon name="trash" size={14} color={Semantic.danger} />
-            <Text style={[styles.actionText, { color: Semantic.danger }]}>Remove</Text>
-          </Pressable>
-        </View>
-      )}
     </View>
   );
 });
 
 export default function AddUsersScreen() {
-  const [showInvite, setShowInvite] = useState(false);
-  const [email, setEmail] = useState('');
+  const { data, loading, error, actions } = useProfiles();
+  const [showAdd, setShowAdd] = useState(false);
+  const [name, setName] = useState('');
+  const [emoji, setEmoji] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const submit = useCallback(async () => {
+    setSaving(true);
+    const added = await actions.add(name, emoji.trim() || undefined);
+    setSaving(false);
+    // Keep the form open on failure so the typed name is not lost.
+    if (added) {
+      setShowAdd(false);
+      setName('');
+      setEmoji('');
+    }
+  }, [actions, name, emoji]);
 
   return (
     <ScrollView
@@ -105,40 +94,66 @@ export default function AddUsersScreen() {
       contentContainerStyle={styles.scroll}
       showsVerticalScrollIndicator={false}
     >
-      <Text style={styles.sectionLabel}>HOUSEHOLD MEMBERS</Text>
-      {USERS.map((u) => (
-        <UserCard key={u.id} user={u} />
+      <Text style={styles.sectionLabel}>HOUSEHOLD PROFILES</Text>
+
+      {loading ? <ActivityIndicator color={JaridaPurple[500]} /> : null}
+
+      {error ? <Text style={styles.errorText}>{error}</Text> : null}
+
+      {!loading && data.profiles.length === 0 ? (
+        <Text style={styles.emptyText}>
+          No profiles yet. Add one so your Pond can tell people apart.
+        </Text>
+      ) : null}
+
+      {data.profiles.map((p) => (
+        <ProfileCard key={p.id} profile={p} onRemove={actions.remove} />
       ))}
 
-      {/* Invite section */}
-      {showInvite ? (
+      {showAdd ? (
         <View style={styles.inviteCard}>
-          <Text style={styles.inviteTitle}>Invite New Member</Text>
+          <Text style={styles.inviteTitle}>Add a profile</Text>
           <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Email Address</Text>
+            <Text style={styles.inputLabel}>Name</Text>
             <TextInput
               style={styles.textInput}
-              value={email}
-              onChangeText={setEmail}
-              placeholder="name@email.com"
+              value={name}
+              onChangeText={setName}
+              placeholder="Alex"
               placeholderTextColor={Grey[400]}
-              keyboardType="email-address"
-              autoCapitalize="none"
+              autoCapitalize="words"
+              editable={!saving}
+            />
+          </View>
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>Emoji (optional)</Text>
+            <TextInput
+              style={styles.textInput}
+              value={emoji}
+              onChangeText={setEmoji}
+              placeholder="Shown on the profile card"
+              placeholderTextColor={Grey[400]}
+              editable={!saving}
             />
           </View>
           <View style={styles.inviteActions}>
-            <GButton variant="ghost" size="sm" onPress={() => setShowInvite(false)}>
+            <GButton variant="ghost" size="sm" onPress={() => setShowAdd(false)}>
               Cancel
             </GButton>
-            <GButton variant="primary" size="sm" onPress={() => { setShowInvite(false); setEmail(''); }}>
-              Send Invite
+            <GButton
+              variant="primary"
+              size="sm"
+              disabled={!name.trim() || saving}
+              onPress={submit}
+            >
+              {saving ? 'Adding\u2026' : 'Add Profile'}
             </GButton>
           </View>
         </View>
       ) : (
-        <Pressable style={styles.addBtn} onPress={() => setShowInvite(true)}>
+        <Pressable style={styles.addBtn} onPress={() => setShowAdd(true)}>
           <GIcon name="plus" size={16} color={JaridaPurple[500]} />
-          <Text style={styles.addBtnText}>Invite Member</Text>
+          <Text style={styles.addBtnText}>Add Profile</Text>
         </Pressable>
       )}
 
@@ -158,6 +173,18 @@ const styles = StyleSheet.create({
     color: Grey[500],
     letterSpacing: 1,
     textTransform: 'uppercase',
+    marginBottom: Spacing.md,
+  },
+  errorText: {
+    fontFamily: FontFamily.body,
+    fontSize: FontSize.sm,
+    color: Semantic.danger,
+    marginBottom: Spacing.md,
+  },
+  emptyText: {
+    fontFamily: FontFamily.body,
+    fontSize: FontSize.base,
+    color: Grey[500],
     marginBottom: Spacing.md,
   },
 
@@ -195,46 +222,8 @@ const styles = StyleSheet.create({
     fontWeight: FontWeight.bold,
     color: Brand.charcoal,
   },
-  userEmail: {
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.sm,
-    color: Grey[500],
-    marginTop: 2,
-  },
-  badges: { gap: 4 },
-  roleBadge: {
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: 2,
-    borderRadius: Radii.pill,
-    alignSelf: 'flex-end',
-  },
-  roleBadgeText: {
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.xs,
-    fontWeight: FontWeight.bold,
-  },
 
   /* Permissions */
-  permissionsRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: Spacing.xs,
-    marginTop: Spacing.md,
-    paddingTop: Spacing.md,
-    borderTopWidth: 1,
-    borderTopColor: Grey[100],
-  },
-  permBadge: {
-    backgroundColor: Grey[100],
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: 2,
-    borderRadius: Radii.pill,
-  },
-  permText: {
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.xs,
-    color: Grey[600],
-  },
 
   /* Actions */
   actionsRow: {

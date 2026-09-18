@@ -50,7 +50,12 @@ Custom hooks in `view-models/` that own all state and side effects. Every ViewMo
 TypeScript interfaces in `models/` defining the domain shapes. These are pure types — no logic. Mock data is co-located with its type file (e.g., `LLM_MODELS` in `models/model.ts`).
 
 ### Services
-`services/api-client.ts` — HTTP client for pond-server (mock for now).
+`services/api-client.ts` — the HTTP client for pond-server, and the only place in
+the app that calls `fetch`. It attaches the bearer token, refreshes once on 401
+(sharing a single refresh across concurrent 401s), and throws a typed `ApiError`
+carrying the status and any `Retry-After`. Wire types live in
+`services/types.ts`, in the server's own snake_case — deliberately separate from
+the display-shaped types in `models/`.
 `services/storage.ts` — typed AsyncStorage wrapper.
 
 ## Providers
