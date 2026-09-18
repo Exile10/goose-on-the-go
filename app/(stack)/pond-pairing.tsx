@@ -22,7 +22,7 @@ import { Grey, JaridaPurple, Brand, Semantic } from '@/constants/colors';
 import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
 import { Spacing } from '@/constants/spacing';
 import { Radii } from '@/constants/radii';
-import { api } from '@/services/api-client';
+import { ApiError, api } from '@/services/api-client';
 import { useServer } from '@/providers/server-provider';
 import { getInstallId } from '@/services/install-id';
 
@@ -230,6 +230,62 @@ function NameStep({ onNext }: { onNext: (name: string) => void }) {
 }
 
 /** Step 3: Run handshake + show outcome. */
+/**
+ * Turn the server's rejection code into something a person can act on.
+ *
+ * `rejection_reason` is a closed set from pond-core's handshake verifier, and it
+ * was rendered raw — someone who mistyped a digit was shown "invalid_mac". The
+ * cases are split because they call for different things: a stale challenge only
+ * needs the same code re-sent, while an expired code needs a new one fetched
+ * from the Pond.
+ *
+ * The 60-second challenge lifetime is worth naming rather than folding into a
+ * generic retry message. It is far shorter than the code's ten minutes, so it is
+ * the limit a user actually hits.
+ */
+/**
+ * Describe a failure that never reached the verifier — a transport or HTTP
+ * error rather than a rejected code.
+ *
+ * The 429 case is the one that matters. GIAP gives pairing its own rate-limit
+ * budget (30/60s, with /handshake/verify further limited to 10/60s), and it
+ * sends Retry-After when it throttles. Showing "handshake/init failed: 429",
+ * which is what this screen used to print, tells a user nothing and invites
+ * them to hammer the button — which is how a phone spends the budget it needs
+ * to recover. Naming the wait turns a dead end into an instruction.
+ */
+function describeTransportFailure(e: unknown): string {
+  if (e instanceof ApiError) {
+    if (e.status === 429) {
+      const wait = e.retryAfterSecs;
+      return wait
+        ? `Your Pond is rate-limiting pairing attempts. Wait ${wait} second${wait === 1 ? '' : 's'} and try again.`
+        : 'Your Pond is rate-limiting pairing attempts. Wait a minute and try again.';
+    }
+    if (e.status >= 500) {
+      return 'Your Pond returned an error while pairing. Check that it is still running, then try again.';
+    }
+    return `Your Pond refused the pairing request (HTTP ${e.status}).`;
+  }
+  return 'Could not reach your Pond. Check that the phone is on the same network and the server is running.';
+}
+
+function explainRejection(reason: string | null): string {
+  switch (reason) {
+    case 'invalid_mac':
+    case 'bad_mac_hex':
+      return 'That pairing code did not match. Check the six digits on your Pond and try again \u2014 a wrong code costs nothing but this attempt.';
+    case 'challenge_expired':
+    case 'challenge_used':
+    case 'unknown_challenge':
+      return 'This attempt took too long \u2014 the server holds a challenge for only 60 seconds. Enter the same code again; you do not need a new one.';
+    case 'no_active_pairing_code':
+      return 'Your Pond has no pairing code right now. Codes last 10 minutes \u2014 open the dashboard on the host machine to show a fresh one.';
+    default:
+      return 'The server rejected the pairing attempt. Double-check the code and try again.';
+  }
+}
+
 function CompleteStep({
   state,
   reason,
@@ -317,11 +373,13 @@ export default function PondPairingScreen() {
           setCompletionState('ok');
         } else {
           setCompletionState('error');
-          setCompletionReason(resp.rejection_reason ?? 'unknown_error');
+          setCompletionReason(explainRejection(resp.rejection_reason));
         }
       } catch (e) {
+        // A throw means the request never reached the verifier, so there is no
+        // rejection_reason to explain — only an HTTP or transport failure.
         setCompletionState('error');
-        setCompletionReason((e as Error).message);
+        setCompletionReason(describeTransportFailure(e));
       }
     },
     [code, pair],
@@ -430,29 +488,6 @@ const styles = StyleSheet.create({
     color: Semantic.danger,
     textAlign: 'center',
     lineHeight: FontSize.sm * 1.5,
-  },
-
-  /* Device found */
-  deviceFound: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
-    backgroundColor: Semantic.successSoft,
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.md,
-    borderRadius: Radii.pill,
-  },
-  foundDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: Semantic.success,
-  },
-  foundText: {
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.base,
-    fontWeight: FontWeight.semibold,
-    color: Semantic.success,
   },
 
   /* Input groups */

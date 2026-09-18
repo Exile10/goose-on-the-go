@@ -201,7 +201,11 @@ export class PondApiClient {
       }),
     });
     if (!res.ok) {
-      throw new Error(`handshake/init failed: ${res.status}`);
+      throw new ApiError(
+        `handshake/init failed: ${res.status}`,
+        res.status,
+        parseRetryAfter(res),
+      );
     }
     return (await res.json()) as ChallengeResponse;
   }
@@ -222,7 +226,11 @@ export class PondApiClient {
       }),
     });
     if (!res.ok) {
-      throw new Error(`handshake/verify failed: ${res.status}`);
+      throw new ApiError(
+        `handshake/verify failed: ${res.status}`,
+        res.status,
+        parseRetryAfter(res),
+      );
     }
     return (await res.json()) as HandshakeResponse;
   }
