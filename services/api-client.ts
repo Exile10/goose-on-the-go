@@ -12,6 +12,7 @@
  */
 
 import { concat, fromBase64, hmacSha256, toHex, utf8 } from './hmac';
+import { timeoutSignal } from './http';
 import type {
   ActivityResponse,
   ActivitySummary,
@@ -116,20 +117,6 @@ async function parseBody<T>(res: Response): Promise<T | undefined> {
   return JSON.parse(text) as T;
 }
 
-/**
- * `AbortSignal.timeout()` stand-in.
- *
- * React Native installs abort-controller@3's `AbortSignal` as the global
- * (react-native/Libraries/Core/setUpXHR.js), and that implementation carries no
- * static methods at all — `AbortSignal.timeout` is `undefined` on device. Calling
- * it threw a TypeError that `health()` then swallowed in its own catch, so the
- * probe reported every Pond unreachable and never once returned ok.
- */
-function timeoutSignal(ms: number): AbortSignal {
-  const controller = new AbortController();
-  setTimeout(() => controller.abort(), ms);
-  return controller.signal;
-}
 
 export class PondApiClient {
   private baseUrl: string;

@@ -9,13 +9,14 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Pressable,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from 'react-native';
 
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { GIcon } from '@/components/ui/g-icon';
 import { GButton } from '@/components/ui/g-button';
 import { Grey, JaridaPurple, Brand, Semantic } from '@/constants/colors';
@@ -25,6 +26,7 @@ import { Radii } from '@/constants/radii';
 import { ApiError, api } from '@/services/api-client';
 import { useServer } from '@/providers/server-provider';
 import { getInstallId } from '@/services/install-id';
+import { takePairingPayload } from '@/services/pairing-handoff';
 
 type Step = 0 | 1 | 2 | 3;
 const STEP_LABELS = ['Server', 'Pairing Code', 'Name Device', 'Complete'];
@@ -64,6 +66,21 @@ function StepIndicator({ current }: { current: Step }) {
 }
 
 /**
+ * Offers the camera as an alternative to typing.
+ *
+ * Both steps keep their text inputs: the scanner is unavailable without camera
+ * permission, and a QR that will not decode has to have a way past it.
+ */
+function ScanLink({ onPress }: { onPress: () => void }) {
+  return (
+    <Pressable onPress={onPress} hitSlop={8} style={styles.scanLink}>
+      <GIcon name="camera" size={16} color={JaridaPurple[500]} />
+      <Text style={styles.scanLinkText}>Scan QR code instead</Text>
+    </Pressable>
+  );
+}
+
+/**
  * Normalise a hand-typed server address, or return null if it cannot be one.
  *
  * The host machine's dashboard shows a bare `host:port`, so a missing scheme is
@@ -90,9 +107,11 @@ export function normalizeServerUrl(raw: string): string | null {
 function ServerStep({
   initial,
   onNext,
+  onScan,
 }: {
   initial: string;
   onNext: (url: string) => void;
+  onScan: () => void;
 }) {
   const [url, setUrl] = useState(initial);
   const [checking, setChecking] = useState(false);
@@ -161,8 +180,16 @@ function ServerStep({
 }
 
 /** Step 1: Pairing code */
-function PairingCodeStep({ onNext }: { onNext: (code: string) => void }) {
-  const [code, setCode] = useState('');
+function PairingCodeStep({
+  initial,
+  onNext,
+  onScan,
+}: {
+  initial: string;
+  onNext: (code: string) => void;
+  onScan: () => void;
+}) {
+  const [code, setCode] = useState(initial);
   const valid = /^\d{6}$/.test(code);
   return (
     <View style={styles.stepContent}>
@@ -192,6 +219,7 @@ function PairingCodeStep({ onNext }: { onNext: (code: string) => void }) {
       >
         Continue
       </GButton>
+      <ScanLink onPress={onScan} />
     </View>
   );
 }
@@ -352,6 +380,56 @@ export default function PondPairingScreen() {
 
   const [step, setStep] = useState<Step>(0);
   const [code, setCode] = useState('');
+  const openScanner = useCallback(() => router.push('/(stack)/connect-desktop'), [router]);
+
+  /**
+   * Pick up a scanned payload when the scanner navigates back.
+   *
+   * The QR carries both halves the wizard would otherwise ask for, so a
+   * successful scan skips to naming the device. The server is still probed
+   * first: a QR pointing at a host the phone cannot resolve should fail here,
+   * not three steps later during the handshake.
+   *
+   * The mDNS name is tried before the raw address because it is the better one
+   * to keep — an address baked into a QR goes stale on the next DHCP lease.
+   * Android resolves no mDNS at all, so on that platform the first probe is
+   * expected to fail and the fallback is the one that works.
+   */
+  useFocusEffect(
+    useCallback(() => {
+      const scanned = takePairingPayload();
+      if (!scanned) return;
+
+      // Order matters: the mDNS name first because it survives a DHCP lease,
+      // the LAN address next because Android cannot resolve that name, and the
+      // tailnet address last because at home the LAN hop is direct and needs no
+      // VPN running. Away from home it is the only one that answers.
+      const candidates = [scanned.serverUrl, scanned.fallbackUrl, scanned.remoteUrl]
+        .map((u) => (u ? normalizeServerUrl(u) : null))
+        .filter((u): u is string => u !== null);
+      if (candidates.length === 0) return;
+
+      void (async () => {
+        let reached: string | null = null;
+        for (const candidate of candidates) {
+          api.setBaseUrl(candidate);
+          if ((await api.health()).ok) {
+            reached = candidate;
+            break;
+          }
+        }
+
+        // Fall back to showing the first candidate, so an unreachable Pond
+        // drops the user on the step that owns the address with something
+        // filled in, rather than failing later as a rejected code.
+        const chosen = reached ?? candidates[0];
+        api.setBaseUrl(chosen);
+        setServerUrl(chosen);
+        setCode(scanned.code);
+        setStep(reached ? 2 : 0);
+      })();
+    }, [setServerUrl]),
+  );
   const [completionState, setCompletionState] =
     useState<'pending' | 'ok' | 'error'>('pending');
   const [completionReason, setCompletionReason] = useState<string | null>(null);
@@ -403,8 +481,12 @@ export default function PondPairingScreen() {
   return (
     <View style={styles.container}>
       <StepIndicator current={step} />
-      {step === 0 && <ServerStep initial={serverUrl} onNext={onServerNext} />}
-      {step === 1 && <PairingCodeStep onNext={onCodeNext} />}
+      {step === 0 && (
+        <ServerStep initial={serverUrl} onNext={onServerNext} onScan={openScanner} />
+      )}
+      {step === 1 && (
+        <PairingCodeStep initial={code} onNext={onCodeNext} onScan={openScanner} />
+      )}
       {step === 2 && <NameStep onNext={runPair} />}
       {step === 3 && (
         <CompleteStep
@@ -488,6 +570,18 @@ const styles = StyleSheet.create({
     color: Semantic.danger,
     textAlign: 'center',
     lineHeight: FontSize.sm * 1.5,
+  },
+  scanLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    paddingVertical: Spacing.sm,
+  },
+  scanLinkText: {
+    fontFamily: FontFamily.body,
+    fontSize: FontSize.base,
+    fontWeight: FontWeight.semibold,
+    color: JaridaPurple[500],
   },
 
   /* Input groups */

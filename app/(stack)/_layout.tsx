@@ -37,6 +37,17 @@ export default function StackLayout() {
       <Stack.Screen name="home-management" options={{ title: 'Home Management' }} />
       <Stack.Screen name="pond-pairing" options={{ title: 'Pond Pairing' }} />
       <Stack.Screen name="commission-device" options={{ title: 'Add Device' }} />
+      <Stack.Screen
+        name="connect-desktop"
+        options={{
+          // No header at all. `headerTransparent` still reserved a white bar
+          // against the light navigation theme -- with a white tint on top of
+          // it, which is why the title was invisible and the camera started an
+          // inch down the screen. A viewfinder wants the whole screen, so the
+          // screen carries its own dismiss control instead.
+          headerShown: false,
+        }}
+      />
     </Stack>
   );
 }
