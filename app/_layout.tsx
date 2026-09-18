@@ -11,7 +11,9 @@ import { useFonts } from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
 import 'react-native-reanimated';
 
+import { NotificationBanner } from '@/components/patterns/notification-banner';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { NotificationsProvider } from '@/providers/notifications-provider';
 import { ThemeProvider } from '@/providers/theme-provider';
 import { ServerProvider } from '@/providers/server-provider';
 
@@ -44,14 +46,17 @@ export default function RootLayout() {
   return (
     <ThemeProvider>
       <ServerProvider>
-        <NavThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-          <Stack>
-            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-            <Stack.Screen name="(stack)" options={{ headerShown: false }} />
-            <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
-          </Stack>
-          <StatusBar style="auto" />
-        </NavThemeProvider>
+        <NotificationsProvider>
+          <NavThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+            <Stack>
+              <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+              <Stack.Screen name="(stack)" options={{ headerShown: false }} />
+              <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
+            </Stack>
+            <NotificationBanner />
+            <StatusBar style="auto" />
+          </NavThemeProvider>
+        </NotificationsProvider>
       </ServerProvider>
     </ThemeProvider>
   );
