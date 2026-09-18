@@ -23,6 +23,7 @@ import {
 } from 'react-native';
 
 import { GIcon } from '@/components/ui/g-icon';
+import { GKeyboardView } from '@/components/ui/g-keyboard-view';
 import { GButton } from '@/components/ui/g-button';
 import { useProfiles } from '@/view-models/use-profiles';
 import type { Profile } from '@/services/types';
@@ -89,76 +90,78 @@ export default function AddUsersScreen() {
   }, [actions, name, emoji]);
 
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={styles.scroll}
-      showsVerticalScrollIndicator={false}
-    >
-      <Text style={styles.sectionLabel}>HOUSEHOLD PROFILES</Text>
+    <GKeyboardView>
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={styles.scroll}
+        showsVerticalScrollIndicator={false}
+      >
+        <Text style={styles.sectionLabel}>HOUSEHOLD PROFILES</Text>
 
-      {loading ? <ActivityIndicator color={JaridaPurple[500]} /> : null}
+        {loading ? <ActivityIndicator color={JaridaPurple[500]} /> : null}
 
-      {error ? <Text style={styles.errorText}>{error}</Text> : null}
+        {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
-      {!loading && data.profiles.length === 0 ? (
-        <Text style={styles.emptyText}>
-          No profiles yet. Add one so your Pond can tell people apart.
-        </Text>
-      ) : null}
+        {!loading && data.profiles.length === 0 ? (
+          <Text style={styles.emptyText}>
+            No profiles yet. Add one so your Pond can tell people apart.
+          </Text>
+        ) : null}
 
-      {data.profiles.map((p) => (
-        <ProfileCard key={p.id} profile={p} onRemove={actions.remove} />
-      ))}
+        {data.profiles.map((p) => (
+          <ProfileCard key={p.id} profile={p} onRemove={actions.remove} />
+        ))}
 
-      {showAdd ? (
-        <View style={styles.inviteCard}>
-          <Text style={styles.inviteTitle}>Add a profile</Text>
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Name</Text>
-            <TextInput
-              style={styles.textInput}
-              value={name}
-              onChangeText={setName}
-              placeholder="Alex"
-              placeholderTextColor={Grey[400]}
-              autoCapitalize="words"
-              editable={!saving}
-            />
+        {showAdd ? (
+          <View style={styles.inviteCard}>
+            <Text style={styles.inviteTitle}>Add a profile</Text>
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Name</Text>
+              <TextInput
+                style={styles.textInput}
+                value={name}
+                onChangeText={setName}
+                placeholder="Alex"
+                placeholderTextColor={Grey[400]}
+                autoCapitalize="words"
+                editable={!saving}
+              />
+            </View>
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Emoji (optional)</Text>
+              <TextInput
+                style={styles.textInput}
+                value={emoji}
+                onChangeText={setEmoji}
+                placeholder="Shown on the profile card"
+                placeholderTextColor={Grey[400]}
+                editable={!saving}
+              />
+            </View>
+            <View style={styles.inviteActions}>
+              <GButton variant="ghost" size="sm" onPress={() => setShowAdd(false)}>
+                Cancel
+              </GButton>
+              <GButton
+                variant="primary"
+                size="sm"
+                disabled={!name.trim() || saving}
+                onPress={submit}
+              >
+                {saving ? 'Adding\u2026' : 'Add Profile'}
+              </GButton>
+            </View>
           </View>
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Emoji (optional)</Text>
-            <TextInput
-              style={styles.textInput}
-              value={emoji}
-              onChangeText={setEmoji}
-              placeholder="Shown on the profile card"
-              placeholderTextColor={Grey[400]}
-              editable={!saving}
-            />
-          </View>
-          <View style={styles.inviteActions}>
-            <GButton variant="ghost" size="sm" onPress={() => setShowAdd(false)}>
-              Cancel
-            </GButton>
-            <GButton
-              variant="primary"
-              size="sm"
-              disabled={!name.trim() || saving}
-              onPress={submit}
-            >
-              {saving ? 'Adding\u2026' : 'Add Profile'}
-            </GButton>
-          </View>
-        </View>
-      ) : (
-        <Pressable style={styles.addBtn} onPress={() => setShowAdd(true)}>
-          <GIcon name="plus" size={16} color={JaridaPurple[500]} />
-          <Text style={styles.addBtnText}>Add Profile</Text>
-        </Pressable>
-      )}
+        ) : (
+          <Pressable style={styles.addBtn} onPress={() => setShowAdd(true)}>
+            <GIcon name="plus" size={16} color={JaridaPurple[500]} />
+            <Text style={styles.addBtnText}>Add Profile</Text>
+          </Pressable>
+        )}
 
-      <View style={{ height: 32 }} />
-    </ScrollView>
+        <View style={{ height: 32 }} />
+      </ScrollView>
+    </GKeyboardView>
   );
 }
 

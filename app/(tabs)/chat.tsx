@@ -13,12 +13,11 @@ import {
   FlatList,
   TextInput,
   Pressable,
-  KeyboardAvoidingView,
-  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { GIcon } from '@/components/ui/g-icon';
+import { GKeyboardView } from '@/components/ui/g-keyboard-view';
 import type { Message } from '@/models/chat';
 import { Grey, JaridaPurple, Brand, Semantic } from '@/constants/colors';
 import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
@@ -123,11 +122,12 @@ export default function ChatScreen() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
-      <KeyboardAvoidingView
-        style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={0}
-      >
+      {/*
+        This used to pass no `behavior` on Android, leaving the composer to
+        `windowSoftInputMode="adjustResize"`. Edge-to-edge stopped resizing the
+        window, so the keyboard covered the composer the user was typing in.
+      */}
+      <GKeyboardView style={styles.flex}>
         {/* Header */}
         <View style={styles.header}>
           <View style={styles.headerLeft}>
@@ -203,7 +203,7 @@ export default function ChatScreen() {
         <View style={styles.footer}>
           <Text style={styles.footerText}>Powered by Goose 2</Text>
         </View>
-      </KeyboardAvoidingView>
+      </GKeyboardView>
     </SafeAreaView>
   );
 }

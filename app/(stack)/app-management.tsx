@@ -16,6 +16,7 @@ import {
 
 import { GSwitch } from '@/components/ui/g-switch';
 import { GIcon } from '@/components/ui/g-icon';
+import { GKeyboardView } from '@/components/ui/g-keyboard-view';
 import { Grey, JaridaPurple, Brand, Semantic } from '@/constants/colors';
 import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
 import { Spacing } from '@/constants/spacing';
@@ -109,17 +110,19 @@ export default function AppManagementScreen() {
   }, []);
 
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={styles.scroll}
-      showsVerticalScrollIndicator={false}
-    >
-      <Text style={styles.sectionLabel}>CONNECTED APPS</Text>
-      {apps.map((app) => (
-        <AppCard key={app.id} app={app} onToggle={handleToggle} />
-      ))}
-      <View style={{ height: 32 }} />
-    </ScrollView>
+    <GKeyboardView>
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={styles.scroll}
+        showsVerticalScrollIndicator={false}
+      >
+        <Text style={styles.sectionLabel}>CONNECTED APPS</Text>
+        {apps.map((app) => (
+          <AppCard key={app.id} app={app} onToggle={handleToggle} />
+        ))}
+        <View style={{ height: 32 }} />
+      </ScrollView>
+    </GKeyboardView>
   );
 }
 
