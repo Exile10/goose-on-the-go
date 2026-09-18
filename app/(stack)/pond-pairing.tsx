@@ -1,6 +1,6 @@
 /**
  * PondPairingScreen — 4-step pairing wizard:
- *   0. Enter the GIAP server URL (LAN address from the dashboard)
+ *   0. Find the GIAP server: discovered over mDNS, scanned from the QR, or typed
  *   1. Enter the 6-digit pairing code shown on the GIAP host
  *   2. Name this device
  *   3. Run the two-phase handshake and confirm
@@ -27,9 +27,17 @@ import { ApiError, api } from '@/services/api-client';
 import { useServer } from '@/providers/server-provider';
 import { getInstallId } from '@/services/install-id';
 import { takePairingPayload } from '@/services/pairing-handoff';
+import { findPondByHost, type DiscoveredPond } from '@/services/discovery';
+import { useDiscovery } from '@/view-models/use-discovery';
 
 type Step = 0 | 1 | 2 | 3;
-const STEP_LABELS = ['Server', 'Pairing Code', 'Name Device', 'Complete'];
+const STEP_LABELS = ['Find Pond', 'Pairing Code', 'Name Device', 'Complete'];
+
+/** The port from a normalised base URL, defaulting to http's 80 as URL does. */
+function portOf(url: string): number {
+  const parsed = new URL(url);
+  return Number(parsed.port) || 80;
+}
 
 /** Step indicator */
 function StepIndicator({ current }: { current: Step }) {
@@ -104,6 +112,122 @@ export function normalizeServerUrl(raw: string): string | null {
 }
 
 /** Step 0: Server URL */
+/**
+ * Step 0: find the Pond on this network.
+ *
+ * The server has always advertised `_pond._tcp.local.`; until now nothing
+ * listened, so typing an address was the only way in. Discovery hands back a
+ * numeric address, which is the part that matters — Android resolves no mDNS,
+ * so a `.local` name is unreachable there however it arrives.
+ *
+ * Typing and scanning stay, one tap away. Multicast is filtered on plenty of
+ * guest and office networks, and a hub that cannot be found still has to be
+ * pairable.
+ */
+function DiscoverStep({
+  onNext,
+  onManual,
+  onScan,
+}: {
+  onNext: (url: string) => void;
+  onManual: () => void;
+  onScan: () => void;
+}) {
+  const { data, error, actions } = useDiscovery();
+  const [picking, setPicking] = useState<string | null>(null);
+  const [pickError, setPickError] = useState<string | null>(null);
+
+  // An advertisement is not a running server. mDNS records outlive the process
+  // that registered them, so a restarted hub leaves an entry that resolves and
+  // answers nothing — probe before advancing, exactly as manual entry does.
+  const pick = useCallback(
+    async (pond: DiscoveredPond) => {
+      setPicking(pond.id);
+      setPickError(null);
+      api.setBaseUrl(pond.url);
+      const { ok } = await api.health();
+      setPicking(null);
+
+      if (!ok) {
+        setPickError(
+          `${pond.name} is advertising itself but did not answer at ${pond.address}:${pond.port}. It may have been restarted — search again.`,
+        );
+        return;
+      }
+      onNext(pond.url);
+    },
+    [onNext],
+  );
+
+  return (
+    <View style={styles.stepContent}>
+      {data.phase === 'searching' ? (
+        <ActivityIndicator color={JaridaPurple[500]} />
+      ) : (
+        <GIcon name="search" size={28} color={JaridaPurple[500]} />
+      )}
+
+      <Text style={styles.stepTitle}>
+        {data.phase === 'searching' ? 'Looking for your Pond' : 'Connect to GIAP'}
+      </Text>
+
+      {data.phase === 'searching' ? (
+        <Text style={styles.stepDesc}>Searching this Wi-Fi network.</Text>
+      ) : null}
+
+      {data.phase === 'empty' ? (
+        <Text style={styles.stepDesc}>
+          No Pond answered on this network. Check that it is running and that this phone is on
+          the same Wi-Fi, or enter its address below.
+        </Text>
+      ) : null}
+
+      {data.phase === 'failed' ? (
+        <Text style={styles.stepError}>
+          {error} You can still enter the address by hand.
+        </Text>
+      ) : null}
+
+      {data.ponds.map((pond) => (
+        <Pressable
+          key={pond.id}
+          style={styles.pondRow}
+          disabled={picking !== null}
+          onPress={() => void pick(pond)}
+        >
+          {picking === pond.id ? (
+            <ActivityIndicator size="small" color={JaridaPurple[500]} />
+          ) : (
+            <GIcon name="wifi" size={18} color={JaridaPurple[500]} />
+          )}
+          <View style={styles.pondInfo}>
+            <Text style={styles.pondName} numberOfLines={1}>
+              {pond.name}
+            </Text>
+            <Text style={styles.pondAddr}>
+              {pond.address}:{pond.port}
+              {pond.version ? ` · v${pond.version}` : ''}
+            </Text>
+          </View>
+        </Pressable>
+      ))}
+
+      {pickError ? <Text style={styles.stepError}>{pickError}</Text> : null}
+
+      {data.phase !== 'searching' ? (
+        <GButton variant="ghost" size="sm" onPress={actions.retry}>
+          Search again
+        </GButton>
+      ) : null}
+
+      <Pressable onPress={onManual} hitSlop={8} style={styles.scanLink}>
+        <Text style={styles.scanLinkText}>Enter address manually</Text>
+      </Pressable>
+      <ScanLink onPress={onScan} />
+    </View>
+  );
+}
+
 function ServerStep({
   initial,
   onNext,
@@ -380,6 +504,9 @@ export default function PondPairingScreen() {
 
   const [step, setStep] = useState<Step>(0);
   const [code, setCode] = useState('');
+  // Step 0 searches the network by default; typing an address is the fallback
+  // for a network that filters multicast, which plenty of guest wifi does.
+  const [manualEntry, setManualEntry] = useState(false);
   const openScanner = useCallback(() => router.push('/(stack)/connect-desktop'), [router]);
 
   /**
@@ -419,6 +546,20 @@ export default function PondPairingScreen() {
           }
         }
 
+        // Nothing in the QR was reachable. That is the ordinary outcome on
+        // Android for a Pond whose server predates the `ip=` fix, or a desktop
+        // build packaged before it: the QR carries only a `.local` name, which
+        // this phone cannot resolve, and the code in it is perfectly good.
+        // Discovery already knows that hub's numeric address, so look it up by
+        // the name the QR did give rather than sending the user back a step.
+        if (!reached) {
+          const found = await findPondByHost(scanned.host, portOf(candidates[0]));
+          if (found) {
+            api.setBaseUrl(found.url);
+            if ((await api.health()).ok) reached = found.url;
+          }
+        }
+
         // Fall back to showing the first candidate, so an unreachable Pond
         // drops the user on the step that owns the address with something
         // filled in, rather than failing later as a rejected code.
@@ -426,6 +567,10 @@ export default function PondPairingScreen() {
         api.setBaseUrl(chosen);
         setServerUrl(chosen);
         setCode(scanned.code);
+        // A scan that could not be reached returns to step 0 with the address
+        // already filled in, so show the field holding it rather than starting
+        // a search that would discard what the QR provided.
+        if (!reached) setManualEntry(true);
         setStep(reached ? 2 : 0);
       })();
     }, [setServerUrl]),
@@ -481,9 +626,16 @@ export default function PondPairingScreen() {
   return (
     <View style={styles.container}>
       <StepIndicator current={step} />
-      {step === 0 && (
-        <ServerStep initial={serverUrl} onNext={onServerNext} onScan={openScanner} />
-      )}
+      {step === 0 &&
+        (manualEntry ? (
+          <ServerStep initial={serverUrl} onNext={onServerNext} onScan={openScanner} />
+        ) : (
+          <DiscoverStep
+            onNext={onServerNext}
+            onManual={() => setManualEntry(true)}
+            onScan={openScanner}
+          />
+        ))}
       {step === 1 && (
         <PairingCodeStep initial={code} onNext={onCodeNext} onScan={openScanner} />
       )}
@@ -582,6 +734,32 @@ const styles = StyleSheet.create({
     fontSize: FontSize.base,
     fontWeight: FontWeight.semibold,
     color: JaridaPurple[500],
+  },
+
+  /* Discovered ponds */
+  pondRow: {
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.md,
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.lg,
+    borderRadius: Radii.md,
+    borderWidth: 1,
+    borderColor: Grey[200],
+    backgroundColor: Brand.white,
+  },
+  pondInfo: { flex: 1 },
+  pondName: {
+    fontFamily: FontFamily.body,
+    fontSize: FontSize.base,
+    fontWeight: FontWeight.semibold,
+    color: Brand.charcoal,
+  },
+  pondAddr: {
+    fontFamily: FontFamily.body,
+    fontSize: FontSize.sm,
+    color: Grey[500],
   },
 
   /* Input groups */
