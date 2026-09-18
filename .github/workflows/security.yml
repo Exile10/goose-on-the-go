@@ -1,0 +1,68 @@
+# Security scanning for the GOTG mobile client. Mirrors the Pond's own
+# Security workflow (goose-in-a-pond/.github/workflows/security.yml) so both
+# halves of the system are held to one standard.
+#
+#   npm-audit — advisory scan of the dependency tree, failing on high/critical.
+#               Exceptions live in .audit-allowlist.json with a written reason
+#               and an expiry; scripts/audit-check.mjs enforces that policy and
+#               fails on stale or expired entries so the list cannot rot.
+#   secrets   — gitleaks over the FULL git history. This app holds pairing
+#               material and session tokens, so a credential committed once and
+#               "removed" later must still fail.
+#
+# Runs on every PR/push to main, weekly (advisories get published against
+# lockfiles that never changed), and on demand.
+
+name: Security
+
+on:
+  # No branch filter: `branches:` here matches the PR's BASE, so a PR stacked on
+  # another feature branch would never be scanned at review time — only after it
+  # had already landed, via the push trigger below. `push` stays scoped to main.
+  pull_request:
+  push:
+    branches: [main]
+  schedule:
+    # Weekly, Monday 06:41 UTC. Offset from the Pond's 06:17 so the two repos'
+    # scheduled runs do not land in the same minute.
+    - cron: "41 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  npm-audit:
+    name: Dependencies — npm audit (high+)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      # The gate reads the lockfile through `npm audit --json`; no install
+      # needed, so a compromised transitive package never gets to run here.
+      - name: npm audit (documented exceptions only)
+        run: node scripts/audit-check.mjs --threshold high
+
+  secrets:
+    name: Secrets — gitleaks (full history)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Full history so a secret committed and later "deleted" still fails.
+          fetch-depth: 0
+
+      # Pinned gitleaks CLI via the official image (the gitleaks GitHub Action
+      # requires an org license; the CLI does not).
+      - name: gitleaks detect
+        run: |
+          docker run --rm -v "$PWD:/repo" zricethezav/gitleaks:v8.21.2 \
+            detect --source /repo --no-banner --redact --exit-code 1

@@ -1,0 +1,20 @@
+{
+  "$schema": "See scripts/audit-check.mjs. Every entry needs a reason and a reviewBy date.",
+  "$policy": "Exceptions are deferrals, not pardons. An entry is only justified when the advisory cannot be fixed without a breaking upgrade AND the exposure does not reach a shipped build or a user's device. Anything reachable from the app bundle gets fixed, not listed.",
+  "allow": [
+    {
+      "advisory": "GHSA-w3rx-r6r6-pgpr",
+      "package": "image-size",
+      "severity": "high",
+      "reason": "Infinite loop in the ICNS parser, reached only via react-native > @react-native/community-cli-plugin > metro, which pins image-size ^1.x. Metro is the bundler: it runs on a developer's machine at build time over assets already in this repo, and no part of it ships in a release build. The advisory is not fixed anywhere in the 1.x or 2.0.x line (the range is <=2.0.2), so clearing it needs a breaking metro bump, which belongs to an Expo SDK upgrade rather than a security patch.",
+      "reviewBy": "2026-12-31"
+    },
+    {
+      "advisory": "GHSA-5p2g-fcmc-qvqq",
+      "package": "image-size",
+      "severity": "high",
+      "reason": "Infinite loops in the JXL and HEIF parsers. Same package, same path and same reasoning as GHSA-w3rx-r6r6-pgpr: metro-only, build-time, not present in a shipped bundle, and unfixed through 2.0.2. Listed separately because the gate requires every advisory behind a package to be excused on its own merit.",
+      "reviewBy": "2026-12-31"
+    }
+  ]
+}
