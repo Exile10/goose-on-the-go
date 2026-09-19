@@ -12,12 +12,12 @@
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Animated, Easing, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
+import { InkButton } from '@jarida/ink/native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CameraView, useCameraPermissions, type BarcodeScanningResult } from 'expo-camera';
 
 import { GIcon } from '@/components/ui/g-icon';
-import { GButton } from '@/components/ui/g-button';
 import {
   InvalidPairingCodeError,
   looksLikeMatterSetupCode,
@@ -154,13 +154,12 @@ export default function ConnectDesktopScreen() {
           Scanning the pairing code needs the camera. You can also enter the six digits by
           hand instead.
         </Text>
-        <GButton
+        <InkButton
           variant="primary"
-          size="lg"
           onPress={canPrompt ? requestPermission : () => void Linking.openSettings()}
         >
           {canPrompt ? 'Enable Camera' : 'Open Settings'}
-        </GButton>
+        </InkButton>
         <Pressable onPress={() => router.back()} hitSlop={8}>
           <Text style={styles.cancel}>Enter the code instead</Text>
         </Pressable>
@@ -218,9 +217,9 @@ export default function ConnectDesktopScreen() {
             <GIcon name="warn" size={28} color={Semantic.danger} />
             <Text style={styles.statusTitle}>Could not use that code</Text>
             <Text style={styles.statusDesc}>{error}</Text>
-            <GButton variant="primary" size="sm" onPress={retry}>
+            <InkButton variant="primary" onPress={retry}>
               Scan again
-            </GButton>
+            </InkButton>
           </View>
         ) : (
           <Text style={styles.hint}>

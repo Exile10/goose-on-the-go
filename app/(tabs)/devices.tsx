@@ -9,6 +9,7 @@
  */
 
 import React, { useCallback, useMemo, useState } from 'react';
+import { InkSwitch } from '@jarida/ink/native';
 import {
   ActivityIndicator,
   View,
@@ -21,7 +22,6 @@ import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { GIcon } from '@/components/ui/g-icon';
-import { GSwitch } from '@/components/ui/g-switch';
 import { ALL_ROOMS, supports, useDevices } from '@/view-models/use-devices';
 import type { Device } from '@/services/types';
 import { Grey, JaridaPurple, Brand, Semantic } from '@/constants/colors';
@@ -83,7 +83,7 @@ const DeviceCard = React.memo(function DeviceCard({
           <GIcon name={icon} size={17} color={on && device.is_online ? color : '#B5B5B5'} />
         </View>
         {canPower ? (
-          <GSwitch value={on} onValueChange={handleToggle} disabled={!device.is_online} />
+          <InkSwitch checked={on} onChange={handleToggle} disabled={!device.is_online} />
         ) : null}
       </View>
       <Text style={styles.deviceLabel} numberOfLines={1}>
@@ -130,6 +130,7 @@ export default function DevicesTab() {
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
+        style={styles.tabsScroll}
         contentContainerStyle={styles.tabsRow}
       >
         {data.roomTabs.map((tab) => (
@@ -247,6 +248,15 @@ const styles = StyleSheet.create({
   },
 
   /* Room tabs */
+  // Pins this ScrollView's own height to its content instead of letting it
+  // compete for leftover flex space in the column layout below — without
+  // this, filtering to a room with fewer devices frees up vertical space
+  // that gets redistributed into the tab pills instead of staying blank,
+  // stretching them tall.
+  tabsScroll: {
+    flexGrow: 0,
+    flexShrink: 0,
+  },
   tabsRow: {
     paddingHorizontal: Spacing.lg,
     paddingVertical: Spacing.md,

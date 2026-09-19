@@ -10,10 +10,10 @@
 
 import React, { useCallback, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, TextInput, View } from 'react-native';
+import { InkButton } from '@jarida/ink/native';
 import { useRouter } from 'expo-router';
 
 import { GIcon } from '@/components/ui/g-icon';
-import { GButton } from '@/components/ui/g-button';
 import { useDevices } from '@/view-models/use-devices';
 import { Grey, JaridaPurple, Semantic } from '@/constants/colors';
 import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
@@ -102,14 +102,13 @@ export default function CommissionDeviceScreen() {
 
       {error ? <Text style={styles.error}>{error}</Text> : null}
 
-      <GButton
+      <InkButton
         variant="primary"
-        size="lg"
         disabled={!looksLikeSetupCode(code) || commissioning}
         onPress={submit}
       >
         Add Device
-      </GButton>
+      </InkButton>
 
       <Text style={styles.footnote}>
         A device straight out of the box has no Wi-Fi yet and can only be reached over

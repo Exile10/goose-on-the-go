@@ -7,6 +7,7 @@
  */
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { InkButton } from '@jarida/ink/native';
 import {
   ActivityIndicator,
   Pressable,
@@ -19,7 +20,6 @@ import {
 
 import { useFocusEffect, useRouter } from 'expo-router';
 import { GIcon } from '@/components/ui/g-icon';
-import { GButton } from '@/components/ui/g-button';
 import { GKeyboardView } from '@/components/ui/g-keyboard-view';
 import { Grey, JaridaPurple, Brand, Semantic } from '@/constants/colors';
 import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
@@ -237,9 +237,9 @@ function DiscoverStep({
       {pickError ? <Text style={styles.stepError}>{pickError}</Text> : null}
 
       {data.phase !== 'searching' ? (
-        <GButton variant="ghost" size="sm" onPress={actions.retry}>
+        <InkButton variant="quiet" onPress={actions.retry}>
           Search again
-        </GButton>
+        </InkButton>
       ) : null}
 
       <Pressable onPress={onManual} hitSlop={8} style={styles.scanLink}>
@@ -313,14 +313,13 @@ function ServerStep({
         />
       </View>
       {error ? <Text style={styles.stepError}>{error}</Text> : null}
-      <GButton
+      <InkButton
         variant="primary"
-        size="lg"
         disabled={!url.trim() || checking}
         onPress={submit}
       >
         {checking ? 'Checking…' : 'Continue'}
-      </GButton>
+      </InkButton>
       <ScanLink onPress={onScan} />
     </StepBody>
   );
@@ -358,14 +357,13 @@ function PairingCodeStep({
           autoFocus
         />
       </View>
-      <GButton
+      <InkButton
         variant="primary"
-        size="lg"
         disabled={!valid}
         onPress={() => onNext(code)}
       >
         Continue
-      </GButton>
+      </InkButton>
       <ScanLink onPress={onScan} />
     </StepBody>
   );
@@ -392,14 +390,13 @@ function NameStep({ onNext }: { onNext: (name: string) => void }) {
           placeholderTextColor={Grey[400]}
         />
       </View>
-      <GButton
+      <InkButton
         variant="primary"
-        size="lg"
         disabled={!name.trim()}
         onPress={() => onNext(name.trim())}
       >
         Pair Device
-      </GButton>
+      </InkButton>
     </StepBody>
   );
 }
@@ -491,9 +488,9 @@ function CompleteStep({
         <Text style={styles.stepDesc}>
           {reason ?? 'The server rejected the pairing attempt. Double-check the code and try again.'}
         </Text>
-        <GButton variant="primary" size="lg" onPress={onRetry}>
+        <InkButton variant="primary" onPress={onRetry}>
           Try again
-        </GButton>
+        </InkButton>
       </StepBody>
     );
   }
@@ -505,9 +502,9 @@ function CompleteStep({
         Your phone is paired. The session token is stored securely on this
         device and used for every API call.
       </Text>
-      <GButton variant="primary" size="lg" onPress={onDone}>
+      <InkButton variant="primary" onPress={onDone}>
         Go to Home
-      </GButton>
+      </InkButton>
     </StepBody>
   );
 }

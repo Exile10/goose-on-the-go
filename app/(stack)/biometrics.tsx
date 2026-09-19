@@ -4,6 +4,7 @@
  */
 
 import React, { useState } from 'react';
+import { InkButton, InkSwitch } from '@jarida/ink/native';
 import {
   View,
   Text,
@@ -13,8 +14,6 @@ import {
 } from 'react-native';
 
 import { GIcon } from '@/components/ui/g-icon';
-import { GButton } from '@/components/ui/g-button';
-import { GSwitch } from '@/components/ui/g-switch';
 import { Grey, JaridaPurple, Brand, Semantic } from '@/constants/colors';
 import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
 import { Spacing } from '@/constants/spacing';
@@ -100,9 +99,9 @@ export default function BiometricsScreen() {
               <Text style={styles.methodTitle}>{method.title}</Text>
               <Text style={styles.methodDesc}>{method.description}</Text>
             </View>
-            <GSwitch
-              value={method.enabled}
-              onValueChange={() => toggleMethod(method.id)}
+            <InkSwitch
+              checked={method.enabled}
+              onChange={() => toggleMethod(method.id)}
             />
           </View>
 
@@ -126,13 +125,12 @@ export default function BiometricsScreen() {
                 <Text style={styles.enrollingText}>Enrolling...</Text>
               </View>
             ) : (
-              <GButton
-                variant="secondary"
-                size="sm"
+              <InkButton
+                variant="quiet"
                 onPress={() => startEnrollment(method.id)}
               >
                 Start Enrollment
-              </GButton>
+              </InkButton>
             )}
           </View>
 

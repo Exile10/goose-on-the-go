@@ -12,6 +12,7 @@
  */
 
 import React, { useCallback, useState } from 'react';
+import { InkButton } from '@jarida/ink/native';
 import {
   ActivityIndicator,
   View,
@@ -24,7 +25,6 @@ import {
 
 import { GIcon } from '@/components/ui/g-icon';
 import { GKeyboardView } from '@/components/ui/g-keyboard-view';
-import { GButton } from '@/components/ui/g-button';
 import { useProfiles } from '@/view-models/use-profiles';
 import type { Profile } from '@/services/types';
 import { Grey, JaridaPurple, Brand, Semantic } from '@/constants/colors';
@@ -139,17 +139,16 @@ export default function AddUsersScreen() {
               />
             </View>
             <View style={styles.inviteActions}>
-              <GButton variant="ghost" size="sm" onPress={() => setShowAdd(false)}>
+              <InkButton variant="quiet" onPress={() => setShowAdd(false)}>
                 Cancel
-              </GButton>
-              <GButton
+              </InkButton>
+              <InkButton
                 variant="primary"
-                size="sm"
                 disabled={!name.trim() || saving}
                 onPress={submit}
               >
                 {saving ? 'Adding\u2026' : 'Add Profile'}
-              </GButton>
+              </InkButton>
             </View>
           </View>
         ) : (

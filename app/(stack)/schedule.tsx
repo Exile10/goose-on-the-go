@@ -3,6 +3,7 @@
  */
 
 import React, { useState, useCallback } from 'react';
+import { InkSwitch } from '@jarida/ink/native';
 import {
   View,
   Text,
@@ -11,7 +12,6 @@ import {
   Pressable,
 } from 'react-native';
 
-import { GSwitch } from '@/components/ui/g-switch';
 import { Grey, JaridaPurple, Brand, Semantic } from '@/constants/colors';
 import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
 import { Spacing } from '@/constants/spacing';
@@ -63,7 +63,7 @@ const TimelineRow = React.memo(function TimelineRow({
             <Text style={styles.eventDetail}>{item.detail}</Text>
           </View>
           {isRoutine && (
-            <GSwitch value={item.enabled} onValueChange={() => onToggle(index)} />
+            <InkSwitch checked={item.enabled} onChange={() => onToggle(index)} />
           )}
         </View>
         {!isRoutine && (

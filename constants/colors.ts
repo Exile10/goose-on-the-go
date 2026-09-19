@@ -16,6 +16,34 @@ export const JaridaPurple = {
   900: '#2A0C66',
 } as const;
 
+/**
+ * Ink's UI accent — the interactive/CTA colour, distinct from the JaridaPurple
+ * brand mark ramp above. Per @jarida/ink's tokens/color.ts the mark
+ * (JaridaPurple[500], 4.42:1) and the accent (5.47:1) are deliberately
+ * different values; the accent is what carries interactive elements and text.
+ *
+ * `base` and `pressed` are the same in ink's light and dark palettes — ink
+ * "keeps base and pressed, and tints the two soft steps instead". But base is
+ * a *fill* colour there, read against the white text on top of it. Against a
+ * dark ground it measures 2.93:1, under the 3:1 floor for UI and nowhere near
+ * the 4.5:1 for text, so anything that draws the accent *as* ink or a line on
+ * dark uses `onDark` — ink's own `accentLine` for its dark theme, 6.9:1.
+ */
+export const Accent = {
+  base: '#7C3AED',
+  pressed: '#6D28D9',
+  soft: 'rgba(124, 58, 237, 0.11)',
+  softer: 'rgba(124, 58, 237, 0.06)',
+  /** Accent as text, icon or line on a dark surface. */
+  onDark: '#B794FF',
+  /** Dark tints the soft steps rather than reusing the light solids. */
+  softDark: 'rgba(124, 58, 237, 0.22)',
+  softerDark: 'rgba(124, 58, 237, 0.12)',
+} as const;
+
+/** Flat alias for the common case of the plain accent colour. */
+export const AccentPurple = Accent.base;
+
 export const Grey = {
   50: '#FAFAFA',
   100: '#F5F5F5',
@@ -48,7 +76,7 @@ export const Brand = {
 
 /** Role-based colors for model assignment chips */
 export const RoleColors = {
-  chat: JaridaPurple[500],
+  chat: Accent.base,
   think: '#F5A524',
   task: '#17C964',
   asr: '#0072F5',
@@ -94,20 +122,20 @@ export const LightColors: ThemeColors = {
   textTertiary: Grey[500],
   textDisabled: Grey[400],
   textOnBrand: Brand.white,
-  textBrand: JaridaPurple[600],
+  textBrand: Accent.base,
 
   // Borders
   border: Grey[200],
   borderStrong: Grey[300],
-  borderBrand: JaridaPurple[500],
+  borderBrand: Accent.base,
 
   // Interactive
-  tint: JaridaPurple[500],
-  tintSoft: JaridaPurple[50],
+  tint: Accent.base,
+  tintSoft: Accent.soft,
   icon: Grey[500],
-  iconActive: JaridaPurple[600],
+  iconActive: Accent.base,
   tabIconDefault: Grey[500],
-  tabIconSelected: JaridaPurple[500],
+  tabIconSelected: Accent.base,
 } as const;
 
 /** Dark theme surface + text colors */
@@ -125,18 +153,18 @@ export const DarkColors: ThemeColors = {
   textTertiary: Grey[500],
   textDisabled: Grey[600],
   textOnBrand: Brand.white,
-  textBrand: JaridaPurple[300],
+  textBrand: Accent.onDark,
 
   // Borders
   border: Grey[700],
   borderStrong: Grey[600],
-  borderBrand: JaridaPurple[400],
+  borderBrand: Accent.onDark,
 
   // Interactive
-  tint: JaridaPurple[400],
-  tintSoft: JaridaPurple[900],
+  tint: Accent.base,
+  tintSoft: Accent.softDark,
   icon: Grey[400],
-  iconActive: JaridaPurple[300],
+  iconActive: Accent.onDark,
   tabIconDefault: Grey[500],
   tabIconSelected: Brand.white,
 } as const;

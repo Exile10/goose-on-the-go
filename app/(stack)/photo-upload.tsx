@@ -4,6 +4,7 @@
  */
 
 import React, { useState, useCallback } from 'react';
+import { InkButton } from '@jarida/ink/native';
 import {
   View,
   Text,
@@ -13,7 +14,6 @@ import {
 } from 'react-native';
 
 import { GIcon } from '@/components/ui/g-icon';
-import { GButton } from '@/components/ui/g-button';
 import { Grey, JaridaPurple, Brand, Semantic } from '@/constants/colors';
 import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
 import { Spacing } from '@/constants/spacing';
@@ -129,9 +129,9 @@ export default function PhotoUploadScreen() {
             </View>
           ))}
 
-          <GButton variant="secondary" size="md" onPress={handleReset}>
+          <InkButton variant="quiet" onPress={handleReset}>
             Upload Another
-          </GButton>
+          </InkButton>
         </>
       )}
 

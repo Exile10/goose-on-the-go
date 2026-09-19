@@ -10,6 +10,19 @@ import { StatusBar } from 'expo-status-bar';
 import { loadAsync as loadFontsAsync, useFonts } from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
 import 'react-native-reanimated';
+import {
+  Quicksand_400Regular,
+  Quicksand_500Medium,
+  Quicksand_600SemiBold,
+  Quicksand_700Bold,
+} from '@expo-google-fonts/quicksand';
+import {
+  JetBrainsMono_400Regular,
+  JetBrainsMono_500Medium,
+  JetBrainsMono_600SemiBold,
+  JetBrainsMono_700Bold,
+} from '@expo-google-fonts/jetbrains-mono';
+import { InkProvider } from '@jarida/ink/native';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { NotificationsProvider } from '@/providers/notifications-provider';
@@ -31,10 +44,28 @@ import { ServerProvider } from '@/providers/server-provider';
  */
 SplashScreen.preventAutoHideAsync();
 
-/** Loaded behind the splash — see above for why none of these gate first paint. */
+/**
+ * Loaded behind the splash — see above for why none of these gate first paint.
+ *
+ * `@jarida/ink` resolves a weight to one exact registered family name, because
+ * Android ignores `fontWeight` (see requiredNativeFonts() in
+ * @jarida/ink/dist/core/font.js). An unregistered name is not an error there —
+ * React Native falls back to the system face — so these belong behind the
+ * splash with the rest rather than in front of it. An ink control drawn in the
+ * first frames is briefly system-faced and then correct, which is the same
+ * trade the two fonts below already make.
+ */
 const DEFERRED_FONTS = {
   Comfortaa: require('../assets/fonts/Comfortaa.ttf'),
   'JetBrainsMono-Regular': require('../assets/fonts/JetBrainsMono-Regular.ttf'),
+  Quicksand_400Regular,
+  Quicksand_500Medium,
+  Quicksand_600SemiBold,
+  Quicksand_700Bold,
+  JetBrainsMono_400Regular,
+  JetBrainsMono_500Medium,
+  JetBrainsMono_600SemiBold,
+  JetBrainsMono_700Bold,
 };
 
 export const unstable_settings = {
@@ -72,12 +103,14 @@ export default function RootLayout() {
       <ServerProvider>
         <NotificationsProvider>
           <NavThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-            <Stack>
-              <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-              <Stack.Screen name="(stack)" options={{ headerShown: false }} />
-              <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
-            </Stack>
-            <StatusBar style="auto" />
+            <InkProvider>
+              <Stack>
+                <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+                <Stack.Screen name="(stack)" options={{ headerShown: false }} />
+                <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
+              </Stack>
+              <StatusBar style="auto" />
+            </InkProvider>
           </NavThemeProvider>
         </NotificationsProvider>
       </ServerProvider>

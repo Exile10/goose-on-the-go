@@ -6,6 +6,7 @@
  */
 
 import React, { useState, useCallback } from 'react';
+import { InkSwitch } from '@jarida/ink/native';
 import {
   View,
   Text,
@@ -19,7 +20,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { GIcon } from '@/components/ui/g-icon';
 import { useRecentSessions } from '@/view-models/use-recent-sessions';
-import { GSwitch } from '@/components/ui/g-switch';
 import { supports, useDevices } from '@/view-models/use-devices';
 import type { Device } from '@/services/types';
 import { HOME_SHORTCUTS } from '@/constants/navigation';
@@ -74,7 +74,7 @@ const DeviceGridItem = React.memo(function DeviceGridItem({
           />
         </View>
         {canPower ? (
-          <GSwitch value={on} onValueChange={handleToggle} disabled={!device.is_online} />
+          <InkSwitch checked={on} onChange={handleToggle} disabled={!device.is_online} />
         ) : null}
       </View>
       <Text style={styles.deviceLabel} numberOfLines={1}>
