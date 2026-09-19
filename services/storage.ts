@@ -11,6 +11,7 @@ const KEYS = {
   serverUrl: '@goose/server-url',
   lastScreen: '@goose/last-screen',
   settings: '@goose/settings',
+  devScreenModes: '@goose/dev-screen-modes',
 } as const;
 
 /**

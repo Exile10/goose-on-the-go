@@ -51,6 +51,10 @@ interface ServerContextValue {
   pair: (opts: PairOptions) => Promise<HandshakeResponse>;
   /** Revoke the current session token (server-side + local). */
   signOut: () => Promise<void>;
+  /** Per-screen mock/real backend flags (dev only) — see MIGRATION_SCREENS. */
+  screenModes: ScreenModes;
+  isScreenReal: (screen: MigrationScreen) => boolean;
+  setScreenMode: (screen: MigrationScreen, useReal: boolean) => void;
   /**
    * Whether the stored base URL and tokens have been read back yet.
    *
@@ -61,6 +65,37 @@ interface ServerContextValue {
   hydrated: boolean;
 }
 
+/**
+ * Screens whose data-fetching hook can still be switched between mock data and
+ * the real PondApiClient (issue #21).
+ *
+ * `devices` was on this list and is not any more: #30 wired the Devices and
+ * Home tabs to the Pond's real device list unconditionally, as #28 did for
+ * models, profiles and recent conversations. A toggle for a screen with no
+ * mock branch left would be a switch that does nothing.
+ *
+ * Nothing enforces this list: each view-model has to call `isScreenReal`
+ * itself, so a screen can read "Real" here while its hook still returns mock
+ * data because it never asked.
+ */
+export const MIGRATION_SCREENS = [
+  'chat',
+  'voice',
+  'memory',
+  'integrations',
+  'schedule',
+  'logs',
+] as const;
+
+export type MigrationScreen = (typeof MIGRATION_SCREENS)[number];
+
+type ScreenModes = Record<MigrationScreen, boolean>;
+
+const DEFAULT_SCREEN_MODES: ScreenModes = MIGRATION_SCREENS.reduce(
+  (acc, screen) => ({ ...acc, [screen]: false }),
+  {} as ScreenModes,
+);
+
 const ServerContext = createContext<ServerContextValue | null>(null);
 
 export function ServerProvider({ children }: PropsWithChildren) {
@@ -68,6 +103,7 @@ export function ServerProvider({ children }: PropsWithChildren) {
   const [online, setOnline] = useState(false);
   const [token, setTokenState] = useState<string | null>(null);
   const [refreshToken, setRefreshTokenState] = useState<string | null>(null);
+  const [screenModes, setScreenModes] = useState<ScreenModes>(DEFAULT_SCREEN_MODES);
   const hydrationStarted = useRef(false);
   const [hydrated, setHydrated] = useState(false);
 
@@ -175,6 +211,45 @@ export function ServerProvider({ children }: PropsWithChildren) {
     [],
   );
 
+  /**
+   * Persisted dev toggles, read once on mount.
+   *
+   * `setScreenMode` awaits this same promise before writing, so a toggle
+   * flipped before the read lands cannot persist a snapshot that is missing
+   * every other screen's saved value.
+   */
+  const loadScreenModes = useRef<Promise<ScreenModes | null> | undefined>(undefined);
+  useEffect(() => {
+    if (!__DEV__) return;
+    loadScreenModes.current = Storage.getJSON<ScreenModes>('devScreenModes');
+    void loadScreenModes.current.then((saved) => {
+      if (saved) setScreenModes((prev) => ({ ...prev, ...saved }));
+    });
+  }, []);
+
+  /** Latest modes, readable synchronously so back-to-back toggles compose. */
+  const screenModesRef = useRef(screenModes);
+  useEffect(() => {
+    screenModesRef.current = screenModes;
+  }, [screenModes]);
+
+  const isScreenReal = useCallback(
+    // Production has no way to flip these, so it never pays to read them.
+    (screen: MigrationScreen) => (__DEV__ ? screenModes[screen] : false),
+    [screenModes],
+  );
+
+  const setScreenMode = useCallback((screen: MigrationScreen, useReal: boolean) => {
+    setScreenModes((prev) => ({ ...prev, [screen]: useReal }));
+    void (async () => {
+      await loadScreenModes.current;
+      await Storage.setJSON('devScreenModes', {
+        ...screenModesRef.current,
+        [screen]: useReal,
+      });
+    })();
+  }, []);
+
   const signOut = useCallback(async () => {
     await api.handshakeRevoke().catch(() => undefined);
     setTokenState(null);
@@ -196,8 +271,14 @@ export function ServerProvider({ children }: PropsWithChildren) {
       pair,
       signOut,
       hydrated,
+      screenModes,
+      isScreenReal,
+      setScreenMode,
     }),
-    [serverUrl, online, token, refreshToken, setServerUrl, setToken, checkHealth, pair, signOut, hydrated],
+    [
+      serverUrl, online, token, refreshToken, setServerUrl, setToken, checkHealth,
+      pair, signOut, hydrated, screenModes, isScreenReal, setScreenMode,
+    ],
   );
 
   return <ServerContext.Provider value={value}>{children}</ServerContext.Provider>;
