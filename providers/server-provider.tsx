@@ -51,6 +51,14 @@ interface ServerContextValue {
   pair: (opts: PairOptions) => Promise<HandshakeResponse>;
   /** Revoke the current session token (server-side + local). */
   signOut: () => Promise<void>;
+  /**
+   * Whether the stored base URL and tokens have been read back yet.
+   *
+   * Hydration is async, so a view-model that fetches on mount would otherwise
+   * race it and call the default `http://127.0.0.1:4000` with no bearer token,
+   * fail, and — with nothing to re-trigger it — stay failed for the session.
+   */
+  hydrated: boolean;
 }
 
 const ServerContext = createContext<ServerContextValue | null>(null);
@@ -60,7 +68,8 @@ export function ServerProvider({ children }: PropsWithChildren) {
   const [online, setOnline] = useState(false);
   const [token, setTokenState] = useState<string | null>(null);
   const [refreshToken, setRefreshTokenState] = useState<string | null>(null);
-  const hydrated = useRef(false);
+  const hydrationStarted = useRef(false);
+  const [hydrated, setHydrated] = useState(false);
 
   /**
    * Guards against an older probe landing after a newer one. Changing the server
@@ -79,8 +88,8 @@ export function ServerProvider({ children }: PropsWithChildren) {
 
   // Hydrate from persistent storage on first mount.
   useEffect(() => {
-    if (hydrated.current) return;
-    hydrated.current = true;
+    if (hydrationStarted.current) return;
+    hydrationStarted.current = true;
     (async () => {
       // Before reading anything, clear what an older build may have left in
       // plaintext. Upgrades are the only path onto this code, so a device that
@@ -110,7 +119,14 @@ export function ServerProvider({ children }: PropsWithChildren) {
       }
       // Only worth probing once there is an address to probe.
       if (storedUrl) void checkHealth();
-    })();
+    })()
+      .catch((e) => {
+        // A keychain that will not open must not strand every consumer waiting
+        // on `hydrated` forever; report it and let them proceed unpaired.
+        // eslint-disable-next-line no-console
+        console.warn('[server] hydration failed:', e);
+      })
+      .finally(() => setHydrated(true));
   }, [checkHealth]);
 
   // Persist token rotations triggered inside the api client (refresh flow).
@@ -179,8 +195,9 @@ export function ServerProvider({ children }: PropsWithChildren) {
       checkHealth,
       pair,
       signOut,
+      hydrated,
     }),
-    [serverUrl, online, token, refreshToken, setServerUrl, setToken, checkHealth, pair, signOut],
+    [serverUrl, online, token, refreshToken, setServerUrl, setToken, checkHealth, pair, signOut, hydrated],
   );
 
   return <ServerContext.Provider value={value}>{children}</ServerContext.Provider>;

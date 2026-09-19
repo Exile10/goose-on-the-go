@@ -7,6 +7,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 
+import { useServer } from '@/providers/server-provider';
 import { ApiError, api } from '@/services/api-client';
 import type { ModelEntry } from '@/services/types';
 
@@ -56,6 +57,10 @@ export function useModels(): UseModels {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // The base URL and bearer token arrive asynchronously; fetching before they
+  // land calls the default address unauthenticated and never retries.
+  const { hydrated } = useServer();
+
   const refresh = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -69,8 +74,9 @@ export function useModels(): UseModels {
   }, []);
 
   useEffect(() => {
+    if (!hydrated) return;
     void refresh();
-  }, [refresh]);
+  }, [hydrated, refresh]);
 
   /**
    * Activate optimistically, then reconcile with the server.

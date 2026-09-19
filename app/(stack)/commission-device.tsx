@@ -61,7 +61,7 @@ export default function CommissionDeviceScreen() {
 
   return (
     <View style={styles.container}>
-      <GIcon name="devices" size={28} color={JaridaPurple[500]} />
+      <GIcon name="device" size={28} color={JaridaPurple[500]} />
       <Text style={styles.title}>Add a Matter device</Text>
       <Text style={styles.desc}>
         Enter the setup code printed on the device or its packaging. A device only accepts

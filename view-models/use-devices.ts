@@ -9,6 +9,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
+import { useServer } from '@/providers/server-provider';
 import { ApiError, api } from '@/services/api-client';
 import type { Device, DeviceStatePatch, MatterStatus } from '@/services/types';
 
@@ -139,6 +140,10 @@ export function useDevices(): UseDevices {
     );
   }, []);
 
+  // The base URL and bearer token arrive asynchronously; fetching before they
+  // land calls the default address unauthenticated and never retries.
+  const { hydrated } = useServer();
+
   const refresh = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -162,8 +167,9 @@ export function useDevices(): UseDevices {
   }, [readPower]);
 
   useEffect(() => {
+    if (!hydrated) return;
     void refresh();
-  }, [refresh]);
+  }, [hydrated, refresh]);
 
   /**
    * Apply a patch optimistically, then reconcile against the server.

@@ -321,6 +321,7 @@ function ServerStep({
       >
         {checking ? 'Checking…' : 'Continue'}
       </GButton>
+      <ScanLink onPress={onScan} />
     </StepBody>
   );
 }

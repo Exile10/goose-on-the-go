@@ -101,11 +101,15 @@ export async function presentLocally(notification: ServerNotification): Promise<
         title: notification.title,
         body: notification.body,
         data: { id: notification.id, category: notification.category },
-        ...(Platform.OS === 'android'
-          ? { channelId: URGENT.has(notification.category) ? ALERT_CHANNEL : INFO_CHANNEL }
-          : {}),
       },
-      trigger: null, // Immediately.
+      // Android routes by channel, and the channel is carried on the trigger —
+      // `NotificationContentInput` has no `channelId`, so a channel set there is
+      // silently dropped and every notification lands on the default channel.
+      // A bare `{ channelId }` is the immediate, channel-aware trigger.
+      trigger:
+        Platform.OS === 'android'
+          ? { channelId: URGENT.has(notification.category) ? ALERT_CHANNEL : INFO_CHANNEL }
+          : null, // iOS has no channels; null is immediate.
     });
   } catch (e) {
     console.warn('[notifications] could not present', notification.id, e);

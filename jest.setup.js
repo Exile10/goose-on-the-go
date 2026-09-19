@@ -17,3 +17,13 @@ Object.defineProperty(globalThis, 'fetch', {
   configurable: true,
   writable: true,
 });
+
+/**
+ * AsyncStorage is a native module with no Node implementation, so importing it
+ * throws in tests. The view-models reach it transitively — they read
+ * `hydrated` off ServerProvider, which persists the server URL — so the mock
+ * has to be installed globally rather than per-suite.
+ */
+jest.mock('@react-native-async-storage/async-storage', () =>
+  require('@react-native-async-storage/async-storage/jest/async-storage-mock'),
+);

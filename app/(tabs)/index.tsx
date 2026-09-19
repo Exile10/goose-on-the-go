@@ -68,7 +68,7 @@ const DeviceGridItem = React.memo(function DeviceGridItem({
       <View style={styles.deviceCardTop}>
         <View style={[styles.deviceIconWrap, { backgroundColor: JaridaPurple[500] + '18' }]}>
           <GIcon
-            name="devices"
+            name="device"
             size={17}
             color={on && device.is_online ? JaridaPurple[500] : '#B5B5B5'}
           />

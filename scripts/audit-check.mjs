@@ -41,7 +41,8 @@ function runAudit() {
     });
   } catch (e) {
     if (e.stdout) return e.stdout;
-    throw e;
+    console.error(`could not run npm audit: ${e.message}`);
+    process.exit(2);
   }
 }
 
@@ -58,6 +59,19 @@ function advisoryIds(vuln) {
 }
 
 const report = JSON.parse(runAudit());
+
+// A security gate that cannot see the advisories must fail, not pass. `npm audit`
+// answers registry and network failures with a JSON body carrying `error` and no
+// `vulnerabilities` map — which parses perfectly and, left unchecked, walks the
+// loop below zero times and reports a clean scan.
+if (report.error) {
+  console.error(`npm audit failed: ${report.error.summary ?? report.error.code ?? 'unknown error'}`);
+  process.exit(2);
+}
+if (typeof report.vulnerabilities !== 'object' || report.vulnerabilities === null) {
+  console.error('npm audit returned no vulnerabilities map — refusing to report a pass.');
+  process.exit(2);
+}
 const allowlist = JSON.parse(readFileSync(ALLOWLIST_PATH, 'utf8'));
 const allowed = new Map(allowlist.allow.map((entry) => [entry.advisory, entry]));
 const usedAllowances = new Set();
