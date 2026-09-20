@@ -5,6 +5,7 @@ import android.net.ConnectivityManager
 import android.net.Network
 import android.net.LinkProperties
 import android.net.NetworkCapabilities
+import io.jarida.mobile.Diagnostics
 import io.jarida.mobile.InterfaceProvider
 import java.net.NetworkInterface
 import io.jarida.mobile.Mobile
@@ -13,6 +14,7 @@ import okhttp3.HttpUrl
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.IOException
+import java.net.Inet6Address
 import java.net.InetSocketAddress
 import java.net.Proxy
 import java.net.ProxySelector
@@ -32,6 +34,17 @@ object PondNetwork {
   private var networkCallback: ConnectivityManager.NetworkCallback? = null
   fun install(value: Context) {
     context = value.applicationContext
+    // Backend logging is discarded in a release build, so a node that cannot
+    // reach its control server fails with nothing to look at. A debuggable build
+    // routes those lines to logcat instead. They are redacted on the Go side:
+    // the backend announces the enrollment URL in plain text and that capability
+    // must not reach a log.
+    if (context.applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE != 0) {
+      Mobile.setDiagnostics(object : Diagnostics {
+        override fun log(line: String) { android.util.Log.i("PondNetwork", line) }
+      })
+    }
+    pushResolvers()
     Mobile.setInterfaceProvider(object : InterfaceProvider {
       override fun getInterfaces(): String {
         val result = JSONArray()
@@ -67,6 +80,7 @@ object PondNetwork {
         // This callback never enters PondNetwork's lock: Go may call the native
         // interface getter while starting/stopping the node on another thread.
         val name = manager.activeNetwork?.let { manager.getLinkProperties(it)?.interfaceName } ?: ""
+        pushResolvers()
         Mobile.networkChanged(name)
       }
     }
@@ -74,6 +88,37 @@ object PondNetwork {
     networkCallback = callback
     val name = manager.activeNetwork?.let { manager.getLinkProperties(it)?.interfaceName } ?: ""
     Mobile.networkChanged(name)
+  }
+  /**
+   * Hand the node the resolvers the OS reports for the active network.
+   *
+   * The platform resolver does not answer for the embedded node: a lookup of the
+   * coordinator hangs and then falls through to Tailscale's bootstrap DNS, which
+   * cannot answer for a self-hosted coordinator and discloses its hostname while
+   * asking. These are pushed rather than fetched on demand, because a lookup must
+   * not wait on a call back into Java.
+   */
+  private fun pushResolvers() {
+    val manager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+    val servers = manager.activeNetwork?.let { manager.getLinkProperties(it) }?.dnsServers.orEmpty()
+    val result = JSONArray()
+    val seen = mutableSetOf<String>()
+    // Keep the order the OS gave: on a home network the server it lists first is
+    // typically the one that answers, and the node tries them in order.
+    for (address in servers) {
+      if (address.isLoopbackAddress || address.isAnyLocalAddress || address.isMulticastAddress) continue
+      var host = address.hostAddress?.substringBefore('%') ?: continue
+      if (address is Inet6Address && address.isLinkLocalAddress) {
+        // A link-local server needs a zone, and it must be the numeric scope:
+        // resolving an interface name needs netlink, which this platform denies
+        // to applications. Without one the node cannot dial it at all.
+        val scope = address.scopeId
+        if (scope == 0) continue
+        host = "$host%$scope"
+      }
+      if (seen.add(host)) result.put(host)
+    }
+    Mobile.setResolvers(result.toString())
   }
   private fun origin(url: HttpUrl) = "https://${url.host}:${url.port}"
   private fun remote(host: String): Boolean {
