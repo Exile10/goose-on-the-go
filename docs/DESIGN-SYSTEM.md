@@ -7,11 +7,34 @@ All design tokens are in `constants/`. Import from individual files or the barre
 ### Brand
 | Token | Value | Usage |
 |-------|-------|-------|
-| `Brand.purple` | `#8C4BFF` | Primary brand, CTAs, active states |
+| `Brand.purple` | `#8C4BFF` | Brand mark only (logo, marketing) |
 | `Brand.charcoal` | `#1C1C1C` | Primary text, headings |
 | `Brand.white` | `#FFFFFF` | Backgrounds, text on brand |
 
+### Accent (interactive)
+As of issue #20, interactive/CTA colour is a separate token from the
+`Brand`/`JaridaPurple` mark ramp above — aligned with `@jarida/ink`'s own
+`tokens/color.ts`, where the mark (4.42:1) and the accent (5.47:1) are
+deliberately different values.
+
+| Token | Value | Usage |
+|-------|-------|-------|
+| `Accent.base` | `#7C3AED` | CTAs, active states, tint — fills and light-mode text/icon/border |
+| `Accent.pressed` | `#6D28D9` | Pressed state |
+| `Accent.soft` | `rgba(124, 58, 237, 0.11)` | Light-mode soft backgrounds |
+| `Accent.softer` | `rgba(124, 58, 237, 0.06)` | Light-mode subtler backgrounds |
+| `Accent.onDark` | `#B794FF` | Accent as **text, icon or border on a dark surface** (6.9:1) |
+| `Accent.softDark` / `Accent.softerDark` | `rgba(124, 58, 237, 0.22 / 0.12)` | Dark-mode soft backgrounds |
+
+`Accent.base` is a *fill* colour, tuned against white text sitting on top of
+it — on a dark background it only measures 2.93:1, under the 3:1 UI floor. Use
+`Accent.base` for fills in both themes; use `Accent.onDark` (not `Accent.base`)
+for text, icons or borders drawn directly on a dark surface. See
+`DarkColors.textBrand` / `iconActive` / `borderBrand` in `constants/colors.ts`.
+
 ### Purple Scale
+`JaridaPurple` (unchanged) is the brand mark ramp — not used for interactive
+elements; use `Accent` for those.
 ```
 50:  #F4ECFF    Soft backgrounds, hover states
 100: #E6D6FF    Light borders
