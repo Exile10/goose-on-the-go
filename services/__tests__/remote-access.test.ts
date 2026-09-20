@@ -1,4 +1,5 @@
 jest.mock('../api-client', () => ({ api: { requestLocal: jest.fn() } }));
+import i18n from '../i18n';
 import { AppState, NativeModules } from 'react-native';
 import { api } from '../api-client';
 import { enableRemoteAccess, cancelRemoteAccess, restoreRemoteAccess } from '../remote-access';
@@ -16,8 +17,15 @@ beforeEach(() => {
 });
 afterEach(() => jest.useRealTimers());
 it('makes no native coordination contact without local approval', async () => {
-  jest.mocked(api.requestLocal).mockResolvedValueOnce({ enabled: false });
-  await expect(enableRemoteAccess('profile', local, jest.fn(), jest.fn())).rejects.toThrow();
+  jest.mocked(api.requestLocal).mockResolvedValueOnce({ enabled: false, controlUrl: control });
+  await expect(enableRemoteAccess('profile', local, jest.fn(), jest.fn())).rejects.toThrow(i18n.t('remote.approval'));
+  expect(bridge.beginRemote).not.toHaveBeenCalled();
+});
+it('explains missing infrastructure without requesting approval or contacting a coordinator', async () => {
+  jest.mocked(api.requestLocal).mockResolvedValueOnce({ enabled: false, controlUrl: '' });
+  const progress = jest.fn();
+  await expect(enableRemoteAccess('profile', local, progress, jest.fn())).rejects.toThrow(i18n.t('remote.unconfigured'));
+  expect(progress).not.toHaveBeenCalled();
   expect(bridge.beginRemote).not.toHaveBeenCalled();
 });
 it('refuses remote pairing addresses before any request', async () => {

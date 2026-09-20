@@ -4,6 +4,11 @@ import { api } from './api-client';
 import { isLocalPairingUrl, normalizeHttpsUrl } from '@/models/connection';
 import i18n from './i18n';
 
+/** Setup cannot proceed until the operator configures remote infrastructure. */
+export class RemoteInfrastructureUnavailableError extends Error {
+  constructor() { super(i18n.t('remote.unconfigured')); this.name = 'RemoteInfrastructureUnavailableError'; }
+}
+
 type NativeStatus = { state: string; authUrl?: string; nodeKey?: string; machineKey?: string; addresses: string[] };
 let generation = 0;
 let busy = false;
@@ -49,6 +54,7 @@ export async function enableRemoteAccess(profileId: string, localUrl: string, pr
     check();
     const config = await api.requestLocal<{ enabled: boolean; controlUrl: string }>(localUrl, '/api/v1/remote-access/configuration');
     check();
+    if (!config.controlUrl?.trim()) throw new RemoteInfrastructureUnavailableError();
     if (!config.enabled) { progress('approval'); throw new Error(i18n.t('remote.approval')); }
     const control = normalizeHttpsUrl(config.controlUrl);
     progress('enrolling');

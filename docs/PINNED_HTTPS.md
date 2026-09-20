@@ -406,3 +406,15 @@ is left local-only, with the Jetson production service active.
 
 Public coordination/relay deployment is still required for the real Wi-Fi/cellular
 roaming matrix. Physical iPhone and iOS 16.4 runtime acceptance remain pending.
+
+### Unconfigured remote-access feedback (2026-09-20)
+
+An empty coordinator address now produces a localized infrastructure-setup message
+before any embedded node starts. Configured-but-disabled remote access retains its
+local-approval message. The screen displays failures once and hides recovery while
+infrastructure is absent. A regression test first reproduced the incorrect approval
+message, then passed with the fix. All 158 app tests, typechecking, lint (zero errors,
+19 existing warnings), and the normal Android release build pass. The Galaxy A57
+received the signature-matched update in place with pairing preserved; its live
+screen shows exactly one setup message and no misleading approval/recovery prompt.
+Public cellular roaming remains blocked by infrastructure deployment.
