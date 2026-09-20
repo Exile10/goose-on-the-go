@@ -23,6 +23,7 @@ export default function StackLayout() {
     >
       <Stack.Screen name="models" options={{ title: 'AI Models' }} />
       <Stack.Screen name="memories" options={{ title: 'Memories' }} />
+      <Stack.Screen name="sessions" options={{ title: 'Sessions' }} />
       <Stack.Screen name="logs" options={{ title: 'Activity Logs' }} />
       <Stack.Screen name="schedule" options={{ title: 'Schedule' }} />
       <Stack.Screen name="app-management" options={{ title: 'App Integrations' }} />

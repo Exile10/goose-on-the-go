@@ -170,6 +170,111 @@ export interface SessionMessage {
   liked?: boolean | null;
 }
 
+// ── Chat streaming ────────────────────────────────────────────
+
+/** Image attachment for a chat turn. `data` is raw base64 — no `data:...;base64,` prefix. */
+export interface ImageAttachment {
+  data: string;
+  mime_type: string;
+}
+
+/** Request body for `POST /chat/stream`. Only `message` is required server-side. */
+export interface ChatStreamRequest {
+  message: string;
+  session_id?: string;
+  images?: ImageAttachment[];
+  voice_mode?: boolean;
+  canvas_mode?: boolean;
+  tool_group_allowlist?: string[];
+  /**
+   * Detach this turn from the response body: it keeps running server-side
+   * when the client disconnects, and can be reattached through
+   * `GET /chat/runs/{run_id}/events`. Defaults to false server-side.
+   */
+  resumable?: boolean;
+}
+
+/**
+ * SSE frames pond-server's `/chat/stream` (and `/chat/runs/{id}/events`)
+ * actually emit.
+ *
+ * `done` and `error` carry no `type` field — check for those keys before
+ * switching on `type`.
+ *
+ * `seq` rides in the SSE `id:` field, not the JSON body — the api client
+ * stamps it on from the frame's `lastEventId` before handing it to `onFrame`.
+ * Only present on frames pushed onto a run's replay ring (i.e. not on
+ * `reattached` / `replay_gap` / `run_evicted`, which are subscriber-local).
+ */
+export type ChatStreamFrame =
+  | { type: 'text'; content: string; token?: string; seq?: number }
+  | { type: 'thinking'; content: string; seq?: number }
+  | { type: 'tool_call'; tool: string; id: string; input: unknown; seq?: number }
+  | {
+      type: 'tool_result';
+      tool: string;
+      id: string;
+      content: string;
+      ui?: { card_type?: string; data?: Record<string, unknown> };
+      seq?: number;
+    }
+  | { type: 'status'; content: string; seq?: number }
+  | { type: 'review_status'; content: string; seq?: number }
+  | { type: 'review_revision'; content: string; score?: number; rounds?: number; seq?: number }
+  | { type: 'tool_revision'; seq?: number }
+  | { type: 'turn_limit_reached'; max_turns: number; seq?: number }
+  | {
+      type: 'context_warning';
+      utilization_pct: number;
+      turns_remaining: number;
+      avg_growth_rate: number;
+      warning: string | null;
+      seq?: number;
+    }
+  | { type: 'subagent_progress'; task_id: string; role: string; status: string; detail?: string; seq?: number }
+  | { type: 'turn_stats'; seq?: number }
+  /** First frame of a resumable run — names the run so the client can persist it. */
+  | { type: 'run_started'; run_id: string; session_id: string; epoch: string; resumable: true; seq?: number }
+  /** First frame of a reattach response only; never appears on the original stream. */
+  | {
+      type: 'reattached';
+      run_id: string;
+      session_id: string;
+      from_seq: number;
+      replay_depth: number;
+      state: 'running' | 'finished' | 'failed' | 'cancelled';
+      epoch: string;
+    }
+  /** The ring rolled past what this client had — frames before `first_available_seq` are gone for good. */
+  | { type: 'replay_gap'; requested_after_seq: number; first_available_seq: number; advice: string }
+  /** The run handle was dropped from the registry while this client was attached (aged out, or the process restarted). */
+  | { type: 'run_evicted'; run_id: string; advice: string }
+  /** Non-terminal bookkeeping frame; the `done` frame with `interrupted:true` that follows is what actually ends the turn. */
+  | { type: 'cancelled'; run_id: string; at_seq: number; seq?: number }
+  | {
+      done: true;
+      session_id: string;
+      run_id?: string;
+      /** True when the turn was cancelled or timed out rather than finishing on its own. */
+      interrupted?: boolean;
+      model_role?: string;
+      model_name?: string;
+      usage?: { prompt_tokens: number; completion_tokens: number };
+      seq?: number;
+    }
+  | { error: string };
+
+/** Mirrors `GET /sessions/{id}/active-run` — what, if anything, the server is still driving. */
+export interface ActiveRun {
+  run_id: string;
+  session_id: string;
+  state: 'running' | 'finished' | 'failed' | 'cancelled';
+  started_at: string;
+  first_seq: number;
+  last_seq: number;
+  epoch: string;
+}
+
 export interface UsageSummary {
   total_prompt_tokens: number;
   total_completion_tokens: number;

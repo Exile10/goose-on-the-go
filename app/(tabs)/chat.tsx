@@ -51,7 +51,7 @@ const ChatBubble = React.memo(function ChatBubble({ item }: { item: Message }) {
   );
 });
 
-/** Typing dots indicator */
+/** Typing dots indicator — shown while streaming with no more specific activity to report. */
 const TypingDots = React.memo(function TypingDots() {
   return (
     <View style={styles.bubbleRow}>
@@ -69,17 +69,35 @@ const TypingDots = React.memo(function TypingDots() {
   );
 });
 
+/** Live "what's happening" row — thinking / tool use / status, driven by real stream events. */
+const ActivityRow = React.memo(function ActivityRow({ label }: { label: string }) {
+  return (
+    <View style={styles.bubbleRow}>
+      <View style={styles.gooseAvatar}>
+        <Text style={styles.gooseAvatarText}>G</Text>
+      </View>
+      <View style={[styles.bubble, styles.bubbleAssistant]}>
+        <Text style={styles.activityText}>{label}</Text>
+      </View>
+    </View>
+  );
+});
+
 export default function ChatScreen() {
   const { data, actions } = useChat();
-  const { messages, streaming: isTyping } = data;
+  const { messages, streaming: isTyping, activity } = data;
   const [draft, setDraft] = useState('');
   const flatListRef = useRef<FlatList<Message>>(null);
 
   const handleSend = useCallback(() => {
+    if (isTyping) {
+      actions.abortRun();
+      return;
+    }
     if (!draft.trim()) return;
     actions.send(draft);
     setDraft('');
-  }, [draft, actions]);
+  }, [draft, actions, isTyping]);
 
   const handleSuggestedPrompt = useCallback((prompt: string) => {
     setDraft(prompt);
@@ -130,7 +148,7 @@ export default function ChatScreen() {
           renderItem={renderItem}
           inverted
           contentContainerStyle={styles.listContent}
-          ListHeaderComponent={isTyping ? <TypingDots /> : null}
+          ListHeaderComponent={isTyping ? (activity ? <ActivityRow label={activity} /> : <TypingDots />) : null}
         />
 
         {/* Suggested prompts */}
@@ -163,11 +181,15 @@ export default function ChatScreen() {
             </Pressable>
           </View>
           <Pressable
-            style={[styles.sendBtn, draft.trim() ? styles.sendBtnActive : styles.sendBtnInactive]}
+            style={[styles.sendBtn, isTyping || draft.trim() ? styles.sendBtnActive : styles.sendBtnInactive]}
             onPress={handleSend}
-            disabled={!draft.trim()}
+            disabled={!isTyping && !draft.trim()}
           >
-            <GIcon name="send" size={16} color={draft.trim() ? Brand.white : Grey[400]} />
+            <GIcon
+              name={isTyping ? 'pause' : 'send'}
+              size={16}
+              color={isTyping || draft.trim() ? Brand.white : Grey[400]}
+            />
           </Pressable>
         </View>
 
@@ -313,6 +335,12 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   dotMid: { opacity: 0.9 },
+  activityText: {
+    fontFamily: FontFamily.body,
+    fontSize: FontSize.sm,
+    fontStyle: 'italic',
+    color: Grey[500],
+  },
 
   /* Suggested prompts */
   suggestedRow: {

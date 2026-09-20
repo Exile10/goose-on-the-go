@@ -12,6 +12,8 @@ const KEYS = {
   lastScreen: '@goose/last-screen',
   settings: '@goose/settings',
   devScreenModes: '@goose/dev-screen-modes',
+  /** Pointer to whatever resumable run the server may still be driving — see view-models/chat-run-store.ts. */
+  chatRun: '@goose/chat-run',
 } as const;
 
 /**

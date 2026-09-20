@@ -1,11 +1,31 @@
 /**
  * Chat ViewModel
- * Manages chat messages, drafting, and mock streaming.
+ *
+ * Hybrid mock/real, gated by the dev-only `isScreenReal('chat')` toggle (see
+ * `providers/server-provider.tsx`). All hooks below are called unconditionally
+ * on every render — only the *returned* data/actions branch on the flag, so
+ * this stays legal under the Rules of Hooks while still being a real toggle
+ * rather than two components.
+ *
+ * The real path is a thin wrapper over `chat-run-store`'s module-scoped
+ * state — the turn itself lives there, outside this hook, so it survives
+ * this screen unmounting (tab switch, navigating to Sessions) and the app
+ * backgrounding/foregrounding mid-reply. The store wires its own
+ * `AppState`-driven resume logic once, at module scope.
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+
 import type { Message } from '@/models/chat';
 import { useServer } from '@/providers/server-provider';
+import { api } from '@/services/api-client';
+import {
+  abortRun as realAbortRun,
+  loadSession as realLoadSession,
+  newConversation as realNewConversation,
+  send as realSend,
+  useChatRun,
+} from './chat-run-store';
 
 const SEED_MESSAGES: Message[] = [
   {
@@ -28,19 +48,34 @@ const SEED_MESSAGES: Message[] = [
   },
 ];
 
-export function useChat() {
-  const { isScreenReal } = useServer();
-  const [messages, setMessages] = useState<Message[]>(() => SEED_MESSAGES);
-  const [streaming, setStreaming] = useState(false);
-  const [sessionId] = useState<string | null>('session-1');
-  const nextId = useRef(4);
+export interface UseChat {
+  data: { messages: Message[]; sessionId: string | null; streaming: boolean; activity: string | null };
+  loading: boolean;
+  error: string | null;
+  actions: {
+    send: (text: string) => void;
+    newConversation: () => void;
+    loadSession: (id: string) => void;
+    abortRun: () => void;
+  };
+}
 
-  // Read fresh at delivery time (not send time) so a reply always reflects
-  // whatever the toggle is when it actually lands, not when it was sent.
-  const isScreenRealRef = useRef(isScreenReal);
+export function useChat(): UseChat {
+  const { isScreenReal, serverUrl, token } = useServer();
+  const real = isScreenReal('chat');
+
+  // Kept current regardless of mode, so flipping the toggle mid-session
+  // never requires a reload before the real path can reach the server.
   useEffect(() => {
-    isScreenRealRef.current = isScreenReal;
-  }, [isScreenReal]);
+    api.setBaseUrl(serverUrl);
+    api.setToken(token);
+  }, [serverUrl, token]);
+
+  // ── Mock path — unconditionally maintained, only rendered when !real ──
+  const [mockMessages, setMockMessages] = useState<Message[]>(() => SEED_MESSAGES);
+  const [mockStreaming, setMockStreaming] = useState(false);
+  const [mockSessionId] = useState<string | null>('session-1');
+  const mockNextId = useRef(4);
 
   const pendingTimeoutsRef = useRef<Set<ReturnType<typeof setTimeout>>>(new Set());
   useEffect(() => {
@@ -51,50 +86,69 @@ export function useChat() {
     };
   }, []);
 
-  const send = useCallback((text: string) => {
+  const mockSend = useCallback((text: string) => {
     if (!text.trim()) return;
     const userMsg: Message = {
-      id: String(nextId.current++),
+      id: String(mockNextId.current++),
       role: 'user',
       content: text.trim(),
       timestamp: Date.now(),
     };
-    setMessages((m) => [...m, userMsg]);
-    setStreaming(true);
+    setMockMessages((m) => [...m, userMsg]);
+    setMockStreaming(true);
 
     const timeoutId = setTimeout(() => {
       pendingTimeoutsRef.current.delete(timeoutId);
-
-      const reply: Message = isScreenRealRef.current('chat')
-        ? {
-            id: String(nextId.current++),
-            role: 'assistant',
-            // Real chat streaming lands separately. The toggle is wired
-            // ahead of that so it's a config flip, not a rewrite.
-            content: 'Real backend mode is on, but chat streaming isn’t wired up yet. Flip back to mock in Developer settings.',
-            timestamp: Date.now(),
-          }
-        : {
-            id: String(nextId.current++),
-            role: 'assistant',
-            content: `Working on it. (${text.length} characters received — this is a mock response.)`,
-            timestamp: Date.now(),
-          };
-      setMessages((m) => [...m, reply]);
-      setStreaming(false);
+      const reply: Message = {
+        id: String(mockNextId.current++),
+        role: 'assistant',
+        content: `Working on it. (${text.length} characters received — this is a mock response.)`,
+        timestamp: Date.now(),
+      };
+      setMockMessages((m) => [...m, reply]);
+      setMockStreaming(false);
     }, 700);
     pendingTimeoutsRef.current.add(timeoutId);
   }, []);
 
-  const newConversation = useCallback(() => {
-    setMessages([]);
-    nextId.current = 1;
+  const mockNewConversation = useCallback(() => {
+    setMockMessages([]);
+    mockNextId.current = 1;
   }, []);
 
+  const mockNoop = useCallback(() => {}, []);
+
+  // ── Real path — always subscribed; only rendered when real ──
+  const realSnapshot = useChatRun();
+
+  if (real) {
+    return {
+      data: {
+        messages: realSnapshot.messages,
+        sessionId: realSnapshot.sessionId,
+        streaming: realSnapshot.streaming,
+        activity: realSnapshot.activity,
+      },
+      loading: false,
+      error: realSnapshot.error,
+      actions: {
+        send: realSend,
+        newConversation: realNewConversation,
+        loadSession: (id: string) => void realLoadSession(id),
+        abortRun: realAbortRun,
+      },
+    };
+  }
+
   return {
-    data: { messages, sessionId, streaming },
+    data: { messages: mockMessages, sessionId: mockSessionId, streaming: mockStreaming, activity: null },
     loading: false,
-    error: null as string | null,
-    actions: { send, newConversation },
+    error: null,
+    actions: {
+      send: mockSend,
+      newConversation: mockNewConversation,
+      loadSession: mockNoop,
+      abortRun: mockNoop,
+    },
   };
 }
