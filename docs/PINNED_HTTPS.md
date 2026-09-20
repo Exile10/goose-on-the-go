@@ -418,3 +418,11 @@ message, then passed with the fix. All 158 app tests, typechecking, lint (zero e
 received the signature-matched update in place with pairing preserved; its live
 screen shows exactly one setup message and no misleading approval/recovery prompt.
 Public cellular roaming remains blocked by infrastructure deployment.
+
+Physical pairing paths were exercised on Galaxy A57: manual HTTPS URL/public pin/
+one-time code, LAN discovery that prefills the address while still requiring a
+trusted pin, and the real camera scanner with user-assisted QR positioning. The
+QR path completes and retains pairing after app restart. The repaired Jetson
+Matter controller accepts Google's MVD; phone control reaches its virtual light,
+and Devices refresh reads changes made in MVD. External device-state changes do
+not yet automatically update the grid. No pairing reset was performed.
