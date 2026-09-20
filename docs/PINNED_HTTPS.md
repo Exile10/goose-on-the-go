@@ -377,3 +377,32 @@ installed: local dashboard HTTP is loopback-only on 8080 and companion HTTPS is
 on 4443. Mac-to-Jetson LAN verification passes with the saved certificate public
 key; the previous plaintext LAN endpoint is refused. Public coordination remains
 unconfigured until the separate infrastructure deployment.
+
+### Physical Android completion and normal app installation (2026-09-20)
+
+The connected Galaxy A57 passes all 39 final app assertions with direct LAN
+pairing to a scratch Pond (`/tmp/gotg-final-physical-android-rerun.log`, exit zero).
+Coverage includes Expo fetch and RN XHR/SSE pin enforcement, dates/hostname,
+renewal, redirects, plaintext refusal, embedded forced DERP, LAN-only pairing,
+remote refresh, outage recovery, infrastructure restore, locally approved
+replacement, and retained identity/authenticated REST/SSE after process restart.
+The first attempt ended when Android killed the background test process for low
+memory; only the complete foreground rerun counts as acceptance. Coordinator and
+fixture traffic use USB forwarding, so this does not establish cellular roaming.
+
+The saved normal release APK was installed in place after matching the existing
+signing certificate. The old APK was backed up; the app ID, data directory inodes,
+first-install timestamp and granted permissions were preserved. The production
+package was neither cleared nor uninstalled. Its existing personal Android debug
+certificate is unchanged; this is not a Play distribution signing claim.
+
+The legacy HTTP profile correctly required a new local pairing. The normal app
+paired with the production Jetson over HTTPS using a public-key fingerprint
+obtained directly through authenticated SSH and a locally issued one-time code.
+It shows `Connected locally`, reconnects after full process restart, and loads
+the Devices screen without a transport error. Remote activation presents local
+approval feedback because production coordination is not yet configured. The app
+is left local-only, with the Jetson production service active.
+
+Public coordination/relay deployment is still required for the real Wi-Fi/cellular
+roaming matrix. Physical iPhone and iOS 16.4 runtime acceptance remain pending.
