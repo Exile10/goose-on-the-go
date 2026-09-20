@@ -1,0 +1,119 @@
+/** Remote access is contacted only after explicit user opt-in and local pairing. */
+import { AppState, NativeModules } from 'react-native';
+import { api } from './api-client';
+import { isLocalPairingUrl, normalizeHttpsUrl } from '@/models/connection';
+import i18n from './i18n';
+
+type NativeStatus = { state: string; authUrl?: string; nodeKey?: string; machineKey?: string; addresses: string[] };
+let generation = 0;
+let busy = false;
+let pendingRecovery: { endpoint: string; id: string } | null = null;
+async function cancelPendingRecovery(): Promise<void> {
+  const pending = pendingRecovery; pendingRecovery = null;
+  if (pending) await api.requestLocal(pending.endpoint, `/api/v1/remote-access/recovery/${pending.id}`, { method: 'DELETE' })
+    .catch(() => console.warn('[remote] recovery cancellation could not reach Pond; approval will expire'));
+}
+export type RemoteProgress = 'approval' | 'review' | 'enrolling' | 'connecting' | 'enabled';
+const native = () => {
+  if (!NativeModules.PondTls?.beginRemote) throw new Error(i18n.t('remote.unsupported'));
+  return NativeModules.PondTls;
+};
+function status(raw: string): NativeStatus {
+  const value = JSON.parse(raw) as NativeStatus;
+  if (typeof value.state !== 'string' || !Array.isArray(value.addresses)) throw new Error(i18n.t('remote.failed'));
+  return value;
+}
+export async function cancelRemoteAccess(): Promise<void> {
+  generation++;
+  if (!busy) return;
+  await cancelPendingRecovery();
+  await native().cancelRemote();
+}
+export async function disableRemoteAccess(): Promise<void> {
+  generation++;
+  await cancelPendingRecovery();
+  await native().disableRemote();
+}
+export async function enableRemoteAccess(profileId: string, localUrl: string, progress: (value: RemoteProgress) => void,
+  commit: (endpoint: string, control: string, current: () => void) => Promise<void>,
+  recovery?: { onReview: (id: string) => void }): Promise<void> {
+  if (busy) throw new Error(i18n.t('remote.busy'));
+  if (!isLocalPairingUrl(localUrl)) throw new Error(i18n.t('pairing.lan'));
+  const current = ++generation;
+  busy = true;
+  const check = () => {
+    if (current !== generation || AppState.currentState !== 'active') throw new Error(i18n.t('remote.cancelled'));
+  };
+  let committed = false;
+  try {
+    check();
+    const config = await api.requestLocal<{ enabled: boolean; controlUrl: string }>(localUrl, '/api/v1/remote-access/configuration');
+    check();
+    if (!config.enabled) { progress('approval'); throw new Error(i18n.t('remote.approval')); }
+    const control = normalizeHttpsUrl(config.controlUrl);
+    progress('enrolling');
+    let state = status(await native().beginRemote(profileId, control));
+    check();
+    let submitted = false;
+    for (let attempt = 0; attempt < 30; attempt++) {
+      check();
+      if (state.state === 'Running') {
+        progress('connecting');
+        const info = await api.requestLocal<{ tailnet_address?: string; https_port?: number }>(localUrl, '/api/v1/system/info');
+        check();
+        const ip = info.tailnet_address?.split('.').map(Number);
+        if (!ip || ip.length !== 4 || ip.some((n) => !Number.isInteger(n) || n < 0 || n > 255) || ip[0] !== 100 || ip[1] < 64 || ip[1] > 127 || !Number.isInteger(info.https_port) || info.https_port! < 1 || info.https_port! > 65535) throw new Error(i18n.t('remote.failed'));
+        // This address came from an authenticated request to the pinned local Pond.
+        const endpoint = normalizeHttpsUrl(`https://${info.tailnet_address}:${info.https_port}`);
+        check(); await commit(endpoint, control, check); committed = true;
+        progress('enabled'); return;
+      }
+      if (state.authUrl && !submitted) {
+        if (new URL(state.authUrl).origin !== control) throw new Error(i18n.t('remote.failed'));
+        submitted = true;
+        // Never automatically replay this enrollment write after an ambiguous failure.
+        const body = JSON.stringify({ authUrl: state.authUrl, nodeKey: state.nodeKey ?? '', machineKey: state.machineKey ?? '' });
+        if (recovery) {
+          const request = await api.requestLocal<{ id: string }>(localUrl, '/api/v1/remote-access/recovery', { method: 'POST', body });
+          if (!/^[a-f0-9-]{36}$/.test(request.id)) throw new Error(i18n.t('remote.failed'));
+          pendingRecovery = { endpoint: localUrl, id: request.id };
+          check(); recovery.onReview(request.id); progress('review');
+          let approved = false;
+          for (let reviewAttempt = 0; reviewAttempt < 24; reviewAttempt++) {
+            check();
+            const review = await api.requestLocal<{ approved: boolean }>(localUrl, `/api/v1/remote-access/recovery/${request.id}`);
+            check();
+            if (review.approved === true) { approved = true; break; }
+            await new Promise<void>((resolve) => setTimeout(resolve, 5000));
+          }
+          if (!approved) throw new Error(i18n.t('remote.reviewExpired'));
+          check(); progress('enrolling');
+          // Only the current, still-authenticated LAN phone can consume approval.
+          await api.requestLocal(localUrl, `/api/v1/remote-access/recovery/${request.id}`, { method: 'POST' });
+          pendingRecovery = null;
+        } else {
+          await api.requestLocal(localUrl, '/api/v1/remote-access/enrollment', { method: 'POST', body });
+        }
+        check();
+      }
+      await new Promise<void>((resolve) => setTimeout(resolve, 1000));
+      check(); state = status(await native().remoteStatus());
+    }
+    throw new Error(i18n.t('remote.failed'));
+  } finally {
+    await cancelPendingRecovery();
+    busy = false;
+    if (!committed) await native().cancelRemote().catch(() => console.warn('[remote] transport restoration failed'));
+  }
+}
+
+/** Restore transport before trust, credentials, health checks, or notification streams. */
+export async function restoreRemoteAccess(profileId: string, control: string): Promise<void> {
+  generation++;
+  await cancelPendingRecovery();
+  if (!NativeModules.PondTls?.activateRemote) {
+    if (control) throw new Error(i18n.t('remote.unsupported'));
+    return;
+  }
+  await NativeModules.PondTls.activateRemote(profileId, control);
+}

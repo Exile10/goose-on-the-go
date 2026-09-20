@@ -5,6 +5,8 @@ export interface ConnectionProfile {
   port: number;
   localUrls: string[];
   remoteUrl?: string;
+  /** Missing on older profiles means local only until explicit activation. */
+  remoteAccess?: { mode: 'local' } | { mode: 'embedded'; controlUrl: string };
 }
 export type ConnectionState = 'trust' | 'unpaired' | 'upgrade' | 'reconnecting' | 'local' | 'remote' | 'disconnected';
 
@@ -27,8 +29,14 @@ export function parseConnectionProfile(raw: unknown): ConnectionProfile | null {
   if (p.version !== 2 || typeof p.host !== 'string' || !p.host || !Number.isInteger(p.port) ||
       p.port < 1 || p.port > 65535 || !Array.isArray(p.localUrls) || !p.localUrls.length || p.localUrls.length > 8) return null;
   try {
+    const remote = p.remoteAccess;
+    if (remote && remote.mode !== 'local' && remote.mode !== 'embedded') return null;
+    if (remote?.mode === 'embedded' && !p.remoteUrl) return null;
     return { version: 2, host: p.host, port: p.port,
       localUrls: [...new Set(p.localUrls.map(normalizeHttpsUrl))],
+      ...(remote ? { remoteAccess: remote.mode === 'embedded'
+        ? { mode: 'embedded' as const, controlUrl: normalizeHttpsUrl(remote.controlUrl) }
+        : { mode: 'local' as const } } : {}),
       ...(p.remoteUrl ? { remoteUrl: normalizeHttpsUrl(p.remoteUrl) } : {}),
     };
   } catch { return null; }

@@ -464,7 +464,7 @@ function CompleteStep({
         device and used for every API call.
       </Text>
       <InkButton variant="primary" onPress={onDone}>
-        Go to Home
+        {i18n.t('remote.continue')}
       </InkButton>
     </StepBody>
   );
@@ -565,7 +565,7 @@ export default function PondPairingScreen() {
     setStep(2);
   }, []);
 
-  const done = useCallback(() => router.back(), [router]);
+  const done = useCallback(() => router.replace('/(stack)/remote-access'), [router]);
 
   return (
     <GKeyboardView style={styles.container}>

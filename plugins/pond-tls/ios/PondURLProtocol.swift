@@ -19,7 +19,8 @@ final class PondURLProtocol: URLProtocol, URLSessionDataDelegate, @unchecked Sen
     guard let host = url.host?.lowercased(), let scheme = url.scheme?.lowercased(),
       url.user == nil, url.password == nil, ["https", "http"].contains(scheme)
     else { return nil }
-    return "\(scheme)://\(host):\(url.port ?? (scheme == "https" ? 443 : 80))"
+    let plain = host.trimmingCharacters(in: CharacterSet(charactersIn: "[]"))
+    return "\(scheme)://\(plain.contains(":") ? "[" + plain + "]" : plain):\(url.port ?? (scheme == "https" ? 443 : 80))"
   }
 
   static func configure(_ entries: [[String: String]]) throws {
@@ -36,9 +37,16 @@ final class PondURLProtocol: URLProtocol, URLSessionDataDelegate, @unchecked Sen
     lock.lock()
     defer { lock.unlock() }
     if next == pins { return }
+    try PondNetwork.configure(Array(next.keys))
     pins = next
     generation &+= 1
     failures.removeAll()
+    for request in active.allObjects { request.fail(URLError(.cancelled)) }
+  }
+
+  static func invalidateConnections() {
+    lock.lock(); defer { lock.unlock() }
+    generation &+= 1
     for request in active.allObjects { request.fail(URLError(.cancelled)) }
   }
 
@@ -59,7 +67,10 @@ final class PondURLProtocol: URLProtocol, URLSessionDataDelegate, @unchecked Sen
     lock.lock()
     defer { lock.unlock() }
     if URLProtocol.property(forKey: "PondTLSHandled", in: request) != nil { return false }
-    return request.value(forHTTPHeaderField: marker) == "1"
+    // ATS exceptions for embedded addresses permit our request-scoped anchor.
+    // Unconfigured endpoints and plaintext must never fall through to URLSession.
+    return request.url?.host.map(PondNetwork.remote) == true
+      || request.value(forHTTPHeaderField: marker) == "1"
       || request.url.flatMap(origin).map { pins[$0] != nil } == true
   }
   override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
@@ -86,6 +97,7 @@ final class PondURLProtocol: URLProtocol, URLSessionDataDelegate, @unchecked Sen
     config.urlCredentialStorage = nil
     config.httpShouldSetCookies = false
     config.timeoutIntervalForRequest = request.timeoutInterval
+    do { try PondNetwork.apply(config, url: url) } catch { fail(error); return }
     session = URLSession(configuration: config, delegate: self, delegateQueue: nil)
     transportTask = session?.dataTask(with: forwarded as URLRequest)
     transportTask?.resume()
@@ -115,6 +127,10 @@ final class PondURLProtocol: URLProtocol, URLSessionDataDelegate, @unchecked Sen
   ) {
     Self.lock.lock()
     defer { Self.lock.unlock() }
+    if !ended, epoch == Self.generation, challenge.previousFailureCount == 0,
+      let credential = PondNetwork.proxyCredential(challenge.protectionSpace) {
+      completionHandler(.useCredential, credential); return
+    }
     guard !ended, epoch == Self.generation,
       challenge.protectionSpace.authenticationMethod == NSURLAuthenticationMethodServerTrust,
       let host = request.url?.host, let trust = challenge.protectionSpace.serverTrust,

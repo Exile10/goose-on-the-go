@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Build an isolated native transport test app against real TLS and a scratch Pond.
 
-Supports an iOS simulator or a USB-connected Android device. Production app data
+Supports an existing iOS simulator, Android emulator, or USB-connected Android device. Production app data
 is never used. Android USB forwarding tests transport, not cellular/VPN roaming.
 """
 import argparse
@@ -35,6 +35,8 @@ def main():
     parser.add_argument("--derived-data", help="Required for iOS builds")
     parser.add_argument("--pond-lan", action="store_true", help="Connect directly to the scratch Pond's advertised LAN address")
     parser.add_argument("--pond-root", type=Path, default=ROOT.parent / "goose-in-a-pond")
+    parser.add_argument("--kokoro-assets", type=Path, help="Reuse public scratch-test voice assets; no production data")
+    parser.add_argument("--embedded", action="store_true", help="Use isolated real Headscale/DERP through the embedded node")
     args = parser.parse_args()
     if args.platform == "ios" and not args.derived_data:
         parser.error("--derived-data is required for iOS")
@@ -45,12 +47,36 @@ def main():
         scratch = Path(directory)
         data = scratch / "pond"
         data.mkdir()
-        with (scratch / "pond.log").open("wb") as log:
-            pond, http_port, https_port = pond_checks.start(data, log)
-            try:
-                exercise(args, scratch, data, http_port, https_port)
-            finally:
-                pond_checks.stop(pond)
+        if args.kokoro_assets:
+            import shutil
+            shutil.copytree(args.kokoro_assets, data / "models/kokoro")
+        fixture = None
+        try:
+            if args.embedded:
+                from embedded_fixture import EmbeddedFixture
+                fixture = EmbeddedFixture(args, scratch / 'embedded')
+                fixture.prepare()
+            args.embedded_fixture = fixture
+            with (scratch / "pond.log").open("wb") as log:
+                pond, http_port, https_port = pond_checks.start(data, log)
+                try:
+                    if fixture:
+                        fixture.approve_pond(http_port, https_port)
+                    exercise(args, scratch, data, http_port, https_port)
+                finally:
+                    pond_checks.stop(pond)
+        except Exception:
+            for diagnostic in [scratch / 'pond.log', scratch / 'embedded/build.log', scratch / 'embedded/enrollment.log']:
+                if diagnostic.exists():
+                    import shutil
+                    destination = Path(tempfile.gettempdir()) / ('pond-app-' + diagnostic.name)
+                    shutil.copyfile(diagnostic, destination)
+                    destination.chmod(0o600)
+                    print(f"Diagnostic log: {destination}", flush=True)
+            raise
+        finally:
+            if fixture:
+                fixture.close()
 
 
 def exercise(args, scratch, data, http_port, https_port):
@@ -126,6 +152,38 @@ basicConstraints = CA:FALSE
 
         def do_GET(self):
             self.record()
+            if self.path in ('/embedded-outage/start', '/embedded-outage/stop'):
+                assert args.embedded_fixture
+                args.embedded_fixture.outage(self.path.endswith('/start'))
+                self.send_response(200); self.end_headers(); self.wfile.write(b'ok')
+                return
+            if self.path == '/embedded-revocation-ready':
+                queue = data / 'embedded-network/revocations.json'
+                for _ in range(200):
+                    if queue.exists() and json.loads(queue.read_text()) == []:
+                        break
+                    time.sleep(.2)
+                else:
+                    raise AssertionError('Scratch Pond did not drain its remote revocation queue')
+                self.send_response(200); self.end_headers(); self.wfile.write(b'ok')
+                return
+            if self.path.startswith('/embedded-approve-recovery/'):
+                identifier = self.path.rsplit('/', 1)[1]
+                import re
+                assert re.fullmatch(r'[a-f0-9-]{36}', identifier)
+                request = urllib.request.Request(f'http://127.0.0.1:{http_port}/api/v1/remote-access/recovery-requests/{identifier}', data=b'{}', headers={'Content-Type': 'application/json'}, method='POST')
+                with urllib.request.urlopen(request, timeout=15) as response:
+                    assert response.status == 200
+                self.send_response(200); self.end_headers(); self.wfile.write(b'ok')
+                return
+            if self.path.startswith('/embedded-certificate/'):
+                assert args.embedded_fixture
+                args.embedded_fixture.certificate(self.path.rsplit('/', 1)[1])
+                self.send_response(200); self.end_headers(); self.wfile.write(b'ok')
+                return
+            if self.path == '/embedded-redirect-check':
+                assert args.embedded_fixture
+                args.embedded_fixture.assert_redirect_blocked()
             if self.path == "/redirect":
                 self.send_response(302)
                 self.send_header("Location", "/captured")
@@ -155,7 +213,10 @@ basicConstraints = CA:FALSE
                     code = json.load(response)["code"]
                 host = info.get("lan_address") if args.pond_lan else "127.0.0.1"
                 assert host, "The scratch Pond has no advertised LAN address"
-                self.wfile.write(json.dumps({"url": f"https://{host}:{https_port}", "pin": info["tls_spki_sha256"], "code": code}).encode())
+                config = {"url": f"https://{host}:{https_port}", "pin": info["tls_spki_sha256"], "code": code}
+                if args.embedded_fixture:
+                    config.update(control=args.embedded_fixture.control, remote=args.embedded_fixture.remote)
+                self.wfile.write(json.dumps(config).encode())
             elif self.path.startswith("/api/v1/notifications/stream"):
                 for notification_id in ["first", "first", "second"]:
                     event = {"id": notification_id, "target": "scratch-phone", "category": "info", "title": "Transport test", "body": "Fixture", "timestamp": "2026-09-19T00:00:00Z"}
@@ -171,6 +232,16 @@ basicConstraints = CA:FALSE
 
         def do_POST(self):
             self.record()
+            if self.path == '/embedded-backup-restore':
+                assert args.embedded_fixture
+                try:
+                    args.embedded_fixture.restore_backup()
+                except Exception as error:
+                    print(f'Fixture restore failed: {type(error).__name__}', flush=True)
+                    self.send_response(500); self.end_headers(); self.wfile.write(b'fixture_restore_failed')
+                else:
+                    self.send_response(200); self.end_headers(); self.wfile.write(b'ok')
+                return
             assert self.path == "/report"
             size = int(self.headers.get("Content-Length", "0"))
             assert 0 < size < 64_000
@@ -207,6 +278,8 @@ basicConstraints = CA:FALSE
             # React Native resolves ENTRY_FILE relative to the app root.
             env["ENTRY_FILE"] = "tests/native-ios/app-integration.tsx"
             ports = [server.server_port, expired_server.server_port]
+            if args.embedded_fixture:
+                ports.append(args.embedded_fixture.control_port)
             if not args.pond_lan:
                 ports.append(https_port)
             for port in ports:
@@ -223,6 +296,7 @@ basicConstraints = CA:FALSE
             aapt = sorted((sdk / "build-tools").glob("*/aapt"))[-1]
             metadata = run(str(aapt), "dump", "badging", str(apk)).decode()
             assert metadata.startswith(f"package: name='{BUNDLE}'"), "Refusing to install a non-test APK"
+            subprocess.run(["python3", str(ROOT / "scripts/check-android-page-alignment.py"), str(apk)], check=True)
             android("install", "--user", "0", "-r", str(apk))
             android("shell", "pm", "clear", "--user", "0", BUNDLE)
         else:
@@ -238,7 +312,7 @@ basicConstraints = CA:FALSE
         for phase in range(2):
             report_ready.clear()
             launch()
-            if not report_ready.wait(120):
+            if not report_ready.wait(360):
                 raise AssertionError("The device did not report a result; inspect its test-app screen")
             for result in reports[-1]:
                 print(json.dumps(result), flush=True)

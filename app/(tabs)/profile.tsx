@@ -14,6 +14,7 @@ import {
   Pressable,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { GIcon } from '@/components/ui/g-icon';
@@ -65,6 +66,7 @@ const sections = PROFILE_NAV.map((g) => ({
 
 export default function ProfileHub() {
   const router = useRouter();
+  const { t } = useTranslation();
 
   const handleNav = useCallback(
     (route: string) => {
@@ -122,6 +124,9 @@ export default function ProfileHub() {
   const ListFooter = useCallback(
     () => (
       <View style={styles.footerSection}>
+        <Pressable style={styles.signOutBtn} onPress={() => router.push('/(stack)/remote-access')}>
+          <Text style={styles.signOutText}>{t('remote.title')}</Text>
+        </Pressable>
         <Pressable style={styles.signOutBtn}>
           <Text style={styles.signOutText}>Sign Out</Text>
         </Pressable>
@@ -130,7 +135,7 @@ export default function ProfileHub() {
         <View style={{ height: 100 }} />
       </View>
     ),
-    [],
+    [router, t],
   );
 
   return (

@@ -11,6 +11,7 @@ import { configurePondTrust, PondTrustError } from '@/services/pond-trust';
 import { findPondByHost } from '@/services/discovery';
 import { parseConnectionProfile, validPin, isLocalPairingUrl, type ConnectionProfile } from '@/models/connection';
 import i18n from '@/services/i18n';
+import { cancelRemoteAccess, restoreRemoteAccess } from '@/services/remote-access';
 
 interface PairOptions { clientId: string; pairingCode: string; deviceName?: string }
 interface ServerContextValue {
@@ -18,6 +19,10 @@ interface ServerContextValue {
   connectionState: ConnectionSnapshot['state'];
   checkHealth: () => Promise<boolean>;
   recover: () => Promise<string | null>;
+  profileId: string;
+  remoteEnabled: boolean;
+  keepLocalOnly: () => Promise<void>;
+  setRemoteEndpoint: (url: string, control: string, current: () => void) => Promise<void>;
   stagePairing: (profile: ConnectionProfile, pin: string) => Promise<void>;
   cancelPairing: () => Promise<void>;
   pair: (opts: PairOptions) => Promise<HandshakeResponse>;
@@ -85,6 +90,7 @@ export function ServerProvider({ children }: PropsWithChildren) {
   const operation = useRef(0);
   const committing = useRef<Promise<void> | null>(null);
   const mounted = useRef(true);
+  const tokenWrite = useRef<Promise<void>>(Promise.resolve());
   const environment = useRef({ cellular: false, active: AppState.currentState === 'active' });
   const manager = useMemo(() => new ConnectionManager({
     probe, trust,
@@ -98,6 +104,9 @@ export function ServerProvider({ children }: PropsWithChildren) {
 
   const restore = useCallback(async () => {
     const current = saved.current;
+    const remote = current?.profile.remoteAccess;
+    try { await restoreRemoteAccess(current?.identity.id ?? '', remote?.mode === 'embedded' ? remote.controlUrl : ''); }
+    catch { console.warn('[remote] saved transport unavailable; local access remains enabled'); }
     await manager.configure(current?.profile ?? null, current?.identity.pin ?? '');
     if (!mounted.current) return;
     if (current) {
@@ -158,7 +167,7 @@ export function ServerProvider({ children }: PropsWithChildren) {
       const next = { ...current.identity, session, refresh };
       saved.current = { ...current, identity: next };
       setIdentity(next);
-      void SecureStorage.set('pondIdentity', JSON.stringify(next)).catch(() => {
+      tokenWrite.current = tokenWrite.current.then(() => SecureStorage.set('pondIdentity', JSON.stringify(next))).catch(() => {
         console.warn('[connection] rotated credentials could not be saved');
         setSnapshot({ state: 'disconnected', url: null });
       });
@@ -176,14 +185,15 @@ export function ServerProvider({ children }: PropsWithChildren) {
     const profile = manager.savedProfile;
     if (!current || !profile || staged.current || !snapshot.url) return;
     saved.current = { ...current, profile };
-    void Storage.set('connectionProfile', JSON.stringify({ [current.identity.id]: profile })).catch(() => {
+    void Storage.set('connectionProfile', JSON.stringify({ [current.identity.profileKey ?? current.identity.id]: profile })).catch(() => {
       console.warn('[connection] updated addresses could not be saved');
     });
   }, [snapshot, manager]);
 
   const stagePairing = useCallback(async (rawProfile: ConnectionProfile, pin: string) => {
     await committing.current?.catch(() => undefined);
-    const profile = parseConnectionProfile(rawProfile);
+    await cancelRemoteAccess();
+    const profile = parseConnectionProfile({ ...rawProfile, remoteAccess: { mode: 'local' } });
     if (!profile || !validPin(pin) || !profile.localUrls.every(isLocalPairingUrl)) throw new Error(i18n.t('pairing.invalid'));
     const op = ++operation.current;
     const net = await NetInfo.fetch();
@@ -236,8 +246,8 @@ export function ServerProvider({ children }: PropsWithChildren) {
       // Write addresses first, retaining the previous entry until the atomic secure commit.
       const previous = saved.current;
       const commit = (async () => {
-        await commitPairedProfile(previous, { identity: next, profile: pending.profile });
-        saved.current = { identity: next, profile: pending.profile };
+        await tokenWrite.current;
+        saved.current = await commitPairedProfile(previous, { identity: next, profile: pending.profile });
         staged.current = null;
         await restore();
       })();
@@ -288,21 +298,59 @@ export function ServerProvider({ children }: PropsWithChildren) {
 
   const signOut = useCallback(async () => {
     await committing.current?.catch(() => undefined);
-    await api.handshakeRevoke().catch(() => console.warn('[connection] remote revocation unavailable'));
+    await cancelRemoteAccess();
+    // Preserve the authenticated transport until the Pond has durably accepted revocation.
+    // Failure keeps the pairing available for an explicit retry.
+    await api.handshakeRevoke();
+    await restoreRemoteAccess('', '');
     operation.current++; staged.current = null; saved.current = null;
     api.invalidateIdentity(); setIdentity(null);
+    await tokenWrite.current;
     await SecureStorage.remove('pondIdentity');
     await SecureStorage.remove('sessionToken'); await SecureStorage.remove('refreshToken');
     await Storage.remove('connectionProfile'); await Storage.remove('serverUrl');
     await manager.configure(null);
   }, [manager]);
+  const updateRemoteProfile = useCallback(async (url: string | null, control: string, check: () => void) => {
+    await committing.current?.catch(() => undefined);
+    const current = saved.current;
+    if (!current || staged.current) throw new Error(i18n.t('connection.unpaired'));
+    const profile = parseConnectionProfile({ ...current.profile,
+      ...(url ? { remoteUrl: url } : {}),
+      remoteAccess: url ? { mode: 'embedded', controlUrl: control } : { mode: 'local' },
+    });
+    if (!profile) throw new Error(i18n.t('remote.failed'));
+    const op = operation.current;
+    const commit = (async () => {
+      check();
+      api.invalidateIdentity(); setIdentity(null); manager.environment(false, false);
+      try {
+        await tokenWrite.current;
+        await manager.configure(profile, current.identity.pin);
+        // Native trust and the allowlisted proxy must prove the same Pond before saving opt-in.
+        if (url && !await probe(url)) throw new Error(i18n.t('remote.failed'));
+        check();
+        if (op !== operation.current || staged.current) throw new Error(i18n.t('remote.cancelled'));
+        saved.current = await commitPairedProfile(current, { identity: current.identity, profile });
+      } finally { await restore(); }
+    })();
+    committing.current = commit;
+    try { await commit; } finally { if (committing.current === commit) committing.current = null; }
+  }, [manager, restore]);
+  const setRemoteEndpoint = useCallback((url: string, control: string, check: () => void) =>
+    updateRemoteProfile(url, control, check), [updateRemoteProfile]);
+  const keepLocalOnly = useCallback(async () => {
+    await cancelRemoteAccess();
+    await updateRemoteProfile(null, '', () => undefined);
+  }, [updateRemoteProfile]);
   const checkHealth = useCallback(async () => !!await manager.recover(), [manager]);
   const value = useMemo<ServerContextValue>(() => ({
     serverUrl: snapshot.url ?? '', online: !!snapshot.url, token: identity?.session ?? null,
     refreshToken: identity?.refresh ?? null, connectionState: snapshot.state,
-    hydrated, screenModes, isScreenReal, setScreenMode,
-    checkHealth, recover: manager.recover, stagePairing, cancelPairing, pair, signOut,
-  }), [snapshot, identity, hydrated, screenModes, isScreenReal, setScreenMode, checkHealth, manager, stagePairing, cancelPairing, pair, signOut]);
+    profileId: identity?.id ?? '', remoteEnabled: saved.current?.profile.remoteAccess?.mode === 'embedded',
+    keepLocalOnly, hydrated, screenModes, isScreenReal, setScreenMode,
+    checkHealth, setRemoteEndpoint, recover: manager.recover, stagePairing, cancelPairing, pair, signOut,
+  }), [snapshot, identity, hydrated, screenModes, isScreenReal, setScreenMode, checkHealth, setRemoteEndpoint, keepLocalOnly, manager, stagePairing, cancelPairing, pair, signOut]);
   return <ServerContext.Provider value={value}>{children}</ServerContext.Provider>;
 }
 export function useServer(): ServerContextValue {

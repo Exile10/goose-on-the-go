@@ -5,6 +5,8 @@ This does not replace an Xcode iOS build or physical-device acceptance.
 """
 import base64
 import hashlib
+import os
+import platform
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 import ssl
@@ -65,9 +67,13 @@ def main():
         thread = threading.Thread(target=server.serve_forever, daemon=True)
         thread.start()
         try:
-            subprocess.run(["xcrun", "swiftc", "-swift-version", "5", "-parse-as-library",
+            framework = Path(os.environ.get("PONDNET_TEST_FRAMEWORK", "/tmp/Pondnet.xcframework/macos-arm64_x86_64"))
+            if not (framework / "Pondnet.framework").exists():
+                raise RuntimeError("Build the macOS Pondnet framework and set PONDNET_TEST_FRAMEWORK to its slice directory")
+            subprocess.run(["xcrun", "swiftc", "-target", f"{platform.machine()}-apple-macos14.0", "-F", str(framework), "-framework", "Pondnet", "-swift-version", "5", "-parse-as-library",
                             str(ROOT / "plugins/pond-tls/ios/PondCertificate.swift"),
                             str(ROOT / "plugins/pond-tls/ios/PondURLProtocol.swift"),
+                            str(ROOT / "plugins/pond-tls/ios/PondNetwork.swift"),
                             str(ROOT / "tests/native-ios/TransportTests.swift"), "-o", str(scratch / "test")], check=True)
             subprocess.run([str(scratch / "test"), directory, f"https://127.0.0.1:{server.server_port}"], check=True, timeout=60)
             assert received == ["/fetch", "/xhr", "/sse", "/redirect", "/hold"], received

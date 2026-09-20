@@ -35,7 +35,13 @@ module.exports = function withPondTlsIOS(config) {
       },
     };
     const ats = mod.modResults.NSAppTransportSecurity ?? {};
-    mod.modResults.NSAppTransportSecurity = { ...ats, NSAllowsArbitraryLoads: false, NSAllowsLocalNetworking: true };
+    // iOS 17+ reapplies system-root trust to CGNAT addresses after the delegate.
+    // These ranges need request-scoped QR trust. PondURLProtocol intercepts every
+    // request to them, requiring HTTPS and a configured pin before opening a socket.
+    const embedded = { NSExceptionAllowsInsecureHTTPLoads: true,
+      NSExceptionMinimumTLSVersion: 'TLSv1.2', NSExceptionRequiresForwardSecrecy: true };
+    mod.modResults.NSAppTransportSecurity = { ...ats, NSAllowsArbitraryLoads: false, NSAllowsLocalNetworking: true,
+      NSExceptionDomains: { ...(ats.NSExceptionDomains || {}), '100.64.0.0/10': embedded, 'fd7a:115c:a1e0::/48': embedded } };
     return mod;
   });
   config = withPodfileProperties(config, (mod) => {
@@ -45,6 +51,7 @@ module.exports = function withPondTlsIOS(config) {
     return mod;
   });
   config = withPodfile(config, (mod) => {
+    if (!mod.modResults.contents.includes("pod 'Pondnet'")) mod.modResults.contents = mod.modResults.contents.replace(/(target '[^']+' do)/, "$1\n  pod 'Pondnet', :path => '../native/pondnet'");
     const marker = '# Align resource bundle targets with the app minimum supported iOS.';
     if (!mod.modResults.contents.includes(marker)) {
       mod.modResults.contents = mod.modResults.contents.replace(
@@ -69,7 +76,7 @@ module.exports = function withPondTlsIOS(config) {
     if (!projectName) throw new Error('Missing iOS project name for Pond TLS');
     const directory = path.join(mod.modRequest.platformProjectRoot, projectName);
     fs.mkdirSync(directory, { recursive: true });
-    for (const name of ['PondCertificate.swift', 'PondURLProtocol.swift', 'PondTls.swift', 'PondTlsBridge.m', 'PondSceneDelegate.swift']) {
+    for (const name of ['PondNetwork.swift', 'PondCertificate.swift', 'PondURLProtocol.swift', 'PondTls.swift', 'PondTlsBridge.m', 'PondSceneDelegate.swift']) {
       fs.copyFileSync(path.join(__dirname, 'pond-tls/ios', name), path.join(directory, name));
       IOSConfig.XcodeUtils.addBuildSourceFileToGroup({ filepath: `${projectName}/${name}`, groupName: projectName, project: mod.modResults });
     }

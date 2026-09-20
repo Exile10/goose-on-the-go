@@ -123,3 +123,56 @@ describe('request()', () => {
     await expect(client.request('/api/v1/thing')).resolves.toEqual({ ok: true });
   });
 });
+
+
+describe('handshakeRevoke()', () => {
+  it('retains credentials when durable revocation fails and does not replay the write', async () => {
+    const fetch = stubFetch({ status: 503, body: { error: 'revocation_unavailable' } });
+    setFetch(fetch);
+    const client = new PondApiClient('https://pond.local:4443');
+    client.setToken('test-session');
+    await expect(client.handshakeRevoke()).rejects.toMatchObject({ status: 503 });
+    expect(fetch).toHaveBeenCalledTimes(1);
+    setFetch(stubFetch({ status: 200, body: { revoked: true } }));
+    await expect(client.handshakeRevoke()).resolves.toBeUndefined();
+    const next = stubFetch({ status: 200 });
+    setFetch(next);
+    await client.handshakeRevoke();
+    expect(next).not.toHaveBeenCalled();
+  });
+  it('requires a positive revocation acknowledgment', async () => {
+    setFetch(stubFetch({ status: 200, body: { error: 'not_revoked' } }));
+    const client = new PondApiClient('https://pond.local:4443');
+    client.setToken('test-session');
+    await expect(client.handshakeRevoke()).rejects.toThrow('not acknowledged');
+  });
+});
+
+describe('local enrollment requests', () => {
+  it('keeps the selected LAN endpoint when the shared client roams', async () => {
+    const fetch = stubFetch({ status: 200 }); setFetch(fetch);
+    const client = new PondApiClient('https://100.64.0.1:4443');
+    client.setToken('fixture-session');
+    await client.requestLocal('https://192.168.1.2:4443', '/api/v1/remote-access/enrollment', { method: 'POST' });
+    expect(fetch).toHaveBeenCalledWith('https://192.168.1.2:4443/api/v1/remote-access/enrollment', expect.objectContaining({ method: 'POST' }));
+  });
+  it('does not recover, replay or rotate tokens after a local request fails', async () => {
+    const fetch = jest.fn().mockRejectedValue(new Error('ambiguous')); setFetch(fetch);
+    const client = new PondApiClient('https://192.168.1.2:4443');
+    const recover = jest.fn(async () => 'https://100.64.0.1:4443'); client.setRecovery(recover);
+    client.setRefreshToken('fixture-refresh');
+    await expect(client.requestLocal('https://192.168.1.2:4443', '/api/v1/remote-access/enrollment', { method: 'POST' })).rejects.toThrow('ambiguous');
+    expect(fetch).toHaveBeenCalledTimes(1); expect(recover).not.toHaveBeenCalled();
+    const unauthorized = stubFetch({ status: 401 }); setFetch(unauthorized);
+    await expect(client.requestLocal('https://192.168.1.2:4443', '/api/v1/remote-access/configuration')).rejects.toMatchObject({ status: 401 });
+    expect(unauthorized).toHaveBeenCalledTimes(1);
+  });
+  it('rejects remote and plaintext endpoints before sending credentials', async () => {
+    const fetch = stubFetch({ status: 200 }); setFetch(fetch);
+    const client = new PondApiClient();
+    for (const url of ['https://100.64.0.1:4443', 'http://192.168.1.2:4443']) {
+      await expect(client.requestLocal(url, '/api/v1/remote-access/configuration')).rejects.toThrow();
+    }
+    expect(fetch).not.toHaveBeenCalled();
+  });
+});

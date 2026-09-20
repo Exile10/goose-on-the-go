@@ -44,14 +44,20 @@ object PondTls {
 
   @Synchronized internal fun configurePins(next: Map<String, String>) {
     if (pins == next) return
+    PondNetwork.configure(next.keys.map { it.toHttpUrl() })
     pins = next.toMap()
     trustFailures.clear()
+    invalidateConnections()
+  }
+
+  internal fun invalidateConnections() {
     // Cached TLS sessions and pooled connections must not outlive a trust change.
     clients.forEach { (dispatcher, pool) -> dispatcher.get()?.cancelAll(); pool.get()?.evictAll() }
     clients.removeAll { (dispatcher, pool) -> dispatcher.get() == null && pool.get() == null }
   }
 
-  fun install() {
+  fun install(context: android.content.Context? = null) {
+    if (context != null) PondNetwork.install(context)
     OkHttpClientProvider.setOkHttpClientFactory {
       val managerFactory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm())
       managerFactory.init(null as KeyStore?)
@@ -75,8 +81,14 @@ object PondTls {
         .sslSocketFactory(ssl.socketFactory, trust)
         // Hostname verification remains OkHttp's standard SAN verifier.
         .retryOnConnectionFailure(false)
+        .proxySelector(PondNetwork.selector(java.net.ProxySelector.getDefault()))
+        .proxyAuthenticator { route, response ->
+          if (response.request.header("Proxy-Authorization") != null) null else
+            PondNetwork.proxyCredential(route?.proxy)?.let { response.request.newBuilder().header("Proxy-Authorization", it).build() }
+        }
         .addInterceptor { chain ->
           val request = chain.request()
+          PondNetwork.requireAvailable(request.url)
           if (request.header(MARKER) == "1") {
             if (!request.url.isHttps || pins[origin(request.url)] == null)
               throw SSLPeerUnverifiedException("Pond HTTPS trust is not configured")
@@ -138,6 +150,13 @@ object PondTls {
 
 class PondTlsModule(context: ReactApplicationContext) : ReactContextBaseJavaModule(context) {
   override fun getName() = "PondTls"
+  @ReactMethod fun beginRemote(profile: String, control: String, promise: Promise) = remote(promise) { PondNetwork.stage(profile, control) }
+  @ReactMethod fun remoteStatus(promise: Promise) = remote(promise) { PondNetwork.status() }
+  @ReactMethod fun activateRemote(profile: String, control: String, promise: Promise) = remote(promise) { PondNetwork.activate(profile, control); null }
+  @ReactMethod fun cancelRemote(promise: Promise) = remote(promise) { PondNetwork.cancel(); null }
+  @ReactMethod fun disableRemote(promise: Promise) = remote(promise) { PondNetwork.disable(); null }
+  private val remoteExecutor = java.util.concurrent.Executors.newSingleThreadExecutor()
+  private fun remote(promise: Promise, action: () -> Any?) { remoteExecutor.execute { try { promise.resolve(action()) } catch (_: Exception) { promise.reject("pond_remote_unavailable", "Remote access operation failed") } } }
   @ReactMethod fun trustFailed(url: String, promise: Promise) {
     try { promise.resolve(PondTls.trustFailed(url)) } catch (_: Exception) { promise.resolve(true) }
   }

@@ -12,7 +12,7 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "audit": "node scripts/audit-check.mjs --threshold high",
-    "postinstall": "node scripts/patch-expo-jsi.cjs"
+    "postinstall": "node scripts/patch-expo-jsi.cjs && node scripts/patch-expo-fetch.cjs"
   },
   "dependencies": {
     "@expo-google-fonts/jetbrains-mono": "^0.4.1",

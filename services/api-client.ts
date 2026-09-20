@@ -1,5 +1,5 @@
 import { assertPondTrust, pondTrustFailed } from './pond-trust';
-import { normalizeHttpsUrl } from '@/models/connection';
+import { isLocalPairingUrl, normalizeHttpsUrl } from '@/models/connection';
 /**
  * PondApiClient — HTTP client for goose-in-a-pond.
  *
@@ -297,11 +297,14 @@ export class PondApiClient {
   /** Revoke the current session token on the server. */
   async handshakeRevoke(): Promise<void> {
     if (!this.token) return;
-    await this.send(`${this.baseUrl}/api/v1/handshake/revoke`, {
+    const response = await this.send(`${this.baseUrl}/api/v1/handshake/revoke`, {
       method: 'POST',
       headers: this.headers(),
       body: JSON.stringify({ token: this.token }),
     });
+    if (!response.ok) throw new ApiError('Pond revocation failed', response.status, parseRetryAfter(response));
+    const result = await response.json();
+    if (result?.revoked !== true) throw new Error('Pond revocation was not acknowledged');
     this.token = null;
     this.refreshToken = null;
   }
@@ -347,6 +350,24 @@ export class PondApiClient {
       );
     }
     return (await parseBody<T>(res)) as T;
+  }
+
+  /** Local enrollment stays on the selected LAN endpoint even if normal traffic roams.
+   * No recovery or token rotation is attempted: the caller must restart explicitly
+   * after an expired session or ambiguous failure. Server peer checks remain authoritative.
+   */
+  async requestLocal<T>(endpoint: string, path: string, init: RequestInit = {}): Promise<T> {
+    if (!isLocalPairingUrl(endpoint)) throw new Error('Local Pond endpoint required');
+    if (!path.startsWith('/api/') || path.startsWith('//')) throw new Error('Invalid Pond API path');
+    const response = await this.send(`${normalizeHttpsUrl(endpoint)}${path}`, {
+      ...init,
+      headers: { ...this.headers(), ...(init.headers ?? {}) },
+      signal: init.signal ?? timeoutSignal(REQUEST_TIMEOUT_MS),
+    });
+    if (!response.ok) {
+      throw new ApiError(`${init.method ?? 'GET'} ${path} → ${response.status}`, response.status, parseRetryAfter(response));
+    }
+    return (await parseBody<T>(response)) as T;
   }
 
   /** Used by SSE without starting a competing token rotation. */

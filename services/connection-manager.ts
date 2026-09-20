@@ -35,7 +35,7 @@ export class ConnectionManager {
     this.generation++; this.flight = null; this.retryAfter = 0; this.attempts = 0; this.localRechecks = 0;
     this.profile = profile; this.pin = pin;
     this.publish(upgrade ? 'upgrade' : 'unpaired');
-    await this.deps.trust(profile ? [...profile.localUrls, ...(profile.remoteUrl ? [profile.remoteUrl] : [])] : [], pin);
+    await this.deps.trust(profile ? [...profile.localUrls, ...(profile.remoteAccess?.mode === 'embedded' && profile.remoteUrl ? [profile.remoteUrl] : [])] : [], pin);
   }
   environment(cellular: boolean, active: boolean): void {
     this.cellular = cellular; this.active = active;
@@ -74,7 +74,7 @@ export class ConnectionManager {
           if (!current()) return null;
           if (found && isLocalPairingUrl(found)) {
             const url = normalizeHttpsUrl(found);
-            await this.deps.trust([...new Set([...profile.localUrls, url, ...(profile.remoteUrl ? [profile.remoteUrl] : [])])], this.pin);
+            await this.deps.trust([...new Set([...profile.localUrls, url, ...(profile.remoteAccess?.mode === 'embedded' && profile.remoteUrl ? [profile.remoteUrl] : [])])], this.pin);
             if (!current()) return null;
             if (await probe(url)) {
               if (!current()) return null;
@@ -83,7 +83,7 @@ export class ConnectionManager {
             }
           }
         }
-        if (profile.remoteUrl && current() && await probe(profile.remoteUrl)) {
+        if (profile.remoteAccess?.mode === 'embedded' && profile.remoteUrl && current() && await probe(profile.remoteUrl)) {
           if (!current()) return null;
           this.attempts = 0; this.publish('remote', profile.remoteUrl);
           // While on Wi-Fi, periodically reconsider LAN after a temporary local outage.

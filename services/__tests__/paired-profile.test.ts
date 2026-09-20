@@ -28,7 +28,14 @@ it('loads credentials only with their matching address profile', async () => {
 });
 it('commits a successful new identity and never puts credentials in address storage', async () => {
   const next = { ...old, identity: { ...old.identity, id: 'new', session: 'new-session' } };
-  await commitPairedProfile(old, next);
-  expect((await loadPairedProfile()).saved).toEqual(next);
+  const committed = await commitPairedProfile(old, next);
+  expect((await loadPairedProfile()).saved).toEqual(committed);
   expect(plain.connectionProfile).not.toContain('session'); expect(plain.connectionProfile).not.toContain('sha256');
+});
+
+it('retains the previous mode and addresses when same-pairing activation fails to persist', async () => {
+  const next: SavedPond = { ...old, profile: { ...old.profile, remoteUrl: 'https://100.64.0.1:4443', remoteAccess: { mode: 'embedded', controlUrl: 'https://coord.example' } } };
+  jest.mocked(SecureStorage.set).mockRejectedValueOnce(new Error('keychain unavailable'));
+  await expect(commitPairedProfile(old, next)).rejects.toThrow();
+  expect((await loadPairedProfile()).saved).toEqual(old);
 });

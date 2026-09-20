@@ -1,7 +1,7 @@
 import { ConnectionManager } from '../connection-manager';
 import { ConnectionProfile } from '@/models/connection';
 const profile: ConnectionProfile = { version: 2, host: 'pond.local', port: 4443,
-  localUrls: ['https://192.168.1.2:4443'], remoteUrl: 'https://100.64.0.2:4443' };
+  localUrls: ['https://192.168.1.2:4443'], remoteUrl: 'https://100.64.0.2:4443', remoteAccess: { mode: 'embedded', controlUrl: 'https://coord.example' } };
 const pin = `sha256/${'A'.repeat(43)}=`;
 const fixture = () => {
   const deps = { probe: jest.fn(async () => true), discover: jest.fn(async () => null),
@@ -51,4 +51,14 @@ it('returns to LAN when a temporary local outage clears on the same Wi-Fi', asyn
   expect(manager.current.state).toBe('remote');
   await jest.advanceTimersByTimeAsync(30_000);
   expect(manager.current.state).toBe('local'); manager.environment(false, false);
+});
+
+it.each([undefined, { mode: 'local' as const }])('never probes remote endpoints without saved opt-in: %s', async (remoteAccess) => {
+  const { deps, manager } = fixture();
+  await manager.configure({ ...profile, remoteAccess }, pin);
+  manager.environment(true, true); await manager.recover();
+  expect(deps.probe).not.toHaveBeenCalled();
+  expect(deps.discover).not.toHaveBeenCalled();
+  expect(deps.trust).toHaveBeenCalledWith(profile.localUrls, pin);
+  manager.environment(false, false);
 });

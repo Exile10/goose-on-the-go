@@ -190,3 +190,190 @@ APKs alone cannot establish that matrix.
 
 No production signing keys or database migrations change in this milestone.
 TLS does not complete the separate W3 authorization-hardening work.
+
+
+## Embedded-network continuation (2026-09-20)
+
+The `feature/embedded-tailnet` branch adds explicit remote-access opt-in, native
+per-profile node restoration and an authenticated local CONNECT transport. Local-only
+profiles do not start the node or probe tailnet addresses. Enrollment administration
+credentials remain on the Goose service; the phone never receives them.
+
+Measured on this branch: 151 app tests and typecheck pass; lint has zero errors and
+19 existing warnings. The ARM64 iOS simulator Debug and unsigned iOS device Release
+builds pass. The connected Galaxy A57 and existing iPhone simulator both pass the
+isolated native Expo fetch, RN XHR/SSE, pin/validity/hostname/redirect/plaintext,
+secure persistence, foreground and scratch-Pond integration suites. These suites
+exercise LAN/loopback transport with the embedded library linked; they do not yet
+prove embedded proxy activation or cellular roaming.
+
+Run `scripts/build-embedded-network.sh android|ios|all` against the adjacent Pond
+checkout (override `POND_SOURCE_ROOT` if necessary). Go and gomobile versions come
+from that checkout's `native/pondnet/go.mod`; the script builds its pinned gobind
+rather than depending on a globally installed version. Regenerate through Expo
+prebuild afterward. Keep iOS Debug and Release builds serialized: React Native
+replaces shared prebuilt frameworks under `ios/Pods`, even when DerivedData differs.
+
+Logout now requires the Pond's positive revocation acknowledgment before clearing
+local credentials. Failed revocation remains available for an explicit retry.
+Secure token writes are serialized before profile commits to prevent an older
+refresh from overwriting the newly selected profile revision.
+
+Remaining: end-to-end embedded proxy tests on both platforms, iOS 16.4 proxy
+failure behavior, enrollment recovery after ambiguous writes/revocation, public
+infrastructure and real cellular roaming. No additional simulator was created;
+physical iPhone acceptance remains deferred. The paired Pond's deployment and
+verification ledgers are `deploy/remote-access/README.md` and
+`docs/embedded-remote-access-verification.md` in the Pond repository.
+
+
+### Embedded transport continuation (2026-09-20)
+
+Failed native activation now stops the partially initialized node on both platforms.
+Failed allowlist replacement preserves the preceding configuration. The Go mobile
+proxy uses the userspace WireGuard TCP stack directly: tsnet's general-purpose
+`Server.Dial` may use system routing for unknown peers and is unsuitable here.
+The real Headscale isolation/forced-DERP/restore/revocation suite passes with the
+strict dialer, and both native libraries were rebuilt.
+
+Run these additional client checks from GOTG with the pinned Go toolchain on PATH:
+
+```sh
+python3 tests/native-ios/run_proxy.py
+bash tests/native-android/run_proxy.sh
+```
+
+The Apple test links the production native transport with a test-only node-lifecycle
+binding; Android substitutes only the native proxy endpoint. Both use the real Go
+CONNECT proxy against isolated TLS listeners. Correct pins, hostname/expiry checks,
+redirect/plaintext rejection, unavailable-proxy refusal, and withholding proxy
+credentials from Pond HTTP pass. These checks do not prove a complete mobile node
+connected through Headscale. Apple core results are from macOS, not iOS 16.4.
+
+The existing iPhone simulator passes 19 first-run and three restart app checks,
+including the real Go binding's failed-start cleanup and disabled remote fetch/XHR.
+The connected Galaxy A57 passes the 19 first-run checks. Its restart test was
+interrupted when the test task was removed and requires a rerun. The production
+phone package is preserved.
+
+The Android binding build now covers `armeabi-v7a`, `arm64-v8a`, `x86`, and `x86_64`,
+matching the app's advertised architectures. Expo prebuild installs an ABI check
+before native builds, preventing an incomplete AAR from silently shipping.
+Full Headscale/mobile enrollment recovery, iOS 16.4 runtime validation, physical
+cellular roaming and physical iPhone acceptance remain open.
+
+Normal iOS Debug simulator and unsigned Release device builds also pass with the
+updated transport. The ABI gate was exercised against the actual old and rebuilt
+AARs: the two-architecture archive was rejected, and the complete archive passed.
+
+Normal Android Debug and Release builds pass with the ABI gate installed. Inspection
+of both APKs confirms an embedded library for each of the four architectures. All
+13 native TLS/proxy tests pass with zero skips. These normal artifacts were built
+only; they were not installed over the production phone app.
+
+## Embedded identity and enrollment recovery (2026-09-20)
+
+Remote activation now binds every configuration, enrollment and address request to
+its selected LAN endpoint. Roaming of the shared API client cannot redirect those
+requests to the remote path. These requests do not automatically retry or rotate
+credentials after a failure; the Pond still checks the actual peer interface.
+
+The native helper reports its public machine key before registration. Locally
+signed enrollment includes this key and the exact pending authorization ID, allowing
+the enrollment service to reconcile a lost registration response without replaying
+the write. Private machine keys remain in native storage. Damaged identity state
+fails before network startup; a persistence failure remains visible until repair
+and restart. Valid existing state retains its keys.
+
+All 154 app tests and typechecking pass; lint has zero errors and 19 existing
+warnings. The Galaxy A57 completed the isolated 19-check initial phase and all
+three restart checks over direct LAN. This does not establish public cellular
+roaming or a fully enrolled mobile path through Headscale. The same-key node restart,
+real Headscale response-loss recovery, household isolation and forced relay tests
+pass separately in the Pond repository. Explicit recovery of revoked device
+identities and full mobile embedded enrollment remain acceptance work.
+
+The existing iPhone simulator also passed the 19 initial and three restart checks
+with the rebuilt library. Normal iOS Debug simulator and unsigned Release device
+builds pass, as do Android Debug/Release builds and all 13 native TLS/proxy tests
+with zero skips. Both Android APKs contain all four required Go-library ABIs.
+
+
+## Current embedded validation and platform fixes (2026-09-20)
+
+The full mobile application now enrolls through real local Headscale and reaches
+its scratch Pond over the Goose DERP relay on Android and iOS. Peer status confirms
+relay use without a direct route. The suite covers native Expo fetch and RN XHR/SSE,
+authenticated REST and refresh, LAN-only pairing, forged forwarding identity,
+incorrect pins, certificate renewal with the same key, expiry, hostname mismatch,
+redirects, plaintext, native shutdown, local re-pairing and approved replacement.
+The existing iOS 27 simulator also passes coordinator/relay outage recovery and
+full app-process restart with the persisted network identity and credentials.
+The Android emulator passes these transport and recovery checks; the final
+infrastructure-restore/process-restart run is recorded in the Pond verification ledger.
+
+Android's sandbox requires a native NetworkInterface provider for the embedded Go
+node; it cannot enumerate interfaces through netlink. ConnectivityManager forwards
+network changes without collecting SSIDs. Native logging uses the private profile
+directory, while upstream remote log upload remains disabled.
+
+The embedded Android library is linked with 16 KB ELF alignment. The build script
+checks every 64-bit library in its AAR; the app integration harness checks every
+64-bit library in the APK before installation. A dedicated API 37 ARM64 emulator
+with 16 KB pages exposed the original 4 KB libgojni.so alignment. The rebuilt test
+APK passes all 31 native-library checks and runs without compatibility mode.
+
+SDK 56 Expo fetch enqueued its native call before publishing the STARTED response
+state. Immediate policy rejection could arrive while INITIALIZED and be dropped,
+leaving the JavaScript promise pending. `scripts/patch-expo-fetch.cjs` applies an
+idempotent, source-checked postinstall fix that publishes STARTED before enqueue.
+It fails visibly if upstream source changes. The before-fix emulator log records
+`currentState[0]` rejection and a bounded test failure; the corrected app repeats
+immediate plaintext rejection 20 times. The patch changes callback ordering only.
+
+On iOS, scoped ATS exceptions for 100.64.0.0/10 and fd7a:115c:a1e0::/48 permit
+request-scoped verification of the self-signed Pond certificate. PondURLProtocol
+intercepts every request to those ranges, including unmarked/unconfigured requests,
+and requires HTTPS, saved SPKI, valid dates and the expected hostname. Unrelated
+traffic retains platform validation. Native CONNECT tests also verify that proxy
+credentials never reach Pond HTTP. The deployment minimum remains iOS 16.4; its
+older runtime proxy path is not established by iOS 27 simulator results.
+
+Fixtures compile an isolated CA through a temporary Go overlay, keep administration
+credentials in private scratch files, and restore normal libraries in cleanup.
+Never ship a fixture library or the isolated transport-test entrypoint. Normal app
+builds include dependency notices. Production package identity, all four Android
+ABIs, native/ZIP alignment, notices and absence of fixture bundle content are checked
+before preparing the phone update. The physical phone update waits for its return.
+Public cellular roaming and physical iPhone acceptance remain pending.
+
+### Completed simulator and package verification (2026-09-20)
+
+The existing iOS 27 simulator passes all 39 expanded app assertions, including
+full Headscale/enrollment/Caddy backup restoration, coordinator/relay outage,
+local replacement approval, and application process restart with retained machine
+identity and authenticated REST/SSE (`/tmp/gotg-final-ios-fresh-restore.log`). The
+restore fixture validates SQLite integrity and mounts fresh restored directories;
+reusing a Docker Desktop host volume path reproduced stale-file startup failures.
+
+Android API 37 emulator coverage passes the same 39 assertions
+(`/tmp/gotg-final-android-restore.log`). Normal development and release builds and
+13 native unit tests pass. Both APKs contain 62 checked 64-bit native libraries with
+16 KB ELF alignment; ZIP alignment, normal package identity, included notices and
+absence of release fixture content were verified. The release artifact in ignored
+`dist/embedded-remote-access/goose-on-the-go-release.apk` is signed with the existing
+personal Android debug certificate, not a Play production-distribution key.
+Installation on the physical Galaxy A57 waits for its return.
+
+The final JavaScript suite passes 157 tests across 18 suites, typechecking passes,
+and lint has zero errors with 19 existing warnings. Physical iPhone, iOS 16.4 runtime,
+and public cellular roaming remain unverified; no additional iOS simulator was
+created and no public infrastructure was purchased or deployed.
+
+The final Android rerun with fresh restored volumes also passes all 39 assertions
+(`/tmp/gotg-final-android-fresh-restore.log`). Both fixture runners restored the
+normal native libraries after testing. The validated Jetson server/helper are now
+installed: local dashboard HTTP is loopback-only on 8080 and companion HTTPS is
+on 4443. Mac-to-Jetson LAN verification passes with the saved certificate public
+key; the previous plaintext LAN endpoint is refused. Public coordination remains
+unconfigured until the separate infrastructure deployment.
