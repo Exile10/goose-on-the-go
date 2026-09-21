@@ -17,9 +17,20 @@ it('says nothing about a refusal the banner is already showing', () => {
 });
 
 it('still speaks for everything the banner does not cover', () => {
+  // The banner reads "Connected" through both of these: the pond answered, it
+  // just did not do what was asked.
   expect(describeApiError(new ApiError('x', 500, null))).toBeTruthy();
   expect(describeApiError(new ApiError('x', 429, 30))).toMatch(/busy/i);
-  expect(describeApiError(new Error('offline'))).toMatch(/[Cc]ould not reach/);
+});
+
+// A request that got no answer at all is a statement about the connection, and
+// the banner is already making it -- "Pond is unavailable. Check its connection
+// and remote access status." A screen saying "Could not reach your Pond" under
+// that is the same fact twice.
+it('says nothing when the pond could not be reached', () => {
+  for (const cause of [new Error('Network request failed'), new TypeError('fetch failed'), 'nope', null]) {
+    expect(describeApiError(cause)).toBeNull();
+  }
 });
 
 it('never puts a status code in front of a reader', () => {

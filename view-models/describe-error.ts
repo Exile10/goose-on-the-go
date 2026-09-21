@@ -27,9 +27,12 @@ import { ApiError } from '@/services/api-client';
  * before there is a session to revoke -- supply their own fallback.
  */
 export function describeApiError(e: unknown): string | null {
-  if (!(e instanceof ApiError)) {
-    return 'Could not reach your Pond. Check that it is running on this network.';
-  }
+  // Not an ApiError means the request never got an answer, which is a statement
+  // about the connection rather than about this screen's operation. The banner
+  // already says "Pond is unavailable", and the failure that produced this also
+  // drove the recovery that put it there, so a screen repeating it underneath
+  // is the same fact twice.
+  if (!(e instanceof ApiError)) return null;
   if (e.status === 401 || e.status === 403) return null;
   if (e.isRetryable) return 'Your Pond is busy. Try again in a moment.';
   return 'Your Pond could not complete that request.';

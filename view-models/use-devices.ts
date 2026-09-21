@@ -264,9 +264,8 @@ function describeDeviceError(e: unknown): string | null {
  * sides of the protocol, and putting it in UI copy would undo that.
  */
 export function describeCommissionError(e: unknown): string | null {
-  if (!(e instanceof ApiError)) {
-    return 'Could not reach your Pond. Check that it is running on this network.';
-  }
+  // As `describeApiError`: an unreachable pond is the banner's to report.
+  if (!(e instanceof ApiError)) return null;
   switch (e.status) {
     case 503:
       return 'Your Pond is still starting its Matter controller. Wait a moment and try again.';
