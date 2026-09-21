@@ -34,15 +34,10 @@ object PondNetwork {
   private var networkCallback: ConnectivityManager.NetworkCallback? = null
   fun install(value: Context) {
     context = value.applicationContext
-    // Backend logging is discarded in a release build, so a node that cannot
-    // reach its control server fails with nothing to look at. A debuggable build
-    // routes those lines to logcat instead. They are redacted on the Go side:
-    // the backend announces the enrollment URL in plain text and that capability
-    // must not reach a log.
+    // A debuggable build always routes backend logging to logcat. A release
+    // build can be asked to, through `setDiagnostics` below.
     if (context.applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE != 0) {
-      Mobile.setDiagnostics(object : Diagnostics {
-        override fun log(line: String) { android.util.Log.i("PondNetwork", line) }
-      })
+      installDiagnostics()
     }
     pushResolvers()
     Mobile.setInterfaceProvider(object : InterfaceProvider {
@@ -98,6 +93,33 @@ object PondNetwork {
    * asking. These are pushed rather than fetched on demand, because a lookup must
    * not wait on a call back into Java.
    */
+  /**
+   * Route the embedded node's own logging to logcat.
+   *
+   * Backend logging is discarded in a release build, so a node that cannot
+   * reach its control server fails with nothing to look at. That is exactly
+   * the situation worth diagnosing, and it is the one where nobody can attach
+   * a debuggable build -- it happens on a particular carrier, in a particular
+   * place, to somebody who is not holding a laptop.
+   *
+   * The lines are redacted on the Go side before they arrive here: the backend
+   * announces the node-authorisation URL in plain text, and that URL is a
+   * bearer capability for joining this household. It must not reach a log, and
+   * `authURLPattern` in node.go is what keeps it out.
+   *
+   * Off unless asked for, and not remembered across a restart: diagnostics that
+   * quietly stay on are a log nobody knows they are writing.
+   */
+  @Synchronized fun installDiagnostics() {
+    Mobile.setDiagnostics(object : Diagnostics {
+      override fun log(line: String) { android.util.Log.i("PondNetwork", line) }
+    })
+  }
+
+  @Synchronized fun removeDiagnostics() {
+    Mobile.setDiagnostics(null)
+  }
+
   private fun pushResolvers() {
     val manager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
     val servers = manager.activeNetwork?.let { manager.getLinkProperties(it) }?.dnsServers.orEmpty()
