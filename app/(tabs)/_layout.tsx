@@ -1,146 +1,170 @@
 /**
- * TabLayout — 4-tab bottom navigation with floating glass pill style.
+ * TabLayout — 4-tab bottom navigation via ink's InkBottomBar (issue #18).
  *
- * Tabs: Home, Chat, Devices, You (profile)
- * Design: floating pill bar with blur backdrop, purple active indicator.
+ * Uses the packaged `InkBottomBar` component as shipped, unmodified — its own
+ * selection treatment (a thin accent line above the icon, label recoloring on
+ * selection, icon never tinted by selection) rather than the original bar's
+ * purple-pill-behind-white-icon. `InkBottomBar` has no prop to reposition its
+ * indicator or to tie the icon's color to selection state, and forking its
+ * source to add either would stop this being "ink's primitive" in any real
+ * sense — so this satisfies the issue's literal "renders via ink's primitive"
+ * criterion under the narrower reading of "visual parity": same floating
+ * pill-shaped bar, ink's own per-tab indicator rather than the old one.
+ *
+ * InkBottomBar has no blurComponent slot and no Reduce Transparency handling
+ * of its own (unlike InkNavbar, which has both) — `GlassPill` below supplies
+ * both around it, matching exactly what InkNavbar does internally with its
+ * own `blurComponent` prop. InkBottomBar renders inside it with `material`
+ * off and no margins/radius of its own (`variant="docked"`), so the wrapper
+ * owns the floating-pill shape and material, and the bar just lays out items.
  */
 
-import React from 'react';
-import { View, StyleSheet, Platform } from 'react-native';
+import React, { useCallback, useEffect, useState } from 'react';
+import { AccessibilityInfo, StyleSheet, View } from 'react-native';
 import { Tabs } from 'expo-router';
+import { BlurView } from 'expo-blur';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { InkBottomBar, useInkTheme, type InkNavDestination } from '@jarida/ink/native';
+import { glassSurface, glassLift } from '@jarida/ink';
 
-import { HapticTab } from '@/components/haptic-tab';
-import { GIcon } from '@/components/ui/g-icon';
-import { JaridaPurple, Grey, Brand } from '@/constants/colors';
-import type { IconName } from '@/constants/icons';
+import { useHaptics } from '@/hooks/use-haptics';
 
-/** Tab icon with active pill indicator */
-function TabIcon({ name, focused }: { name: IconName; focused: boolean }) {
+const TAB_ITEMS: InkNavDestination[] = [
+  { key: 'index', label: 'Home', icon: 'home' },
+  { key: 'chat', label: 'Chat', icon: 'chat' },
+  { key: 'devices', label: 'Devices', icon: 'device' },
+  { key: 'profile', label: 'You', icon: 'profile' },
+];
+
+function useReduceTransparency(): boolean {
+  const [reduced, setReduced] = useState(false);
+  useEffect(() => {
+    let live = true;
+    AccessibilityInfo.isReduceTransparencyEnabled?.().then((v) => {
+      if (live) setReduced(v);
+    });
+    const sub = AccessibilityInfo.addEventListener('reduceTransparencyChanged', setReduced);
+    return () => {
+      live = false;
+      sub.remove();
+    };
+  }, []);
+  return reduced;
+}
+
+/**
+ * The floating glass pill: real blur, or solid paper when transparency is
+ * reduced. The shape (margin/radius/lift) lives on this plain outer View
+ * rather than on `BlurView` itself — expo-blur's web shim appends its own
+ * `backgroundColor` after whatever `style` it's given, so a color set there
+ * would win over the derived tint on web regardless of prop order on our
+ * side. Keeping the shape here sidesteps that rather than fighting it; native
+ * BlurView doesn't have the issue, but this way both platforms share one path.
+ */
+function GlassPill({ children, bottomInset }: { children: React.ReactNode; bottomInset: number }) {
+  const theme = useInkTheme();
+  // Back to ink's own legibility-derived alpha (~0.497 light / ~0.638 dark,
+  // no minAlpha floor) — the most transparent the tint can be while the
+  // label on it still guarantees 4.5:1 contrast against any backdrop.
+  const glass = glassSurface(theme);
+  const reduceTransparency = useReduceTransparency();
+  const lift = glassLift(theme);
+
   return (
-    <View style={styles.iconWrap}>
-      {focused && <View style={styles.activePill} />}
-      <View style={styles.iconOnTop}>
-        <GIcon
-          name={name}
-          size={22}
-          color={focused ? Brand.white : Grey[400]}
+    <View
+      style={[
+        styles.pill,
+        {
+          borderRadius: theme.radius.xl,
+          marginHorizontal: theme.space[4],
+          marginBottom: Math.max(theme.space[3], bottomInset),
+          ...lift,
+        },
+      ]}
+    >
+      {reduceTransparency ? (
+        <View style={[StyleSheet.absoluteFill, { backgroundColor: glass.solid }]} />
+      ) : (
+        <BlurView
+          // On native this sets blur strength — the tint color above still
+          // wins there. On web, expo-blur's shim computes its own background
+          // from these two props and ignores ours entirely (see the file
+          // header): intensity 60 on 'light'/'dark' works out to ~0.47 alpha
+          // there too, close to the tint's own derived value so neither
+          // platform reads more opaque than the other.
+          intensity={60}
+          tint={theme.scheme === 'dark' ? 'dark' : 'light'}
+          style={[StyleSheet.absoluteFill, { backgroundColor: glass.background }]}
         />
-      </View>
+      )}
+      <View style={styles.bar}>{children}</View>
     </View>
   );
 }
 
-/**
- * Custom tab bar background with glass morphism.
- * Uses a semi-transparent white background for the frosted effect.
- * expo-blur can be added later for true blur on iOS.
- */
-function TabBarBackground() {
-  return <View style={[StyleSheet.absoluteFill, styles.glassBackground]} />;
+// expo-router 56 and @react-navigation ship divergent BottomTabBarProps
+// definitions; the runtime props are just { state, descriptors, navigation,
+// insets }, so accept loosely rather than fight two incompatible types.
+function CustomTabBar({ state, navigation }: any) {
+  const insets = useSafeAreaInsets();
+  const haptics = useHaptics();
+
+  const handleChange = useCallback(
+    (key: string) => {
+      const route = state.routes.find((r: { name: string }) => r.name === key);
+      if (!route) return;
+      const isFocused = state.routes[state.index].key === route.key;
+      const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
+      if (!isFocused && !event.defaultPrevented) {
+        haptics.light();
+        navigation.navigate(route.name);
+      }
+    },
+    [state, navigation, haptics],
+  );
+
+  return (
+    <View style={styles.container}>
+      <GlassPill bottomInset={insets.bottom}>
+        <InkBottomBar
+          label="Main navigation"
+          items={TAB_ITEMS}
+          value={state.routes[state.index].name}
+          onChange={handleChange}
+          variant="docked"
+          material="never"
+          style={styles.innerBar}
+        />
+      </GlassPill>
+    </View>
+  );
 }
 
 export default function TabLayout() {
   return (
-    <Tabs
-      screenOptions={{
-        headerShown: false,
-        tabBarButton: HapticTab,
-        tabBarShowLabel: true,
-        tabBarActiveTintColor: JaridaPurple[500],
-        tabBarInactiveTintColor: Grey[400],
-        tabBarLabelStyle: styles.tabLabel,
-        tabBarStyle: styles.tabBar,
-        tabBarBackground: TabBarBackground,
-      }}
-    >
-      <Tabs.Screen
-        name="index"
-        options={{
-          title: 'Home',
-          tabBarIcon: ({ focused }) => (
-            <TabIcon name="home" focused={focused} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="chat"
-        options={{
-          title: 'Chat',
-          tabBarIcon: ({ focused }) => (
-            <TabIcon name="chat" focused={focused} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="devices"
-        options={{
-          title: 'Devices',
-          tabBarIcon: ({ focused }) => (
-            <TabIcon name="device" focused={focused} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="profile"
-        options={{
-          title: 'You',
-          tabBarIcon: ({ focused }) => (
-            <TabIcon name="profile" focused={focused} />
-          ),
-        }}
-      />
+    <Tabs tabBar={(props) => <CustomTabBar {...props} />} screenOptions={{ headerShown: false }}>
+      <Tabs.Screen name="index" options={{ title: 'Home' }} />
+      <Tabs.Screen name="chat" options={{ title: 'Chat' }} />
+      <Tabs.Screen name="devices" options={{ title: 'Devices' }} />
+      <Tabs.Screen name="profile" options={{ title: 'You' }} />
     </Tabs>
   );
 }
 
 const styles = StyleSheet.create({
-  tabBar: {
+  container: {
     position: 'absolute',
-    bottom: 16,
-    left: 12,
-    right: 12,
-    height: 64,
-    borderRadius: 26,
-    backgroundColor: 'rgba(255,255,255,0.82)',
-    borderTopWidth: 0,
-    elevation: 8,
-    shadowColor: '#1C1C1C',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.12,
-    shadowRadius: 24,
-    paddingBottom: 0,
-  },
-  glassBackground: {
-    backgroundColor: 'rgba(255,255,255,0.92)',
-    borderRadius: 26,
-  },
-  tabLabel: {
-    fontSize: 10,
-    fontWeight: '600',
-    marginTop: -2,
-  },
-  iconWrap: {
-    width: 44,
-    height: 30,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 15,
-    overflow: 'hidden',
-  },
-  activePill: {
-    position: 'absolute',
-    top: 0,
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: JaridaPurple[500],
-    borderRadius: 15,
   },
-  /* CSS paints position:absolute siblings (activePill) after static ones
-     regardless of DOM order, so without this the pill covers the icon —
-     zIndex only takes effect on a positioned element, hence 'relative'. */
-  iconOnTop: {
-    position: 'relative',
-    zIndex: 1,
+  pill: {
+    overflow: 'hidden',
+  },
+  bar: {
+    flexDirection: 'row',
+  },
+  innerBar: {
+    width: '100%',
   },
 });
