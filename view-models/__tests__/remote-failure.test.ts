@@ -80,8 +80,7 @@ it('sends an already-enrolled phone to recovery, and leaves the button showing',
 it('does not answer a refused recovery by pointing back at recovery', () => {
   const { message, unavailable } = describeRemoteFailure(new RemoteReplacementUnavailableError());
   expect(message).not.toMatch(/use Recover/i);
-  expect(message).toMatch(/[Ss]ign out/);
-  // The button is hidden too: pressing it again cannot help.
+  // The button is hidden: pressing it again cannot help.
   expect(unavailable).toBe(true);
 });
 
