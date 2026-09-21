@@ -8,7 +8,7 @@ void i18n.use(initReactI18next).init({
   resources: { en: { translation: {
     remote: {
       title: 'Access your Pond from anywhere', description: 'Keep using your Pond away from home through an encrypted private connection. Your Pond must approve remote access locally.',
-      continue: 'Choose remote access', enable: 'Enable remote access', localOnly: 'Keep local only', done: 'Go to Home',
+      continue: 'Set up', notNow: 'Not now', enable: 'Enable remote access', localOnly: 'Keep local only', done: 'Go to Home',
       unconfigured: 'Remote access is not set up on this Pond yet. Its operator must configure the coordination and relay service before cellular access can work. Local pairing is ready to use.',
       approval: 'Approve remote access on your Pond, then try again.', enrolling: 'Registering this device', connecting: 'Checking remote access', enabled: 'Remote access enabled',
       failed: 'Remote access could not be enabled. Your local pairing is preserved.', cancelled: 'Remote access setup was cancelled.',

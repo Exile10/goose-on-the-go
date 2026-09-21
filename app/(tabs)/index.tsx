@@ -28,6 +28,7 @@ import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
 import { Spacing } from '@/constants/spacing';
 import { Radii } from '@/constants/radii';
 import { Shadows } from '@/constants/shadows';
+import { RemoteAccessOffer } from '@/components/patterns/remote-access-offer';
 
 /** Status chip data */
 const STATUS_CHIPS = [
@@ -114,6 +115,10 @@ export default function HomeScreen() {
         contentContainerStyle={styles.scroll}
         showsVerticalScrollIndicator={false}
       >
+        {/* Offered once per pairing, and declinable. Pairing used to push a
+            remote-access screen you had to get past. */}
+        <RemoteAccessOffer />
+
         {/* Greeting header */}
         <View style={styles.greetingRow}>
           <View style={styles.greetingText}>

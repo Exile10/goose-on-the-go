@@ -13,6 +13,7 @@ const KEYS = {
   lastScreen: '@goose/last-screen',
   settings: '@goose/settings',
   devScreenModes: '@goose/dev-screen-modes',
+  remoteOfferDismissed: '@goose/remote-offer-dismissed',
 } as const;
 
 /**
