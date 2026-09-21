@@ -114,7 +114,7 @@ export function useModels(): UseModels {
   };
 }
 
-function describe(e: unknown): string {
+function describe(e: unknown): string | null {
   if (e instanceof ApiError && e.status === 404) {
     return 'This Pond does not expose a model catalogue.';
   }

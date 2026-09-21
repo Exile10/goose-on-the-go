@@ -86,7 +86,7 @@ export function useProfiles(): UseProfiles {
   return { data: { profiles }, loading, error, actions: { add, remove, refresh } };
 }
 
-function describe(e: unknown): string {
+function describe(e: unknown): string | null {
   if (e instanceof ApiError && e.status === 409) {
     return 'A profile with that name already exists.';
   }

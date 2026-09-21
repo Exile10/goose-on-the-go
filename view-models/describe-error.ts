@@ -13,17 +13,24 @@
 
 import { ApiError } from '@/services/api-client';
 
-/** The shared reading of a failed request, in words rather than a code. */
-export function describeApiError(e: unknown): string {
+/**
+ * The shared reading of a failed request, in words rather than a code.
+ *
+ * `null` means there is nothing for the screen to add, because the connection
+ * banner is already saying it. That is not a guess: a 401 or 403 that survives
+ * the client's one refresh attempt reports the pond as having stopped accepting
+ * this phone, which puts the banner into `revoked` -- so by the time a screen
+ * is deciding what to render, the sentence is already on top of it. Printing it
+ * again underneath is the same fact twice, which is what this used to do.
+ *
+ * Callers that must always show something -- the pairing wizard, which runs
+ * before there is a session to revoke -- supply their own fallback.
+ */
+export function describeApiError(e: unknown): string | null {
   if (!(e instanceof ApiError)) {
     return 'Could not reach your Pond. Check that it is running on this network.';
   }
-  // The revoked case. The connection banner says the same thing and offers the
-  // way out, so this is deliberately the same sentence rather than a second,
-  // differently-worded account of one situation.
-  if (e.status === 401 || e.status === 403) {
-    return 'Your Pond is no longer accepting this phone. Pair again at home.';
-  }
+  if (e.status === 401 || e.status === 403) return null;
   if (e.isRetryable) return 'Your Pond is busy. Try again in a moment.';
   return 'Your Pond could not complete that request.';
 }

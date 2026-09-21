@@ -452,7 +452,12 @@ function describeTransportFailure(e: unknown): string {
     if (e.status >= 500) {
       return 'Your Pond returned an error while pairing. Check that it is still running, then try again.';
     }
-    return describeApiError(e);
+    // The wizard runs before there is a session to revoke, so a refusal here
+    // is about this attempt and the screen has to say so itself.
+    return (
+      describeApiError(e) ??
+      'Your Pond refused the pairing request. Check the code on its dashboard and try again.'
+    );
   }
   return 'Could not reach your Pond. Check that the phone is on the same network and the server is running.';
 }

@@ -248,7 +248,7 @@ export function useDevices(): UseDevices {
   };
 }
 
-function describeDeviceError(e: unknown): string {
+function describeDeviceError(e: unknown): string | null {
   if (e instanceof ApiError) {
     if (e.status === 404) return 'That device is no longer registered with your Pond.';
     if (e.status === 409) return 'Your Pond will not remove a bridged endpoint on its own.';
@@ -263,7 +263,7 @@ function describeDeviceError(e: unknown): string {
  * The message never echoes the setup code. It is a credential, redacted on both
  * sides of the protocol, and putting it in UI copy would undo that.
  */
-export function describeCommissionError(e: unknown): string {
+export function describeCommissionError(e: unknown): string | null {
   if (!(e instanceof ApiError)) {
     return 'Could not reach your Pond. Check that it is running on this network.';
   }
