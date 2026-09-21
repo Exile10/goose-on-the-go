@@ -12,7 +12,7 @@ import {
   Pressable,
 } from 'react-native';
 
-import { GIcon } from '@/components/ui/g-icon';
+import { InkIcon } from '@jarida/ink/native';
 import { Grey, JaridaPurple, Brand, Semantic } from '@/constants/colors';
 import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
 import { Spacing } from '@/constants/spacing';
@@ -74,17 +74,17 @@ const ServerCard = React.memo(function ServerCard({ server }: { server: McpServe
       {/* Actions */}
       <View style={styles.actionsRow}>
         <Pressable style={styles.actionBtn}>
-          <GIcon name="settings" size={14} color={Grey[500]} />
+          <InkIcon name="settings" size={14} tone="neutral" />
           <Text style={styles.actionText}>Configure</Text>
         </Pressable>
         {server.status === 'error' && (
           <Pressable style={styles.actionBtn}>
-            <GIcon name="refresh" size={14} color={Semantic.warning} />
+            <InkIcon name="refresh" size={14} tone="warning" />
             <Text style={[styles.actionText, { color: Semantic.warning }]}>Retry</Text>
           </Pressable>
         )}
         <Pressable style={styles.actionBtn}>
-          <GIcon name="trash" size={14} color={Semantic.danger} />
+          <InkIcon name="trash" size={14} tone="danger" />
           <Text style={[styles.actionText, { color: Semantic.danger }]}>Remove</Text>
         </Pressable>
       </View>
@@ -106,7 +106,7 @@ export default function McpServersScreen() {
 
       {/* Add server button */}
       <Pressable style={styles.addBtn}>
-        <GIcon name="plus" size={18} color={JaridaPurple[500]} />
+        <InkIcon name="plus" size={18} tone="brand" />
         <Text style={styles.addBtnText}>Add MCP Server</Text>
       </Pressable>
 

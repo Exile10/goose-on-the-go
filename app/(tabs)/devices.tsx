@@ -9,7 +9,8 @@
  */
 
 import React, { useCallback, useMemo, useState } from 'react';
-import { InkSwitch } from '@jarida/ink/native';
+import { InkSwitch, InkIcon } from '@jarida/ink/native';
+import type { InkTone } from '@jarida/ink';
 import {
   ActivityIndicator,
   View,
@@ -21,7 +22,6 @@ import {
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { GIcon } from '@/components/ui/g-icon';
 import { ALL_ROOMS, supports, useDevices } from '@/view-models/use-devices';
 import type { Device } from '@/services/types';
 import { Grey, JaridaPurple, Brand, Semantic } from '@/constants/colors';
@@ -30,14 +30,14 @@ import { Spacing } from '@/constants/spacing';
 import { Radii } from '@/constants/radii';
 
 /** Icon and accent by device type, falling back to something neutral. */
-const TYPE_STYLE: Record<string, { icon: string; color: string }> = {
-  light: { icon: 'light', color: '#F59E0B' },
-  thermostat: { icon: 'thermo', color: '#1C63D1' },
-  lock: { icon: 'lock', color: '#1F8A3C' },
-  camera: { icon: 'camera', color: '#C8383B' },
-  speaker: { icon: 'speaker', color: '#8C4BFF' },
+const TYPE_STYLE: Record<string, { icon: string; color: string; tone: InkTone }> = {
+  light: { icon: 'light', color: '#F59E0B', tone: 'warning' },
+  thermostat: { icon: 'thermo', color: '#1C63D1', tone: 'info' },
+  lock: { icon: 'lock', color: '#1F8A3C', tone: 'success' },
+  camera: { icon: 'camera', color: '#C8383B', tone: 'danger' },
+  speaker: { icon: 'speaker', color: '#8C4BFF', tone: 'brand' },
 };
-const DEFAULT_STYLE = { icon: 'devices', color: JaridaPurple[500] };
+const DEFAULT_STYLE = { icon: 'devices', color: JaridaPurple[500], tone: 'brand' as InkTone };
 
 function styleFor(device: Device) {
   return TYPE_STYLE[device.device_type?.toLowerCase() ?? ''] ?? DEFAULT_STYLE;
@@ -67,7 +67,7 @@ const DeviceCard = React.memo(function DeviceCard({
   power: boolean | undefined;
   onToggle: (device: Device, on: boolean) => void;
 }) {
-  const { icon, color } = styleFor(device);
+  const { icon, color, tone } = styleFor(device);
   const canPower = supports(device, 'power');
   const on = power ?? false;
 
@@ -80,7 +80,7 @@ const DeviceCard = React.memo(function DeviceCard({
     <View style={styles.deviceCard}>
       <View style={styles.deviceCardTop}>
         <View style={[styles.deviceIconWrap, { backgroundColor: color + '18' }]}>
-          <GIcon name={icon} size={17} color={on && device.is_online ? color : '#B5B5B5'} />
+          <InkIcon name={icon} size={17} tone={on && device.is_online ? tone : 'neutral'} />
         </View>
         {canPower ? (
           <InkSwitch checked={on} onChange={handleToggle} disabled={!device.is_online} />
@@ -190,7 +190,7 @@ export default function DevicesTab() {
           style={styles.addDeviceBtn}
           onPress={() => router.push('/(stack)/commission-device')}
         >
-          <GIcon name="plus" size={20} color={JaridaPurple[500]} />
+          <InkIcon name="plus" size={20} tone="brand" />
           <Text style={styles.addDeviceText}>Add a device</Text>
         </Pressable>
 
@@ -198,7 +198,7 @@ export default function DevicesTab() {
           style={styles.addDeviceBtn}
           onPress={() => router.push('/(stack)/pond-pairing')}
         >
-          <GIcon name="plus" size={20} color={JaridaPurple[500]} />
+          <InkIcon name="plus" size={20} tone="brand" />
           <Text style={styles.addDeviceText}>Pair another Pond</Text>
         </Pressable>
 

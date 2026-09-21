@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useCallback } from 'react';
-import { InkButton } from '@jarida/ink/native';
+import { InkButton, InkIcon } from '@jarida/ink/native';
 import {
   View,
   Text,
@@ -13,7 +13,6 @@ import {
   Pressable,
 } from 'react-native';
 
-import { GIcon } from '@/components/ui/g-icon';
 import { Grey, JaridaPurple, Brand, Semantic } from '@/constants/colors';
 import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
 import { Spacing } from '@/constants/spacing';
@@ -65,7 +64,7 @@ export default function PhotoUploadScreen() {
         {state === 'idle' && (
           <>
             <View style={styles.uploadIconWrap}>
-              <GIcon name="upload" size={32} color={JaridaPurple[400]} />
+              <InkIcon name="upload" size={32} tone="brand" />
             </View>
             <Text style={styles.uploadTitle}>Tap to upload a photo</Text>
             <Text style={styles.uploadDesc}>
@@ -79,7 +78,7 @@ export default function PhotoUploadScreen() {
 
         {state === 'analysing' && (
           <View style={styles.analysingWrap}>
-            <GIcon name="search" size={28} color={JaridaPurple[500]} />
+            <InkIcon name="search" size={28} tone="brand" />
             <Text style={styles.analysingTitle}>Analysing...</Text>
             <View style={styles.progressBar}>
               <View style={styles.progressFill} />
@@ -92,7 +91,7 @@ export default function PhotoUploadScreen() {
 
         {state === 'done' && (
           <View style={styles.doneWrap}>
-            <GIcon name="check" size={28} color={Semantic.success} />
+            <InkIcon name="check" size={28} tone="success" />
             <Text style={styles.doneTitle}>Analysis Complete</Text>
             <Text style={styles.doneDesc}>
               Found {results.length} items in your image
@@ -118,11 +117,11 @@ export default function PhotoUploadScreen() {
               <Text style={styles.resultSuggestion}>{r.suggestion}</Text>
               <View style={styles.resultActions}>
                 <Pressable style={styles.resultAction}>
-                  <GIcon name="check" size={14} color={Semantic.success} />
+                  <InkIcon name="check" size={14} tone="success" />
                   <Text style={[styles.resultActionText, { color: Semantic.success }]}>Accept</Text>
                 </Pressable>
                 <Pressable style={styles.resultAction}>
-                  <GIcon name="edit" size={14} color={Grey[500]} />
+                  <InkIcon name="edit" size={14} tone="neutral" />
                   <Text style={styles.resultActionText}>Edit</Text>
                 </Pressable>
               </View>

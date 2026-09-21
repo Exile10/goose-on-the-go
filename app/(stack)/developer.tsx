@@ -11,9 +11,7 @@ import React, { useCallback, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native';
 import { Redirect } from 'expo-router';
 
-import { InkInput, InkSwitch } from '@jarida/ink/native';
-
-import { GIcon } from '@/components/ui/g-icon';
+import { InkInput, InkSwitch, InkIcon } from '@jarida/ink/native';
 import { ServerStatus } from '@/components/patterns/server-status';
 import { useServer, MIGRATION_SCREENS, type MigrationScreen } from '@/providers/server-provider';
 import { Grey, JaridaPurple, Brand, Semantic } from '@/constants/colors';
@@ -78,7 +76,7 @@ function DeveloperScreenContent() {
         <View style={styles.connectionRow}>
           <ServerStatus online={online} />
           <Pressable style={styles.testButton} onPress={handleTestConnection} disabled={checking}>
-            <GIcon name="refresh" size={14} color={Brand.white} />
+            <InkIcon name="refresh" size={14} />
             <Text style={styles.testButtonText}>{checking ? 'Checking…' : 'Test connection'}</Text>
           </Pressable>
         </View>
@@ -110,7 +108,7 @@ function DeveloperScreenContent() {
       </View>
 
       <View style={styles.warningBanner}>
-        <GIcon name="warn" size={16} color={Semantic.warning} />
+        <InkIcon name="warn" size={16} tone="warning" />
         <Text style={styles.warningText}>
           This screen is dev-only. It isn’t linked from Settings in production builds.
         </Text>

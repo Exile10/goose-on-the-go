@@ -11,7 +11,8 @@
     "lint": "expo lint",
     "test": "jest",
     "test:watch": "jest --watch",
-    "audit": "node scripts/audit-check.mjs --threshold high"
+    "audit": "node scripts/audit-check.mjs --threshold high",
+    "check-icons": "node --experimental-strip-types scripts/sweep-icons.mjs"
   },
   "dependencies": {
     "@expo-google-fonts/jetbrains-mono": "^0.4.1",

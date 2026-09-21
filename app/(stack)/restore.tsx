@@ -3,7 +3,7 @@
  */
 
 import React, { useState, useCallback } from 'react';
-import { InkButton } from '@jarida/ink/native';
+import { InkButton, InkIcon } from '@jarida/ink/native';
 import {
   View,
   Text,
@@ -12,7 +12,6 @@ import {
   Pressable,
 } from 'react-native';
 
-import { GIcon } from '@/components/ui/g-icon';
 import { Grey, JaridaPurple, Brand, Semantic } from '@/constants/colors';
 import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
 import { Spacing } from '@/constants/spacing';
@@ -73,7 +72,7 @@ export default function RestoreScreen() {
         <>
           {/* Info */}
           <View style={styles.infoBanner}>
-            <GIcon name="refresh" size={18} color={JaridaPurple[600]} />
+            <InkIcon name="refresh" size={18} tone="brand" />
             <Text style={styles.infoText}>
               Restore your Pond device from a previous backup. This will replace current settings, memories, and device configurations.
             </Text>
@@ -119,7 +118,7 @@ export default function RestoreScreen() {
 
       {state === 'progress' && (
         <View style={styles.progressWrap}>
-          <GIcon name="refresh" size={28} color="#8C4BFF" />
+          <InkIcon name="refresh" size={28} tone="brand" />
           <Text style={styles.progressTitle}>Restoring...</Text>
           <Text style={styles.progressDesc}>
             Transferring data to your Pond device. Do not disconnect power.
@@ -131,25 +130,25 @@ export default function RestoreScreen() {
           <View style={styles.progressSteps}>
             <View style={styles.progressStepRow}>
               {progress > 20
-                ? <GIcon name="check" size={12} color="#1F8A3C" />
+                ? <InkIcon name="check" size={12} tone="success" />
                 : <View style={{ width: 12, height: 12, borderRadius: 6, borderWidth: 1.5, borderColor: '#D9D9D9' }} />}
               <Text style={[styles.progressStep, progress > 20 && styles.progressStepDone]}>Settings</Text>
             </View>
             <View style={styles.progressStepRow}>
               {progress > 50
-                ? <GIcon name="check" size={12} color="#1F8A3C" />
+                ? <InkIcon name="check" size={12} tone="success" />
                 : <View style={{ width: 12, height: 12, borderRadius: 6, borderWidth: 1.5, borderColor: '#D9D9D9' }} />}
               <Text style={[styles.progressStep, progress > 50 && styles.progressStepDone]}>Memories</Text>
             </View>
             <View style={styles.progressStepRow}>
               {progress > 75
-                ? <GIcon name="check" size={12} color="#1F8A3C" />
+                ? <InkIcon name="check" size={12} tone="success" />
                 : <View style={{ width: 12, height: 12, borderRadius: 6, borderWidth: 1.5, borderColor: '#D9D9D9' }} />}
               <Text style={[styles.progressStep, progress > 75 && styles.progressStepDone]}>Devices</Text>
             </View>
             <View style={styles.progressStepRow}>
               {progress >= 100
-                ? <GIcon name="check" size={12} color="#1F8A3C" />
+                ? <InkIcon name="check" size={12} tone="success" />
                 : <View style={{ width: 12, height: 12, borderRadius: 6, borderWidth: 1.5, borderColor: '#D9D9D9' }} />}
               <Text style={[styles.progressStep, progress >= 100 && styles.progressStepDone]}>Routines</Text>
             </View>
@@ -159,7 +158,7 @@ export default function RestoreScreen() {
 
       {state === 'complete' && (
         <View style={styles.completeWrap}>
-          <GIcon name="sparkle" size={28} color="#1F8A3C" />
+          <InkIcon name="sparkle" size={28} tone="success" />
           <Text style={styles.completeTitle}>Restore Complete!</Text>
           <Text style={styles.completeDesc}>
             Your Pond device has been restored successfully. All settings, memories, and device configurations are back.

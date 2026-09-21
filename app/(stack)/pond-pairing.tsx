@@ -7,7 +7,7 @@
  */
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { InkButton } from '@jarida/ink/native';
+import { InkButton, InkIcon } from '@jarida/ink/native';
 import {
   ActivityIndicator,
   Pressable,
@@ -19,7 +19,6 @@ import {
 } from 'react-native';
 
 import { useFocusEffect, useRouter } from 'expo-router';
-import { GIcon } from '@/components/ui/g-icon';
 import { GKeyboardView } from '@/components/ui/g-keyboard-view';
 import { Grey, JaridaPurple, Brand, Semantic } from '@/constants/colors';
 import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
@@ -58,7 +57,7 @@ function StepIndicator({ current }: { current: Step }) {
               ]}
             >
               {isDone ? (
-                <GIcon name="check" size={14} color={Brand.white} />
+                <InkIcon name="check" size={14} />
               ) : (
                 <Text style={[styles.stepNumber, isActive && styles.stepNumberActive]}>
                   {i + 1}
@@ -84,7 +83,7 @@ function StepIndicator({ current }: { current: Step }) {
 function ScanLink({ onPress }: { onPress: () => void }) {
   return (
     <Pressable onPress={onPress} hitSlop={8} style={styles.scanLink}>
-      <GIcon name="camera" size={16} color={JaridaPurple[500]} />
+      <InkIcon name="camera" size={16} tone="brand" />
       <Text style={styles.scanLinkText}>Scan QR code instead</Text>
     </Pressable>
   );
@@ -186,7 +185,7 @@ function DiscoverStep({
       {data.phase === 'searching' ? (
         <ActivityIndicator color={JaridaPurple[500]} />
       ) : (
-        <GIcon name="search" size={28} color={JaridaPurple[500]} />
+        <InkIcon name="search" size={28} tone="brand" />
       )}
 
       <Text style={styles.stepTitle}>
@@ -220,7 +219,7 @@ function DiscoverStep({
           {picking === pond.id ? (
             <ActivityIndicator size="small" color={JaridaPurple[500]} />
           ) : (
-            <GIcon name="wifi" size={18} color={JaridaPurple[500]} />
+            <InkIcon name="wifi" size={18} tone="brand" />
           )}
           <View style={styles.pondInfo}>
             <Text style={styles.pondName} numberOfLines={1}>
@@ -290,7 +289,7 @@ function ServerStep({
 
   return (
     <StepBody>
-      <GIcon name="search" size={28} color={JaridaPurple[500]} />
+      <InkIcon name="search" size={28} tone="brand" />
       <Text style={styles.stepTitle}>Connect to GIAP</Text>
       <Text style={styles.stepDesc}>
         Enter the URL of your Goose In A Pond server — shown in the dashboard
@@ -339,7 +338,7 @@ function PairingCodeStep({
   const valid = /^\d{6}$/.test(code);
   return (
     <StepBody>
-      <GIcon name="wifi" size={28} color={JaridaPurple[500]} />
+      <InkIcon name="wifi" size={28} tone="brand" />
       <Text style={styles.stepTitle}>Enter Pairing Code</Text>
       <Text style={styles.stepDesc}>
         The 6-digit code is shown on the GIAP host&apos;s dashboard or terminal
@@ -374,7 +373,7 @@ function NameStep({ onNext }: { onNext: (name: string) => void }) {
   const [name, setName] = useState('');
   return (
     <StepBody>
-      <GIcon name="edit" size={28} color={JaridaPurple[500]} />
+      <InkIcon name="edit" size={28} tone="brand" />
       <Text style={styles.stepTitle}>Name This Phone</Text>
       <Text style={styles.stepDesc}>
         This name shows up in the GIAP devices list — pick something you&apos;ll
@@ -483,7 +482,7 @@ function CompleteStep({
   if (state === 'error') {
     return (
       <StepBody>
-        <GIcon name="x" size={28} color={Semantic.danger} />
+        <InkIcon name="x" size={28} tone="danger" />
         <Text style={styles.stepTitle}>Pairing failed</Text>
         <Text style={styles.stepDesc}>
           {reason ?? 'The server rejected the pairing attempt. Double-check the code and try again.'}
@@ -496,7 +495,7 @@ function CompleteStep({
   }
   return (
     <StepBody>
-      <GIcon name="check" size={28} color={Semantic.success} />
+      <InkIcon name="check" size={28} tone="success" />
       <Text style={styles.stepTitle}>All Set!</Text>
       <Text style={styles.stepDesc}>
         Your phone is paired. The session token is stored securely on this

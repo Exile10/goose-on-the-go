@@ -12,12 +12,11 @@
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Animated, Easing, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
-import { InkButton } from '@jarida/ink/native';
+import { InkButton, InkIcon, InkProvider } from '@jarida/ink/native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CameraView, useCameraPermissions, type BarcodeScanningResult } from 'expo-camera';
 
-import { GIcon } from '@/components/ui/g-icon';
 import {
   InvalidPairingCodeError,
   looksLikeMatterSetupCode,
@@ -148,7 +147,7 @@ export default function ConnectDesktopScreen() {
     const canPrompt = permission.canAskAgain;
     return (
       <View style={styles.permissionContainer}>
-        <GIcon name="camera" size={32} color={JaridaPurple[500]} />
+        <InkIcon name="camera" size={32} tone="brand" />
         <Text style={styles.permissionTitle}>Camera access needed</Text>
         <Text style={styles.permissionDesc}>
           Scanning the pairing code needs the camera. You can also enter the six digits by
@@ -184,7 +183,11 @@ export default function ConnectDesktopScreen() {
         hitSlop={12}
         style={[styles.close, { top: insets.top + Spacing.sm }]}
       >
-        <GIcon name="arrow" size={22} color={Brand.white} />
+        {/* Sits on a semi-black overlay over the live camera feed — same
+            dark-surface case as user-media.tsx's play glyph, same fix. */}
+        <InkProvider scheme="dark">
+          <InkIcon name="arrow" size={22} />
+        </InkProvider>
       </Pressable>
 
       <View style={styles.overlay}>
@@ -214,7 +217,7 @@ export default function ConnectDesktopScreen() {
 
         {error ? (
           <View style={styles.statusCard}>
-            <GIcon name="warn" size={28} color={Semantic.danger} />
+            <InkIcon name="warn" size={28} tone="danger" />
             <Text style={styles.statusTitle}>Could not use that code</Text>
             <Text style={styles.statusDesc}>{error}</Text>
             <InkButton variant="primary" onPress={retry}>

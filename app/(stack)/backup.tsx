@@ -3,7 +3,7 @@
  */
 
 import React, { useState } from 'react';
-import { InkButton, InkSwitch } from '@jarida/ink/native';
+import { InkButton, InkSwitch, InkIcon } from '@jarida/ink/native';
 import {
   View,
   Text,
@@ -11,7 +11,6 @@ import {
   ScrollView,
 } from 'react-native';
 
-import { GIcon } from '@/components/ui/g-icon';
 import { Grey, JaridaPurple, Brand, Semantic } from '@/constants/colors';
 import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
 import { Spacing } from '@/constants/spacing';
@@ -41,7 +40,7 @@ export default function BackupScreen() {
       <View style={styles.statusCard}>
         <View style={styles.statusHeader}>
           <View style={styles.statusIconWrap}>
-            <GIcon name="download" size={24} color={Semantic.success} />
+            <InkIcon name="download" size={24} tone="success" />
           </View>
           <View style={styles.statusInfo}>
             <Text style={styles.statusTitle}>Last Backup</Text>
@@ -64,7 +63,7 @@ export default function BackupScreen() {
             </View>
           </View>
         </View>
-        <InkButton variant="primary" icon={<GIcon name="download" size={16} color={Brand.white} />}>
+        <InkButton variant="primary" icon="download">
           Backup Now
         </InkButton>
       </View>

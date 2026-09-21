@@ -14,7 +14,8 @@ import {
   ScrollView,
 } from 'react-native';
 
-import { GIcon } from '@/components/ui/g-icon';
+import { InkIcon } from '@jarida/ink/native';
+import type { InkTone } from '@jarida/ink';
 import { SAMPLE_MEMORIES, type MemoryFragment, type MemoryCategory } from '@/models/memory';
 import { Grey, JaridaPurple, Brand, Semantic } from '@/constants/colors';
 import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
@@ -30,6 +31,13 @@ const CATEGORY_COLORS: Record<MemoryCategory, string> = {
   Reminder: Semantic.warning,
 };
 
+const CATEGORY_TONES: Record<MemoryCategory, InkTone> = {
+  Preference: 'brand',
+  Habit: 'info',
+  Person: 'success',
+  Reminder: 'warning',
+};
+
 /** Memory card */
 const MemoryCard = React.memo(function MemoryCard({
   item,
@@ -41,21 +49,22 @@ const MemoryCard = React.memo(function MemoryCard({
   onDelete: (id: number) => void;
 }) {
   const catColor = CATEGORY_COLORS[item.category];
+  const catTone = CATEGORY_TONES[item.category];
   return (
     <View style={styles.memoryCard}>
       <View style={styles.memoryHeader}>
         <View style={{ marginRight: Spacing.sm }}>
-          <GIcon name={item.icon} size={16} color={catColor} />
+          <InkIcon name={item.icon} size={16} tone={catTone} />
         </View>
         <View style={[styles.categoryBadge, { backgroundColor: catColor + '18' }]}>
           <Text style={[styles.categoryText, { color: catColor }]}>{item.category}</Text>
         </View>
         <View style={styles.memoryActions}>
           <Pressable onPress={() => onPin(item.id)} style={styles.actionBtn}>
-            <GIcon name={item.pinned ? 'check' : 'logs'} size={14} color={item.pinned ? JaridaPurple[500] : Grey[400]} />
+            <InkIcon name={item.pinned ? 'check' : 'logs'} size={14} tone={item.pinned ? 'brand' : 'neutral'} />
           </Pressable>
           <Pressable onPress={() => onDelete(item.id)} style={styles.actionBtn}>
-            <GIcon name="trash" size={14} color={Grey[400]} />
+            <InkIcon name="trash" size={14} tone="neutral" />
           </Pressable>
         </View>
       </View>

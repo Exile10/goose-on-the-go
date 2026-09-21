@@ -28,6 +28,7 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { NotificationsProvider } from '@/providers/notifications-provider';
 import { ThemeProvider } from '@/providers/theme-provider';
 import { ServerProvider } from '@/providers/server-provider';
+import '@/constants/icon-registry';
 
 /**
  * Keep the splash up until the app can draw itself.

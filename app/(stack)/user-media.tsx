@@ -12,7 +12,7 @@ import {
   Dimensions,
 } from 'react-native';
 
-import { GIcon } from '@/components/ui/g-icon';
+import { InkIcon, InkProvider } from '@jarida/ink/native';
 import { Grey, JaridaPurple, Brand, Semantic } from '@/constants/colors';
 import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
 import { Spacing } from '@/constants/spacing';
@@ -42,11 +42,26 @@ const VIDEO_COLORS = [
   '#1C2A2A',
 ];
 
-/** Media tile placeholder */
+/**
+ * Media tile placeholder.
+ *
+ * The play glyph sits on a dark tile — `InkIcon` has no tone that renders
+ * light-on-dark in a light-scheme app (every tone's `fg` is calibrated
+ * dark-on-light). Scoping a `dark`-scheme `InkProvider` to just this icon
+ * gets a legible default color without a raw-SVG exception: still `InkIcon`,
+ * still nothing bypassing ink's own registry, just a locally correct theme
+ * for a locally dark surface.
+ */
 function MediaTile({ color, label, showPlay }: { color: string; label: string; showPlay?: boolean }) {
   return (
     <View style={[styles.tile, { backgroundColor: color }]}>
-      {showPlay && <View style={{ marginBottom: 4 }}><GIcon name="play" size={20} color="#fff" /></View>}
+      {showPlay && (
+        <View style={{ marginBottom: 4 }}>
+          <InkProvider scheme="dark">
+            <InkIcon name="play" size={20} />
+          </InkProvider>
+        </View>
+      )}
       <Text style={styles.tileLabel}>{label}</Text>
     </View>
   );
@@ -101,7 +116,7 @@ export default function UserMediaScreen() {
             ].map((item, i) => (
               <View key={i} style={styles.analysedCard}>
                 <View style={{ marginRight: Spacing.md }}>
-                  <GIcon name={item.icon} size={22} color={JaridaPurple[500]} />
+                  <InkIcon name={item.icon} size={22} tone="brand" />
                 </View>
                 <View style={styles.analysedInfo}>
                   <Text style={styles.analysedLabel}>{item.label}</Text>

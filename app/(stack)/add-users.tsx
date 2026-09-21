@@ -12,7 +12,7 @@
  */
 
 import React, { useCallback, useState } from 'react';
-import { InkButton } from '@jarida/ink/native';
+import { InkButton, InkIcon } from '@jarida/ink/native';
 import {
   ActivityIndicator,
   View,
@@ -23,7 +23,6 @@ import {
   TextInput,
 } from 'react-native';
 
-import { GIcon } from '@/components/ui/g-icon';
 import { GKeyboardView } from '@/components/ui/g-keyboard-view';
 import { useProfiles } from '@/view-models/use-profiles';
 import type { Profile } from '@/services/types';
@@ -62,7 +61,7 @@ const ProfileCard = React.memo(function ProfileCard({
 
       <View style={styles.actionsRow}>
         <Pressable style={styles.actionBtn} onPress={handleRemove}>
-          <GIcon name="trash" size={14} color={Semantic.danger} />
+          <InkIcon name="trash" size={14} tone="danger" />
           <Text style={[styles.actionText, { color: Semantic.danger }]}>Remove</Text>
         </Pressable>
       </View>
@@ -153,7 +152,7 @@ export default function AddUsersScreen() {
           </View>
         ) : (
           <Pressable style={styles.addBtn} onPress={() => setShowAdd(true)}>
-            <GIcon name="plus" size={16} color={JaridaPurple[500]} />
+            <InkIcon name="plus" size={16} tone="brand" />
             <Text style={styles.addBtnText}>Add Profile</Text>
           </Pressable>
         )}

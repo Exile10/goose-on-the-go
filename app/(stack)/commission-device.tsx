@@ -10,10 +10,9 @@
 
 import React, { useCallback, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, TextInput, View } from 'react-native';
-import { InkButton } from '@jarida/ink/native';
+import { InkButton, InkIcon } from '@jarida/ink/native';
 import { useRouter } from 'expo-router';
 
-import { GIcon } from '@/components/ui/g-icon';
 import { useDevices } from '@/view-models/use-devices';
 import { Grey, JaridaPurple, Semantic } from '@/constants/colors';
 import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
@@ -61,7 +60,7 @@ export default function CommissionDeviceScreen() {
 
   return (
     <View style={styles.container}>
-      <GIcon name="device" size={28} color={JaridaPurple[500]} />
+      <InkIcon name="device" size={28} tone="brand" />
       <Text style={styles.title}>Add a Matter device</Text>
       <Text style={styles.desc}>
         Enter the setup code printed on the device or its packaging. A device only accepts

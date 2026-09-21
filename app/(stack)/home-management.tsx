@@ -13,8 +13,8 @@ import {
   Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { InkIcon } from '@jarida/ink/native';
 
-import { GIcon } from '@/components/ui/g-icon';
 import { GKeyboardView } from '@/components/ui/g-keyboard-view';
 import { Grey, JaridaPurple, Brand, Semantic } from '@/constants/colors';
 import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
@@ -74,27 +74,27 @@ export default function HomeManagementScreen() {
         {rooms.map((room) => (
           <View key={room.id} style={styles.roomCard}>
             <View style={{ marginRight: Spacing.md }}>
-              <GIcon name={room.icon} size={20} color={JaridaPurple[500]} />
+              <InkIcon name={room.icon} size={20} tone="brand" />
             </View>
             <View style={styles.roomInfo}>
               <Text style={styles.roomName}>{room.name}</Text>
               <Text style={styles.roomDevices}>{room.deviceCount} devices</Text>
             </View>
             <Pressable style={styles.roomAction}>
-              <GIcon name="edit" size={16} color={Grey[400]} />
+              <InkIcon name="edit" size={16} tone="neutral" />
             </Pressable>
             <Pressable
               style={styles.roomAction}
               onPress={() => handleRemoveRoom(room.id)}
             >
-              <GIcon name="trash" size={16} color={Semantic.danger} />
+              <InkIcon name="trash" size={16} tone="danger" />
             </Pressable>
           </View>
         ))}
 
         {/* Add room */}
         <Pressable style={styles.addBtn}>
-          <GIcon name="plus" size={16} color={JaridaPurple[500]} />
+          <InkIcon name="plus" size={16} tone="brand" />
           <Text style={styles.addBtnText}>Add Room</Text>
         </Pressable>
 
@@ -122,7 +122,7 @@ export default function HomeManagementScreen() {
           style={styles.addBtn}
           onPress={() => router.push('/(stack)/pond-pairing')}
         >
-          <GIcon name="plus" size={16} color={JaridaPurple[500]} />
+          <InkIcon name="plus" size={16} tone="brand" />
           <Text style={styles.addBtnText}>Pair New Pond Device</Text>
         </Pressable>
 

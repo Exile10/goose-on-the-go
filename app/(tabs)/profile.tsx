@@ -16,7 +16,7 @@ import {
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { GIcon } from '@/components/ui/g-icon';
+import { InkIcon } from '@jarida/ink/native';
 import { PROFILE_NAV, type NavItem, type NavGroup } from '@/constants/navigation';
 import { Grey, JaridaPurple, Brand, Semantic } from '@/constants/colors';
 import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
@@ -49,10 +49,10 @@ const NavRow = React.memo(function NavRow({
       onPress={handlePress}
     >
       <View style={styles.rowLeft}>
-        <GIcon name={item.icon} size={16} color="#8C4BFF" />
+        <InkIcon name={item.icon} size={16} tone="brand" />
         <Text style={styles.rowLabel}>{item.label}</Text>
       </View>
-      <GIcon name="chevron" size={16} color={Grey[400]} />
+      <InkIcon name="chevron" size={16} tone="neutral" />
     </Pressable>
   );
 });

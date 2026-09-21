@@ -16,7 +16,8 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { GIcon } from '@/components/ui/g-icon';
+import { InkIcon } from '@jarida/ink/native';
+
 import { GKeyboardView } from '@/components/ui/g-keyboard-view';
 import type { Message } from '@/models/chat';
 import { useChat } from '@/view-models/use-chat';
@@ -118,7 +119,7 @@ export default function ChatScreen() {
             </View>
           </View>
           <Pressable style={styles.newChatBtn} onPress={actions.newConversation}>
-            <GIcon name="plus" size={18} color={Grey[600]} />
+            <InkIcon name="plus" size={18} tone="neutral" />
           </Pressable>
         </View>
 
@@ -159,7 +160,7 @@ export default function ChatScreen() {
               maxLength={4000}
             />
             <Pressable style={styles.micBtn}>
-              <GIcon name="voice" size={18} color={JaridaPurple[500]} />
+              <InkIcon name="voice" size={18} tone="brand" />
             </Pressable>
           </View>
           <Pressable
@@ -167,7 +168,12 @@ export default function ChatScreen() {
             onPress={handleSend}
             disabled={!draft.trim()}
           >
-            <GIcon name="send" size={16} color={draft.trim() ? Brand.white : Grey[400]} />
+            {/* No tone when active: the button's own fill is JaridaPurple[500],
+                and tone="brand" resolves close enough to that same purple
+                that the icon nearly vanishes into it (verified — stroke
+                computed to #7C3AED against an #8C4BFF fill). Default text
+                color has real contrast against the fill instead. */}
+            <InkIcon name="send" size={16} tone={draft.trim() ? undefined : 'neutral'} />
           </Pressable>
         </View>
 

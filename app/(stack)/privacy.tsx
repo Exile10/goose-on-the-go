@@ -11,7 +11,7 @@ import {
   Pressable,
 } from 'react-native';
 
-import { GIcon } from '@/components/ui/g-icon';
+import { InkIcon } from '@jarida/ink/native';
 import { Grey, JaridaPurple, Brand, Semantic } from '@/constants/colors';
 import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
 import { Spacing } from '@/constants/spacing';
@@ -59,11 +59,11 @@ function ExpandableSection({ section }: { section: PrivacySection }) {
     >
       <View style={styles.sectionHeader}>
         <View style={{ marginRight: Spacing.md }}>
-          <GIcon name={section.icon} size={16} color={JaridaPurple[500]} />
+          <InkIcon name={section.icon} size={16} tone="brand" />
         </View>
         <Text style={styles.sectionTitle}>{section.title}</Text>
         <View style={expanded ? { transform: [{ rotate: '180deg' }] } : undefined}>
-          <GIcon name="chevron" size={16} color="#B5B5B5" />
+          <InkIcon name="chevron" size={16} tone="neutral" />
         </View>
       </View>
       {expanded && (
@@ -92,7 +92,7 @@ export default function PrivacyScreen() {
         {DATA_RIGHTS.map((right, i) => (
           <Pressable key={i} style={styles.rightRow}>
             <Text style={styles.rightText}>{right}</Text>
-            <GIcon name="chevron" size={16} color={Grey[400]} />
+            <InkIcon name="chevron" size={16} tone="neutral" />
           </Pressable>
         ))}
       </View>
