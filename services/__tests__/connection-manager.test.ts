@@ -62,3 +62,54 @@ it.each([undefined, { mode: 'local' as const }])('never probes remote endpoints 
   expect(deps.trust).toHaveBeenCalledWith(profile.localUrls, pin);
   manager.environment(false, false);
 });
+
+/**
+ * The bug this reproduces, seen by unregistering the phone from the Pond's own
+ * device list while the app was open: the banner alternated between "Connected
+ * remotely", "Reconnecting to your Pond" and "Pond unavailable" indefinitely.
+ *
+ * The cause is that `probe` carries no bearer token -- it asks whether the Pond
+ * is reachable, not whether it still knows this phone. So a revoked pairing
+ * looks exactly like a healthy one to the recovery path, while every real
+ * request keeps failing and asking it to recover again.
+ */
+it('stops recovering once the Pond has refused this phone, and says so', async () => {
+  const { deps, manager } = fixture();
+  await manager.configure(profile, pin);
+  await manager.recover();
+  expect(manager.current.state).toBe('local');
+
+  manager.revoke();
+  expect(manager.current.state).toBe('revoked');
+
+  // The flicker itself: a request path and an event stream both discovering the
+  // same 401 and both asking to reconnect. The probe would succeed every time.
+  const probesBefore = deps.probe.mock.calls.length;
+  expect(await manager.recover()).toBeNull();
+  expect(await manager.recover(true)).toBeNull();
+  manager.environment(false, true);
+  expect(deps.probe).toHaveBeenCalledTimes(probesBefore);
+  expect(manager.current.state).toBe('revoked');
+
+  // Announced once, however many callers trip over it.
+  const announcements = deps.changed.mock.calls.filter(
+    ([snapshot]: [{ state: string }]) => snapshot.state === 'revoked',
+  );
+  expect(announcements).toHaveLength(1);
+
+  manager.environment(false, false);
+});
+
+it('pairing again clears the refusal', async () => {
+  const { deps, manager } = fixture();
+  await manager.configure(profile, pin);
+  manager.revoke();
+  expect(manager.current.state).toBe('revoked');
+
+  // `configure` is what pairing calls, and it is the only way back.
+  await manager.configure(profile, pin);
+  expect(await manager.recover()).toBe(profile.localUrls[0]);
+  expect(manager.current.state).toBe('local');
+  expect(deps.probe).toHaveBeenCalled();
+  manager.environment(false, false);
+});

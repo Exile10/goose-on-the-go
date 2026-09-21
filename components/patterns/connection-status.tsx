@@ -11,8 +11,12 @@ export function ConnectionStatus() {
   const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  // `revoked` joins the states that send you to pairing rather than retrying:
+  // the Pond is reachable and has stopped recognising this phone, so `recover`
+  // -- which probes endpoints without a token -- would report success and
+  // change nothing.
   const act = () => {
-    if (connectionState === 'unpaired' || connectionState === 'upgrade') router.push('/(stack)/pond-pairing');
+    if (['unpaired', 'upgrade', 'revoked'].includes(connectionState)) router.push('/(stack)/pond-pairing');
     else void recover();
   };
   return <Pressable accessibilityRole="button" onPress={act} style={[styles.container, { paddingTop: insets.top + 6 }]}>

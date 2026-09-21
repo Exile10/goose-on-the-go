@@ -16,7 +16,7 @@ jest.mock('@/services/paired-profile', () => ({
 jest.mock('@/services/pond-trust', () => ({ configurePondTrust: jest.fn(async () => undefined), PondTrustError: class extends Error {} }));
 jest.mock('@/services/discovery', () => ({ findPondByHost: jest.fn(async () => null) }));
 jest.mock('@/services/api-client', () => ({
-  api: { setRecovery: jest.fn(), setOnTokensRotated: jest.fn(), invalidateIdentity: jest.fn() },
+  api: { setRecovery: jest.fn(), setAuthRevoked: jest.fn(), setOnTokensRotated: jest.fn(), invalidateIdentity: jest.fn() },
   PondApiClient: jest.fn(),
 }));
 

@@ -51,7 +51,7 @@ interface NotificationsContextValue {
 const NotificationsContext = createContext<NotificationsContextValue | null>(null);
 
 export function NotificationsProvider({ children }: PropsWithChildren) {
-  const { serverUrl, token, online, recover } = useServer();
+  const { serverUrl, token, online, recover, revoke } = useServer();
   const deduplicator = useMemo(() => new NotificationDeduplicator(), []);
   const [notifications, setNotifications] = useState<ServerNotification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -70,7 +70,17 @@ export function NotificationsProvider({ children }: PropsWithChildren) {
         deviceId,
         token,
         onDisconnect: () => { void recover(); },
-        onAuthFailure: () => { void api.refreshAuthentication().then((ok) => { if (ok) void recover(); else console.warn('[notifications] local pairing may be required'); }).catch(() => console.warn('[notifications] token refresh failed; not retrying rotation')); },
+        // A refused stream that a refresh cannot rescue is the Pond saying it
+        // no longer knows this phone. Reported rather than logged: it used to
+        // warn to the console and leave the stream reconnecting into the same
+        // 401, which is what made the banner alternate between connected and
+        // reconnecting for as long as the app was open.
+        onAuthFailure: () => {
+          void api
+            .refreshAuthentication()
+            .then((ok) => (ok ? void recover() : revoke()))
+            .catch(() => revoke());
+        },
         onNotification: (n) => {
           setNotifications((prev) => [n, ...prev].slice(0, MAX_KEPT));
           setUnreadCount((prev) => prev + 1);

@@ -19,6 +19,8 @@ interface ServerContextValue {
   connectionState: ConnectionSnapshot['state'];
   checkHealth: () => Promise<boolean>;
   recover: () => Promise<string | null>;
+  /** Announce that the Pond has stopped recognising this phone. Terminal. */
+  revoke: () => void;
   profileId: string;
   remoteEnabled: boolean;
   keepLocalOnly: () => Promise<void>;
@@ -145,6 +147,7 @@ export function ServerProvider({ children }: PropsWithChildren) {
       if (!staged.current) manager.environment(environment.current.cellular, environment.current.active);
     });
     api.setRecovery(manager.recover);
+    api.setAuthRevoked(() => manager.revoke());
     void (async () => {
       try {
         await purgeLegacyStorage();
@@ -353,7 +356,7 @@ export function ServerProvider({ children }: PropsWithChildren) {
     refreshToken: identity?.refresh ?? null, connectionState: snapshot.state,
     profileId: identity?.id ?? '', remoteEnabled: saved.current?.profile.remoteAccess?.mode === 'embedded',
     keepLocalOnly, hydrated, screenModes, isScreenReal, setScreenMode,
-    checkHealth, setRemoteEndpoint, recover: manager.recover, stagePairing, cancelPairing, pair, signOut,
+    checkHealth, setRemoteEndpoint, recover: manager.recover, revoke: manager.revoke.bind(manager), stagePairing, cancelPairing, pair, signOut,
   }), [snapshot, identity, hydrated, screenModes, isScreenReal, setScreenMode, checkHealth, setRemoteEndpoint, keepLocalOnly, manager, stagePairing, cancelPairing, pair, signOut]);
   return <ServerContext.Provider value={value}>{children}</ServerContext.Provider>;
 }

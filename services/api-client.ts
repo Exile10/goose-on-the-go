@@ -145,8 +145,21 @@ export class PondApiClient {
   private refreshInFlight: Promise<HandshakeResponse | null> | null = null;
 
   private recovery: (() => Promise<string | null>) | null = null;
+  private authRevoked: (() => void) | null = null;
   private identityEpoch = 0;
   setRecovery(recover: (() => Promise<string | null>) | null) { this.recovery = recover; }
+
+  /**
+   * Called when the Pond refuses this phone's credentials and a refresh cannot
+   * replace them -- the device was unregistered, or its session was revoked.
+   *
+   * Distinct from `setRecovery`, which exists for a transport that might come
+   * back. This one cannot be recovered from by trying again, and saying so is
+   * what stops the connection banner alternating between "connected" (the
+   * token-less health probe still succeeds) and "reconnecting" (every real
+   * request still fails).
+   */
+  setAuthRevoked(onRevoked: (() => void) | null) { this.authRevoked = onRevoked; }
   invalidateIdentity() { this.identityEpoch++; this.token = null; this.refreshToken = null; }
 
   constructor(baseUrl = 'https://127.0.0.1:4443') {
@@ -382,6 +395,11 @@ export class PondApiClient {
       const refreshed = await this.refreshOnce();
       if (refreshed?.accepted) res = await doFetch();
     }
+    // Still refused after the one refresh this client allows itself: the
+    // credentials are dead rather than stale, and no retry will revive them.
+    // Reported once here so the whole app can settle, instead of each screen
+    // discovering it separately and asking the transport to reconnect.
+    if (res.status === 401 && epoch === this.identityEpoch) this.authRevoked?.();
     if (!res.ok) {
       // Message format unchanged — existing logs stay readable.
       throw new ApiError(

@@ -23,6 +23,14 @@ export class ConnectionManager {
   private timer: ReturnType<typeof setTimeout> | null = null;
   private clearTimer() { if (this.timer) clearTimeout(this.timer); this.timer = null; }
   private snapshot: ConnectionSnapshot = { state: 'unpaired', url: null };
+  /**
+   * Set once the Pond has refused this phone's credentials outright. It stops
+   * `recover` doing anything at all, because what it does -- probe endpoints
+   * without a bearer token -- cannot distinguish a Pond that has forgotten this
+   * phone from one that is working perfectly. Cleared only by `configure`,
+   * which is what pairing again calls.
+   */
+  private revoked = false;
   constructor(private readonly deps: ConnectionDependencies) {}
   private publish(state: ConnectionState, url: string | null = null) {
     this.snapshot = { state, url };
@@ -33,19 +41,37 @@ export class ConnectionManager {
   async configure(profile: ConnectionProfile | null, pin = '', upgrade = false): Promise<void> {
     this.clearTimer();
     this.generation++; this.flight = null; this.retryAfter = 0; this.attempts = 0; this.localRechecks = 0;
+    this.revoked = false;
     this.profile = profile; this.pin = pin;
     this.publish(upgrade ? 'upgrade' : 'unpaired');
     await this.deps.trust(profile ? [...profile.localUrls, ...(profile.remoteAccess?.mode === 'embedded' && profile.remoteUrl ? [profile.remoteUrl] : [])] : [], pin);
   }
+  /**
+   * The Pond answered, and said it does not know this phone: its session token
+   * was refused and the refresh token could not replace it. Terminal until
+   * `configure` runs again.
+   *
+   * Announced once. Repeat calls are ignored rather than republished, because
+   * the callers are a request path and an event stream that will both keep
+   * hitting the same 401 and would otherwise take turns redrawing the banner.
+   */
+  revoke(): void {
+    if (this.revoked) return;
+    this.clearTimer();
+    this.generation++; this.flight = null;
+    this.revoked = true;
+    this.publish('revoked');
+  }
+
   environment(cellular: boolean, active: boolean): void {
     this.cellular = cellular; this.active = active;
     this.clearTimer();
     this.generation++; this.flight = null; this.retryAfter = 0; this.attempts = 0; this.localRechecks = 0;
-    if (!active) return;
+    if (!active || this.revoked) return;
     void this.recover();
   }
   recover = (quiet = false): Promise<string | null> => {
-    if (!this.active || !this.profile) return Promise.resolve(null);
+    if (!this.active || !this.profile || this.revoked) return Promise.resolve(null);
     if (this.flight) return this.flight;
     if (Date.now() < this.retryAfter) return Promise.resolve(null);
     this.clearTimer();

@@ -8,7 +8,18 @@ export interface ConnectionProfile {
   /** Missing on older profiles means local only until explicit activation. */
   remoteAccess?: { mode: 'local' } | { mode: 'embedded'; controlUrl: string };
 }
-export type ConnectionState = 'trust' | 'unpaired' | 'upgrade' | 'reconnecting' | 'local' | 'remote' | 'disconnected';
+/**
+ * `revoked` is terminal and the others are not, which is the whole reason it
+ * exists. Every other unhappy state describes a transport that might come back,
+ * so the manager keeps probing; `revoked` says the Pond is reachable and has
+ * stopped recognising this phone, which no amount of reconnecting can fix.
+ * Without it a revoked pairing reads as a flapping network: the token-less
+ * health probe keeps succeeding, every authenticated call keeps failing, and
+ * the banner alternates between them forever.
+ */
+export type ConnectionState =
+  | 'trust' | 'unpaired' | 'upgrade' | 'reconnecting'
+  | 'local' | 'remote' | 'disconnected' | 'revoked';
 
 export function validPin(pin: string): boolean {
   return /^sha256\/[A-Za-z0-9+/]{43}=$/.test(pin);

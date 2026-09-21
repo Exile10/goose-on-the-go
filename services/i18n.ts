@@ -23,6 +23,7 @@ void i18n.use(initReactI18next).init({
       local: 'Connected locally', remote: 'Connected remotely', reconnecting: 'Reconnecting to your Pond',
       disconnected: 'Pond is unavailable. Check its connection and remote access status.',
       unpaired: 'Pair with your Pond at home', upgrade: 'Scan a new QR code at home to enable secure connections.',
+      revoked: 'Your Pond no longer recognises this phone. Tap to pair again at home.',
       trust: 'Could not verify this Pond. Check its fingerprint on the Pond before pairing again.',
       unsupported: 'Secure Pond connections require an Android or iOS development or release build.',
     },
