@@ -18,7 +18,11 @@ interface ServerContextValue {
   serverUrl: string; online: boolean; token: string | null; refreshToken: string | null;
   connectionState: ConnectionSnapshot['state'];
   checkHealth: () => Promise<boolean>;
-  recover: () => Promise<string | null>;
+  /**
+   * Re-select an endpoint. `quiet` suppresses the "Reconnecting" announcement,
+   * for callers whose failure is not evidence the transport is down.
+   */
+  recover: (quiet?: boolean) => Promise<string | null>;
   /** Announce that the Pond has stopped recognising this phone. Terminal. */
   revoke: () => void;
   profileId: string;

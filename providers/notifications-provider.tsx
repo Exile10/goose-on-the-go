@@ -69,7 +69,15 @@ export function NotificationsProvider({ children }: PropsWithChildren) {
         deduplicator,
         deviceId,
         token,
-        onDisconnect: () => { void recover(); },
+        // Quiet, deliberately. A dropped stream is not evidence that the
+        // transport is down -- the endpoint it just failed against may be
+        // answering everything else perfectly -- and a loud recover publishes
+        // "Reconnecting" before it has looked. When the stream fails in a loop,
+        // as it does against a pond that has stopped accepting it, that is a
+        // banner alternating between reconnecting and whatever the probe found,
+        // several times a second. A quiet pass still switches endpoints if it
+        // needs to; it just does not narrate.
+        onDisconnect: () => { void recover(true); },
         // A refused stream that a refresh cannot rescue is the Pond saying it
         // no longer knows this phone. Reported rather than logged: it used to
         // warn to the console and leave the stream reconnecting into the same
