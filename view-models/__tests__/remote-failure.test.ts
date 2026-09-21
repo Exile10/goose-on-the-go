@@ -57,3 +57,15 @@ it('falls back rather than rendering whatever it was handed', () => {
     expect(message).not.toBe('a bare string');
   }
 });
+
+// The failure this phone actually hit: the pond reached the coordinator and was
+// told the device is already enrolled. Reporting that as "not set up" told a
+// household with working remote access that it had none, and hid Recover -- the
+// one control that addresses it.
+it('sends an already-enrolled phone to recovery, and leaves the button showing', () => {
+  const { message, unavailable } = describeRemoteFailure(new ApiError('x', 409, null));
+  expect(unavailable).toBe(false);
+  expect(message).toMatch(/already set up/i);
+  expect(message).toMatch(/Recover/);
+  expect(message).not.toMatch(/not set up/i);
+});

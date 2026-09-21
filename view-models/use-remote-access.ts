@@ -23,6 +23,14 @@ export function describeRemoteFailure(cause: unknown): { message: string; unavai
     return { message: cause.message, unavailable: true };
   }
   if (cause instanceof ApiError) {
+    // The pond reached the coordinator and the coordinator refused: this phone
+    // is already enrolled. Recovery is exactly the flow for that, so the
+    // message points at it and `unavailable` stays false so the button showing
+    // it is not hidden. Reporting this as unavailable told a household with
+    // working remote access that it had none.
+    if (cause.status === 409) {
+      return { message: i18n.t('remote.alreadyEnrolled'), unavailable: false };
+    }
     if (cause.status === 503) return { message: i18n.t('remote.unconfigured'), unavailable: true };
     if (cause.status === 401 || cause.status === 403) {
       return { message: i18n.t('remote.approval'), unavailable: false };

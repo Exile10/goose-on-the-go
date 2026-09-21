@@ -13,6 +13,7 @@ void i18n.use(initReactI18next).init({
       approval: 'Approve remote access on your Pond, then try again.', enrolling: 'Registering this device', connecting: 'Checking remote access', enabled: 'Remote access enabled',
       failed: 'Remote access could not be enabled. Your local pairing is preserved.', cancelled: 'Remote access setup was cancelled.',
       recover: 'Recover remote access after local re-pairing',
+      alreadyEnrolled: 'This phone is already set up for remote access. If you paired with your Pond again, use Recover below to re-issue its remote address.',
       review: 'Approve this recovery request on your Pond dashboard. Keep this phone on the home network.',
       reviewCode: 'Match this request on the Pond: {{id}}',
       reviewExpired: 'Local approval expired. Request recovery again while on the home network.',
