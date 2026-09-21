@@ -34,11 +34,6 @@ void i18n.use(initReactI18next).init({
       signOutWarning: 'This releases this phone\u2019s access to your Pond, including its remote access. You will need to pair again at home to come back.',
       signOutFailed: 'Could not sign out. Your Pond may be unreachable \u2014 try again when you are on its network.',
     },
-    diagnostics: {
-      title: 'Node diagnostics',
-      hint: 'Writes the embedded network node\u2019s own log to the system log, so a connection that will not come up can be diagnosed from the device it fails on. Addresses that would let another device join your household are removed before anything is written. Turns itself off when the app restarts.',
-      unavailable: 'This build cannot record node diagnostics.',
-    },
     pairing: {
       lan: 'Connect to the same home network as your Pond to pair.',
       invalid: 'Scan a current HTTPS pairing QR code from your Pond.',

@@ -34,8 +34,16 @@ object PondNetwork {
   private var networkCallback: ConnectivityManager.NetworkCallback? = null
   fun install(value: Context) {
     context = value.applicationContext
-    // A debuggable build always routes backend logging to logcat. A release
-    // build can be asked to, through `setDiagnostics` below.
+    // The node's own diagnostic lines are always recorded. There are a handful
+    // of them, they are redacted on the Go side, and they are the difference
+    // between "the node did not connect" and "the first resolver refused TCP".
+    // Requiring somebody to find a switch and reproduce the failure before the
+    // reason is written down is how a field failure becomes undiagnosable.
+    Mobile.setEventLog(object : Diagnostics {
+      override fun log(line: String) { android.util.Log.i("PondNetwork", line) }
+    })
+    // Tailscale's backend log is a different thing: verbose, and it names
+    // addresses and keys. That stays off unless asked for.
     if (context.applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE != 0) {
       installDiagnostics()
     }
@@ -94,7 +102,7 @@ object PondNetwork {
    * not wait on a call back into Java.
    */
   /**
-   * Route the embedded node's own logging to logcat.
+   * Route tailscale's backend logging to logcat.
    *
    * Backend logging is discarded in a release build, so a node that cannot
    * reach its control server fails with nothing to look at. That is exactly
@@ -114,10 +122,6 @@ object PondNetwork {
     Mobile.setDiagnostics(object : Diagnostics {
       override fun log(line: String) { android.util.Log.i("PondNetwork", line) }
     })
-  }
-
-  @Synchronized fun removeDiagnostics() {
-    Mobile.setDiagnostics(null)
   }
 
   private fun pushResolvers() {

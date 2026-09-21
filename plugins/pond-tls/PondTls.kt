@@ -155,19 +155,6 @@ class PondTlsModule(context: ReactApplicationContext) : ReactContextBaseJavaModu
   @ReactMethod fun activateRemote(profile: String, control: String, promise: Promise) = remote(promise) { PondNetwork.activate(profile, control); null }
   @ReactMethod fun cancelRemote(promise: Promise) = remote(promise) { PondNetwork.cancel(); null }
   @ReactMethod fun disableRemote(promise: Promise) = remote(promise) { PondNetwork.disable(); null }
-  /**
-   * Turn the embedded node's own logging on or off for this run.
-   *
-   * Exposed in release because the failures worth diagnosing happen on
-   * networks nobody can reach with a debuggable build. What reaches the log is
-   * redacted on the Go side; see `PondNetwork.installDiagnostics`.
-   */
-  @ReactMethod fun setDiagnostics(enabled: Boolean, promise: Promise) = remote(promise) {
-    if (enabled) PondNetwork.installDiagnostics() else PondNetwork.removeDiagnostics()
-    null
-  }
-  private val remoteExecutor = java.util.concurrent.Executors.newSingleThreadExecutor()
-  private fun remote(promise: Promise, action: () -> Any?) { remoteExecutor.execute { try { promise.resolve(action()) } catch (_: Exception) { promise.reject("pond_remote_unavailable", "Remote access operation failed") } } }
   @ReactMethod fun trustFailed(url: String, promise: Promise) {
     try { promise.resolve(PondTls.trustFailed(url)) } catch (_: Exception) { promise.resolve(true) }
   }
