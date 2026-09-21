@@ -241,8 +241,18 @@ function ServerStep({
   const [pin, setPin] = useState(initialPin);
   const [url, setUrl] = useState(initial);
   const [checking, setChecking] = useState(false);
-  const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  /**
+   * Whether to ask for the fingerprint at all.
+   *
+   * Not asked by default, because on a Pond that publishes its pin nobody
+   * should have to know what a fingerprint is. An empty field with that label
+   * on it reads as required however the hint under it is worded, so the field
+   * appears only once the lookup has actually failed and there is nothing else
+   * left to try. Arriving with a pin already in hand -- picked off the
+   * discovery list -- never asks.
+   */
+  const [askForPin, setAskForPin] = useState(false);
 
   // Reach the Pond before advancing. Without this the address is only exercised
   // three steps later, during the handshake, where a typo surfaces as a failed
@@ -253,24 +263,24 @@ function ServerStep({
       setError(i18n.t('pairing.invalid'));
       return;
     }
-    setChecking(true); setError(null); setStatus(null);
+    setChecking(true); setError(null);
     try {
-      // An empty fingerprint is a request to look it up, not a mistake: the
+      // No fingerprint in hand is a request to look one up, not a mistake: the
       // Pond publishes its own pin beside the service phones already discover
-      // it by, so the only thing anybody should have to read off a screen is
+      // it by, so the only things anybody should have to read off a screen are
       // the address and the six-digit code.
       let fingerprint = pin.trim();
       if (!fingerprint) {
-        setStatus(i18n.t('pairing.fingerprintSearching'));
         const discovered = await discoverFingerprint(normalized);
         if (!discovered) {
+          // Only now is there a question worth putting to the user. A Pond
+          // running a server older than the pin record looks like this, and so
+          // does a network that filters multicast.
+          setAskForPin(true);
           setError(i18n.t('pairing.fingerprintMissing'));
           return;
         }
-        // Shown as well as used. It is the value this pairing will be pinned
-        // to, and somebody standing at the Pond can compare it.
         setPin(discovered);
-        setStatus(i18n.t('pairing.fingerprintFound'));
         fingerprint = discovered;
       }
       if (!validPin(fingerprint)) {
@@ -299,7 +309,6 @@ function ServerStep({
           onChangeText={(t) => {
             setUrl(t);
             setError(null);
-            setStatus(null);
           }}
           placeholder="https://pond.local:4443"
           placeholderTextColor={Grey[400]}
@@ -308,20 +317,22 @@ function ServerStep({
           editable={!checking}
         />
       </View>
-      <View style={styles.inputGroup}>
-        <Text style={styles.inputLabel}>{i18n.t('pairing.fingerprint')}</Text>
-        <TextInput style={styles.textInput} value={pin}
-          onChangeText={(t) => { setPin(t); setStatus(null); setError(null); }}
-          placeholder="sha256/..." autoCapitalize="none" autoCorrect={false} editable={!checking} />
-        <Text style={styles.stepDesc}>{status ?? i18n.t('pairing.fingerprintHint')}</Text>
-      </View>
+      {askForPin ? (
+        <View style={styles.inputGroup}>
+          <Text style={styles.inputLabel}>{i18n.t('pairing.fingerprint')}</Text>
+          <TextInput style={styles.textInput} value={pin}
+            onChangeText={(t) => { setPin(t); setError(null); }}
+            placeholder="sha256/..." autoCapitalize="none" autoCorrect={false} editable={!checking} />
+          <Text style={styles.stepDesc}>{i18n.t('pairing.fingerprintHint')}</Text>
+        </View>
+      ) : null}
       {error ? <Text style={styles.stepError}>{error}</Text> : null}
       <InkButton
         variant="primary"
         disabled={!url.trim() || checking}
         onPress={submit}
       >
-        {checking ? 'Checking…' : 'Continue'}
+        {checking ? i18n.t('pairing.fingerprintSearching') : 'Continue'}
       </InkButton>
       <ScanLink onPress={onScan} />
     </StepBody>
