@@ -28,11 +28,20 @@ it('never shows the raw text of an API error', () => {
 
 // A 503 is the Pond saying it cannot reach coordination at all. Offering
 // "Recover" for that invites the user to retry something that cannot work.
-it('treats a 503 as infrastructure that is not there, and hides recovery', () => {
-  expect(describeRemoteFailure(new ApiError('x', 503, null))).toEqual({
-    message: expect.stringContaining('not set up'),
-    unavailable: true,
-  });
+// A 503 means the pond could not reach coordination. That is not the same as
+// the household having no coordinator, and treating it as such hid the Recover
+// button behind the very failure Recover exists to retry -- leaving Enable as
+// the only control, which could not succeed either.
+it('does not read a 503 as a household with no coordinator', () => {
+  const { message, unavailable } = describeRemoteFailure(new ApiError('x', 503, null));
+  expect(unavailable).toBe(false);
+  expect(message).not.toMatch(/not set up/i);
+});
+
+// Only the pond saying it has no control URL at all means that.
+it('reads an absent coordinator from the pond saying so, and hides recovery', () => {
+  const own = new RemoteInfrastructureUnavailableError();
+  expect(describeRemoteFailure(own)).toEqual({ message: own.message, unavailable: true });
 });
 
 it('points a refused enrollment at local approval', () => {

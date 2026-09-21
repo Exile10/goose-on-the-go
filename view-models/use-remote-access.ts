@@ -44,7 +44,16 @@ export function describeRemoteFailure(cause: unknown): { message: string; unavai
     if (cause.status === 409) {
       return { message: i18n.t('remote.alreadyEnrolled'), unavailable: false };
     }
-    if (cause.status === 503) return { message: i18n.t('remote.unconfigured'), unavailable: true };
+    // A 503 is the pond unable to reach coordination, which recovery cannot
+    // fix either -- but it is NOT proof the household has no coordinator. Only
+    // RemoteInfrastructureUnavailableError, raised when the pond reports no
+    // control URL at all, means that.
+    //
+    // Hiding Recover for every 503 turned one failed replacement into a dead
+    // end: the failure hid the control that would have retried it, leaving
+    // Enable as the only button, which could not succeed either. The message
+    // says what happened; the button stays.
+    if (cause.status === 503) return { message: i18n.t('remote.failed'), unavailable: false };
     if (cause.status === 401 || cause.status === 403) {
       return { message: i18n.t('remote.approval'), unavailable: false };
     }
