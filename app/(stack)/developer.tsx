@@ -16,7 +16,6 @@ import { InkSwitch } from '@jarida/ink/native';
 import { useTranslation } from 'react-i18next';
 import { GIcon } from '@/components/ui/g-icon';
 import { ServerStatus } from '@/components/patterns/server-status';
-import { diagnosticsAvailable, setDiagnostics } from '@/services/diagnostics';
 import { useServer, MIGRATION_SCREENS, type MigrationScreen } from '@/providers/server-provider';
 import { Grey, JaridaPurple, Brand, Semantic } from '@/constants/colors';
 import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
@@ -55,14 +54,6 @@ function DeveloperScreenContent() {
     try { await checkHealth(); } finally { setChecking(false); }
   }, [checkHealth]);
 
-  const available = diagnosticsAvailable();
-  const [recording, setRecording] = useState(false);
-  // Session-only: nothing persists this, so a restart leaves it off.
-  const onDiagnostics = useCallback((next: boolean) => {
-    setRecording(next);
-    void setDiagnostics(next).catch(() => setRecording((was) => !was));
-  }, []);
-
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <Text style={styles.sectionTitle}>Server connection</Text>
@@ -77,17 +68,6 @@ function DeveloperScreenContent() {
             <GIcon name="refresh" size={14} color={Brand.white} />
             <Text style={styles.testButtonText}>{checking ? 'Checking…' : 'Test connection'}</Text>
           </Pressable>
-        </View>
-      </View>
-
-      <Text style={styles.sectionTitle}>{t('diagnostics.title')}</Text>
-      <View style={styles.card}>
-        <Text style={styles.sectionHint}>
-          {available ? t('diagnostics.hint') : t('diagnostics.unavailable')}
-        </Text>
-        <View style={styles.connectionRow}>
-          <Text style={styles.screenLabel}>{t('diagnostics.title')}</Text>
-          <InkSwitch checked={recording} disabled={!available} onChange={onDiagnostics} />
         </View>
       </View>
 
