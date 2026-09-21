@@ -31,7 +31,7 @@ import { ApiError } from '@/services/api-client';
 import { useServer } from '@/providers/server-provider';
 import { getInstallId } from '@/services/install-id';
 import { takePairingPayload } from '@/services/pairing-handoff';
-import { type DiscoveredPond } from '@/services/discovery';
+import { findPondAt, type DiscoveredPond } from '@/services/discovery';
 import { useDiscovery } from '@/view-models/use-discovery';
 
 type Step = 0 | 1 | 2 | 3;
@@ -136,14 +136,14 @@ function DiscoverStep({
   onManual,
   onScan,
 }: {
-  onNext: (url: string) => void;
+  onNext: (url: string, pin?: string) => void;
   onManual: () => void;
   onScan: () => void;
 }) {
   const { data, error, actions } = useDiscovery();
-  const picking: string | null = null;
-  const pickError: string | null = null;
-  const pick = (pond: DiscoveredPond) => onNext(pond.url);
+  // The advertisement already carried this Pond's pin, so hand it on rather
+  // than making the next step browse for the same record again.
+  const pick = (pond: DiscoveredPond) => onNext(pond.url, pond.pin);
 
   return (
     <StepBody>
@@ -175,17 +175,8 @@ function DiscoverStep({
       ) : null}
 
       {data.ponds.map((pond) => (
-        <Pressable
-          key={pond.id}
-          style={styles.pondRow}
-          disabled={picking !== null}
-          onPress={() => void pick(pond)}
-        >
-          {picking === pond.id ? (
-            <ActivityIndicator size="small" color={JaridaPurple[500]} />
-          ) : (
-            <GIcon name="wifi" size={18} color={JaridaPurple[500]} />
-          )}
+        <Pressable key={pond.id} style={styles.pondRow} onPress={() => pick(pond)}>
+          <GIcon name="wifi" size={18} color={JaridaPurple[500]} />
           <View style={styles.pondInfo}>
             <Text style={styles.pondName} numberOfLines={1}>
               {pond.name}
@@ -197,8 +188,6 @@ function DiscoverStep({
           </View>
         </Pressable>
       ))}
-
-      {pickError ? <Text style={styles.stepError}>{pickError}</Text> : null}
 
       {data.phase !== 'searching' ? (
         <InkButton variant="quiet" onPress={actions.retry}>
@@ -214,18 +203,45 @@ function DiscoverStep({
   );
 }
 
+/**
+ * Ask the network for the pin of the Pond at `origin`, so the fingerprint field
+ * does not have to be typed.
+ *
+ * Only the Pond's own advertisement is consulted, and only when the address and
+ * port both match what was typed. Resolves null when nothing answers, which is
+ * what a network that filters multicast looks like and what a Pond running a
+ * server older than the `pin` TXT record looks like; the caller asks for the
+ * fingerprint by hand in both cases.
+ *
+ * A pin learned this way is not trusted on the strength of where it came from.
+ * mDNS is unauthenticated, so anything on this network can claim to be the Pond
+ * and offer its own key. What makes that harmless is the handshake: it binds the
+ * certificate actually served into the proof it computes from the pairing code,
+ * so a pin belonging to anyone but the Pond ends the pair with a failure rather
+ * than a wrong success.
+ */
+async function discoverFingerprint(origin: string): Promise<string | null> {
+  const { hostname, port } = new URL(origin);
+  const found = await findPondAt(hostname, Number(port) || 443);
+  return found?.pin ?? null;
+}
+
 function ServerStep({
   initial,
+  initialPin,
   onNext,
   onScan,
 }: {
   initial: string;
+  /** The pin discovery already learned for `initial`, when it had one. */
+  initialPin: string;
   onNext: (url: string, pin: string) => Promise<void>;
   onScan: () => void;
 }) {
-  const [pin, setPin] = useState('');
+  const [pin, setPin] = useState(initialPin);
   const [url, setUrl] = useState(initial);
   const [checking, setChecking] = useState(false);
+  const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   // Reach the Pond before advancing. Without this the address is only exercised
@@ -233,12 +249,36 @@ function ServerStep({
   // pairing rather than as a bad URL on the screen that asked for it.
   const submit = useCallback(async () => {
     const normalized = normalizeServerUrl(url);
-    if (!normalized || !validPin(pin.trim())) {
+    if (!normalized) {
       setError(i18n.t('pairing.invalid'));
       return;
     }
-    setChecking(true); setError(null);
-    try { await onNext(normalized, pin.trim()); }
+    setChecking(true); setError(null); setStatus(null);
+    try {
+      // An empty fingerprint is a request to look it up, not a mistake: the
+      // Pond publishes its own pin beside the service phones already discover
+      // it by, so the only thing anybody should have to read off a screen is
+      // the address and the six-digit code.
+      let fingerprint = pin.trim();
+      if (!fingerprint) {
+        setStatus(i18n.t('pairing.fingerprintSearching'));
+        const discovered = await discoverFingerprint(normalized);
+        if (!discovered) {
+          setError(i18n.t('pairing.fingerprintMissing'));
+          return;
+        }
+        // Shown as well as used. It is the value this pairing will be pinned
+        // to, and somebody standing at the Pond can compare it.
+        setPin(discovered);
+        setStatus(i18n.t('pairing.fingerprintFound'));
+        fingerprint = discovered;
+      }
+      if (!validPin(fingerprint)) {
+        setError(i18n.t('pairing.invalid'));
+        return;
+      }
+      await onNext(normalized, fingerprint);
+    }
     catch (error) { setError(error instanceof Error ? error.message : i18n.t('pairing.failed')); }
     finally { setChecking(false); }
   }, [url, pin, onNext]);
@@ -259,6 +299,7 @@ function ServerStep({
           onChangeText={(t) => {
             setUrl(t);
             setError(null);
+            setStatus(null);
           }}
           placeholder="https://pond.local:4443"
           placeholderTextColor={Grey[400]}
@@ -269,9 +310,10 @@ function ServerStep({
       </View>
       <View style={styles.inputGroup}>
         <Text style={styles.inputLabel}>{i18n.t('pairing.fingerprint')}</Text>
-        <TextInput style={styles.textInput} value={pin} onChangeText={setPin}
+        <TextInput style={styles.textInput} value={pin}
+          onChangeText={(t) => { setPin(t); setStatus(null); setError(null); }}
           placeholder="sha256/..." autoCapitalize="none" autoCorrect={false} editable={!checking} />
-        <Text style={styles.stepDesc}>{i18n.t('pairing.fingerprintHint')}</Text>
+        <Text style={styles.stepDesc}>{status ?? i18n.t('pairing.fingerprintHint')}</Text>
       </View>
       {error ? <Text style={styles.stepError}>{error}</Text> : null}
       <InkButton
@@ -474,6 +516,7 @@ export default function PondPairingScreen() {
   const router = useRouter();
   const { serverUrl, stagePairing, cancelPairing, pair } = useServer();
   const [manualUrl, setManualUrl] = useState(serverUrl);
+  const [manualPin, setManualPin] = useState('');
   const [pairingError, setPairingError] = useState<string | null>(null);
   useEffect(() => () => { void cancelPairing(); }, [cancelPairing]);
   // Stable per-install client_id, hydrated from SecureStorage on mount. The
@@ -573,10 +616,15 @@ export default function PondPairingScreen() {
       {pairingError ? <Text style={styles.stepError}>{pairingError}</Text> : null}
       {step === 0 &&
         (manualEntry ? (
-          <ServerStep initial={manualUrl} onNext={onServerNext} onScan={openScanner} />
+          <ServerStep
+            initial={manualUrl}
+            initialPin={manualPin}
+            onNext={onServerNext}
+            onScan={openScanner}
+          />
         ) : (
           <DiscoverStep
-            onNext={(url) => { setManualUrl(url); setManualEntry(true); }}
+            onNext={(url, pin) => { setManualUrl(url); setManualPin(pin ?? ''); setManualEntry(true); }}
             onManual={() => setManualEntry(true)}
             onScan={openScanner}
           />

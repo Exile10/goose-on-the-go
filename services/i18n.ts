@@ -29,7 +29,11 @@ void i18n.use(initReactI18next).init({
     pairing: {
       lan: 'Connect to the same home network as your Pond to pair.',
       invalid: 'Scan a current HTTPS pairing QR code from your Pond.',
-      fingerprint: 'Pond public-key fingerprint', fingerprintHint: 'sha256/... shown on your Pond',
+      fingerprint: 'Pond public-key fingerprint',
+      fingerprintHint: 'Leave this empty and it fills itself from your network.',
+      fingerprintSearching: 'Looking for this Pond on your network...',
+      fingerprintFound: 'Fingerprint found on your network. Check it matches the one your Pond shows.',
+      fingerprintMissing: 'This Pond did not answer on your network. Enter the fingerprint shown on its dashboard.',
       failed: 'Could not pair securely with this Pond.',
       saving: 'Could not save this pairing. Your previous Pond is still selected.',
       address: 'HTTPS Pond address', code: 'Pairing code',

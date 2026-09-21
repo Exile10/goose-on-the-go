@@ -14,6 +14,8 @@
 
 import Zeroconf, { type Service } from 'react-native-zeroconf';
 
+import { validPin } from '@/models/connection';
+
 /** The service pond-server registers. */
 const SERVICE_TYPE = 'pond';
 const PROTOCOL = 'tcp';
@@ -32,6 +34,18 @@ export interface DiscoveredPond {
   url: string;
   /** Server version from the TXT record, when it published one. */
   version?: string;
+  /**
+   * The Pond's public-key pin from the TXT record, in `sha256/<base64>` form.
+   *
+   * Offered so nobody has to copy fifty-one characters of base64 off a
+   * dashboard. It is **not** trusted on the strength of having arrived over
+   * mDNS -- multicast is unauthenticated and anything on this network can claim
+   * it. What makes accepting it safe is that the pairing handshake binds the
+   * served certificate into its proof: pin the wrong key and the pair fails
+   * outright rather than succeeding against the wrong Pond. Absent when the
+   * Pond runs a server older than that TXT record.
+   */
+  pin?: string;
   /**
    * The machine this resolved from, normalised for comparison — lowercased,
    * with any trailing dot and `.local` removed, e.g. `nano`.
@@ -68,8 +82,20 @@ export function toPond(service: Service): DiscoveredPond | null {
     port,
     url: `https://${address}:${port}`,
     version,
+    pin: advertisedPin(service.txt?.pin),
     hostname: normalizeHostname(service.host),
   };
+}
+
+/**
+ * Take the advertised pin only when it is shaped like one.
+ *
+ * A malformed value is dropped rather than carried, so the pairing screen falls
+ * back to asking instead of prefilling a field with something that cannot work.
+ * The shape check is `validPin`'s, kept in one place.
+ */
+function advertisedPin(raw: unknown): string | undefined {
+  return typeof raw === 'string' && validPin(raw) ? raw : undefined;
 }
 
 /**
@@ -189,7 +215,39 @@ export function findPondByHost(
 ): Promise<DiscoveredPond | null> {
   const wanted = normalizeHostname(host);
   if (!wanted) return Promise.resolve(null);
+  return findPond((p) => p.hostname === wanted && p.port === port, timeoutMs);
+}
 
+/**
+ * Find the Pond a typed address names, so its advertised pin can be offered.
+ *
+ * Deliberately broader than `findPondByHost`: somebody entering an address by
+ * hand types whichever form they were given, and on Android that is usually the
+ * numeric one, whose first label (`192`) is not a machine name. So the address
+ * matches either way, and the port must match in both.
+ */
+export function findPondAt(
+  host: string,
+  port: number,
+  timeoutMs = 6_000,
+): Promise<DiscoveredPond | null> {
+  const wanted = normalizeHostname(host);
+  return findPond(
+    (p) => p.port === port && (p.address === host || (!!wanted && p.hostname === wanted)),
+    timeoutMs,
+  );
+}
+
+/**
+ * Browse until one advertisement satisfies `matches`, or until the clock runs
+ * out. Resolves null on a timeout or on a browse that could not start, which is
+ * the honest answer on a network that filters multicast -- the caller's next
+ * move is the same either way.
+ */
+function findPond(
+  matches: (pond: DiscoveredPond) => boolean,
+  timeoutMs: number,
+): Promise<DiscoveredPond | null> {
   return new Promise((resolve) => {
     let settled = false;
     // `startDiscovery` reports a scan that throws synchronously, before it has
@@ -206,15 +264,10 @@ export function findPondByHost(
     };
 
     const timer = setTimeout(() => finish(null), timeoutMs);
-    handle = startDiscovery(
-      (ponds) => {
-        const match = ponds.find((p) => p.hostname === wanted && p.port === port);
-        if (match) finish(match);
-      },
-      // A browse that cannot start is a null answer, not a thrown error: the
-      // caller's next move is the same either way.
-      () => finish(null),
-    );
+    handle = startDiscovery((ponds) => {
+      const match = ponds.find(matches);
+      if (match) finish(match);
+    }, () => finish(null));
 
     // If the browse failed on the way out, the handle arrived after `finish`
     // had already run and nothing has released it.
