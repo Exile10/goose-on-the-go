@@ -12,7 +12,10 @@
  */
 
 import { ApiError } from '@/services/api-client';
-import { RemoteInfrastructureUnavailableError } from '@/services/remote-access';
+import {
+  RemoteInfrastructureUnavailableError,
+  RemoteReplacementUnavailableError,
+} from '@/services/remote-access';
 import { describeRemoteFailure } from '@/view-models/use-remote-access';
 
 it('never shows the raw text of an API error', () => {
@@ -68,4 +71,20 @@ it('sends an already-enrolled phone to recovery, and leaves the button showing',
   expect(message).toMatch(/already set up/i);
   expect(message).toMatch(/Recover/);
   expect(message).not.toMatch(/not set up/i);
+});
+
+// Enrollment's 409 and recovery's 409 mean opposite things. Enrollment says
+// "already enrolled, use Recover"; recovery says "the pond still calls this
+// enrollment live, so it will not be replaced". Sharing one message between
+// them told the user to press the button they had just pressed.
+it('does not answer a refused recovery by pointing back at recovery', () => {
+  const { message, unavailable } = describeRemoteFailure(new RemoteReplacementUnavailableError());
+  expect(message).not.toMatch(/use Recover/i);
+  expect(message).toMatch(/[Ss]ign out/);
+  // The button is hidden too: pressing it again cannot help.
+  expect(unavailable).toBe(true);
+});
+
+it('still points a refused enrollment at recovery', () => {
+  expect(describeRemoteFailure(new ApiError('x', 409, null)).message).toMatch(/Recover/);
 });

@@ -1,6 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useServer } from '@/providers/server-provider';
-import { cancelRemoteAccess, enableRemoteAccess, RemoteInfrastructureUnavailableError, type RemoteProgress } from '@/services/remote-access';
+import {
+  cancelRemoteAccess,
+  enableRemoteAccess,
+  RemoteInfrastructureUnavailableError,
+  RemoteReplacementUnavailableError,
+  type RemoteProgress,
+} from '@/services/remote-access';
 import { ApiError } from '@/services/api-client';
 import i18n from '@/services/i18n';
 
@@ -20,6 +26,12 @@ import i18n from '@/services/i18n';
  */
 export function describeRemoteFailure(cause: unknown): { message: string; unavailable: boolean } {
   if (cause instanceof RemoteInfrastructureUnavailableError) {
+    return { message: cause.message, unavailable: true };
+  }
+  // Recovery itself was refused, so pointing at Recover would be circular. The
+  // message says what actually unblocks it, and the button is hidden because
+  // pressing it again cannot help.
+  if (cause instanceof RemoteReplacementUnavailableError) {
     return { message: cause.message, unavailable: true };
   }
   if (cause instanceof ApiError) {

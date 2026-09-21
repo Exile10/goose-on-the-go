@@ -1,10 +1,30 @@
 /** Remote access is contacted only after explicit user opt-in and local pairing. */
 import { AppState, NativeModules } from 'react-native';
-import { api } from './api-client';
+import { ApiError, api } from './api-client';
 import { isLocalPairingUrl, normalizeHttpsUrl } from '@/models/connection';
 import i18n from './i18n';
 
 /** Setup cannot proceed until the operator configures remote infrastructure. */
+/**
+ * The pond will not replace this device's enrollment.
+ *
+ * Raised only from the recovery request, where a 409 means something specific:
+ * the coordinator still calls this device active, so superseding it would be a
+ * way to take over a live enrollment rather than repair a broken one. Revoking
+ * the old enrollment first is what makes it replaceable, and signing out is
+ * what queues that.
+ *
+ * Distinct from the 409 that enrollment raises, which means the opposite --
+ * already enrolled, use recovery. Sharing one message between them told the
+ * user to press the button they had just pressed.
+ */
+export class RemoteReplacementUnavailableError extends Error {
+  constructor() {
+    super(i18n.t('remote.replacementBlocked'));
+    this.name = 'RemoteReplacementUnavailableError';
+  }
+}
+
 export class RemoteInfrastructureUnavailableError extends Error {
   constructor() { super(i18n.t('remote.unconfigured')); this.name = 'RemoteInfrastructureUnavailableError'; }
 }
@@ -80,7 +100,14 @@ export async function enableRemoteAccess(profileId: string, localUrl: string, pr
         // Never automatically replay this enrollment write after an ambiguous failure.
         const body = JSON.stringify({ authUrl: state.authUrl, nodeKey: state.nodeKey ?? '', machineKey: state.machineKey ?? '' });
         if (recovery) {
-          const request = await api.requestLocal<{ id: string }>(localUrl, '/api/v1/remote-access/recovery', { method: 'POST', body });
+          const request = await api
+            .requestLocal<{ id: string }>(localUrl, '/api/v1/remote-access/recovery', { method: 'POST', body })
+            .catch((cause) => {
+              if (cause instanceof ApiError && cause.status === 409) {
+                throw new RemoteReplacementUnavailableError();
+              }
+              throw cause;
+            });
           if (!/^[a-f0-9-]{36}$/.test(request.id)) throw new Error(i18n.t('remote.failed'));
           pendingRecovery = { endpoint: localUrl, id: request.id };
           check(); recovery.onReview(request.id); progress('review');
