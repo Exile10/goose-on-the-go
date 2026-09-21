@@ -42,7 +42,7 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "Goose On The Go uses your camera to scan the pairing QR code shown on your Pond.",
+          "cameraPermission": "Goose On The Go uses your camera to scan QR codes: the pairing code shown on your Pond, and the setup code on a device you are adding.",
           "recordAudioAndroid": false
         }
       ],

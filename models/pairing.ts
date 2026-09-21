@@ -55,6 +55,39 @@ export function looksLikeMatterSetupCode(raw: string): boolean {
   return /^\d{11}$|^\d{21}$/.test(trimmed.replace(/[\s-]/g, ''));
 }
 
+/**
+ * As above, plus the bare 8-digit passcode, for a code somebody types.
+ *
+ * The passcode is deliberately absent from the scannable forms: it is printed
+ * beside the QR, never inside one, and treating it as scannable would mean any
+ * eight digits on a label read as a device to commission. Typed, it is
+ * unambiguous, and the controller accepts it -- `parse_setup_code` in
+ * `pond-core/src/user_data/ports/device_commissioning.rs` maps it to
+ * `SetupCode::Passcode`.
+ *
+ * Loose on purpose, like its sibling: the controller remains the authority on
+ * what actually decodes, and this only decides whether the button is live.
+ */
+export function looksLikeTypedSetupCode(raw: string): boolean {
+  return looksLikeMatterSetupCode(raw) || /^\d{8}$/.test(raw.trim().replace(/[\s-]/g, ''));
+}
+
+/**
+ * Whether this text is a Pond pairing payload, without throwing.
+ *
+ * For telling somebody which of the two QR codes they are holding, where the
+ * answer is a sentence rather than a payload and a `try` around a parse would
+ * read as though the parse mattered.
+ */
+export function isPairingPayload(raw: string): boolean {
+  try {
+    parsePairingPayload(raw);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /** Parses raw QR code text into a pairing payload. Throws `InvalidPairingCodeError` if malformed. */
 export function parsePairingPayload(raw: string): PairingPayload {
   try {

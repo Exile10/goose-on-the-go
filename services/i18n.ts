@@ -38,6 +38,16 @@ void i18n.use(initReactI18next).init({
       saving: 'Could not save this pairing. Your previous Pond is still selected.',
       address: 'HTTPS Pond address', code: 'Pairing code',
     },
+    // The Matter commissioning path. The rest of the copy on those two screens
+    // is still hardcoded in the components; these are the strings this change
+    // introduced, and new strings go here.
+    commission: {
+      scan: 'Scan the code instead', type: 'Type the code instead',
+      aim: 'Point the camera at the QR code on the device or its packaging',
+      camera: 'Scanning a device setup code needs the camera. You can also type the code printed on the device instead.',
+      notSetupCode: 'That is not a Matter setup code. Look for a QR beginning MT: on the device or its box.',
+      isPondCode: 'That is your Pond\u2019s pairing code, not a device setup code. This phone is already paired \u2014 scan the QR on the device itself, or on its packaging.',
+    },
   } } },
 });
 export default i18n;

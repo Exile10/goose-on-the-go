@@ -8,10 +8,17 @@
 
 import {
   InvalidPairingCodeError,
+  isPairingPayload,
   looksLikeMatterSetupCode,
+  looksLikeTypedSetupCode,
   parsePairingPayload,
 } from '@/models/pairing';
-import { offerPairingPayload, takePairingPayload } from '@/services/pairing-handoff';
+import {
+  offerPairingPayload,
+  offerSetupCode,
+  takePairingPayload,
+  takeSetupCode,
+} from '@/services/pairing-handoff';
 
 const VALID = 'pond://pair?v=2&scheme=https&pin=sha256%2FAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA%3D&host=pond.local&port=4000&code=123456';
 
@@ -141,5 +148,64 @@ describe('looksLikeMatterSetupCode', () => {
   it('does not claim an empty or bare MT: prefix', () => {
     expect(looksLikeMatterSetupCode('')).toBe(false);
     expect(looksLikeMatterSetupCode('MT:')).toBe(false);
+  });
+});
+
+describe('looksLikeTypedSetupCode', () => {
+  // The controller accepts a bare 8-digit passcode, so the field must too, or
+  // the Add Device button stays dead against a code the Pond would have taken.
+  it('accepts the bare passcode a typed code may be', () => {
+    expect(looksLikeTypedSetupCode('20202021')).toBe(true);
+    expect(looksLikeTypedSetupCode('2020-2021')).toBe(true);
+  });
+
+  // And the scanner must NOT, which is why these are two functions. A passcode
+  // is printed beside the QR, never inside one, so treating eight digits as
+  // scannable would make any short number on a label read as a device.
+  it('is the one place the passcode is accepted', () => {
+    expect(looksLikeMatterSetupCode('20202021')).toBe(false);
+  });
+
+  it('still accepts everything the scanner does', () => {
+    for (const code of ['MT:Y.K9042C00KA0648G00', '34970112332', '123456789012345678901']) {
+      expect(looksLikeTypedSetupCode(code)).toBe(true);
+    }
+  });
+
+  it('refuses the wizard\u2019s own six-digit code and empty input', () => {
+    expect(looksLikeTypedSetupCode('123456')).toBe(false);
+    expect(looksLikeTypedSetupCode('')).toBe(false);
+    expect(looksLikeTypedSetupCode('   ')).toBe(false);
+  });
+});
+
+describe('isPairingPayload', () => {
+  it('answers yes for a payload and no for anything else, without throwing', () => {
+    expect(isPairingPayload(VALID)).toBe(true);
+    expect(isPairingPayload('MT:Y.K9042C00KA0648G00')).toBe(false);
+    expect(isPairingPayload('not a url at all')).toBe(false);
+    expect(isPairingPayload('')).toBe(false);
+  });
+});
+
+describe('the setup-code handoff', () => {
+  it('hands a scanned code over exactly once', () => {
+    offerSetupCode('MT:Y.K9042C00KA0648G00');
+    expect(takeSetupCode()).toBe('MT:Y.K9042C00KA0648G00');
+    // Cleared by the read: returning to the commissioning screen later must not
+    // resurrect a code the user has already used or abandoned.
+    expect(takeSetupCode()).toBeNull();
+  });
+
+  // Separate slots, so whichever screen looks first cannot take the other's
+  // scan. Sharing one would make the mix-up a runtime accident.
+  it('does not cross with the pairing payload', () => {
+    offerSetupCode('MT:Y.K9042C00KA0648G00');
+    expect(takePairingPayload()).toBeNull();
+    expect(takeSetupCode()).toBe('MT:Y.K9042C00KA0648G00');
+
+    offerPairingPayload(parsePairingPayload(VALID));
+    expect(takeSetupCode()).toBeNull();
+    expect(takePairingPayload()).not.toBeNull();
   });
 });
