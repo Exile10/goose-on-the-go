@@ -1,4 +1,7 @@
-jest.mock('@/services/pond-trust', () => ({ assertPondTrust: jest.fn().mockResolvedValue(undefined) }));
+jest.mock('@/services/pond-trust', () => ({
+  ...jest.requireActual('@/services/pond-trust'),
+  assertPondTrust: jest.fn().mockResolvedValue(undefined),
+}));
 /**
  * Tests for the API client's error surface.
  *
@@ -174,5 +177,92 @@ describe('local enrollment requests', () => {
       await expect(client.requestLocal(url, '/api/v1/remote-access/configuration')).rejects.toThrow();
     }
     expect(fetch).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * The client's half of the channel binding.
+ *
+ * The pin is what this connection is pinned to, so `pair` folding it into the
+ * proof is what stops the pin's own provenance mattering: a phone that pinned
+ * an interceptor's key fails the pair instead of completing one against the
+ * wrong Pond. That refusal is the Pond's; what is tested here is the other
+ * direction -- something that terminated this connection and invented an
+ * acceptance, which only the returned proof catches.
+ */
+describe('pair() channel binding', () => {
+  const PIN = 'sha256/TnkUsN+AaLec3BDTh/KUwSokXTmCq2+4rlfBnmJxPkE=';
+  const CHALLENGE = 'AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=';
+  const CODE = '482915';
+  const CLIENT_ID = 'install-abcdef';
+  const PROOF = '73171bac55bb3346045142bb0647057067d94712f5fab82d2260bf91c106ebe0';
+
+  /** init, then verify answering with `verify`. */
+  function pairingFetch(verify: Record<string, unknown>) {
+    return jest.fn(async (url: string, _init?: RequestInit) =>
+      new Response(
+        JSON.stringify(
+          String(url).endsWith('/init')
+            ? { challenge_id: 'c1', challenge: CHALLENGE, expires_at: '' }
+            : verify,
+        ),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      ),
+    );
+  }
+
+  const accepted = {
+    accepted: true,
+    session_token: 'session',
+    refresh_token: 'refresh',
+    hostname: 'nano',
+    server_version: 'test',
+    capabilities: [],
+    rejection_reason: null,
+  };
+
+  it('sends the pin and the bound MAC, and keeps the tokens when the proof checks out', async () => {
+    const fetch = pairingFetch({ ...accepted, server_proof: PROOF }); setFetch(fetch);
+    const client = new PondApiClient('https://192.168.1.7:4443');
+
+    const rotated = jest.fn(); client.setOnTokensRotated(rotated);
+
+    const resp = await client.pair({ clientId: CLIENT_ID, pairingCode: CODE, channelBinding: PIN });
+
+    expect(resp.accepted).toBe(true);
+    expect(rotated).toHaveBeenCalledWith('session', 'refresh');
+    const body = JSON.parse(String(fetch.mock.calls[1]?.[1]?.body));
+    expect(body.channel_binding).toBe(PIN);
+    expect(body.mac).toBe('2cc63017ff6979d0f1c4009a4f37c3c95bc2d535897fc2fb19a0a496f6a649aa');
+  });
+
+  // The interceptor's best remaining move once the Pond has refused its relay:
+  // answer the phone itself. It cannot produce the proof without the code.
+  it('rejects an acceptance whose proof is wrong, and keeps no token from it', async () => {
+    for (const server_proof of [undefined, '00'.repeat(32), `f${PROOF.slice(1)}`]) {
+      setFetch(pairingFetch({ ...accepted, server_proof }));
+      const client = new PondApiClient('https://192.168.1.7:4443');
+      const rotated = jest.fn(); client.setOnTokensRotated(rotated);
+      await expect(
+        client.pair({ clientId: CLIENT_ID, pairingCode: CODE, channelBinding: PIN }),
+      ).rejects.toThrow();
+      // Nothing is kept and nothing is persisted: the tokens in that response
+      // came from whoever answered, not from the Pond.
+      expect(rotated).not.toHaveBeenCalled();
+    }
+  });
+
+  // The dashboard, and a Pond older than the binding: no pin, the original
+  // transcript, and no proof to demand back.
+  it('sends the unbound MAC and asks for no proof when there is no pin', async () => {
+    const fetch = pairingFetch(accepted); setFetch(fetch);
+    const client = new PondApiClient('https://192.168.1.7:4443');
+
+    await expect(client.pair({ clientId: CLIENT_ID, pairingCode: CODE })).resolves.toMatchObject({
+      accepted: true,
+    });
+    const body = JSON.parse(String(fetch.mock.calls[1]?.[1]?.body));
+    expect(body.channel_binding).toBeNull();
+    expect(body.mac).toBe('b922abd25f5f1519c9d0f8ccabab4ed17b3e888a3b868be9cfdc320de017ec30');
   });
 });

@@ -1,4 +1,4 @@
-import { assertPondTrust, pondTrustFailed } from './pond-trust';
+import { assertPondTrust, PondTrustError, pondTrustFailed } from './pond-trust';
 import { isLocalPairingUrl, normalizeHttpsUrl } from '@/models/connection';
 /**
  * PondApiClient — HTTP client for goose-in-a-pond.
@@ -13,7 +13,16 @@ import { isLocalPairingUrl, normalizeHttpsUrl } from '@/models/connection';
  * before bubbling the error up to the caller.
  */
 
-import { concat, fromBase64, hmacSha256, toHex, utf8 } from './hmac';
+import {
+  CLIENT_LABEL,
+  equalHex,
+  fromBase64,
+  hmacSha256,
+  pairTranscript,
+  SERVER_LABEL,
+  toHex,
+  utf8,
+} from './hmac';
 import { timeoutSignal } from './http';
 import type {
   ActivityResponse,
@@ -84,6 +93,12 @@ export interface HandshakeResponse {
   server_version: string;
   capabilities: string[];
   rejection_reason: string | null;
+  /**
+   * The server's half of the channel binding: hex HMAC-SHA256 over the same
+   * transcript the client MACed, under `goose-pair-server-v1`. Present exactly
+   * when the accepted request carried a `channel_binding`.
+   */
+  server_proof?: string | null;
 }
 
 interface ChallengeResponse {
@@ -222,6 +237,7 @@ export class PondApiClient {
     challengeId: string;
     mac: string;
     deviceName?: string;
+    channelBinding?: string;
   }): Promise<HandshakeResponse> {
     const res = await this.send(`${this.baseUrl}/api/v1/handshake/verify`, {
       method: 'POST',
@@ -230,6 +246,7 @@ export class PondApiClient {
         challenge_id: input.challengeId,
         mac: input.mac,
         device_name: input.deviceName ?? null,
+        channel_binding: input.channelBinding ?? null,
       }),
     });
     if (!res.ok) {
@@ -250,18 +267,42 @@ export class PondApiClient {
     clientId: string;
     pairingCode: string;
     deviceName?: string;
+    /**
+     * The Pond public-key pin this connection is pinned to, folded into the
+     * proof so it is this pairing that certifies the key rather than the other
+     * way round. See {@link pairTranscript}.
+     */
+    channelBinding?: string;
   }): Promise<HandshakeResponse> {
     const epoch = this.identityEpoch;
     const init = await this.handshakeInit({ clientId: input.clientId });
     const challenge = fromBase64(init.challenge);
-    const message = concat(challenge, utf8(input.clientId));
-    const mac = toHex(hmacSha256(utf8(input.pairingCode), message));
+    const key = utf8(input.pairingCode);
+    const mac = toHex(
+      hmacSha256(key, pairTranscript(CLIENT_LABEL, challenge, input.clientId, input.channelBinding)),
+    );
     const resp = await this.handshakeVerify({
       challengeId: init.challenge_id,
       mac,
       deviceName: input.deviceName,
+      channelBinding: input.channelBinding,
     });
     if (epoch !== this.identityEpoch) throw new Error('Pond profile changed');
+    // The Pond's half. Without it, something that terminated this connection
+    // with its own certificate could invent an acceptance and a token of its
+    // own, and this phone would be paired with the interceptor. Only something
+    // holding the pairing code can produce the proof, so checking it is what
+    // makes a pin that arrived over an untrusted route safe to use.
+    if (input.channelBinding && resp.accepted) {
+      const expected = toHex(
+        hmacSha256(key, pairTranscript(SERVER_LABEL, challenge, input.clientId, input.channelBinding)),
+      );
+      if (!equalHex(resp.server_proof ?? '', expected)) {
+        this.token = null;
+        this.refreshToken = null;
+        throw new PondTrustError();
+      }
+    }
     if (resp.accepted && resp.session_token) {
       this.token = resp.session_token;
       this.refreshToken = resp.refresh_token ?? null;

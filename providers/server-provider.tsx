@@ -238,7 +238,11 @@ export function ServerProvider({ children }: PropsWithChildren) {
     const net = await NetInfo.fetch();
     if (!['wifi', 'ethernet'].includes(net.type)) throw new Error(i18n.t('pairing.lan'));
     if (op !== operation.current) throw new Error(i18n.t('pairing.failed'));
-    const resp = await pending.client.pair(opts);
+    // The staged pin is what this connection is pinned to, and folding it into
+    // the pairing proof is what makes the pin's own provenance stop mattering:
+    // the Pond refuses a pin that is not its own, so one that arrived over mDNS
+    // or a QR ends in a visible failure rather than a pair with the wrong Pond.
+    const resp = await pending.client.pair({ ...opts, channelBinding: pending.pin });
     if (op !== operation.current) throw new Error(i18n.t('pairing.failed'));
     if (resp.accepted && resp.session_token) {
       const next: Identity = { id: `${Date.now()}-${Math.random().toString(36).slice(2)}`, pin: pending.pin,
