@@ -5,8 +5,9 @@
  * iOS-style grouped settings sections linking to sub-screens.
  */
 
-import React, { useCallback } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
+  Alert,
   View,
   Text,
   StyleSheet,
@@ -16,6 +17,8 @@ import {
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { SafeAreaView } from 'react-native-safe-area-context';
+
+import { useServer } from '@/providers/server-provider';
 
 import { GIcon } from '@/components/ui/g-icon';
 import { PROFILE_NAV, type NavItem, type NavGroup } from '@/constants/navigation';
@@ -67,6 +70,36 @@ const sections = PROFILE_NAV.map((g) => ({
 export default function ProfileHub() {
   const router = useRouter();
   const { t } = useTranslation();
+  const { signOut } = useServer();
+  const [signingOut, setSigningOut] = useState(false);
+
+  /**
+   * Signing out is not undoable from the phone: it revokes this device's
+   * session on the Pond and releases its remote enrollment, so coming back
+   * means pairing at home again. Worth one question first.
+   */
+  const confirmSignOut = useCallback(() => {
+    Alert.alert(
+      t('profile.signOut'),
+      t('profile.signOutWarning'),
+      [
+        { text: t('profile.cancel'), style: 'cancel' },
+        {
+          text: t('profile.signOut'),
+          style: 'destructive',
+          onPress: () => {
+            setSigningOut(true);
+            // The provider clears stored credentials and reconfigures the
+            // connection, which puts the app back into `unpaired` -- and
+            // PairFirst takes it to pairing from there.
+            void signOut()
+              .catch(() => Alert.alert(t('profile.signOut'), t('profile.signOutFailed')))
+              .finally(() => setSigningOut(false));
+          },
+        },
+      ],
+    );
+  }, [signOut, t]);
 
   const handleNav = useCallback(
     (route: string) => {
@@ -127,8 +160,17 @@ export default function ProfileHub() {
         <Pressable style={styles.signOutBtn} onPress={() => router.push('/(stack)/remote-access')}>
           <Text style={styles.signOutText}>{t('remote.title')}</Text>
         </Pressable>
-        <Pressable style={styles.signOutBtn}>
-          <Text style={styles.signOutText}>Sign Out</Text>
+        {/* This had no handler at all: a button that looked like the way out
+            and did nothing when pressed. Signing out is also the only way to
+            release a remote enrollment the Pond still calls active, so its
+            absence stranded anyone whose phone needed re-enrolling. */}
+        <Pressable
+          accessibilityRole="button"
+          style={styles.signOutBtn}
+          disabled={signingOut}
+          onPress={confirmSignOut}
+        >
+          <Text style={styles.signOutText}>{signingOut ? t('profile.signingOut') : t('profile.signOut')}</Text>
         </Pressable>
         <Text style={styles.versionText}>Goose on the Go v0.2.0</Text>
         {/* Bottom spacer for tab bar */}

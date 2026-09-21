@@ -29,6 +29,11 @@ void i18n.use(initReactI18next).init({
       trust: 'Could not verify this Pond. Check its fingerprint on the Pond before pairing again.',
       unsupported: 'Secure Pond connections require an Android or iOS development or release build.',
     },
+    profile: {
+      signOut: 'Sign Out', signingOut: 'Signing out...', cancel: 'Cancel',
+      signOutWarning: 'This releases this phone\u2019s access to your Pond, including its remote access. You will need to pair again at home to come back.',
+      signOutFailed: 'Could not sign out. Your Pond may be unreachable \u2014 try again when you are on its network.',
+    },
     pairing: {
       lan: 'Connect to the same home network as your Pond to pair.',
       invalid: 'Scan a current HTTPS pairing QR code from your Pond.',
