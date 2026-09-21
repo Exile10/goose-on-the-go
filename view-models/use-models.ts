@@ -10,6 +10,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useServer } from '@/providers/server-provider';
 import { ApiError, api } from '@/services/api-client';
 import type { ModelEntry } from '@/services/types';
+import { describeApiError } from './describe-error';
 
 /**
  * Providers that run the model on the Pond itself.
@@ -114,10 +115,8 @@ export function useModels(): UseModels {
 }
 
 function describe(e: unknown): string {
-  if (e instanceof ApiError) {
-    if (e.status === 404) return 'This Pond does not expose a model catalogue.';
-    if (e.isRetryable) return 'Your Pond is busy. Try again in a moment.';
-    return `Your Pond refused the request (HTTP ${e.status}).`;
+  if (e instanceof ApiError && e.status === 404) {
+    return 'This Pond does not expose a model catalogue.';
   }
-  return 'Could not reach your Pond. Check that it is running on this network.';
+  return describeApiError(e);
 }

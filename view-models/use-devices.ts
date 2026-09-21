@@ -12,6 +12,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useServer } from '@/providers/server-provider';
 import { ApiError, api } from '@/services/api-client';
 import type { Device, DeviceStatePatch, MatterStatus } from '@/services/types';
+import { describeApiError } from './describe-error';
 
 /**
  * Read a device's power state out of `get_device_state`'s text.
@@ -251,10 +252,8 @@ function describeDeviceError(e: unknown): string {
   if (e instanceof ApiError) {
     if (e.status === 404) return 'That device is no longer registered with your Pond.';
     if (e.status === 409) return 'Your Pond will not remove a bridged endpoint on its own.';
-    if (e.isRetryable) return 'Your Pond is busy. Try again in a moment.';
-    return `Your Pond refused the request (HTTP ${e.status}).`;
   }
-  return 'Could not reach your Pond. Check that it is running on this network.';
+  return describeApiError(e);
 }
 
 /**
@@ -276,6 +275,6 @@ export function describeCommissionError(e: unknown): string {
     case 400:
       return 'That setup code was not accepted. Check the code on the device or its packaging.';
     default:
-      return `Commissioning failed (HTTP ${e.status}).`;
+      return describeApiError(e);
   }
 }

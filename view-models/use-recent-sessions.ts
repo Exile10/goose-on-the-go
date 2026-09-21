@@ -8,8 +8,9 @@
 import { useCallback, useEffect, useState } from 'react';
 
 import { useServer } from '@/providers/server-provider';
-import { ApiError, api } from '@/services/api-client';
+import { api } from '@/services/api-client';
 import type { SessionSummary } from '@/services/types';
+import { describeApiError } from './describe-error';
 
 /** How many the home strip shows. The screen has room for a handful. */
 const RECENT_LIMIT = 3;
@@ -66,11 +67,7 @@ export function useRecentSessions(): UseRecentSessions {
       const all = await api.listSessions();
       setSessions(all.slice(0, RECENT_LIMIT).map(toRecent));
     } catch (e) {
-      setError(
-        e instanceof ApiError
-          ? `Could not load recent conversations (HTTP ${e.status}).`
-          : 'Could not reach your Pond.',
-      );
+      setError(describeApiError(e));
     } finally {
       setLoading(false);
     }

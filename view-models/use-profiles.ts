@@ -12,6 +12,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useServer } from '@/providers/server-provider';
 import { ApiError, api } from '@/services/api-client';
 import type { Profile } from '@/services/types';
+import { describeApiError } from './describe-error';
 
 export interface UseProfiles {
   data: { profiles: Profile[] };
@@ -86,10 +87,8 @@ export function useProfiles(): UseProfiles {
 }
 
 function describe(e: unknown): string {
-  if (e instanceof ApiError) {
-    if (e.status === 409) return 'A profile with that name already exists.';
-    if (e.isRetryable) return 'Your Pond is busy. Try again in a moment.';
-    return `Your Pond refused the request (HTTP ${e.status}).`;
+  if (e instanceof ApiError && e.status === 409) {
+    return 'A profile with that name already exists.';
   }
-  return 'Could not reach your Pond. Check that it is running on this network.';
+  return describeApiError(e);
 }

@@ -33,6 +33,7 @@ import { getInstallId } from '@/services/install-id';
 import { takePairingPayload } from '@/services/pairing-handoff';
 import { findPondAt, type DiscoveredPond } from '@/services/discovery';
 import { useDiscovery } from '@/view-models/use-discovery';
+import { describeApiError } from '@/view-models/describe-error';
 
 type Step = 0 | 1 | 2 | 3;
 const STEP_LABELS = ['Find Pond', 'Pairing Code', 'Name Device', 'Complete'];
@@ -451,7 +452,7 @@ function describeTransportFailure(e: unknown): string {
     if (e.status >= 500) {
       return 'Your Pond returned an error while pairing. Check that it is still running, then try again.';
     }
-    return `Your Pond refused the pairing request (HTTP ${e.status}).`;
+    return describeApiError(e);
   }
   return 'Could not reach your Pond. Check that the phone is on the same network and the server is running.';
 }
