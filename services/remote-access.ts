@@ -61,7 +61,9 @@ export async function disableRemoteAccess(): Promise<void> {
 }
 export async function enableRemoteAccess(profileId: string, localUrl: string, progress: (value: RemoteProgress) => void,
   commit: (endpoint: string, control: string, current: () => void) => Promise<void>,
-  recovery?: { onReview: (id: string) => void }): Promise<void> {
+  recovery?: { onReview: (id: string) => void },
+  /** When this device's remote access lapses if it does not come home. */
+  onLapse?: (lapsesAt: string | null) => void): Promise<void> {
   if (busy) throw new Error(i18n.t('remote.busy'));
   if (!isLocalPairingUrl(localUrl)) throw new Error(i18n.t('pairing.lan'));
   const current = ++generation;
@@ -72,7 +74,8 @@ export async function enableRemoteAccess(profileId: string, localUrl: string, pr
   let committed = false;
   try {
     check();
-    const config = await api.requestLocal<{ enabled: boolean; controlUrl: string }>(localUrl, '/api/v1/remote-access/configuration');
+    const config = await api.requestLocal<{ enabled: boolean; controlUrl: string; lapsesAt?: string | null }>(localUrl, '/api/v1/remote-access/configuration');
+    onLapse?.(config.lapsesAt ?? null);
     check();
     if (!config.controlUrl?.trim()) throw new RemoteInfrastructureUnavailableError();
     if (!config.enabled) { progress('approval'); throw new Error(i18n.t('remote.approval')); }

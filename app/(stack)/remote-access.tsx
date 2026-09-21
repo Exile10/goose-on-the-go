@@ -22,6 +22,8 @@ export default function RemoteAccessScreen() {
 const styles = StyleSheet.create({
   page: { flex: 1, padding: 28, paddingTop: 80, gap: 24, backgroundColor: '#FAFAFA' },
   title: { fontSize: 28, fontWeight: '600' }, body: { fontSize: 16, lineHeight: 24, color: '#444444' },
-  error: { fontSize: 16, color: '#A02020' }, primary: { padding: 18, borderRadius: 12, backgroundColor: '#6030A0', alignItems: 'center' },
+  error: { fontSize: 16, color: '#A02020' },
+  warning: { fontSize: 16, color: '#8A5A00', lineHeight: 24 },
+  primary: { padding: 18, borderRadius: 12, backgroundColor: '#6030A0', alignItems: 'center' },
   primaryText: { color: '#FFFFFF', fontSize: 16 }, secondary: { padding: 18, alignItems: 'center' },
 });

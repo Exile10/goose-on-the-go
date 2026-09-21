@@ -9,6 +9,7 @@ import {
 } from '@/services/remote-access';
 import { ApiError } from '@/services/api-client';
 import i18n from '@/services/i18n';
+import { describeLapse, lapseIn } from '@/models/lapse';
 
 /**
  * Turn a failure into something worth reading.
@@ -58,6 +59,7 @@ export function useRemoteAccess() {
   const [error, setError] = useState<string | null>(null);
   const [reviewId, setReviewId] = useState<string | null>(null);
   const [setupUnavailable, setSetupUnavailable] = useState(false);
+  const [lapsesAt, setLapsesAt] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const alive = useRef(true);
   useEffect(() => { alive.current = true; return () => { alive.current = false; void cancelRemoteAccess().catch(() => undefined); }; }, []);
@@ -69,7 +71,8 @@ export function useRemoteAccess() {
         async (endpoint, control, current) => {
           if (!alive.current) throw new Error(i18n.t('remote.cancelled'));
           await setRemoteEndpoint(endpoint, control, current);
-        }, recovery ? { onReview: (id) => { if (alive.current) setReviewId(id); } } : undefined);
+        }, recovery ? { onReview: (id) => { if (alive.current) setReviewId(id); } } : undefined,
+        (at) => { if (alive.current) setLapsesAt(at); });
     } catch (cause) {
       if (alive.current) {
         const { message, unavailable } = describeRemoteFailure(cause);
@@ -82,5 +85,8 @@ export function useRemoteAccess() {
     try { await keepLocalOnly(); return true; }
     catch { if (alive.current) setError(i18n.t('remote.failed')); return false; }
   }, [keepLocalOnly]);
-  return { setupUnavailable, reviewId, recover: () => start(true), progress: remoteEnabled ? 'enabled' as const : progress, error, busy, enable: () => start(false), localOnly };
+  // Shown whether or not anything failed: the point is to say it before access
+  // lapses, and nothing has gone wrong yet at that stage.
+  const lapse = describeLapse(lapseIn(lapsesAt));
+  return { setupUnavailable, reviewId, lapse, recover: () => start(true), progress: remoteEnabled ? 'enabled' as const : progress, error, busy, enable: () => start(false), localOnly };
 }
