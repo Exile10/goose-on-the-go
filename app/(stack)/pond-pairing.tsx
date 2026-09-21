@@ -600,6 +600,9 @@ export default function PondPairingScreen() {
         });
         if (resp.accepted) {
           setCompletionState('ok');
+          // Leave on success rather than waiting to be dismissed. The wizard
+          // has nothing left to say and the app has somewhere to be.
+          router.replace('/(tabs)');
         } else {
           setCompletionState('error');
           setCompletionReason(explainRejection(resp.rejection_reason));
@@ -611,7 +614,7 @@ export default function PondPairingScreen() {
         setCompletionReason(e instanceof ApiError && e.status === 403 ? i18n.t('pairing.lan') : describeTransportFailure(e));
       }
     },
-    [code, pair],
+    [code, pair, router],
   );
 
   const onServerNext = useCallback(async (url: string, pin: string) => {
@@ -625,7 +628,15 @@ export default function PondPairingScreen() {
     setStep(2);
   }, []);
 
-  const done = useCallback(() => router.replace('/(stack)/remote-access'), [router]);
+  // Home, and replacing rather than pushing, so a finished wizard is not left
+  // sitting in the stack. It used to wait on the Done button and then go to
+  // remote access; anyone who reached for the Home tab instead came back later
+  // to a pairing screen that had already succeeded.
+  //
+  // Remote access is not offered here any more. It is one tap away under
+  // Profile, and a wizard that has just finished is the wrong moment to ask a
+  // second question.
+  const done = useCallback(() => router.replace('/(tabs)'), [router]);
 
   return (
     <GKeyboardView style={styles.container}>
