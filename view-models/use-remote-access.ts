@@ -1,7 +1,37 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useServer } from '@/providers/server-provider';
 import { cancelRemoteAccess, enableRemoteAccess, RemoteInfrastructureUnavailableError, type RemoteProgress } from '@/services/remote-access';
+import { ApiError } from '@/services/api-client';
 import i18n from '@/services/i18n';
+
+/**
+ * Turn a failure into something worth reading.
+ *
+ * Every error `remote-access.ts` raises on purpose is already worded for a
+ * person, so its message is shown as-is. An `ApiError` is not: its message is
+ * built for a log line, and `POST /api/v1/remote-access/enrollment -> 503`
+ * reached the screen exactly as written. It is mapped by status instead, and
+ * anything unrecognised falls back to the generic failure rather than leaking
+ * whatever string it happened to carry.
+ *
+ * Returns the copy and whether setting up again could plausibly help: a 503 is
+ * the Pond saying it cannot reach coordination at all, which the Recover button
+ * cannot fix, so that button is hidden for it.
+ */
+export function describeRemoteFailure(cause: unknown): { message: string; unavailable: boolean } {
+  if (cause instanceof RemoteInfrastructureUnavailableError) {
+    return { message: cause.message, unavailable: true };
+  }
+  if (cause instanceof ApiError) {
+    if (cause.status === 503) return { message: i18n.t('remote.unconfigured'), unavailable: true };
+    if (cause.status === 401 || cause.status === 403) {
+      return { message: i18n.t('remote.approval'), unavailable: false };
+    }
+    return { message: i18n.t('remote.failed'), unavailable: false };
+  }
+  if (cause instanceof Error && cause.message) return { message: cause.message, unavailable: false };
+  return { message: i18n.t('remote.failed'), unavailable: false };
+}
 export function useRemoteAccess() {
   const { profileId, serverUrl, setRemoteEndpoint, keepLocalOnly, remoteEnabled } = useServer();
   const [progress, setProgress] = useState<RemoteProgress | null>(null);
@@ -22,8 +52,9 @@ export function useRemoteAccess() {
         }, recovery ? { onReview: (id) => { if (alive.current) setReviewId(id); } } : undefined);
     } catch (cause) {
       if (alive.current) {
-        setSetupUnavailable(cause instanceof RemoteInfrastructureUnavailableError);
-        setError(cause instanceof Error ? cause.message : i18n.t('remote.failed'));
+        const { message, unavailable } = describeRemoteFailure(cause);
+        setSetupUnavailable(unavailable);
+        setError(message);
       }
     } finally { if (alive.current) setBusy(false); }
   }, [busy, profileId, serverUrl, setRemoteEndpoint, keepLocalOnly, remoteEnabled]);
