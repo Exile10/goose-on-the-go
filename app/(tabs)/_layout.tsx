@@ -7,7 +7,9 @@
 
 import React from 'react';
 import { View, StyleSheet, Platform } from 'react-native';
-import { Tabs } from 'expo-router';
+import { Redirect, Tabs } from 'expo-router';
+
+import { useServer } from '@/providers/server-provider';
 
 import { HapticTab } from '@/components/haptic-tab';
 import { GIcon } from '@/components/ui/g-icon';
@@ -40,6 +42,23 @@ function TabBarBackground() {
 }
 
 export default function TabLayout() {
+  const { hydrated, profileId } = useServer();
+
+  // Nothing in this app works without a paired Pond, so an app that has none
+  // reaches none of it. A fresh install and a phone that just signed out land
+  // in the same place: pairing, and only pairing.
+  //
+  // Keyed on whether there is a stored identity, not on the connection state.
+  // `configure` publishes `unpaired` at the start of every reconfiguration --
+  // including the one that enables remote access -- so a guard watching the
+  // connection would throw somebody onto the pairing screen in the middle of
+  // setting remote access up, which is what the previous attempt did.
+  //
+  // `hydrated` is what says the stored identity has been read back. Without
+  // it, every cold start would bounce through pairing before discovering it is
+  // already paired.
+  if (hydrated && !profileId) return <Redirect href="/(stack)/pond-pairing" />;
+
   return (
     <Tabs
       screenOptions={{
