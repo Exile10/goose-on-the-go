@@ -32,9 +32,8 @@ export default function StackLayout() {
       <Stack.Screen name="photo-upload" options={{ title: i18n.t('nav.photoUpload') }} />
       <Stack.Screen name="add-users" options={{ title: i18n.t('nav.addUsers') }} />
       <Stack.Screen name="biometrics" options={{ title: i18n.t('screens.biometrics') }} />
-      <Stack.Screen name="backup" options={{ title: i18n.t('nav.backup') }} />
-      <Stack.Screen name="restore" options={{ title: i18n.t('nav.restore') }} />
       <Stack.Screen name="privacy" options={{ title: i18n.t('nav.privacy') }} />
+      <Stack.Screen name="remote-access" options={{ title: i18n.t('nav.remoteAccess') }} />
       <Stack.Screen name="home-management" options={{ title: i18n.t('nav.homeManagement') }} />
       <Stack.Screen name="pond-pairing" options={{ title: i18n.t('screens.pondPairing') }} />
       <Stack.Screen name="developer" options={{ title: i18n.t('screens.developer') }} />

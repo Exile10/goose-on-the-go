@@ -58,8 +58,6 @@ export const PROFILE_NAV: NavGroup[] = [
   {
     groupKey: 'nav.groupPrivacy',
     items: [
-      { id: 'backup', labelKey: 'nav.backup', icon: 'cloud', route: '/(stack)/backup' },
-      { id: 'restore', labelKey: 'nav.restore', icon: 'restore', route: '/(stack)/restore' },
       { id: 'privacy', labelKey: 'nav.privacy', icon: 'shield', route: '/(stack)/privacy' },
     ],
   },
