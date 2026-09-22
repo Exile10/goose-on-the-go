@@ -1,4 +1,7 @@
 jest.mock('../api-client', () => ({ api: { requestLocal: jest.fn() } }));
+// The node's directory, and so its identity to the coordinator, follows the
+// install rather than the pairing -- see nodeIdentity in ../remote-access.
+jest.mock('../install-id', () => ({ getInstallId: jest.fn(async () => 'install-0001') }));
 import i18n from '../i18n';
 import { AppState, NativeModules } from 'react-native';
 import { api } from '../api-client';
@@ -36,7 +39,9 @@ it('submits registration once and commits only a pinned-Pond supplied address', 
   const commit = jest.fn(async () => undefined);
   const result = enableRemoteAccess('profile', local, jest.fn(), commit);
   await jest.advanceTimersByTimeAsync(1000); await result;
-  expect(bridge.beginRemote).toHaveBeenCalledWith('profile', control);
+  // The pairing id is deliberately not what the node is named after: it changes
+  // on every pairing, which minted a fresh coordinator node each time.
+  expect(bridge.beginRemote).toHaveBeenCalledWith('install-0001', control);
   expect(jest.mocked(api.requestLocal).mock.calls.every(([endpoint]) => endpoint === local)).toBe(true);
   expect(jest.mocked(api.requestLocal).mock.calls.filter(([_endpoint, path]) => path.endsWith('/enrollment'))).toHaveLength(1);
   expect(commit).toHaveBeenCalledWith('https://100.64.0.1:4443', control, expect.any(Function));
@@ -59,7 +64,7 @@ it('rejects a stale enrollment result after cancellation', async () => {
 });
 it('restores only the saved profile transport before use, and stops for local-only', async () => {
   await restoreRemoteAccess('saved', control); await restoreRemoteAccess('saved', '');
-  expect(bridge.activateRemote.mock.calls).toEqual([['saved', control], ['saved', '']]);
+  expect(bridge.activateRemote.mock.calls).toEqual([['install-0001', control], ['install-0001', '']]);
 });
 
 // The node runs in the app process, so returning to the foreground is the first moment
@@ -68,7 +73,7 @@ it('restores only the saved profile transport before use, and stops for local-on
 it('restarts the embedded node when it did not survive the background', async () => {
   bridge.remoteStatus.mockResolvedValueOnce(JSON.stringify({ state: 'Stopped', addresses: [] }));
   await expect(resumeRemoteAccess('saved', control)).resolves.toBe(true);
-  expect(bridge.activateRemote.mock.calls).toEqual([['saved', control]]);
+  expect(bridge.activateRemote.mock.calls).toEqual([['install-0001', control]]);
 });
 it('leaves a node that survived the background alone', async () => {
   await expect(resumeRemoteAccess('saved', control)).resolves.toBe(false);
@@ -84,7 +89,7 @@ it('asks nothing of the bridge for a local-only profile', async () => {
 it('restarts when the node status cannot be read', async () => {
   bridge.remoteStatus.mockRejectedValueOnce(new Error('bridge gone'));
   await expect(resumeRemoteAccess('saved', control)).resolves.toBe(true);
-  expect(bridge.activateRemote.mock.calls).toEqual([['saved', control]]);
+  expect(bridge.activateRemote.mock.calls).toEqual([['install-0001', control]]);
 });
 
 it('requires an explicit recovery request, waits for local approval and executes once', async () => {
@@ -133,4 +138,16 @@ it('never replays an ambiguous replacement and preserves the saved profile', asy
   await expect(enableRemoteAccess('new-local-profile', local, jest.fn(), commit, { onReview: jest.fn() })).rejects.toThrow('replacement response lost');
   expect(commit).not.toHaveBeenCalled();
   expect(jest.mocked(api.requestLocal).mock.calls.filter(([, path, init]) => path.endsWith(id) && init?.method === 'POST')).toHaveLength(1);
+});
+
+// The leak this prevents: providers/server-provider.tsx mints a profile id from
+// the clock on every pairing, and the node's state directory was named after it,
+// so a phone paired five times left five registrations on the coordinator with
+// nothing able to remove them. Two different pairings must reach the same node.
+it('keeps one node identity across pairings, rather than one per pairing', async () => {
+  await restoreRemoteAccess('pairing-one', control);
+  await restoreRemoteAccess('pairing-two', control);
+  const names = bridge.activateRemote.mock.calls.map(([name]) => name);
+  expect(new Set(names).size).toBe(1);
+  expect(names[0]).toBe('install-0001');
 });

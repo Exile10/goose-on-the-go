@@ -3,6 +3,7 @@ import { AppState, NativeModules } from 'react-native';
 import { ApiError, api } from './api-client';
 import { isLocalPairingUrl, normalizeHttpsUrl } from '@/models/connection';
 import i18n from './i18n';
+import { getInstallId } from './install-id';
 
 /** Setup cannot proceed until the operator configures remote infrastructure. */
 /**
@@ -38,6 +39,29 @@ async function cancelPendingRecovery(): Promise<void> {
   if (pending) await api.requestLocal(pending.endpoint, `/api/v1/remote-access/recovery/${pending.id}`, { method: 'DELETE' })
     .catch(() => console.warn('[remote] recovery cancellation could not reach Pond; approval will expire'));
 }
+/**
+ * The name of the embedded node's state directory, and so of its identity.
+ *
+ * This used to be the profile id, which providers/server-provider.tsx mints
+ * fresh on every pairing from the clock and a random number. Every re-pair
+ * therefore produced a new node key and a new registration on the coordinator,
+ * and nothing removes those: a phone paired five times leaves five nodes, its
+ * tailnet address climbing each time. The ACL only ever admits the current
+ * address, so the strays reach nothing, but they accumulate for as long as the
+ * household keeps re-pairing.
+ *
+ * The install id is the identifier this app already uses to mean "this phone
+ * across re-pairings" -- services/install-id.ts exists so the Pond recognises a
+ * returning device rather than accumulating rows for it. The node had simply not
+ * been given the same treatment.
+ *
+ * Re-pairing still needs the Pond's approval to get an address; that lives in
+ * the enrollment exchange, not in this name.
+ */
+async function nodeIdentity(): Promise<string> {
+  return (await getInstallId()).replace(/[^A-Za-z0-9_-]/g, '');
+}
+
 export type RemoteProgress = 'approval' | 'review' | 'enrolling' | 'connecting' | 'enabled';
 const native = () => {
   if (!NativeModules.PondTls?.beginRemote) throw new Error(i18n.t('remote.unsupported'));
@@ -84,7 +108,7 @@ export async function enableRemoteAccess(profileId: string, localUrl: string, pr
     if (!config.enabled) { progress('approval'); throw new Error(i18n.t('remote.approval')); }
     const control = normalizeHttpsUrl(config.controlUrl);
     progress('enrolling');
-    let state = status(await native().beginRemote(profileId, control));
+    let state = status(await native().beginRemote(await nodeIdentity(), control));
     check();
     let submitted = false;
     for (let attempt = 0; attempt < 30; attempt++) {
@@ -198,5 +222,5 @@ export async function restoreRemoteAccess(profileId: string, control: string): P
     if (control) throw new Error(i18n.t('remote.unsupported'));
     return;
   }
-  await NativeModules.PondTls.activateRemote(profileId, control);
+  await NativeModules.PondTls.activateRemote(await nodeIdentity(), control);
 }
