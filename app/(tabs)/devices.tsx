@@ -52,10 +52,10 @@ function styleFor(device: Device) {
  * inventing a state.
  */
 function detailFor(device: Device, power: boolean | undefined): string {
-  if (!device.is_online) return 'Offline';
-  if (power !== undefined) return power ? 'On' : 'Off';
+  if (!device.is_online) return i18n.t('devices.stateOffline');
+  if (power !== undefined) return power ? i18n.t('devices.stateOn') : i18n.t('devices.stateOff');
   // Online is reachability, not power — a different fact, and labelled as one.
-  return 'Online';
+  return i18n.t('devices.stateOnline');
 }
 
 /** Device card. The switch appears only for devices that accept one. */

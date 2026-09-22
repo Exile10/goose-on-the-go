@@ -13,6 +13,7 @@ import { useServer } from '@/providers/server-provider';
 import { ApiError, api } from '@/services/api-client';
 import type { Device, DeviceStatePatch, MatterStatus } from '@/services/types';
 import { describeApiError } from './describe-error';
+import i18n from '@/services/i18n';
 
 /**
  * Read a device's power state out of `get_device_state`'s text.
@@ -250,8 +251,8 @@ export function useDevices(): UseDevices {
 
 function describeDeviceError(e: unknown): string | null {
   if (e instanceof ApiError) {
-    if (e.status === 404) return 'That device is no longer registered with your Pond.';
-    if (e.status === 409) return 'Your Pond will not remove a bridged endpoint on its own.';
+    if (e.status === 404) return i18n.t('errors.deviceGone');
+    if (e.status === 409) return i18n.t('errors.bridgedEndpoint');
   }
   return describeApiError(e);
 }
@@ -268,11 +269,11 @@ export function describeCommissionError(e: unknown): string | null {
   if (!(e instanceof ApiError)) return null;
   switch (e.status) {
     case 503:
-      return 'Your Pond is still starting its Matter controller. Wait a moment and try again.';
+      return i18n.t('devices.matterStartingRetry');
     case 502:
-      return 'Your Pond could not reach its Matter controller, or the device refused to pair. Power-cycle the device and try again — a device only accepts pairing for about 15 minutes after it starts up.';
+      return i18n.t('devices.matterRefused');
     case 400:
-      return 'That setup code was not accepted. Check the code on the device or its packaging.';
+      return i18n.t('devices.setupCodeRejected');
     default:
       return describeApiError(e);
   }

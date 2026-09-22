@@ -18,7 +18,7 @@ const i18next = require('eslint-plugin-i18next');
  *
  * See docs/I18N.md.
  */
-const TRANSLATED_SURFACE = ['app/**/*.tsx', 'components/**/*.tsx', 'view-models/**/*.ts'];
+const TRANSLATED_SURFACE = ['app/**/*.tsx', 'components/**/*.tsx', 'view-models/**/*.ts', 'constants/**/*.ts'];
 
 module.exports = defineConfig([
   expoConfig,
@@ -27,12 +27,23 @@ module.exports = defineConfig([
   },
   {
     files: TRANSLATED_SURFACE,
+    // Tests assert on copy; they are not copy.
+    ignores: ['**/__tests__/**'],
     plugins: { i18next },
     rules: {
       'i18next/no-literal-string': ['error', {
-        // `jsx-text-only` would miss the literal in `{matter ? t('…') : 'Enter the code
-        // instead'}`, and copy hides in that shape throughout these screens.
-        mode: 'jsx-only',
+        // `jsx-only` was not enough, and the gap was not subtle: it inspects JSX text and
+        // JSX attributes, so copy living in a data structure -- `{ label: '4 Active' }`, a
+        // navigation entry, an error string returned from a view-model -- was never looked
+        // at. Whole screens read as clean while most of their copy sat in a const above
+        // them.
+        mode: 'all',
+        // `all` means every literal, so the copy-bearing property names have to be named
+        // or the rule drowns in style tokens and route ids.
+        'object-properties': {
+          include: ['label', 'title', 'desc', 'description', 'detail', 'subtitle', 'hint', 'message', 'placeholder', 'headerTitle', 'text'],
+        },
+        callees: { exclude: ['console.*', 'require', 'Error', 'i18n.t', 't'] },
         // Only attributes that render as copy. Left unrestricted this also flags
         // `variant="primary"` and `name="camera"`, and a rule that cries wolf is a rule
         // somebody switches off.
@@ -47,7 +58,17 @@ module.exports = defineConfig([
         // `^…$`. A leading `^` therefore produces `^^…$` and silently matches nothing, so
         // the trailing `.*` is load-bearing rather than decorative.
         words: {
-          exclude: ['https?://.*', 'sha256/.*', '[^a-zA-Z]+'],
+          exclude: [
+            'https?://.*', 'sha256/.*', '[^a-zA-Z]+',
+            // A single lowercase token is an identifier in this codebase, never copy:
+            // state enums ('idle', 'searching'), capability names ('power'), theme and
+            // layout values ('dark', 'window'), route and screen ids. Copy starts with a
+            // capital or contains a space, so this separates them without a wordlist that
+            // would need maintaining.
+            '[a-z][a-zA-Z0-9_.-]*',
+            // Route paths and hex colours, for the same reason.
+            '/[^ ]*', '#[0-9a-fA-F]{3,8}',
+          ],
         },
       }],
     },

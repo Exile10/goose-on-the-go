@@ -36,16 +36,16 @@ export default function BiometricsScreen() {
   const [methods, setMethods] = useState<BiometricMethod[]>([
     {
       id: 'face',
-      title: 'Face Recognition',
-      description: 'Identify household members by face using the Pond camera. Works locally — no cloud processing.',
+      title: i18n.t('biometricsMethods.faceTitle'),
+      description: i18n.t('biometricsMethods.faceDesc'),
       icon: 'face',
       state: 'enrolled',
       enabled: true,
     },
     {
       id: 'voice',
-      title: 'Voice Recognition',
-      description: 'Identify who is speaking to personalize responses and apply per-user permissions.',
+      title: i18n.t('biometricsMethods.voiceTitle'),
+      description: i18n.t('biometricsMethods.voiceDesc'),
       icon: 'mic',
       state: 'not_enrolled',
       enabled: false,

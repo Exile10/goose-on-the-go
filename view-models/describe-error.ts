@@ -12,6 +12,7 @@
  */
 
 import { ApiError } from '@/services/api-client';
+import i18n from '@/services/i18n';
 
 /**
  * The shared reading of a failed request, in words rather than a code.
@@ -34,6 +35,6 @@ export function describeApiError(e: unknown): string | null {
   // is the same fact twice.
   if (!(e instanceof ApiError)) return null;
   if (e.status === 401 || e.status === 403) return null;
-  if (e.isRetryable) return 'Your Pond is busy. Try again in a moment.';
-  return 'Your Pond could not complete that request.';
+  if (e.isRetryable) return i18n.t('errors.busy');
+  return i18n.t('errors.generic');
 }

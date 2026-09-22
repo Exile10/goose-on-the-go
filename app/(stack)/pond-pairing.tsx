@@ -432,35 +432,35 @@ function describeTransportFailure(e: unknown): string {
     if (e.status === 429) {
       const wait = e.retryAfterSecs;
       return wait
-        ? `Your Pond is rate-limiting pairing attempts. Wait ${wait} second${wait === 1 ? '' : 's'} and try again.`
-        : 'Your Pond is rate-limiting pairing attempts. Wait a minute and try again.';
+        ? i18n.t('pairingErrors.rateLimited', { count: wait, plural: wait === 1 ? '' : 's' })
+        : i18n.t('pairingErrors.rateLimitedNoHint');
     }
     if (e.status >= 500) {
-      return 'Your Pond returned an error while pairing. Check that it is still running, then try again.';
+      return i18n.t('pairingErrors.serverError');
     }
     // The wizard runs before there is a session to revoke, so a refusal here
     // is about this attempt and the screen has to say so itself.
     return (
       describeApiError(e) ??
-      'Your Pond refused the pairing request. Check the code on its dashboard and try again.'
+      i18n.t('pairingErrors.refused')
     );
   }
-  return 'Could not reach your Pond. Check that the phone is on the same network and the server is running.';
+  return i18n.t('pairingErrors.unreachable');
 }
 
 function explainRejection(reason: string | null): string {
   switch (reason) {
     case 'invalid_mac':
     case 'bad_mac_hex':
-      return 'That pairing code did not match. Check the six digits on your Pond and try again \u2014 a wrong code costs nothing but this attempt.';
+      return i18n.t('pairingErrors.badCode');
     case 'challenge_expired':
     case 'challenge_used':
     case 'unknown_challenge':
-      return 'This attempt took too long \u2014 the server holds a challenge for only 60 seconds. Enter the same code again; you do not need a new one.';
+      return i18n.t('pairingErrors.expired');
     case 'no_active_pairing_code':
-      return 'Your Pond has no pairing code right now. Codes last 10 minutes \u2014 open the dashboard on the host machine to show a fresh one.';
+      return i18n.t('pairingErrors.noCode');
     default:
-      return 'The server rejected the pairing attempt. Double-check the code and try again.';
+      return i18n.t('pairingErrors.rejected');
   }
 }
 

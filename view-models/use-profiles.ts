@@ -13,6 +13,7 @@ import { useServer } from '@/providers/server-provider';
 import { ApiError, api } from '@/services/api-client';
 import type { Profile } from '@/services/types';
 import { describeApiError } from './describe-error';
+import i18n from '@/services/i18n';
 
 export interface UseProfiles {
   data: { profiles: Profile[] };
@@ -88,7 +89,7 @@ export function useProfiles(): UseProfiles {
 
 function describe(e: unknown): string | null {
   if (e instanceof ApiError && e.status === 409) {
-    return 'A profile with that name already exists.';
+    return i18n.t('errors.profileExists');
   }
   return describeApiError(e);
 }

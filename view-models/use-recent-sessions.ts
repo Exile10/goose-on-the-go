@@ -11,6 +11,7 @@ import { useServer } from '@/providers/server-provider';
 import { api } from '@/services/api-client';
 import type { SessionSummary } from '@/services/types';
 import { describeApiError } from './describe-error';
+import i18n from '@/services/i18n';
 
 /** How many the home strip shows. The screen has room for a handful. */
 const RECENT_LIMIT = 3;
@@ -24,12 +25,12 @@ export function formatRelativeTime(iso: string, now = Date.now()): string {
   if (Number.isNaN(then)) return '';
 
   const minutes = Math.floor((now - then) / 60_000);
-  if (minutes < 1) return 'Just now';
+  if (minutes < 1) return i18n.t('sessions.justNow');
   if (minutes < 60) return `${minutes}m ago`;
 
   const hours = Math.floor(minutes / 60);
   if (hours < 24) return `${hours}h ago`;
-  if (hours < 48) return 'Yesterday';
+  if (hours < 48) return i18n.t('sessions.yesterday');
 
   const days = Math.floor(hours / 24);
   if (days < 7) return `${days}d ago`;
@@ -89,7 +90,7 @@ export function useRecentSessions(): UseRecentSessions {
 function toRecent(s: SessionSummary): RecentSession {
   return {
     id: s.id,
-    text: s.title?.trim() || s.preview?.trim() || 'Untitled conversation',
+    text: s.title?.trim() || s.preview?.trim() || i18n.t('sessions.untitled'),
     time: formatRelativeTime(s.updated_at),
   };
 }

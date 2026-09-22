@@ -20,6 +20,7 @@ import { Grey, JaridaPurple, Brand, Semantic } from '@/constants/colors';
 import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
 import { Spacing } from '@/constants/spacing';
 import { Radii } from '@/constants/radii';
+import i18n from '@/services/i18n';
 
 const CATEGORY_TABS: Array<MemoryCategory | 'All'> = ['All', 'Preference', 'Habit', 'Person', 'Reminder'];
 
@@ -67,6 +68,7 @@ const MemoryCard = React.memo(function MemoryCard({
 
 export default function MemoriesScreen() {
   const [memories, setMemories] = useState(SAMPLE_MEMORIES);
+  // eslint-disable-next-line i18next/no-literal-string -- 'All' is the filter value, not copy
   const [activeCategory, setActiveCategory] = useState<MemoryCategory | 'All'>('All');
 
   const filtered = activeCategory === 'All'
@@ -108,7 +110,7 @@ export default function MemoriesScreen() {
             onPress={() => setActiveCategory(tab)}
           >
             <Text style={[styles.tabText, activeCategory === tab && styles.tabTextActive]}>
-              {tab}
+              {i18n.t(`memories.tab${tab}`)}
             </Text>
           </Pressable>
         ))}

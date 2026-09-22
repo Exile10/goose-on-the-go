@@ -203,7 +203,7 @@ export default function HomeScreen() {
           {HOME_SHORTCUTS.map((s) => (
             <Pressable key={s.id} style={[styles.shortcutPill, { backgroundColor: s.color }]}>
               <GIcon name={s.iconName} size={13} color={Brand.charcoal} />
-              <Text style={styles.shortcutLabel}>{s.label}</Text>
+              <Text style={styles.shortcutLabel}>{i18n.t(s.labelKey)}</Text>
             </Pressable>
           ))}
         </ScrollView>

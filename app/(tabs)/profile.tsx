@@ -28,6 +28,7 @@ import { Spacing } from '@/constants/spacing';
 import { Radii } from '@/constants/radii';
 import { Shadows } from '@/constants/shadows';
 import type { IconName } from '@/constants/icons';
+import i18n from '@/services/i18n';
 
 /** Stats data */
 const STATS = [
@@ -54,7 +55,7 @@ const NavRow = React.memo(function NavRow({
     >
       <View style={styles.rowLeft}>
         <GIcon name={item.icon} size={16} color="#8C4BFF" />
-        <Text style={styles.rowLabel}>{item.label}</Text>
+        <Text style={styles.rowLabel}>{i18n.t(item.labelKey)}</Text>
       </View>
       <GIcon name="chevron" size={16} color={Grey[400]} />
     </Pressable>
@@ -63,7 +64,7 @@ const NavRow = React.memo(function NavRow({
 
 /** SectionList sections from PROFILE_NAV */
 const sections = PROFILE_NAV.map((g) => ({
-  title: g.group,
+  title: i18n.t(g.groupKey),
   data: g.items,
 }));
 

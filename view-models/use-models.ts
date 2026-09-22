@@ -11,6 +11,7 @@ import { useServer } from '@/providers/server-provider';
 import { ApiError, api } from '@/services/api-client';
 import type { ModelEntry } from '@/services/types';
 import { describeApiError } from './describe-error';
+import i18n from '@/services/i18n';
 
 /**
  * Providers that run the model on the Pond itself.
@@ -116,7 +117,7 @@ export function useModels(): UseModels {
 
 function describe(e: unknown): string | null {
   if (e instanceof ApiError && e.status === 404) {
-    return 'This Pond does not expose a model catalogue.';
+    return i18n.t('errors.noModelCatalogue');
   }
   return describeApiError(e);
 }

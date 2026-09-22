@@ -117,8 +117,8 @@ export default function ConnectDesktopScreen() {
           // user back to hunt for "the right QR" is the unhelpful outcome here.
           return reject(
             looksLikeMatterSetupCode(data)
-              ? 'That is a Matter device setup code, not a Pond pairing code. Use Devices, then Add device, to commission it. The pairing code is the one on your Pond dashboard.'
-              : 'That is not a Goose In A Pond pairing code. Open Pairing on your Pond and scan the code it shows.',
+              ? i18n.t('scanErrors.matterCode')
+              : i18n.t('scanErrors.notPondCode'),
           );
         }
       }

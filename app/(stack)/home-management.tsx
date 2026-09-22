@@ -53,10 +53,10 @@ export default function HomeManagementScreen() {
   const [rooms, setRooms] = useState(ROOMS);
 
   const handleRemoveRoom = useCallback((id: string) => {
-    Alert.alert('Remove Room', 'Are you sure you want to remove this room?', [
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert(i18n.t('homeManagementAlert.removeTitle'), i18n.t('homeManagementAlert.removeBody'), [
+      { text: i18n.t('common.cancel'), style: 'cancel' },
       {
-        text: 'Remove',
+        text: i18n.t('homeManagementAlert.remove'),
         style: 'destructive',
         onPress: () => setRooms((prev) => prev.filter((r) => r.id !== id)),
       },
