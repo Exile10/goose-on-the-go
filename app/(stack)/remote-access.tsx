@@ -3,6 +3,25 @@ import { View, Text, StyleSheet, Pressable, ActivityIndicator } from 'react-nati
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useRemoteAccess } from '@/view-models/use-remote-access';
+import type { RemoteProgress } from '@/services/remote-access';
+/**
+ * One literal key per step, so services/__tests__/i18n.test.ts can see them.
+ *
+ * Assembling the key from the step reads better and hides a failure: a deleted
+ * key leaves the test green and renders "remote.enrolling" to somebody watching
+ * a setup they cannot otherwise observe. The switch is exhaustive, so a new step
+ * fails the typecheck here rather than at runtime.
+ */
+function progressLabel(t: (key: string) => string, progress: RemoteProgress): string {
+  switch (progress) {
+    case 'approval': return t('remote.approval');
+    case 'review': return t('remote.review');
+    case 'enrolling': return t('remote.enrolling');
+    case 'connecting': return t('remote.connecting');
+    case 'enabled': return t('remote.enabled');
+  }
+}
+
 export default function RemoteAccessScreen() {
   const { t } = useTranslation();
   const router = useRouter();
@@ -10,7 +29,7 @@ export default function RemoteAccessScreen() {
   return <View style={styles.page}>
     <Text style={styles.title}>{t('remote.title')}</Text>
     <Text style={styles.body}>{t('remote.description')}</Text>
-    {progress && !error && <Text accessibilityLiveRegion="polite" style={styles.body}>{t(`remote.${progress}`)}</Text>}
+    {progress && !error && <Text accessibilityLiveRegion="polite" style={styles.body}>{progressLabel(t, progress)}</Text>}
     {reviewId && busy && <Text selectable style={styles.body}>{t('remote.reviewCode', { id: reviewId })}</Text>}
     {error && <Text accessibilityRole="alert" style={styles.error}>{error}</Text>}
     {busy && <ActivityIndicator />}

@@ -53,6 +53,20 @@ it('resolves every key the app actually asks for', () => {
   expect(missing).toEqual([]);
 });
 
+// The check above reads keys out of the source, so it can only see the ones
+// written there. A key assembled at runtime is invisible to it, and the failure
+// it hides is the same one: the raw key rendered where a sentence should be.
+// Banning the construct is what keeps the check above meaningful.
+it('refuses keys assembled at runtime, which the check above cannot see', () => {
+  const offenders: string[] = [];
+  for (const dir of SEARCHED) {
+    for (const file of sources(path.join(ROOT, dir))) {
+      if (/\bt\(\s*`/.test(fs.readFileSync(file, 'utf8'))) offenders.push(path.relative(ROOT, file));
+    }
+  }
+  expect(offenders).toEqual([]);
+});
+
 it('returns the key itself for a key that does not exist, which is why the test above exists', () => {
   expect(i18n.t('pairing.notAKeyAnybodyDefined')).toBe('pairing.notAKeyAnybodyDefined');
 });

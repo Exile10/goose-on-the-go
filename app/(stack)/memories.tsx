@@ -24,6 +24,25 @@ import i18n from '@/services/i18n';
 
 const CATEGORY_TABS: Array<MemoryCategory | 'All'> = ['All', 'Preference', 'Habit', 'Person', 'Reminder'];
 
+/**
+ * Tab labels, one literal key per branch.
+ *
+ * This used to assemble the key from the tab value at runtime, which reads
+ * better and is worse: a key built that way is invisible to
+ * services/__tests__/i18n.test.ts, so deleting memories.tabHabit would have left
+ * the test green and put the raw key on screen. The switch is exhaustive, so
+ * TypeScript fails here if a category is added without a label.
+ */
+function tabLabel(tab: MemoryCategory | 'All'): string {
+  switch (tab) {
+    case 'All': return i18n.t('memories.tabAll');
+    case 'Preference': return i18n.t('memories.tabPreference');
+    case 'Habit': return i18n.t('memories.tabHabit');
+    case 'Person': return i18n.t('memories.tabPerson');
+    case 'Reminder': return i18n.t('memories.tabReminder');
+  }
+}
+
 const CATEGORY_COLORS: Record<MemoryCategory, string> = {
   Preference: JaridaPurple[500],
   Habit: Semantic.info,
@@ -110,7 +129,7 @@ export default function MemoriesScreen() {
             onPress={() => setActiveCategory(tab)}
           >
             <Text style={[styles.tabText, activeCategory === tab && styles.tabTextActive]}>
-              {i18n.t(`memories.tab${tab}`)}
+              {tabLabel(tab)}
             </Text>
           </Pressable>
         ))}
