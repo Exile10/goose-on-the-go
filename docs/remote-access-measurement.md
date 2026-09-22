@@ -49,18 +49,25 @@ Record all of this before starting; a run without it cannot be compared to anoth
 - Network: Wi-Fi SSID or carrier, and whether the Pond is reachable locally.
 - Whether the Pond and coordinator were otherwise idle.
 
-Find the node name first — the watcher needs the name or id exactly as the coordinator
-lists it, and headscale runs under Docker Compose rather than as a bare binary:
+The coordinator is `controlpond.jarida.io`, which is
+`DEFAULT_CONTROL_URL` in the Pond's `crates/pond-server/src/embedded_network.rs`. Its
+administration API is **not** reachable over HTTPS: the Caddyfile answers `/api/*` with 404
+on purpose, so `headscale` has to be run on the host itself. The stack lives at
+`/opt/goose-remote-access/deploy/remote-access` and runs under Docker Compose rather than
+as a bare binary.
+
+Find the node name first — the watcher needs it exactly as the coordinator lists it. On the
+coordinator host:
 
 ```bash
-ssh COORDINATOR_HOST 'cd /path/to/remote-access && docker compose exec -T headscale headscale nodes list'
+cd /opt/goose-remote-access/deploy/remote-access && docker compose exec -T headscale headscale nodes list
 ```
 
 Then start the watcher, which writes one row per observed state change. Substitute the node
-name and the same host before running it:
+name and your own SSH target:
 
 ```bash
-python3 scripts/watch-remote-node.py NODE_NAME --headscale "ssh COORDINATOR_HOST cd /path/to/remote-access && docker compose exec -T headscale headscale" --interval 15 --out run1.csv
+python3 scripts/watch-remote-node.py NODE_NAME --headscale "ssh SSH_TARGET cd /opt/goose-remote-access/deploy/remote-access && docker compose exec -T headscale headscale" --interval 15 --out run1.csv
 ```
 
 `--headscale` takes the whole command prefix, so any way of reaching the coordinator works
