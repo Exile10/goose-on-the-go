@@ -34,6 +34,9 @@ void i18n.use(initReactI18next).init({
       signOut: 'Sign Out', signingOut: 'Signing out...', cancel: 'Cancel',
       signOutWarning: 'This releases this phone\u2019s access to your Pond, including its remote access. You will need to pair again at home to come back.',
       signOutFailed: 'Could not sign out. Your Pond may be unreachable \u2014 try again when you are on its network.',
+      yourPond: 'Your Pond',
+      pairedTo: 'Paired to {{pond}}',
+      statDevices: 'Devices', statRooms: 'Rooms', statRoutines: 'Routines', statUsers: 'Users',
     },
     pairing: {
       lan: 'Connect to the same home network as your Pond to pair.',

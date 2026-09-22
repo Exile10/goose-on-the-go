@@ -31,6 +31,7 @@ import type {
   CommissionDeviceResponse,
   CreateDeviceRequest,
   Device,
+  DeviceSelf,
   DeviceStatePatch,
   EventCategory,
   Extension,
@@ -48,6 +49,7 @@ import type {
   ScheduleRun,
   SessionMessage,
   SessionSummary,
+  SystemInfo,
   ToolCallResult,
   UpdateDeviceRequest,
   UsageSummary,
@@ -724,6 +726,16 @@ export class PondApiClient {
 
   deleteProfile(id: string): Promise<void> {
     return this.del<void>(`/api/v1/profiles/${encodeURIComponent(id)}`);
+  }
+
+  /** Which household member this device belongs to, as the Pond sees it. */
+  deviceSelf(): Promise<DeviceSelf> {
+    return this.get<DeviceSelf>('/api/v1/devices/self');
+  }
+
+  /** The Pond's own description of itself: hostname and version. */
+  systemInfo(): Promise<SystemInfo> {
+    return this.get<SystemInfo>('/api/v1/system/info');
   }
 
   // ── Verb helpers ────────────────────────────────────────────

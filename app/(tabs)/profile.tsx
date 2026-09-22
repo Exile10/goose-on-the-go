@@ -5,7 +5,7 @@
  * iOS-style grouped settings sections linking to sub-screens.
  */
 
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   Alert,
   View,
@@ -19,6 +19,7 @@ import { useTranslation } from 'react-i18next';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useServer } from '@/providers/server-provider';
+import { initialOf, useHousehold } from '@/view-models/use-household';
 
 import { GIcon } from '@/components/ui/g-icon';
 import { PROFILE_NAV, type NavItem, type NavGroup } from '@/constants/navigation';
@@ -29,14 +30,6 @@ import { Radii } from '@/constants/radii';
 import { Shadows } from '@/constants/shadows';
 import type { IconName } from '@/constants/icons';
 import i18n from '@/services/i18n';
-
-/** Stats data */
-const STATS = [
-  { label: 'Devices', value: '6' },
-  { label: 'Rooms', value: '3' },
-  { label: 'Routines', value: '4' },
-  { label: 'Users', value: '2' },
-];
 
 /** Navigation row */
 const NavRow = React.memo(function NavRow({
@@ -73,6 +66,7 @@ export default function ProfileHub() {
   const { t } = useTranslation();
   const { signOut } = useServer();
   const [signingOut, setSigningOut] = useState(false);
+  const { data: household } = useHousehold();
 
   /**
    * Signing out is not undoable from the phone: it revokes this device's
@@ -123,6 +117,23 @@ export default function ProfileHub() {
 
   const keyExtractor = useCallback((item: NavItem) => item.id, []);
 
+  // Only what the Pond said. The name is the member it attributes this phone to -- there is no
+  // account, and so no email -- and each figure is one read, shown as a dash when that read
+  // failed rather than as a zero nobody counted.
+  const { member, pondName, counts } = household;
+  const initial = member ? initialOf(member.displayName) : null;
+  // Memoised because it feeds ListHeader's callback: a fresh array every render would rebuild the
+  // header component every render, and a SectionList remounts a header whose component changes.
+  const stats = useMemo(
+    () => [
+      { key: 'devices', label: t('profile.statDevices'), value: counts.devices },
+      { key: 'rooms', label: t('profile.statRooms'), value: counts.rooms },
+      { key: 'routines', label: t('profile.statRoutines'), value: counts.routines },
+      { key: 'users', label: t('profile.statUsers'), value: counts.users },
+    ],
+    [counts, t],
+  );
+
   const ListHeader = useCallback(
     () => (
       <>
@@ -131,24 +142,23 @@ export default function ProfileHub() {
           <View style={styles.charcoalBand} />
           <View style={styles.profileContent}>
             <View style={styles.avatarLarge}>
-              {/* eslint-disable-next-line i18next/no-literal-string -- placeholder account data, replaced when the Pond supplies the signed-in user */}
-            <Text style={styles.avatarLargeText}>J</Text>
+              {initial ? (
+                <Text style={styles.avatarLargeText}>{initial}</Text>
+              ) : (
+                <GIcon name="home" size={28} color={Brand.white} />
+              )}
             </View>
-            {/* eslint-disable-next-line i18next/no-literal-string -- placeholder account data */}
-            <Text style={styles.profileName}>Jerry Ochieng</Text>
-            {/* eslint-disable-next-line i18next/no-literal-string -- placeholder account data */}
-            <Text style={styles.profileEmail}>jerryochieng178@gmail.com</Text>
-            <View style={styles.proBadge}>
-              {/* eslint-disable-next-line i18next/no-literal-string -- product name, not translated */}
-              <Text style={styles.proBadgeText}>Jarida Pro</Text>
-            </View>
+            <Text style={styles.profileName}>{member?.displayName ?? pondName ?? t('profile.yourPond')}</Text>
+            {member && pondName ? (
+              <Text style={styles.profileSubtitle}>{t('profile.pairedTo', { pond: pondName })}</Text>
+            ) : null}
           </View>
 
           {/* Overlapping stats row */}
           <View style={styles.statsRow}>
-            {STATS.map((stat) => (
-              <View key={stat.label} style={styles.statItem}>
-                <Text style={styles.statValue}>{stat.value}</Text>
+            {stats.map((stat) => (
+              <View key={stat.key} style={styles.statItem}>
+                <Text style={styles.statValue}>{stat.value ?? '\u2014'}</Text>
                 <Text style={styles.statLabel}>{stat.label}</Text>
               </View>
             ))}
@@ -156,7 +166,7 @@ export default function ProfileHub() {
         </View>
       </>
     ),
-    [],
+    [initial, member, pondName, stats, t],
   );
 
   const ListFooter = useCallback(
@@ -250,24 +260,11 @@ const styles = StyleSheet.create({
     color: Brand.charcoal,
     marginTop: Spacing.sm,
   },
-  profileEmail: {
+  profileSubtitle: {
     fontFamily: FontFamily.body,
     fontSize: FontSize.sm,
     color: Grey[500],
     marginTop: 2,
-  },
-  proBadge: {
-    backgroundColor: JaridaPurple[50],
-    paddingHorizontal: Spacing.md,
-    paddingVertical: 4,
-    borderRadius: Radii.pill,
-    marginTop: Spacing.sm,
-  },
-  proBadgeText: {
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.xs,
-    fontWeight: FontWeight.bold,
-    color: JaridaPurple[600],
   },
 
   /* Stats row */

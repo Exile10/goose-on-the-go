@@ -379,3 +379,21 @@ export interface Profile {
   display_name: string;
   avatar_emoji: string;
 }
+
+/**
+ * `GET /api/v1/devices/self` -- this device, and the household member it is attributed to.
+ *
+ * The Pond reads the device off the token it issued at pairing; the phone never names itself.
+ * `profile: null` means nobody has claimed this device, which is the normal case: pairing
+ * happens before anyone says who they are. Display only -- it proves nothing to the Pond.
+ */
+export interface DeviceSelf {
+  device_id: string;
+  profile: { id: string; display_name: string } | null;
+}
+
+/** `GET /api/v1/system/info` -- the Pond describing itself. Only the fields read here. */
+export interface SystemInfo {
+  hostname: string;
+  version?: string;
+}
