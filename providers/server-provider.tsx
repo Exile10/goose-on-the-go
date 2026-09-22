@@ -12,6 +12,7 @@ import { findPondByHost } from '@/services/discovery';
 import { parseConnectionProfile, validPin, isLocalPairingUrl, type ConnectionProfile } from '@/models/connection';
 import i18n from '@/services/i18n';
 import { cancelRemoteAccess, restoreRemoteAccess } from '@/services/remote-access';
+import { getInstallId } from '@/services/install-id';
 
 interface PairOptions { clientId: string; pairingCode: string; deviceName?: string }
 interface ServerContextValue {
@@ -185,6 +186,38 @@ export function ServerProvider({ children }: PropsWithChildren) {
       api.setRecovery(null); api.setOnTokensRotated(null);
     };
   }, [manager, restore, invalidateOperation]);
+
+  /**
+   * Keep this phone's row in the Pond's device registry fresh while the app is open.
+   *
+   * The Pond derives `is_online` from `last_seen` against a five-minute threshold
+   * and has a heartbeat route that nothing was calling, so a paired phone aged out
+   * of its own device list and described itself as offline while in use.
+   *
+   * Two minutes, which is well inside that threshold and far outside anything the
+   * per-IP rate limit cares about -- thirty requests an hour against a budget that
+   * a runaway listener once spent in seconds. A missed beat is dropped rather than
+   * retried: the next one is already scheduled, and a retry loop against a
+   * rate-limited Pond is the failure this interval exists to stay clear of.
+   *
+   * Foreground only. When the app is not running the phone genuinely is not
+   * reachable through it, and saying so is the honest answer rather than a
+   * convenient one.
+   */
+  useEffect(() => {
+    if (!identity) return;
+    let stopped = false;
+    const beat = () => {
+      if (stopped || staged.current || AppState.currentState !== 'active') return;
+      void getInstallId()
+        .then((id) => api.deviceHeartbeat(id))
+        .catch(() => undefined);
+    };
+    beat();
+    const timer = setInterval(beat, 120_000);
+    const sub = AppState.addEventListener('change', (state) => { if (state === 'active') beat(); });
+    return () => { stopped = true; clearInterval(timer); sub.remove(); };
+  }, [identity]);
 
   // Address updates remain non-secret and tied to the saved secure identity.
   useEffect(() => {

@@ -115,3 +115,35 @@ describe('concurrent 401s', () => {
     expect(refreshes).toBe(1);
   });
 });
+
+/**
+ * The Pond derives `is_online` from `last_seen` against a five-minute threshold
+ * and has had a heartbeat route with no caller, so a paired phone aged out of its
+ * own device list and reported itself offline while in use. The path and method
+ * are what this pins; the interval that drives it is a provider concern and is
+ * verified against a real Pond rather than here.
+ */
+it('posts a heartbeat to the device path the Pond registered', async () => {
+  const seen: { url: string; method?: string }[] = [];
+  setFetch(async (url: string, init?: { method?: string }) => {
+    seen.push({ url, method: init?.method });
+    return reply('{"status":"ok"}');
+  });
+  const api = new PondApiClient('https://pond.test:4000');
+
+  await api.deviceHeartbeat('install-77');
+
+  expect(seen).toHaveLength(1);
+  expect(seen[0].method).toBe('POST');
+  expect(seen[0].url).toBe('https://pond.test:4000/api/v1/devices/install-77/heartbeat');
+});
+
+it('escapes a device id that would otherwise change the path', async () => {
+  const seen: string[] = [];
+  setFetch(async (url: string) => { seen.push(url); return reply('{}'); });
+  const api = new PondApiClient('https://pond.test:4000');
+
+  await api.deviceHeartbeat('a/../b');
+
+  expect(seen[0]).toBe('https://pond.test:4000/api/v1/devices/a%2F..%2Fb/heartbeat');
+});
