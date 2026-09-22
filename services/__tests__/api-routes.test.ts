@@ -114,3 +114,27 @@ describe('concurrent 401s', () => {
     expect(refreshes).toBe(1);
   });
 });
+
+/**
+ * A response shape the wrapper did not expect must not reach a screen as
+ * `undefined`. The Pond answering `{}` -- or an envelope with the key missing or
+ * null -- crashed the AI Models screen with "Cannot read property 'find' of
+ * undefined", because the declared type asserted a key the body need not carry.
+ */
+describe('a catalogue the server did not send', () => {
+  it.each([
+    ['an envelope without the key', '{}'],
+    ['an envelope with a null list', '{"models":null}'],
+    ['an unrelated envelope', '{"items":[{"name":"x"}]}'],
+  ])('answers %s with an empty list rather than undefined', async (_label, body) => {
+    setFetch(async () => reply(body));
+    const api = new PondApiClient('http://pond.test:4000');
+    await expect(api.listModels()).resolves.toEqual([]);
+  });
+
+  it('still unwraps a well-formed envelope', async () => {
+    setFetch(async () => reply('{"models":[{"provider":"p","name":"m","is_active":true}]}'));
+    const api = new PondApiClient('http://pond.test:4000');
+    await expect(api.listModels()).resolves.toEqual([{ provider: 'p', name: 'm', is_active: true }]);
+  });
+});

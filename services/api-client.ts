@@ -450,8 +450,14 @@ export class PondApiClient {
   // ── Models ──────────────────────────────────────────────────
 
   async listModels(): Promise<ModelEntry[]> {
-    const res = await this.request<{ models: ModelEntry[] } | ModelEntry[]>('/api/v1/models');
-    return Array.isArray(res) ? res : res.models;
+    const res = await this.request<{ models?: ModelEntry[] } | ModelEntry[]>('/api/v1/models');
+    if (Array.isArray(res)) return res;
+    // The envelope is not guaranteed to carry the key, and the type saying it does
+    // is what let this through: `res.models` is typed ModelEntry[] whatever the
+    // server actually sent, so `undefined` reached the screen as state and
+    // `models.find(...)` threw where a Pond without a catalogue should have shown
+    // the empty state it already has.
+    return Array.isArray(res?.models) ? res.models : [];
   }
 
   modelCapabilities(): Promise<ModelCapabilities> {
