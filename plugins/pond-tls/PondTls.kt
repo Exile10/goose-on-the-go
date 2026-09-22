@@ -150,6 +150,11 @@ object PondTls {
 
 class PondTlsModule(context: ReactApplicationContext) : ReactContextBaseJavaModule(context) {
   override fun getName() = "PondTls"
+  // Every remote call is serialised onto one thread: PondNetwork's methods are
+  // @Synchronized, and letting the bridge queue several of them against that monitor turns
+  // a slow start into a pile of blocked bridge threads.
+  private val remoteExecutor = java.util.concurrent.Executors.newSingleThreadExecutor()
+  private fun remote(promise: Promise, action: () -> Any?) { remoteExecutor.execute { try { promise.resolve(action()) } catch (_: Exception) { promise.reject("pond_remote_unavailable", "Remote access operation failed") } } }
   @ReactMethod fun beginRemote(profile: String, control: String, promise: Promise) = remote(promise) { PondNetwork.stage(profile, control) }
   @ReactMethod fun remoteStatus(promise: Promise) = remote(promise) { PondNetwork.status() }
   @ReactMethod fun activateRemote(profile: String, control: String, promise: Promise) = remote(promise) { PondNetwork.activate(profile, control); null }
