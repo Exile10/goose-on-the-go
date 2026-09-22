@@ -111,7 +111,23 @@ class PondNetworkService : Service() {
           else "Remote access is on. Looking for your Pond."
         )
         .setSmallIcon(context.applicationInfo.icon)
-        .setOngoing(true)
+        // Not marked ongoing, so nothing here asks the platform to pin it.
+        //
+        // That is as far as an app can go. NotificationManagerService owns the flags on a
+        // foreground-service notification: it sets FOREGROUND_SERVICE and NO_CLEAR itself
+        // and drops AUTO_CANCEL, so setAutoCancel(true) is silently discarded -- confirmed
+        // on Android 16, where the posted notification came back
+        // ONLY_ALERT_ONCE|NO_CLEAR|FOREGROUND_SERVICE with no AUTO_CANCEL. Tapping it
+        // cannot clear it.
+        //
+        // From Android 13 the user can still swipe it away, because System UI allows that
+        // for foreground-service notifications despite NO_CLEAR. The service keeps running
+        // when they do: remote access depends on the service holding the app out of Doze's
+        // network restrictions, not on the notification being on screen.
+        //
+        // Clearing it on tap would mean calling stopForeground, which surrenders exactly
+        // the exemption this service exists to hold. The notification is the price of the
+        // feature, and the honest thing is to say so rather than fake a dismissal.
         .setOnlyAlertOnce(true)
         .also { if (pending != null) it.setContentIntent(pending) }
         .build()
