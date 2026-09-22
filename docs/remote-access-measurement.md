@@ -38,6 +38,43 @@ There are two distinct failures, and the point of the third run is to tell them 
 If the coordinator shows the node online throughout but the app cannot reach the Pond until
 something forces a re-probe, the defect is the second, and no foreground service fixes it.
 
+## A hazard that will silently invalidate a run
+
+**USB debugging keeps the app in the active standby bucket.** Observed on 2026-09-22: with
+adb attached, `am get-standby-bucket io.jarida.gooseonthego` reported `10` (active) while
+the app had been backgrounded for over ten minutes. An app in the active bucket is not
+being throttled, so a run conducted this way measures nothing about Doze and will look
+reassuring for the wrong reason.
+
+Unplug the phone for runs 2 and 3, or at minimum stop issuing adb commands during them --
+every `adb shell` touch resets the device's idea of activity. Capture the device log by
+starting `adb logcat` before unplugging and reading it afterwards, or accept that the
+coordinator is the only instrument for those runs.
+
+Record `am get-standby-bucket` at the start and the end of every run, and
+`dumpsys deviceidle get deep` alongside it. Without those two numbers a run cannot be
+compared to any other.
+
+## What "the node died" actually means
+
+A finding from the same session, worth stating because the issue's wording points the other
+way. When the coordinator marked the phone offline, the app process was **still alive** --
+the same pid kept logging throughout, and resolution recovered on its own once the device
+became active again. What had been withdrawn was network access, not the process.
+
+So record the two separately:
+
+- **Is the process alive?** `adb shell pidof io.jarida.gooseonthego`.
+- **Does it have network?** Resolver failures in the log distinguish themselves: `operation
+  was canceled` is a losing racer after another dial won, and is normal and healthy. `i/o
+  timeout` is the real thing. Counting those per minute is the clearest signal available
+  device-side.
+
+That distinction decides what the fix has to be. A foreground service that only keeps a
+process alive addresses nothing if the process was never dying; it is worth having here
+because a foreground service also keeps an app out of Doze's network restrictions, and that
+is the claim the measurement must actually test.
+
 ## Setup
 
 Record all of this before starting; a run without it cannot be compared to another.
