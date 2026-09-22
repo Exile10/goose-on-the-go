@@ -55,12 +55,6 @@ void i18n.use(initReactI18next).init({
       notSetupCode: 'That is not a Matter setup code. Look for a QR beginning MT: on the device or its box.',
       isPondCode: 'That is your Pond\u2019s pairing code, not a device setup code. This phone is already paired \u2014 scan the QR on the device itself, or on its packaging.',
     },
-    // Header titles that differ from the navigation label for the same screen.
-    screens: {
-      biometrics: 'Biometrics',
-      developer: 'Developer',
-      pondPairing: 'Pond Pairing',
-    },
   } } },
 });
 export default i18n;
