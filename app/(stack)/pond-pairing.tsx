@@ -20,7 +20,7 @@ import {
   View,
 } from 'react-native';
 
-import { useFocusEffect, useRouter } from 'expo-router';
+import { Stack, useFocusEffect, useRouter } from 'expo-router';
 import { GIcon } from '@/components/ui/g-icon';
 import { GKeyboardView } from '@/components/ui/g-keyboard-view';
 import { Grey, JaridaPurple, Brand, Semantic } from '@/constants/colors';
@@ -524,7 +524,25 @@ function CompleteStep({
 
 export default function PondPairingScreen() {
   const router = useRouter();
-  const { serverUrl, stagePairing, cancelPairing, pair } = useServer();
+  const { serverUrl, stagePairing, cancelPairing, pair, profileId } = useServer();
+  /**
+   * Whether this screen was reached with somewhere to go back to, decided once.
+   *
+   * Reached from inside the app to change or repair a pond, there is; reached
+   * because there is no pond -- a fresh install, a sign out, or the Pond revoking
+   * this phone -- the tab layout redirected here precisely because the app cannot
+   * be used, and a back arrow would offer a way to a screen whose every request
+   * fails.
+   *
+   * Captured at mount and never revised, which is the whole point. Binding the
+   * header option to the live value crashed the app on every completed pairing:
+   * the profile appears and the redirect starts in the same frame, and
+   * react-native-screens re-evaluated canNavigateBack on a fragment that was no
+   * longer in a stack -- IllegalStateException on the main thread, from
+   * ScreenStackHeaderConfig.onUpdate. The condition was right; changing it while
+   * the screen was being torn down was not.
+   */
+  const [reachedWithHistory] = useState(() => Boolean(profileId));
   const [manualUrl, setManualUrl] = useState(serverUrl);
   const [manualPin, setManualPin] = useState('');
   const [pairingError, setPairingError] = useState<string | null>(null);
@@ -624,6 +642,7 @@ export default function PondPairingScreen() {
 
   return (
     <GKeyboardView style={styles.container}>
+      <Stack.Screen options={{ headerBackVisible: reachedWithHistory, gestureEnabled: reachedWithHistory }} />
       <StepIndicator current={step} />
       {pairingError ? <Text style={styles.stepError}>{pairingError}</Text> : null}
       {step === 0 &&
