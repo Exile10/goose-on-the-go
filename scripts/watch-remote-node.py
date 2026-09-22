@@ -67,6 +67,26 @@ def find(nodes, wanted):
     return None
 
 
+def staleness(raw):
+    """Seconds since the coordinator last heard from the node, or None if unreadable.
+
+    This matters more than the online flag. Headscale does not probe the node; it reports
+    whether it still holds a control session. A phone that loses its radio never closes that
+    connection, so the session -- and `online` -- survives until a keepalive gives up. The
+    last-seen timestamp is the one thing that cannot be stale without saying so.
+    """
+    if not raw:
+        return None
+    text = str(raw).strip().replace("Z", "+00:00")
+    try:
+        seen = datetime.fromisoformat(text)
+    except ValueError:
+        return None
+    if seen.tzinfo is None:
+        seen = seen.replace(tzinfo=timezone.utc)
+    return (datetime.now(timezone.utc) - seen).total_seconds()
+
+
 def describe(seconds):
     if seconds < 90:
         return f"{seconds:.0f}s"
@@ -103,9 +123,16 @@ def watch(args):
                     current, seen, note = "absent", "", f"not in list; saw: {known}"
                 else:
                     online = first(node, ONLINE_KEYS)
-                    current = "online" if online else "offline"
                     seen = str(first(node, SEEN_KEYS, ""))
-                    note = ""
+                    age = staleness(seen)
+                    if not online:
+                        current, note = "offline", ""
+                    elif age is not None and age > args.stale:
+                        # Reported online, but nothing has been heard for longer than a
+                        # node that is genuinely talking would ever go quiet.
+                        current, note = "stale", f"online flag set, last heard {describe(age)} ago"
+                    else:
+                        current, note = "online", ""
 
             if current != state:
                 if state is not None:
@@ -165,6 +192,8 @@ if __name__ == "__main__":
     parser.add_argument("--headscale", default="headscale",
                         help="command that reaches the coordinator, e.g. 'ssh pond-coordinator headscale'")
     parser.add_argument("--interval", type=float, default=15.0, help="seconds between polls (default 15)")
+    parser.add_argument("--stale", type=float, default=90.0,
+                        help="treat an 'online' node as stale once last-seen is older than this (default 90s)")
     parser.add_argument("--duration", type=float, default=0.0, help="stop after this many seconds (default: until Ctrl-C)")
     parser.add_argument("--out", help="write observed transitions to this CSV")
     watch(parser.parse_args())
