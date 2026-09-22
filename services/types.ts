@@ -392,6 +392,46 @@ export interface DeviceSelf {
   profile: { id: string; display_name: string } | null;
 }
 
+/**
+ * `GET /api/v1/weather` -- outdoor conditions where the Pond is configured to be.
+ *
+ * Temperatures are Celsius: the adapter asks open-meteo for `temperature_unit=celsius` and the
+ * field is `temperature_c` rounded. `{enabled: false}` means no location is configured, which
+ * is a setting, not a failure. Only the fields read here.
+ */
+export interface WeatherResponse {
+  enabled: boolean;
+  temp?: number;
+  location_name?: string;
+}
+
+/**
+ * `GET /api/v1/music/now-playing` -- a Spotify snapshot. `connected: false` is no account (or a
+ * refused network); `connected: true, playing: false` is the only genuine "nothing playing".
+ * `error` is set when Spotify answered and refused, in which case nothing here can be trusted.
+ */
+export interface NowPlayingResponse {
+  connected: boolean;
+  playing?: boolean;
+  track?: string;
+  artist?: string;
+  error?: string;
+}
+
+/**
+ * One entry of `GET /api/v1/schedules/upcoming`: the Pond's own `Schedule`, serialised as-is.
+ *
+ * Declared separately because it is not the shape `Schedule` above claims. The Pond sends
+ * `label` and `paused`; there is no `name`, no `enabled` and no top-level `prompt` on the wire.
+ * Only the fields read here.
+ */
+export interface UpcomingSchedule {
+  id: string;
+  label: string;
+  next_run: string | null;
+  paused: boolean;
+}
+
 /** `GET /api/v1/system/info` -- the Pond describing itself. Only the fields read here. */
 export interface SystemInfo {
   hostname: string;

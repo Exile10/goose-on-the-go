@@ -144,3 +144,39 @@ it('reads which Pond this is from its own system info', async () => {
   await expect(api.systemInfo()).resolves.toMatchObject({ hostname: 'giap-mac' });
   expect(seen).toEqual(['https://pond.test:4000/api/v1/system/info']);
 });
+
+describe('right-now reads', () => {
+  it('reads the weather the Pond reports, which is in Celsius', async () => {
+    const seen: string[] = [];
+    setFetch(async (url: string) => { seen.push(url); return reply('{"enabled":true,"temp":22,"location_name":"Nairobi"}'); });
+    const api = new PondApiClient('https://pond.test:4000');
+
+    await expect(api.weather()).resolves.toMatchObject({ enabled: true, temp: 22 });
+    expect(seen).toEqual(['https://pond.test:4000/api/v1/weather']);
+  });
+
+  it('reads what is playing', async () => {
+    const seen: string[] = [];
+    setFetch(async (url: string) => { seen.push(url); return reply('{"connected":true,"playing":false}'); });
+    const api = new PondApiClient('https://pond.test:4000');
+
+    await expect(api.nowPlaying()).resolves.toEqual({ connected: true, playing: false });
+    expect(seen).toEqual(['https://pond.test:4000/api/v1/music/now-playing']);
+  });
+
+  // The Pond answers `json!(tasks)`: a bare array of its own Schedule, which has `label` and
+  // `paused` and no `name` or `enabled`. Read it as what it is.
+  it('reads the next routines as the bare array the Pond sends', async () => {
+    const seen: string[] = [];
+    setFetch(async (url: string) => {
+      seen.push(url);
+      return reply('[{"id":"s1","label":"Morning briefing","next_run":"2026-09-23T04:00:00Z","paused":false}]');
+    });
+    const api = new PondApiClient('https://pond.test:4000');
+
+    await expect(api.upcomingSchedules(1)).resolves.toEqual([
+      { id: 's1', label: 'Morning briefing', next_run: '2026-09-23T04:00:00Z', paused: false },
+    ]);
+    expect(seen).toEqual(['https://pond.test:4000/api/v1/schedules/upcoming?limit=1']);
+  });
+});

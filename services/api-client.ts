@@ -43,6 +43,7 @@ import type {
   ModelCapabilities,
   ModelEntry,
   ModelMemoryStatus,
+  NowPlayingResponse,
   OAuthProvider,
   Profile,
   Schedule,
@@ -51,8 +52,10 @@ import type {
   SessionSummary,
   SystemInfo,
   ToolCallResult,
+  UpcomingSchedule,
   UpdateDeviceRequest,
   UsageSummary,
+  WeatherResponse,
 } from './types';
 
 /**
@@ -736,6 +739,24 @@ export class PondApiClient {
   /** The Pond's own description of itself: hostname and version. */
   systemInfo(): Promise<SystemInfo> {
     return this.get<SystemInfo>('/api/v1/system/info');
+  }
+
+  /** Outdoor weather where the Pond is configured to be, in Celsius. */
+  weather(): Promise<WeatherResponse> {
+    return this.get<WeatherResponse>('/api/v1/weather');
+  }
+
+  /** What Spotify is playing, as the Pond reports it. */
+  nowPlaying(): Promise<NowPlayingResponse> {
+    return this.get<NowPlayingResponse>('/api/v1/music/now-playing');
+  }
+
+  /** Active schedules, soonest first. The Pond sends a bare array; an envelope is tolerated. */
+  async upcomingSchedules(limit: number): Promise<UpcomingSchedule[]> {
+    const res = await this.get<{ schedules: UpcomingSchedule[] } | UpcomingSchedule[]>(
+      `/api/v1/schedules/upcoming?limit=${encodeURIComponent(String(limit))}`,
+    );
+    return Array.isArray(res) ? res : res.schedules;
   }
 
   // ── Verb helpers ────────────────────────────────────────────

@@ -89,6 +89,23 @@ export function isSelfUnsupported(e: unknown): boolean {
   return e instanceof ApiError && (e.status === 404 || e.status === 405);
 }
 
+/**
+ * The member this phone belongs to, or null. Never rejects.
+ *
+ * No name either way when it fails, but a Pond that tried and failed is not one with nothing to
+ * say, and that difference should not vanish: only the unsupported case stays quiet.
+ */
+export async function readMember(client: Pick<PondApiClient, 'deviceSelf'> = api): Promise<Member | null> {
+  try {
+    return memberOf(await client.deviceSelf());
+  } catch (e) {
+    if (!isSelfUnsupported(e)) {
+      console.warn('[household] could not read which member this device belongs to', e instanceof ApiError ? e.status : 'network');
+    }
+    return null;
+  }
+}
+
 /** The reads the header needs, and no more of the client than that. */
 type HouseholdReader = Pick<PondApiClient, 'deviceSelf' | 'systemInfo' | 'listDevices' | 'listSchedules' | 'listProfiles'>;
 
@@ -97,22 +114,10 @@ type HouseholdReader = Pick<PondApiClient, 'deviceSelf' | 'systemInfo' | 'listDe
  * costs only its own figure, and it comes back as unknown rather than as zero.
  */
 export async function readHousehold(client: HouseholdReader = api): Promise<Household> {
-  const [self, info, devices, schedules, profiles] = await Promise.allSettled([
-    client.deviceSelf(),
-    client.systemInfo(),
-    client.listDevices(),
-    client.listSchedules(),
-    client.listProfiles(),
+  const [member, [info, devices, schedules, profiles]] = await Promise.all([
+    readMember(client),
+    Promise.allSettled([client.systemInfo(), client.listDevices(), client.listSchedules(), client.listProfiles()]),
   ]);
-
-  let member: Member | null = null;
-  if (self.status === 'fulfilled') {
-    member = memberOf(self.value);
-  } else if (!isSelfUnsupported(self.reason)) {
-    // No name either way, but a Pond that tried and failed is not one with nothing to say, and
-    // that difference should not vanish.
-    console.warn('[household] could not read which member this device belongs to', self.reason instanceof ApiError ? self.reason.status : 'network');
-  }
 
   return {
     member,
@@ -156,4 +161,26 @@ export function useHousehold(): UseHousehold {
   }, []);
 
   return { data: household, loading, actions: { refresh } };
+}
+
+/**
+ * Just the member, for screens that greet without showing the rest of the household. Null until
+ * the read lands and when nobody has claimed this device -- either way, no name is shown.
+ */
+export function useMember(): Member | null {
+  const [member, setMember] = useState<Member | null>(null);
+  const { hydrated } = useServer();
+
+  useEffect(() => {
+    if (!hydrated) return;
+    let live = true;
+    void readMember().then((next) => {
+      if (live) setMember(next);
+    });
+    return () => {
+      live = false;
+    };
+  }, [hydrated]);
+
+  return member;
 }

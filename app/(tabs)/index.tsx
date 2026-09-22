@@ -21,6 +21,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { GIcon } from '@/components/ui/g-icon';
 import { useRecentSessions } from '@/view-models/use-recent-sessions';
 import { supports, useDevices } from '@/view-models/use-devices';
+import { initialOf, useMember } from '@/view-models/use-household';
+import { greetingFor, untilOf, useRightNow, type Until } from '@/view-models/use-right-now';
 import type { Device } from '@/services/types';
 import { HOME_SHORTCUTS } from '@/constants/navigation';
 import { Grey, JaridaPurple, Brand, Semantic } from '@/constants/colors';
@@ -31,13 +33,13 @@ import { Shadows } from '@/constants/shadows';
 import { RemoteAccessOffer } from '@/components/patterns/remote-access-offer';
 import i18n from '@/services/i18n';
 
-/** Status chip data */
-const STATUS_CHIPS = [
-  { label: '4 Active', color: Semantic.success, bg: Semantic.successSoft },
-  { label: '72\u00B0F', color: Semantic.info, bg: Semantic.infoSoft },
-  { label: 'Meeting 2pm', color: Semantic.warning, bg: Semantic.warningSoft },
-  { label: 'Locked', color: Semantic.success, bg: Semantic.successSoft },
-];
+/** How far off a routine is, in words. */
+function untilText(until: Until): string {
+  if (until.unit === 'now') return i18n.t('home.dueNow');
+  if (until.unit === 'minutes') return i18n.t('home.inMinutes', { count: until.count });
+  if (until.unit === 'hours') return i18n.t('home.inHours', { count: until.count });
+  return i18n.t('home.inDays', { count: until.count });
+}
 
 function StatusChip({ label, color, bg }: { label: string; color: string; bg: string }) {
   return (
@@ -95,6 +97,35 @@ const HOME_GRID_LIMIT = 4;
 export default function HomeScreen() {
   const recent = useRecentSessions();
   const devices = useDevices();
+  const member = useMember();
+  const rightNow = useRightNow().data;
+  // Read from the clock once, as the waveform below is rolled once, so render stays pure.
+  const [greeting] = useState(() => greetingFor(new Date().getHours()));
+  const [now] = useState(() => new Date());
+  const initial = member ? initialOf(member.displayName) : null;
+
+  // Only chips with a source. The online count is the list the grid below shows, so the two
+  // cannot disagree, and it is not shown while that list is unknown. Meeting and Locked had no
+  // source at all and are gone rather than guessed.
+  const chips = [
+    ...(devices.loading || devices.error
+      ? []
+      : [{
+          key: 'online',
+          label: i18n.t('home.chipOnline', { count: devices.data.devices.filter((d) => d.is_online).length }),
+          color: Semantic.success,
+          bg: Semantic.successSoft,
+        }]),
+    ...(rightNow.outdoorTemp === null
+      ? []
+      : [{
+          key: 'outdoor',
+          label: i18n.t('home.chipOutdoorTemp', { temp: rightNow.outdoorTemp }),
+          color: Semantic.info,
+          bg: Semantic.infoSoft,
+        }]),
+  ];
+  const { nowPlaying, nextRoutine } = rightNow;
   const handleDeviceToggle = useCallback(
     (device: Device, on: boolean) => void devices.actions.setState(device, { power: on }),
     [devices.actions],
@@ -123,26 +154,37 @@ export default function HomeScreen() {
         {/* Greeting header */}
         <View style={styles.greetingRow}>
           <View style={styles.greetingText}>
-            <Text style={styles.greetingLabel}>{i18n.t('home.greeting')}</Text>
-            {/* eslint-disable-next-line i18next/no-literal-string -- placeholder data, replaced when the Pond supplies it */}
-            <Text style={styles.greetingName}>Jerry</Text>
+            <Text style={styles.greetingLabel}>
+              {greeting === 'morning'
+                ? i18n.t('home.greetingMorning')
+                : greeting === 'afternoon'
+                  ? i18n.t('home.greetingAfternoon')
+                  : i18n.t('home.greetingEvening')}
+            </Text>
+            {/* The member the Pond attributes this phone to. No name when nobody has claimed it. */}
+            {member ? <Text style={styles.greetingName}>{member.displayName}</Text> : null}
           </View>
           <View style={styles.avatar}>
-            {/* eslint-disable-next-line i18next/no-literal-string -- placeholder data, replaced when the Pond supplies it */}
-            <Text style={styles.avatarText}>J</Text>
+            {initial ? (
+              <Text style={styles.avatarText}>{initial}</Text>
+            ) : (
+              <GIcon name="home" size={18} color={Brand.white} />
+            )}
           </View>
         </View>
 
         {/* Status chips */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.chipsRow}
-        >
-          {STATUS_CHIPS.map((chip) => (
-            <StatusChip key={chip.label} {...chip} />
-          ))}
-        </ScrollView>
+        {chips.length > 0 ? (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.chipsRow}
+          >
+            {chips.map(({ key, ...chip }) => (
+              <StatusChip key={key} {...chip} />
+            ))}
+          </ScrollView>
+        ) : null}
 
         {/* Ask Goose search bar */}
         <Pressable style={styles.askBar}>
@@ -159,39 +201,48 @@ export default function HomeScreen() {
           </Pressable>
         </Pressable>
 
-        {/* Right Now section */}
-        <Text style={styles.sectionLabel}>{i18n.t('home.rightNow')}</Text>
-        <View style={styles.rightNowRow}>
-          {/* Now playing card */}
-          <View style={styles.nowPlayingCard}>
-            <Text style={styles.nowPlayingLabel}>{i18n.t('home.nowPlaying')}</Text>
-            {/* eslint-disable-next-line i18next/no-literal-string -- placeholder data, replaced when the Pond supplies it */}
-            <Text style={styles.nowPlayingTitle}>Lo-fi Beats</Text>
-            {/* eslint-disable-next-line i18next/no-literal-string -- placeholder data, replaced when the Pond supplies it */}
-            <Text style={styles.nowPlayingArtist}>Living Room Speaker</Text>
-            <View style={styles.waveformRow}>
-              {waveBarHeights.map((height, i) => (
-                <View
-                  key={i}
-                  style={[styles.waveBar, { height }]}
-                />
-              ))}
-            </View>
-          </View>
+        {/* Right Now section: a card with nothing true to say is not drawn, and a row with no
+            cards has no heading. */}
+        {nowPlaying || nextRoutine ? (
+          <>
+            <Text style={styles.sectionLabel}>{i18n.t('home.rightNow')}</Text>
+            <View style={styles.rightNowRow}>
+              {nowPlaying ? (
+                <View style={styles.nowPlayingCard}>
+                  <Text style={styles.nowPlayingLabel}>{i18n.t('home.nowPlaying')}</Text>
+                  {nowPlaying.state === 'playing' ? (
+                    <>
+                      <Text style={styles.nowPlayingTitle}>{nowPlaying.track}</Text>
+                      {nowPlaying.artist ? <Text style={styles.nowPlayingArtist}>{nowPlaying.artist}</Text> : null}
+                      {/* Decorative, and only while something is playing: a moving waveform over
+                          silence would say music is on. */}
+                      <View style={styles.waveformRow}>
+                        {waveBarHeights.map((height, i) => (
+                          <View key={i} style={[styles.waveBar, { height }]} />
+                        ))}
+                      </View>
+                    </>
+                  ) : (
+                    <Text style={styles.nowPlayingTitle}>{i18n.t('home.nothingPlaying')}</Text>
+                  )}
+                </View>
+              ) : null}
 
-          {/* Next event card */}
-          <View style={styles.nextEventCard}>
-            <Text style={styles.nextEventLabel}>{i18n.t('home.nextEvent')}</Text>
-            {/* eslint-disable-next-line i18next/no-literal-string -- placeholder data, replaced when the Pond supplies it */}
-            <Text style={styles.nextEventTitle}>Team Standup</Text>
-            {/* eslint-disable-next-line i18next/no-literal-string -- placeholder data, replaced when the Pond supplies it */}
-            <Text style={styles.nextEventTime}>2:00 PM</Text>
-            <View style={styles.nextEventBadge}>
-              {/* eslint-disable-next-line i18next/no-literal-string -- placeholder data, replaced when the Pond supplies it */}
-              <Text style={styles.nextEventBadgeText}>In 45 min</Text>
+              {nextRoutine ? (
+                <View style={styles.nextRoutineCard}>
+                  <Text style={styles.nextRoutineLabel}>{i18n.t('home.nextRoutine')}</Text>
+                  <Text style={styles.nextRoutineTitle}>{nextRoutine.label}</Text>
+                  <Text style={styles.nextRoutineTime}>
+                    {nextRoutine.nextRun.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+                  </Text>
+                  <View style={styles.nextRoutineBadge}>
+                    <Text style={styles.nextRoutineBadgeText}>{untilText(untilOf(nextRoutine.nextRun, now))}</Text>
+                  </View>
+                </View>
+              ) : null}
             </View>
-          </View>
-        </View>
+          </>
+        ) : null}
 
         {/* Shortcuts carousel */}
         <Text style={styles.sectionLabel}>{i18n.t('home.shortcuts')}</Text>
@@ -399,7 +450,7 @@ const styles = StyleSheet.create({
     backgroundColor: JaridaPurple[400],
   },
 
-  nextEventCard: {
+  nextRoutineCard: {
     flex: 1,
     backgroundColor: Brand.white,
     borderRadius: Radii.xl,
@@ -407,25 +458,25 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Grey[200],
   },
-  nextEventLabel: {
+  nextRoutineLabel: {
     fontFamily: FontFamily.body,
     fontSize: FontSize.xs,
     color: Grey[500],
     marginBottom: Spacing.xs,
   },
-  nextEventTitle: {
+  nextRoutineTitle: {
     fontFamily: FontFamily.heading,
     fontSize: FontSize.md,
     fontWeight: FontWeight.bold,
     color: Brand.charcoal,
   },
-  nextEventTime: {
+  nextRoutineTime: {
     fontFamily: FontFamily.body,
     fontSize: FontSize.sm,
     color: Grey[500],
     marginTop: 2,
   },
-  nextEventBadge: {
+  nextRoutineBadge: {
     alignSelf: 'flex-start',
     backgroundColor: Semantic.warningSoft,
     borderRadius: Radii.pill,
@@ -433,7 +484,7 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
     marginTop: Spacing.md,
   },
-  nextEventBadgeText: {
+  nextRoutineBadgeText: {
     fontFamily: FontFamily.body,
     fontSize: FontSize.xs,
     fontWeight: FontWeight.semibold,
