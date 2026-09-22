@@ -346,6 +346,12 @@ void i18n.use(initReactI18next).init({
       tabPerson: 'Person',
       tabReminder: 'Reminder',
     },
+    // Header titles whose wording differs from the navigation label for the same screen.
+    screens: {
+      biometrics: 'Biometrics',
+      developer: 'Developer',
+      pondPairing: 'Pond Pairing',
+    },
   } } },
 });
 export default i18n;

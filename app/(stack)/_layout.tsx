@@ -8,6 +8,7 @@ import { Stack } from 'expo-router';
 import React from 'react';
 
 import { Brand, Grey, JaridaPurple } from '@/constants/colors';
+import i18n from '@/services/i18n';
 
 export default function StackLayout() {
   return (
@@ -21,23 +22,23 @@ export default function StackLayout() {
         headerBackButtonDisplayMode: 'minimal',
       }}
     >
-      <Stack.Screen name="models" options={{ title: 'AI Models' }} />
-      <Stack.Screen name="memories" options={{ title: 'Memories' }} />
-      <Stack.Screen name="logs" options={{ title: 'Activity Logs' }} />
-      <Stack.Screen name="schedule" options={{ title: 'Schedule' }} />
-      <Stack.Screen name="app-management" options={{ title: 'App Integrations' }} />
-      <Stack.Screen name="mcp-servers" options={{ title: 'MCP Servers' }} />
-      <Stack.Screen name="user-media" options={{ title: 'Photos & Videos' }} />
-      <Stack.Screen name="photo-upload" options={{ title: 'Upload for Analysis' }} />
-      <Stack.Screen name="add-users" options={{ title: 'Users' }} />
-      <Stack.Screen name="biometrics" options={{ title: 'Biometrics' }} />
-      <Stack.Screen name="backup" options={{ title: 'Backup' }} />
-      <Stack.Screen name="restore" options={{ title: 'Restore to Pond' }} />
-      <Stack.Screen name="privacy" options={{ title: 'Privacy & Licenses' }} />
-      <Stack.Screen name="home-management" options={{ title: 'Home Management' }} />
-      <Stack.Screen name="pond-pairing" options={{ title: 'Pond Pairing' }} />
-      <Stack.Screen name="developer" options={{ title: 'Developer' }} />
-      <Stack.Screen name="commission-device" options={{ title: 'Add Device' }} />
+      <Stack.Screen name="models" options={{ title: i18n.t('nav.models') }} />
+      <Stack.Screen name="memories" options={{ title: i18n.t('nav.memories') }} />
+      <Stack.Screen name="logs" options={{ title: i18n.t('nav.logs') }} />
+      <Stack.Screen name="schedule" options={{ title: i18n.t('nav.schedule') }} />
+      <Stack.Screen name="app-management" options={{ title: i18n.t('nav.appManagement') }} />
+      <Stack.Screen name="mcp-servers" options={{ title: i18n.t('nav.mcpServers') }} />
+      <Stack.Screen name="user-media" options={{ title: i18n.t('nav.userMedia') }} />
+      <Stack.Screen name="photo-upload" options={{ title: i18n.t('nav.photoUpload') }} />
+      <Stack.Screen name="add-users" options={{ title: i18n.t('nav.addUsers') }} />
+      <Stack.Screen name="biometrics" options={{ title: i18n.t('screens.biometrics') }} />
+      <Stack.Screen name="backup" options={{ title: i18n.t('nav.backup') }} />
+      <Stack.Screen name="restore" options={{ title: i18n.t('nav.restore') }} />
+      <Stack.Screen name="privacy" options={{ title: i18n.t('nav.privacy') }} />
+      <Stack.Screen name="home-management" options={{ title: i18n.t('nav.homeManagement') }} />
+      <Stack.Screen name="pond-pairing" options={{ title: i18n.t('screens.pondPairing') }} />
+      <Stack.Screen name="developer" options={{ title: i18n.t('screens.developer') }} />
+      <Stack.Screen name="commission-device" options={{ title: i18n.t('commission.addDevice') }} />
       <Stack.Screen
         name="connect-desktop"
         options={{
