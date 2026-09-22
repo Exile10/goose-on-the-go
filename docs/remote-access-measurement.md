@@ -49,11 +49,28 @@ Record all of this before starting; a run without it cannot be compared to anoth
 - Network: Wi-Fi SSID or carrier, and whether the Pond is reachable locally.
 - Whether the Pond and coordinator were otherwise idle.
 
-Start the coordinator watcher, which writes one row per observed state change:
+Find the node name first — the watcher needs the name or id exactly as the coordinator
+lists it, and headscale runs under Docker Compose rather than as a bare binary:
 
 ```bash
-python3 scripts/watch-remote-node.py <node-name> --headscale "ssh <coordinator> headscale" --interval 15 --out run1.csv
+ssh COORDINATOR_HOST 'cd /path/to/remote-access && docker compose exec -T headscale headscale nodes list'
 ```
+
+Then start the watcher, which writes one row per observed state change. Substitute the node
+name and the same host before running it:
+
+```bash
+python3 scripts/watch-remote-node.py NODE_NAME --headscale "ssh COORDINATOR_HOST cd /path/to/remote-access && docker compose exec -T headscale headscale" --interval 15 --out run1.csv
+```
+
+`--headscale` takes the whole command prefix, so any way of reaching the coordinator works
+as long as it ends at the `headscale` binary; the watcher appends
+`nodes list --output json` itself.
+
+Note that `docker compose exec -T` consumes standard input, which the Pond's
+`deploy/remote-access/README.md` warns will eat the input of the script invoking it. The
+watcher closes stdin on every call for exactly that reason, so it will not swallow your
+terminal over a long run — but if you write your own polling loop, close stdin yourself.
 
 It polls `headscale nodes list --output json`, tolerates the command failing without
 stopping, and prints a summary of online and offline spells at the end — the spells are the

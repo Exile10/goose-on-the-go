@@ -33,7 +33,13 @@ def first(node, keys, default=None):
 def poll(command):
     """Return the node list, or a string describing why it could not be read."""
     try:
-        done = subprocess.run(command, capture_output=True, text=True, timeout=30)
+        # stdin must be closed. The coordinator is reached through
+        # `docker compose exec -T headscale headscale ...`, and `exec -T` consumes standard
+        # input -- the Pond's own deploy/remote-access/README.md warns that this eats the
+        # input of whatever script invoked it. Inheriting this process's stdin would let a
+        # multi-hour poll swallow the operator's terminal a keystroke at a time.
+        done = subprocess.run(command, capture_output=True, text=True, timeout=30,
+                              stdin=subprocess.DEVNULL)
     except (OSError, subprocess.TimeoutExpired) as error:
         return f"{type(error).__name__}: {error}"
     if done.returncode != 0:
