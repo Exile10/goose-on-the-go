@@ -8,17 +8,9 @@ import { Stack } from 'expo-router';
 import React from 'react';
 
 import { Brand, Grey, JaridaPurple } from '@/constants/colors';
-import { useServer } from '@/providers/server-provider';
 import i18n from '@/services/i18n';
 
 export default function StackLayout() {
-  // Pairing is reachable two ways, and they want different headers. Reached from
-  // inside the app to re-pair, there is somewhere to go back to. Reached because
-  // there is no pond -- a fresh install, or a sign-out, or the Pond revoking this
-  // phone -- back would leave the user on a screen the app has already decided
-  // they cannot use, so there is nothing to offer.
-  const { profileId } = useServer();
-  const paired = Boolean(profileId);
   return (
     <Stack
       screenOptions={{
@@ -44,14 +36,7 @@ export default function StackLayout() {
       <Stack.Screen name="restore" options={{ title: i18n.t('nav.restore') }} />
       <Stack.Screen name="privacy" options={{ title: i18n.t('nav.privacy') }} />
       <Stack.Screen name="home-management" options={{ title: i18n.t('nav.homeManagement') }} />
-      <Stack.Screen
-        name="pond-pairing"
-        options={{
-          title: i18n.t('screens.pondPairing'),
-          headerBackVisible: paired,
-          gestureEnabled: paired,
-        }}
-      />
+      <Stack.Screen name="pond-pairing" options={{ title: i18n.t('screens.pondPairing') }} />
       <Stack.Screen name="developer" options={{ title: i18n.t('screens.developer') }} />
       <Stack.Screen name="commission-device" options={{ title: i18n.t('commission.addDevice') }} />
       <Stack.Screen
