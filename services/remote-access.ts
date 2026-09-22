@@ -143,6 +143,41 @@ export async function enableRemoteAccess(profileId: string, localUrl: string, pr
   }
 }
 
+/**
+ * Bring the embedded node back if it did not survive the app being backgrounded.
+ *
+ * The node runs inside the app process, and nothing holds that process up: there is no
+ * foreground service on Android and no background mode on iOS. So returning to the
+ * foreground is the first moment the app can discover the node is gone.
+ *
+ * Nothing used to ask. `AppState` reaches `ConnectionManager.environment`, which re-probes
+ * HTTP endpoints, and probing cannot tell a dead node from an unreachable Pond -- it simply
+ * retries a tailnet address that no longer routes, for as long as the user is prepared to
+ * wait. `restoreRemoteAccess` was called only at mount and at sign-out.
+ *
+ * Returns whether the transport was restarted, so the caller can re-probe immediately
+ * rather than wait for the next scheduled attempt. A resume onto a healthy node costs one
+ * bridge call.
+ */
+export async function resumeRemoteAccess(profileId: string, control: string): Promise<boolean> {
+  // Local-only profiles have no node, and an enrollment in flight is already driving the
+  // transport and must not have it pulled from under it.
+  if (!control || busy) return false;
+  const bridge = NativeModules.PondTls;
+  if (!bridge?.remoteStatus || !bridge.activateRemote) return false;
+  let running = false;
+  try {
+    running = status(await bridge.remoteStatus()).state === 'Running';
+  } catch {
+    // An unreadable status is not evidence of health, and the costs are asymmetric: a
+    // needless restart is a moment, a missed one is no remote access until the next launch.
+    console.warn('[remote] node status unreadable on resume; restarting transport');
+  }
+  if (running) return false;
+  await restoreRemoteAccess(profileId, control);
+  return true;
+}
+
 /** Restore transport before trust, credentials, health checks, or notification streams. */
 export async function restoreRemoteAccess(profileId: string, control: string): Promise<void> {
   generation++;

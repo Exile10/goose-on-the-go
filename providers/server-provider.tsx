@@ -11,7 +11,7 @@ import { configurePondTrust, PondTrustError } from '@/services/pond-trust';
 import { findPondByHost } from '@/services/discovery';
 import { parseConnectionProfile, validPin, isLocalPairingUrl, type ConnectionProfile } from '@/models/connection';
 import i18n from '@/services/i18n';
-import { cancelRemoteAccess, restoreRemoteAccess } from '@/services/remote-access';
+import { cancelRemoteAccess, restoreRemoteAccess, resumeRemoteAccess } from '@/services/remote-access';
 
 interface PairOptions { clientId: string; pairingCode: string; deviceName?: string }
 interface ServerContextValue {
@@ -123,6 +123,23 @@ export function ServerProvider({ children }: PropsWithChildren) {
     } else setIdentity(null);
   }, [manager]);
 
+  /**
+   * The node lives in this process and nothing holds the process up, so coming back to the
+   * foreground is the first chance we get to notice it is gone. Probing alone cannot see
+   * this: a dead node and an unreachable Pond look identical from the HTTP side.
+   */
+  const resumeTransport = useCallback(async () => {
+    const current = saved.current;
+    const remote = current?.profile.remoteAccess;
+    if (!current || remote?.mode !== 'embedded') return;
+    try {
+      // Re-probe only when the transport actually changed underneath us.
+      if (await resumeRemoteAccess(current.identity.id, remote.controlUrl)) await manager.recover();
+    } catch {
+      console.warn('[remote] transport could not be restarted on resume; local access remains enabled');
+    }
+  }, [manager]);
+
   const cancelPairing = useCallback(async () => {
     await committing.current?.catch(() => undefined);
     operation.current++;
@@ -148,7 +165,9 @@ export function ServerProvider({ children }: PropsWithChildren) {
     });
     const appSub = AppState.addEventListener('change', (state) => {
       environment.current.active = state === 'active';
-      if (!staged.current) manager.environment(environment.current.cellular, environment.current.active);
+      if (staged.current) return;
+      manager.environment(environment.current.cellular, environment.current.active);
+      if (state === 'active') void resumeTransport();
     });
     api.setRecovery(manager.recover);
     api.setAuthRevoked(() => manager.revoke());
@@ -184,7 +203,7 @@ export function ServerProvider({ children }: PropsWithChildren) {
       networkSub(); appSub.remove(); manager.environment(false, false);
       api.setRecovery(null); api.setOnTokensRotated(null);
     };
-  }, [manager, restore, invalidateOperation]);
+  }, [manager, restore, invalidateOperation, resumeTransport]);
 
   // Address updates remain non-secret and tied to the saved secure identity.
   useEffect(() => {
