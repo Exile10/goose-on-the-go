@@ -137,4 +137,17 @@ describe('a catalogue the server did not send', () => {
     const api = new PondApiClient('http://pond.test:4000');
     await expect(api.listModels()).resolves.toEqual([{ provider: 'p', name: 'm', is_active: true }]);
   });
+
+  /**
+   * Nine wrappers share the unwrapping, so pinning it through one of them proves
+   * little. Devices is the other end of the same helper: the Home and Devices
+   * screens both map over this list, and `undefined` there fails the same way the
+   * models screen did.
+   */
+  it('applies the same tolerance to the other collections', async () => {
+    setFetch(async () => reply('{}'));
+    const api = new PondApiClient('http://pond.test:4000');
+    await expect(api.listDevices()).resolves.toEqual([]);
+    await expect(api.listSchedules()).resolves.toEqual([]);
+  });
 });
