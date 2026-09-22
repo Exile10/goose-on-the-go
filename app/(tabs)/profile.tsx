@@ -130,11 +130,15 @@ export default function ProfileHub() {
           <View style={styles.charcoalBand} />
           <View style={styles.profileContent}>
             <View style={styles.avatarLarge}>
-              <Text style={styles.avatarLargeText}>J</Text>
+              {/* eslint-disable-next-line i18next/no-literal-string -- placeholder account data, replaced when the Pond supplies the signed-in user */}
+            <Text style={styles.avatarLargeText}>J</Text>
             </View>
+            {/* eslint-disable-next-line i18next/no-literal-string -- placeholder account data */}
             <Text style={styles.profileName}>Jerry Ochieng</Text>
+            {/* eslint-disable-next-line i18next/no-literal-string -- placeholder account data */}
             <Text style={styles.profileEmail}>jerryochieng178@gmail.com</Text>
             <View style={styles.proBadge}>
+              {/* eslint-disable-next-line i18next/no-literal-string -- product name, not translated */}
               <Text style={styles.proBadgeText}>Jarida Pro</Text>
             </View>
           </View>
@@ -172,6 +176,7 @@ export default function ProfileHub() {
         >
           <Text style={styles.signOutText}>{signingOut ? t('profile.signingOut') : t('profile.signOut')}</Text>
         </Pressable>
+        {/* eslint-disable-next-line i18next/no-literal-string -- product name and version, not translated */}
         <Text style={styles.versionText}>Goose on the Go v0.2.0</Text>
         {/* Bottom spacer for tab bar */}
         <View style={{ height: 100 }} />

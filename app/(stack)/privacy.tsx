@@ -16,6 +16,7 @@ import { Grey, JaridaPurple, Brand, Semantic } from '@/constants/colors';
 import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
 import { Spacing } from '@/constants/spacing';
 import { Radii } from '@/constants/radii';
+import i18n from '@/services/i18n';
 
 interface PrivacySection {
   id: string;
@@ -81,13 +82,13 @@ export default function PrivacyScreen() {
       showsVerticalScrollIndicator={false}
     >
       {/* Privacy sections */}
-      <Text style={styles.label}>PRIVACY POLICY</Text>
+      <Text style={styles.label}>{i18n.t('privacy.policyLabel')}</Text>
       {PRIVACY_SECTIONS.map((s) => (
         <ExpandableSection key={s.id} section={s} />
       ))}
 
       {/* Data rights */}
-      <Text style={styles.label}>YOUR DATA RIGHTS</Text>
+      <Text style={styles.label}>{i18n.t('privacy.rightsLabel')}</Text>
       <View style={styles.rightsCard}>
         {DATA_RIGHTS.map((right, i) => (
           <Pressable key={i} style={styles.rightRow}>
@@ -98,7 +99,7 @@ export default function PrivacyScreen() {
       </View>
 
       {/* Licenses */}
-      <Text style={styles.label}>OPEN SOURCE LICENSES</Text>
+      <Text style={styles.label}>{i18n.t('privacy.licensesLabel')}</Text>
       <View style={styles.licensesCard}>
         {LICENSES.map((l, i) => (
           <View key={i} style={[styles.licenseRow, i < LICENSES.length - 1 && styles.licenseDivider]}>

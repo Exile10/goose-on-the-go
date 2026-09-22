@@ -15,6 +15,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { JaridaPurple, Grey } from '@/constants/colors';
 import type { VoiceState } from '@/models/voice';
+import i18n from '@/services/i18n';
 
 interface VoiceOrbProps {
   state: VoiceState;
@@ -69,7 +70,7 @@ export function VoiceOrb({ state, onPress }: VoiceOrbProps) {
         <GIcon name="mic" size={24} color="#fff" />
       </Animated.View>
       <Text style={styles.caption}>
-        {state === 'recording' ? 'Listening\u2026' : state === 'thinking' ? 'Thinking\u2026' : state === 'speaking' ? 'Speaking\u2026' : 'Tap to speak'}
+        {state === 'recording' ? i18n.t('voice.listening') : state === 'thinking' ? i18n.t('voice.thinking') : state === 'speaking' ? i18n.t('voice.speaking') : i18n.t('voice.idle')}
       </Text>
     </Pressable>
   );

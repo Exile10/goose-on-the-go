@@ -31,6 +31,7 @@ import { Grey, JaridaPurple, Brand, Semantic } from '@/constants/colors';
 import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
 import { Spacing } from '@/constants/spacing';
 import { Radii } from '@/constants/radii';
+import i18n from '@/services/i18n';
 
 /** Fallback when a profile has no emoji, so the avatar is never blank. */
 function initial(displayName: string): string {
@@ -63,7 +64,7 @@ const ProfileCard = React.memo(function ProfileCard({
       <View style={styles.actionsRow}>
         <Pressable style={styles.actionBtn} onPress={handleRemove}>
           <GIcon name="trash" size={14} color={Semantic.danger} />
-          <Text style={[styles.actionText, { color: Semantic.danger }]}>Remove</Text>
+          <Text style={[styles.actionText, { color: Semantic.danger }]}>{i18n.t('addUsers.remove')}</Text>
         </Pressable>
       </View>
     </View>
@@ -96,16 +97,14 @@ export default function AddUsersScreen() {
         contentContainerStyle={styles.scroll}
         showsVerticalScrollIndicator={false}
       >
-        <Text style={styles.sectionLabel}>HOUSEHOLD PROFILES</Text>
+        <Text style={styles.sectionLabel}>{i18n.t('addUsers.profiles')}</Text>
 
         {loading ? <ActivityIndicator color={JaridaPurple[500]} /> : null}
 
         {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
         {!loading && data.profiles.length === 0 ? (
-          <Text style={styles.emptyText}>
-            No profiles yet. Add one so your Pond can tell people apart.
-          </Text>
+          <Text style={styles.emptyText}>{i18n.t('addUsers.empty')}</Text>
         ) : null}
 
         {data.profiles.map((p) => (
@@ -114,47 +113,47 @@ export default function AddUsersScreen() {
 
         {showAdd ? (
           <View style={styles.inviteCard}>
-            <Text style={styles.inviteTitle}>Add a profile</Text>
+            <Text style={styles.inviteTitle}>{i18n.t('addUsers.addProfile')}</Text>
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Name</Text>
+              <Text style={styles.inputLabel}>{i18n.t('addUsers.name')}</Text>
               <TextInput
                 style={styles.textInput}
                 value={name}
                 onChangeText={setName}
-                placeholder="Alex"
+                placeholder={i18n.t('addUsers.namePlaceholder')}
                 placeholderTextColor={Grey[400]}
                 autoCapitalize="words"
                 editable={!saving}
               />
             </View>
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Emoji (optional)</Text>
+              <Text style={styles.inputLabel}>{i18n.t('addUsers.emoji')}</Text>
               <TextInput
                 style={styles.textInput}
                 value={emoji}
                 onChangeText={setEmoji}
-                placeholder="Shown on the profile card"
+                placeholder={i18n.t('addUsers.emojiPlaceholder')}
                 placeholderTextColor={Grey[400]}
                 editable={!saving}
               />
             </View>
             <View style={styles.inviteActions}>
               <InkButton variant="quiet" onPress={() => setShowAdd(false)}>
-                Cancel
+                {i18n.t('common.cancel')}
               </InkButton>
               <InkButton
                 variant="primary"
                 disabled={!name.trim() || saving}
                 onPress={submit}
               >
-                {saving ? 'Adding\u2026' : 'Add Profile'}
+                {saving ? i18n.t('addUsers.adding') : i18n.t('addUsers.add')}
               </InkButton>
             </View>
           </View>
         ) : (
           <Pressable style={styles.addBtn} onPress={() => setShowAdd(true)}>
             <GIcon name="plus" size={16} color={JaridaPurple[500]} />
-            <Text style={styles.addBtnText}>Add Profile</Text>
+            <Text style={styles.addBtnText}>{i18n.t('addUsers.add')}</Text>
           </Pressable>
         )}
 

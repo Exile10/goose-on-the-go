@@ -24,6 +24,7 @@ import { Grey, JaridaPurple, Brand, Semantic } from '@/constants/colors';
 import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
 import { Spacing } from '@/constants/spacing';
 import { Radii } from '@/constants/radii';
+import i18n from '@/services/i18n';
 
 const SUGGESTED_PROMPTS = [
   'Turn off all lights',
@@ -39,7 +40,8 @@ const ChatBubble = React.memo(function ChatBubble({ item }: { item: Message }) {
     <View style={[styles.bubbleRow, isUser && styles.bubbleRowUser]}>
       {!isUser && (
         <View style={styles.gooseAvatar}>
-          <Text style={styles.gooseAvatarText}>G</Text>
+          {/* eslint-disable-next-line i18next/no-literal-string -- the Goose mark and product name */}
+        <Text style={styles.gooseAvatarText}>G</Text>
         </View>
       )}
       <View style={[styles.bubble, isUser ? styles.bubbleUser : styles.bubbleAssistant]}>
@@ -56,6 +58,7 @@ const TypingDots = React.memo(function TypingDots() {
   return (
     <View style={styles.bubbleRow}>
       <View style={styles.gooseAvatar}>
+        {/* eslint-disable-next-line i18next/no-literal-string -- the Goose mark and product name */}
         <Text style={styles.gooseAvatarText}>G</Text>
       </View>
       <View style={[styles.bubble, styles.bubbleAssistant]}>
@@ -104,16 +107,19 @@ export default function ChatScreen() {
         <View style={styles.header}>
           <View style={styles.headerLeft}>
             <View style={styles.headerAvatar}>
-              <Text style={styles.headerAvatarText}>G</Text>
+              {/* eslint-disable-next-line i18next/no-literal-string -- the Goose mark and product name */}
+          <Text style={styles.headerAvatarText}>G</Text>
             </View>
             <View>
-              <Text style={styles.headerName}>Goose</Text>
+              {/* eslint-disable-next-line i18next/no-literal-string -- the Goose mark and product name */}
+          <Text style={styles.headerName}>Goose</Text>
               <View style={styles.headerMeta}>
                 <View style={styles.modelBadge}>
-                  <Text style={styles.modelBadgeText}>Goose 2</Text>
+                  {/* eslint-disable-next-line i18next/no-literal-string -- the Goose mark and product name */}
+            <Text style={styles.modelBadgeText}>Goose 2</Text>
                 </View>
                 <View style={styles.statusDot} />
-                <Text style={styles.statusText}>Connected</Text>
+                <Text style={styles.statusText}>{i18n.t('chat.connected')}</Text>
               </View>
             </View>
           </View>
@@ -153,7 +159,7 @@ export default function ChatScreen() {
               style={styles.input}
               value={draft}
               onChangeText={setDraft}
-              placeholder="Message Goose..."
+              placeholder={i18n.t('chat.messagePlaceholder')}
               placeholderTextColor={Grey[400]}
               multiline
               maxLength={4000}
@@ -173,7 +179,7 @@ export default function ChatScreen() {
 
         {/* Powered by footer */}
         <View style={styles.footer}>
-          <Text style={styles.footerText}>Powered by Goose 2</Text>
+          <Text style={styles.footerText}>{i18n.t('chat.poweredBy')}</Text>
         </View>
       </GKeyboardView>
     </SafeAreaView>

@@ -55,10 +55,8 @@ export default function CommissionDeviceScreen() {
     return (
       <View style={styles.centred}>
         <ActivityIndicator color={JaridaPurple[500]} />
-        <Text style={styles.title}>Adding the device</Text>
-        <Text style={styles.desc}>
-          This can take a couple of minutes. Keep the device powered and nearby.
-        </Text>
+        <Text style={styles.title}>{i18n.t('commission.adding')}</Text>
+        <Text style={styles.desc}>{i18n.t('commission.addingDesc')}</Text>
       </View>
     );
   }
@@ -66,22 +64,15 @@ export default function CommissionDeviceScreen() {
   return (
     <GKeyboardView style={styles.container}>
       <GIcon name="device" size={28} color={JaridaPurple[500]} />
-      <Text style={styles.title}>Add a Matter device</Text>
-      <Text style={styles.desc}>
-        Scan or enter the setup code printed on the device or its packaging. A device only
-        accepts pairing for about 15 minutes after it starts up, so power-cycle it first if
-        it has been sitting.
-      </Text>
+      <Text style={styles.title}>{i18n.t('commission.title')}</Text>
+      <Text style={styles.desc}>{i18n.t('commission.desc')}</Text>
 
       {commissioning ? (
-        <Text style={styles.notice}>
-          Your Pond is still starting its Matter controller. Adding a device will not work
-          until it has finished.
-        </Text>
+        <Text style={styles.notice}>{i18n.t('commission.controllerStarting')}</Text>
       ) : null}
 
       <View style={styles.inputGroup}>
-        <Text style={styles.inputLabel}>Setup code</Text>
+        <Text style={styles.inputLabel}>{i18n.t('commission.setupCode')}</Text>
         <TextInput
           style={styles.textInput}
           value={code}
@@ -107,12 +98,12 @@ export default function CommissionDeviceScreen() {
       </View>
 
       <View style={styles.inputGroup}>
-        <Text style={styles.inputLabel}>Name (optional)</Text>
+        <Text style={styles.inputLabel}>{i18n.t('commission.nameOptional')}</Text>
         <TextInput
           style={styles.textInput}
           value={name}
           onChangeText={setName}
-          placeholder="Kitchen light"
+          placeholder={i18n.t('commission.namePlaceholder')}
           placeholderTextColor={Grey[400]}
         />
       </View>
@@ -124,13 +115,11 @@ export default function CommissionDeviceScreen() {
         disabled={!looksLikeTypedSetupCode(code) || commissioning}
         onPress={submit}
       >
-        Add Device
+        {i18n.t('commission.addDevice')}
       </InkButton>
 
       <Text style={styles.footnote}>
-        A device straight out of the box has no Wi-Fi yet and can only be reached over
-        Bluetooth. If it is not found, turn on Bluetooth pairing in your Pond&apos;s Matter
-        settings and try again.
+        {i18n.t('commission.bluetoothFootnote')}
       </Text>
     </GKeyboardView>
   );

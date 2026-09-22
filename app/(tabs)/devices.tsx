@@ -28,6 +28,7 @@ import { Grey, JaridaPurple, Brand, Semantic } from '@/constants/colors';
 import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
 import { Spacing } from '@/constants/spacing';
 import { Radii } from '@/constants/radii';
+import i18n from '@/services/i18n';
 
 /** Icon and accent by device type, falling back to something neutral. */
 const TYPE_STYLE: Record<string, { icon: string; color: string }> = {
@@ -116,13 +117,13 @@ export default function DevicesTab() {
     <SafeAreaView style={styles.safe} edges={['top']}>
       <View style={styles.header}>
         <View>
-          <Text style={styles.headerTitle}>Devices</Text>
+          <Text style={styles.headerTitle}>{i18n.t('devices.title')}</Text>
           <Text style={styles.headerSubtitle}>
-            {data.devices.length === 1 ? '1 device' : `${data.devices.length} devices`}
+            {data.devices.length === 1 ? i18n.t('devices.countOne') : i18n.t('devices.countMany', { count: data.devices.length })}
           </Text>
         </View>
         <Pressable style={styles.manageBtn} onPress={actions.refresh}>
-          <Text style={styles.manageBtnText}>Refresh</Text>
+          <Text style={styles.manageBtnText}>{i18n.t('devices.refresh')}</Text>
         </Pressable>
       </View>
 
@@ -150,14 +151,10 @@ export default function DevicesTab() {
         {/* The controller can take minutes to come up on first use, and nothing
             can be commissioned until it has. Say so rather than failing later. */}
         {data.matter?.state === 'connecting' ? (
-          <Text style={styles.notice}>
-            Your Pond is still starting its Matter controller. New devices cannot be added yet.
-          </Text>
+          <Text style={styles.notice}>{i18n.t('devices.matterStarting')}</Text>
         ) : null}
         {data.matter?.state === 'unreachable' ? (
-          <Text style={styles.noticeError}>
-            Your Pond cannot reach its Matter controller. Existing devices still work.
-          </Text>
+          <Text style={styles.noticeError}>{i18n.t('devices.matterUnreachable')}</Text>
         ) : null}
 
         {loading ? <ActivityIndicator color={JaridaPurple[500]} /> : null}
@@ -165,9 +162,7 @@ export default function DevicesTab() {
         {error ? <Text style={styles.noticeError}>{error}</Text> : null}
 
         {!loading && data.devices.length === 0 ? (
-          <Text style={styles.notice}>
-            No devices registered yet. Commission one to get started.
-          </Text>
+          <Text style={styles.notice}>{i18n.t('devices.empty')}</Text>
         ) : null}
 
         {visibleRooms.map((room) => (
@@ -191,7 +186,7 @@ export default function DevicesTab() {
           onPress={() => router.push('/(stack)/commission-device')}
         >
           <GIcon name="plus" size={20} color={JaridaPurple[500]} />
-          <Text style={styles.addDeviceText}>Add a device</Text>
+          <Text style={styles.addDeviceText}>{i18n.t('devices.addDevice')}</Text>
         </Pressable>
 
         <Pressable
@@ -199,7 +194,7 @@ export default function DevicesTab() {
           onPress={() => router.push('/(stack)/pond-pairing')}
         >
           <GIcon name="plus" size={20} color={JaridaPurple[500]} />
-          <Text style={styles.addDeviceText}>Pair another Pond</Text>
+          <Text style={styles.addDeviceText}>{i18n.t('devices.pairAnother')}</Text>
         </Pressable>
 
         <View style={{ height: 100 }} />

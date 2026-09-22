@@ -18,6 +18,7 @@ import { Grey, JaridaPurple, Brand, Semantic } from '@/constants/colors';
 import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
 import { Spacing } from '@/constants/spacing';
 import { Radii } from '@/constants/radii';
+import i18n from '@/services/i18n';
 
 
 type EnrollState = 'not_enrolled' | 'enrolling' | 'enrolled';
@@ -82,13 +83,11 @@ export default function BiometricsScreen() {
       {/* Info banner */}
       <View style={styles.infoBanner}>
         <GIcon name="shield" size={18} color={JaridaPurple[600]} />
-        <Text style={styles.infoText}>
-          Biometric data is stored locally on your Pond device and never uploaded to the cloud.
-        </Text>
+        <Text style={styles.infoText}>{i18n.t('biometrics.info')}</Text>
       </View>
 
       {/* Biometric methods */}
-      <Text style={styles.sectionLabel}>BIOMETRIC METHODS</Text>
+      <Text style={styles.sectionLabel}>{i18n.t('biometrics.methods')}</Text>
       {methods.map((method) => (
         <View key={method.id} style={styles.methodCard}>
           <View style={styles.methodHeader}>
@@ -110,11 +109,11 @@ export default function BiometricsScreen() {
             {method.state === 'enrolled' ? (
               <View style={styles.enrolledRow}>
                 <View style={[styles.statusBadge, { backgroundColor: Semantic.successSoft }]}>
-                  <Text style={[styles.statusText, { color: Semantic.success }]}>Enrolled</Text>
+                  <Text style={[styles.statusText, { color: Semantic.success }]}>{i18n.t('biometrics.enrolled')}</Text>
                 </View>
                 <Pressable style={styles.reEnrollBtn}>
                   <GIcon name="refresh" size={14} color={JaridaPurple[500]} />
-                  <Text style={styles.reEnrollText}>Re-enroll</Text>
+                  <Text style={styles.reEnrollText}>{i18n.t('biometrics.reEnroll')}</Text>
                 </Pressable>
               </View>
             ) : method.state === 'enrolling' ? (
@@ -122,14 +121,14 @@ export default function BiometricsScreen() {
                 <View style={styles.progressBar}>
                   <View style={styles.progressFill} />
                 </View>
-                <Text style={styles.enrollingText}>Enrolling...</Text>
+                <Text style={styles.enrollingText}>{i18n.t('biometrics.enrolling')}</Text>
               </View>
             ) : (
               <InkButton
                 variant="quiet"
                 onPress={() => startEnrollment(method.id)}
               >
-                Start Enrollment
+                {i18n.t('biometrics.startEnrollment')}
               </InkButton>
             )}
           </View>
@@ -137,18 +136,18 @@ export default function BiometricsScreen() {
           {/* Enrollment steps hint */}
           {method.state === 'not_enrolled' && (
             <View style={styles.stepsHint}>
-              <Text style={styles.stepsTitle}>Setup requires:</Text>
+              <Text style={styles.stepsTitle}>{i18n.t('biometrics.setupRequires')}</Text>
               {method.id === 'face' ? (
                 <>
-                  <Text style={styles.stepItem}>{'\u2022'} Face the Pond camera</Text>
-                  <Text style={styles.stepItem}>{'\u2022'} Turn head slowly left and right</Text>
-                  <Text style={styles.stepItem}>{'\u2022'} Takes about 10 seconds</Text>
+                  <Text style={styles.stepItem}>{'\u2022'} {i18n.t('biometrics.faceCamera')}</Text>
+                  <Text style={styles.stepItem}>{'\u2022'} {i18n.t('biometrics.turnHead')}</Text>
+                  <Text style={styles.stepItem}>{'\u2022'} {i18n.t('biometrics.faceDuration')}</Text>
                 </>
               ) : (
                 <>
-                  <Text style={styles.stepItem}>{'\u2022'} Read 3 sample phrases aloud</Text>
-                  <Text style={styles.stepItem}>{'\u2022'} Speak in your normal voice</Text>
-                  <Text style={styles.stepItem}>{'\u2022'} Takes about 30 seconds</Text>
+                  <Text style={styles.stepItem}>{'\u2022'} {i18n.t('biometrics.readPhrases')}</Text>
+                  <Text style={styles.stepItem}>{'\u2022'} {i18n.t('biometrics.normalVoice')}</Text>
+                  <Text style={styles.stepItem}>{'\u2022'} {i18n.t('biometrics.voiceDuration')}</Text>
                 </>
               )}
             </View>

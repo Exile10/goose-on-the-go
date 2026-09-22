@@ -94,10 +94,12 @@ export default function UserMediaScreen() {
 
         {activeTab === 'analysed' && (
           <View style={styles.analysedList}>
+            {/* eslint-disable i18next/no-literal-string -- fixture data standing in for the Pond's real analyses; deleted when this screen is wired */}
             {[
               { label: 'Kitchen shelf photo', result: 'Identified: cereal, milk, bread, vitamins', time: '2h ago', icon: 'photo' },
               { label: 'Package label scan', result: 'Tracking: 1Z999...4321 \u2014 arriving today', time: '1d ago', icon: 'package' },
               { label: 'Pet cam screenshot', result: 'Goose detected: golden retriever, resting', time: '3d ago', icon: 'activity' },
+            /* eslint-enable i18next/no-literal-string */
             ].map((item, i) => (
               <View key={i} style={styles.analysedCard}>
                 <View style={{ marginRight: Spacing.md }}>

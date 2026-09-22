@@ -18,6 +18,7 @@ import { Grey, JaridaPurple, Brand, Semantic } from '@/constants/colors';
 import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
 import { Spacing } from '@/constants/spacing';
 import { Radii } from '@/constants/radii';
+import i18n from '@/services/i18n';
 
 
 type AnalysisState = 'idle' | 'analysing' | 'done';
@@ -67,12 +68,10 @@ export default function PhotoUploadScreen() {
             <View style={styles.uploadIconWrap}>
               <GIcon name="upload" size={32} color={JaridaPurple[400]} />
             </View>
-            <Text style={styles.uploadTitle}>Tap to upload a photo</Text>
-            <Text style={styles.uploadDesc}>
-              Goose will analyze the image and provide smart suggestions
-            </Text>
+            <Text style={styles.uploadTitle}>{i18n.t('photoUpload.tapToUpload')}</Text>
+            <Text style={styles.uploadDesc}>{i18n.t('photoUpload.uploadDesc')}</Text>
             <View style={styles.uploadFormats}>
-              <Text style={styles.formatText}>JPG, PNG, HEIC up to 25MB</Text>
+              <Text style={styles.formatText}>{i18n.t('photoUpload.formats')}</Text>
             </View>
           </>
         )}
@@ -80,23 +79,19 @@ export default function PhotoUploadScreen() {
         {state === 'analysing' && (
           <View style={styles.analysingWrap}>
             <GIcon name="search" size={28} color={JaridaPurple[500]} />
-            <Text style={styles.analysingTitle}>Analysing...</Text>
+            <Text style={styles.analysingTitle}>{i18n.t('photoUpload.analysing')}</Text>
             <View style={styles.progressBar}>
               <View style={styles.progressFill} />
             </View>
-            <Text style={styles.analysingDesc}>
-              Goose is examining the image for objects, text, and context
-            </Text>
+            <Text style={styles.analysingDesc}>{i18n.t('photoUpload.analysingDesc')}</Text>
           </View>
         )}
 
         {state === 'done' && (
           <View style={styles.doneWrap}>
             <GIcon name="check" size={28} color={Semantic.success} />
-            <Text style={styles.doneTitle}>Analysis Complete</Text>
-            <Text style={styles.doneDesc}>
-              Found {results.length} items in your image
-            </Text>
+            <Text style={styles.doneTitle}>{i18n.t('photoUpload.doneTitle')}</Text>
+            <Text style={styles.doneDesc}>{i18n.t('photoUpload.doneDesc', { count: results.length })}</Text>
           </View>
         )}
       </Pressable>
@@ -104,7 +99,7 @@ export default function PhotoUploadScreen() {
       {/* Results */}
       {state === 'done' && (
         <>
-          <Text style={styles.sectionLabel}>GOOSE SUGGESTIONS</Text>
+          <Text style={styles.sectionLabel}>{i18n.t('photoUpload.suggestions')}</Text>
           {results.map((r, i) => (
             <View key={i} style={styles.resultCard}>
               <View style={styles.resultHeader}>
@@ -119,18 +114,18 @@ export default function PhotoUploadScreen() {
               <View style={styles.resultActions}>
                 <Pressable style={styles.resultAction}>
                   <GIcon name="check" size={14} color={Semantic.success} />
-                  <Text style={[styles.resultActionText, { color: Semantic.success }]}>Accept</Text>
+                  <Text style={[styles.resultActionText, { color: Semantic.success }]}>{i18n.t('photoUpload.accept')}</Text>
                 </Pressable>
                 <Pressable style={styles.resultAction}>
                   <GIcon name="edit" size={14} color={Grey[500]} />
-                  <Text style={styles.resultActionText}>Edit</Text>
+                  <Text style={styles.resultActionText}>{i18n.t('photoUpload.edit')}</Text>
                 </Pressable>
               </View>
             </View>
           ))}
 
           <InkButton variant="quiet" onPress={handleReset}>
-            Upload Another
+            {i18n.t('photoUpload.uploadAnother')}
           </InkButton>
         </>
       )}

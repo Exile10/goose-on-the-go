@@ -22,6 +22,7 @@ import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
 import { Spacing } from '@/constants/spacing';
 import { Radii } from '@/constants/radii';
 import { Shadows } from '@/constants/shadows';
+import i18n from '@/services/i18n';
 
 const SCREEN_LABELS: Record<MigrationScreen, string> = {
   chat: 'Chat',
@@ -56,7 +57,7 @@ function DeveloperScreenContent() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <Text style={styles.sectionTitle}>Server connection</Text>
+      <Text style={styles.sectionTitle}>{i18n.t('developer.serverConnection')}</Text>
       <View style={styles.card}>
         <Text style={styles.screenLabel}>{serverUrl || t('connection.unpaired')}</Text>
         <Pressable onPress={() => router.push('/(stack)/pond-pairing')}>
@@ -66,16 +67,13 @@ function DeveloperScreenContent() {
           <ServerStatus online={online} />
           <Pressable style={styles.testButton} onPress={handleTestConnection} disabled={checking}>
             <GIcon name="refresh" size={14} color={Brand.white} />
-            <Text style={styles.testButtonText}>{checking ? 'Checking…' : 'Test connection'}</Text>
+            <Text style={styles.testButtonText}>{checking ? i18n.t('developer.checking') : i18n.t('developer.testConnection')}</Text>
           </Pressable>
         </View>
       </View>
 
-      <Text style={styles.sectionTitle}>Per-screen backend mode</Text>
-      <Text style={styles.sectionHint}>
-        Flip a screen to “Real” once its backend wiring lands (#9–#15). Mock and real
-        code paths coexist — nothing needs to be deleted to test either one.
-      </Text>
+      <Text style={styles.sectionTitle}>{i18n.t('developer.backendMode')}</Text>
+      <Text style={styles.sectionHint}>{i18n.t('developer.backendHint')}</Text>
       <View style={styles.card}>
         {MIGRATION_SCREENS.map((screen, i) => (
           <View
@@ -85,7 +83,7 @@ function DeveloperScreenContent() {
             <View style={styles.screenRowLeft}>
               <Text style={styles.screenLabel}>{SCREEN_LABELS[screen]}</Text>
               <Text style={styles.screenModeText}>
-                {isScreenReal(screen) ? 'Real backend' : 'Mock data'}
+                {isScreenReal(screen) ? i18n.t('developer.realBackend') : i18n.t('developer.mockData')}
               </Text>
             </View>
             <InkSwitch
@@ -98,9 +96,7 @@ function DeveloperScreenContent() {
 
       <View style={styles.warningBanner}>
         <GIcon name="warn" size={16} color={Semantic.warning} />
-        <Text style={styles.warningText}>
-          This screen is dev-only. It isn’t linked from Settings in production builds.
-        </Text>
+        <Text style={styles.warningText}>{i18n.t('developer.devOnly')}</Text>
       </View>
     </ScrollView>
   );

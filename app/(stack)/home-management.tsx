@@ -20,6 +20,7 @@ import { Grey, JaridaPurple, Brand, Semantic } from '@/constants/colors';
 import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
 import { Spacing } from '@/constants/spacing';
 import { Radii } from '@/constants/radii';
+import i18n from '@/services/i18n';
 
 interface RoomItem {
   id: string;
@@ -70,7 +71,7 @@ export default function HomeManagementScreen() {
         showsVerticalScrollIndicator={false}
       >
         {/* Rooms */}
-        <Text style={styles.sectionLabel}>ROOMS</Text>
+        <Text style={styles.sectionLabel}>{i18n.t('homeManagement.rooms')}</Text>
         {rooms.map((room) => (
           <View key={room.id} style={styles.roomCard}>
             <View style={{ marginRight: Spacing.md }}>
@@ -78,7 +79,7 @@ export default function HomeManagementScreen() {
             </View>
             <View style={styles.roomInfo}>
               <Text style={styles.roomName}>{room.name}</Text>
-              <Text style={styles.roomDevices}>{room.deviceCount} devices</Text>
+              <Text style={styles.roomDevices}>{i18n.t('homeManagement.deviceCount', { count: room.deviceCount })}</Text>
             </View>
             <Pressable style={styles.roomAction}>
               <GIcon name="edit" size={16} color={Grey[400]} />
@@ -95,11 +96,11 @@ export default function HomeManagementScreen() {
         {/* Add room */}
         <Pressable style={styles.addBtn}>
           <GIcon name="plus" size={16} color={JaridaPurple[500]} />
-          <Text style={styles.addBtnText}>Add Room</Text>
+          <Text style={styles.addBtnText}>{i18n.t('homeManagement.addRoom')}</Text>
         </Pressable>
 
         {/* Pond devices */}
-        <Text style={styles.sectionLabel}>POND DEVICES</Text>
+        <Text style={styles.sectionLabel}>{i18n.t('homeManagement.pondDevices')}</Text>
         {POND_DEVICES.map((pd) => (
           <View key={pd.id} style={styles.pondCard}>
             <View style={styles.pondHeader}>
@@ -107,7 +108,7 @@ export default function HomeManagementScreen() {
               <Text style={styles.pondName}>{pd.name}</Text>
             </View>
             <View style={styles.pondMeta}>
-              <Text style={styles.pondFirmware}>Firmware: {pd.firmware}</Text>
+              <Text style={styles.pondFirmware}>{i18n.t('homeManagement.firmware', { version: pd.firmware })}</Text>
               <View style={[styles.pondStatus, { backgroundColor: pd.status === 'online' ? Semantic.successSoft : Grey[100] }]}>
                 <Text style={[styles.pondStatusText, { color: pd.status === 'online' ? Semantic.success : Grey[500] }]}>
                   {pd.status}
@@ -123,7 +124,7 @@ export default function HomeManagementScreen() {
           onPress={() => router.push('/(stack)/pond-pairing')}
         >
           <GIcon name="plus" size={16} color={JaridaPurple[500]} />
-          <Text style={styles.addBtnText}>Pair New Pond Device</Text>
+          <Text style={styles.addBtnText}>{i18n.t('homeManagement.pairDevice')}</Text>
         </Pressable>
 
         <View style={{ height: 32 }} />

@@ -16,6 +16,7 @@ import { Grey, JaridaPurple, Brand, Semantic } from '@/constants/colors';
 import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
 import { Spacing } from '@/constants/spacing';
 import { Radii } from '@/constants/radii';
+import i18n from '@/services/i18n';
 
 /** Day data for the picker */
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -68,7 +69,7 @@ const TimelineRow = React.memo(function TimelineRow({
         </View>
         {!isRoutine && (
           <View style={styles.eventBadge}>
-            <Text style={styles.eventBadgeText}>Event</Text>
+            <Text style={styles.eventBadgeText}>{i18n.t('schedule.eventBadge')}</Text>
           </View>
         )}
       </View>

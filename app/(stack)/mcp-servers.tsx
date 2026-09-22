@@ -17,6 +17,7 @@ import { Grey, JaridaPurple, Brand, Semantic } from '@/constants/colors';
 import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
 import { Spacing } from '@/constants/spacing';
 import { Radii } from '@/constants/radii';
+import i18n from '@/services/i18n';
 
 interface McpServer {
   id: string;
@@ -62,11 +63,11 @@ const ServerCard = React.memo(function ServerCard({ server }: { server: McpServe
 
       <View style={styles.metricsRow}>
         <View style={styles.metric}>
-          <Text style={styles.metricLabel}>Latency</Text>
+          <Text style={styles.metricLabel}>{i18n.t('mcp.latency')}</Text>
           <Text style={styles.metricValue}>{server.latency}</Text>
         </View>
         <View style={styles.metric}>
-          <Text style={styles.metricLabel}>Tools</Text>
+          <Text style={styles.metricLabel}>{i18n.t('mcp.tools')}</Text>
           <Text style={styles.metricValue}>{server.tools}</Text>
         </View>
       </View>
@@ -75,17 +76,17 @@ const ServerCard = React.memo(function ServerCard({ server }: { server: McpServe
       <View style={styles.actionsRow}>
         <Pressable style={styles.actionBtn}>
           <GIcon name="settings" size={14} color={Grey[500]} />
-          <Text style={styles.actionText}>Configure</Text>
+          <Text style={styles.actionText}>{i18n.t('mcp.configure')}</Text>
         </Pressable>
         {server.status === 'error' && (
           <Pressable style={styles.actionBtn}>
             <GIcon name="refresh" size={14} color={Semantic.warning} />
-            <Text style={[styles.actionText, { color: Semantic.warning }]}>Retry</Text>
+            <Text style={[styles.actionText, { color: Semantic.warning }]}>{i18n.t('mcp.retry')}</Text>
           </Pressable>
         )}
         <Pressable style={styles.actionBtn}>
           <GIcon name="trash" size={14} color={Semantic.danger} />
-          <Text style={[styles.actionText, { color: Semantic.danger }]}>Remove</Text>
+          <Text style={[styles.actionText, { color: Semantic.danger }]}>{i18n.t('mcp.remove')}</Text>
         </Pressable>
       </View>
     </View>
@@ -99,7 +100,7 @@ export default function McpServersScreen() {
       contentContainerStyle={styles.scroll}
       showsVerticalScrollIndicator={false}
     >
-      <Text style={styles.sectionLabel}>MCP SERVERS</Text>
+      <Text style={styles.sectionLabel}>{i18n.t('mcp.servers')}</Text>
       {SERVERS.map((s) => (
         <ServerCard key={s.id} server={s} />
       ))}
@@ -107,7 +108,7 @@ export default function McpServersScreen() {
       {/* Add server button */}
       <Pressable style={styles.addBtn}>
         <GIcon name="plus" size={18} color={JaridaPurple[500]} />
-        <Text style={styles.addBtnText}>Add MCP Server</Text>
+        <Text style={styles.addBtnText}>{i18n.t('mcp.addServer')}</Text>
       </Pressable>
 
       <View style={{ height: 32 }} />

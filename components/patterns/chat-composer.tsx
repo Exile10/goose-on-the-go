@@ -9,6 +9,7 @@ import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
 import { JaridaPurple, Grey } from '@/constants/colors';
 import { Radii } from '@/constants/radii';
 import { Spacing } from '@/constants/spacing';
+import i18n from '@/services/i18n';
 
 interface ChatComposerProps {
   onSend: (text: string) => void;
@@ -47,7 +48,7 @@ export function ChatComposer({ onSend, placeholder = 'Message Pond\u2026', disab
           <GIcon name="send" size={14} color="#fff" />
         </Pressable>
       </View>
-      <Text style={styles.hint}>Return to send</Text>
+      <Text style={styles.hint}>{i18n.t('chat.returnToSend')}</Text>
     </View>
   );
 }

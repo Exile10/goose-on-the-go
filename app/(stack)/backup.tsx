@@ -17,6 +17,7 @@ import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
 import { Spacing } from '@/constants/spacing';
 import { Radii } from '@/constants/radii';
 import { Shadows } from '@/constants/shadows';
+import i18n from '@/services/i18n';
 
 const BACKUP_HISTORY = [
   { date: 'Apr 26, 2026', size: '142 MB', status: 'complete' },
@@ -44,37 +45,42 @@ export default function BackupScreen() {
             <GIcon name="download" size={24} color={Semantic.success} />
           </View>
           <View style={styles.statusInfo}>
-            <Text style={styles.statusTitle}>Last Backup</Text>
-            <Text style={styles.statusDate}>Apr 26, 2026 at 3:00 AM</Text>
+            <Text style={styles.statusTitle}>{i18n.t('backup.lastBackup')}</Text>
+            {/* eslint-disable-next-line i18next/no-literal-string -- mock value, replaced by the Pond's real backup data */}
+          <Text style={styles.statusDate}>Apr 26, 2026 at 3:00 AM</Text>
           </View>
         </View>
         <View style={styles.statusMeta}>
           <View style={styles.metaItem}>
-            <Text style={styles.metaLabel}>Size</Text>
+            <Text style={styles.metaLabel}>{i18n.t('backup.size')}</Text>
+            {/* eslint-disable-next-line i18next/no-literal-string -- mock value, replaced by the Pond's real backup data */}
             <Text style={styles.metaValue}>142 MB</Text>
           </View>
           <View style={styles.metaItem}>
-            <Text style={styles.metaLabel}>Duration</Text>
+            <Text style={styles.metaLabel}>{i18n.t('backup.duration')}</Text>
+            {/* eslint-disable-next-line i18next/no-literal-string -- mock value, replaced by the Pond's real backup data */}
             <Text style={styles.metaValue}>2m 14s</Text>
           </View>
           <View style={styles.metaItem}>
-            <Text style={styles.metaLabel}>Status</Text>
+            <Text style={styles.metaLabel}>{i18n.t('backup.status')}</Text>
             <View style={[styles.statusBadge, { backgroundColor: Semantic.successSoft }]}>
+              {/* eslint-disable-next-line i18next/no-literal-string -- mock value, replaced by the Pond's real backup data */}
               <Text style={[styles.statusBadgeText, { color: Semantic.success }]}>Complete</Text>
             </View>
           </View>
         </View>
         <InkButton variant="primary" icon={<GIcon name="download" size={16} color={Brand.white} />}>
-          Backup Now
+          {i18n.t('backup.backupNow')}
         </InkButton>
       </View>
 
       {/* Settings toggles */}
-      <Text style={styles.sectionLabel}>BACKUP SETTINGS</Text>
+      <Text style={styles.sectionLabel}>{i18n.t('backup.settings')}</Text>
       <View style={styles.settingsCard}>
         <View style={styles.settingRow}>
           <View>
-            <Text style={styles.settingTitle}>Automatic Backup</Text>
+            <Text style={styles.settingTitle}>{i18n.t('backup.automatic')}</Text>
+            {/* eslint-disable-next-line i18next/no-literal-string -- mock value, replaced by the Pond's real backup data */}
             <Text style={styles.settingDesc}>Weekly at 3:00 AM</Text>
           </View>
           <InkSwitch checked={autoBackup} onChange={setAutoBackup} />
@@ -82,31 +88,31 @@ export default function BackupScreen() {
         <View style={styles.divider} />
         <View style={styles.settingRow}>
           <View>
-            <Text style={styles.settingTitle}>Include Media</Text>
-            <Text style={styles.settingDesc}>Photos, videos, and analysis</Text>
+            <Text style={styles.settingTitle}>{i18n.t('backup.includeMedia')}</Text>
+            <Text style={styles.settingDesc}>{i18n.t('backup.includeMediaDesc')}</Text>
           </View>
           <InkSwitch checked={includeMedia} onChange={setIncludeMedia} />
         </View>
         <View style={styles.divider} />
         <View style={styles.settingRow}>
           <View>
-            <Text style={styles.settingTitle}>Include Memories</Text>
-            <Text style={styles.settingDesc}>AI memories and preferences</Text>
+            <Text style={styles.settingTitle}>{i18n.t('backup.includeMemories')}</Text>
+            <Text style={styles.settingDesc}>{i18n.t('backup.includeMemoriesDesc')}</Text>
           </View>
           <InkSwitch checked={includeMemories} onChange={setIncludeMemories} />
         </View>
         <View style={styles.divider} />
         <View style={styles.settingRow}>
           <View>
-            <Text style={styles.settingTitle}>Encrypt Backup</Text>
-            <Text style={styles.settingDesc}>AES-256 encryption</Text>
+            <Text style={styles.settingTitle}>{i18n.t('backup.encrypt')}</Text>
+            <Text style={styles.settingDesc}>{i18n.t('backup.encryptDesc')}</Text>
           </View>
           <InkSwitch checked={encryptBackup} onChange={setEncryptBackup} />
         </View>
       </View>
 
       {/* History */}
-      <Text style={styles.sectionLabel}>BACKUP HISTORY</Text>
+      <Text style={styles.sectionLabel}>{i18n.t('backup.history')}</Text>
       {BACKUP_HISTORY.map((b, i) => {
         const isComplete = b.status === 'complete';
         return (

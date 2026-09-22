@@ -21,6 +21,7 @@ import { Grey, JaridaPurple, Brand, Semantic } from '@/constants/colors';
 import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
 import { Spacing } from '@/constants/spacing';
 import { Radii } from '@/constants/radii';
+import i18n from '@/services/i18n';
 
 interface AppIntegration {
   id: string;
@@ -68,18 +69,18 @@ const AppCard = React.memo(function AppCard({
       {/* API key row */}
       {app.enabled && (
         <View style={styles.apiKeyRow}>
-          <Text style={styles.apiKeyLabel}>API Key</Text>
+          <Text style={styles.apiKeyLabel}>{i18n.t('appManagement.apiKey')}</Text>
           <View style={styles.apiKeyInput}>
             <TextInput
               style={styles.apiKeyText}
               value={apiKey}
               onChangeText={setApiKey}
               secureTextEntry={!showKey}
-              placeholder="Enter API key..."
+              placeholder={i18n.t('appManagement.apiKeyPlaceholder')}
               placeholderTextColor={Grey[400]}
             />
             <Pressable onPress={() => setShowKey(!showKey)}>
-              <Text style={styles.showHideText}>{showKey ? 'Hide' : 'Show'}</Text>
+              <Text style={styles.showHideText}>{showKey ? i18n.t('appManagement.hide') : i18n.t('appManagement.show')}</Text>
             </Pressable>
           </View>
         </View>
@@ -92,7 +93,7 @@ const AppCard = React.memo(function AppCard({
         </View>
         {app.hasApiKey && app.enabled && (
           <View style={[styles.statusBadge, { backgroundColor: Semantic.successSoft }]}>
-            <Text style={[styles.statusText, { color: Semantic.success }]}>Connected</Text>
+            <Text style={[styles.statusText, { color: Semantic.success }]}>{i18n.t('appManagement.connected')}</Text>
           </View>
         )}
       </View>
@@ -116,7 +117,7 @@ export default function AppManagementScreen() {
         contentContainerStyle={styles.scroll}
         showsVerticalScrollIndicator={false}
       >
-        <Text style={styles.sectionLabel}>CONNECTED APPS</Text>
+        <Text style={styles.sectionLabel}>{i18n.t('appManagement.connectedApps')}</Text>
         {apps.map((app) => (
           <AppCard key={app.id} app={app} onToggle={handleToggle} />
         ))}

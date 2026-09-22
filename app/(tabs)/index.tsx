@@ -29,6 +29,7 @@ import { Spacing } from '@/constants/spacing';
 import { Radii } from '@/constants/radii';
 import { Shadows } from '@/constants/shadows';
 import { RemoteAccessOffer } from '@/components/patterns/remote-access-offer';
+import i18n from '@/services/i18n';
 
 /** Status chip data */
 const STATUS_CHIPS = [
@@ -82,7 +83,7 @@ const DeviceGridItem = React.memo(function DeviceGridItem({
         {device.name}
       </Text>
       <Text style={styles.deviceDetail}>
-        {!device.is_online ? 'Offline' : power === undefined ? 'Online' : power ? 'On' : 'Off'}
+        {!device.is_online ? i18n.t('devices.stateOffline') : power === undefined ? i18n.t('devices.stateOnline') : power ? i18n.t('devices.stateOn') : i18n.t('devices.stateOff')}
       </Text>
     </View>
   );
@@ -122,10 +123,12 @@ export default function HomeScreen() {
         {/* Greeting header */}
         <View style={styles.greetingRow}>
           <View style={styles.greetingText}>
-            <Text style={styles.greetingLabel}>Good morning,</Text>
+            <Text style={styles.greetingLabel}>{i18n.t('home.greeting')}</Text>
+            {/* eslint-disable-next-line i18next/no-literal-string -- placeholder data, replaced when the Pond supplies it */}
             <Text style={styles.greetingName}>Jerry</Text>
           </View>
           <View style={styles.avatar}>
+            {/* eslint-disable-next-line i18next/no-literal-string -- placeholder data, replaced when the Pond supplies it */}
             <Text style={styles.avatarText}>J</Text>
           </View>
         </View>
@@ -146,7 +149,7 @@ export default function HomeScreen() {
           <GIcon name="search" size={18} color={Grey[400]} />
           <TextInput
             style={styles.askInput}
-            placeholder="Ask Goose anything..."
+            placeholder={i18n.t('home.askPlaceholder')}
             placeholderTextColor={Grey[400]}
             value={askText}
             onChangeText={setAskText}
@@ -157,12 +160,14 @@ export default function HomeScreen() {
         </Pressable>
 
         {/* Right Now section */}
-        <Text style={styles.sectionLabel}>RIGHT NOW</Text>
+        <Text style={styles.sectionLabel}>{i18n.t('home.rightNow')}</Text>
         <View style={styles.rightNowRow}>
           {/* Now playing card */}
           <View style={styles.nowPlayingCard}>
-            <Text style={styles.nowPlayingLabel}>Now Playing</Text>
+            <Text style={styles.nowPlayingLabel}>{i18n.t('home.nowPlaying')}</Text>
+            {/* eslint-disable-next-line i18next/no-literal-string -- placeholder data, replaced when the Pond supplies it */}
             <Text style={styles.nowPlayingTitle}>Lo-fi Beats</Text>
+            {/* eslint-disable-next-line i18next/no-literal-string -- placeholder data, replaced when the Pond supplies it */}
             <Text style={styles.nowPlayingArtist}>Living Room Speaker</Text>
             <View style={styles.waveformRow}>
               {waveBarHeights.map((height, i) => (
@@ -176,17 +181,20 @@ export default function HomeScreen() {
 
           {/* Next event card */}
           <View style={styles.nextEventCard}>
-            <Text style={styles.nextEventLabel}>Next Event</Text>
+            <Text style={styles.nextEventLabel}>{i18n.t('home.nextEvent')}</Text>
+            {/* eslint-disable-next-line i18next/no-literal-string -- placeholder data, replaced when the Pond supplies it */}
             <Text style={styles.nextEventTitle}>Team Standup</Text>
+            {/* eslint-disable-next-line i18next/no-literal-string -- placeholder data, replaced when the Pond supplies it */}
             <Text style={styles.nextEventTime}>2:00 PM</Text>
             <View style={styles.nextEventBadge}>
+              {/* eslint-disable-next-line i18next/no-literal-string -- placeholder data, replaced when the Pond supplies it */}
               <Text style={styles.nextEventBadgeText}>In 45 min</Text>
             </View>
           </View>
         </View>
 
         {/* Shortcuts carousel */}
-        <Text style={styles.sectionLabel}>SHORTCUTS</Text>
+        <Text style={styles.sectionLabel}>{i18n.t('home.shortcuts')}</Text>
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -202,9 +210,9 @@ export default function HomeScreen() {
 
         {/* Devices grid */}
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionLabel}>DEVICES</Text>
+          <Text style={styles.sectionLabel}>{i18n.t('home.devices')}</Text>
           <Pressable onPress={() => router.push('/(tabs)/devices')}>
-            <Text style={styles.seeAllText}>See all</Text>
+            <Text style={styles.seeAllText}>{i18n.t('home.seeAll')}</Text>
           </Pressable>
         </View>
         <View style={styles.devicesGrid}>
@@ -219,7 +227,7 @@ export default function HomeScreen() {
         </View>
 
         {/* Recent conversations */}
-        <Text style={styles.sectionLabel}>RECENT CONVERSATIONS</Text>
+        <Text style={styles.sectionLabel}>{i18n.t('home.recentConversations')}</Text>
         {recent.data.sessions.map((c) => (
           <Pressable key={c.id} style={styles.convoRow}>
             <View style={styles.convoIcon}>
@@ -232,7 +240,7 @@ export default function HomeScreen() {
         {/* Say why the strip is empty. A blank gap reads as a broken screen. */}
         {!recent.loading && recent.data.sessions.length === 0 ? (
           <Text style={styles.convoEmpty}>
-            {recent.error ?? 'No conversations yet. Ask your Pond something.'}
+            {recent.error ?? i18n.t('home.noConversations')}
           </Text>
         ) : null}
 

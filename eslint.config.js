@@ -4,24 +4,21 @@ const expoConfig = require('eslint-config-expo/flat');
 const i18next = require('eslint-plugin-i18next');
 
 /**
- * Screens and components whose copy is covered by `services/i18n.ts`.
+ * Every file that renders user-facing copy.
  *
- * i18n here is scoped on purpose — see docs/I18N.md. It covers connection, pairing,
- * remote access, trust, and the errors a user meets when something is wrong; it does not
- * cover the rest of the app. This list is the enforced half of that decision, so a bare
- * string added to one of these files fails the build rather than relying on somebody
- * remembering the convention.
+ * i18n used to cover about a fifth of the app, and the rule demanding more lived only in an
+ * untracked agent-guidance file -- so it was resolved ad hoc each time somebody added a
+ * line of copy. The copy has now been migrated and the rule applies everywhere, which is
+ * what makes it a rule rather than an intention: a bare user-facing string in any of these
+ * files fails the build.
  *
- * Files that mix covered and uncovered copy are deliberately absent, because enforcing on
- * them would drag unrelated copy into the rule by accident. docs/I18N.md names them.
+ * Literals that are not copy carry a targeted disable naming what they are -- placeholder
+ * data awaiting a real Pond response, or a product name. Those disables are the list of
+ * things still to do on each screen, and they go when the screen is wired.
+ *
+ * See docs/I18N.md.
  */
-const TRANSLATED_SURFACE = [
-  '**/pond-pairing.tsx',
-  '**/remote-access.tsx',
-  '**/connect-desktop.tsx',
-  'components/patterns/connection-status.tsx',
-  'components/patterns/remote-access-offer.tsx',
-];
+const TRANSLATED_SURFACE = ['app/**/*.tsx', 'components/**/*.tsx', 'view-models/**/*.ts'];
 
 module.exports = defineConfig([
   expoConfig,

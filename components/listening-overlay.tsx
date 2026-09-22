@@ -24,6 +24,7 @@ import { Brand, JaridaPurple, Grey } from '@/constants/colors';
 import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
 import { Spacing } from '@/constants/spacing';
 import { Radii } from '@/constants/radii';
+import i18n from '@/services/i18n';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -137,19 +138,20 @@ function ListeningOverlayInner({ visible, onCancel }: ListeningOverlayProps) {
 
           {/* Center Goose logo */}
           <View style={styles.logoCircle}>
+            {/* eslint-disable-next-line i18next/no-literal-string -- the Goose mark, not copy */}
             <Text style={styles.logoText}>G</Text>
           </View>
         </View>
 
         {/* Listening label */}
-        <Text style={styles.listeningLabel}>Listening...</Text>
+        <Text style={styles.listeningLabel}>{i18n.t('voice.listening')}</Text>
 
         {/* Waveform */}
         <WaveformBars />
 
         {/* Suggested phrases */}
         <View style={styles.suggestedSection}>
-          <Text style={styles.suggestedTitle}>Try saying:</Text>
+          <Text style={styles.suggestedTitle}>{i18n.t('voice.trySaying')}</Text>
           {SUGGESTED_PHRASES.map((phrase) => (
             <Pressable key={phrase} style={styles.phraseChip}>
               <Text style={styles.phraseText}>{`"${phrase}"`}</Text>
@@ -159,7 +161,7 @@ function ListeningOverlayInner({ visible, onCancel }: ListeningOverlayProps) {
 
         {/* Cancel button */}
         <Pressable style={styles.cancelBtn} onPress={onCancel}>
-          <Text style={styles.cancelText}>Cancel</Text>
+          <Text style={styles.cancelText}>{i18n.t('common.cancel')}</Text>
         </Pressable>
       </View>
     </Modal>

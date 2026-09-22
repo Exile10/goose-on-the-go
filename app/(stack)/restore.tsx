@@ -17,6 +17,7 @@ import { Grey, JaridaPurple, Brand, Semantic } from '@/constants/colors';
 import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
 import { Spacing } from '@/constants/spacing';
 import { Radii } from '@/constants/radii';
+import i18n from '@/services/i18n';
 
 type RestoreState = 'select' | 'progress' | 'complete';
 
@@ -74,13 +75,11 @@ export default function RestoreScreen() {
           {/* Info */}
           <View style={styles.infoBanner}>
             <GIcon name="refresh" size={18} color={JaridaPurple[600]} />
-            <Text style={styles.infoText}>
-              Restore your Pond device from a previous backup. This will replace current settings, memories, and device configurations.
-            </Text>
+            <Text style={styles.infoText}>{i18n.t('restore.info')}</Text>
           </View>
 
           {/* Backup selection */}
-          <Text style={styles.sectionLabel}>SELECT A BACKUP</Text>
+          <Text style={styles.sectionLabel}>{i18n.t('restore.selectBackup')}</Text>
           {BACKUPS.map((b) => (
             <Pressable
               key={b.id}
@@ -98,10 +97,10 @@ export default function RestoreScreen() {
               </View>
               <View style={styles.backupMeta}>
                 <View style={styles.metaChip}>
-                  <Text style={styles.metaText}>{b.devices} devices</Text>
+                  <Text style={styles.metaText}>{i18n.t('restore.deviceCount', { count: b.devices })}</Text>
                 </View>
                 <View style={styles.metaChip}>
-                  <Text style={styles.metaText}>{b.rooms} rooms</Text>
+                  <Text style={styles.metaText}>{i18n.t('restore.roomCount', { count: b.rooms })}</Text>
                 </View>
               </View>
             </Pressable>
@@ -112,7 +111,7 @@ export default function RestoreScreen() {
             onPress={handleRestore}
             disabled={!selectedBackup}
           >
-            Restore from Backup
+            {i18n.t('restore.fromBackup')}
           </InkButton>
         </>
       )}
@@ -120,10 +119,8 @@ export default function RestoreScreen() {
       {state === 'progress' && (
         <View style={styles.progressWrap}>
           <GIcon name="refresh" size={28} color="#8C4BFF" />
-          <Text style={styles.progressTitle}>Restoring...</Text>
-          <Text style={styles.progressDesc}>
-            Transferring data to your Pond device. Do not disconnect power.
-          </Text>
+          <Text style={styles.progressTitle}>{i18n.t('restore.restoring')}</Text>
+          <Text style={styles.progressDesc}>{i18n.t('restore.restoringDesc')}</Text>
           <View style={styles.progressBarWrap}>
             <View style={[styles.progressFill, { width: `${progress}%` }]} />
           </View>
@@ -133,25 +130,25 @@ export default function RestoreScreen() {
               {progress > 20
                 ? <GIcon name="check" size={12} color="#1F8A3C" />
                 : <View style={{ width: 12, height: 12, borderRadius: 6, borderWidth: 1.5, borderColor: '#D9D9D9' }} />}
-              <Text style={[styles.progressStep, progress > 20 && styles.progressStepDone]}>Settings</Text>
+              <Text style={[styles.progressStep, progress > 20 && styles.progressStepDone]}>{i18n.t('restore.stepSettings')}</Text>
             </View>
             <View style={styles.progressStepRow}>
               {progress > 50
                 ? <GIcon name="check" size={12} color="#1F8A3C" />
                 : <View style={{ width: 12, height: 12, borderRadius: 6, borderWidth: 1.5, borderColor: '#D9D9D9' }} />}
-              <Text style={[styles.progressStep, progress > 50 && styles.progressStepDone]}>Memories</Text>
+              <Text style={[styles.progressStep, progress > 50 && styles.progressStepDone]}>{i18n.t('restore.stepMemories')}</Text>
             </View>
             <View style={styles.progressStepRow}>
               {progress > 75
                 ? <GIcon name="check" size={12} color="#1F8A3C" />
                 : <View style={{ width: 12, height: 12, borderRadius: 6, borderWidth: 1.5, borderColor: '#D9D9D9' }} />}
-              <Text style={[styles.progressStep, progress > 75 && styles.progressStepDone]}>Devices</Text>
+              <Text style={[styles.progressStep, progress > 75 && styles.progressStepDone]}>{i18n.t('restore.stepDevices')}</Text>
             </View>
             <View style={styles.progressStepRow}>
               {progress >= 100
                 ? <GIcon name="check" size={12} color="#1F8A3C" />
                 : <View style={{ width: 12, height: 12, borderRadius: 6, borderWidth: 1.5, borderColor: '#D9D9D9' }} />}
-              <Text style={[styles.progressStep, progress >= 100 && styles.progressStepDone]}>Routines</Text>
+              <Text style={[styles.progressStep, progress >= 100 && styles.progressStepDone]}>{i18n.t('restore.stepRoutines')}</Text>
             </View>
           </View>
         </View>
@@ -160,12 +157,10 @@ export default function RestoreScreen() {
       {state === 'complete' && (
         <View style={styles.completeWrap}>
           <GIcon name="sparkle" size={28} color="#1F8A3C" />
-          <Text style={styles.completeTitle}>Restore Complete!</Text>
-          <Text style={styles.completeDesc}>
-            Your Pond device has been restored successfully. All settings, memories, and device configurations are back.
-          </Text>
+          <Text style={styles.completeTitle}>{i18n.t('restore.completeTitle')}</Text>
+          <Text style={styles.completeDesc}>{i18n.t('restore.completeDesc')}</Text>
           <InkButton variant="primary" onPress={handleDone}>
-            Done
+            {i18n.t('restore.done')}
           </InkButton>
         </View>
       )}
