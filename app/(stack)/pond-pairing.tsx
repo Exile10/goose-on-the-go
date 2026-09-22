@@ -82,7 +82,7 @@ function ScanLink({ onPress }: { onPress: () => void }) {
   return (
     <Pressable onPress={onPress} hitSlop={8} style={styles.scanLink}>
       <GIcon name="camera" size={16} color={JaridaPurple[500]} />
-      <Text style={styles.scanLinkText}>Scan QR code instead</Text>
+      <Text style={styles.scanLinkText}>{i18n.t('pairing.scanInstead')}</Text>
     </Pressable>
   );
 }
@@ -155,24 +155,19 @@ function DiscoverStep({
       )}
 
       <Text style={styles.stepTitle}>
-        {data.phase === 'searching' ? 'Looking for your Pond' : 'Connect to GIAP'}
+        {data.phase === 'searching' ? i18n.t('pairing.searchingTitle') : i18n.t('pairing.connectTitle')}
       </Text>
 
       {data.phase === 'searching' ? (
-        <Text style={styles.stepDesc}>Searching this Wi-Fi network.</Text>
+        <Text style={styles.stepDesc}>{i18n.t('pairing.searchingDesc')}</Text>
       ) : null}
 
       {data.phase === 'empty' ? (
-        <Text style={styles.stepDesc}>
-          No Pond answered on this network. Check that it is running and that this phone is on
-          the same Wi-Fi, or enter its address below.
-        </Text>
+        <Text style={styles.stepDesc}>{i18n.t('pairing.noneFound')}</Text>
       ) : null}
 
       {data.phase === 'failed' ? (
-        <Text style={styles.stepError}>
-          {error} You can still enter the address by hand.
-        </Text>
+        <Text style={styles.stepError}>{i18n.t('pairing.searchFailed', { error })}</Text>
       ) : null}
 
       {data.ponds.map((pond) => (
@@ -192,12 +187,12 @@ function DiscoverStep({
 
       {data.phase !== 'searching' ? (
         <InkButton variant="quiet" onPress={actions.retry}>
-          Search again
+          {i18n.t('pairing.searchAgain')}
         </InkButton>
       ) : null}
 
       <Pressable onPress={onManual} hitSlop={8} style={styles.scanLink}>
-        <Text style={styles.scanLinkText}>Enter address manually</Text>
+        <Text style={styles.scanLinkText}>{i18n.t('pairing.enterManually')}</Text>
       </Pressable>
       <ScanLink onPress={onScan} />
     </StepBody>
@@ -297,13 +292,10 @@ function ServerStep({
   return (
     <StepBody>
       <GIcon name="search" size={28} color={JaridaPurple[500]} />
-      <Text style={styles.stepTitle}>Connect to GIAP</Text>
-      <Text style={styles.stepDesc}>
-        Enter the URL of your Goose In A Pond server — shown in the dashboard
-        banner on the host machine.
-      </Text>
+      <Text style={styles.stepTitle}>{i18n.t('pairing.connectTitle')}</Text>
+      <Text style={styles.stepDesc}>{i18n.t('pairing.connectDesc')}</Text>
       <View style={styles.inputGroup}>
-        <Text style={styles.inputLabel}>Server URL</Text>
+        <Text style={styles.inputLabel}>{i18n.t('pairing.serverUrl')}</Text>
         <TextInput
           style={styles.textInput}
           value={url}
@@ -333,7 +325,7 @@ function ServerStep({
         disabled={!url.trim() || checking}
         onPress={submit}
       >
-        {checking ? i18n.t('pairing.fingerprintSearching') : 'Continue'}
+        {checking ? i18n.t('pairing.fingerprintSearching') : i18n.t('pairing.continueAction')}
       </InkButton>
       <ScanLink onPress={onScan} />
     </StepBody>
@@ -355,13 +347,10 @@ function PairingCodeStep({
   return (
     <StepBody>
       <GIcon name="wifi" size={28} color={JaridaPurple[500]} />
-      <Text style={styles.stepTitle}>Enter Pairing Code</Text>
-      <Text style={styles.stepDesc}>
-        The 6-digit code is shown on the GIAP host&apos;s dashboard or terminal
-        when the server starts. It expires after 10 minutes.
-      </Text>
+      <Text style={styles.stepTitle}>{i18n.t('pairing.codeTitle')}</Text>
+      <Text style={styles.stepDesc}>{i18n.t('pairing.codeDesc')}</Text>
       <View style={styles.inputGroup}>
-        <Text style={styles.inputLabel}>Code</Text>
+        <Text style={styles.inputLabel}>{i18n.t('pairing.codeLabel')}</Text>
         <TextInput
           style={styles.textInput}
           value={code}
@@ -377,7 +366,7 @@ function PairingCodeStep({
         disabled={!valid}
         onPress={() => onNext(code)}
       >
-        Continue
+        {i18n.t('pairing.continueAction')}
       </InkButton>
       <ScanLink onPress={onScan} />
     </StepBody>
@@ -390,18 +379,15 @@ function NameStep({ onNext }: { onNext: (name: string) => void }) {
   return (
     <StepBody>
       <GIcon name="edit" size={28} color={JaridaPurple[500]} />
-      <Text style={styles.stepTitle}>Name This Phone</Text>
-      <Text style={styles.stepDesc}>
-        This name shows up in the GIAP devices list — pick something you&apos;ll
-        recognize.
-      </Text>
+      <Text style={styles.stepTitle}>{i18n.t('pairing.nameTitle')}</Text>
+      <Text style={styles.stepDesc}>{i18n.t('pairing.nameDesc')}</Text>
       <View style={styles.inputGroup}>
-        <Text style={styles.inputLabel}>Device Name</Text>
+        <Text style={styles.inputLabel}>{i18n.t('pairing.nameLabel')}</Text>
         <TextInput
           style={styles.textInput}
           value={name}
           onChangeText={setName}
-          placeholder="e.g., Emmanuel's iPhone"
+          placeholder={i18n.t('pairing.namePlaceholder')}
           placeholderTextColor={Grey[400]}
         />
       </View>
@@ -410,7 +396,7 @@ function NameStep({ onNext }: { onNext: (name: string) => void }) {
         disabled={!name.trim()}
         onPress={() => onNext(name.trim())}
       >
-        Pair Device
+        {i18n.t('pairing.pairDevice')}
       </InkButton>
     </StepBody>
   );
@@ -491,10 +477,8 @@ function CompleteStep({
     return (
       <StepBody>
         <ActivityIndicator size="large" color={JaridaPurple[500]} />
-        <Text style={styles.stepTitle}>Pairing…</Text>
-        <Text style={styles.stepDesc}>
-          Verifying the code and exchanging tokens with your GIAP server.
-        </Text>
+        <Text style={styles.stepTitle}>{i18n.t('pairing.inProgress')}</Text>
+        <Text style={styles.stepDesc}>{i18n.t('pairing.inProgressDesc')}</Text>
       </StepBody>
     );
   }
@@ -502,12 +486,12 @@ function CompleteStep({
     return (
       <StepBody>
         <GIcon name="x" size={28} color={Semantic.danger} />
-        <Text style={styles.stepTitle}>Pairing failed</Text>
+        <Text style={styles.stepTitle}>{i18n.t('pairing.failedTitle')}</Text>
         <Text style={styles.stepDesc}>
-          {reason ?? 'The server rejected the pairing attempt. Double-check the code and try again.'}
+          {reason ?? i18n.t('pairing.failedDesc')}
         </Text>
         <InkButton variant="primary" onPress={onRetry}>
-          Try again
+          {i18n.t('pairing.tryAgain')}
         </InkButton>
       </StepBody>
     );
@@ -517,7 +501,7 @@ function CompleteStep({
   return (
     <StepBody>
       <ActivityIndicator size="large" color={JaridaPurple[500]} />
-      <Text style={styles.stepTitle}>Pairing\u2026</Text>
+      <Text style={styles.stepTitle}>{i18n.t('pairing.inProgress')}</Text>
     </StepBody>
   );
 }

@@ -110,7 +110,7 @@ export default function ConnectDesktopScreen() {
           payload = parsePairingPayload(data);
         } catch (e) {
           if (!(e instanceof InvalidPairingCodeError)) {
-            return reject('Could not read that code. Try again.');
+            return reject(i18n.t('pairing.codeUnreadable'));
           }
           // Name the mistake rather than just rejecting it: a Matter device's
           // code is valid, only in a different part of the app, and sending the
@@ -174,21 +174,21 @@ export default function ConnectDesktopScreen() {
     return (
       <View style={styles.permissionContainer}>
         <GIcon name="camera" size={32} color={JaridaPurple[500]} />
-        <Text style={styles.permissionTitle}>Camera access needed</Text>
+        <Text style={styles.permissionTitle}>{i18n.t('pairing.cameraTitle')}</Text>
         <Text style={styles.permissionDesc}>
           {matter
             ? i18n.t('commission.camera')
-            : 'Scanning the pairing code needs the camera. You can also enter the six digits by hand instead.'}
+            : i18n.t('pairing.cameraDesc')}
         </Text>
         <InkButton
           variant="primary"
           onPress={canPrompt ? requestPermission : () => void Linking.openSettings()}
         >
-          {canPrompt ? 'Enable Camera' : 'Open Settings'}
+          {canPrompt ? i18n.t('pairing.enableCamera') : i18n.t('pairing.openSettings')}
         </InkButton>
         <Pressable onPress={() => router.back()} hitSlop={8}>
           <Text style={styles.cancel}>
-            {matter ? i18n.t('commission.type') : 'Enter the code instead'}
+            {matter ? i18n.t('commission.type') : i18n.t('pairing.typeInstead')}
           </Text>
         </Pressable>
       </View>
@@ -207,7 +207,7 @@ export default function ConnectDesktopScreen() {
           it sits below the status bar rather than under it. */}
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel="Close scanner"
+        accessibilityLabel={i18n.t('pairing.closeScanner')}
         onPress={() => router.back()}
         hitSlop={12}
         style={[styles.close, { top: insets.top + Spacing.sm }]}
@@ -243,25 +243,25 @@ export default function ConnectDesktopScreen() {
         {error ? (
           <View style={styles.statusCard}>
             <GIcon name="warn" size={28} color={Semantic.danger} />
-            <Text style={styles.statusTitle}>Could not use that code</Text>
+            <Text style={styles.statusTitle}>{i18n.t('pairing.codeRejected')}</Text>
             <Text style={styles.statusDesc}>{error}</Text>
             <InkButton variant="primary" onPress={retry}>
-              Scan again
+              {i18n.t('pairing.scanAgain')}
             </InkButton>
           </View>
         ) : (
           <Text style={styles.hint}>
             {holding
-              ? 'Hold steady\u2026'
+              ? i18n.t('pairing.holdSteady')
               : matter
                 ? i18n.t('commission.aim')
-                : "Point the camera at the QR code on your Pond's dashboard"}
+                : i18n.t('pairing.aimAtPond')}
           </Text>
         )}
 
         <Pressable onPress={() => router.back()} hitSlop={8}>
           <Text style={styles.cancel}>
-            {matter ? i18n.t('commission.type') : 'Enter the code instead'}
+            {matter ? i18n.t('commission.type') : i18n.t('pairing.typeInstead')}
           </Text>
         </Pressable>
       </View>

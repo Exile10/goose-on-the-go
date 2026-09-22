@@ -44,6 +44,32 @@ void i18n.use(initReactI18next).init({
       failed: 'Could not pair securely with this Pond.',
       saving: 'Could not save this pairing. Your previous Pond is still selected.',
       address: 'HTTPS Pond address', code: 'Pairing code',
+      // The local pairing wizard. Covered by the lint rule in eslint.config.js, so a bare
+      // string added to pond-pairing.tsx or connect-desktop.tsx now fails the build.
+      scanInstead: 'Scan QR code instead', enterManually: 'Enter address manually',
+      searchingTitle: 'Looking for your Pond', searchingDesc: 'Searching this Wi-Fi network.',
+      noneFound: 'No Pond answered on this network. Check that it is running and that this phone is on the same Wi-Fi, or enter its address below.',
+      searchFailed: '{{error}} You can still enter the address by hand.', searchAgain: 'Search again',
+      connectTitle: 'Connect to GIAP',
+      connectDesc: 'Enter the URL of your Goose In A Pond server \u2014 shown in the dashboard banner on the host machine.',
+      serverUrl: 'Server URL', continueAction: 'Continue',
+      codeTitle: 'Enter Pairing Code',
+      codeDesc: 'The 6-digit code is shown on the GIAP host\'s dashboard or terminal when the server starts. It expires after 10 minutes.',
+      codeLabel: 'Code',
+      nameTitle: 'Name This Phone',
+      nameDesc: 'This name shows up in the GIAP devices list \u2014 pick something you\'ll recognize.',
+      nameLabel: 'Device Name', namePlaceholder: 'e.g., Emmanuel\'s iPhone', pairDevice: 'Pair Device',
+      inProgress: 'Pairing\u2026', inProgressDesc: 'Verifying the code and exchanging tokens with your GIAP server.',
+      failedTitle: 'Pairing failed',
+      failedDesc: 'The server rejected the pairing attempt. Double-check the code and try again.',
+      tryAgain: 'Try again',
+      // The desktop-pairing scanner.
+      cameraTitle: 'Camera access needed',
+      cameraDesc: 'Scanning the pairing code needs the camera. You can also enter the six digits by hand instead.',
+      enableCamera: 'Enable Camera', openSettings: 'Open Settings', typeInstead: 'Enter the code instead',
+      closeScanner: 'Close scanner', codeRejected: 'Could not use that code', scanAgain: 'Scan again',
+      codeUnreadable: 'Could not read that code. Try again.',
+      holdSteady: 'Hold steady\u2026', aimAtPond: 'Point the camera at the QR code on your Pond\'s dashboard',
     },
     // The Matter commissioning path. The rest of the copy on those two screens
     // is still hardcoded in the components; these are the strings this change
