@@ -45,7 +45,10 @@ const native = () => {
 };
 function status(raw: string): NativeStatus {
   const value = JSON.parse(raw) as NativeStatus;
-  if (typeof value.state !== 'string' || !Array.isArray(value.addresses)) throw new Error(i18n.t('remote.failed'));
+  if (typeof value.state !== 'string' || !Array.isArray(value.addresses)) {
+    console.warn('[remote] native status was not the expected shape:', raw.slice(0, 200));
+    throw new Error(i18n.t('remote.failed'));
+  }
   return value;
 }
 export async function cancelRemoteAccess(): Promise<void> {
@@ -91,14 +94,22 @@ export async function enableRemoteAccess(profileId: string, localUrl: string, pr
         const info = await api.requestLocal<{ tailnet_address?: string; https_port?: number }>(localUrl, '/api/v1/system/info');
         check();
         const ip = info.tailnet_address?.split('.').map(Number);
-        if (!ip || ip.length !== 4 || ip.some((n) => !Number.isInteger(n) || n < 0 || n > 255) || ip[0] !== 100 || ip[1] < 64 || ip[1] > 127 || !Number.isInteger(info.https_port) || info.https_port! < 1 || info.https_port! > 65535) throw new Error(i18n.t('remote.failed'));
+        if (!ip || ip.length !== 4 || ip.some((n) => !Number.isInteger(n) || n < 0 || n > 255) || ip[0] !== 100 || ip[1] < 64 || ip[1] > 127 || !Number.isInteger(info.https_port) || info.https_port! < 1 || info.https_port! > 65535) {
+          // Names both values: an IPv6-only tailnet address, or a missing port,
+          // are indistinguishable from a malformed one in the message shown.
+          console.warn('[remote] Pond reported an unusable tailnet endpoint:', JSON.stringify({ tailnet_address: info.tailnet_address, https_port: info.https_port }));
+          throw new Error(i18n.t('remote.failed'));
+        }
         // This address came from an authenticated request to the pinned local Pond.
         const endpoint = normalizeHttpsUrl(`https://${info.tailnet_address}:${info.https_port}`);
         check(); await commit(endpoint, control, check); committed = true;
         progress('enabled'); return;
       }
       if (state.authUrl && !submitted) {
-        if (new URL(state.authUrl).origin !== control) throw new Error(i18n.t('remote.failed'));
+        if (new URL(state.authUrl).origin !== control) {
+          console.warn('[remote] node offered an authUrl for a different coordinator:', new URL(state.authUrl).origin, 'expected', control);
+          throw new Error(i18n.t('remote.failed'));
+        }
         submitted = true;
         // Never automatically replay this enrollment write after an ambiguous failure.
         const body = JSON.stringify({ authUrl: state.authUrl, nodeKey: state.nodeKey ?? '', machineKey: state.machineKey ?? '' });
@@ -135,6 +146,7 @@ export async function enableRemoteAccess(profileId: string, localUrl: string, pr
       await new Promise<void>((resolve) => setTimeout(resolve, 1000));
       check(); state = status(await native().remoteStatus());
     }
+    console.warn('[remote] node did not reach Running within the enrollment window; last state:', state.state);
     throw new Error(i18n.t('remote.failed'));
   } finally {
     await cancelPendingRecovery();
