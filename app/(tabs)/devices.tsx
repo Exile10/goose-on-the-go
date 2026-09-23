@@ -22,7 +22,7 @@ import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { GIcon } from '@/components/ui/g-icon';
-import { ALL_ROOMS, supports, useDevices } from '@/view-models/use-devices';
+import { ALL_ROOMS, roomLabel, supports, useDevices } from '@/view-models/use-devices';
 import type { Device } from '@/services/types';
 import { Grey, JaridaPurple, Brand, Semantic } from '@/constants/colors';
 import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
@@ -141,7 +141,7 @@ export default function DevicesTab() {
             onPress={() => setActiveRoom(tab)}
           >
             <Text style={[styles.roomTabText, activeRoom === tab && styles.roomTabTextActive]}>
-              {tab}
+              {roomLabel(tab)}
             </Text>
           </Pressable>
         ))}
@@ -167,7 +167,7 @@ export default function DevicesTab() {
 
         {visibleRooms.map((room) => (
           <View key={room.name} style={styles.roomSection}>
-            <Text style={styles.roomLabel}>{room.name.toUpperCase()}</Text>
+            <Text style={styles.roomLabel}>{roomLabel(room.name).toUpperCase()}</Text>
             <View style={styles.deviceGrid}>
               {room.devices.map((d) => (
                 <DeviceCard

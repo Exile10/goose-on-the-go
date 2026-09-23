@@ -13,8 +13,11 @@ import {
   isBridgedEndpoint,
   parsePowerState,
   supports,
+  ALL_ROOMS,
+  roomLabel,
 } from '@/view-models/use-devices';
 import type { Device } from '@/services/types';
+import i18n from '@/services/i18n';
 
 function device(over: Partial<Device> = {}): Device {
   return { id: 'd1', name: 'Lamp', is_online: true, ...over };
@@ -95,5 +98,28 @@ describe('isBridgedEndpoint', () => {
   it('leaves ordinary devices alone', () => {
     expect(isBridgedEndpoint('matter-12345')).toBe(false);
     expect(isBridgedEndpoint('kitchen-lamp')).toBe(false);
+  });
+});
+
+/**
+ * The room names the app makes up itself -- the no-room bucket and the "all" tab -- are ids, shown
+ * through the catalogue. They used to be the English words, rendered raw, which also made them
+ * collide with a room the household had actually named "Unassigned" or "All".
+ */
+describe('room labels', () => {
+  it('shows the fallback room and the all tab as copy, not as their ids', () => {
+    expect(roomLabel(UNASSIGNED_ROOM)).toBe(i18n.t('devices.roomUnassigned'));
+    expect(roomLabel(ALL_ROOMS)).toBe(i18n.t('devices.roomAll'));
+    expect(roomLabel(UNASSIGNED_ROOM)).not.toBe(UNASSIGNED_ROOM);
+  });
+
+  it('shows a room the household named exactly as it was named', () => {
+    expect(roomLabel('Kitchen')).toBe('Kitchen');
+  });
+
+  it('keeps a room literally named "Unassigned" apart from devices that have no room', () => {
+    const named = { id: 'a', name: 'a', is_online: true, room: 'Unassigned' } as Device;
+    const none = { id: 'b', name: 'b', is_online: true } as Device;
+    expect(groupByRoom([named, none]).map((r) => r.name).sort()).toEqual(['Unassigned', UNASSIGNED_ROOM].sort());
   });
 });

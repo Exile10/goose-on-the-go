@@ -31,6 +31,7 @@ import type { IconName } from '@/constants/icons';
 import i18n from '@/services/i18n';
 
 /** Stats data */
+/* eslint-disable i18next/no-literal-string -- invented household counts; this constant is deleted in #70 */
 const STATS = [
   { label: 'Devices', value: '6' },
   { label: 'Rooms', value: '3' },
@@ -38,6 +39,7 @@ const STATS = [
   { label: 'Users', value: '2' },
 ];
 
+/* eslint-enable i18next/no-literal-string */
 /** Navigation row */
 const NavRow = React.memo(function NavRow({
   item,

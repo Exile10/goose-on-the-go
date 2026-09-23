@@ -22,6 +22,8 @@ import { Spacing } from '@/constants/spacing';
 import { Radii } from '@/constants/radii';
 import i18n from '@/services/i18n';
 
+// Identifiers, typed by MemoryCategory, not copy: the label each one shows comes from tabLabel().
+/* eslint-disable-next-line i18next/no-literal-string -- category ids; tabLabel() supplies the words */
 const CATEGORY_TABS: Array<MemoryCategory | 'All'> = ['All', 'Preference', 'Habit', 'Person', 'Reminder'];
 
 /**
@@ -68,7 +70,7 @@ const MemoryCard = React.memo(function MemoryCard({
           <GIcon name={item.icon} size={16} color={catColor} />
         </View>
         <View style={[styles.categoryBadge, { backgroundColor: catColor + '18' }]}>
-          <Text style={[styles.categoryText, { color: catColor }]}>{item.category}</Text>
+          <Text style={[styles.categoryText, { color: catColor }]}>{tabLabel(item.category)}</Text>
         </View>
         <View style={styles.memoryActions}>
           <Pressable onPress={() => onPin(item.id)} style={styles.actionBtn}>

@@ -35,11 +35,23 @@ export function parsePowerState(content: string): boolean | undefined {
   return undefined;
 }
 
-/** Devices with no room of their own still have to appear somewhere. */
-export const UNASSIGNED_ROOM = 'Unassigned';
+/**
+ * Devices with no room of their own still have to appear somewhere.
+ *
+ * An id, not a name: shown through `roomLabel`. It used to be the English word, rendered raw, which
+ * also merged it with a room the household had genuinely named "Unassigned".
+ */
+export const UNASSIGNED_ROOM = 'room.unassigned';
 
-/** The tab shown before any room is chosen. */
-export const ALL_ROOMS = 'All';
+/** The tab shown before any room is chosen. An id, for the same reasons. */
+export const ALL_ROOMS = 'room.all';
+
+/** What a room is called on screen: the app's own buckets as copy, a household's rooms as named. */
+export function roomLabel(name: string): string {
+  if (name === UNASSIGNED_ROOM) return i18n.t('devices.roomUnassigned');
+  if (name === ALL_ROOMS) return i18n.t('devices.roomAll');
+  return name;
+}
 
 export interface DeviceRoom {
   name: string;

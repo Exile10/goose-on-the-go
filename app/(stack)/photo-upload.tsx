@@ -29,12 +29,14 @@ interface AnalysisResult {
   suggestion: string;
 }
 
+/* eslint-disable i18next/no-literal-string -- invented photo analyses; this screen is deleted in #69 */
 const MOCK_RESULTS: AnalysisResult[] = [
   { label: 'Grocery items detected', confidence: 0.94, suggestion: 'Add these to your shopping list: milk, eggs, bread' },
   { label: 'Receipt found', confidence: 0.87, suggestion: 'Total: $42.50 from Trader Joe\'s. Shall I log this expense?' },
   { label: 'Pet detected', confidence: 0.98, suggestion: 'Your golden retriever Max is in the photo! Looking healthy.' },
 ];
 
+/* eslint-enable i18next/no-literal-string */
 export default function PhotoUploadScreen() {
   const [state, setState] = useState<AnalysisState>('idle');
   const [results, setResults] = useState<AnalysisResult[]>([]);

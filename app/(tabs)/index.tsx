@@ -32,6 +32,7 @@ import { RemoteAccessOffer } from '@/components/patterns/remote-access-offer';
 import i18n from '@/services/i18n';
 
 /** Status chip data */
+/* eslint-disable i18next/no-literal-string -- invented status chips; this constant is deleted in #71 */
 const STATUS_CHIPS = [
   { label: '4 Active', color: Semantic.success, bg: Semantic.successSoft },
   { label: '72\u00B0F', color: Semantic.info, bg: Semantic.infoSoft },
@@ -39,6 +40,7 @@ const STATUS_CHIPS = [
   { label: 'Locked', color: Semantic.success, bg: Semantic.successSoft },
 ];
 
+/* eslint-enable i18next/no-literal-string */
 function StatusChip({ label, color, bg }: { label: string; color: string; bg: string }) {
   return (
     <View style={[styles.statusChip, { backgroundColor: bg }]}>

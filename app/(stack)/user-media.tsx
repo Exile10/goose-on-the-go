@@ -25,11 +25,13 @@ const TILE_SIZE = (SCREEN_WIDTH - Spacing.lg * 2 - GRID_GAP * (GRID_COLS - 1)) /
 
 type MediaTab = 'photos' | 'videos' | 'analysed';
 
+/* eslint-disable i18next/no-literal-string -- a screen of invented photo analyses, deleted in #69 */
 const TABS: Array<{ key: MediaTab; label: string }> = [
   { key: 'photos', label: 'Photos' },
   { key: 'videos', label: 'Videos' },
   { key: 'analysed', label: 'Analysed' },
 ];
+/* eslint-enable i18next/no-literal-string */
 
 /** Placeholder colors for mock media tiles */
 const PHOTO_COLORS = [

@@ -18,11 +18,18 @@ import { Spacing } from '@/constants/spacing';
 import { Radii } from '@/constants/radii';
 import i18n from '@/services/i18n';
 
-/** Day data for the picker */
+/**
+ * Day data for the picker. A fixed week -- the 21st to the 27th, with Saturday chosen -- rather than
+ * this week, so translating the weekday names alone would only translate a placeholder. It goes
+ * when the screen reads the Pond's schedules (#14).
+ */
+/* eslint-disable i18next/no-literal-string -- placeholder week, replaced with the schedule screen (#14) */
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+/* eslint-enable i18next/no-literal-string */
 const DATES = [21, 22, 23, 24, 25, 26, 27];
 
 /** Sample timeline events */
+/* eslint-disable i18next/no-literal-string -- placeholder schedule, replaced when the screen reads the Pond's schedules (#14) */
 const TIMELINE = [
   { time: '7:00 AM', title: 'Morning Routine', type: 'routine' as const, detail: 'Lights warm up, thermostat to 72\u00B0F, coffee maker on', enabled: true },
   { time: '9:00 AM', title: 'Focus Mode', type: 'routine' as const, detail: 'DND enabled, office lights to 80%', enabled: true },
@@ -32,6 +39,7 @@ const TIMELINE = [
   { time: '10:00 PM', title: 'Night Mode', type: 'routine' as const, detail: 'All lights off, doors locked, DND on', enabled: true },
 ];
 
+/* eslint-enable i18next/no-literal-string */
 /** Timeline event row */
 const TimelineRow = React.memo(function TimelineRow({
   item,
