@@ -8,10 +8,10 @@
 import React from 'react';
 import { View, StyleSheet, Platform } from 'react-native';
 import { Tabs } from 'expo-router';
+import { InkIcon, InkProvider } from '@jarida/ink/native';
 
 import { HapticTab } from '@/components/haptic-tab';
-import { GIcon } from '@/components/ui/g-icon';
-import { JaridaPurple, Grey, Brand } from '@/constants/colors';
+import { JaridaPurple, Grey } from '@/constants/colors';
 import type { IconName } from '@/constants/icons';
 
 /** Tab icon with active pill indicator */
@@ -20,11 +20,14 @@ function TabIcon({ name, focused }: { name: IconName; focused: boolean }) {
     <View style={styles.iconWrap}>
       {focused && <View style={styles.activePill} />}
       <View style={styles.iconOnTop}>
-        <GIcon
-          name={name}
-          size={22}
-          color={focused ? Brand.white : Grey[400]}
-        />
+        {/* Light-on-purple when selected: no ink tone does that, so use a dark scheme. */}
+        {focused ? (
+          <InkProvider scheme="dark">
+            <InkIcon name={name} size={22} />
+          </InkProvider>
+        ) : (
+          <InkIcon name={name} size={22} tone="neutral" />
+        )}
       </View>
     </View>
   );
