@@ -15,7 +15,7 @@ Everything here is read through `services/api-client.ts`; no screen fetches on i
 | `404` / `405` | no name, not logged. An older Pond without the route answers 405, because the GET falls through to `/devices/{id}`. |
 | `503` or a network failure | no name, logged. A Pond that tried and failed is not the same as one with nothing to say. |
 
-`memberOf()` and `isSelfUnsupported()`, read as part of `readHousehold()` in `view-models/use-household.ts`.
+`readMember()` in `view-models/use-household.ts`. The profile header and the Home greeting share it; Home uses `useMember()`, which reads the member alone rather than the whole household.
 
 ## The profile header
 
@@ -32,11 +32,30 @@ There is no email line and no plan badge. A profile is an id, a name and an avat
 
 Each figure is its own read, settled independently, so a Pond that cannot list its schedules still shows its device count. **A failed read shows a dash.** `readHousehold()`, `settledCount()` and `countRooms()` in `view-models/use-household.ts`.
 
+## Home
+
+| Shown | Source | When it is not shown |
+|---|---|---|
+| Greeting | the phone's clock: morning from 5 until 12, afternoon until 17, evening after that (`greetingFor`) | |
+| Name and avatar | `readMember()`, above | no name when nobody has claimed the device |
+| "N online" chip | the device list the grid below shows, so the two cannot disagree | while that list is loading or failed |
+| "N°C outside" chip | `GET /api/v1/weather` → `temp`. **Celsius**: the Pond asks open-meteo for `temperature_unit=celsius`. "Outside", because it is outdoor weather where the Pond is set up, not a thermostat. | when no location is configured (`enabled: false`), or the read failed |
+| Now Playing | `GET /api/v1/music/now-playing` (`nowPlayingOf`). Track and artist while Spotify reports playback. "Nothing playing" only when the Pond says `connected: true, playing: false`. | with no Spotify account, when Spotify refused (`error` set), or when a claim of playback carries no track |
+| Next routine | `GET /api/v1/schedules/upcoming?limit=5`: the first schedule that is not paused and has a valid `next_run` (`nextRoutineOf`). A time already passed reads "Due now" (`untilOf`). | when no routine will run |
+
+With neither card, the Right Now heading is not drawn over an empty row.
+
+The **Meeting** and **Locked** chips were removed rather than wired: nothing in the Pond answers either question. **Next Event became Next routine.** There is no calendar integration, so the card shows the Pond's own schedules and is labelled as a routine, never as an event.
+
+`/schedules/upcoming` sends the Pond's `Schedule` as stored: `label`, `paused`, `next_run`, and no `name`. The card reads it through `UpcomingSchedule` in `services/types.ts`, which describes what is actually on the wire, rather than through the mismatched shared `Schedule` noted under Known gaps.
+
+The three cards are read by `readRightNow()` in `view-models/use-right-now.ts`, one read per card, each settled on its own.
+
 ## How this is tested
 
 The reads live in plain async functions that take the client as an argument, `readHousehold(client)`, rather than inside the hooks. That lets the whole behaviour be tested with a fake client and no renderer: partial failure, an older Pond's 405, and a Pond that tried and failed. It is what defeated a provider-level test earlier. The hooks set state only in the promise's callback, which is also what `react-hooks/set-state-in-effect` asks for.
 
-Each rule was checked by breaking it on purpose: counting a failed read as zero fails two tests, and treating the 405 as a failure fails two others.
+Each rule was checked by breaking it on purpose: counting a failed read as zero fails two tests, and treating the 405 as a failure fails two others. On Home, a greeting stuck on "morning", the bug as reported at 22:40, fails the afternoon and evening tests. The "no location configured" test first passed for the wrong reason, because its disabled weather carried no temperature to leak, so it now carries one on purpose.
 
 ## Known gaps
 
