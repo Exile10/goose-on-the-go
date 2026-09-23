@@ -16,7 +16,7 @@ Floating glass pill bottom nav (iOS 26 "Liquid Glass" style):
 | Devices | Device Grid | devices | Room-grouped smart home control |
 | You | Profile Hub | profile | Settings, integrations, data |
 
-## Sub-Screens (15 — stack navigation from Profile hub)
+## Sub-Screens (16 — stack navigation from Profile hub)
 
 | Screen | Route | Section |
 |--------|-------|---------|
@@ -35,6 +35,9 @@ Floating glass pill bottom nav (iOS 26 "Liquid Glass" style):
 | Restore to Pond | `/(stack)/restore` | Data & Privacy |
 | Privacy & Licenses | `/(stack)/privacy` | Data & Privacy |
 | Pond Pairing | `/(stack)/pond-pairing` | Devices |
+| Developer Mode | `/(stack)/developer` | Developer (dev builds only, #21) |
+
+Two more stack screens aren't in the hub: **Add Device** (`/(stack)/commission-device`, from the Devices tab) and **Connect Desktop** (`/(stack)/connect-desktop`, the QR scanner opened from Pond Pairing).
 
 ## Special Overlays
 - **Listening Overlay**: Full-screen dark overlay triggered by mic FAB or Ask bar

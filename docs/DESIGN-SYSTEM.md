@@ -136,7 +136,7 @@ brand: Purple glow (purple shadow)
 ## Role Colors
 Used for model role assignment chips:
 ```
-chat:  #8C4BFF  (purple)
+chat:  #7C3AED  (Accent.base — #20)
 think: #F5A524  (amber)
 task:  #17C964  (green)
 asr:   #0072F5  (blue)

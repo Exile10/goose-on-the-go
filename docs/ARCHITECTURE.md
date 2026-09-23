@@ -98,17 +98,19 @@ implementation, which is the default backend.
 
 ## Providers
 
-Two React context providers wrap the app:
+`app/_layout.tsx` wraps the app in these, outermost first:
 
 - **ThemeProvider** (`providers/theme-provider.tsx`) — Jarida color tokens resolved for light/dark mode. Access via `useTheme()`.
-- **ServerProvider** (`providers/server-provider.tsx`) — Server connection state. Access via `useServer()`.
+- **ServerProvider** (`providers/server-provider.tsx`) — Server connection state and the dev mock/real toggles. Access via `useServer()`.
+- **NotificationsProvider** (`providers/notifications-provider.tsx`) — Push registration.
+- **InkProvider** (`@jarida/ink/native`) — Theme context for the ink primitives (#17).
 
 ## Navigation
 
 Uses Expo Router v6 with file-based routing:
 
-- **`(tabs)/`** — Bottom tab navigator (5 tabs: Dashboard, Chat, Canvas, Devices, More)
-- **`(stack)/`** — Stack navigator (8 screens: Memory, Skills, Models, Logs, Schedules, Prompts, Settings, Agent)
+- **`(tabs)/`** — Bottom tab navigator (4 tabs: Home, Chat, Devices, You)
+- **`(stack)/`** — Stack navigator for the You-tab sub-screens, plus Add Device, Connect Desktop and the dev-only Developer screen
 - **`modal.tsx`** — Modal presentation route
 
 See [NAVIGATION.md](./NAVIGATION.md) for detailed rationale.
