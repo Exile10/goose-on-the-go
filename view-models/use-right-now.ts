@@ -10,11 +10,12 @@
  * soonest first -- but it is not what the card first claimed, so it is labelled a routine and
  * never an event.
  */
-import { useCallback, useEffect, useState } from 'react';
+import { useRef, useState } from 'react';
 
 import { useServer } from '@/providers/server-provider';
 import { api, type PondApiClient } from '@/services/api-client';
 import type { NowPlayingResponse, UpcomingSchedule } from '@/services/types';
+import { useLive } from './use-live';
 
 export type Greeting = 'morning' | 'afternoon' | 'evening';
 
@@ -36,11 +37,26 @@ export interface RightNow {
 
 export interface UseRightNow {
   data: RightNow;
-  loading: boolean;
-  actions: { refresh: () => Promise<void> };
 }
 
-const UNREAD: RightNow = { outdoorTemp: null, nowPlaying: null, nextRoutine: null };
+/**
+ * How often each card asks.
+ *
+ * Now Playing follows the desktop's cadence, and every call reaches Spotify. Weather is cached by
+ * the Pond for fifteen minutes, so asking more often than every ten only re-reads that cache. The
+ * next routine only moves when one runs or is edited.
+ */
+export const NOW_PLAYING_MS = 10_000;
+export const NOW_PLAYING_BACKOFF_MS = 5 * 60_000;
+export const ROUTINE_MS = 60_000;
+export const WEATHER_MS = 10 * 60_000;
+
+/** One Now Playing read: what the card shows, and whether the next ask should wait. */
+export interface NowPlayingReading {
+  card: NowPlaying | null;
+  /** Spotify refused, or there is no account. Neither is fixed by asking again soon. */
+  backOff: boolean;
+}
 
 /** Which greeting the phone's own clock calls for. */
 export function greetingFor(hour: number): Greeting {
@@ -90,52 +106,83 @@ export function untilOf(at: Date, now: Date): Until {
 
 type RightNowReader = Pick<PondApiClient, 'weather' | 'nowPlaying' | 'upcomingSchedules'>;
 
-/** Read the row in one pass. Never rejects: a card whose read fails is absent, not wrong. */
-export async function readRightNow(client: RightNowReader = api): Promise<RightNow> {
-  const [weather, playing, upcoming] = await Promise.allSettled([
-    client.weather(),
-    client.nowPlaying(),
-    // Paused schedules come back too, so ask for a few and take the first that will run.
-    client.upcomingSchedules(5),
-  ]);
-  return {
-    outdoorTemp:
-      weather.status === 'fulfilled' && weather.value.enabled && typeof weather.value.temp === 'number'
-        ? weather.value.temp
-        : null,
-    nowPlaying: playing.status === 'fulfilled' ? nowPlayingOf(playing.value) : null,
-    nextRoutine: upcoming.status === 'fulfilled' ? nextRoutineOf(upcoming.value) : null,
-  };
+/** Degrees Celsius outside, or null: no location configured, or the read failed. */
+export async function readOutdoorTemp(client: Pick<RightNowReader, 'weather'> = api): Promise<number | null> {
+  try {
+    const w = await client.weather();
+    return w.enabled && typeof w.temp === 'number' ? w.temp : null;
+  } catch {
+    return null;
+  }
 }
 
+/**
+ * What is playing, and whether to back off.
+ *
+ * Only an answer from Spotify can say "stop asking so often": a refusal, or no account. A Pond
+ * that could not be reached has said nothing about Spotify, and backing off then would leave the
+ * card five minutes stale after a blip -- the staleness this exists to fix.
+ */
+export async function readNowPlaying(client: Pick<RightNowReader, 'nowPlaying'> = api): Promise<NowPlayingReading> {
+  try {
+    const r = await client.nowPlaying();
+    return { card: nowPlayingOf(r), backOff: !r.connected || !!r.error };
+  } catch {
+    return { card: null, backOff: false };
+  }
+}
+
+export function nowPlayingDelay(reading: NowPlayingReading): number {
+  return reading.backOff ? NOW_PLAYING_BACKOFF_MS : NOW_PLAYING_MS;
+}
+
+export async function readNextRoutine(client: Pick<RightNowReader, 'upcomingSchedules'> = api): Promise<NextRoutine | null> {
+  try {
+    // Paused schedules come back too, so ask for a few and take the first that will run.
+    return nextRoutineOf(await client.upcomingSchedules(5));
+  } catch {
+    return null;
+  }
+}
+
+/** Read the row in one pass. Never rejects: a card whose read fails is absent, not wrong. */
+export async function readRightNow(client: RightNowReader = api): Promise<RightNow> {
+  const [outdoorTemp, playing, nextRoutine] = await Promise.all([
+    readOutdoorTemp(client),
+    readNowPlaying(client),
+    readNextRoutine(client),
+  ]);
+  return { outdoorTemp, nowPlaying: playing.card, nextRoutine };
+}
+
+/**
+ * The row, kept current while Home is in front.
+ *
+ * Three loops rather than one, because the cards cost different amounts and go stale at
+ * different rates; a single cadence would either poll the weather cache every ten seconds or let
+ * a track sit a minute after it ended.
+ */
 export function useRightNow(): UseRightNow {
-  const [rightNow, setRightNow] = useState<RightNow>(UNREAD);
-  const [loading, setLoading] = useState(true);
+  const [outdoorTemp, setOutdoorTemp] = useState<number | null>(null);
+  const [nowPlaying, setNowPlaying] = useState<NowPlaying | null>(null);
+  const [nextRoutine, setNextRoutine] = useState<NextRoutine | null>(null);
+  const lastPlaying = useRef<NowPlayingReading>({ card: null, backOff: false });
 
   // The base URL and bearer token arrive asynchronously; reading before they land calls the
   // default address unauthenticated and never retries.
   const { hydrated } = useServer();
 
-  // State is set in the promise's callback, never synchronously in the effect, and not at all
-  // once the screen has gone.
-  useEffect(() => {
-    if (!hydrated) return;
-    let live = true;
-    void readRightNow().then((next) => {
-      if (!live) return;
-      setRightNow(next);
-      setLoading(false);
-    });
-    return () => {
-      live = false;
-    };
-  }, [hydrated]);
+  useLive(
+    async () => {
+      const reading = await readNowPlaying();
+      lastPlaying.current = reading;
+      setNowPlaying(reading.card);
+    },
+    () => nowPlayingDelay(lastPlaying.current),
+    hydrated,
+  );
+  useLive(async () => setOutdoorTemp(await readOutdoorTemp()), WEATHER_MS, hydrated);
+  useLive(async () => setNextRoutine(await readNextRoutine()), ROUTINE_MS, hydrated);
 
-  const refresh = useCallback(async () => {
-    setLoading(true);
-    setRightNow(await readRightNow());
-    setLoading(false);
-  }, []);
-
-  return { data: rightNow, loading, actions: { refresh } };
+  return { data: { outdoorTemp, nowPlaying, nextRoutine } };
 }

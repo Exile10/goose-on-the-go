@@ -5,12 +5,13 @@
  * `data` and calls `actions`, and never touches the network itself.
  */
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 
 import { useServer } from '@/providers/server-provider';
 import { ApiError, api } from '@/services/api-client';
 import type { ModelEntry } from '@/services/types';
 import { describeApiError } from './describe-error';
+import { useLive } from './use-live';
 import i18n from '@/services/i18n';
 
 /**
@@ -54,6 +55,10 @@ export interface UseModels {
   };
 }
 
+
+/** Which model is loaded, and what finished downloading, changes on the Pond and not here. */
+export const MODELS_MS = 60_000;
+
 export function useModels(): UseModels {
   const [models, setModels] = useState<ModelEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -63,22 +68,30 @@ export function useModels(): UseModels {
   // land calls the default address unauthenticated and never retries.
   const { hydrated } = useServer();
 
-  const refresh = useCallback(async () => {
-    setLoading(true);
-    setError(null);
+  // Whether a read has ever succeeded. After one, a failed poll keeps what is on screen.
+  const loaded = useRef(false);
+
+  /** `loud` is a read somebody asked for; a poll is quiet and keeps the last good data. */
+  const load = useCallback(async (loud: boolean) => {
+    if (loud) {
+      setLoading(true);
+      setError(null);
+    }
     try {
       setModels(await api.listModels());
+      loaded.current = true;
+      setError(null);
     } catch (e) {
-      setError(describe(e));
+      if (loud || !loaded.current) setError(describe(e));
+      else console.warn('[models] refresh failed; showing the last result', e instanceof ApiError ? e.status : 'network');
     } finally {
       setLoading(false);
     }
   }, []);
 
-  useEffect(() => {
-    if (!hydrated) return;
-    void refresh();
-  }, [hydrated, refresh]);
+  const refresh = useCallback(() => load(true), [load]);
+
+  useLive(() => load(false), MODELS_MS, hydrated);
 
   /**
    * Activate optimistically, then reconcile with the server.

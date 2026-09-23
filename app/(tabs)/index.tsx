@@ -23,6 +23,7 @@ import { useRecentSessions } from '@/view-models/use-recent-sessions';
 import { supports, useDevices } from '@/view-models/use-devices';
 import { initialOf, useMember } from '@/view-models/use-household';
 import { greetingFor, untilOf, useRightNow, type Until } from '@/view-models/use-right-now';
+import { useLive } from '@/view-models/use-live';
 import type { Device } from '@/services/types';
 import { HOME_SHORTCUTS } from '@/constants/navigation';
 import { Grey, JaridaPurple, Brand, Semantic } from '@/constants/colors';
@@ -94,14 +95,19 @@ const DeviceGridItem = React.memo(function DeviceGridItem({
 /** The home grid is a glance, not the full list — that is the Devices tab. */
 const HOME_GRID_LIMIT = 4;
 
+/** How often the greeting and the countdowns catch up with the clock. */
+const CLOCK_MS = 60_000;
+
 export default function HomeScreen() {
   const recent = useRecentSessions();
   const devices = useDevices();
   const member = useMember();
   const rightNow = useRightNow().data;
-  // Read from the clock once, as the waveform below is rolled once, so render stays pure.
-  const [greeting] = useState(() => greetingFor(new Date().getHours()));
-  const [now] = useState(() => new Date());
+  // The clock is state, advanced once a minute while Home is in front, so render stays pure and
+  // the greeting and "in 23 h" move with the time instead of freezing at the moment Home mounted.
+  const [now, setNow] = useState(() => new Date());
+  useLive(async () => setNow(new Date()), CLOCK_MS);
+  const greeting = greetingFor(now.getHours());
   const initial = member ? initialOf(member.displayName) : null;
 
   // Only chips with a source. The online count is the list the grid below shows, so the two

@@ -7,7 +7,7 @@
  */
 import { ApiError } from '@/services/api-client';
 import type { Device } from '@/services/types';
-import { countRooms, initialOf, isSelfUnsupported, memberOf, readHousehold, settledCount } from '../use-household';
+import { countRooms, initialOf, isSelfUnsupported, memberOf, mergeHousehold, readHousehold, settledCount } from '../use-household';
 
 const device = (id: string, room?: string): Device => ({ id, name: id, is_online: true, room });
 
@@ -124,9 +124,39 @@ describe('readHousehold', () => {
     expect(warn).not.toHaveBeenCalled();
   });
 
-  it('shows no name from a Pond that tried and failed, and says so', async () => {
+  // Unknown, not nobody. Merged into a live screen, a failed read keeps the last name it had
+  // rather than wiping it until the next poll.
+  it('reports a Pond that tried and failed as unknown, and says so', async () => {
     const h = await readHousehold(pond({ deviceSelf: async () => { throw new ApiError('unavailable', 503, null); } }));
-    expect(h.member).toBeNull();
+    expect(h.member).toBeUndefined();
     expect(warn).toHaveBeenCalledWith('[household] could not read which member this device belongs to', 503);
+  });
+});
+
+/**
+ * A live screen polls, and a poll can fail. What it knew a minute ago was true a minute ago; a
+ * failed read has said nothing, so it must not replace a count with a dash or a name with none.
+ */
+describe('mergeHousehold', () => {
+  const known = {
+    member: { id: 'p1', displayName: 'Liz' },
+    pondName: 'pond',
+    counts: { devices: 2, rooms: 1, routines: 3, users: 2 },
+  };
+  const failed = { member: undefined, pondName: null, counts: { devices: null, rooms: null, routines: null, users: null } };
+
+  it('keeps what it knew through a read that failed', () => {
+    expect(mergeHousehold(known, failed)).toEqual(known);
+  });
+
+  it('takes every figure a read did return', () => {
+    const fresh = { member: null, pondName: 'pond', counts: { devices: 3, rooms: 1, routines: 0, users: 2 } };
+    // A real null member is an answer -- nobody claims this device now -- and a real zero is a count.
+    expect(mergeHousehold(known, fresh)).toEqual(fresh);
+  });
+
+  it('keeps only the figures that failed, and updates the rest', () => {
+    const partial = { ...failed, counts: { ...failed.counts, devices: 5 } };
+    expect(mergeHousehold(known, partial).counts).toEqual({ devices: 5, rooms: 1, routines: 3, users: 2 });
   });
 });

@@ -7,12 +7,13 @@
  * role, no permission tier and no invite.
  */
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 
 import { useServer } from '@/providers/server-provider';
 import { ApiError, api } from '@/services/api-client';
 import type { Profile } from '@/services/types';
 import { describeApiError } from './describe-error';
+import { useLive } from './use-live';
 import i18n from '@/services/i18n';
 
 export interface UseProfiles {
@@ -26,6 +27,10 @@ export interface UseProfiles {
   };
 }
 
+
+/** A member added or removed on the desktop should show up here without a restart. */
+export const PROFILES_MS = 60_000;
+
 export function useProfiles(): UseProfiles {
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
@@ -35,22 +40,30 @@ export function useProfiles(): UseProfiles {
   // land calls the default address unauthenticated and never retries.
   const { hydrated } = useServer();
 
-  const refresh = useCallback(async () => {
-    setLoading(true);
-    setError(null);
+  // Whether a read has ever succeeded. After one, a failed poll keeps what is on screen.
+  const loaded = useRef(false);
+
+  /** `loud` is a read somebody asked for; a poll is quiet and keeps the last good data. */
+  const load = useCallback(async (loud: boolean) => {
+    if (loud) {
+      setLoading(true);
+      setError(null);
+    }
     try {
       setProfiles(await api.listProfiles());
+      loaded.current = true;
+      setError(null);
     } catch (e) {
-      setError(describe(e));
+      if (loud || !loaded.current) setError(describe(e));
+      else console.warn('[profiles] refresh failed; showing the last result', e instanceof ApiError ? e.status : 'network');
     } finally {
       setLoading(false);
     }
   }, []);
 
-  useEffect(() => {
-    if (!hydrated) return;
-    void refresh();
-  }, [hydrated, refresh]);
+  const refresh = useCallback(() => load(true), [load]);
+
+  useLive(() => load(false), PROFILES_MS, hydrated);
 
   /** Returns whether it was added, so the caller knows to close its form. */
   const add = useCallback(async (displayName: string, avatarEmoji?: string) => {

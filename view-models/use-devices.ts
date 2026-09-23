@@ -7,12 +7,13 @@
  * a broken switch.
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 
 import { useServer } from '@/providers/server-provider';
 import { ApiError, api } from '@/services/api-client';
 import type { Device, DeviceStatePatch, MatterStatus } from '@/services/types';
 import { describeApiError } from './describe-error';
+import { useLive } from './use-live';
 import i18n from '@/services/i18n';
 
 /**
@@ -108,12 +109,56 @@ export interface UseDevices {
   };
 }
 
+/**
+ * How often the device list and power states are re-read while a devices screen is in front.
+ *
+ * Each read is one request for the list and one per switchable device, so this is the most
+ * expensive poll in the app and it runs slower than Now Playing for that reason.
+ */
+export const DEVICES_MS = 15_000;
+
+/**
+ * Fold a poll's power readings in without undoing anything changed after that poll began.
+ *
+ * A poll is slower than a tap. One that read the lamp as off just before it was switched on would
+ * land afterwards and switch it back off on screen, and if it landed after the switch's own
+ * read-back it would stay wrong until the next poll. So a device changed at or after
+ * `pollStartedAt` keeps what it shows; every other device takes the poll, including a device the
+ * poll no longer reports, which becomes unknown.
+ */
+export function mergePower(
+  current: Record<string, boolean>,
+  fresh: Record<string, boolean>,
+  changedAt: Record<string, number>,
+  pollStartedAt: number,
+): Record<string, boolean> {
+  const next = { ...fresh };
+  for (const [id, at] of Object.entries(changedAt)) {
+    if (at >= pollStartedAt && id in current) next[id] = current[id];
+  }
+  return next;
+}
+
+/**
+ * Whether a poll's device list may be shown. Not if the list was changed here -- a removal or a
+ * commission -- at or after the poll began, which would put a deleted device back.
+ */
+export function listPollStillCurrent(pollStartedAt: number, listChangedAt: number): boolean {
+  return pollStartedAt > listChangedAt;
+}
+
 export function useDevices(): UseDevices {
   const [devices, setDevices] = useState<Device[]>([]);
   const [powerById, setPowerById] = useState<Record<string, boolean>>({});
   const [matter, setMatter] = useState<MatterStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // When this screen last changed something itself, so a poll that began earlier cannot undo it.
+  const powerChangedAt = useRef<Record<string, number>>({});
+  const listChangedAt = useRef(0);
+  // Whether a read has ever succeeded. Before that a failure is the screen's news; after it, a
+  // failed poll keeps the last list rather than replacing it with an error.
+  const loaded = useRef(false);
 
   /**
    * Read power state for the devices that have it.
@@ -122,7 +167,7 @@ export function useDevices(): UseDevices {
    * left unknown rather than failing the grid — a single unreachable bulb should
    * not blank the screen.
    */
-  const readPower = useCallback(async (list: Device[]) => {
+  const readPower = useCallback(async (list: Device[], startedAt: number) => {
     const readings = await Promise.all(
       list
         .filter((d) => supports(d, 'power'))
@@ -135,43 +180,57 @@ export function useDevices(): UseDevices {
           }
         }),
     );
-    setPowerById(
-      Object.fromEntries(
-        readings.filter((r): r is readonly [string, boolean] => r[1] !== undefined),
-      ),
+    const fresh = Object.fromEntries(
+      readings.filter((r): r is readonly [string, boolean] => r[1] !== undefined),
     );
+    setPowerById((current) => mergePower(current, fresh, powerChangedAt.current, startedAt));
   }, []);
 
   // The base URL and bearer token arrive asynchronously; fetching before they
   // land calls the default address unauthenticated and never retries.
   const { hydrated } = useServer();
 
-  const refresh = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const list = await api.listDevices();
-      setDevices(list);
-      void readPower(list);
-    } catch (e) {
-      setError(describeDeviceError(e));
-    } finally {
-      setLoading(false);
-    }
-    // Matter status is advisory: a Pond with the controller unreachable still
-    // lists and controls whatever is already registered, so a failure here must
-    // not take the screen down with it.
-    try {
-      setMatter(await api.matterStatus());
-    } catch {
-      setMatter(null);
-    }
-  }, [readPower]);
+  /**
+   * One read of the list, the power states and the controller.
+   *
+   * `loud` is a read somebody asked for: it shows a spinner and reports a failure. A poll is
+   * quiet: it keeps what is on screen through a failure, because a Pond that is briefly
+   * unreachable has said nothing about the devices, and the connection banner already says
+   * whether it can be reached.
+   */
+  const load = useCallback(
+    async (loud: boolean) => {
+      const startedAt = Date.now();
+      if (loud) {
+        setLoading(true);
+        setError(null);
+      }
+      try {
+        const list = await api.listDevices();
+        if (listPollStillCurrent(startedAt, listChangedAt.current)) setDevices(list);
+        loaded.current = true;
+        setError(null);
+        void readPower(list, startedAt);
+      } catch (e) {
+        if (loud || !loaded.current) setError(describeDeviceError(e));
+        else console.warn('[devices] refresh failed; showing the last list', e instanceof ApiError ? e.status : 'network');
+      } finally {
+        setLoading(false);
+      }
+      // Matter status is advisory: a Pond with the controller unreachable still
+      // lists and controls whatever is already registered, so a failure here must
+      // not take the screen down with it.
+      try {
+        setMatter(await api.matterStatus());
+      } catch {
+        setMatter(null);
+      }
+    },
+    [readPower],
+  );
+  useLive(() => load(false), DEVICES_MS, hydrated);
 
-  useEffect(() => {
-    if (!hydrated) return;
-    void refresh();
-  }, [hydrated, refresh]);
+  const refresh = useCallback(() => load(true), [load]);
 
   /**
    * Apply a patch optimistically, then reconcile against the server.
@@ -184,6 +243,7 @@ export function useDevices(): UseDevices {
   const setState = useCallback(
     async (device: Device, patch: DeviceStatePatch) => {
       const previous = powerById;
+      powerChangedAt.current[device.id] = Date.now();
       if (patch.power !== undefined) {
         setPowerById((current) => ({ ...current, [device.id]: patch.power as boolean }));
       }
@@ -196,6 +256,9 @@ export function useDevices(): UseDevices {
         const result = await api.getDeviceState(device.id);
         const actual = parsePowerState(result.content);
         if (actual !== undefined) {
+          // The read-back is the newest thing known about this device; a poll already in
+          // flight began before it and must not overwrite it.
+          powerChangedAt.current[device.id] = Date.now();
           setPowerById((current) => ({ ...current, [device.id]: actual }));
         }
       } catch (e) {
@@ -211,7 +274,10 @@ export function useDevices(): UseDevices {
     setError(null);
     try {
       const created = await api.commissionDevice({ code, name });
-      setDevices(await api.listDevices());
+      const list = await api.listDevices();
+      // After the read, so a poll that began before it cannot replace this list with an older one.
+      listChangedAt.current = Date.now();
+      setDevices(list);
       return created.id;
     } catch (e) {
       setError(describeCommissionError(e));
@@ -222,12 +288,17 @@ export function useDevices(): UseDevices {
   const remove = useCallback(
     async (device: Device) => {
       const previous = devices;
+      listChangedAt.current = Date.now();
       setDevices((current) => current.filter((d) => d.id !== device.id));
       try {
         await api.deleteDevice(device.id);
       } catch (e) {
         setDevices(previous);
         setError(describeDeviceError(e));
+      } finally {
+        // Again once the server has answered: a poll that began while the delete was still out
+        // read a list the server had not yet changed.
+        listChangedAt.current = Date.now();
       }
     },
     [devices],

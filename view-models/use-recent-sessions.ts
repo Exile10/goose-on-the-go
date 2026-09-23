@@ -5,12 +5,13 @@
  * a session and streaming a turn belongs to #9.
  */
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 
 import { useServer } from '@/providers/server-provider';
-import { api } from '@/services/api-client';
+import { ApiError, api } from '@/services/api-client';
 import type { SessionSummary } from '@/services/types';
 import { describeApiError } from './describe-error';
+import { useLive } from './use-live';
 import i18n from '@/services/i18n';
 
 /** How many the home strip shows. The screen has room for a handful. */
@@ -52,6 +53,10 @@ export interface UseRecentSessions {
   actions: { refresh: () => Promise<void> };
 }
 
+
+/** Conversations started on the desktop or by voice should appear without leaving Home. */
+export const RECENT_SESSIONS_MS = 30_000;
+
 export function useRecentSessions(): UseRecentSessions {
   const [sessions, setSessions] = useState<RecentSession[]>([]);
   const [loading, setLoading] = useState(true);
@@ -61,23 +66,31 @@ export function useRecentSessions(): UseRecentSessions {
   // land calls the default address unauthenticated and never retries.
   const { hydrated } = useServer();
 
-  const refresh = useCallback(async () => {
-    setLoading(true);
-    setError(null);
+  // Whether a read has ever succeeded. After one, a failed poll keeps what is on screen.
+  const loaded = useRef(false);
+
+  /** `loud` is a read somebody asked for; a poll is quiet and keeps the last good data. */
+  const load = useCallback(async (loud: boolean) => {
+    if (loud) {
+      setLoading(true);
+      setError(null);
+    }
     try {
       const all = await api.listSessions();
       setSessions(all.slice(0, RECENT_LIMIT).map(toRecent));
+      loaded.current = true;
+      setError(null);
     } catch (e) {
-      setError(describeApiError(e));
+      if (loud || !loaded.current) setError(describeApiError(e));
+      else console.warn('[recent] refresh failed; showing the last result', e instanceof ApiError ? e.status : 'network');
     } finally {
       setLoading(false);
     }
   }, []);
 
-  useEffect(() => {
-    if (!hydrated) return;
-    void refresh();
-  }, [hydrated, refresh]);
+  const refresh = useCallback(() => load(true), [load]);
+
+  useLive(() => load(false), RECENT_SESSIONS_MS, hydrated);
 
   return { data: { sessions }, loading, error, actions: { refresh } };
 }

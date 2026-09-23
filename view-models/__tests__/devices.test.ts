@@ -13,6 +13,8 @@ import {
   isBridgedEndpoint,
   parsePowerState,
   supports,
+  listPollStillCurrent,
+  mergePower,
 } from '@/view-models/use-devices';
 import type { Device } from '@/services/types';
 
@@ -95,5 +97,41 @@ describe('isBridgedEndpoint', () => {
   it('leaves ordinary devices alone', () => {
     expect(isBridgedEndpoint('matter-12345')).toBe(false);
     expect(isBridgedEndpoint('kitchen-lamp')).toBe(false);
+  });
+});
+
+/**
+ * Devices poll, and a poll is slower than a tap. One that read the lamp as off just before you
+ * switched it on would land afterwards and switch it back off on screen -- and if it landed after
+ * the switch's own read-back, it would stay wrong until the next poll. The rule: a poll never
+ * overrides anything changed after that poll began.
+ */
+describe('a poll does not undo what was done after it began', () => {
+  it('keeps a power state changed after the poll started', () => {
+    const current = { lamp: true, fan: false };
+    const fresh = { lamp: false, fan: false };
+    expect(mergePower(current, fresh, { lamp: 2_000 }, 1_000)).toEqual({ lamp: true, fan: false });
+  });
+
+  it('takes the poll for a device changed before it started', () => {
+    const current = { lamp: true };
+    const fresh = { lamp: false };
+    expect(mergePower(current, fresh, { lamp: 500 }, 1_000)).toEqual({ lamp: false });
+  });
+
+  // A device the poll no longer reports is unknown, which is a real answer -- unless it was
+  // changed after the poll began, when the poll has not seen it yet.
+  it('drops a device the poll no longer reports, unless it was just changed', () => {
+    expect(mergePower({ lamp: true }, {}, {}, 1_000)).toEqual({});
+    expect(mergePower({ lamp: true }, {}, { lamp: 2_000 }, 1_000)).toEqual({ lamp: true });
+  });
+
+  // Removing or adding a device changes the list. A poll that began before that would put a
+  // deleted device back.
+  it('does not apply a device list that began before the list was changed', () => {
+    expect(listPollStillCurrent(1_000, 2_000)).toBe(false);
+    expect(listPollStillCurrent(1_000, 1_000)).toBe(false);
+    expect(listPollStillCurrent(3_000, 2_000)).toBe(true);
+    expect(listPollStillCurrent(1_000, 0)).toBe(true);
   });
 });

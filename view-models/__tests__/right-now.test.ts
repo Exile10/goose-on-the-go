@@ -7,7 +7,17 @@
  */
 import { ApiError } from '@/services/api-client';
 import type { UpcomingSchedule } from '@/services/types';
-import { greetingFor, nextRoutineOf, nowPlayingOf, readRightNow, untilOf } from '../use-right-now';
+import {
+  NOW_PLAYING_BACKOFF_MS,
+  NOW_PLAYING_MS,
+  greetingFor,
+  nextRoutineOf,
+  nowPlayingDelay,
+  nowPlayingOf,
+  readNowPlaying,
+  readRightNow,
+  untilOf,
+} from '../use-right-now';
 
 describe('greetingFor', () => {
   it('says morning from five until noon', () => {
@@ -124,5 +134,34 @@ describe('readRightNow', () => {
     expect(r.nowPlaying).toBeNull();
     expect(r.outdoorTemp).toBe(22);
     expect(r.nextRoutine).not.toBeNull();
+  });
+});
+
+/**
+ * How often Now Playing asks, following the desktop's rule: every call reaches Spotify, so a
+ * refusal that only a person can fix is not asked about every ten seconds.
+ */
+describe('now playing cadence', () => {
+  const reading = (r: object) => readNowPlaying({ nowPlaying: async () => r as never });
+
+  it('asks every ten seconds while Spotify is answering', async () => {
+    expect(nowPlayingDelay(await reading({ connected: true, playing: true, track: 'A' }))).toBe(NOW_PLAYING_MS);
+    expect(nowPlayingDelay(await reading({ connected: true, playing: false }))).toBe(NOW_PLAYING_MS);
+  });
+
+  it('backs off with no account to ask', async () => {
+    expect(nowPlayingDelay(await reading({ connected: false }))).toBe(NOW_PLAYING_BACKOFF_MS);
+  });
+
+  it('backs off when Spotify refused', async () => {
+    expect(nowPlayingDelay(await reading({ connected: true, error: 'rate_limited' }))).toBe(NOW_PLAYING_BACKOFF_MS);
+  });
+
+  // A Pond that is restarting, or a phone between networks, is not a refusal. Backing off here
+  // would leave the card five minutes stale after a blip, which is the bug this fixes.
+  it('keeps its cadence when the Pond could not be reached', async () => {
+    const r = await readNowPlaying({ nowPlaying: async () => { throw new ApiError('bad gateway', 502, null); } });
+    expect(r.card).toBeNull();
+    expect(nowPlayingDelay(r)).toBe(NOW_PLAYING_MS);
   });
 });
