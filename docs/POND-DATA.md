@@ -13,7 +13,7 @@ Everything here is read through `services/api-client.ts`; no screen fetches on i
 | `profile: { id, display_name }` | the member's name |
 | `profile: null` | no name. Nobody has claimed this device, which is the normal case, because pairing happens before anyone says who they are. |
 | `404` / `405` | no name, not logged. An older Pond without the route answers 405, because the GET falls through to `/devices/{id}`. |
-| `503` or a network failure | no name, logged. A Pond that tried and failed is not the same as one with nothing to say. |
+| `503` or a network failure | logged, and reported as *unknown* (`undefined`) rather than as nobody (`null`), so a live screen keeps the name it already had instead of dropping it until the next poll. Before any name has loaded, none is shown. A Pond that tried and failed is not the same as one with nothing to say. |
 
 `readMember()` in `view-models/use-household.ts`. The profile header and the Home greeting share it; Home uses `useMember()`, which reads the member alone rather than the whole household.
 
@@ -49,13 +49,42 @@ The **Meeting** and **Locked** chips were removed rather than wired: nothing in 
 
 `/schedules/upcoming` sends the Pond's `Schedule` as stored: `label`, `paused`, `next_run`, and no `name`. The card reads it through `UpcomingSchedule` in `services/types.ts`, which describes what is actually on the wire, rather than through the mismatched shared `Schedule` noted under Known gaps.
 
-The three cards are read by `readRightNow()` in `view-models/use-right-now.ts`, one read per card, each settled on its own.
+Each card has its own reader in `view-models/use-right-now.ts`: `readOutdoorTemp()`, `readNowPlaying()` and `readNextRoutine()`. None of them ever rejects, and each runs on its own cadence (below). `readRightNow()` composes the three for one-shot use.
+
+## Keeping it current
+
+A screen reads the Pond **while it is in front**, not once when it mounts. Every live read goes through one loop, `view-models/use-live.ts`, so the rules that keep polling safe live in one place:
+
+- it reads **only while its screen is focused** and the app is not in the background, so a screen nobody is looking at costs nothing;
+- it reads **at once on arrival**, so coming back to a screen, or returning the app to the foreground, is current straight away;
+- it **never overlaps**: the next read is scheduled when the last one settles, so a slow Pond slows the poll rather than stacking requests behind it;
+- it **never waits less than `MIN_POLL_MS`** (5s), whatever it is asked for. The guard checks for a finite number, because a `NaN` delay would slip past a plain `Math.max`.
+
+The Pond rate-limits per IP (600 requests a minute for API traffic), and a runaway loop once spent the whole budget and locked this phone out of `/handshake`, the recovery path.
+
+| Source | Cadence | Constant | Why |
+|---|---|---|---|
+| Now Playing | 10s, or 5 min after a refusal or with no account | `NOW_PLAYING_MS`, `NOW_PLAYING_BACKOFF_MS` | The desktop's own cadence, and every call reaches Spotify. It does **not** back off when the Pond cannot be reached: a blip should not leave the card stale for five minutes. |
+| Devices | 15s | `DEVICES_MS` | Each read also fetches every switchable device's power state. |
+| Recent conversations | 30s | `RECENT_SESSIONS_MS` | |
+| Next routine | 60s | `ROUTINE_MS` | |
+| Household counts | 60s | `HOUSEHOLD_MS` | |
+| Profiles, models | 60s | `PROFILES_MS`, `MODELS_MS` | |
+| Weather | 10 min | `WEATHER_MS` | The Pond caches it for 15 min, so asking more often only re-reads that cache. |
+| Member | 5 min | `MEMBER_MS` | An attribution changes only when a pairing code says so. |
+| Home clock | 60s | `CLOCK_MS` | Moves the greeting and the countdowns with the time. |
+
+With Home in front that comes to about 15 requests a minute.
+
+**A poll is quiet.** It never shows a spinner, and on failure it keeps what is on screen rather than replacing it with an error or a dash. A first load, or a refresh somebody asked for, still reports its failure, and the connection banner reports whether the Pond is reachable at all. For the household, `mergeHousehold()` keeps each figure a failed read did not return and takes every one it did, including a real zero and a real "nobody has claimed this device".
+
+**A poll never undoes what you just did.** A poll is slower than a tap. One that read a lamp as off just before you switched it on would land afterwards and switch it back off on screen. `mergePower()` keeps any device changed at or after the poll began. The mark is set on the tap and again when the tap's own read-back lands, since a poll in flight began before that too. A deleted device could come back the same way, so `listPollStillCurrent()` ignores a device list if the list changed after the poll began, and that stamp moves again once the server answers.
 
 ## How this is tested
 
 The reads live in plain async functions that take the client as an argument, `readHousehold(client)`, rather than inside the hooks. That lets the whole behaviour be tested with a fake client and no renderer: partial failure, an older Pond's 405, and a Pond that tried and failed. It is what defeated a provider-level test earlier. The hooks set state only in the promise's callback, which is also what `react-hooks/set-state-in-effect` asks for.
 
-Each rule was checked by breaking it on purpose: counting a failed read as zero fails two tests, and treating the 405 as a failure fails two others. On Home, a greeting stuck on "morning", the bug as reported at 22:40, fails the afternoon and evening tests. The "no location configured" test first passed for the wrong reason, because its disabled weather carried no temperature to leak, so it now carries one on purpose.
+The loop is tested with fake timers (`view-models/__tests__/live.test.ts`): no overlap, the floor, a failing read keeping its cadence, and **a stopped loop leaving nothing scheduled**. That last one is pinned directly because the top-of-tick guard would otherwise hide an orphaned timer. Each rule was checked by breaking it on purpose: counting a failed read as zero fails two tests, and treating the 405 as a failure fails two others. On Home, a greeting stuck on "morning", the bug as reported at 22:40, fails the afternoon and evening tests. The "no location configured" test first passed for the wrong reason, because its disabled weather carried no temperature to leak, so it now carries one on purpose.
 
 ## Known gaps
 
