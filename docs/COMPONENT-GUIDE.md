@@ -125,6 +125,21 @@ How to add, modify, and remove components in the Goose on The Go UI library.
 | GSelect | options, selectedKey, onSelectionChange, label | Modal picker |
 | GSkeleton | width, height, borderRadius | Loading placeholder |
 | GEmptyState | icon, title, message, action | Empty content |
+| EqualizerBars | color, count (8), height (20) | Animated level-meter bars for playing audio. See below. |
+
+### Animated components: the rules EqualizerBars follows
+
+`EqualizerBars` (`components/ui/equalizer-bars.tsx`) draws the Now Playing card's bars, each rising and falling at its own pace, so the row reads as "playing" at a glance. It is the first continuous animation in the app, and it sets the rules the next one should follow:
+
+- **Run it on the UI thread**, with Reanimated, so it keeps its rhythm while the JS thread is polling the Pond.
+- **Stop it when its screen is not in front.** Tab screens stay mounted, and an off-screen animation spends battery for nobody. It uses `useFocusEffect`.
+- **Honour Reduce Motion**, with Reanimated's `useReducedMotion`, and hold still.
+- **Keep render pure.** Each bar's motion is fixed per index (`equalizerMotion` in `equalizer-motion.ts`), not random.
+- **Draw it only when it is true.** The card shows bars only while something is playing, never over "Nothing playing".
+
+The motion numbers are in their own module because Reanimated's native worklets do not exist under Jest. That module is tested on its own (`components/ui/__tests__/equalizer-motion.test.ts`) without mocking Reanimated for the whole suite.
+
+Verified on a device from outside the app. Six rapid screenshots of the bar area were all different, while a static control area was identical in all six. uiautomator cannot reach an idle screen on Home while the bars move, and it can on another tab, which shows the animation stops off-screen. Reduce Motion has not been tested on a device.
 
 ### Patterns (components/patterns/)
 | Component | Props | Description |

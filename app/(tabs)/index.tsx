@@ -32,6 +32,7 @@ import { Spacing } from '@/constants/spacing';
 import { Radii } from '@/constants/radii';
 import { Shadows } from '@/constants/shadows';
 import { RemoteAccessOffer } from '@/components/patterns/remote-access-offer';
+import { EqualizerBars } from '@/components/ui/equalizer-bars';
 import i18n from '@/services/i18n';
 
 /** How far off a routine is, in words. */
@@ -138,10 +139,6 @@ export default function HomeScreen() {
   );
   const router = useRouter();
   const [askText, setAskText] = useState('');
-  // Decorative waveform. Rolled once so render stays pure.
-  const [waveBarHeights] = useState(() =>
-    Array.from({ length: 8 }, () => 6 + Math.random() * 14),
-  );
 
   const handleMicPress = useCallback(() => {
     // Will trigger listening overlay in future
@@ -220,12 +217,11 @@ export default function HomeScreen() {
                     <>
                       <Text style={styles.nowPlayingTitle}>{nowPlaying.track}</Text>
                       {nowPlaying.artist ? <Text style={styles.nowPlayingArtist}>{nowPlaying.artist}</Text> : null}
-                      {/* Decorative, and only while something is playing: a moving waveform over
-                          silence would say music is on. */}
+                      {/* Moving, and only while something is playing: bars over silence would say
+                          music is on. They hold still under Reduce Motion and when Home is not in
+                          front. */}
                       <View style={styles.waveformRow}>
-                        {waveBarHeights.map((height, i) => (
-                          <View key={i} style={[styles.waveBar, { height }]} />
-                        ))}
+                        <EqualizerBars color={JaridaPurple[400]} />
                       </View>
                     </>
                   ) : (
@@ -444,16 +440,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   waveformRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    gap: 3,
     marginTop: Spacing.md,
-    height: 20,
-  },
-  waveBar: {
-    width: 4,
-    borderRadius: 2,
-    backgroundColor: JaridaPurple[400],
   },
 
   nextRoutineCard: {
