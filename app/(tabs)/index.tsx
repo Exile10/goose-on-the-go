@@ -170,7 +170,6 @@ export default function HomeScreen() {
             {initial ? (
               <Text style={styles.avatarText}>{initial}</Text>
             ) : (
-              {/* Stands in for the white initial on the purple avatar fill. */}
               <InkProvider scheme="dark">
                 <InkIcon name="home" size={18} />
               </InkProvider>

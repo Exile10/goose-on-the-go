@@ -87,7 +87,7 @@ async function run(): Promise<Result[]> {
   }
   if (previous.saved) {
     await check('secure profile survives app restart', async () => {
-      assert(previous.saved?.identity.pin === pin && previous.saved.identity.session === 'scratch-fixture', 'Restored identity differs');
+      assert(previous.saved?.identity.pin === pin && previous.saved?.identity.session === 'scratch-fixture', 'Restored identity differs');
       const response = await expoFetch(origin + '/restart', { headers });
       assert(response.status === 200, 'Restored trust cannot connect');
     });

@@ -145,7 +145,6 @@ export default function ProfileHub() {
               {initial ? (
                 <Text style={styles.avatarLargeText}>{initial}</Text>
               ) : (
-                {/* Stands in for the white initial on the purple avatar fill. */}
                 <InkProvider scheme="dark">
                   <InkIcon name="home" size={28} />
                 </InkProvider>
