@@ -5,13 +5,15 @@ import { AppState } from 'react-native';
 import NetInfo from '@react-native-community/netinfo';
 import { Storage, purgeLegacyStorage } from '@/services/storage';
 import { SecureStorage } from '@/services/secure-storage';
-import { api, PondApiClient, type HandshakeResponse } from '@/services/api-client';
+import { ApiError, api, PondApiClient, type HandshakeResponse } from '@/services/api-client';
 import { ConnectionManager, type ConnectionSnapshot } from '@/services/connection-manager';
 import { configurePondTrust, PondTrustError } from '@/services/pond-trust';
 import { findPondByHost } from '@/services/discovery';
 import { parseConnectionProfile, validPin, isLocalPairingUrl, type ConnectionProfile } from '@/models/connection';
 import i18n from '@/services/i18n';
 import { cancelRemoteAccess, restoreRemoteAccess, resumeRemoteAccess } from '@/services/remote-access';
+import { getInstallId } from '@/services/install-id';
+import { canBeat, HEARTBEAT_MS } from '@/services/heartbeat';
 
 interface PairOptions { clientId: string; pairingCode: string; deviceName?: string }
 interface ServerContextValue {
@@ -238,6 +240,50 @@ export function ServerProvider({ children }: PropsWithChildren) {
       api.setRecovery(null); api.setOnTokensRotated(null);
     };
   }, [manager, restore, invalidateOperation, resumeTransport, forgetPairing]);
+
+  /**
+   * Keep this phone's row in the Pond's device registry fresh while the app is open.
+   *
+   * The Pond derives `is_online` from `last_seen` against a five-minute threshold
+   * and has a heartbeat route that nothing was calling, so a paired phone aged out
+   * of its own device list and described itself as offline while in use.
+   *
+   * Two minutes, which is well inside that threshold and far outside anything the
+   * per-IP rate limit cares about -- thirty requests an hour against a budget that
+   * a runaway listener once spent in seconds. A missed beat is dropped rather than
+   * retried: the next one is already scheduled, and a retry loop against a
+   * rate-limited Pond is the failure this interval exists to stay clear of.
+   *
+   * Foreground only. When the app is not running the phone genuinely is not
+   * reachable through it, and saying so is the honest answer rather than a
+   * convenient one.
+   *
+   * Keyed on the resolved URL as well as the identity. The identity loads before
+   * the connection manager has reached the Pond, and the first version beat at
+   * that moment -- at the client's default address, while requiring an AppState
+   * a cold start had not reported yet -- so the beat a launch exists to send went
+   * nowhere, and the card stayed offline until the interval came round. The
+   * conditions are in `canBeat`, where they are tested.
+   */
+  const reachedUrl = snapshot.url;
+  useEffect(() => {
+    if (!identity || !reachedUrl) return;
+    let stopped = false;
+    const beat = () => {
+      if (stopped || !canBeat({ paired: true, pairing: !!staged.current, url: reachedUrl, appState: AppState.currentState })) return;
+      void getInstallId()
+        .then((id) => api.deviceHeartbeat(id))
+        .catch((e: unknown) => {
+          // Dropped, not retried: the next beat is already scheduled. But not silent -- a beat
+          // that always fails looks exactly like one that never fires.
+          console.warn('[heartbeat] not delivered', e instanceof ApiError ? e.status : 'network');
+        });
+    };
+    beat();
+    const timer = setInterval(beat, HEARTBEAT_MS);
+    const sub = AppState.addEventListener('change', (state) => { if (state === 'active') beat(); });
+    return () => { stopped = true; clearInterval(timer); sub.remove(); };
+  }, [identity, reachedUrl]);
 
   // Address updates remain non-secret and tied to the saved secure identity.
   useEffect(() => {

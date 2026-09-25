@@ -105,6 +105,21 @@ implementation, which is the default backend.
 - **NotificationsProvider** (`providers/notifications-provider.tsx`) — Push registration.
 - **InkProvider** (`@jarida/ink/native`) — Theme context for the ink primitives (#17).
 
+## Presence: telling the Pond this phone is still here
+
+The Pond does not store whether a device is online. It derives `is_online` at read time from `last_seen` against a **five-minute** threshold, so a paired phone has to keep refreshing its own row, or it ages out and reports itself offline in its own device list while in use. `ServerProvider` does that with `POST /api/v1/devices/{id}/heartbeat`, where `{id}` is the install id sent as `client_id` at pairing. The Pond keys the device row on exactly that id.
+
+| Rule | Why |
+|---|---|
+| Every **2 minutes** (`HEARTBEAT_MS`) | Inside the five-minute threshold with room for one dropped beat, and about 30 requests an hour against the Pond's per-IP budget. |
+| First beat once the **connection manager has reached the Pond** | The paired identity loads before the base URL resolves. A beat sent then goes to the client's default address and is lost, which on a cold start left the card offline until the interval came round. |
+| Stops only in a **known background** state | Backgrounding a React Native app suspends its networking, so claiming reachability then would be false. On an Android cold start AppState can still read `'unknown'`, and the app is on screen. |
+| A missed beat is **dropped, not retried**, and logged | The next one is already scheduled, and a retry loop against a rate-limited Pond is the failure the interval avoids. It is logged because a beat that always fails looks exactly like one that never fires. |
+
+The conditions live in `services/heartbeat.ts` (`canBeat`) and are unit tested there; the provider only wires them to its state. The cold-start behaviour was verified on a device, starting from a row that had aged out: the card read online 38 seconds after launch, before the interval could fire.
+
+The desktop app has the same problem and the same fix, on the Pond side (goose-in-a-pond#388).
+
 ## Navigation
 
 Uses Expo Router v6 with file-based routing:

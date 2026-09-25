@@ -765,6 +765,22 @@ export class PondApiClient {
     return this.request<T>(path);
   }
 
+  /**
+   * Tell the Pond this device is still here.
+   *
+   * The Pond derives `is_online` at read time from `last_seen` against a
+   * five-minute threshold, and nothing refreshes a phone's row after pairing
+   * writes it once -- so the row ages out and the phone's own card reports
+   * "offline" while the app is open and in use. That is the one direction the
+   * answer must not be wrong in: offline is what somebody opens this screen to
+   * check.
+   *
+   * The route already exists on the Pond and had no caller.
+   */
+  deviceHeartbeat(deviceId: string): Promise<void> {
+    return this.post<void>(`/api/v1/devices/${encodeURIComponent(deviceId)}/heartbeat`, {});
+  }
+
   private post<T>(path: string, body: unknown): Promise<T> {
     return this.request<T>(path, { method: 'POST', body: JSON.stringify(body) });
   }
