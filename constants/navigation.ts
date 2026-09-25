@@ -41,13 +41,6 @@ export const PROFILE_NAV: NavGroup[] = [
     ],
   },
   {
-    groupKey: 'nav.groupMedia',
-    items: [
-      { id: 'userMedia', labelKey: 'nav.userMedia', icon: 'photo', route: '/(stack)/user-media' },
-      { id: 'photoUpload', labelKey: 'nav.photoUpload', icon: 'upload', route: '/(stack)/photo-upload' },
-    ],
-  },
-  {
     groupKey: 'nav.groupHousehold',
     items: [
       { id: 'addUsers', labelKey: 'nav.addUsers', icon: 'users', route: '/(stack)/add-users' },

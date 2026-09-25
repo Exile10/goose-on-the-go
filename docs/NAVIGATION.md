@@ -26,8 +26,6 @@ Floating glass pill bottom nav (iOS 26 "Liquid Glass" style):
 | Schedule | `/(stack)/schedule` | Goose |
 | App Integrations | `/(stack)/app-management` | Integrations |
 | MCP Servers | `/(stack)/mcp-servers` | Integrations |
-| Photos & Videos | `/(stack)/user-media` | Media & Data |
-| Photo Upload | `/(stack)/photo-upload` | Media & Data |
 | Users | `/(stack)/add-users` | Household |
 | Biometrics | `/(stack)/biometrics` | Household |
 | Home Management | `/(stack)/home-management` | Household |

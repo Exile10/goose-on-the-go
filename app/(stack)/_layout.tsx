@@ -28,8 +28,6 @@ export default function StackLayout() {
       <Stack.Screen name="schedule" options={{ title: i18n.t('nav.schedule') }} />
       <Stack.Screen name="app-management" options={{ title: i18n.t('nav.appManagement') }} />
       <Stack.Screen name="mcp-servers" options={{ title: i18n.t('nav.mcpServers') }} />
-      <Stack.Screen name="user-media" options={{ title: i18n.t('nav.userMedia') }} />
-      <Stack.Screen name="photo-upload" options={{ title: i18n.t('nav.photoUpload') }} />
       <Stack.Screen name="add-users" options={{ title: i18n.t('nav.addUsers') }} />
       <Stack.Screen name="biometrics" options={{ title: i18n.t('screens.biometrics') }} />
       <Stack.Screen name="privacy" options={{ title: i18n.t('nav.privacy') }} />
