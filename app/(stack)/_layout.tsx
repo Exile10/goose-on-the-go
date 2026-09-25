@@ -24,6 +24,7 @@ export default function StackLayout() {
     >
       <Stack.Screen name="models" options={{ title: i18n.t('nav.models') }} />
       <Stack.Screen name="memories" options={{ title: i18n.t('nav.memories') }} />
+      <Stack.Screen name="sessions" options={{ title: i18n.t('nav.sessions') }} />
       <Stack.Screen name="logs" options={{ title: i18n.t('nav.logs') }} />
       <Stack.Screen name="schedule" options={{ title: i18n.t('nav.schedule') }} />
       <Stack.Screen name="app-management" options={{ title: i18n.t('nav.appManagement') }} />

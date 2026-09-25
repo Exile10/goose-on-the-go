@@ -251,6 +251,7 @@ void i18n.use(initReactI18next).init({
     nav: {
       models: 'AI Models',
       memories: 'Memories',
+      sessions: 'Sessions',
       logs: 'Activity Logs',
       schedule: 'Schedule',
       appManagement: 'App Integrations',

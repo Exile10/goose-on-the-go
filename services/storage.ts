@@ -14,6 +14,8 @@ const KEYS = {
   settings: '@goose/settings',
   devScreenModes: '@goose/dev-screen-modes',
   remoteOfferDismissed: '@goose/remote-offer-dismissed',
+  /** Pointer to whatever resumable run the server may still be driving — see view-models/chat-run-store.ts. */
+  chatRun: '@goose/chat-run',
 } as const;
 
 /**

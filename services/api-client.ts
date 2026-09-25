@@ -13,6 +13,8 @@ import { isLocalPairingUrl, normalizeHttpsUrl } from '@/models/connection';
  * before bubbling the error up to the caller.
  */
 
+import EventSource from 'react-native-sse';
+
 import {
   CLIENT_LABEL,
   equalHex,
@@ -25,8 +27,11 @@ import {
 } from './hmac';
 import { timeoutSignal } from './http';
 import type {
+  ActiveRun,
   ActivityResponse,
   ActivitySummary,
+  ChatStreamFrame,
+  ChatStreamRequest,
   CommissionDeviceRequest,
   CommissionDeviceResponse,
   CreateDeviceRequest,
@@ -563,6 +568,152 @@ export class PondApiClient {
 
   deleteSession(id: string): Promise<void> {
     return this.del<void>(`/api/v1/sessions/${encodeURIComponent(id)}`);
+  }
+
+  renameSession(id: string, title: string): Promise<void> {
+    return this.request<void>(`/api/v1/sessions/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ title }),
+    });
+  }
+
+  // ── Chat streaming ──────────────────────────────────────────
+
+  /**
+   * Shared by `streamChat` and `reattachChat` — both are an SSE body read the
+   * same way, one POSTing a new turn and one GETting back into a run already
+   * in flight.
+   *
+   * Uses `react-native-sse` rather than native `EventSource` because
+   * `/chat/stream` requires a POST body — the browser-standard `EventSource`
+   * is GET-only. `pollingInterval: 0` is load-bearing: the library
+   * auto-reconnects by default when the server closes the stream, which here
+   * would silently re-POST the same chat message (or re-GET a finished run)
+   * after the server already finished replying.
+   *
+   * A frame's sequence number rides in the SSE `id:` field, not the JSON
+   * body — pond-server writes it there deliberately so the hot path stays
+   * JSON-free. Stamped onto the parsed frame here rather than left for every
+   * caller to remember.
+   */
+  private openEventSource(
+    url: string,
+    init: { method: 'GET' | 'POST'; body?: string },
+    handlers: {
+      onFrame: (frame: ChatStreamFrame) => void;
+      onNetworkError?: (message: string) => void;
+    },
+  ): { close: () => void } {
+    // The stream carries the bearer token, so it waits for native trust like every other request.
+    let es: EventSource | null = null;
+    let closed = false;
+    assertPondTrust(new URL(url).origin).then(() => {
+      if (closed) return;
+      es = new EventSource(url, {
+        method: init.method,
+        headers: { ...this.headers(), 'X-Pond-Transport': '1' },
+        body: init.body,
+        pollingInterval: 0,
+      });
+      this.attachStreamHandlers(es, handlers);
+    }, (error: unknown) => {
+      if (!closed) handlers.onNetworkError?.(error instanceof Error ? error.message : String(error));
+    });
+    return { close: () => { closed = true; es?.close(); } };
+  }
+
+  private attachStreamHandlers(
+    es: EventSource,
+    handlers: {
+      onFrame: (frame: ChatStreamFrame) => void;
+      onNetworkError?: (message: string) => void;
+    },
+  ) {
+    es.addEventListener('message', (event) => {
+      if (!event.data) return;
+      try {
+        const frame = JSON.parse(event.data) as ChatStreamFrame;
+        const seq = event.lastEventId ? Number(event.lastEventId) : NaN;
+        if (Number.isFinite(seq)) (frame as { seq?: number }).seq = seq;
+        handlers.onFrame(frame);
+      } catch {
+        // Malformed frame — drop it, don't kill the stream over one bad line.
+      }
+    });
+
+    es.addEventListener('error', (event) => {
+      const message = event.type === 'timeout' ? 'Request timed out' : event.message || 'Could not reach the server';
+      handlers.onNetworkError?.(message);
+    });
+  }
+
+  /** Open a streaming chat turn against POST /chat/stream (SSE). */
+  streamChat(
+    req: ChatStreamRequest,
+    handlers: {
+      onFrame: (frame: ChatStreamFrame) => void;
+      onNetworkError?: (message: string) => void;
+    },
+  ): { close: () => void } {
+    return this.openEventSource(
+      `${this.baseUrl}/api/v1/chat/stream`,
+      { method: 'POST', body: JSON.stringify(req) },
+      handlers,
+    );
+  }
+
+  /**
+   * Follow a run already in flight (or replay one that just finished),
+   * against GET /chat/runs/{run_id}/events.
+   *
+   * `afterSeq` is exclusive — everything after it is replayed, then live
+   * frames follow. `epoch` is what the run reported when it started; sending
+   * it back is what earns a 410 with a reason instead of a bare 404 when the
+   * server has restarted underneath the client.
+   */
+  reattachChat(
+    runId: string,
+    afterSeq: number,
+    epoch: string | undefined,
+    handlers: {
+      onFrame: (frame: ChatStreamFrame) => void;
+      onNetworkError?: (message: string) => void;
+    },
+  ): { close: () => void } {
+    const q = new URLSearchParams({ after_seq: String(afterSeq) });
+    if (epoch) q.set('epoch', epoch);
+    return this.openEventSource(
+      `${this.baseUrl}/api/v1/chat/runs/${encodeURIComponent(runId)}/events?${q}`,
+      { method: 'GET' },
+      handlers,
+    );
+  }
+
+  /**
+   * Stop a run on purpose — the only way, now that a resumable turn keeps
+   * running after the client disconnects. A 404 means the run already ended
+   * on its own, which is not a failure from the caller's perspective.
+   */
+  async cancelRun(runId: string): Promise<void> {
+    try {
+      await this.request<void>(`/api/v1/chat/runs/${encodeURIComponent(runId)}/cancel`, { method: 'POST' });
+    } catch (e) {
+      if (!(e instanceof ApiError && e.status === 404)) throw e;
+    }
+  }
+
+  /**
+   * The run driving this session, if the server is still driving one — the
+   * way back in after a restart, when a client knows only its session id.
+   * `null` covers both "never had one" and "server restarted since".
+   */
+  async getActiveRun(sessionId: string): Promise<ActiveRun | null> {
+    try {
+      return await this.request<ActiveRun>(`/api/v1/sessions/${encodeURIComponent(sessionId)}/active-run`);
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 404) return null;
+      throw e;
+    }
   }
 
   usageSummary(): Promise<UsageSummary> {
