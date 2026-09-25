@@ -32,6 +32,9 @@ Floating glass pill bottom nav (iOS 26 "Liquid Glass" style):
 | Privacy & Licenses | `/(stack)/privacy` | Data & Privacy |
 | Pond Pairing | `/(stack)/pond-pairing` | Devices |
 | Remote Access | `/(stack)/remote-access` | Profile footer, Home offer |
+| Developer Mode | `/(stack)/developer` | Developer (dev builds only, #21) |
+
+Two more stack screens aren't in the hub: **Add Device** (`/(stack)/commission-device`, from the Devices tab) and **Connect Desktop** (`/(stack)/connect-desktop`, the QR scanner opened from Pond Pairing).
 
 ## Every route has to lead somewhere
 

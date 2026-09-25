@@ -98,30 +98,43 @@ implementation, which is the default backend.
 
 ## Providers
 
-Two React context providers wrap the app:
+`app/_layout.tsx` wraps the app in these, outermost first:
 
 - **ThemeProvider** (`providers/theme-provider.tsx`) — Jarida color tokens resolved for light/dark mode. Access via `useTheme()`.
-- **ServerProvider** (`providers/server-provider.tsx`) — Server connection state. Access via `useServer()`.
+- **ServerProvider** (`providers/server-provider.tsx`) — Server connection state and the dev mock/real toggles. Access via `useServer()`.
+- **NotificationsProvider** (`providers/notifications-provider.tsx`) — Push registration.
+- **InkProvider** (`@jarida/ink/native`) — Theme context for the ink primitives (#17).
 
 ## Navigation
 
 Uses Expo Router v6 with file-based routing:
 
-- **`(tabs)/`** — Bottom tab navigator (5 tabs: Dashboard, Chat, Canvas, Devices, More)
-- **`(stack)/`** — Stack navigator (8 screens: Memory, Skills, Models, Logs, Schedules, Prompts, Settings, Agent)
+- **`(tabs)/`** — Bottom tab navigator (4 tabs: Home, Chat, Devices, You)
+- **`(stack)/`** — Stack navigator for the You-tab sub-screens, plus Add Device, Connect Desktop and the dev-only Developer screen
 - **`modal.tsx`** — Modal presentation route
 
 See [NAVIGATION.md](./NAVIGATION.md) for detailed rationale.
 
 ## Component Library
 
-All UI components are in-house — no external UI library.
+Primitives come from **`@jarida/ink/native`** (`InkButton`, `InkInput`, `InkSwitch`, `InkProvider`, etc. — issue #17). Two in-house primitives remain in `components/ui/`, re-exported from its barrel: `GIcon` (pending the icon-registry work in #19) and `GKeyboardView` (no ink equivalent).
 
-- **`components/ui/`** — Primitive components (GButton, GCard, GChip, etc.)
-- **`components/patterns/`** — Composite components (ChatBubble, DeviceCard, etc.)
+- **`components/ui/`** — The two surviving in-house primitives (`GIcon`, `GKeyboardView`)
+- **`components/patterns/`** — Composite components (ChatBubble, ServerStatus, etc.), composed from ink primitives
 - **`components/layout/`** — Screen wrappers (ScreenScrollView, ScreenFlatList)
 
 See [COMPONENT-GUIDE.md](./COMPONENT-GUIDE.md) for how to add/modify components.
+
+## Developer Mode
+
+`app/(stack)/developer.tsx`, reached from the You tab's "Developer" section, is a
+dev-only screen (`if (!__DEV__) return <Redirect .../>`) that lets each
+migratable screen be flipped independently between its mock data and the real
+`PondApiClient` (issue #21). `MIGRATION_SCREENS` and `isScreenReal`/`setScreenMode`
+live on `ServerProvider` (`providers/server-provider.tsx`); mock and real code
+paths coexist per screen, so nothing needs to be deleted to test either one.
+It also has a "Pond server URL" field and a Test connection button that probes
+`/health`. The screen isn't linked from the You-tab menu in production builds.
 
 ## Performance
 

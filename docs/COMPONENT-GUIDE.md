@@ -6,11 +6,21 @@ How to add, modify, and remove components in the Goose on The Go UI library.
 
 | Type | Location | Naming | Purpose |
 |------|----------|--------|---------|
-| **Primitive** | `components/ui/` | `g-*.tsx` (GButton, GCard) | Basic building blocks. No business logic. |
-| **Pattern** | `components/patterns/` | descriptive (chat-bubble, device-card) | Composed from primitives. Domain-aware. |
+| **Primitive** | `@jarida/ink/native` | `Ink*` (InkButton, InkSwitch) | Basic building blocks. No business logic. Two in-house exceptions live in `components/ui/`: `GIcon` and `GKeyboardView` — see below. |
+| **Pattern** | `components/patterns/` | descriptive (chat-bubble, role-chip) | Composed from ink primitives. Domain-aware. |
 | **Layout** | `components/layout/` | descriptive (screen-scroll-view) | Screen wrappers and containers. |
 
-## Adding a New Primitive Component
+As of issue #17, in-house primitives (the old `GButton`/`GCard`/`GChip`/etc.
+`g-*.tsx` family) were replaced by `@jarida/ink/native`. Before adding a new
+primitive, check whether ink already has it — most basic building blocks
+should come from there, imported directly (e.g. `import { InkButton } from
+'@jarida/ink/native'`).
+
+## Adding a New In-House Primitive (exception case only)
+
+Only add a component to `components/ui/` if ink has no equivalent — as with
+`GKeyboardView` — or it's a stopgap pending upstream ink work — as with `GIcon`
+pending #19.
 
 1. **Create the file** in `components/ui/` with kebab-case naming:
    ```
@@ -31,7 +41,7 @@ How to add, modify, and remove components in the Goose on The Go UI library.
 
 4. **Import tokens** from individual constant files:
    ```tsx
-   import { JaridaPurple, Grey } from '@/constants/colors';
+   import { Accent, Grey } from '@/constants/colors';
    import { FontFamily, FontSize } from '@/constants/typography';
    import { Spacing } from '@/constants/spacing';
    import { Radii } from '@/constants/radii';
@@ -61,9 +71,10 @@ How to add, modify, and remove components in the Goose on The Go UI library.
    components/patterns/notification-card.tsx
    ```
 
-2. **Compose from primitives** — import from `@/components/ui`:
+2. **Compose from ink primitives**, plus `GIcon`/`GKeyboardView` from `@/components/ui` where needed:
    ```tsx
-   import { GCard, GChip, GButton } from '@/components/ui';
+   import { InkButton, InkSwitch } from '@jarida/ink/native';
+   import { GIcon } from '@/components/ui';
    ```
 
 3. **Props should mirror ViewModel data shapes:**
@@ -107,24 +118,23 @@ How to add, modify, and remove components in the Goose on The Go UI library.
 
 ## Existing Components
 
-### Primitives (components/ui/)
+### Primitives (@jarida/ink/native)
+Imported directly from the library — not re-exported through `components/ui/`.
+See ink's own docs for full prop lists; only the primitives actually in use
+here are listed.
+
+| Component | Description |
+|-----------|-------------|
+| InkButton | Primary action button — 3 variants (GButton's old secondary/ghost/bordered variants collapsed into ink's `quiet`; `size` prop is gone) |
+| InkInput | Text input |
+| InkSwitch | Toggle switch |
+| InkProvider | Wraps the app (see `app/_layout.tsx`) |
+
+### Primitives — in-house exceptions (components/ui/)
 | Component | Props | Description |
 |-----------|-------|-------------|
-| GButton | variant, size, startIcon, endIcon, loading, disabled | Primary action button |
-| GCard | variant (default/elevated) | Surface container |
-| GChip | variant (6 colors), size, startIcon | Status badge |
-| GIcon | name, size, color, fill | SVG icon from IconPaths registry |
-| GInput | label, variant (bordered/flat), startIcon | Text input |
-| GTextArea | label, variant, minLines, maxLines | Multi-line input |
-| GSwitch | value, onValueChange, label | Toggle switch |
-| GTabs | tabs, activeKey, onTabChange, variant | Tab bar |
-| GSeparator | — | Divider line |
-| GRadioGroup | options, value, onValueChange, orientation | Radio options |
-| GSlider | value, onValueChange, min, max, label | Range slider |
-| GProgressBar | value, color, size, label | Progress indicator |
-| GSelect | options, selectedKey, onSelectionChange, label | Modal picker |
-| GSkeleton | width, height, borderRadius | Loading placeholder |
-| GEmptyState | icon, title, message, action | Empty content |
+| GIcon | name, size, color, fill | SVG icon from IconPaths registry — pending ink's icon registry (#19) |
+| GKeyboardView | — | Keyboard-avoiding view — no ink equivalent |
 | EqualizerBars | color, count (8), height (20) | Animated level-meter bars for playing audio. See below. |
 
 ### Animated components: the rules EqualizerBars follows
@@ -153,10 +163,5 @@ Verified on a device from outside the app. Six rapid screenshots of the bar area
 | ChatComposer | onSend, placeholder | Message input |
 | MoreMenuItem | label, onPress | More hub nav item |
 | MemoryItem | text, date, onDelete | Memory list row |
-| DeviceCard | device | Device display card |
-| ScheduleCard | schedule, onToggle | Schedule display card |
-| ModelItem | model, isActive, onPress | Model browser row |
-| LogRow | log | Log entry row |
-| SkillItem | skill, onToggle, onDelete | Skill list row |
 | VoiceOrb | state, onPress | Voice mode button |
 | VuMeter | level, active | Audio level bars |
