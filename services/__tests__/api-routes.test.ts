@@ -212,3 +212,40 @@ it('escapes a device id that would otherwise change the path', async () => {
 
   expect(seen[0]).toBe('https://pond.test:4000/api/v1/devices/a%2F..%2Fb/heartbeat');
 });
+
+/**
+ * A response shape the wrapper did not expect must not reach a screen as
+ * `undefined`. The Pond answering `{}` -- or an envelope with the key missing or
+ * null -- crashed the AI Models screen with "Cannot read property 'find' of
+ * undefined", because the declared type asserted a key the body need not carry.
+ */
+describe('a catalogue the server did not send', () => {
+  it.each([
+    ['an envelope without the key', '{}'],
+    ['an envelope with a null list', '{"models":null}'],
+    ['an unrelated envelope', '{"items":[{"name":"x"}]}'],
+  ])('answers %s with an empty list rather than undefined', async (_label, body) => {
+    setFetch(async () => reply(body));
+    const api = new PondApiClient('https://pond.test:4000');
+    await expect(api.listModels()).resolves.toEqual([]);
+  });
+
+  it('still unwraps a well-formed envelope', async () => {
+    setFetch(async () => reply('{"models":[{"provider":"p","name":"m","is_active":true}]}'));
+    const api = new PondApiClient('https://pond.test:4000');
+    await expect(api.listModels()).resolves.toEqual([{ provider: 'p', name: 'm', is_active: true }]);
+  });
+
+  /**
+   * Nine wrappers share the unwrapping, so pinning it through one of them proves
+   * little. Devices is the other end of the same helper: the Home and Devices
+   * screens both map over this list, and `undefined` there fails the same way the
+   * models screen did.
+   */
+  it('applies the same tolerance to the other collections', async () => {
+    setFetch(async () => reply('{}'));
+    const api = new PondApiClient('https://pond.test:4000');
+    await expect(api.listDevices()).resolves.toEqual([]);
+    await expect(api.listSchedules()).resolves.toEqual([]);
+  });
+});

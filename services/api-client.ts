@@ -140,6 +140,25 @@ async function parseBody<T>(res: Response): Promise<T | undefined> {
 }
 
 
+/**
+ * Unwrap a collection that may arrive bare or inside an envelope.
+ *
+ * The envelope is input, not a guarantee. Nine wrappers declared the body as
+ * `{ key: T[] } | T[]` and returned `res.key` for the object case, which types as
+ * `T[]` whatever the server actually sent -- so a Pond answering `{}`, or an
+ * envelope carrying a null list, produced `undefined`. That reached a screen as
+ * state and threw on the first `.find` or `.map`, which is how opening AI Models
+ * killed the app rather than showing the empty state it already has.
+ *
+ * A shape the client did not expect is an empty collection, and every one of
+ * these screens has something to say about an empty collection.
+ */
+function collection<T>(res: unknown, key: string): T[] {
+  if (Array.isArray(res)) return res as T[];
+  const value = (res as Record<string, unknown> | null | undefined)?.[key];
+  return Array.isArray(value) ? (value as T[]) : [];
+}
+
 export class PondApiClient {
   private baseUrl: string;
   private token: string | null = null;
@@ -451,8 +470,8 @@ export class PondApiClient {
 
   /** `GET /devices`. The server wraps the list in an envelope; callers get the list. */
   async listDevices(): Promise<Device[]> {
-    const res = await this.request<{ devices: Device[] } | Device[]>('/api/v1/devices');
-    return Array.isArray(res) ? res : res.devices;
+    const res = await this.request<{ devices?: Device[] } | Device[]>('/api/v1/devices');
+    return collection<Device>(res, 'devices');
   }
 
   registerDevice(req: CreateDeviceRequest): Promise<Device> {
@@ -524,10 +543,10 @@ export class PondApiClient {
   // ── Sessions ────────────────────────────────────────────────
 
   async listSessions(): Promise<SessionSummary[]> {
-    const res = await this.request<{ sessions: SessionSummary[] } | SessionSummary[]>(
+    const res = await this.request<{ sessions?: SessionSummary[] } | SessionSummary[]>(
       '/api/v1/sessions',
     );
-    return Array.isArray(res) ? res : res.sessions;
+    return collection<SessionSummary>(res, 'sessions');
   }
 
   getSession(id: string): Promise<SessionSummary> {
@@ -536,10 +555,10 @@ export class PondApiClient {
 
   async listSessionMessages(id: string, limit?: number): Promise<SessionMessage[]> {
     const q = limit ? `?limit=${limit}` : '';
-    const res = await this.request<{ messages: SessionMessage[] } | SessionMessage[]>(
+    const res = await this.request<{ messages?: SessionMessage[] } | SessionMessage[]>(
       `/api/v1/sessions/${encodeURIComponent(id)}/messages${q}`,
     );
-    return Array.isArray(res) ? res : res.messages;
+    return collection<SessionMessage>(res, 'messages');
   }
 
   deleteSession(id: string): Promise<void> {
@@ -554,10 +573,10 @@ export class PondApiClient {
 
   async listMemories(limit?: number): Promise<MemoryFragment[]> {
     const q = limit ? `?limit=${limit}` : '';
-    const res = await this.request<{ memories: MemoryFragment[] } | MemoryFragment[]>(
+    const res = await this.request<{ memories?: MemoryFragment[] } | MemoryFragment[]>(
       `/api/v1/memories${q}`,
     );
-    return Array.isArray(res) ? res : res.memories;
+    return collection<MemoryFragment>(res, 'memories');
   }
 
   addMemory(content: string, tags?: string[]): Promise<MemoryFragment> {
@@ -571,8 +590,8 @@ export class PondApiClient {
   // ── Models ──────────────────────────────────────────────────
 
   async listModels(): Promise<ModelEntry[]> {
-    const res = await this.request<{ models: ModelEntry[] } | ModelEntry[]>('/api/v1/models');
-    return Array.isArray(res) ? res : res.models;
+    const res = await this.request<{ models?: ModelEntry[] } | ModelEntry[]>('/api/v1/models');
+    return collection<ModelEntry>(res, 'models');
   }
 
   modelCapabilities(): Promise<ModelCapabilities> {
@@ -597,8 +616,8 @@ export class PondApiClient {
   // ── Schedules ───────────────────────────────────────────────
 
   async listSchedules(): Promise<Schedule[]> {
-    const res = await this.request<{ schedules: Schedule[] } | Schedule[]>('/api/v1/schedules');
-    return Array.isArray(res) ? res : res.schedules;
+    const res = await this.request<{ schedules?: Schedule[] } | Schedule[]>('/api/v1/schedules');
+    return collection<Schedule>(res, 'schedules');
   }
 
   createSchedule(req: Omit<Schedule, 'id'>): Promise<Schedule> {
@@ -622,10 +641,10 @@ export class PondApiClient {
   }
 
   async listScheduleRuns(id: string, limit = 20): Promise<ScheduleRun[]> {
-    const res = await this.request<{ runs: ScheduleRun[] } | ScheduleRun[]>(
+    const res = await this.request<{ runs?: ScheduleRun[] } | ScheduleRun[]>(
       `/api/v1/schedules/${encodeURIComponent(id)}/runs?limit=${limit}`,
     );
-    return Array.isArray(res) ? res : res.runs;
+    return collection<ScheduleRun>(res, 'runs');
   }
 
   // ── Logs and activity ───────────────────────────────────────
@@ -635,10 +654,10 @@ export class PondApiClient {
     if (params?.limit) qs.set('limit', String(params.limit));
     if (params?.level) qs.set('level', params.level);
     const q = qs.toString();
-    const res = await this.request<{ logs: LogEntry[] } | LogEntry[]>(
+    const res = await this.request<{ logs?: LogEntry[] } | LogEntry[]>(
       `/api/v1/logs${q ? `?${q}` : ''}`,
     );
-    return Array.isArray(res) ? res : res.logs;
+    return collection<LogEntry>(res, 'logs');
   }
 
   listActivity(params?: {
@@ -663,10 +682,10 @@ export class PondApiClient {
   // ── Extensions and the marketplace ──────────────────────────
 
   async listExtensions(): Promise<Extension[]> {
-    const res = await this.request<{ extensions: Extension[] } | Extension[]>(
+    const res = await this.request<{ extensions?: Extension[] } | Extension[]>(
       '/api/v1/extensions',
     );
-    return Array.isArray(res) ? res : res.extensions;
+    return collection<Extension>(res, 'extensions');
   }
 
   setExtensionEnabled(name: string, enabled: boolean): Promise<void> {
