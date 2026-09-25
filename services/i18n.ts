@@ -39,6 +39,7 @@ void i18n.use(initReactI18next).init({
       statDevices: 'Devices', statRooms: 'Rooms', statRoutines: 'Routines', statUsers: 'Users',
     },
     pairing: {
+      stepFind: 'Find Pond', stepCode: 'Pairing Code', stepName: 'Name Device', stepComplete: 'Complete',
       lan: 'Connect to the same home network as your Pond to pair.',
       invalid: 'Scan a current HTTPS pairing QR code from your Pond.',
       fingerprint: 'Pond public-key fingerprint',
@@ -97,6 +98,7 @@ void i18n.use(initReactI18next).init({
       eventBadge: 'Event',
     },
     chat: {
+      suggestLights: 'Turn off all lights', suggestWeather: 'What\u2019s the weather?', suggestMusic: 'Play some music', suggestLock: 'Lock the front door',
       connected: 'Connected', messagePlaceholder: 'Message Goose\u2026', poweredBy: 'Powered by Goose 2',
       returnToSend: 'Return to send',
       you: 'You',
@@ -128,6 +130,7 @@ void i18n.use(initReactI18next).init({
       cancel: 'Cancel',
     },
     voice: {
+      phraseLights: 'Turn off the lights', phraseWeather: 'What\u2019s the weather like?', phraseTimer: 'Set a timer for 10 minutes', phrasePlaylist: 'Play my evening playlist',
       listening: 'Listening\u2026',
       thinking: 'Thinking\u2026',
       speaking: 'Speaking\u2026',
@@ -203,6 +206,7 @@ void i18n.use(initReactI18next).init({
       add: 'Add Profile',
     },
     devices: {
+      roomUnassigned: 'Unassigned', roomAll: 'All',
       title: 'Devices',
       countOne: '1 device',
       countMany: '{{count}} devices',

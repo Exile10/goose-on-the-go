@@ -18,6 +18,38 @@ const i18next = require('eslint-plugin-i18next');
  *
  * See docs/I18N.md.
  */
+/**
+ * `i18next/no-literal-string`, without the exemption that hid a third of the copy.
+ *
+ * The plugin treats any variable with an all-caps name as a constant and skips every string
+ * inside it: its `VariableDeclarator` handler pushes `isUpperCase(name)` onto the stack of scopes
+ * it consults, and one "skip" anywhere up that stack wins over everything below. That is exactly
+ * where this codebase keeps copy -- `STEP_LABELS`, `SUGGESTED_PROMPTS`, a privacy screen's
+ * paragraphs -- so about seventy strings were invisible to a rule this file says covers the whole
+ * surface. `{ title: 'Data Collection' }` was flagged in `const sections` and not in
+ * `const SECTIONS`, and nothing else differed.
+ *
+ * The plugin has no option for it, so the handler goes. Its enter and exit are both removed, which
+ * keeps that stack balanced; every other rule the plugin applies is unchanged, and the rule keeps
+ * its id, so the existing targeted disables still apply.
+ */
+const literalRule = i18next.rules['no-literal-string'];
+const i18nextWithoutUppercaseExemption = {
+  ...i18next,
+  rules: {
+    ...i18next.rules,
+    'no-literal-string': {
+      ...literalRule,
+      create(context) {
+        const visitors = literalRule.create(context);
+        delete visitors.VariableDeclarator;
+        delete visitors['VariableDeclarator:exit'];
+        return visitors;
+      },
+    },
+  },
+};
+
 const TRANSLATED_SURFACE = ['app/**/*.tsx', 'components/**/*.tsx', 'view-models/**/*.ts', 'constants/**/*.ts'];
 
 module.exports = defineConfig([
@@ -29,7 +61,7 @@ module.exports = defineConfig([
     files: TRANSLATED_SURFACE,
     // Tests assert on copy; they are not copy.
     ignores: ['**/__tests__/**'],
-    plugins: { i18next },
+    plugins: { i18next: i18nextWithoutUppercaseExemption },
     rules: {
       'i18next/no-literal-string': ['error', {
         // `jsx-only` was not enough, and the gap was not subtle: it inspects JSX text and

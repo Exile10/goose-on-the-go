@@ -28,12 +28,15 @@ import i18n from '@/services/i18n';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
-const SUGGESTED_PHRASES = [
-  'Turn off the lights',
-  'What\'s the weather like?',
-  'Set a timer for 10 minutes',
-  'Play my evening playlist',
-];
+/** Example phrases for the listening overlay, from literal keys so the i18n test sees each one. */
+function suggestedPhrases(): string[] {
+  return [
+    i18n.t('voice.phraseLights'),
+    i18n.t('voice.phraseWeather'),
+    i18n.t('voice.phraseTimer'),
+    i18n.t('voice.phrasePlaylist'),
+  ];
+}
 
 export interface ListeningOverlayProps {
   /** Whether the overlay is visible */
@@ -152,7 +155,7 @@ function ListeningOverlayInner({ visible, onCancel }: ListeningOverlayProps) {
         {/* Suggested phrases */}
         <View style={styles.suggestedSection}>
           <Text style={styles.suggestedTitle}>{i18n.t('voice.trySaying')}</Text>
-          {SUGGESTED_PHRASES.map((phrase) => (
+          {suggestedPhrases().map((phrase) => (
             <Pressable key={phrase} style={styles.phraseChip}>
               <Text style={styles.phraseText}>{`"${phrase}"`}</Text>
             </Pressable>

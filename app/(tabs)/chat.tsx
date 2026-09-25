@@ -26,12 +26,19 @@ import { Spacing } from '@/constants/spacing';
 import { Radii } from '@/constants/radii';
 import i18n from '@/services/i18n';
 
-const SUGGESTED_PROMPTS = [
-  'Turn off all lights',
-  'What\u2019s the weather?',
-  'Play some music',
-  'Lock the front door',
-];
+/**
+ * The suggested prompts, read from the catalogue when the screen renders -- literal keys, so
+ * services/__tests__/i18n.test.ts sees each one. Tapping one sends its text, so a reader in another
+ * language sends the prompt in that language too.
+ */
+function suggestedPrompts(): string[] {
+  return [
+    i18n.t('chat.suggestLights'),
+    i18n.t('chat.suggestWeather'),
+    i18n.t('chat.suggestMusic'),
+    i18n.t('chat.suggestLock'),
+  ];
+}
 
 /** Chat bubble component */
 const ChatBubble = React.memo(function ChatBubble({ item }: { item: Message }) {
@@ -141,7 +148,7 @@ export default function ChatScreen() {
 
         {/* Suggested prompts */}
         <View style={styles.suggestedRow}>
-          {SUGGESTED_PROMPTS.map((p) => (
+          {suggestedPrompts().map((p) => (
             <Pressable
               key={p}
               style={styles.suggestedChip}

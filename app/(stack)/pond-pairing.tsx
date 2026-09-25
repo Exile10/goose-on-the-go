@@ -36,17 +36,32 @@ import { useDiscovery } from '@/view-models/use-discovery';
 import { describeApiError } from '@/view-models/describe-error';
 
 type Step = 0 | 1 | 2 | 3;
-const STEP_LABELS = ['Find Pond', 'Pairing Code', 'Name Device', 'Complete'];
+const STEPS = ['find', 'code', 'name', 'complete'] as const;
+
+/**
+ * A step's label, one literal key per branch, as the Memories tabs do: a key assembled at runtime
+ * is invisible to services/__tests__/i18n.test.ts, and the exhaustive switch makes TypeScript fail
+ * if a step is added without one. These were the one piece of pairing copy the i18n rule could not
+ * see, because it sat in an all-caps constant.
+ */
+function stepLabel(step: (typeof STEPS)[number]): string {
+  switch (step) {
+    case 'find': return i18n.t('pairing.stepFind');
+    case 'code': return i18n.t('pairing.stepCode');
+    case 'name': return i18n.t('pairing.stepName');
+    case 'complete': return i18n.t('pairing.stepComplete');
+  }
+}
 
 /** Step indicator */
 function StepIndicator({ current }: { current: Step }) {
   return (
     <View style={styles.stepRow}>
-      {STEP_LABELS.map((label, i) => {
+      {STEPS.map((step, i) => {
         const isActive = i === current;
         const isDone = i < current;
         return (
-          <View key={label} style={styles.stepItem}>
+          <View key={step} style={styles.stepItem}>
             <View
               style={[
                 styles.stepDot,
@@ -63,7 +78,7 @@ function StepIndicator({ current }: { current: Step }) {
               )}
             </View>
             <Text style={[styles.stepLabel, isActive && styles.stepLabelActive]}>
-              {label}
+              {stepLabel(step)}
             </Text>
           </View>
         );
