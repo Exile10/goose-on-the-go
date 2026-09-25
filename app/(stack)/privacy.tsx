@@ -27,7 +27,7 @@ interface PrivacySection {
 
 const PRIVACY_SECTIONS: PrivacySection[] = [
   { id: 'data', title: 'Data Collection', icon: 'activity', content: 'Goose collects voice commands, device interactions, and usage patterns to improve your experience. All data is processed on-device via Pond when possible. Cloud processing is only used when explicitly enabled.' },
-  { id: 'storage', title: 'Data Storage', icon: 'server', content: 'Your data is stored locally on your Pond device with AES-256 encryption. Cloud backups are encrypted end-to-end. We never sell or share your personal data with third parties.' },
+  { id: 'storage', title: 'Data Storage', icon: 'server', content: 'Your data is stored locally on your Pond device with AES-256 encryption. We never sell or share your personal data with third parties.' },
   { id: 'sharing', title: 'Third-Party Sharing', icon: 'link', content: 'MCP integrations (Uber, Glovo, Spotify) only receive the minimum data needed to fulfill your requests. API keys are stored encrypted and never leave your device.' },
   { id: 'voice', title: 'Voice Data', icon: 'mic', content: 'Voice recordings are processed locally by default. Recordings are not stored after transcription unless you enable voice history. Wake word detection runs entirely on-device.' },
   { id: 'biometric', title: 'Biometric Data', icon: 'shield', content: 'Face and voice biometric templates are stored only on your Pond device. Biometric data is never uploaded to the cloud and cannot be reverse-engineered into images or audio.' },

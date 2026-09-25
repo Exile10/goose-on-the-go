@@ -16,7 +16,7 @@ Floating glass pill bottom nav (iOS 26 "Liquid Glass" style):
 | Devices | Device Grid | devices | Room-grouped smart home control |
 | You | Profile Hub | profile | Settings, integrations, data |
 
-## Sub-Screens (15 — stack navigation from Profile hub)
+## Sub-Screens (stack navigation from Profile hub)
 
 | Screen | Route | Section |
 |--------|-------|---------|
@@ -31,10 +31,21 @@ Floating glass pill bottom nav (iOS 26 "Liquid Glass" style):
 | Users | `/(stack)/add-users` | Household |
 | Biometrics | `/(stack)/biometrics` | Household |
 | Home Management | `/(stack)/home-management` | Household |
-| Backup | `/(stack)/backup` | Data & Privacy |
-| Restore to Pond | `/(stack)/restore` | Data & Privacy |
 | Privacy & Licenses | `/(stack)/privacy` | Data & Privacy |
 | Pond Pairing | `/(stack)/pond-pairing` | Devices |
+| Remote Access | `/(stack)/remote-access` | Profile footer, Home offer |
+
+## Every route has to lead somewhere
+
+expo-router resolves routes at runtime, so a menu row pointing at a deleted screen passes `tsc` and fails only when someone taps it, on an unmatched-route screen. `constants/__tests__/navigation.test.ts` holds three rules:
+
+- every profile menu row in `constants/navigation.ts` reaches a screen file;
+- every screen `app/(stack)/_layout.tsx` registers exists;
+- every screen file in `app/(stack)` is registered.
+
+The third is this app's rule, not expo-router's. The stack sets `headerShown: true`, and a screen the layout does not register gets its route name as its header. That is how Remote Access shipped headed `remote-access`, lowercase and untranslated, until the guard caught it. So a new screen needs its `<Stack.Screen name=... options={{ title: i18n.t('nav....') }} />` line, and removing a screen means removing its file, its registration and its menu row together.
+
+Backup and Restore were removed rather than wired (#64): the Pond exposes no backup API, and a screen reporting a backup that never ran is worse than no screen.
 
 ## Special Overlays
 - **Listening Overlay**: Full-screen dark overlay triggered by mic FAB or Ask bar
