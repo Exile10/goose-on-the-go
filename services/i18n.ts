@@ -104,6 +104,9 @@ void i18n.use(initReactI18next).init({
       you: 'You',
       pond: 'Pond',
     },
+    tabs: {
+      home: 'Home', chat: 'Chat', devices: 'Devices', you: 'You', navigation: 'Main navigation',
+    },
     modal: {
       title: 'This is a modal',
       goHome: 'Go to home screen',
@@ -286,6 +289,10 @@ void i18n.use(initReactI18next).init({
       justNow: 'Just now',
       yesterday: 'Yesterday',
       untitled: 'Untitled conversation',
+      deleteTitle: 'Delete Conversation', deleteBody: 'This cannot be undone.', delete: 'Delete', cancel: 'Cancel',
+      loadFailed: 'Could not load conversations (HTTP {{status}}).', unreachable: 'Could not reach your Pond.',
+      emptyTitle: 'No conversations yet', emptyMessage: 'Start a chat to see it here.',
+      renameFailed: 'Failed to rename conversation.', deleteFailed: 'Failed to delete conversation.',
     },
     biometricsMethods: {
       faceTitle: 'Face Recognition',

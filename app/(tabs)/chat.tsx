@@ -84,6 +84,7 @@ const ActivityRow = React.memo(function ActivityRow({ label }: { label: string }
   return (
     <View style={styles.bubbleRow}>
       <View style={styles.gooseAvatar}>
+        {/* eslint-disable-next-line i18next/no-literal-string -- the Goose mark and product name */}
         <Text style={styles.gooseAvatarText}>G</Text>
       </View>
       <View style={[styles.bubble, styles.bubbleAssistant]}>

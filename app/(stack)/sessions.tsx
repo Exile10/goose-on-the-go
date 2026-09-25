@@ -17,6 +17,7 @@ import { Brand, Grey, Semantic } from '@/constants/colors';
 import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
 import { Spacing } from '@/constants/spacing';
 import { Radii } from '@/constants/radii';
+import i18n from '@/services/i18n';
 
 const SessionRow = React.memo(function SessionRow({
   session,
@@ -29,7 +30,7 @@ const SessionRow = React.memo(function SessionRow({
   onRename: (title: string) => void;
   onDelete: () => void;
 }) {
-  const title = session.title?.trim() || 'Untitled conversation';
+  const title = session.title?.trim() || i18n.t('sessions.untitled');
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(title);
 
@@ -92,9 +93,9 @@ export default function SessionsScreen() {
 
   const confirmDelete = useCallback(
     (id: string) => {
-      Alert.alert('Delete Conversation', 'This cannot be undone.', [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Delete', style: 'destructive', onPress: () => actions.remove(id) },
+      Alert.alert(i18n.t('sessions.deleteTitle'), i18n.t('sessions.deleteBody'), [
+        { text: i18n.t('sessions.cancel'), style: 'cancel' },
+        { text: i18n.t('sessions.delete'), style: 'destructive', onPress: () => actions.remove(id) },
       ]);
     },
     [actions],
@@ -129,8 +130,8 @@ export default function SessionsScreen() {
       onRefresh={actions.refresh}
       ListEmptyComponent={
         <View style={styles.empty}>
-          <Text style={styles.emptyTitle}>No conversations yet</Text>
-          <Text style={styles.emptyMessage}>Start a chat to see it here.</Text>
+          <Text style={styles.emptyTitle}>{i18n.t('sessions.emptyTitle')}</Text>
+          <Text style={styles.emptyMessage}>{i18n.t('sessions.emptyMessage')}</Text>
         </View>
       }
     />

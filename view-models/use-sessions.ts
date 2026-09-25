@@ -8,6 +8,7 @@ import { useState, useCallback, useEffect } from 'react';
 import { useServer } from '@/providers/server-provider';
 import { ApiError, api } from '@/services/api-client';
 import type { SessionSummary } from '@/services/types';
+import i18n from '@/services/i18n';
 
 export function useSessions() {
   // The base URL and bearer token arrive asynchronously; fetching before they
@@ -26,8 +27,8 @@ export function useSessions() {
     } catch (e) {
       setError(
         e instanceof ApiError
-          ? `Could not load conversations (HTTP ${e.status}).`
-          : 'Could not reach your Pond.',
+          ? i18n.t('sessions.loadFailed', { status: e.status })
+          : i18n.t('sessions.unreachable'),
       );
     } finally {
       setLoading(false);
@@ -44,7 +45,7 @@ export function useSessions() {
       await api.renameSession(id, title);
       setSessions((prev) => prev.map((s) => (s.id === id ? { ...s, title } : s)));
     } catch {
-      setError('Failed to rename conversation.');
+      setError(i18n.t('sessions.renameFailed'));
     }
   }, []);
 
@@ -53,7 +54,7 @@ export function useSessions() {
       await api.deleteSession(id);
       setSessions((prev) => prev.filter((s) => s.id !== id));
     } catch {
-      setError('Failed to delete conversation.');
+      setError(i18n.t('sessions.deleteFailed'));
     }
   }, []);
 

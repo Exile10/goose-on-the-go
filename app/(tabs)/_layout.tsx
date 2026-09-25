@@ -28,14 +28,16 @@ import { InkBottomBar, useInkTheme, type InkNavDestination } from '@jarida/ink/n
 import { glassSurface, glassLift } from '@jarida/ink';
 
 import { useServer } from '@/providers/server-provider';
+import i18n from '@/services/i18n';
 
 import { useHaptics } from '@/hooks/use-haptics';
 
-const TAB_ITEMS: InkNavDestination[] = [
-  { key: 'index', label: 'Home', icon: 'home' },
-  { key: 'chat', label: 'Chat', icon: 'chat' },
-  { key: 'devices', label: 'Devices', icon: 'device' },
-  { key: 'profile', label: 'You', icon: 'profile' },
+/** `labelKey` is an i18n key, translated at render. */
+const TAB_ITEMS: (Omit<InkNavDestination, 'label'> & { labelKey: string })[] = [
+  { key: 'index', labelKey: 'tabs.home', icon: 'home' },
+  { key: 'chat', labelKey: 'tabs.chat', icon: 'chat' },
+  { key: 'devices', labelKey: 'tabs.devices', icon: 'device' },
+  { key: 'profile', labelKey: 'tabs.you', icon: 'profile' },
 ];
 
 function useReduceTransparency(): boolean {
@@ -129,8 +131,8 @@ function CustomTabBar({ state, navigation }: any) {
     <View style={styles.container}>
       <GlassPill bottomInset={insets.bottom}>
         <InkBottomBar
-          label="Main navigation"
-          items={TAB_ITEMS}
+          label={i18n.t('tabs.navigation')}
+          items={TAB_ITEMS.map(({ labelKey, ...item }) => ({ ...item, label: i18n.t(labelKey) }))}
           value={state.routes[state.index].name}
           onChange={handleChange}
           variant="docked"
