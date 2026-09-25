@@ -5,7 +5,7 @@
  */
 
 import React, { useState, useCallback } from 'react';
-import { InkSwitch } from '@jarida/ink/native';
+import { InkSwitch, InkIcon } from '@jarida/ink/native';
 import {
   View,
   Text,
@@ -15,7 +15,6 @@ import {
   TextInput,
 } from 'react-native';
 
-import { GIcon } from '@/components/ui/g-icon';
 import { GKeyboardView } from '@/components/ui/g-keyboard-view';
 import { Grey, JaridaPurple, Brand, Semantic } from '@/constants/colors';
 import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
@@ -59,7 +58,7 @@ const AppCard = React.memo(function AppCard({
     <View style={styles.appCard}>
       <View style={styles.appHeader}>
         <View style={{ marginRight: Spacing.md }}>
-          <GIcon name={app.icon} size={24} color={JaridaPurple[500]} />
+          <InkIcon name={app.icon} size={24} tone="brand" />
         </View>
         <View style={styles.appInfo}>
           <Text style={styles.appName}>{app.name}</Text>

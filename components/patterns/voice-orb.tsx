@@ -4,7 +4,7 @@
 
 import React, { useEffect } from 'react';
 import { Pressable, Text, StyleSheet } from 'react-native';
-import { GIcon } from '@/components/ui/g-icon';
+import { InkIcon } from '@jarida/ink/native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -67,7 +67,7 @@ export function VoiceOrb({ state, onPress }: VoiceOrbProps) {
     >
       {isActive && <Animated.View style={[styles.ring, ringStyle]} />}
       <Animated.View style={[styles.orb, orbStyle]}>
-        <GIcon name="mic" size={24} color="#fff" />
+        <InkIcon name="mic" size={24} />
       </Animated.View>
       <Text style={styles.caption}>
         {state === 'recording' ? i18n.t('voice.listening') : state === 'thinking' ? i18n.t('voice.thinking') : state === 'speaking' ? i18n.t('voice.speaking') : i18n.t('voice.idle')}

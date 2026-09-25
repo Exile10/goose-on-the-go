@@ -4,7 +4,7 @@
  */
 
 import React, { useState } from 'react';
-import { InkButton, InkSwitch } from '@jarida/ink/native';
+import { InkButton, InkSwitch, InkIcon } from '@jarida/ink/native';
 import {
   View,
   Text,
@@ -13,7 +13,6 @@ import {
   Pressable,
 } from 'react-native';
 
-import { GIcon } from '@/components/ui/g-icon';
 import { Grey, JaridaPurple, Brand, Semantic } from '@/constants/colors';
 import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
 import { Spacing } from '@/constants/spacing';
@@ -82,7 +81,7 @@ export default function BiometricsScreen() {
     >
       {/* Info banner */}
       <View style={styles.infoBanner}>
-        <GIcon name="shield" size={18} color={JaridaPurple[600]} />
+        <InkIcon name="shield" size={18} tone="brand" />
         <Text style={styles.infoText}>{i18n.t('biometrics.info')}</Text>
       </View>
 
@@ -92,7 +91,7 @@ export default function BiometricsScreen() {
         <View key={method.id} style={styles.methodCard}>
           <View style={styles.methodHeader}>
             <View style={{ marginRight: Spacing.md }}>
-              <GIcon name={method.icon} size={28} color={JaridaPurple[500]} />
+              <InkIcon name={method.icon} size={28} tone="brand" />
             </View>
             <View style={styles.methodInfo}>
               <Text style={styles.methodTitle}>{method.title}</Text>
@@ -112,7 +111,7 @@ export default function BiometricsScreen() {
                   <Text style={[styles.statusText, { color: Semantic.success }]}>{i18n.t('biometrics.enrolled')}</Text>
                 </View>
                 <Pressable style={styles.reEnrollBtn}>
-                  <GIcon name="refresh" size={14} color={JaridaPurple[500]} />
+                  <InkIcon name="refresh" size={14} tone="brand" />
                   <Text style={styles.reEnrollText}>{i18n.t('biometrics.reEnroll')}</Text>
                 </Pressable>
               </View>

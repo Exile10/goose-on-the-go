@@ -10,11 +10,10 @@
 
 import React, { useCallback, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
-import { InkButton } from '@jarida/ink/native';
+import { InkButton, InkIcon } from '@jarida/ink/native';
 import { useFocusEffect, useRouter } from 'expo-router';
 
 import { GKeyboardView } from '@/components/ui/g-keyboard-view';
-import { GIcon } from '@/components/ui/g-icon';
 import i18n from '@/services/i18n';
 import { looksLikeTypedSetupCode } from '@/models/pairing';
 import { takeSetupCode } from '@/services/pairing-handoff';
@@ -63,7 +62,7 @@ export default function CommissionDeviceScreen() {
 
   return (
     <GKeyboardView style={styles.container}>
-      <GIcon name="device" size={28} color={JaridaPurple[500]} />
+      <InkIcon name="device" size={28} tone="brand" />
       <Text style={styles.title}>{i18n.t('commission.title')}</Text>
       <Text style={styles.desc}>{i18n.t('commission.desc')}</Text>
 
@@ -92,7 +91,7 @@ export default function CommissionDeviceScreen() {
           hitSlop={8}
           style={styles.scanLink}
         >
-          <GIcon name="camera" size={16} color={JaridaPurple[500]} />
+          <InkIcon name="camera" size={16} tone="brand" />
           <Text style={styles.scanLinkText}>{i18n.t('commission.scan')}</Text>
         </Pressable>
       </View>

@@ -4,7 +4,7 @@
 
 import React, { useState } from 'react';
 import { View, TextInput, Pressable, Text, StyleSheet } from 'react-native';
-import { GIcon } from '@/components/ui/g-icon';
+import { InkIcon } from '@jarida/ink/native';
 import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
 import { JaridaPurple, Grey } from '@/constants/colors';
 import { Radii } from '@/constants/radii';
@@ -45,7 +45,7 @@ export function ChatComposer({ onSend, placeholder = 'Message Pond\u2026', disab
           onPress={handleSend}
           disabled={!draft.trim() || disabled}
         >
-          <GIcon name="send" size={14} color="#fff" />
+          <InkIcon name="send" size={14} />
         </Pressable>
       </View>
       <Text style={styles.hint}>{i18n.t('chat.returnToSend')}</Text>

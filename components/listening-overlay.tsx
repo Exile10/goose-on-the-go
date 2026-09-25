@@ -19,7 +19,6 @@ import {
   Dimensions,
 } from 'react-native';
 
-import { GIcon } from '@/components/ui/g-icon';
 import { Brand, JaridaPurple, Grey } from '@/constants/colors';
 import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
 import { Spacing } from '@/constants/spacing';

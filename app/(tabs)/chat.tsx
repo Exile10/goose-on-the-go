@@ -6,6 +6,7 @@
  */
 
 import React, { useState, useCallback, useRef } from 'react';
+import { InkIcon } from '@jarida/ink/native';
 import {
   View,
   Text,
@@ -16,7 +17,6 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { GIcon } from '@/components/ui/g-icon';
 import { GKeyboardView } from '@/components/ui/g-keyboard-view';
 import type { Message } from '@/models/chat';
 import { useChat } from '@/view-models/use-chat';
@@ -149,7 +149,7 @@ export default function ChatScreen() {
             </View>
           </View>
           <Pressable style={styles.newChatBtn} onPress={actions.newConversation}>
-            <GIcon name="plus" size={18} color={Grey[600]} />
+            <InkIcon name="plus" size={18} tone="neutral" />
           </Pressable>
         </View>
 
@@ -190,7 +190,7 @@ export default function ChatScreen() {
               maxLength={4000}
             />
             <Pressable style={styles.micBtn}>
-              <GIcon name="voice" size={18} color={JaridaPurple[500]} />
+              <InkIcon name="voice" size={18} tone="brand" />
             </Pressable>
           </View>
           <Pressable
@@ -198,10 +198,10 @@ export default function ChatScreen() {
             onPress={handleSend}
             disabled={!isTyping && !draft.trim()}
           >
-            <GIcon
+            <InkIcon
               name={isTyping ? 'pause' : 'send'}
               size={16}
-              color={isTyping || draft.trim() ? Brand.white : Grey[400]}
+              tone={isTyping || draft.trim() ? undefined : 'neutral'}
             />
           </Pressable>
         </View>

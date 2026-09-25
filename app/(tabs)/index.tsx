@@ -6,7 +6,7 @@
  */
 
 import React, { useState, useCallback } from 'react';
-import { InkSwitch } from '@jarida/ink/native';
+import { InkSwitch, InkIcon, InkProvider } from '@jarida/ink/native';
 import {
   View,
   Text,
@@ -18,7 +18,6 @@ import {
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { GIcon } from '@/components/ui/g-icon';
 import { useRecentSessions } from '@/view-models/use-recent-sessions';
 import { supports, useDevices } from '@/view-models/use-devices';
 import { initialOf, useMember } from '@/view-models/use-household';
@@ -73,10 +72,10 @@ const DeviceGridItem = React.memo(function DeviceGridItem({
     <View style={styles.deviceCard}>
       <View style={styles.deviceCardTop}>
         <View style={[styles.deviceIconWrap, { backgroundColor: JaridaPurple[500] + '18' }]}>
-          <GIcon
+          <InkIcon
             name="device"
             size={17}
-            color={on && device.is_online ? JaridaPurple[500] : '#B5B5B5'}
+            tone={on && device.is_online ? 'brand' : 'neutral'}
           />
         </View>
         {canPower ? (
@@ -171,7 +170,10 @@ export default function HomeScreen() {
             {initial ? (
               <Text style={styles.avatarText}>{initial}</Text>
             ) : (
-              <GIcon name="home" size={18} color={Brand.white} />
+              {/* Stands in for the white initial on the purple avatar fill. */}
+              <InkProvider scheme="dark">
+                <InkIcon name="home" size={18} />
+              </InkProvider>
             )}
           </View>
         </View>
@@ -191,7 +193,7 @@ export default function HomeScreen() {
 
         {/* Ask Goose search bar */}
         <Pressable style={styles.askBar}>
-          <GIcon name="search" size={18} color={Grey[400]} />
+          <InkIcon name="search" size={18} tone="neutral" />
           <TextInput
             style={styles.askInput}
             placeholder={i18n.t('home.askPlaceholder')}
@@ -200,7 +202,7 @@ export default function HomeScreen() {
             onChangeText={setAskText}
           />
           <Pressable style={styles.askMicBtn} onPress={handleMicPress}>
-            <GIcon name="mic" size={18} color={JaridaPurple[500]} />
+            <InkIcon name="mic" size={18} tone="brand" />
           </Pressable>
         </Pressable>
 
@@ -255,7 +257,12 @@ export default function HomeScreen() {
         >
           {HOME_SHORTCUTS.map((s) => (
             <Pressable key={s.id} style={[styles.shortcutPill, { backgroundColor: s.color }]}>
-              <GIcon name={s.iconName} size={13} color={Brand.charcoal} />
+              {/* Pills keep their own fixed pastel background regardless of
+                  theme (see shortcutLabel below), so the icon needs a scoped
+                  light-scheme provider to stay dark-on-light too. */}
+              <InkProvider scheme="light">
+                <InkIcon name={s.iconName} size={13} />
+              </InkProvider>
               <Text style={styles.shortcutLabel}>{i18n.t(s.labelKey)}</Text>
             </Pressable>
           ))}
@@ -284,7 +291,7 @@ export default function HomeScreen() {
         {recent.data.sessions.map((c) => (
           <Pressable key={c.id} style={styles.convoRow}>
             <View style={styles.convoIcon}>
-              <GIcon name="chat" size={14} color={JaridaPurple[400]} />
+              <InkIcon name="chat" size={14} tone="brand" />
             </View>
             <Text style={styles.convoText} numberOfLines={1}>{c.text}</Text>
             <Text style={styles.convoTime}>{c.time}</Text>

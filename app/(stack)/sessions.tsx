@@ -6,11 +6,11 @@
  */
 
 import React, { useCallback, useState } from 'react';
+import { InkIcon } from '@jarida/ink/native';
 import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
 
 import { ScreenFlatList } from '@/components/layout/screen-flat-list';
-import { GIcon } from '@/components/ui/g-icon';
 import type { SessionSummary } from '@/services/types';
 import { useSessions } from '@/view-models/use-sessions';
 import { Brand, Grey, Semantic } from '@/constants/colors';
@@ -52,7 +52,7 @@ const SessionRow = React.memo(function SessionRow({
               placeholderTextColor={Grey[400]}
             />
             <Pressable onPress={confirmRename} hitSlop={8}>
-              <GIcon name="check" size={18} color={Semantic.success} />
+              <InkIcon name="check" size={18} tone="success" />
             </Pressable>
           </View>
         ) : (
@@ -68,10 +68,10 @@ const SessionRow = React.memo(function SessionRow({
       {!editing && (
         <View style={styles.actions}>
           <Pressable onPress={() => { setDraft(title); setEditing(true); }} hitSlop={8}>
-            <GIcon name="edit" size={16} color={Grey[400]} />
+            <InkIcon name="edit" size={16} tone="neutral" />
           </Pressable>
           <Pressable onPress={onDelete} hitSlop={8}>
-            <GIcon name="trash" size={16} color={Grey[400]} />
+            <InkIcon name="trash" size={16} tone="neutral" />
           </Pressable>
         </View>
       )}

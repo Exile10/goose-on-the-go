@@ -6,6 +6,7 @@
  */
 
 import React, { useCallback, useMemo, useState } from 'react';
+import { InkIcon, InkProvider } from '@jarida/ink/native';
 import {
   Alert,
   View,
@@ -21,7 +22,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useServer } from '@/providers/server-provider';
 import { initialOf, useHousehold } from '@/view-models/use-household';
 
-import { GIcon } from '@/components/ui/g-icon';
 import { PROFILE_NAV, type NavItem, type NavGroup } from '@/constants/navigation';
 import { Grey, JaridaPurple, Brand, Semantic } from '@/constants/colors';
 import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
@@ -47,10 +47,10 @@ const NavRow = React.memo(function NavRow({
       onPress={handlePress}
     >
       <View style={styles.rowLeft}>
-        <GIcon name={item.icon} size={16} color="#8C4BFF" />
+        <InkIcon name={item.icon} size={16} tone="brand" />
         <Text style={styles.rowLabel}>{i18n.t(item.labelKey)}</Text>
       </View>
-      <GIcon name="chevron" size={16} color={Grey[400]} />
+      <InkIcon name="chevron" size={16} tone="neutral" />
     </Pressable>
   );
 });
@@ -145,7 +145,10 @@ export default function ProfileHub() {
               {initial ? (
                 <Text style={styles.avatarLargeText}>{initial}</Text>
               ) : (
-                <GIcon name="home" size={28} color={Brand.white} />
+                {/* Stands in for the white initial on the purple avatar fill. */}
+                <InkProvider scheme="dark">
+                  <InkIcon name="home" size={28} />
+                </InkProvider>
               )}
             </View>
             <Text style={styles.profileName}>{member?.displayName ?? pondName ?? t('profile.yourPond')}</Text>

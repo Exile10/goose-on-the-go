@@ -4,6 +4,7 @@
  */
 
 import React, { useState } from 'react';
+import { InkIcon } from '@jarida/ink/native';
 import {
   View,
   Text,
@@ -12,7 +13,6 @@ import {
   Pressable,
 } from 'react-native';
 
-import { GIcon } from '@/components/ui/g-icon';
 import { Grey, JaridaPurple, Brand } from '@/constants/colors';
 import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
 import { Spacing } from '@/constants/spacing';
@@ -30,11 +30,11 @@ function ExpandableSection({ section }: { section: PrivacySection }) {
     >
       <View style={styles.sectionHeader}>
         <View style={{ marginRight: Spacing.md }}>
-          <GIcon name={section.icon} size={16} color={JaridaPurple[500]} />
+          <InkIcon name={section.icon} size={16} tone="brand" />
         </View>
         <Text style={styles.sectionTitle}>{i18n.t(section.titleKey)}</Text>
         <View style={expanded ? { transform: [{ rotate: '180deg' }] } : undefined}>
-          <GIcon name="chevron" size={16} color="#B5B5B5" />
+          <InkIcon name="chevron" size={16} tone="neutral" />
         </View>
       </View>
       {expanded && (

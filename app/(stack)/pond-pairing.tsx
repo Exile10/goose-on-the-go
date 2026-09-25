@@ -9,7 +9,7 @@ import { normalizeHttpsUrl, validPin } from '@/models/connection';
  */
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { InkButton } from '@jarida/ink/native';
+import { InkButton, InkIcon } from '@jarida/ink/native';
 import {
   ActivityIndicator,
   Pressable,
@@ -21,7 +21,6 @@ import {
 } from 'react-native';
 
 import { Stack, useFocusEffect, useRouter } from 'expo-router';
-import { GIcon } from '@/components/ui/g-icon';
 import { GKeyboardView } from '@/components/ui/g-keyboard-view';
 import { Grey, JaridaPurple, Brand, Semantic } from '@/constants/colors';
 import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
@@ -70,7 +69,7 @@ function StepIndicator({ current }: { current: Step }) {
               ]}
             >
               {isDone ? (
-                <GIcon name="check" size={14} color={Brand.white} />
+                <InkIcon name="check" size={14} />
               ) : (
                 <Text style={[styles.stepNumber, isActive && styles.stepNumberActive]}>
                   {i + 1}
@@ -96,7 +95,7 @@ function StepIndicator({ current }: { current: Step }) {
 function ScanLink({ onPress }: { onPress: () => void }) {
   return (
     <Pressable onPress={onPress} hitSlop={8} style={styles.scanLink}>
-      <GIcon name="camera" size={16} color={JaridaPurple[500]} />
+      <InkIcon name="camera" size={16} tone="brand" />
       <Text style={styles.scanLinkText}>{i18n.t('pairing.scanInstead')}</Text>
     </Pressable>
   );
@@ -166,7 +165,7 @@ function DiscoverStep({
       {data.phase === 'searching' ? (
         <ActivityIndicator color={JaridaPurple[500]} />
       ) : (
-        <GIcon name="search" size={28} color={JaridaPurple[500]} />
+        <InkIcon name="search" size={28} tone="brand" />
       )}
 
       <Text style={styles.stepTitle}>
@@ -187,7 +186,7 @@ function DiscoverStep({
 
       {data.ponds.map((pond) => (
         <Pressable key={pond.id} style={styles.pondRow} onPress={() => pick(pond)}>
-          <GIcon name="wifi" size={18} color={JaridaPurple[500]} />
+          <InkIcon name="wifi" size={18} tone="brand" />
           <View style={styles.pondInfo}>
             <Text style={styles.pondName} numberOfLines={1}>
               {pond.name}
@@ -306,7 +305,7 @@ function ServerStep({
 
   return (
     <StepBody>
-      <GIcon name="search" size={28} color={JaridaPurple[500]} />
+      <InkIcon name="search" size={28} tone="brand" />
       <Text style={styles.stepTitle}>{i18n.t('pairing.connectTitle')}</Text>
       <Text style={styles.stepDesc}>{i18n.t('pairing.connectDesc')}</Text>
       <View style={styles.inputGroup}>
@@ -361,7 +360,7 @@ function PairingCodeStep({
   const valid = /^\d{6}$/.test(code);
   return (
     <StepBody>
-      <GIcon name="wifi" size={28} color={JaridaPurple[500]} />
+      <InkIcon name="wifi" size={28} tone="brand" />
       <Text style={styles.stepTitle}>{i18n.t('pairing.codeTitle')}</Text>
       <Text style={styles.stepDesc}>{i18n.t('pairing.codeDesc')}</Text>
       <View style={styles.inputGroup}>
@@ -393,7 +392,7 @@ function NameStep({ onNext }: { onNext: (name: string) => void }) {
   const [name, setName] = useState('');
   return (
     <StepBody>
-      <GIcon name="edit" size={28} color={JaridaPurple[500]} />
+      <InkIcon name="edit" size={28} tone="brand" />
       <Text style={styles.stepTitle}>{i18n.t('pairing.nameTitle')}</Text>
       <Text style={styles.stepDesc}>{i18n.t('pairing.nameDesc')}</Text>
       <View style={styles.inputGroup}>
@@ -500,7 +499,7 @@ function CompleteStep({
   if (state === 'error') {
     return (
       <StepBody>
-        <GIcon name="x" size={28} color={Semantic.danger} />
+        <InkIcon name="x" size={28} tone="danger" />
         <Text style={styles.stepTitle}>{i18n.t('pairing.failedTitle')}</Text>
         <Text style={styles.stepDesc}>
           {reason ?? i18n.t('pairing.failedDesc')}
