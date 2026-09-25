@@ -32,6 +32,24 @@ object PondNetwork {
   private var targets: List<String> = emptyList()
 
   private var networkCallback: ConnectivityManager.NetworkCallback? = null
+
+  /**
+   * The state last handed to the foreground service.
+   *
+   * `status()` is polled once a second during enrollment, and re-delivering an unchanged
+   * state would restart the service on every tick for no benefit.
+   */
+  private var announced: String? = null
+
+  /** Keep the foreground service in step with the node, so the notification cannot lie. */
+  private fun announce(raw: String) {
+    val state = try { JSONObject(raw).optString("state") } catch (error: Exception) { "" }
+    val next = if (state == PondNetworkService.STATE_RUNNING) PondNetworkService.STATE_RUNNING
+               else PondNetworkService.STATE_CONNECTING
+    if (next == announced) return
+    announced = next
+    PondNetworkService.start(context, next)
+  }
   fun install(value: Context) {
     context = value.applicationContext
     // The node's own diagnostic lines are always recorded. There are a handful
@@ -182,13 +200,18 @@ object PondNetwork {
       observeNetwork()
       val result = Mobile.status()
       started = true
+      announce(result)
       return result
     } finally {
       if (!started) stopTransport()
       PondTls.invalidateConnections()
     }
   }
-  @Synchronized fun status(): String = Mobile.status()
+  @Synchronized fun status(): String {
+    val raw = Mobile.status()
+    announce(raw)
+    return raw
+  }
   @Synchronized fun activate(profile: String, control: String) {
     activeProfile = if (control.isEmpty()) null else Pair(profile, control)
     if (activeProfile == null) { stopTransport() }
@@ -211,6 +234,9 @@ object PondNetwork {
     }
     networkCallback = null
     proxyAddress = null; credential = null; runningProfile = null; Mobile.stop()
+    // A local-only profile never starts the node, so it never sees the notification.
+    announced = null
+    PondNetworkService.stop(context)
   }
   fun requireAvailable(url: HttpUrl) {
     if (origin(url) in origins && proxyAddress == null) throw IOException("Embedded remote access is unavailable")

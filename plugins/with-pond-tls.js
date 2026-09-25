@@ -21,9 +21,24 @@ module.exports = function withPondTls(config) {
     return mod;
   });
   config = withAndroidManifest(config, (mod) => {
-    const app = mod.modResults.manifest.application[0].$;
+    const application = mod.modResults.manifest.application[0];
+    const app = application.$;
     app['android:usesCleartextTraffic'] = 'false';
     app['android:networkSecurityConfig'] = '@xml/pond_network_security';
+    // Doze withdraws network access from a backgrounded app; it does not kill this one's
+    // process. The service exists to keep that access, which is why dataSync is the type:
+    // the node is maintaining a control connection on the user's behalf.
+    application.service = application.service ?? [];
+    const name = 'io.jarida.pondtls.PondNetworkService';
+    if (!application.service.some((entry) => entry.$?.['android:name'] === name)) {
+      application.service.push({
+        $: {
+          'android:name': name,
+          'android:exported': 'false',
+          'android:foregroundServiceType': 'dataSync',
+        },
+      });
+    }
     return mod;
   });
   config = withAppBuildGradle(config, (mod) => {
@@ -66,6 +81,7 @@ tasks.named('preBuild').configure { dependsOn 'verifyPondNetworkAbis' }
     fs.mkdirSync(java, { recursive: true });
     fs.copyFileSync(path.join(__dirname, 'pond-tls/PondTls.kt'), path.join(java, 'PondTls.kt'));
     fs.copyFileSync(path.join(__dirname, 'pond-tls/PondNetwork.kt'), path.join(java, 'PondNetwork.kt'));
+    fs.copyFileSync(path.join(__dirname, 'pond-tls/PondNetworkService.kt'), path.join(java, 'PondNetworkService.kt'));
     const assets = path.join(root, 'main/assets');
     fs.mkdirSync(assets, { recursive: true });
     fs.copyFileSync(path.join(mod.modRequest.projectRoot, 'native/pondnet/THIRD_PARTY_NOTICES.txt'), path.join(assets, 'pond-network-notices.txt'));

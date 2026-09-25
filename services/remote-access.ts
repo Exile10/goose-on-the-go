@@ -45,7 +45,10 @@ const native = () => {
 };
 function status(raw: string): NativeStatus {
   const value = JSON.parse(raw) as NativeStatus;
-  if (typeof value.state !== 'string' || !Array.isArray(value.addresses)) throw new Error(i18n.t('remote.failed'));
+  if (typeof value.state !== 'string' || !Array.isArray(value.addresses)) {
+    console.warn('[remote] native status was not the expected shape:', raw.slice(0, 200));
+    throw new Error(i18n.t('remote.failed'));
+  }
   return value;
 }
 export async function cancelRemoteAccess(): Promise<void> {
@@ -91,14 +94,22 @@ export async function enableRemoteAccess(profileId: string, localUrl: string, pr
         const info = await api.requestLocal<{ tailnet_address?: string; https_port?: number }>(localUrl, '/api/v1/system/info');
         check();
         const ip = info.tailnet_address?.split('.').map(Number);
-        if (!ip || ip.length !== 4 || ip.some((n) => !Number.isInteger(n) || n < 0 || n > 255) || ip[0] !== 100 || ip[1] < 64 || ip[1] > 127 || !Number.isInteger(info.https_port) || info.https_port! < 1 || info.https_port! > 65535) throw new Error(i18n.t('remote.failed'));
+        if (!ip || ip.length !== 4 || ip.some((n) => !Number.isInteger(n) || n < 0 || n > 255) || ip[0] !== 100 || ip[1] < 64 || ip[1] > 127 || !Number.isInteger(info.https_port) || info.https_port! < 1 || info.https_port! > 65535) {
+          // Names both values: an IPv6-only tailnet address, or a missing port,
+          // are indistinguishable from a malformed one in the message shown.
+          console.warn('[remote] Pond reported an unusable tailnet endpoint:', JSON.stringify({ tailnet_address: info.tailnet_address, https_port: info.https_port }));
+          throw new Error(i18n.t('remote.failed'));
+        }
         // This address came from an authenticated request to the pinned local Pond.
         const endpoint = normalizeHttpsUrl(`https://${info.tailnet_address}:${info.https_port}`);
         check(); await commit(endpoint, control, check); committed = true;
         progress('enabled'); return;
       }
       if (state.authUrl && !submitted) {
-        if (new URL(state.authUrl).origin !== control) throw new Error(i18n.t('remote.failed'));
+        if (new URL(state.authUrl).origin !== control) {
+          console.warn('[remote] node offered an authUrl for a different coordinator:', new URL(state.authUrl).origin, 'expected', control);
+          throw new Error(i18n.t('remote.failed'));
+        }
         submitted = true;
         // Never automatically replay this enrollment write after an ambiguous failure.
         const body = JSON.stringify({ authUrl: state.authUrl, nodeKey: state.nodeKey ?? '', machineKey: state.machineKey ?? '' });
@@ -135,12 +146,48 @@ export async function enableRemoteAccess(profileId: string, localUrl: string, pr
       await new Promise<void>((resolve) => setTimeout(resolve, 1000));
       check(); state = status(await native().remoteStatus());
     }
+    console.warn('[remote] node did not reach Running within the enrollment window; last state:', state.state);
     throw new Error(i18n.t('remote.failed'));
   } finally {
     await cancelPendingRecovery();
     busy = false;
     if (!committed) await native().cancelRemote().catch(() => console.warn('[remote] transport restoration failed'));
   }
+}
+
+/**
+ * Bring the embedded node back if it did not survive the app being backgrounded.
+ *
+ * The node runs inside the app process, and nothing holds that process up: there is no
+ * foreground service on Android and no background mode on iOS. So returning to the
+ * foreground is the first moment the app can discover the node is gone.
+ *
+ * Nothing used to ask. `AppState` reaches `ConnectionManager.environment`, which re-probes
+ * HTTP endpoints, and probing cannot tell a dead node from an unreachable Pond -- it simply
+ * retries a tailnet address that no longer routes, for as long as the user is prepared to
+ * wait. `restoreRemoteAccess` was called only at mount and at sign-out.
+ *
+ * Returns whether the transport was restarted, so the caller can re-probe immediately
+ * rather than wait for the next scheduled attempt. A resume onto a healthy node costs one
+ * bridge call.
+ */
+export async function resumeRemoteAccess(profileId: string, control: string): Promise<boolean> {
+  // Local-only profiles have no node, and an enrollment in flight is already driving the
+  // transport and must not have it pulled from under it.
+  if (!control || busy) return false;
+  const bridge = NativeModules.PondTls;
+  if (!bridge?.remoteStatus || !bridge.activateRemote) return false;
+  let running = false;
+  try {
+    running = status(await bridge.remoteStatus()).state === 'Running';
+  } catch {
+    // An unreadable status is not evidence of health, and the costs are asymmetric: a
+    // needless restart is a moment, a missed one is no remote access until the next launch.
+    console.warn('[remote] node status unreadable on resume; restarting transport');
+  }
+  if (running) return false;
+  await restoreRemoteAccess(profileId, control);
+  return true;
 }
 
 /** Restore transport before trust, credentials, health checks, or notification streams. */

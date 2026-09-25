@@ -426,3 +426,71 @@ QR path completes and retains pairing after app restart. The repaired Jetson
 Matter controller accepts Google's MVD; phone control reaches its virtual light,
 and Devices refresh reads changes made in MVD. External device-state changes do
 not yet automatically update the grid. No pairing reset was performed.
+
+## Does remote access survive the screen going off? (2026-09-22)
+
+This section exists because the document previously neither claimed nor disclaimed it, and
+somebody relying on remote access to check their home while away needs to know which it is.
+
+**The honest answer today: on Android, yes while the foreground service is running; on iOS,
+no, and we do not yet know for how long it lasts.**
+
+### What was observed
+
+On a Galaxy A57 (SM-A576B), with the app backgrounded deliberately:
+
+- The coordinator marked the phone's node offline **within about forty-five seconds**.
+- The **app process stayed alive** throughout, logging under the same pid, and was still
+  alive thirteen minutes later.
+- The node's resolver failures changed character at the moment of backgrounding: from
+  `operation was canceled` (a losing racer after another dial won, which is healthy) to
+  `i/o timeout`, 88 of them in that minute.
+- Once the device became active again, resolution recovered on its own.
+
+So what Doze withdraws here is **network access, not the process**. That matters, because
+issue #50 is worded the other way -- "nothing keeps the embedded node alive" -- and a fix
+aimed at process lifetime would have addressed nothing.
+
+### What was done about it
+
+`PondNetworkService` is a foreground service whose lifetime is exactly the node's: started
+when `stage()` brings a node up, stopped in `stopTransport()`. A profile that never enables
+remote access never starts a node, so a local-only user never sees the notification.
+
+The notification reports what the connection is actually doing -- connected, or reconnecting
+-- and opens the app when tapped, because a permanent notification reading "Goose is
+running" would be a cost with no return.
+
+### What this rests on, and what would falsify it
+
+**The controlled measurement in `docs/remote-access-measurement.md` has not been run.** The
+service was built on the single observation above, which was not a controlled run: USB
+debugging held the app in the active standby bucket (`am get-standby-bucket` reported 10
+after ten minutes backgrounded), so the phone was never fully in the state being measured.
+
+The reasoning is that a foreground service is the supported way to keep network access
+during Doze, and network access is what was lost. That is a reasonable inference and it is
+not yet evidence. The three runs in the measurement document are still owed, unplugged, and
+they are what turns this section from a claim into a guarantee.
+
+It would be falsified if the node still drops when backgrounded with the service running. In
+that case the cause is something other than Doze's network restrictions, and the persistent
+notification is a cost the user is paying for nothing -- it should be removed rather than
+kept for reassurance.
+
+### iOS
+
+iOS has no equivalent mechanism for this, and no `UIBackgroundModes` declaration this app
+could honestly justify. Nothing here changes iOS behaviour, and remote access there should
+be assumed not to survive backgrounding until measured. Implying parity would be the
+dishonest option.
+
+### A separate fragility, not the cause
+
+`native/pondnet/mobile/dns.go` dials every resolver over TCP only, discarding the transport
+Go asks for. The comment there states the assumption -- "a home router commonly answers DNS
+over TCP" -- and on the test network that is false: the gateway answers UDP and times out on
+TCP. It is not what caused the drop above, since resolution demonstrably worked while the
+app was foreground, but it removes the margin: an app given a narrow window of network
+access spends it on a transport the router refuses. That is a Pond-side fix and is not
+covered here.

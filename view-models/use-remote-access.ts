@@ -83,6 +83,13 @@ export function useRemoteAccess() {
         }, recovery ? { onReview: (id) => { if (alive.current) setReviewId(id); } } : undefined,
         (at) => { if (alive.current) setLapsesAt(at); });
     } catch (cause) {
+      // Log the cause, not just the message shown on screen. Five different
+      // failures in enableRemoteAccess surface as the same sentence, so without
+      // this a failed setup is indistinguishable in a bug report from any other
+      // failed setup -- which is exactly what happened while diagnosing this.
+      console.warn('[remote] setup failed:',
+        cause instanceof ApiError ? `ApiError ${cause.status} ${cause.message}` :
+        cause instanceof Error ? `${cause.name}: ${cause.message}` : String(cause));
       if (alive.current) {
         const { message, unavailable } = describeRemoteFailure(cause);
         setSetupUnavailable(unavailable);

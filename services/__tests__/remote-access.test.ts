@@ -2,7 +2,7 @@ jest.mock('../api-client', () => ({ api: { requestLocal: jest.fn() } }));
 import i18n from '../i18n';
 import { AppState, NativeModules } from 'react-native';
 import { api } from '../api-client';
-import { enableRemoteAccess, cancelRemoteAccess, restoreRemoteAccess } from '../remote-access';
+import { enableRemoteAccess, cancelRemoteAccess, restoreRemoteAccess, resumeRemoteAccess } from '../remote-access';
 const local = 'https://192.168.1.2:4443';
 const control = 'https://coord.example';
 const pending = JSON.stringify({ state: 'NeedsLogin', machineKey: 'mkey:' + 'b'.repeat(64), authUrl: `${control}/register/pending-registration`, addresses: [] });
@@ -60,6 +60,31 @@ it('rejects a stale enrollment result after cancellation', async () => {
 it('restores only the saved profile transport before use, and stops for local-only', async () => {
   await restoreRemoteAccess('saved', control); await restoreRemoteAccess('saved', '');
   expect(bridge.activateRemote.mock.calls).toEqual([['saved', control], ['saved', '']]);
+});
+
+// The node runs in the app process, so returning to the foreground is the first moment
+// the app can learn that the OS took it away. Before this, nothing asked: the resume path
+// re-probed HTTP endpoints, which cannot tell a dead node from an unreachable Pond.
+it('restarts the embedded node when it did not survive the background', async () => {
+  bridge.remoteStatus.mockResolvedValueOnce(JSON.stringify({ state: 'Stopped', addresses: [] }));
+  await expect(resumeRemoteAccess('saved', control)).resolves.toBe(true);
+  expect(bridge.activateRemote.mock.calls).toEqual([['saved', control]]);
+});
+it('leaves a node that survived the background alone', async () => {
+  await expect(resumeRemoteAccess('saved', control)).resolves.toBe(false);
+  expect(bridge.activateRemote).not.toHaveBeenCalled();
+});
+it('asks nothing of the bridge for a local-only profile', async () => {
+  await expect(resumeRemoteAccess('saved', '')).resolves.toBe(false);
+  expect(bridge.remoteStatus).not.toHaveBeenCalled();
+  expect(bridge.activateRemote).not.toHaveBeenCalled();
+});
+// An unreadable status is not evidence the node is healthy, and the cost of being wrong
+// is asymmetric: a needless restart costs a moment, a missed one costs remote access.
+it('restarts when the node status cannot be read', async () => {
+  bridge.remoteStatus.mockRejectedValueOnce(new Error('bridge gone'));
+  await expect(resumeRemoteAccess('saved', control)).resolves.toBe(true);
+  expect(bridge.activateRemote.mock.calls).toEqual([['saved', control]]);
 });
 
 it('requires an explicit recovery request, waits for local approval and executes once', async () => {
