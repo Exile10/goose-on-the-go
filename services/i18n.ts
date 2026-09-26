@@ -107,6 +107,8 @@ void i18n.use(initReactI18next).init({
       suggestLights: 'Turn off all lights', suggestWeather: 'What\u2019s the weather?', suggestMusic: 'Play some music', suggestLock: 'Lock the front door',
       connected: 'Connected', messagePlaceholder: 'Message Goose\u2026', poweredBy: 'Powered by Goose 2',
       returnToSend: 'Return to send',
+      history: 'Past conversations',
+      newConversation: 'New conversation',
       you: 'You',
       pond: 'Pond',
     },

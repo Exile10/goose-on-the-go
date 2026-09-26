@@ -5,7 +5,7 @@
  * suggested prompts, input bar with mic and send.
  */
 
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { InkIcon } from '@jarida/ink/native';
 import {
   View,
@@ -16,6 +16,7 @@ import {
   Pressable,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 
 import { GKeyboardView } from '@/components/ui/g-keyboard-view';
 import type { Message } from '@/models/chat';
@@ -97,6 +98,18 @@ const ActivityRow = React.memo(function ActivityRow({ label }: { label: string }
 export default function ChatScreen() {
   const { data, actions } = useChat();
   const { messages, streaming: isTyping, activity } = data;
+  const router = useRouter();
+  // The Sessions screen opens a conversation by sending its id here.
+  const { sessionId: requestedSession } = useLocalSearchParams<{ sessionId?: string }>();
+  const { loadSession } = actions;
+  const handledSession = useRef<string | null>(null);
+  useEffect(() => {
+    if (!requestedSession) { handledSession.current = null; return; }
+    if (requestedSession === handledSession.current) return;
+    handledSession.current = requestedSession;
+    loadSession(requestedSession);
+    router.setParams({ sessionId: undefined });
+  }, [requestedSession, loadSession, router]);
   const [draft, setDraft] = useState('');
   const flatListRef = useRef<FlatList<Message>>(null);
 
@@ -149,9 +162,24 @@ export default function ChatScreen() {
               </View>
             </View>
           </View>
-          <Pressable style={styles.newChatBtn} onPress={actions.newConversation}>
-            <InkIcon name="plus" size={18} tone="neutral" />
-          </Pressable>
+          <View style={styles.headerActions}>
+            <Pressable
+              style={styles.newChatBtn}
+              onPress={() => router.push('/(stack)/sessions')}
+              accessibilityRole="button"
+              accessibilityLabel={i18n.t('chat.history')}
+            >
+              <InkIcon name="logs" size={18} tone="neutral" />
+            </Pressable>
+            <Pressable
+              style={styles.newChatBtn}
+              onPress={actions.newConversation}
+              accessibilityRole="button"
+              accessibilityLabel={i18n.t('chat.newConversation')}
+            >
+              <InkIcon name="plus" size={18} tone="neutral" />
+            </Pressable>
+          </View>
         </View>
 
         {/* Message list */}
@@ -275,6 +303,10 @@ const styles = StyleSheet.create({
     fontFamily: FontFamily.body,
     fontSize: 10,
     color: Grey[500],
+  },
+  headerActions: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
   },
   newChatBtn: {
     width: 36,
