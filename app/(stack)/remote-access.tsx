@@ -25,12 +25,13 @@ function progressLabel(t: (key: string) => string, progress: RemoteProgress): st
 export default function RemoteAccessScreen() {
   const { t } = useTranslation();
   const router = useRouter();
-  const { setupUnavailable, progress, error, busy, enable, recover, reviewId, localOnly } = useRemoteAccess();
+  const { setupUnavailable, progress, error, busy, enable, recover, reviewId, localOnly, lapse } = useRemoteAccess();
   return <View style={styles.page}>
     <Text style={styles.title}>{t('remote.title')}</Text>
     <Text style={styles.body}>{t('remote.description')}</Text>
     {progress && !error && <Text accessibilityLiveRegion="polite" style={styles.body}>{progressLabel(t, progress)}</Text>}
     {reviewId && busy && <Text selectable style={styles.body}>{t('remote.reviewCode', { id: reviewId })}</Text>}
+    {lapse && <Text accessibilityRole="alert" style={styles.warning}>{lapse}</Text>}
     {error && <Text accessibilityRole="alert" style={styles.error}>{error}</Text>}
     {busy && <ActivityIndicator />}
     {progress !== 'enabled' && <Pressable accessibilityRole="button" disabled={busy} onPress={enable} style={styles.primary}><Text style={styles.primaryText}>{t('remote.enable')}</Text></Pressable>}

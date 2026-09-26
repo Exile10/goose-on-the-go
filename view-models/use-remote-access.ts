@@ -10,6 +10,7 @@ import {
 import { ApiError } from '@/services/api-client';
 import i18n from '@/services/i18n';
 import { describeLapse, lapseIn } from '@/models/lapse';
+import { Storage } from '@/services/storage';
 
 /**
  * Turn a failure into something worth reading.
@@ -72,6 +73,12 @@ export function useRemoteAccess() {
   const [busy, setBusy] = useState(false);
   const alive = useRef(true);
   useEffect(() => { alive.current = true; return () => { alive.current = false; void cancelRemoteAccess().catch(() => undefined); }; }, []);
+  // The deadline is only readable at home, and the warning matters away from it, so keep
+  // the last one learned rather than forgetting it with the screen.
+  useEffect(() => {
+    void Storage.get('remoteLapsesAt').then((at) => { if (alive.current && at) setLapsesAt((current) => current ?? at); })
+      .catch(() => undefined);
+  }, []);
   const start = useCallback(async (recovery = false) => {
     if (busy) return;
     setBusy(true); setError(null); setReviewId(null); setProgress(null); setSetupUnavailable(false);
@@ -81,7 +88,10 @@ export function useRemoteAccess() {
           if (!alive.current) throw new Error(i18n.t('remote.cancelled'));
           await setRemoteEndpoint(endpoint, control, current);
         }, recovery ? { onReview: (id) => { if (alive.current) setReviewId(id); } } : undefined,
-        (at) => { if (alive.current) setLapsesAt(at); });
+        (at) => {
+          void (at ? Storage.set('remoteLapsesAt', at) : Storage.remove('remoteLapsesAt')).catch(() => undefined);
+          if (alive.current) setLapsesAt(at);
+        });
     } catch (cause) {
       // Log the cause, not just the message shown on screen. Five different
       // failures in enableRemoteAccess surface as the same sentence, so without

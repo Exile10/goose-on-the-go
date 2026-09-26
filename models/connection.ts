@@ -66,7 +66,9 @@ export function parseConnectionProfile(raw: unknown): ConnectionProfile | null {
 
 /** The phone rejects known remote addresses; the server checks the actual source subnet. */
 export function isLocalPairingUrl(url: string): boolean {
-  const host = new URL(normalizeHttpsUrl(url)).hostname.toLowerCase();
+  let host: string;
+  try { host = new URL(normalizeHttpsUrl(url)).hostname.toLowerCase(); }
+  catch { return false; }
   if (host === 'localhost' || host === '[::1]' || host.endsWith('.local')) return true;
   const parts = host.split('.').map(Number);
   if (parts.length === 4 && parts.every((n) => Number.isInteger(n) && n >= 0 && n <= 255)) {
