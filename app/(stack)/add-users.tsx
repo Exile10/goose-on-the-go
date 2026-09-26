@@ -109,9 +109,7 @@ export default function AddUsersScreen() {
         {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
         {!loading && data.profiles.length === 0 ? (
-          <Text style={styles.emptyText}>
-            No profiles yet. Add one so your Pond can tell people apart.
-          </Text>
+          <Text style={styles.emptyText}>{t('people.emptyBody')}</Text>
         ) : null}
 
         {data.profiles.map((p) => (
@@ -146,14 +144,14 @@ export default function AddUsersScreen() {
             </View>
             <View style={styles.inviteActions}>
               <InkButton variant="quiet" onPress={() => setShowAdd(false)}>
-                Cancel
+                {t('common.cancel')}
               </InkButton>
               <InkButton
                 variant="primary"
                 disabled={!name.trim() || saving}
                 onPress={submit}
               >
-                {saving ? 'Adding\u2026' : 'Add Profile'}
+                {saving ? t('addUsers.adding') : t('common.add')}
               </InkButton>
             </View>
           </View>

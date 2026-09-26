@@ -1,3 +1,7 @@
+jest.mock('@/services/pond-trust', () => ({
+  ...jest.requireActual('@/services/pond-trust'),
+  assertPondTrust: jest.fn().mockResolvedValue(undefined),
+}));
 /**
  * Tests for the API client's error surface.
  *
@@ -72,7 +76,7 @@ describe('ApiError', () => {
 describe('request()', () => {
   it('throws an ApiError carrying the status and Retry-After', async () => {
     setFetch(stubFetch({ status: 429, headers: { 'Retry-After': '42' } }));
-    const client = new PondApiClient('http://pond.test');
+    const client = new PondApiClient('https://pond.test');
 
     const error: ApiError = await client
       .request('/api/v1/thing', { method: 'POST' })
@@ -90,7 +94,7 @@ describe('request()', () => {
 
   it('reports a null Retry-After when the header is absent', async () => {
     setFetch(stubFetch({ status: 503 }));
-    const client = new PondApiClient('http://pond.test');
+    const client = new PondApiClient('https://pond.test');
 
     const error = (await client.request('/api/v1/thing').catch((e) => e)) as ApiError;
 
@@ -108,7 +112,7 @@ describe('request()', () => {
       status: 429,
       headers: { 'Retry-After': 'Wed, 21 Oct 2026 07:28:00 GMT' },
     }));
-    const client = new PondApiClient('http://pond.test');
+    const client = new PondApiClient('https://pond.test');
 
     const error = (await client.request('/api/v1/thing').catch((e) => e)) as ApiError;
 
@@ -117,8 +121,148 @@ describe('request()', () => {
 
   it('returns the parsed body on success', async () => {
     setFetch(stubFetch({ status: 200, body: { ok: true } }));
-    const client = new PondApiClient('http://pond.test');
+    const client = new PondApiClient('https://pond.test');
 
     await expect(client.request('/api/v1/thing')).resolves.toEqual({ ok: true });
+  });
+});
+
+
+describe('handshakeRevoke()', () => {
+  it('retains credentials when durable revocation fails and does not replay the write', async () => {
+    const fetch = stubFetch({ status: 503, body: { error: 'revocation_unavailable' } });
+    setFetch(fetch);
+    const client = new PondApiClient('https://pond.local:4443');
+    client.setToken('test-session');
+    await expect(client.handshakeRevoke()).rejects.toMatchObject({ status: 503 });
+    expect(fetch).toHaveBeenCalledTimes(1);
+    setFetch(stubFetch({ status: 200, body: { revoked: true } }));
+    await expect(client.handshakeRevoke()).resolves.toBeUndefined();
+    const next = stubFetch({ status: 200 });
+    setFetch(next);
+    await client.handshakeRevoke();
+    expect(next).not.toHaveBeenCalled();
+  });
+  it('requires a positive revocation acknowledgment', async () => {
+    setFetch(stubFetch({ status: 200, body: { error: 'not_revoked' } }));
+    const client = new PondApiClient('https://pond.local:4443');
+    client.setToken('test-session');
+    await expect(client.handshakeRevoke()).rejects.toThrow('not acknowledged');
+  });
+});
+
+describe('local enrollment requests', () => {
+  it('keeps the selected LAN endpoint when the shared client roams', async () => {
+    const fetch = stubFetch({ status: 200 }); setFetch(fetch);
+    const client = new PondApiClient('https://100.64.0.1:4443');
+    client.setToken('fixture-session');
+    await client.requestLocal('https://192.168.1.2:4443', '/api/v1/remote-access/enrollment', { method: 'POST' });
+    expect(fetch).toHaveBeenCalledWith('https://192.168.1.2:4443/api/v1/remote-access/enrollment', expect.objectContaining({ method: 'POST' }));
+  });
+  it('does not recover, replay or rotate tokens after a local request fails', async () => {
+    const fetch = jest.fn().mockRejectedValue(new Error('ambiguous')); setFetch(fetch);
+    const client = new PondApiClient('https://192.168.1.2:4443');
+    const recover = jest.fn(async () => 'https://100.64.0.1:4443'); client.setRecovery(recover);
+    client.setRefreshToken('fixture-refresh');
+    await expect(client.requestLocal('https://192.168.1.2:4443', '/api/v1/remote-access/enrollment', { method: 'POST' })).rejects.toThrow('ambiguous');
+    expect(fetch).toHaveBeenCalledTimes(1); expect(recover).not.toHaveBeenCalled();
+    const unauthorized = stubFetch({ status: 401 }); setFetch(unauthorized);
+    await expect(client.requestLocal('https://192.168.1.2:4443', '/api/v1/remote-access/configuration')).rejects.toMatchObject({ status: 401 });
+    expect(unauthorized).toHaveBeenCalledTimes(1);
+  });
+  it('rejects remote and plaintext endpoints before sending credentials', async () => {
+    const fetch = stubFetch({ status: 200 }); setFetch(fetch);
+    const client = new PondApiClient();
+    for (const url of ['https://100.64.0.1:4443', 'http://192.168.1.2:4443']) {
+      await expect(client.requestLocal(url, '/api/v1/remote-access/configuration')).rejects.toThrow();
+    }
+    expect(fetch).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * The client's half of the channel binding.
+ *
+ * The pin is what this connection is pinned to, so `pair` folding it into the
+ * proof is what stops the pin's own provenance mattering: a phone that pinned
+ * an interceptor's key fails the pair instead of completing one against the
+ * wrong Pond. That refusal is the Pond's; what is tested here is the other
+ * direction -- something that terminated this connection and invented an
+ * acceptance, which only the returned proof catches.
+ */
+describe('pair() channel binding', () => {
+  const PIN = 'sha256/TnkUsN+AaLec3BDTh/KUwSokXTmCq2+4rlfBnmJxPkE=';
+  const CHALLENGE = 'AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=';
+  const CODE = '482915';
+  const CLIENT_ID = 'install-abcdef';
+  const PROOF = '73171bac55bb3346045142bb0647057067d94712f5fab82d2260bf91c106ebe0';
+
+  /** init, then verify answering with `verify`. */
+  function pairingFetch(verify: Record<string, unknown>) {
+    return jest.fn(async (url: string, _init?: RequestInit) =>
+      new Response(
+        JSON.stringify(
+          String(url).endsWith('/init')
+            ? { challenge_id: 'c1', challenge: CHALLENGE, expires_at: '' }
+            : verify,
+        ),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      ),
+    );
+  }
+
+  const accepted = {
+    accepted: true,
+    session_token: 'session',
+    refresh_token: 'refresh',
+    hostname: 'nano',
+    server_version: 'test',
+    capabilities: [],
+    rejection_reason: null,
+  };
+
+  it('sends the pin and the bound MAC, and keeps the tokens when the proof checks out', async () => {
+    const fetch = pairingFetch({ ...accepted, server_proof: PROOF }); setFetch(fetch);
+    const client = new PondApiClient('https://192.168.1.7:4443');
+
+    const rotated = jest.fn(); client.setOnTokensRotated(rotated);
+
+    const resp = await client.pair({ clientId: CLIENT_ID, pairingCode: CODE, channelBinding: PIN });
+
+    expect(resp.accepted).toBe(true);
+    expect(rotated).toHaveBeenCalledWith('session', 'refresh');
+    const body = JSON.parse(String(fetch.mock.calls[1]?.[1]?.body));
+    expect(body.channel_binding).toBe(PIN);
+    expect(body.mac).toBe('2cc63017ff6979d0f1c4009a4f37c3c95bc2d535897fc2fb19a0a496f6a649aa');
+  });
+
+  // The interceptor's best remaining move once the Pond has refused its relay:
+  // answer the phone itself. It cannot produce the proof without the code.
+  it('rejects an acceptance whose proof is wrong, and keeps no token from it', async () => {
+    for (const server_proof of [undefined, '00'.repeat(32), `f${PROOF.slice(1)}`]) {
+      setFetch(pairingFetch({ ...accepted, server_proof }));
+      const client = new PondApiClient('https://192.168.1.7:4443');
+      const rotated = jest.fn(); client.setOnTokensRotated(rotated);
+      await expect(
+        client.pair({ clientId: CLIENT_ID, pairingCode: CODE, channelBinding: PIN }),
+      ).rejects.toThrow();
+      // Nothing is kept and nothing is persisted: the tokens in that response
+      // came from whoever answered, not from the Pond.
+      expect(rotated).not.toHaveBeenCalled();
+    }
+  });
+
+  // The dashboard, and a Pond older than the binding: no pin, the original
+  // transcript, and no proof to demand back.
+  it('sends the unbound MAC and asks for no proof when there is no pin', async () => {
+    const fetch = pairingFetch(accepted); setFetch(fetch);
+    const client = new PondApiClient('https://192.168.1.7:4443');
+
+    await expect(client.pair({ clientId: CLIENT_ID, pairingCode: CODE })).resolves.toMatchObject({
+      accepted: true,
+    });
+    const body = JSON.parse(String(fetch.mock.calls[1]?.[1]?.body));
+    expect(body.channel_binding).toBeNull();
+    expect(body.mac).toBe('b922abd25f5f1519c9d0f8ccabab4ed17b3e888a3b868be9cfdc320de017ec30');
   });
 });

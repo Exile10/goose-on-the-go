@@ -22,8 +22,30 @@ import { Spacing } from '@/constants/spacing';
 import { Radii } from '@/constants/radii';
 import { useThemedStyles } from '@/hooks/use-themed-styles';
 import type { ThemeColors } from '@/constants/colors';
+import i18n from '@/services/i18n';
 
+// Identifiers, typed by MemoryCategory, not copy: the label each one shows comes from tabLabel().
+/* eslint-disable-next-line i18next/no-literal-string -- category ids; tabLabel() supplies the words */
 const CATEGORY_TABS: (MemoryCategory | 'All')[] = ['All', 'Preference', 'Habit', 'Person', 'Reminder'];
+
+/**
+ * Tab labels, one literal key per branch.
+ *
+ * This used to assemble the key from the tab value at runtime, which reads
+ * better and is worse: a key built that way is invisible to
+ * services/__tests__/i18n.test.ts, so deleting memories.tabHabit would have left
+ * the test green and put the raw key on screen. The switch is exhaustive, so
+ * TypeScript fails here if a category is added without a label.
+ */
+function tabLabel(tab: MemoryCategory | 'All'): string {
+  switch (tab) {
+    case 'All': return i18n.t('memories.tabAll');
+    case 'Preference': return i18n.t('memories.tabPreference');
+    case 'Habit': return i18n.t('memories.tabHabit');
+    case 'Person': return i18n.t('memories.tabPerson');
+    case 'Reminder': return i18n.t('memories.tabReminder');
+  }
+}
 
 const CATEGORY_COLORS: Record<MemoryCategory, string> = {
   Preference: JaridaPurple[500],
@@ -51,7 +73,7 @@ const MemoryCard = React.memo(function MemoryCard({
           <GIcon name={item.icon} size={16} color={catColor} />
         </View>
         <View style={[styles.categoryBadge, { backgroundColor: catColor + '18' }]}>
-          <Text style={[styles.categoryText, { color: catColor }]}>{item.category}</Text>
+          <Text style={[styles.categoryText, { color: catColor }]}>{tabLabel(item.category)}</Text>
         </View>
         <View style={styles.memoryActions}>
           <GPressable onPress={() => onPin(item.id)} style={styles.actionBtn}>
@@ -71,6 +93,7 @@ const MemoryCard = React.memo(function MemoryCard({
 export default function MemoriesScreen() {
   const styles = useThemedStyles(makeStyles);
   const [memories, setMemories] = useState(SAMPLE_MEMORIES);
+  // eslint-disable-next-line i18next/no-literal-string -- 'All' is the filter value, not copy
   const [activeCategory, setActiveCategory] = useState<MemoryCategory | 'All'>('All');
 
   const filtered = activeCategory === 'All'
@@ -112,7 +135,7 @@ export default function MemoriesScreen() {
             onPress={() => setActiveCategory(tab)}
           >
             <Text style={[styles.tabText, activeCategory === tab && styles.tabTextActive]}>
-              {tab}
+              {tabLabel(tab)}
             </Text>
           </GPressable>
         ))}

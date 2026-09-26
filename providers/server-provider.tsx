@@ -1,56 +1,44 @@
-/**
- * ServerProvider — server connection state for the GIAP companion link.
- *
- * Holds `serverUrl`, `online`, `token`, `refreshToken`, plus a `pair()`
- * method that runs the two-phase handshake with the user-supplied 6-digit
- * pairing code shown on the server's CLI / dashboard.
- *
- * On mount:
- *   - server URL is loaded from AsyncStorage (`@goose/server-url`)
- *   - tokens are loaded from SecureStorage (Keychain / EncryptedSharedPrefs)
- */
-
-import React, {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type PropsWithChildren,
-} from 'react';
-
+import { loadPairedProfile, commitPairedProfile, type PondIdentity as Identity, type SavedPond as Saved } from '@/services/paired-profile';
+/** Owns the saved identity, staged local pairing, and shared endpoint recovery. */
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type PropsWithChildren } from 'react';
+import { AppState } from 'react-native';
+import NetInfo from '@react-native-community/netinfo';
 import { forgetAllCards } from '@/services/card-cache';
 import { Storage, purgeLegacyStorage } from '@/services/storage';
 import { SecureStorage } from '@/services/secure-storage';
-import { api, type HandshakeResponse } from '@/services/api-client';
+import { ApiError, api, PondApiClient, type HandshakeResponse } from '@/services/api-client';
+import { ConnectionManager, type ConnectionSnapshot } from '@/services/connection-manager';
+import { configurePondTrust, PondTrustError } from '@/services/pond-trust';
+import { findPondAt, findPondByHost } from '@/services/discovery';
+import { parseConnectionProfile, validPin, isLocalPairingUrl, type ConnectionProfile } from '@/models/connection';
+import i18n from '@/services/i18n';
+import { cancelRemoteAccess, restoreRemoteAccess, resumeRemoteAccess } from '@/services/remote-access';
+import { getInstallId } from '@/services/install-id';
+import { canBeat, HEARTBEAT_MS } from '@/services/heartbeat';
 
-const DEFAULT_SERVER_URL = 'http://127.0.0.1:4000';
+const NUMERIC_HOST = /^\d{1,3}(\.\d{1,3}){3}$/;
 
-interface PairOptions {
-  clientId: string;
-  pairingCode: string;
-  deviceName?: string;
-}
-
+interface PairOptions { clientId: string; pairingCode: string; deviceName?: string }
 interface ServerContextValue {
-  serverUrl: string;
-  online: boolean;
-  token: string | null;
-  refreshToken: string | null;
-  setServerUrl: (url: string) => void;
-  setToken: (token: string | null) => void;
-  /**
-   * Probe `/health` and update `online` from the answer.
-   *
-   * `online` has no manual setter on purpose: it should say whether the Pond
-   * actually answered, not whether something once believed it would.
-   */
+  serverUrl: string; online: boolean; token: string | null; refreshToken: string | null;
+  connectionState: ConnectionSnapshot['state'];
   checkHealth: () => Promise<boolean>;
-  /** Execute the GIAP two-phase handshake. Returns the server response. */
+  /**
+   * Re-select an endpoint. `quiet` suppresses the "Reconnecting" announcement,
+   * for callers whose failure is not evidence the transport is down.
+   */
+  recover: (quiet?: boolean) => Promise<string | null>;
+  /** Announce that the Pond has stopped recognising this phone. Terminal. */
+  revoke: () => void;
+  profileId: string;
+  /** Whether a pairing is stored, including while another pairing is being staged over it. */
+  paired: boolean;
+  remoteEnabled: boolean;
+  keepLocalOnly: () => Promise<void>;
+  setRemoteEndpoint: (url: string, control: string, current: () => void) => Promise<void>;
+  stagePairing: (profile: ConnectionProfile, pin: string) => Promise<void>;
+  cancelPairing: () => Promise<void>;
   pair: (opts: PairOptions) => Promise<HandshakeResponse>;
-  /** Revoke the current session token (server-side + local). */
   signOut: () => Promise<void>;
   /** Per-screen mock/real backend flags (dev only) — see MIGRATION_SCREENS. */
   screenModes: ScreenModes;
@@ -61,7 +49,7 @@ interface ServerContextValue {
    * Whether the stored base URL and tokens have been read back yet.
    *
    * Hydration is async, so a view-model that fetches on mount would otherwise
-   * race it and call the default `http://127.0.0.1:4000` with no bearer token,
+   * race trust restoration and issue an unauthenticated request,
    * fail, and — with nothing to re-trigger it — stay failed for the session.
    */
   hydrated: boolean;
@@ -128,119 +116,306 @@ export function resolveScreenReal(
 }
 
 const ServerContext = createContext<ServerContextValue | null>(null);
+const trust = (urls: string[], pin: string) => configurePondTrust(urls.map((url) => ({ url, pin })));
+const probe = async (url: string) => {
+  const result = await new PondApiClient(url).health();
+  if (result.trustFailure) throw new PondTrustError();
+  return result.ok;
+};
 
 export function ServerProvider({ children }: PropsWithChildren) {
-  const [serverUrl, setServerUrlRaw] = useState(DEFAULT_SERVER_URL);
-  const [online, setOnline] = useState(false);
-  const [token, setTokenState] = useState<string | null>(null);
-  const [refreshToken, setRefreshTokenState] = useState<string | null>(null);
   const [screenModes, setScreenModes] = useState<ScreenModes>(DEFAULT_SCREEN_MODES);
-  const hydrationStarted = useRef(false);
   const [hydrated, setHydrated] = useState(false);
+  const [snapshot, setSnapshot] = useState<ConnectionSnapshot>({ state: 'unpaired', url: null });
+  const [identity, setIdentity] = useState<Identity | null>(null);
+  const saved = useRef<Saved | null>(null);
+  // Mirrors whether `saved` holds a pairing, for render. Set wherever that changes.
+  const [hasPairing, setHasPairing] = useState(false);
+  const staged = useRef<{ profile: ConnectionProfile; pin: string; client: PondApiClient } | null>(null);
+  const operation = useRef(0);
+  const committing = useRef<Promise<void> | null>(null);
+  const mounted = useRef(true);
+  const tokenWrite = useRef<Promise<void>>(Promise.resolve());
+  const environment = useRef({ cellular: false, active: AppState.currentState === 'active' });
+  const manager = useMemo(() => new ConnectionManager({
+    probe, trust,
+    discover: async (host, port) => (await findPondByHost(host, port))?.url ?? null,
+    changed: (next) => {
+      console.info('[connection]', next.state);
+      setSnapshot(next);
+      if (next.url) api.setBaseUrl(next.url);
+    },
+  }), []);
+
+  const restore = useCallback(async () => {
+    const current = saved.current;
+    const remote = current?.profile.remoteAccess;
+    try { await restoreRemoteAccess(current?.identity.id ?? '', remote?.mode === 'embedded' ? remote.controlUrl : ''); }
+    catch { console.warn('[remote] saved transport unavailable; local access remains enabled'); }
+    await manager.configure(current?.profile ?? null, current?.identity.pin ?? '');
+    if (!mounted.current) return;
+    if (current) {
+      api.setToken(current.identity.session);
+      api.setRefreshToken(current.identity.refresh);
+      setIdentity(current.identity);
+      manager.environment(environment.current.cellular, environment.current.active);
+    } else setIdentity(null);
+  }, [manager]);
 
   /**
-   * Guards against an older probe landing after a newer one. Changing the server
-   * URL starts a second check while the first is still in flight, and without a
-   * sequence number the slower answer — about the previous address — wins.
+   * The node lives in this process and nothing holds the process up, so coming back to the
+   * foreground is the first chance we get to notice it is gone. Probing alone cannot see
+   * this: a dead node and an unreachable Pond look identical from the HTTP side.
    */
-  const healthSeq = useRef(0);
+  const resumeTransport = useCallback(async () => {
+    const current = saved.current;
+    const remote = current?.profile.remoteAccess;
+    if (!current || remote?.mode !== 'embedded') return;
+    try {
+      // Re-probe only when the transport actually changed underneath us.
+      if (await resumeRemoteAccess(current.identity.id, remote.controlUrl)) await manager.recover();
+    } catch {
+      console.warn('[remote] transport could not be restarted on resume; local access remains enabled');
+    }
+  }, [manager]);
 
-  const checkHealth = useCallback(async () => {
-    const seq = ++healthSeq.current;
-    const { ok } = await api.health();
-    if (seq === healthSeq.current) setOnline(ok);
-    return ok;
-  }, []);
+  /**
+   * Drop this phone's pairing locally, without asking the Pond to release it.
+   *
+   * signOut tells the Pond first and deliberately keeps the pairing when that
+   * call fails, so a failed sign-out can be retried. Revocation is the opposite
+   * situation: the Pond has already stopped recognising this phone, so there is
+   * nothing to tell it and nothing to retry. Holding dead credentials only means
+   * every later request fails the same way, and the remote-access setup keeps
+   * enrolling nodes against an identity the Pond will not accept.
+   */
+  const forgetPairing = useCallback(async () => {
+    await cancelRemoteAccess().catch(() => undefined);
+    await restoreRemoteAccess('', '').catch(() => undefined);
+    operation.current++; staged.current = null; saved.current = null; setHasPairing(false);
+    api.invalidateIdentity(); setIdentity(null);
+    await tokenWrite.current.catch(() => undefined);
+    await SecureStorage.remove('pondIdentity');
+    await SecureStorage.remove('sessionToken'); await SecureStorage.remove('refreshToken');
+    await Storage.remove('connectionProfile'); await Storage.remove('serverUrl');
+    // The tool cards kept from its conversations are the household's too.
+    await forgetAllCards().catch(() => undefined);
+    await manager.configure(null);
+  }, [manager]);
 
+  const cancelPairing = useCallback(async () => {
+    await committing.current?.catch(() => undefined);
+    operation.current++;
+    if (!staged.current) return;
+    staged.current = null;
+    api.invalidateIdentity();
+    await restore();
+  }, [restore]);
 
-  // Hydrate from persistent storage on first mount.
+  const invalidateOperation = useCallback(() => { operation.current++; }, []);
   useEffect(() => {
-    if (hydrationStarted.current) return;
-    hydrationStarted.current = true;
-    (async () => {
-      // Before reading anything, clear what an older build may have left in
-      // plaintext. Upgrades are the only path onto this code, so a device that
-      // once held a token in AsyncStorage still holds it until something deletes
-      // it — and nothing else ever would.
-      await purgeLegacyStorage().catch((e) => {
-        // eslint-disable-next-line no-console
-        console.warn('[storage] could not purge legacy plaintext keys:', e);
-      });
-
-      const [storedUrl, storedToken, storedRefresh] = await Promise.all([
-        Storage.get('serverUrl'),
-        SecureStorage.get('sessionToken'),
-        SecureStorage.get('refreshToken'),
-      ]);
-      if (storedUrl) {
-        setServerUrlRaw(storedUrl);
-        api.setBaseUrl(storedUrl);
-      }
-      if (storedToken) {
-        setTokenState(storedToken);
-        api.setToken(storedToken);
-      }
-      if (storedRefresh) {
-        setRefreshTokenState(storedRefresh);
-        api.setRefreshToken(storedRefresh);
-      }
-      // Only worth probing once there is an address to probe.
-      if (storedUrl) void checkHealth();
-    })()
-      .catch((e) => {
-        // A keychain that will not open must not strand every consumer waiting
-        // on `hydrated` forever; report it and let them proceed unpaired.
-        // eslint-disable-next-line no-console
-        console.warn('[server] hydration failed:', e);
-      })
-      .finally(() => setHydrated(true));
-  }, [checkHealth]);
-
-  // Persist token rotations triggered inside the api client (refresh flow).
-  useEffect(() => {
-    api.setOnTokensRotated((session, refresh) => {
-      setTokenState(session);
-      setRefreshTokenState(refresh);
-      void SecureStorage.set('sessionToken', session);
-      void SecureStorage.set('refreshToken', refresh);
+    mounted.current = true;
+    let cancelled = false;
+    NetInfo.configure({ useNativeReachability: true, reachabilityShouldRun: () => false, shouldFetchWiFiSSID: false });
+    let networkKey = '';
+    const networkSub = NetInfo.addEventListener((state) => {
+      const address = state.details && 'ipAddress' in state.details ? state.details.ipAddress : '';
+      const key = `${state.type}:${state.isConnected}:${address}`;
+      if (key === networkKey) return;
+      networkKey = key;
+      environment.current.cellular = state.type === 'cellular';
+      if (!staged.current) manager.environment(environment.current.cellular, environment.current.active);
     });
-    return () => api.setOnTokensRotated(null);
-  }, []);
-
-  const setServerUrl = useCallback(
-    (url: string) => {
-      const trimmed = url.replace(/\/+$/, '');
-      setServerUrlRaw(trimmed);
-      api.setBaseUrl(trimmed);
-      void Storage.set('serverUrl', trimmed);
-      void checkHealth();
-    },
-    [checkHealth],
-  );
-
-  const setToken = useCallback((next: string | null) => {
-    setTokenState(next);
-    api.setToken(next);
-    if (next) void SecureStorage.set('sessionToken', next);
-    else void SecureStorage.remove('sessionToken');
-  }, []);
-
-  const pair = useCallback(
-    async ({ clientId, pairingCode, deviceName }: PairOptions) => {
-      const resp = await api.pair({ clientId, pairingCode, deviceName });
-      if (resp.accepted && resp.session_token) {
-        setTokenState(resp.session_token);
-        await SecureStorage.set('sessionToken', resp.session_token);
-        if (resp.refresh_token) {
-          setRefreshTokenState(resp.refresh_token);
-          await SecureStorage.set('refreshToken', resp.refresh_token);
-        }
-        setOnline(true);
+    const appSub = AppState.addEventListener('change', (state) => {
+      environment.current.active = state === 'active';
+      if (staged.current) return;
+      manager.environment(environment.current.cellular, environment.current.active);
+      if (state === 'active') void resumeTransport();
+    });
+    api.setRecovery(manager.recover);
+    api.setAuthRevoked(() => {
+      manager.revoke();
+      // Unregistering the phone on the Pond should end the session here too. The
+      // tab layout redirects to pairing as soon as there is no profile, so
+      // clearing is all this has to do -- the user lands on a fresh pair rather
+      // than on a screen whose every request will fail.
+      //
+      // Not while a pairing is being staged: that flow owns the identity and has
+      // its own cancellation.
+      if (!staged.current) {
+        void forgetPairing().catch(() => console.warn('[connection] revoked pairing could not be cleared'));
       }
-      return resp;
-    },
-    [],
-  );
+    });
+    void (async () => {
+      try {
+        // Best effort: a store that cannot delete the old plaintext keys must not keep a
+        // valid pairing from loading.
+        try { await purgeLegacyStorage(); } catch { console.warn('[storage] could not purge legacy plaintext keys'); }
+        const loaded = await loadPairedProfile();
+        if (cancelled || staged.current) return;
+        if (loaded.saved) {
+          saved.current = loaded.saved;
+          setHasPairing(true);
+          await restore();
+        } else await manager.configure(null, '', loaded.upgrade);
+      } catch {
+        console.warn('[connection] saved profile could not be loaded');
+        setSnapshot({ state: 'upgrade', url: null });
+      } finally {
+        if (!cancelled) setHydrated(true);
+      }
+    })();
+    api.setOnTokensRotated((session, refresh) => {
+      const current = saved.current;
+      if (!current || staged.current) return;
+      const next = { ...current.identity, session, refresh };
+      saved.current = { ...current, identity: next };
+      setIdentity(next);
+      tokenWrite.current = tokenWrite.current.then(() => SecureStorage.set('pondIdentity', JSON.stringify(next))).catch(() => {
+        console.warn('[connection] rotated credentials could not be saved');
+        setSnapshot({ state: 'disconnected', url: null });
+      });
+    });
+    return () => {
+      cancelled = true; mounted.current = false; invalidateOperation();
+      networkSub(); appSub.remove(); manager.environment(false, false);
+      api.setRecovery(null); api.setOnTokensRotated(null);
+    };
+  }, [manager, restore, invalidateOperation, resumeTransport, forgetPairing]);
+
+  /**
+   * Keep this phone's row in the Pond's device registry fresh while the app is open.
+   *
+   * The Pond derives `is_online` from `last_seen` against a five-minute threshold
+   * and has a heartbeat route that nothing was calling, so a paired phone aged out
+   * of its own device list and described itself as offline while in use.
+   *
+   * Two minutes, which is well inside that threshold and far outside anything the
+   * per-IP rate limit cares about -- thirty requests an hour against a budget that
+   * a runaway listener once spent in seconds. A missed beat is dropped rather than
+   * retried: the next one is already scheduled, and a retry loop against a
+   * rate-limited Pond is the failure this interval exists to stay clear of.
+   *
+   * Foreground only. When the app is not running the phone genuinely is not
+   * reachable through it, and saying so is the honest answer rather than a
+   * convenient one.
+   *
+   * Keyed on the resolved URL as well as the identity. The identity loads before
+   * the connection manager has reached the Pond, and the first version beat at
+   * that moment -- at the client's default address, while requiring an AppState
+   * a cold start had not reported yet -- so the beat a launch exists to send went
+   * nowhere, and the card stayed offline until the interval came round. The
+   * conditions are in `canBeat`, where they are tested.
+   */
+  const reachedUrl = snapshot.url;
+  useEffect(() => {
+    if (!identity || !reachedUrl) return;
+    let stopped = false;
+    const beat = () => {
+      if (stopped || !canBeat({ paired: true, pairing: !!staged.current, url: reachedUrl, appState: AppState.currentState })) return;
+      void getInstallId()
+        .then((id) => api.deviceHeartbeat(id))
+        .catch((e: unknown) => {
+          // Dropped, not retried: the next beat is already scheduled. But not silent -- a beat
+          // that always fails looks exactly like one that never fires.
+          console.warn('[heartbeat] not delivered', e instanceof ApiError ? e.status : 'network');
+        });
+    };
+    beat();
+    const timer = setInterval(beat, HEARTBEAT_MS);
+    const sub = AppState.addEventListener('change', (state) => { if (state === 'active') beat(); });
+    return () => { stopped = true; clearInterval(timer); sub.remove(); };
+  }, [identity, reachedUrl]);
+
+  // Address updates remain non-secret and tied to the saved secure identity.
+  useEffect(() => {
+    const current = saved.current;
+    const profile = manager.savedProfile;
+    if (!current || !profile || staged.current || !snapshot.url) return;
+    saved.current = { ...current, profile };
+    void Storage.set('connectionProfile', JSON.stringify({ [current.identity.profileKey ?? current.identity.id]: profile })).catch(() => {
+      console.warn('[connection] updated addresses could not be saved');
+    });
+  }, [snapshot, manager]);
+
+  const stagePairing = useCallback(async (rawProfile: ConnectionProfile, pin: string) => {
+    await committing.current?.catch(() => undefined);
+    await cancelRemoteAccess();
+    const profile = parseConnectionProfile({ ...rawProfile, remoteAccess: { mode: 'local' } });
+    if (!profile || !validPin(pin) || !profile.localUrls.every(isLocalPairingUrl)) throw new Error(i18n.t('pairing.invalid'));
+    const op = ++operation.current;
+    const net = await NetInfo.fetch();
+    if (op !== operation.current) throw new Error(i18n.t('pairing.failed'));
+    if (!['wifi', 'ethernet'].includes(net.type)) throw new Error(i18n.t('pairing.lan'));
+    api.invalidateIdentity(); setIdentity(null);
+    manager.environment(false, false);
+    staged.current = { profile, pin, client: new PondApiClient(profile.localUrls[0]) };
+    try {
+      await manager.configure(null);
+      if (op !== operation.current) throw new Error(i18n.t('pairing.failed'));
+      await trust(profile.localUrls, pin);
+      if (op !== operation.current) throw new Error(i18n.t('pairing.failed'));
+      const candidates = [...profile.localUrls];
+      // A numeric host names no machine, so rediscovery after the Pond's lease changes
+      // could never find it again. Ask the network which Pond answers at that address
+      // and keep its advertised name instead.
+      const numericHost = NUMERIC_HOST.test(profile.host);
+      const found = numericHost
+        ? await findPondAt(profile.host, profile.port, 3_000)
+        : await findPondByHost(profile.host, profile.port);
+      if (op !== operation.current) throw new Error(i18n.t('pairing.failed'));
+      const host = numericHost && found?.hostname ? found.hostname : profile.host;
+      if (found && isLocalPairingUrl(found.url) && !candidates.includes(found.url)) candidates.push(found.url);
+      await trust(candidates, pin);
+      let trustRejected = false;
+      for (const url of candidates) {
+        if (op !== operation.current) throw new Error(i18n.t('pairing.failed'));
+        let verified = false;
+        try { verified = await probe(url); } catch (error) { if (error instanceof PondTrustError) trustRejected = true; }
+        if (verified) {
+          if (op !== operation.current) throw new Error(i18n.t('pairing.failed'));
+          staged.current = { profile: { ...profile, host, localUrls: candidates }, pin, client: new PondApiClient(url) };
+          return;
+        }
+      }
+      if (trustRejected) throw new PondTrustError();
+      throw new Error(i18n.t('pairing.lan'));
+    } catch (error) {
+      if (op === operation.current) { staged.current = null; await restore(); }
+      throw error;
+    }
+  }, [manager, restore]);
+
+  const pair = useCallback(async (opts: PairOptions) => {
+    const pending = staged.current;
+    const op = operation.current;
+    if (!pending) throw new Error(i18n.t('pairing.lan'));
+    const net = await NetInfo.fetch();
+    if (!['wifi', 'ethernet'].includes(net.type)) throw new Error(i18n.t('pairing.lan'));
+    if (op !== operation.current) throw new Error(i18n.t('pairing.failed'));
+    // The staged pin is what this connection is pinned to, and folding it into
+    // the pairing proof is what makes the pin's own provenance stop mattering:
+    // the Pond refuses a pin that is not its own, so one that arrived over mDNS
+    // or a QR ends in a visible failure rather than a pair with the wrong Pond.
+    const resp = await pending.client.pair({ ...opts, channelBinding: pending.pin });
+    if (op !== operation.current) throw new Error(i18n.t('pairing.failed'));
+    if (resp.accepted && resp.session_token) {
+      const next: Identity = { id: `${Date.now()}-${Math.random().toString(36).slice(2)}`, pin: pending.pin,
+        session: resp.session_token, refresh: resp.refresh_token ?? null };
+      // Write addresses first, retaining the previous entry until the atomic secure commit.
+      const previous = saved.current;
+      const commit = (async () => {
+        await tokenWrite.current;
+        saved.current = await commitPairedProfile(previous, { identity: next, profile: pending.profile });
+        setHasPairing(true);
+        staged.current = null;
+        await restore();
+      })();
+      committing.current = commit;
+      try { await commit; } finally { if (committing.current === commit) committing.current = null; }
+    }
+    return resp;
+  }, [restore]);
 
   /**
    * Persisted dev toggles, read once on mount.
@@ -282,49 +457,60 @@ export function ServerProvider({ children }: PropsWithChildren) {
   }, []);
 
   const signOut = useCallback(async () => {
-    await api.handshakeRevoke().catch(() => undefined);
-    setTokenState(null);
-    setRefreshTokenState(null);
-    await SecureStorage.remove('sessionToken');
-    await SecureStorage.remove('refreshToken');
-    // The tool cards kept from its conversations are the household's too.
-    await forgetAllCards();
-    setOnline(false);
-  }, []);
-
-  const value = useMemo<ServerContextValue>(
-    () => ({
-      serverUrl,
-      online,
-      token,
-      refreshToken,
-      setServerUrl,
-      setToken,
-      checkHealth,
-      pair,
-      signOut,
-      hydrated,
-      screenModes,
-      isScreenReal,
-      setScreenMode,
-    }),
-    [
-      serverUrl, online, token, refreshToken, setServerUrl, setToken, checkHealth,
-      pair, signOut, hydrated, screenModes, isScreenReal, setScreenMode,
-    ],
-  );
-
+    await committing.current?.catch(() => undefined);
+    await cancelRemoteAccess();
+    // Preserve the authenticated transport until the Pond has durably accepted revocation.
+    // Failure keeps the pairing available for an explicit retry -- except when the Pond
+    // refuses the session outright, which means it is already gone there and a retry can
+    // only fail the same way.
+    try { await api.handshakeRevoke(); }
+    catch (e) { if (!(e instanceof ApiError && (e.status === 401 || e.status === 403))) throw e; }
+    await forgetPairing();
+  }, [forgetPairing]);
+  const updateRemoteProfile = useCallback(async (url: string | null, control: string, check: () => void) => {
+    await committing.current?.catch(() => undefined);
+    const current = saved.current;
+    if (!current || staged.current) throw new Error(i18n.t('connection.unpaired'));
+    const profile = parseConnectionProfile({ ...current.profile,
+      ...(url ? { remoteUrl: url } : {}),
+      remoteAccess: url ? { mode: 'embedded', controlUrl: control } : { mode: 'local' },
+    });
+    if (!profile) throw new Error(i18n.t('remote.failed'));
+    const op = operation.current;
+    const commit = (async () => {
+      check();
+      api.invalidateIdentity(); setIdentity(null); manager.environment(false, false);
+      try {
+        await tokenWrite.current;
+        await manager.configure(profile, current.identity.pin);
+        // Native trust and the allowlisted proxy must prove the same Pond before saving opt-in.
+        if (url && !await probe(url)) throw new Error(i18n.t('remote.failed'));
+        check();
+        if (op !== operation.current || staged.current) throw new Error(i18n.t('remote.cancelled'));
+        saved.current = await commitPairedProfile(current, { identity: current.identity, profile });
+      } finally { await restore(); }
+    })();
+    committing.current = commit;
+    try { await commit; } finally { if (committing.current === commit) committing.current = null; }
+  }, [manager, restore]);
+  const setRemoteEndpoint = useCallback((url: string, control: string, check: () => void) =>
+    updateRemoteProfile(url, control, check), [updateRemoteProfile]);
+  const keepLocalOnly = useCallback(async () => {
+    await cancelRemoteAccess();
+    await updateRemoteProfile(null, '', () => undefined);
+  }, [updateRemoteProfile]);
+  const checkHealth = useCallback(async () => !!await manager.recover(), [manager]);
+  const value = useMemo<ServerContextValue>(() => ({
+    serverUrl: snapshot.url ?? '', online: !!snapshot.url, token: identity?.session ?? null,
+    refreshToken: identity?.refresh ?? null, connectionState: snapshot.state,
+    profileId: identity?.id ?? '', paired: hasPairing, remoteEnabled: saved.current?.profile.remoteAccess?.mode === 'embedded',
+    keepLocalOnly, hydrated, screenModes, isScreenReal, setScreenMode,
+    checkHealth, setRemoteEndpoint, recover: manager.recover, revoke: manager.revoke.bind(manager), stagePairing, cancelPairing, pair, signOut,
+  }), [snapshot, identity, hasPairing, hydrated, screenModes, isScreenReal, setScreenMode, checkHealth, setRemoteEndpoint, keepLocalOnly, manager, stagePairing, cancelPairing, pair, signOut]);
   return <ServerContext.Provider value={value}>{children}</ServerContext.Provider>;
 }
-
-/**
- * Access server connection state.
- * Must be called within a `<ServerProvider>`.
- */
 export function useServer(): ServerContextValue {
-  const ctx = useContext(ServerContext);
-  if (!ctx) {
-    throw new Error('useServer must be used within a <ServerProvider>');
-  }
-  return ctx;
+  const context = useContext(ServerContext);
+  if (!context) throw new Error('useServer must be used within a ServerProvider');
+  return context;
 }

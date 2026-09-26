@@ -18,8 +18,7 @@ import { PondList } from '@/components/patterns/pond-list';
 import { useThemedStyles } from '@/hooks/use-themed-styles';
 import { useTheme } from '@/providers/theme-provider';
 import { useDiscovery } from '@/view-models/use-discovery';
-import { useOnboarding } from '@/view-models/use-onboarding';
-import { selectionTick, tap } from '@/services/haptics';
+import { selectionTick } from '@/services/haptics';
 import type { DiscoveredPond } from '@/services/discovery';
 import type { ThemeColors } from '@/constants/colors';
 import { Spacing } from '@/constants/spacing';
@@ -30,7 +29,6 @@ export default function Welcome() {
   const { isDark } = useTheme();
   const router = useRouter();
   const discovery = useDiscovery();
-  const { actions } = useOnboarding();
 
   const openPairing = useCallback(
     (url?: string) => {
@@ -39,12 +37,6 @@ export default function Welcome() {
     },
     [router],
   );
-
-  const later = useCallback(() => {
-    void tap();
-    actions.dismiss();
-    router.replace('/(tabs)');
-  }, [actions, router]);
 
   const onSelect = useCallback((pond: DiscoveredPond) => openPairing(pond.url), [openPairing]);
   const { ponds, phase } = discovery.data;
@@ -77,9 +69,6 @@ export default function Welcome() {
         <View style={styles.actions}>
           <InkButton variant="primary" block icon="plus" onPress={() => openPairing()}>
             {t('onboarding.manual')}
-          </InkButton>
-          <InkButton variant="quiet" block onPress={later}>
-            {t('onboarding.skip')}
           </InkButton>
         </View>
       </ScrollView>

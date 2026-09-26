@@ -3,8 +3,9 @@
  *
  * The app is inert without a Pond, so its reachability is the first thing on
  * the screen rather than a grey line under the fold. Everything below it is
- * something the Pond actually told us: conversations it is holding, devices it
- * can see. Surfaces are Ink's printed plate, not a shadow.
+ * something the Pond actually told us: what is playing, the next routine,
+ * conversations it is holding, devices it can see. A card with nothing true to
+ * say is not drawn. Surfaces are Ink's printed plate, not a shadow.
  */
 
 import React, { useCallback, useState } from 'react';
@@ -13,6 +14,7 @@ import {
   InkButton,
   InkCard,
   InkEmptyState,
+  InkNotice,
   InkSwitch,
   InkText,
   InkTitle,
@@ -28,15 +30,19 @@ import type { ThemeColors } from '@/constants/colors';
 
 import { GIcon } from '@/components/ui/g-icon';
 import { GPressable } from '@/components/ui/g-pressable';
+import { EqualizerBars } from '@/components/ui/equalizer-bars';
+import { RemoteAccessOffer } from '@/components/patterns/remote-access-offer';
 import { useRecentSessions } from '@/view-models/use-recent-sessions';
 import { supports, useDevices } from '@/view-models/use-devices';
-import { useProfiles } from '@/view-models/use-profiles';
+import { initialOf, useMember } from '@/view-models/use-household';
+import { untilOf, useRightNow, type NextRoutine, type NowPlaying } from '@/view-models/use-right-now';
+import { useLive } from '@/view-models/use-live';
 import { useServer } from '@/providers/server-provider';
 import { hostOf } from '@/services/discovery';
 import { deviceStyle } from '@/constants/device-style';
 import { toggle } from '@/services/haptics';
 import type { Device } from '@/services/types';
-import { Grey, JaridaPurple } from '@/constants/colors';
+import { Brand, Grey, JaridaPurple } from '@/constants/colors';
 import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
 import { Spacing } from '@/constants/spacing';
 import { Radii } from '@/constants/radii';
@@ -44,13 +50,16 @@ import { Radii } from '@/constants/radii';
 /** The home grid is a glance, not the full list — that is the Devices tab. */
 const HOME_GRID_LIMIT = 4;
 
+/** How often the greeting and the countdowns catch up with the clock. */
+const CLOCK_MS = 60_000;
+
 /** A greeting uses the name someone is called, not their full record. */
 function firstName(displayName: string | undefined): string | null {
   const first = displayName?.trim().split(/\s+/)[0];
   return first || null;
 }
 
-function greetingKey(hour = new Date().getHours()) {
+function greetingKey(hour: number) {
   if (hour < 5) return 'greeting.night' as const;
   if (hour < 12) return 'greeting.morning' as const;
   if (hour < 18) return 'greeting.afternoon' as const;
@@ -132,6 +141,72 @@ function PondCard() {
 }
 
 /**
+ * What is playing. Idle is said in words; the bars move only while something
+ * plays, because bars over silence would say music is on. They hold still
+ * under Reduce Motion and when Home is not in front.
+ */
+function NowPlayingCard({ playing }: { playing: NowPlaying }) {
+  const styles = useThemedStyles(makeStyles);
+  const { t } = useTranslation();
+
+  return (
+    <InkCard style={styles.rightNowCard}>
+      <Text style={styles.cardEyebrow}>{t('home.nowPlaying')}</Text>
+      {playing.state === 'playing' ? (
+        <>
+          <Text style={styles.cardTitle} numberOfLines={2}>
+            {playing.track}
+          </Text>
+          {playing.artist ? (
+            <Text style={styles.cardDetail} numberOfLines={1}>
+              {playing.artist}
+            </Text>
+          ) : null}
+          <View style={styles.waveformRow}>
+            <EqualizerBars color={JaridaPurple[400]} />
+          </View>
+        </>
+      ) : (
+        <Text style={styles.cardTitle}>{t('home.nothingPlaying')}</Text>
+      )}
+    </InkCard>
+  );
+}
+
+/**
+ * The soonest routine that will actually run. Labelled a routine, never an
+ * event: the data is the Pond's own schedules, not a calendar.
+ */
+function NextRoutineCard({ routine, now }: { routine: NextRoutine; now: Date }) {
+  const styles = useThemedStyles(makeStyles);
+  const { t } = useTranslation();
+  const until = untilOf(routine.nextRun, now);
+
+  return (
+    <InkCard style={styles.rightNowCard}>
+      <Text style={styles.cardEyebrow}>{t('home.nextRoutine')}</Text>
+      <Text style={styles.cardTitle} numberOfLines={2}>
+        {routine.label}
+      </Text>
+      <Text style={styles.cardDetail}>
+        {routine.nextRun.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+      </Text>
+      <View style={styles.routineBadge}>
+        <InkBadge tone="warning">
+          {until.unit === 'now'
+            ? t('home.dueNow')
+            : until.unit === 'minutes'
+              ? t('home.inMinutes', { count: until.count })
+              : until.unit === 'hours'
+                ? t('home.inHours', { count: until.count })
+                : t('home.inDays', { count: until.count })}
+        </InkBadge>
+      </View>
+    </InkCard>
+  );
+}
+
+/**
  * A device on the home grid. Same rules as the Devices tab: the switch appears
  * only where `capabilities` says the device accepts one, and its position comes
  * from what the device reported rather than from a default.
@@ -189,12 +264,22 @@ export default function HomeScreen() {
   const offline = hydrated && !online;
   const recent = useRecentSessions();
   const devices = useDevices();
-  const profiles = useProfiles();
+  // The member the Pond attributes this phone to. No name when nobody has
+  // claimed it — the first household profile is not necessarily whoever holds
+  // this phone.
+  const member = useMember();
+  const rightNow = useRightNow().data;
   const router = useRouter();
   const chrome = useChromeScroll();
   const bottomInset = useBottomBarInset();
 
-  const me = profiles.data.profiles[0];
+  // The clock is state, advanced once a minute while Home is in front, so render stays pure and
+  // the greeting and "in 23 h" move with the time instead of freezing at the moment Home mounted.
+  const [now, setNow] = useState(() => new Date());
+  useLive(async () => setNow(new Date()), CLOCK_MS);
+
+  const initial = member ? initialOf(member.displayName) : null;
+  const { nowPlaying, nextRoutine } = rightNow;
 
   const handleDeviceToggle = useCallback(
     (device: Device, on: boolean) => void devices.actions.setState(device, { power: on }),
@@ -202,6 +287,12 @@ export default function HomeScreen() {
   );
 
   const shown = devices.data.devices.slice(0, HOME_GRID_LIMIT);
+
+  // Only badges with a source. The online count is the list the grid below
+  // shows, so the two cannot disagree, and it is not shown while that list is
+  // unknown.
+  const showOnlineCount = !devices.loading && !devices.error;
+  const showOutdoor = rightNow.outdoorTemp !== null;
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -212,25 +303,61 @@ export default function HomeScreen() {
       >
         <View style={styles.greetingRow}>
           <View style={styles.greetingText}>
-            <Text style={styles.greetingLabel}>{t(greetingKey())}</Text>
-            <InkTitle level={1}>{firstName(me?.display_name) ?? t('home.you')}</InkTitle>
+            <Text style={styles.greetingLabel}>{t(greetingKey(now.getHours()))}</Text>
+            <InkTitle level={1}>{firstName(member?.displayName) ?? t('home.you')}</InkTitle>
           </View>
           <GPressable feedback="lift"
             style={styles.avatar}
             onPress={() => router.push('/(tabs)/profile')}
             accessibilityRole="button"
-            accessibilityLabel={t('screens.addUsers')}
+            accessibilityLabel={t('tabs.you')}
           >
-            <Text style={styles.avatarText}>
-              {me?.avatar_emoji || me?.display_name.charAt(0).toUpperCase() || '—'}
-            </Text>
+            {initial ? (
+              <Text style={styles.avatarText}>{initial}</Text>
+            ) : (
+              <GIcon name="home" size={18} color={Brand.white} />
+            )}
           </GPressable>
         </View>
 
+        {!offline && (showOnlineCount || showOutdoor) ? (
+          <View style={styles.badges}>
+            {showOnlineCount ? (
+              <InkBadge tone="success">
+                {t('home.chipOnline', { count: devices.data.onlineCount })}
+              </InkBadge>
+            ) : null}
+            {showOutdoor ? (
+              <InkBadge tone="info">
+                {t('home.chipOutdoorTemp', { temp: rightNow.outdoorTemp })}
+              </InkBadge>
+            ) : null}
+          </View>
+        ) : null}
+
         <PondCard />
+
+        {/* Offered once per pairing, and declinable. It draws nothing unless
+            the Pond is reachable and remote access is off, so it sits under the
+            card that says the Pond is reachable. */}
+        <RemoteAccessOffer />
 
         {offline ? null : (
           <>
+        {/* A card with nothing true to say is not drawn, and a row with no
+            cards has no heading. */}
+        {nowPlaying || nextRoutine ? (
+          <>
+            <InkTitle level={3} style={styles.section}>
+              {t('home.rightNowTitle')}
+            </InkTitle>
+            <View style={styles.rightNowRow}>
+              {nowPlaying ? <NowPlayingCard playing={nowPlaying} /> : null}
+              {nextRoutine ? <NextRoutineCard routine={nextRoutine} now={now} /> : null}
+            </View>
+          </>
+        ) : null}
+
         <InkTitle level={3} style={styles.section}>
           {t('home.conversations')}
         </InkTitle>
@@ -252,10 +379,16 @@ export default function HomeScreen() {
             <Text style={styles.convoTime}>{c.time}</Text>
           </GPressable>
         ))}
+        {/* Say why the strip is empty: a read that failed is not "no
+            conversations yet". */}
         {!recent.loading && recent.data.sessions.length === 0 ? (
-          <InkEmptyState icon="chat" title={t('home.noConversations')}>
-            <InkText>{t('home.noConversationsBody')}</InkText>
-          </InkEmptyState>
+          recent.error ? (
+            <InkNotice tone="danger">{recent.error}</InkNotice>
+          ) : (
+            <InkEmptyState icon="chat" title={t('home.noConversations')}>
+              <InkText>{t('home.noConversationsBody')}</InkText>
+            </InkEmptyState>
+          )
         ) : null}
 
         <View style={styles.sectionHeader}>
@@ -277,22 +410,27 @@ export default function HomeScreen() {
           </View>
         ) : null}
         {/* An empty grid used to render as a blank gap, which reads as a broken
-            screen rather than as an absence. */}
+            screen rather than as an absence. A list that failed to load is
+            neither, and says so. */}
         {!devices.loading && shown.length === 0 ? (
-          <InkEmptyState
-            icon="device"
-            title={t('home.noDevices')}
-            action={
-              <InkButton
-                variant="primary"
-                onPress={() => router.push('/(stack)/commission-device')}
-              >
-                Add a device
-              </InkButton>
-            }
-          >
-            <InkText>{t('home.noDevicesBody')}</InkText>
-          </InkEmptyState>
+          devices.error ? (
+            <InkNotice tone="danger">{devices.error}</InkNotice>
+          ) : (
+            <InkEmptyState
+              icon="device"
+              title={t('home.noDevices')}
+              action={
+                <InkButton
+                  variant="primary"
+                  onPress={() => router.push('/(stack)/commission-device')}
+                >
+                  {t('home.addDevice')}
+                </InkButton>
+              }
+            >
+              <InkText>{t('home.noDevicesBody')}</InkText>
+            </InkEmptyState>
+          )
         ) : null}
           </>
         )}
@@ -320,12 +458,6 @@ const makeStyles = (c: ThemeColors) =>
     fontSize: FontSize.base,
     color: c.textTertiary,
   },
-  greetingName: {
-    fontFamily: FontFamily.heading,
-    fontSize: FontSize['3xl'],
-    fontWeight: FontWeight.bold,
-    color: c.text,
-  },
   avatar: {
     width: 44,
     height: 44,
@@ -338,7 +470,14 @@ const makeStyles = (c: ThemeColors) =>
     fontFamily: FontFamily.heading,
     fontSize: FontSize.lg,
     fontWeight: FontWeight.bold,
-    color: '#FFFFFF',
+    color: Brand.white,
+  },
+
+  badges: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.sm,
+    marginBottom: Spacing.md,
   },
 
   /* The plate sits 4px below the face, so every card reserves room for it. */
@@ -370,6 +509,34 @@ const makeStyles = (c: ThemeColors) =>
     fontWeight: FontWeight.semibold,
     color: JaridaPurple[600],
   },
+
+  /* Right now. InkCard draws its own face and plate; its style is layout only. */
+  rightNowRow: {
+    flexDirection: 'row',
+    gap: Spacing.md,
+    marginBottom: Spacing.lg,
+  },
+  rightNowCard: { flex: 1 },
+  cardEyebrow: {
+    fontFamily: FontFamily.body,
+    fontSize: FontSize.xs,
+    color: c.textTertiary,
+    marginBottom: Spacing.xs,
+  },
+  cardTitle: {
+    fontFamily: FontFamily.heading,
+    fontSize: FontSize.md,
+    fontWeight: FontWeight.bold,
+    color: c.text,
+  },
+  cardDetail: {
+    fontFamily: FontFamily.body,
+    fontSize: FontSize.sm,
+    color: c.textSecondary,
+    marginTop: 2,
+  },
+  waveformRow: { marginTop: Spacing.md },
+  routineBadge: { alignSelf: 'flex-start', marginTop: Spacing.md },
 
   convoRow: {
     flexDirection: 'row',

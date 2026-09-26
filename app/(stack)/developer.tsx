@@ -10,9 +10,9 @@
 import { useTranslation } from 'react-i18next';
 import React, { useCallback, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
-import { Redirect } from 'expo-router';
+import { Redirect, useRouter } from 'expo-router';
 
-import { InkInput, InkSwitch, InkNotice } from '@jarida/ink/native';
+import { InkSwitch, InkNotice } from '@jarida/ink/native';
 
 import { GIcon } from '@/components/ui/g-icon';
 import { GPressable } from '@/components/ui/g-pressable';
@@ -25,13 +25,14 @@ import { Radii } from '@/constants/radii';
 import { Shadows } from '@/constants/shadows';
 import { useThemedStyles } from '@/hooks/use-themed-styles';
 import type { ThemeColors } from '@/constants/colors';
+import type { TranslationKey } from '@/services/i18n';
 
-const SCREEN_LABELS: Record<MigrationScreen, string> = {
-  chat: 'Chat',
-  memory: 'Memories',
-  integrations: 'App Integrations & MCP Servers',
-  schedule: 'Schedule',
-  logs: 'Activity Logs',
+const SCREEN_LABELS: Record<MigrationScreen, TranslationKey> = {
+  chat: 'dev.screens.chat',
+  memory: 'dev.screens.memory',
+  integrations: 'dev.screens.integrations',
+  schedule: 'dev.screens.schedule',
+  logs: 'dev.screens.logs',
 };
 
 export default function DeveloperScreen() {
@@ -49,37 +50,25 @@ export default function DeveloperScreen() {
 function DeveloperScreenContent() {
   const styles = useThemedStyles(makeStyles);
   const { t } = useTranslation();
-  const { serverUrl, setServerUrl, online, checkHealth, isScreenReal, setScreenMode } = useServer();
-  const [urlDraft, setUrlDraft] = useState(serverUrl);
+  const router = useRouter();
+  const { serverUrl, online, checkHealth, isScreenReal, setScreenMode } = useServer();
   const [checking, setChecking] = useState(false);
 
+  // The address is whatever pairing stored; it is changed by pairing again,
+  // not typed here. The probe re-selects an endpoint and reports the result.
   const handleTestConnection = useCallback(async () => {
-    // Mirrors the trailing-slash cleanup setServerUrl applies internally, so
-    // this comparison (and the draft resync below) line up with what actually
-    // ends up in `serverUrl` instead of drifting after the first change.
-    const clean = urlDraft.replace(/\/+$/, '');
     setChecking(true);
-    // setServerUrl already performs and awaits its own health check when the
-    // URL actually changes; only fire a separate one to retest the same URL.
-    if (clean !== serverUrl) {
-      setServerUrl(clean);
-      setUrlDraft(clean);
-    }
-    // `setServerUrl` here only records the address; the probe is always ours.
-    await checkHealth();
-    setChecking(false);
-  }, [urlDraft, serverUrl, setServerUrl, checkHealth]);
+    try { await checkHealth(); } finally { setChecking(false); }
+  }, [checkHealth]);
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <Text style={styles.sectionTitle}>{t('dev.connection')}</Text>
       <View style={styles.card}>
-        <InkInput
-          label="Pond server URL"
-          value={urlDraft}
-          onChange={setUrlDraft}
-          placeholder={t('dev.addressPlaceholder')}
-        />
+        <Text style={styles.screenLabel}>{serverUrl || t('connection.unpaired')}</Text>
+        <GPressable onPress={() => router.push('/(stack)/pond-pairing')} hitSlop={8}>
+          <Text style={styles.changeLink}>{t('connection.changePond')}</Text>
+        </GPressable>
         <View style={styles.connectionRow}>
           <ServerStatus online={online} />
           <GPressable
@@ -90,17 +79,14 @@ function DeveloperScreenContent() {
           >
             <GIcon name="refresh" size={14} color={Brand.white} />
             <Text style={styles.testButtonText}>
-              {checking ? 'Checking\u2026' : 'Test connection'}
+              {checking ? t('developer.checking') : t('developer.testConnection')}
             </Text>
           </GPressable>
         </View>
       </View>
 
       <Text style={styles.sectionTitle}>{t('dev.screenMode')}</Text>
-      <Text style={styles.sectionHint}>
-        Flip a screen to “Real” once its backend wiring lands (#9–#15). Mock and real
-        code paths coexist — nothing needs to be deleted to test either one.
-      </Text>
+      <Text style={styles.sectionHint}>{t('developer.backendHint')}</Text>
       <View style={styles.card}>
         {MIGRATION_SCREENS.map((screen, i) => (
           <View
@@ -108,9 +94,9 @@ function DeveloperScreenContent() {
             style={[styles.screenRow, i < MIGRATION_SCREENS.length - 1 && styles.screenRowDivider]}
           >
             <View style={styles.screenRowLeft}>
-              <Text style={styles.screenLabel}>{SCREEN_LABELS[screen]}</Text>
+              <Text style={styles.screenLabel}>{t(SCREEN_LABELS[screen])}</Text>
               <Text style={styles.screenModeText}>
-                {isScreenReal(screen) ? 'Real backend' : 'Mock data'}
+                {isScreenReal(screen) ? t('developer.realBackend') : t('developer.mockData')}
               </Text>
             </View>
             <InkSwitch
@@ -122,9 +108,7 @@ function DeveloperScreenContent() {
       </View>
 
       <View style={styles.notice}>
-        <InkNotice tone="warning">
-          This screen is dev-only. It is not linked from the You tab in production builds.
-        </InkNotice>
+        <InkNotice tone="warning">{t('dev.devOnly')}</InkNotice>
       </View>
     </ScrollView>
   );
@@ -149,6 +133,13 @@ const makeStyles = (c: ThemeColors) =>
       color: c.textTertiary,
       marginBottom: Spacing.md,
       marginTop: -Spacing.xs,
+      lineHeight: FontSize.sm * 1.5,
+    },
+    changeLink: {
+      fontFamily: FontFamily.body,
+      fontSize: FontSize.sm,
+      color: c.textBrand,
+      marginTop: Spacing.xs,
       lineHeight: FontSize.sm * 1.5,
     },
 

@@ -2,14 +2,16 @@
  * ProfileHub — the "You" tab: who this Pond knows you as, and everything that
  * configures it.
  *
- * The identity shown here is the first household profile the Pond returns, not
+ * The identity shown here is the member the Pond attributes this phone to, not
  * an account. There is no login and no email field anywhere in GIAP, so the
- * card reports the profile and the Pond it came from rather than inventing a
- * user.
+ * card reports that member and the Pond it came from rather than inventing a
+ * user — and each figure under it is one read, shown as a dash when that read
+ * failed rather than as a zero nobody counted.
  */
 
-import React, { useCallback } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
+  Alert,
   View,
   Text,
   StyleSheet,
@@ -35,17 +37,15 @@ import {
 import { GIcon } from '@/components/ui/g-icon';
 import { GPressable } from '@/components/ui/g-pressable';
 import { PROFILE_NAV, type NavItem } from '@/constants/navigation';
-import { useDevices } from '@/view-models/use-devices';
-import { useProfiles } from '@/view-models/use-profiles';
+import { initialOf, useHousehold } from '@/view-models/use-household';
 import { useServer } from '@/providers/server-provider';
 import { hostOf } from '@/services/discovery';
 import { APP_VERSION } from '@/constants/app';
 import { selectionTick, caution } from '@/services/haptics';
-import { Grey, JaridaPurple, Brand, Semantic } from '@/constants/colors';
+import { Grey, JaridaPurple, Brand } from '@/constants/colors';
 import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
 import { Spacing } from '@/constants/spacing';
 import { Radii } from '@/constants/radii';
-import { Shadows } from '@/constants/shadows';
 
 const NavRow = React.memo(function NavRow({
   item,
@@ -83,13 +83,22 @@ export default function ProfileHub() {
   const styles = useThemedStyles(makeStyles);
   const { t } = useTranslation();
   const router = useRouter();
-  const devices = useDevices();
-  const profiles = useProfiles();
+  const { data: household } = useHousehold();
   const { signOut, serverUrl } = useServer();
+  const [signingOut, setSigningOut] = useState(false);
   const chrome = useChromeScroll();
   const bottomInset = useBottomBarInset();
 
-  const me = profiles.data.profiles[0];
+  // Only what the Pond said. The name is the member it attributes this phone to -- there is no
+  // account, and so no email.
+  const { member, pondName, counts } = household;
+  const initial = member ? initialOf(member.displayName) : null;
+  const stats = [
+    { key: 'devices', label: t('profile.statDevices'), value: counts.devices },
+    { key: 'rooms', label: t('profile.statRooms'), value: counts.rooms },
+    { key: 'routines', label: t('profile.statRoutines'), value: counts.routines },
+    { key: 'users', label: t('profile.statUsers'), value: counts.users },
+  ];
 
   const handleNav = useCallback(
     (route: string) => {
@@ -98,10 +107,35 @@ export default function ProfileHub() {
     },
     [router],
   );
-  const handleSignOut = useCallback(() => {
+
+  /**
+   * Signing out is not undoable from the phone: it revokes this device's
+   * session on the Pond and releases its remote enrollment, so coming back
+   * means pairing at home again. Worth one question first.
+   */
+  const confirmSignOut = useCallback(() => {
     void caution();
-    void signOut();
-  }, [signOut]);
+    Alert.alert(
+      t('common.signOut'),
+      t('profile.signOutWarning'),
+      [
+        { text: t('common.cancel'), style: 'cancel' },
+        {
+          text: t('common.signOut'),
+          style: 'destructive',
+          onPress: () => {
+            setSigningOut(true);
+            // The provider clears stored credentials and reconfigures the
+            // connection, which leaves no stored pairing -- and the tab
+            // layout's gate takes the app to pairing from there.
+            void signOut()
+              .catch(() => Alert.alert(t('common.signOut'), t('profile.signOutFailed')))
+              .finally(() => setSigningOut(false));
+          },
+        },
+      ],
+    );
+  }, [signOut, t]);
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -113,29 +147,27 @@ export default function ProfileHub() {
         <InkCard style={styles.profileCard}>
           <View style={styles.profileContent}>
             <View style={styles.avatarLarge}>
-              <Text style={styles.avatarLargeText}>
-                {me?.avatar_emoji || me?.display_name.charAt(0).toUpperCase() || '\u2014'}
-              </Text>
+              {initial ? (
+                <Text style={styles.avatarLargeText}>{initial}</Text>
+              ) : (
+                <GIcon name="home" size={28} color={Brand.white} />
+              )}
             </View>
-            <InkTitle level={2}>{me?.display_name ?? t('profile.noProfile')}</InkTitle>
-            <InkText>
-              {serverUrl ? hostOf(serverUrl) : t('profile.notPaired')}
-            </InkText>
+            <InkTitle level={2}>{member?.displayName ?? pondName ?? t('profile.yourPond')}</InkTitle>
+            {member && pondName ? (
+              <InkText>{t('profile.pairedTo', { pond: pondName })}</InkText>
+            ) : serverUrl ? (
+              <InkText>{hostOf(serverUrl)}</InkText>
+            ) : null}
           </View>
 
           <View style={styles.statsRow}>
-            <View style={styles.statItem}>
-              <Text style={styles.statValue}>{devices.data.devices.length}</Text>
-              <Text style={styles.statLabel}>{t('profile.devices')}</Text>
-            </View>
-            <View style={styles.statItem}>
-              <Text style={styles.statValue}>{devices.data.rooms.length}</Text>
-              <Text style={styles.statLabel}>{t('profile.rooms')}</Text>
-            </View>
-            <View style={styles.statItem}>
-              <Text style={styles.statValue}>{profiles.data.profiles.length}</Text>
-              <Text style={styles.statLabel}>{t('profile.people')}</Text>
-            </View>
+            {stats.map((stat) => (
+              <View key={stat.key} style={styles.statItem}>
+                <Text style={styles.statValue}>{stat.value ?? '—'}</Text>
+                <Text style={styles.statLabel}>{stat.label}</Text>
+              </View>
+            ))}
           </View>
         </InkCard>
 
@@ -147,8 +179,16 @@ export default function ProfileHub() {
           </InkGroup>
         ))}
 
-        <InkButton variant="danger" onPress={handleSignOut} style={styles.signOut}>
-          {t('common.signOut')}
+        {/* Signing out is also the only way to release a remote enrollment the
+            Pond still calls active, so it has to work — and say that it is
+            working, rather than take a second press for a second sign-out. */}
+        <InkButton
+          variant="danger"
+          disabled={signingOut}
+          onPress={confirmSignOut}
+          style={styles.signOut}
+        >
+          {signingOut ? t('profile.signingOut') : t('common.signOut')}
         </InkButton>
         <Text style={styles.versionText}>{t('profile.version', { version: APP_VERSION })}</Text>
       </ScrollView>
@@ -164,20 +204,11 @@ const makeStyles = (c: ThemeColors) =>
   safe: { flex: 1, backgroundColor: c.background },
   listContent: { paddingHorizontal: Spacing.lg },
 
-  /* Profile card */
+  /* Profile card. InkCard draws its own face and plate, so its style carries
+     layout only: a background, border or radius here paints a second card. */
   profileCard: {
-    backgroundColor: c.card,
-    borderRadius: Radii.xl,
-    overflow: 'hidden',
     marginTop: Spacing.lg,
     marginBottom: Spacing.xl,
-    borderWidth: 1,
-    borderColor: c.border,
-    ...Shadows.md,
-  },
-  charcoalBand: {
-    height: 80,
-    backgroundColor: Brand.charcoal,
   },
   profileContent: {
     alignItems: 'center',
@@ -198,32 +229,6 @@ const makeStyles = (c: ThemeColors) =>
     fontSize: FontSize['2xl'],
     fontWeight: FontWeight.bold,
     color: Brand.white,
-  },
-  profileName: {
-    fontFamily: FontFamily.heading,
-    fontSize: FontSize.lg,
-    fontWeight: FontWeight.bold,
-    color: c.text,
-    marginTop: Spacing.sm,
-  },
-  profileEmail: {
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.sm,
-    color: c.textTertiary,
-    marginTop: 2,
-  },
-  proBadge: {
-    backgroundColor: c.tintSoft,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: 4,
-    borderRadius: Radii.pill,
-    marginTop: Spacing.sm,
-  },
-  proBadgeText: {
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.xs,
-    fontWeight: FontWeight.bold,
-    color: JaridaPurple[600],
   },
 
   /* Stats row */
@@ -252,26 +257,7 @@ const makeStyles = (c: ThemeColors) =>
     marginTop: 2,
   },
 
-  /* Section headers */
-
   /* Nav rows */
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: Spacing.md,
-    paddingHorizontal: Spacing.md,
-    marginBottom: 1,
-    backgroundColor: c.card,
-    borderRadius: Radii.md,
-    borderWidth: 1,
-    borderColor: c.border,
-    marginTop: Spacing.xs,
-  },
-  rowPressed: {
-    backgroundColor: c.tintSoft,
-    borderColor: JaridaPurple[200],
-  },
   rowLeft: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -284,24 +270,6 @@ const makeStyles = (c: ThemeColors) =>
     color: c.text,
   },
 
-  /* Footer */
-  footerSection: {
-    alignItems: 'center',
-    marginTop: Spacing['3xl'],
-  },
-  signOutBtn: {
-    paddingVertical: Spacing.md,
-    paddingHorizontal: Spacing['3xl'],
-    borderRadius: Radii.md,
-    borderWidth: 1,
-    borderColor: Semantic.danger,
-  },
-  signOutText: {
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.base,
-    fontWeight: FontWeight.semibold,
-    color: Semantic.danger,
-  },
   versionText: {
     fontFamily: FontFamily.body,
     fontSize: FontSize.xs,

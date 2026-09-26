@@ -29,10 +29,23 @@ import {
 
 import { formatContextWindow, formatSize, useModels } from '@/view-models/use-models';
 import { selectionTick, confirm } from '@/services/haptics';
-import type { ModelEntry } from '@/services/types';
+import type { ModelCategory, ModelEntry } from '@/services/types';
+import type { TranslationKey } from '@/services/i18n';
 import { Spacing } from '@/constants/spacing';
 import { useThemedStyles } from '@/hooks/use-themed-styles';
 import type { ThemeColors } from '@/constants/colors';
+
+/** One literal key per category, so the key-completeness test can see every one. */
+function categoryKey(category: ModelCategory): TranslationKey {
+  switch (category) {
+    case 'gguf': return 'models.category.gguf';
+    case 'ollama': return 'models.category.ollama';
+    case 'llamafile': return 'models.category.llamafile';
+    case 'whisper': return 'models.category.whisper';
+    case 'tts': return 'models.category.tts';
+    case 'embedding': return 'models.category.embedding';
+  }
+}
 
 /** One reported fact about a model. Rendered only when the server sent it. */
 function Fact({ label, value }: { label: string; value: string | null }) {
@@ -122,7 +135,7 @@ export default function ModelsScreen() {
       {data.active.length > 0 ? (
         <InkGroup title={t('models.serving')} style={styles.serving}>
           {data.active.map((m, i) => (
-            <InkRow key={m.id} divided={i > 0} label={t(`models.category.${m.category}` as const)}>
+            <InkRow key={m.id} divided={i > 0} label={t(categoryKey(m.category))}>
               <InkText>{m.name}</InkText>
             </InkRow>
           ))}
@@ -153,7 +166,7 @@ export default function ModelsScreen() {
 
       {data.groups.map((group) => (
         <View key={group.category} style={styles.group}>
-          <InkTitle level={3}>{t(`models.category.${group.category}` as const)}</InkTitle>
+          <InkTitle level={3}>{t(categoryKey(group.category))}</InkTitle>
           {group.models.map((m) => (
             <ModelCard key={m.id} model={m} onSelect={actions.activate} />
           ))}

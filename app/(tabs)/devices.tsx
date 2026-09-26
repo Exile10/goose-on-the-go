@@ -34,7 +34,7 @@ import { useBottomBarInset, useChromeScroll } from '@/providers/chrome-provider'
 import { useThemedStyles } from '@/hooks/use-themed-styles';
 import { selectionTick, toggle } from '@/services/haptics';
 import { deviceStyle } from '@/constants/device-style';
-import { ALL_ROOMS, supports, useDevices } from '@/view-models/use-devices';
+import { ALL_ROOMS, roomLabel, supports, useDevices } from '@/view-models/use-devices';
 import type { Device } from '@/services/types';
 import { Grey } from '@/constants/colors';
 import type { ThemeColors } from '@/constants/colors';
@@ -146,7 +146,9 @@ export default function DevicesTab() {
       </View>
 
       {/* Room tabs, derived from the rooms devices are actually in. The
-          view-model returns none when there is only one room to show. */}
+          view-model returns none when there is only one room to show. A tab
+          is a room id, not a name: "All" and "Unassigned" are ids, and
+          `roomLabel` is what turns any of them into words. */}
       {data.roomTabs.length > 0 ? (
         <ScrollView
           horizontal
@@ -162,7 +164,7 @@ export default function DevicesTab() {
               selected={activeRoom === tab}
               onSelect={() => pickRoom(tab)}
             >
-              {tab === ALL_ROOMS ? t('devices.allRooms') : tab}
+              {roomLabel(tab)}
             </InkChoice>
           ))}
         </ScrollView>
@@ -198,7 +200,9 @@ export default function DevicesTab() {
           </View>
         ) : null}
 
-        {!loading && total === 0 ? (
+        {/* A list that failed to load is unknown, not empty: the notice above
+            says so, and "No devices yet" would be a claim nobody made. */}
+        {!loading && !error && total === 0 ? (
           <InkEmptyState
             icon="device"
             title={t('devices.noneTitle')}
@@ -218,7 +222,7 @@ export default function DevicesTab() {
         {visibleRooms.map((room) => (
           <View key={room.name} style={styles.roomSection}>
             {/* One room needs no heading — the screen is already that room. */}
-            {data.rooms.length > 1 ? <InkTitle level={3}>{room.name}</InkTitle> : null}
+            {data.rooms.length > 1 ? <InkTitle level={3}>{roomLabel(room.name)}</InkTitle> : null}
             <View style={styles.grid}>
               {room.devices.map((d) => (
                 <DeviceCard

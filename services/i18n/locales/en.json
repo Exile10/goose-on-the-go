@@ -23,7 +23,8 @@
     "home": "Home",
     "chat": "Chat",
     "devices": "Devices",
-    "you": "You"
+    "you": "You",
+    "navigation": "Main navigation"
   },
   "greeting": {
     "night": "Good night,",
@@ -52,7 +53,25 @@
     "noDevices": "No devices yet",
     "noDevicesBody": "Devices your Pond can see will appear here.",
     "addDevice": "Add a device",
-    "you": "there"
+    "you": "there",
+    "greetingMorning": "Good morning",
+    "greetingAfternoon": "Good afternoon",
+    "greetingEvening": "Good evening",
+    "chipOnline": "{{count}} online",
+    "chipOutdoorTemp": "{{temp}}°C outside",
+    "nothingPlaying": "Nothing playing",
+    "askPlaceholder": "Ask Goose anything…",
+    "rightNow": "RIGHT NOW",
+    "nowPlaying": "Now Playing",
+    "nextRoutine": "Next routine",
+    "dueNow": "Due now",
+    "inMinutes": "In {{count}} min",
+    "inHours": "In {{count}} h",
+    "inDays": "In {{count}} d",
+    "shortcuts": "SHORTCUTS",
+    "seeAll": "See all",
+    "recentConversations": "RECENT CONVERSATIONS",
+    "rightNowTitle": "Right now"
   },
   "chat": {
     "connecting": "Connecting",
@@ -148,8 +167,8 @@
       "removeAttachment": "Remove {{name}}",
       "needsUpdate": "This needs the newest build of the app. Update it to attach pictures and files.",
       "unreadable": "That picture could not be read.",
-    "fileUnreadable": "That file could not be read.",
-    "pickerFailed": "That picker would not open. If it keeps happening, close the app and open it again.",
+      "fileUnreadable": "That file could not be read.",
+      "pickerFailed": "That picker would not open. If it keeps happening, close the app and open it again.",
       "tooLarge": "That picture is too large for your Pond, even made smaller.",
       "turnTooLarge": "Those pictures are more than 8 MB together, which is your Pond's limit for one message. Send fewer at once.",
       "textTooLarge": "That file is too long to send. Text files can be up to 64 KB.",
@@ -300,7 +319,17 @@
         "1": "Answered on your Pond, on your own hardware.",
         "2": "No cloud account, and no telemetry you did not switch on."
       }
-    }
+    },
+    "suggestLights": "Turn off all lights",
+    "suggestWeather": "What’s the weather?",
+    "suggestMusic": "Play some music",
+    "suggestLock": "Lock the front door",
+    "connected": "Connected",
+    "messagePlaceholder": "Message Goose…",
+    "poweredBy": "Powered by Goose 2",
+    "returnToSend": "Return to send",
+    "you": "You",
+    "pond": "Pond"
   },
   "devices": {
     "title": "Devices",
@@ -323,7 +352,20 @@
     "noneTitle": "No devices yet",
     "online_one": "{{count}} reachable",
     "online_other": "{{count}} reachable",
-    "online_zero": "none reachable"
+    "online_zero": "none reachable",
+    "roomUnassigned": "Unassigned",
+    "roomAll": "All",
+    "countOne": "1 device",
+    "countMany": "{{count}} devices",
+    "refresh": "Refresh",
+    "matterStartingRetry": "Your Pond is still starting its Matter controller. Wait a moment and try again.",
+    "matterRefused": "Your Pond could not reach its Matter controller, or the device refused to pair. Power-cycle the device and try again — a device only accepts pairing for about 15 minutes after it starts up.",
+    "setupCodeRejected": "That setup code was not accepted. Check the code on the device or its packaging.",
+    "empty": "No devices registered yet. Commission one to get started.",
+    "stateOffline": "Offline",
+    "stateOnline": "Online",
+    "stateOn": "On",
+    "stateOff": "Off"
   },
   "onboarding": {
     "welcomeTitle": "Goose On The Go",
@@ -367,7 +409,9 @@
     "pondPairing": "Pair a Pond",
     "developer": "Developer",
     "commissionDevice": "Add a device",
-    "switchPond": "Switch Pond"
+    "switchPond": "Switch Pond",
+    "sessions": "Conversations",
+    "remoteAccess": "Remote access"
   },
   "nav": {
     "goose": "Goose",
@@ -376,7 +420,27 @@
     "household": "Household",
     "privacy": "Data and privacy",
     "developer": "Developer",
-    "developerMode": "Developer mode"
+    "developerMode": "Developer mode",
+    "models": "AI Models",
+    "memories": "Memories",
+    "sessions": "Sessions",
+    "logs": "Activity Logs",
+    "schedule": "Schedule",
+    "appManagement": "App Integrations",
+    "mcpServers": "MCP Servers",
+    "addUsers": "Users",
+    "homeManagement": "Home Management",
+    "remoteAccess": "Remote Access",
+    "groupGoose": "GOOSE",
+    "groupIntegrations": "INTEGRATIONS",
+    "groupHousehold": "HOUSEHOLD",
+    "groupPrivacy": "DATA & PRIVACY",
+    "groupDeveloper": "DEVELOPER",
+    "shortcutMorning": "Morning",
+    "shortcutHome": "Home",
+    "shortcutNight": "Night",
+    "shortcutMusic": "Music",
+    "shortcutPackages": "Packages"
   },
   "profile": {
     "noProfile": "No profile yet",
@@ -385,7 +449,18 @@
     "devices": "Devices",
     "rooms": "Rooms",
     "people": "People",
-    "version": "Goose On The Go {{version}}"
+    "version": "Goose On The Go {{version}}",
+    "signOut": "Sign Out",
+    "signingOut": "Signing out...",
+    "cancel": "Cancel",
+    "signOutWarning": "This releases this phone’s access to your Pond, including its remote access. You will need to pair again at home to come back.",
+    "signOutFailed": "Could not sign out. Your Pond may be unreachable — try again when you are on its network.",
+    "yourPond": "Your Pond",
+    "pairedTo": "Paired to {{pond}}",
+    "statDevices": "Devices",
+    "statRooms": "Rooms",
+    "statRoutines": "Routines",
+    "statUsers": "Users"
   },
   "models": {
     "serving": "Serving now",
@@ -407,7 +482,15 @@
       "whisper": "Speech to text",
       "tts": "Text to speech",
       "embedding": "Embeddings"
-    }
+    },
+    "onPond": "On your Pond",
+    "cloud": "Cloud",
+    "quantisation": "Quantisation",
+    "ramNeeded": "{{size}} needed",
+    "contextWindow": "Context Window",
+    "notReported": "Not reported",
+    "available": "AVAILABLE MODELS",
+    "tryAgain": "Try again"
   },
   "sections": {
     "backupSettings": "How backups run",
@@ -460,12 +543,76 @@
     "noAnswer": "No Pond answered at {{address}}. Check the address, and that the phone is on the same network.",
     "codeBody": "Your Pond shows a six-digit code on its dashboard, or in the terminal when it starts. It expires after ten minutes.",
     "nameBody": "This is the name your Pond lists this phone under. Pick something you will recognise.",
-    "pairingBody": "Checking the code and exchanging keys with your Pond."
+    "pairingBody": "Checking the code and exchanging keys with your Pond.",
+    "stepComplete": "Complete",
+    "lan": "Connect to the same home network as your Pond to pair.",
+    "invalid": "Scan a current HTTPS pairing QR code from your Pond.",
+    "fingerprint": "Pond public-key fingerprint",
+    "fingerprintHint": "Your Pond shows this on its dashboard, under Pairing.",
+    "fingerprintSearching": "Looking for your Pond...",
+    "fingerprintConfirmTitle": "Is this your Pond?",
+    "fingerprintConfirmDesc": "Open Pairing on your Pond’s dashboard. Its fingerprint should begin with:",
+    "fingerprintConfirmWhy": "Anything on this network can answer to your Pond’s name. Only your Pond shows this fingerprint.",
+    "fingerprintMatches": "It matches",
+    "fingerprintDiffers": "It doesn’t match",
+    "fingerprintMismatch": "Then something else answered for your Pond. Type the fingerprint your Pond shows instead.",
+    "fingerprintMissing": "This Pond did not publish its fingerprint on your network, so it has to be entered by hand this once.",
+    "saving": "Could not save this pairing. Your previous Pond is still selected.",
+    "address": "HTTPS Pond address",
+    "code": "Pairing code",
+    "scanInstead": "Scan QR code instead",
+    "enterManually": "Enter address manually",
+    "searchingTitle": "Looking for your Pond",
+    "searchingDesc": "Searching this Wi-Fi network.",
+    "noneFound": "No Pond answered on this network. Check that it is running and that this phone is on the same Wi-Fi, or enter its address below.",
+    "searchFailed": "{{error}} You can still enter the address by hand.",
+    "searchAgain": "Search again",
+    "connectTitle": "Connect to GIAP",
+    "connectDesc": "Enter the URL of your Goose In A Pond server — shown in the dashboard banner on the host machine.",
+    "serverUrl": "Server URL",
+    "continueAction": "Continue",
+    "codeDesc": "The 6-digit code is shown on the GIAP host's dashboard or terminal when the server starts. It expires after 10 minutes.",
+    "nameDesc": "This name shows up in the GIAP devices list — pick something you'll recognize.",
+    "pairDevice": "Pair Device",
+    "inProgress": "Pairing…",
+    "inProgressDesc": "Verifying the code and exchanging tokens with your GIAP server.",
+    "failedTitle": "Pairing failed",
+    "failedDesc": "The server rejected the pairing attempt. Double-check the code and try again.",
+    "tryAgain": "Try again",
+    "cameraTitle": "Camera access needed",
+    "cameraDesc": "Scanning the pairing code needs the camera. You can also enter the six digits by hand instead.",
+    "enableCamera": "Enable Camera",
+    "openSettings": "Open Settings",
+    "typeInstead": "Enter the code instead",
+    "closeScanner": "Close scanner",
+    "codeRejected": "Could not use that code",
+    "scanAgain": "Scan again",
+    "codeUnreadable": "Could not read that code. Try again.",
+    "holdSteady": "Hold steady…",
+    "aimAtPond": "Point the camera at the QR code on your Pond's dashboard"
   },
   "privacy": {
     "policy": "Privacy policy",
     "rights": "Your data rights",
-    "licenses": "Open source licenses"
+    "licenses": "Open source licenses",
+    "policyLabel": "WHAT HAPPENS TO YOUR DATA",
+    "rightsLabel": "WHAT YOU CAN DO FROM THIS APP",
+    "licensesLabel": "OPEN SOURCE IN THIS APP",
+    "localTitle": "Where your data lives",
+    "localBody": "Your conversations, memories and household profiles are kept on your Pond. There is no account with us, and no server of ours holding them. The language models your Pond ships with run on the Pond itself.",
+    "storageTitle": "How it is stored",
+    "storageBody": "API keys you give your Pond are encrypted on disk. Its other data — conversations, memories, profiles and face templates — is not encrypted by the Pond, so protect the computer it runs on as you would any device holding personal information.",
+    "networkTitle": "What reaches the internet",
+    "networkBody": "Some features need the internet: weather comes from Open-Meteo, and music from Spotify once you connect it. Your Pond keeps a record of every outbound call it makes, and can be set to refuse sensitive destinations or to stay offline entirely.",
+    "voiceTitle": "Voice",
+    "voiceBody": "Speech is transcribed on your Pond by default, and the recording is not kept afterwards. What you said is kept as text, as part of the conversation. The wake word is detected on your Pond, not on this phone.",
+    "facesTitle": "Faces",
+    "facesBody": "If you enrol a face, your Pond keeps a numerical template of it and never the photo. Removing a household member deletes their face data with them.",
+    "rightSignOut": "Sign out to release this phone’s access to your Pond, including its remote access.",
+    "rightRemoveMember": "Remove a household member under Users, and their face data goes with them.",
+    "policyHeading": "What happens to your data",
+    "rightsHeading": "What you can do from this app",
+    "licensesHeading": "Open source in this app"
   },
   "backup": {
     "last": "Last backup",
@@ -536,7 +683,20 @@
     "code": "Setup code",
     "codePlaceholder": "12345678",
     "name": "Name",
-    "namePlaceholder": "Kitchen light"
+    "namePlaceholder": "Kitchen light",
+    "scan": "Scan the code instead",
+    "type": "Type the code instead",
+    "aim": "Point the camera at the QR code on the device or its packaging",
+    "camera": "Scanning a device setup code needs the camera. You can also type the code printed on the device instead.",
+    "notSetupCode": "That is not a Matter setup code. Look for a QR beginning MT: on the device or its box.",
+    "isPondCode": "That is your Pond’s pairing code, not a device setup code. This phone is already paired — scan the QR on the device itself, or on its packaging.",
+    "desc": "Scan or enter the setup code printed on the device or its packaging. A device only accepts pairing for about 15 minutes after it starts up, so power-cycle it first if it has been sitting.",
+    "addingDesc": "This can take a couple of minutes. Keep the device powered and nearby.",
+    "controllerStarting": "Your Pond is still starting its Matter controller. Adding a device will not work until it has finished.",
+    "setupCode": "Setup code",
+    "nameOptional": "Name (optional)",
+    "addDevice": "Add Device",
+    "bluetoothFootnote": "A device straight out of the box has no Wi-Fi yet and can only be reached over Bluetooth. If it is not found, turn on Bluetooth pairing in your Pond’s Matter settings and try again."
   },
   "desktop": {
     "cameraNeeded": "Camera access needed",
@@ -546,13 +706,173 @@
   "dev": {
     "connection": "Server connection",
     "addressPlaceholder": "http://pond.local:4000",
-    "screenMode": "Per-screen backend mode"
+    "screenMode": "Per-screen backend mode",
+    "screens": {
+      "chat": "Chat",
+      "memory": "Memories",
+      "integrations": "App Integrations & MCP Servers",
+      "schedule": "Schedule",
+      "logs": "Activity Logs"
+    },
+    "devOnly": "This screen is dev-only. It is not linked from the You tab in production builds."
   },
   "rooms": {
     "add": "Add a room",
     "pairDevice": "Pair another Pond"
   },
   "schedule": {
-    "event": "Event"
+    "event": "Event",
+    "eventBadge": "Event"
+  },
+  "remote": {
+    "title": "Access your Pond from anywhere",
+    "description": "Keep using your Pond away from home through an encrypted private connection. Your Pond must approve remote access locally.",
+    "continue": "Set up",
+    "notNow": "Not now",
+    "enable": "Enable remote access",
+    "localOnly": "Keep local only",
+    "done": "Go to Home",
+    "unconfigured": "Remote access is not set up on this Pond yet. Its operator must configure the coordination and relay service before cellular access can work. Local pairing is ready to use.",
+    "approval": "Approve remote access on your Pond, then try again.",
+    "enrolling": "Registering this device",
+    "connecting": "Checking remote access",
+    "enabled": "Remote access enabled",
+    "failed": "Remote access could not be enabled. Your local pairing is preserved.",
+    "cancelled": "Remote access setup was cancelled.",
+    "recover": "Recover remote access after local re-pairing",
+    "alreadyEnrolled": "This phone is already set up for remote access. If you paired with your Pond again, use Recover below to re-issue its remote address.",
+    "replacementBlocked": "Your Pond could not re-issue this phone’s remote address. Try again in a moment, or sign out and pair again if it keeps failing.",
+    "review": "Approve this recovery request on your Pond dashboard. Keep this phone on the home network.",
+    "reviewCode": "Match this request on the Pond: {{id}}",
+    "reviewExpired": "Local approval expired. Request recovery again while on the home network.",
+    "busy": "Remote access setup is already running.",
+    "unsupported": "Remote access requires the latest native Goose app."
+  },
+  "connection": {
+    "changePond": "Scan a local QR code to change the paired Pond.",
+    "local": "Connected locally",
+    "remote": "Connected remotely",
+    "reconnecting": "Reconnecting to your Pond",
+    "connected": "Connected",
+    "offline": "Disconnected",
+    "disconnected": "Pond is unavailable. Check its connection and remote access status.",
+    "unpaired": "Pair with your Pond at home",
+    "upgrade": "Scan a new QR code at home to enable secure connections.",
+    "revoked": "Your Pond no longer recognises this phone. Tap to pair again at home.",
+    "trust": "Could not verify this Pond. Check its fingerprint on the Pond before pairing again.",
+    "unsupported": "Secure Pond connections require an Android or iOS development or release build."
+  },
+  "modal": {
+    "title": "This is a modal",
+    "goHome": "Go to home screen"
+  },
+  "voice": {
+    "phraseLights": "Turn off the lights",
+    "phraseWeather": "What’s the weather like?",
+    "phraseTimer": "Set a timer for 10 minutes",
+    "phrasePlaylist": "Play my evening playlist",
+    "listening": "Listening…",
+    "thinking": "Thinking…",
+    "speaking": "Speaking…",
+    "idle": "Tap to speak",
+    "trySaying": "Try saying:"
+  },
+  "homeManagement": {
+    "rooms": "ROOMS",
+    "deviceCount": "{{count}} devices",
+    "addRoom": "Add Room",
+    "pondDevices": "POND DEVICES",
+    "firmware": "Firmware: {{version}}",
+    "pairDevice": "Pair New Pond Device",
+    "deviceCount_one": "{{count}} device"
+  },
+  "appManagement": {
+    "apiKey": "API Key",
+    "apiKeyPlaceholder": "Enter API key…",
+    "hide": "Hide",
+    "show": "Show",
+    "connected": "Connected",
+    "connectedApps": "CONNECTED APPS"
+  },
+  "mcp": {
+    "latency": "Latency",
+    "tools": "Tools",
+    "configure": "Configure",
+    "retry": "Retry",
+    "remove": "Remove",
+    "servers": "MCP SERVERS",
+    "addServer": "Add MCP Server"
+  },
+  "addUsers": {
+    "remove": "Remove",
+    "profiles": "HOUSEHOLD PROFILES",
+    "empty": "No profiles yet. Add one so your Pond can tell people apart.",
+    "addProfile": "Add a profile",
+    "name": "Name",
+    "namePlaceholder": "Alex",
+    "emoji": "Emoji (optional)",
+    "emojiPlaceholder": "Shown on the profile card",
+    "adding": "Adding…",
+    "add": "Add Profile"
+  },
+  "developer": {
+    "serverConnection": "Server connection",
+    "checking": "Checking…",
+    "testConnection": "Test connection",
+    "backendMode": "Per-screen backend mode",
+    "backendHint": "Flip a screen to “Real” once its backend wiring lands (#9–#15). Mock and real code paths coexist — nothing needs to be deleted to test either one.",
+    "realBackend": "Real backend",
+    "mockData": "Mock data",
+    "devOnly": "This screen is dev-only. It isn’t linked from Settings in production builds."
+  },
+  "errors": {
+    "busy": "Your Pond is busy. Try again in a moment.",
+    "generic": "Your Pond could not complete that request.",
+    "deviceGone": "That device is no longer registered with your Pond.",
+    "bridgedEndpoint": "Your Pond will not remove a bridged endpoint on its own.",
+    "noModelCatalogue": "This Pond does not expose a model catalogue.",
+    "profileExists": "A profile with that name already exists."
+  },
+  "sessions": {
+    "justNow": "Just now",
+    "yesterday": "Yesterday",
+    "untitled": "Untitled conversation",
+    "deleteTitle": "Delete Conversation",
+    "deleteBody": "This cannot be undone.",
+    "delete": "Delete",
+    "cancel": "Cancel",
+    "loadFailed": "Could not load conversations (HTTP {{status}}).",
+    "unreachable": "Could not reach your Pond.",
+    "emptyTitle": "No conversations yet",
+    "emptyMessage": "Start a chat to see it here.",
+    "renameFailed": "Failed to rename conversation.",
+    "deleteFailed": "Failed to delete conversation."
+  },
+  "homeManagementAlert": {
+    "removeTitle": "Remove Room",
+    "removeBody": "Are you sure you want to remove this room?",
+    "remove": "Remove"
+  },
+  "scanErrors": {
+    "matterCode": "That is a Matter device setup code, not a Pond pairing code. Use Devices, then Add device, to commission it. The pairing code is the one on your Pond dashboard.",
+    "notPondCode": "That is not a Goose In A Pond pairing code. Open Pairing on your Pond and scan the code it shows."
+  },
+  "pairingErrors": {
+    "rateLimited": "Your Pond is rate-limiting pairing attempts. Wait {{count}} second{{plural}} and try again.",
+    "rateLimitedNoHint": "Your Pond is rate-limiting pairing attempts. Wait a minute and try again.",
+    "serverError": "Your Pond returned an error while pairing. Check that it is still running, then try again.",
+    "refused": "Your Pond refused the pairing request. Check the code on its dashboard and try again.",
+    "unreachable": "Could not reach your Pond. Check that the phone is on the same network and the server is running.",
+    "badCode": "That pairing code did not match. Check the six digits on your Pond and try again — a wrong code costs nothing but this attempt.",
+    "expired": "This attempt took too long — the server holds a challenge for only 60 seconds. Enter the same code again; you do not need a new one.",
+    "noCode": "Your Pond has no pairing code right now. Codes last 10 minutes — open the dashboard on the host machine to show a fresh one.",
+    "rejected": "The server rejected the pairing attempt. Double-check the code and try again."
+  },
+  "memories": {
+    "tabAll": "All",
+    "tabPreference": "Preference",
+    "tabHabit": "Habit",
+    "tabPerson": "Person",
+    "tabReminder": "Reminder"
   }
 }

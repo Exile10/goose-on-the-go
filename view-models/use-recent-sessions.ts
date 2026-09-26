@@ -5,11 +5,14 @@
  * a session and streaming a turn belongs to #9.
  */
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 
 import { useServer } from '@/providers/server-provider';
 import { ApiError, api } from '@/services/api-client';
 import type { SessionSummary } from '@/services/types';
+import { describeApiError } from './describe-error';
+import { useLive } from './use-live';
+import i18n from '@/services/i18n';
 
 /** How many the home strip shows. The screen has room for a handful. */
 const RECENT_LIMIT = 3;
@@ -23,12 +26,12 @@ export function formatRelativeTime(iso: string, now = Date.now()): string {
   if (Number.isNaN(then)) return '';
 
   const minutes = Math.floor((now - then) / 60_000);
-  if (minutes < 1) return 'Just now';
+  if (minutes < 1) return i18n.t('sessions.justNow');
   if (minutes < 60) return `${minutes}m ago`;
 
   const hours = Math.floor(minutes / 60);
   if (hours < 24) return `${hours}h ago`;
-  if (hours < 48) return 'Yesterday';
+  if (hours < 48) return i18n.t('sessions.yesterday');
 
   const days = Math.floor(hours / 24);
   if (days < 7) return `${days}d ago`;
@@ -52,6 +55,10 @@ export interface UseRecentSessions {
   actions: { refresh: () => Promise<void> };
 }
 
+
+/** Conversations started on the desktop or by voice should appear without leaving Home. */
+export const RECENT_SESSIONS_MS = 30_000;
+
 export function useRecentSessions(): UseRecentSessions {
   const [sessions, setSessions] = useState<RecentSession[]>([]);
   const [loading, setLoading] = useState(true);
@@ -61,27 +68,31 @@ export function useRecentSessions(): UseRecentSessions {
   // land calls the default address unauthenticated and never retries.
   const { hydrated } = useServer();
 
-  const refresh = useCallback(async () => {
-    setLoading(true);
-    setError(null);
+  // Whether a read has ever succeeded. After one, a failed poll keeps what is on screen.
+  const loaded = useRef(false);
+
+  /** `loud` is a read somebody asked for; a poll is quiet and keeps the last good data. */
+  const load = useCallback(async (loud: boolean) => {
+    if (loud) {
+      setLoading(true);
+      setError(null);
+    }
     try {
       const all = await api.listSessions();
       setSessions(all.slice(0, RECENT_LIMIT).map(toRecent));
+      loaded.current = true;
+      setError(null);
     } catch (e) {
-      setError(
-        e instanceof ApiError
-          ? `Could not load recent conversations (HTTP ${e.status}).`
-          : 'Could not reach your Pond.',
-      );
+      if (loud || !loaded.current) setError(describeApiError(e));
+      else console.warn('[recent] refresh failed; showing the last result', e instanceof ApiError ? e.status : 'network');
     } finally {
       setLoading(false);
     }
   }, []);
 
-  useEffect(() => {
-    if (!hydrated) return;
-    void refresh();
-  }, [hydrated, refresh]);
+  const refresh = useCallback(() => load(true), [load]);
+
+  useLive(() => load(false), RECENT_SESSIONS_MS, hydrated);
 
   return { data: { sessions }, loading, error, actions: { refresh } };
 }
@@ -94,7 +105,7 @@ export function useRecentSessions(): UseRecentSessions {
 function toRecent(s: SessionSummary): RecentSession {
   return {
     id: s.id,
-    text: s.title?.trim() || s.preview?.trim() || 'Untitled conversation',
+    text: s.title?.trim() || s.preview?.trim() || i18n.t('sessions.untitled'),
     title: s.title?.trim() || null,
     time: formatRelativeTime(s.updated_at),
   };

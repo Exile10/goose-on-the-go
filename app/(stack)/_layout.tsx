@@ -70,17 +70,14 @@ export default function StackLayout() {
     >
       <Stack.Screen name="models" options={{ title: t('screens.models') }} />
       <Stack.Screen name="memories" options={{ title: t('screens.memories') }} />
+      <Stack.Screen name="sessions" options={{ title: t('screens.sessions') }} />
       <Stack.Screen name="logs" options={{ title: t('screens.logs') }} />
       <Stack.Screen name="schedule" options={{ title: t('screens.schedule') }} />
       <Stack.Screen name="app-management" options={{ title: t('screens.appManagement') }} />
       <Stack.Screen name="mcp-servers" options={{ title: t('screens.mcpServers') }} />
-      <Stack.Screen name="user-media" options={{ title: t('screens.userMedia') }} />
-      <Stack.Screen name="photo-upload" options={{ title: t('screens.photoUpload') }} />
       <Stack.Screen name="add-users" options={{ title: t('screens.addUsers') }} />
-      <Stack.Screen name="biometrics" options={{ title: t('screens.biometrics') }} />
-      <Stack.Screen name="backup" options={{ title: t('screens.backup') }} />
-      <Stack.Screen name="restore" options={{ title: t('screens.restore') }} />
       <Stack.Screen name="privacy" options={{ title: t('screens.privacy') }} />
+      <Stack.Screen name="remote-access" options={{ title: t('screens.remoteAccess') }} />
       <Stack.Screen name="home-management" options={{ title: t('screens.homeManagement') }} />
       <Stack.Screen name="pond-pairing" options={{ title: t('screens.pondPairing') }} />
       <Stack.Screen name="developer" options={{ title: t('screens.developer') }} />

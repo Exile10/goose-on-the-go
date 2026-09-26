@@ -4,6 +4,10 @@
  * Labels are catalogue keys rather than text. A module constant is evaluated
  * once at import, before i18next has a language, so a literal here would freeze
  * the app in whatever the build shipped with.
+ *
+ * Every row has to reach a screen file: `constants/__tests__/navigation.test.ts`
+ * fails on one that does not, because expo-router resolves routes at runtime and
+ * nothing else would notice until someone tapped it.
  */
 
 import type { TranslationKey } from '@/services/i18n';
@@ -31,6 +35,7 @@ export const PROFILE_NAV: NavGroup[] = [
     items: [
       { id: 'models', labelKey: 'screens.models', icon: 'models', route: '/(stack)/models' },
       { id: 'memories', labelKey: 'screens.memories', icon: 'memory', route: '/(stack)/memories' },
+      { id: 'sessions', labelKey: 'screens.sessions', icon: 'chat', route: '/(stack)/sessions' },
       { id: 'logs', labelKey: 'screens.logs', icon: 'logs', route: '/(stack)/logs' },
       { id: 'schedule', labelKey: 'screens.schedule', icon: 'schedule', route: '/(stack)/schedule' },
     ],
@@ -43,25 +48,16 @@ export const PROFILE_NAV: NavGroup[] = [
     ],
   },
   {
-    groupKey: 'nav.media',
-    items: [
-      { id: 'userMedia', labelKey: 'screens.userMedia', icon: 'photo', route: '/(stack)/user-media' },
-      { id: 'photoUpload', labelKey: 'screens.photoUpload', icon: 'upload', route: '/(stack)/photo-upload' },
-    ],
-  },
-  {
     groupKey: 'nav.household',
     items: [
       { id: 'addUsers', labelKey: 'screens.addUsers', icon: 'users', route: '/(stack)/add-users' },
-      { id: 'biometrics', labelKey: 'screens.biometrics', icon: 'shield', route: '/(stack)/biometrics' },
       { id: 'homeManagement', labelKey: 'screens.homeManagement', icon: 'home', route: '/(stack)/home-management' },
     ],
   },
   {
     groupKey: 'nav.privacy',
     items: [
-      { id: 'backup', labelKey: 'screens.backup', icon: 'cloud', route: '/(stack)/backup' },
-      { id: 'restore', labelKey: 'screens.restore', icon: 'restore', route: '/(stack)/restore' },
+      { id: 'remoteAccess', labelKey: 'screens.remoteAccess', icon: 'lock', route: '/(stack)/remote-access' },
       { id: 'privacy', labelKey: 'screens.privacy', icon: 'shield', route: '/(stack)/privacy' },
     ],
   },

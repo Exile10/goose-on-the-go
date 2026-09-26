@@ -20,6 +20,7 @@ import { Spacing } from '@/constants/spacing';
 import { Radii } from '@/constants/radii';
 import { useThemedStyles } from '@/hooks/use-themed-styles';
 import type { ThemeColors } from '@/constants/colors';
+import type { TranslationKey } from '@/services/i18n';
 
 interface McpServer {
   id: string;
@@ -45,6 +46,15 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 /** Server card */
+/** One literal key per status, so the key-completeness test can see every one. */
+function statusKey(status: McpServer['status']): TranslationKey {
+  switch (status) {
+    case 'online': return 'integrations.online';
+    case 'offline': return 'integrations.offline';
+    case 'error': return 'integrations.error';
+  }
+}
+
 const ServerCard = React.memo(function ServerCard({ server }: { server: McpServer }) {
   const styles = useThemedStyles(makeStyles);
   const { t } = useTranslation();
@@ -58,7 +68,7 @@ const ServerCard = React.memo(function ServerCard({ server }: { server: McpServe
         </View>
         <View style={[styles.statusBadge, { backgroundColor: statusColor + '18' }]}>
           <Text style={[styles.statusText, { color: statusColor }]}>
-            {t(`integrations.${server.status}` as const)}
+            {t(statusKey(server.status))}
           </Text>
         </View>
       </View>

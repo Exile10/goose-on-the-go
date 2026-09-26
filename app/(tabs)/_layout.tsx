@@ -13,6 +13,8 @@
  * a single control carrying the current destination's glyph, and pressing that
  * restores the bar rather than navigating, because the reader contracted it by
  * scrolling and not by choosing to.
+ *
+ * None of it is reachable without a paired Pond; see `TabLayout`.
  */
 
 import React, { useCallback, useMemo, useState } from 'react';
@@ -34,6 +36,7 @@ import {
   useChromeRestore,
   useChromeStage,
 } from '@/providers/chrome-provider';
+import { useServer } from '@/providers/server-provider';
 import { useOnboarding } from '@/view-models/use-onboarding';
 import { selectionTick } from '@/services/haptics';
 import type { IconName } from '@/constants/icons';
@@ -46,9 +49,18 @@ const DESTINATIONS: { name: string; labelKey: TranslationKey; icon: IconName }[]
   { name: 'profile', labelKey: 'tabs.you', icon: 'profile' },
 ];
 
+/**
+ * What the bar reads of the navigator. expo-router and @react-navigation ship
+ * divergent `BottomTabBarProps`, so this names only the part that is used.
+ */
 interface TabBarProps {
-  state: { index: number; routes: { name: string }[] };
-  navigation: { navigate: (name: string) => void };
+  state: { index: number; routes: { key: string; name: string }[] };
+  navigation: {
+    navigate: (name: string) => void;
+    emit: (event: { type: 'tabPress'; target: string; canPreventDefault: true }) => {
+      defaultPrevented: boolean;
+    };
+  };
 }
 
 function AppTabBar({ state, navigation }: TabBarProps) {
@@ -91,14 +103,20 @@ function AppTabBar({ state, navigation }: TabBarProps) {
     [theme],
   );
 
+  // Every press is announced as `tabPress`, the current tab's included, so a
+  // screen can listen for it (and veto it) exactly as with the stock bar. Only
+  // a press that moves somewhere navigates.
   const onChange = useCallback(
     (key: string) => {
-      if (key !== current) {
+      const route = state.routes.find((r) => r.name === key);
+      if (!route) return;
+      const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
+      if (key !== current && !event.defaultPrevented) {
         void selectionTick();
-        navigation.navigate(key);
+        navigation.navigate(route.name);
       }
     },
-    [current, navigation],
+    [current, navigation, state.routes],
   );
 
   return (
@@ -148,6 +166,8 @@ function AppTabBar({ state, navigation }: TabBarProps) {
             // separates nothing, and the 36% it lets through is enough to read
             // a card's white label straight across the bar. Ink names the
             // answer — `chrome`, opaque, not the `surface` content is made of.
+            // Opaque is also what Reduce Transparency asks for, so the bar
+            // needs no second path for it.
             backgroundColor: theme.color.chrome,
             // The lift is a shadow, and a shadow on a dark ground is nothing.
             // An edge is what says this is a plane. The web glass draws the
@@ -162,11 +182,37 @@ function AppTabBar({ state, navigation }: TabBarProps) {
 }
 
 export default function TabLayout() {
+  const { hydrated, paired } = useServer();
   const onboarding = useOnboarding();
   const { t } = useTranslation();
 
-  if (onboarding.loading) return null;
-  if (onboarding.data.show) return <Redirect href="/(onboarding)/welcome" />;
+  // `hydrated` is what says the stored identity has been read back. Without
+  // it, every cold start would bounce through pairing before discovering it is
+  // already paired.
+  if (!hydrated) return null;
+
+  // Nothing in this app works without a paired Pond, so an app that has none
+  // reaches none of it. A fresh install and a phone that just signed out land
+  // in the same place: the first-run screen, which hands off to pairing — or
+  // pairing itself, for someone who has already been shown that screen and
+  // chosen to set up later.
+  //
+  // Keyed on whether there is a stored identity, not on the connection state.
+  // `configure` publishes `unpaired` at the start of every reconfiguration --
+  // including the one that enables remote access -- so a guard watching the
+  // connection would throw somebody onto the pairing screen in the middle of
+  // setting remote access up, which is what the previous attempt did.
+  //
+  // Nor on the in-memory identity. Staging another pairing clears that while the
+  // stored one stays, and redirecting then replaced the tabs mid-wizard, so
+  // backing out of pairing another Pond (Switch Pond) no longer led back to them.
+  if (!paired) {
+    // Which of the two depends on a stored flag; wait for it rather than guess.
+    if (onboarding.loading) return null;
+    return (
+      <Redirect href={onboarding.data.show ? '/(onboarding)/welcome' : '/(stack)/pond-pairing'} />
+    );
+  }
 
   return (
     <ChromeProvider>

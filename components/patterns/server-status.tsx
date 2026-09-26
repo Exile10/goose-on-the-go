@@ -31,7 +31,7 @@ export const ServerStatus = React.memo(function ServerStatus({
     <View style={styles.container}>
       <View style={[styles.dot, online ? styles.dotOnline : styles.dotOffline]} />
       <Text style={styles.label}>
-        {label ?? t(online ? 'pond.connected' : 'pond.unreachable')}
+        {label ?? (online ? t('pond.connected') : t('pond.unreachable'))}
       </Text>
     </View>
   );

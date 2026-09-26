@@ -13,8 +13,14 @@ import {
   isBridgedEndpoint,
   parsePowerState,
   supports,
+  listPollStillCurrent,
+  powerPollStillCurrent,
+  mergePower,
+  ALL_ROOMS,
+  roomLabel,
 } from '@/view-models/use-devices';
 import type { Device } from '@/services/types';
+import i18n from '@/services/i18n';
 
 function device(over: Partial<Device> = {}): Device {
   return { id: 'd1', name: 'Lamp', is_online: true, ...over };
@@ -95,5 +101,79 @@ describe('isBridgedEndpoint', () => {
   it('leaves ordinary devices alone', () => {
     expect(isBridgedEndpoint('matter-12345')).toBe(false);
     expect(isBridgedEndpoint('kitchen-lamp')).toBe(false);
+  });
+});
+
+/**
+ * Devices poll, and a poll is slower than a tap. One that read the lamp as off just before you
+ * switched it on would land afterwards and switch it back off on screen -- and if it landed after
+ * the switch's own read-back, it would stay wrong until the next poll. The rule: a poll never
+ * overrides anything changed after that poll began.
+ */
+describe('a poll does not undo what was done after it began', () => {
+  it('keeps a power state changed after the poll started', () => {
+    const current = { lamp: true, fan: false };
+    const fresh = { lamp: false, fan: false };
+    expect(mergePower(current, fresh, { lamp: 2_000 }, 1_000)).toEqual({ lamp: true, fan: false });
+  });
+
+  it('takes the poll for a device changed before it started', () => {
+    const current = { lamp: true };
+    const fresh = { lamp: false };
+    expect(mergePower(current, fresh, { lamp: 500 }, 1_000)).toEqual({ lamp: false });
+  });
+
+  // A device the poll no longer reports is unknown, which is a real answer -- unless it was
+  // changed after the poll began, when the poll has not seen it yet.
+  it('drops a device the poll no longer reports, unless it was just changed', () => {
+    expect(mergePower({ lamp: true }, {}, {}, 1_000)).toEqual({});
+    expect(mergePower({ lamp: true }, {}, { lamp: 2_000 }, 1_000)).toEqual({ lamp: true });
+  });
+
+  // Removing or adding a device changes the list. A poll that began before that would put a
+  // deleted device back.
+  it('does not apply a device list that began before the list was changed', () => {
+    expect(listPollStillCurrent(1_000, 2_000)).toBe(false);
+    expect(listPollStillCurrent(1_000, 1_000)).toBe(false);
+    expect(listPollStillCurrent(3_000, 2_000)).toBe(true);
+    expect(listPollStillCurrent(1_000, 0)).toBe(true);
+  });
+});
+
+/**
+ * The room names the app makes up itself -- the no-room bucket and the "all" tab -- are ids, shown
+ * through the catalogue. They used to be the English words, rendered raw, which also made them
+ * collide with a room the household had actually named "Unassigned" or "All".
+ */
+describe('room labels', () => {
+  it('shows the fallback room and the all tab as copy, not as their ids', () => {
+    expect(roomLabel(UNASSIGNED_ROOM)).toBe(i18n.t('devices.roomUnassigned'));
+    expect(roomLabel(ALL_ROOMS)).toBe(i18n.t('devices.roomAll'));
+    expect(roomLabel(UNASSIGNED_ROOM)).not.toBe(UNASSIGNED_ROOM);
+  });
+
+  it('shows a room the household named exactly as it was named', () => {
+    expect(roomLabel('Kitchen')).toBe('Kitchen');
+  });
+
+  it('keeps a room literally named "Unassigned" apart from devices that have no room', () => {
+    const named = { id: 'a', name: 'a', is_online: true, room: 'Unassigned' } as Device;
+    const none = { id: 'b', name: 'b', is_online: true } as Device;
+    expect(groupByRoom([named, none]).map((r) => r.name).sort()).toEqual(['Unassigned', UNASSIGNED_ROOM].sort());
+  });
+});
+
+/**
+ * The poll loop does not wait for power reads, so an older poll's reads can land after a newer
+ * poll's and must not be applied over them.
+ */
+describe('power readings from an older poll', () => {
+  it('are not applied once a newer poll has applied its own', () => {
+    expect(powerPollStillCurrent(1_000, 2_000)).toBe(false);
+  });
+
+  it('are applied when they are the newest', () => {
+    expect(powerPollStillCurrent(3_000, 2_000)).toBe(true);
+    expect(powerPollStillCurrent(1_000, 0)).toBe(true);
   });
 });

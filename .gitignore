@@ -53,3 +53,11 @@ app-example
 # generated native folders
 /ios
 /android
+
+# Generated embedded networking libraries
+/native/pondnet/*.aar
+/native/pondnet/*.jar
+/native/pondnet/*.xcframework/
+
+# Python native integration harness bytecode
+__pycache__/

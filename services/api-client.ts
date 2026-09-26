@@ -1,3 +1,5 @@
+import { assertPondTrust, PondTrustError, pondTrustFailed } from './pond-trust';
+import { isLocalPairingUrl, normalizeHttpsUrl } from '@/models/connection';
 /**
  * PondApiClient — HTTP client for goose-in-a-pond.
  *
@@ -11,7 +13,16 @@
  * before bubbling the error up to the caller.
  */
 
-import { concat, fromBase64, hmacSha256, toHex, utf8 } from './hmac';
+import {
+  CLIENT_LABEL,
+  equalHex,
+  fromBase64,
+  hmacSha256,
+  pairTranscript,
+  SERVER_LABEL,
+  toHex,
+  utf8,
+} from './hmac';
 import { timeoutSignal } from './http';
 import { readSse, type SseEvent } from './sse';
 import type {
@@ -21,6 +32,7 @@ import type {
   CommissionDeviceResponse,
   CreateDeviceRequest,
   Device,
+  DeviceSelf,
   DeviceStatePatch,
   EventCategory,
   Extension,
@@ -36,6 +48,7 @@ import type {
   ModelEntry,
   ModelListResponse,
   ModelMemoryStatus,
+  NowPlayingResponse,
   OAuthProvider,
   Profile,
   Schedule,
@@ -43,10 +56,13 @@ import type {
   SessionMessage,
   SessionSummary,
   SuggestionList,
+  SystemInfo,
   ToolCallResult,
   TranscribeResponse,
+  UpcomingSchedule,
   UpdateDeviceRequest,
   UsageSummary,
+  WeatherResponse,
 } from './types';
 import { MODEL_CATEGORIES } from './types';
 
@@ -90,6 +106,12 @@ export interface HandshakeResponse {
   server_version: string;
   capabilities: string[];
   rejection_reason: string | null;
+  /**
+   * The server's half of the channel binding: hex HMAC-SHA256 over the same
+   * transcript the client MACed, under `goose-pair-server-v1`. Present exactly
+   * when the accepted request carried a `channel_binding`.
+   */
+  server_proof?: string | null;
 }
 
 interface ChallengeResponse {
@@ -170,6 +192,28 @@ async function parseBody<T>(res: Response): Promise<T | undefined> {
 }
 
 
+/**
+ * Unwrap a collection that may arrive bare or inside an envelope.
+ *
+ * The envelope is input, not a guarantee. Nine wrappers declared the body as
+ * `{ key: T[] } | T[]` and returned `res.key` for the object case, which types as
+ * `T[]` whatever the server actually sent -- so a Pond answering `{}`, or an
+ * envelope carrying a null list, produced `undefined`. That reached a screen as
+ * state and threw on the first `.find` or `.map`, which is how opening AI Models
+ * killed the app rather than showing the empty state it already has.
+ *
+ * A shape the client did not expect is an empty collection, and every one of
+ * these screens has something to say about an empty collection.
+ */
+function collection<T>(res: unknown, key: string): T[] {
+  if (Array.isArray(res)) return res as T[];
+  const value = (res as Record<string, unknown> | null | undefined)?.[key];
+  return Array.isArray(value) ? (value as T[]) : [];
+}
+
+/** Refresh responses that mean the Pond will not accept this refresh token. */
+const REFRESH_REFUSED = [400, 401, 403, 404, 410];
+
 export class PondApiClient {
   private baseUrl: string;
   private token: string | null = null;
@@ -179,12 +223,30 @@ export class PondApiClient {
   /** The refresh every concurrent 401 waits on, rather than each starting its own. */
   private refreshInFlight: Promise<HandshakeResponse | null> | null = null;
 
-  constructor(baseUrl = 'http://127.0.0.1:4000') {
-    this.baseUrl = baseUrl.replace(/\/+$/, '');
+  private recovery: (() => Promise<string | null>) | null = null;
+  private authRevoked: (() => void) | null = null;
+  private identityEpoch = 0;
+  setRecovery(recover: (() => Promise<string | null>) | null) { this.recovery = recover; }
+
+  /**
+   * Called when the Pond refuses this phone's credentials and a refresh cannot
+   * replace them -- the device was unregistered, or its session was revoked.
+   *
+   * Distinct from `setRecovery`, which exists for a transport that might come
+   * back. This one cannot be recovered from by trying again, and saying so is
+   * what stops the connection banner alternating between "connected" (the
+   * token-less health probe still succeeds) and "reconnecting" (every real
+   * request still fails).
+   */
+  setAuthRevoked(onRevoked: (() => void) | null) { this.authRevoked = onRevoked; }
+  invalidateIdentity() { this.identityEpoch++; this.token = null; this.refreshToken = null; }
+
+  constructor(baseUrl = 'https://127.0.0.1:4443') {
+    this.baseUrl = normalizeHttpsUrl(baseUrl);
   }
 
   setBaseUrl(url: string) {
-    this.baseUrl = url.replace(/\/+$/, '');
+    this.baseUrl = normalizeHttpsUrl(url);
   }
 
   setToken(token: string | null) {
@@ -199,6 +261,25 @@ export class PondApiClient {
     this.onTokensRotated = cb;
   }
 
+  /**
+   * Every request to the Pond goes through here: the pin is checked, redirects
+   * are refused, and a request is cut off at `timeoutMs` unless the caller
+   * passes its own `signal`. A stream passes `null`, since silence there is
+   * the stream's to judge.
+   */
+  private async send(url: string, init: RequestInit, timeoutMs: number | null = REQUEST_TIMEOUT_MS): Promise<Response> {
+    const epoch = this.identityEpoch;
+    await assertPondTrust(new URL(url).origin);
+    if (epoch !== this.identityEpoch) throw new Error('Pond profile changed');
+    const headers = new Headers(init.headers);
+    headers.set('X-Pond-Transport', '1');
+    const response = await fetch(url, { ...init, headers, redirect: 'error',
+      signal: init.signal ?? (timeoutMs === null ? undefined : timeoutSignal(timeoutMs)) });
+    if (epoch !== this.identityEpoch) throw new Error('Pond profile changed');
+    if (response.status >= 300 && response.status < 400) throw new Error('Pond redirect rejected');
+    return response;
+  }
+
   private headers(): Record<string, string> {
     const h: Record<string, string> = { 'Content-Type': 'application/json' };
     if (this.token) h['Authorization'] = `Bearer ${this.token}`;
@@ -211,16 +292,16 @@ export class PondApiClient {
    * Never throws: an unreachable Pond is an expected state here, not an error,
    * so callers get `ok: false` rather than a rejection to handle.
    */
-  async health(): Promise<{ ok: boolean; latencyMs: number }> {
+  async health(): Promise<{ ok: boolean; latencyMs: number; trustFailure?: boolean }> {
     const start = Date.now();
     try {
-      const res = await fetch(`${this.baseUrl}/health`, {
-        headers: this.headers(),
+      const res = await this.send(`${this.baseUrl}/api/v1/health`, {
+        headers: {},
         signal: timeoutSignal(HEALTH_TIMEOUT_MS),
       });
       return { ok: res.ok, latencyMs: Date.now() - start };
     } catch {
-      return { ok: false, latencyMs: Date.now() - start };
+      return { ok: false, latencyMs: Date.now() - start, trustFailure: await pondTrustFailed(this.baseUrl).catch(() => true) };
     }
   }
 
@@ -230,7 +311,7 @@ export class PondApiClient {
     clientType?: string;
     clientVersion?: string;
   }): Promise<ChallengeResponse> {
-    const res = await fetch(`${this.baseUrl}/api/v1/handshake/init`, {
+    const res = await this.send(`${this.baseUrl}/api/v1/handshake/init`, {
       method: 'POST',
       headers: this.headers(),
       body: JSON.stringify({
@@ -254,14 +335,16 @@ export class PondApiClient {
     challengeId: string;
     mac: string;
     deviceName?: string;
+    channelBinding?: string;
   }): Promise<HandshakeResponse> {
-    const res = await fetch(`${this.baseUrl}/api/v1/handshake/verify`, {
+    const res = await this.send(`${this.baseUrl}/api/v1/handshake/verify`, {
       method: 'POST',
       headers: this.headers(),
       body: JSON.stringify({
         challenge_id: input.challengeId,
         mac: input.mac,
         device_name: input.deviceName ?? null,
+        channel_binding: input.channelBinding ?? null,
       }),
     });
     if (!res.ok) {
@@ -282,16 +365,42 @@ export class PondApiClient {
     clientId: string;
     pairingCode: string;
     deviceName?: string;
+    /**
+     * The Pond public-key pin this connection is pinned to, folded into the
+     * proof so it is this pairing that certifies the key rather than the other
+     * way round. See {@link pairTranscript}.
+     */
+    channelBinding?: string;
   }): Promise<HandshakeResponse> {
+    const epoch = this.identityEpoch;
     const init = await this.handshakeInit({ clientId: input.clientId });
     const challenge = fromBase64(init.challenge);
-    const message = concat(challenge, utf8(input.clientId));
-    const mac = toHex(hmacSha256(utf8(input.pairingCode), message));
+    const key = utf8(input.pairingCode);
+    const mac = toHex(
+      hmacSha256(key, pairTranscript(CLIENT_LABEL, challenge, input.clientId, input.channelBinding)),
+    );
     const resp = await this.handshakeVerify({
       challengeId: init.challenge_id,
       mac,
       deviceName: input.deviceName,
+      channelBinding: input.channelBinding,
     });
+    if (epoch !== this.identityEpoch) throw new Error('Pond profile changed');
+    // The Pond's half. Without it, something that terminated this connection
+    // with its own certificate could invent an acceptance and a token of its
+    // own, and this phone would be paired with the interceptor. Only something
+    // holding the pairing code can produce the proof, so checking it is what
+    // makes a pin that arrived over an untrusted route safe to use.
+    if (input.channelBinding && resp.accepted) {
+      const expected = toHex(
+        hmacSha256(key, pairTranscript(SERVER_LABEL, challenge, input.clientId, input.channelBinding)),
+      );
+      if (!equalHex(resp.server_proof ?? '', expected)) {
+        this.token = null;
+        this.refreshToken = null;
+        throw new PondTrustError();
+      }
+    }
     if (resp.accepted && resp.session_token) {
       this.token = resp.session_token;
       this.refreshToken = resp.refresh_token ?? null;
@@ -305,13 +414,22 @@ export class PondApiClient {
   /** Exchange the stored refresh token for a fresh pair. */
   async handshakeRefresh(): Promise<HandshakeResponse | null> {
     if (!this.refreshToken) return null;
-    const res = await fetch(`${this.baseUrl}/api/v1/handshake/refresh`, {
+    const epoch = this.identityEpoch;
+    const res = await this.send(`${this.baseUrl}/api/v1/handshake/refresh`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ refresh_token: this.refreshToken }),
     });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      // Only the Pond refusing the refresh token says these credentials are dead.
+      // A rate limit, a restart or a gateway error says nothing about them, and
+      // treating it as a refusal revoked -- and since #59, wiped -- a pairing
+      // whose refresh token was still good.
+      if (REFRESH_REFUSED.includes(res.status)) return null;
+      throw new ApiError(`handshake/refresh → ${res.status}`, res.status, parseRetryAfter(res));
+    }
     const body = (await res.json()) as HandshakeResponse;
+    if (epoch !== this.identityEpoch) throw new Error('Pond profile changed');
     if (body.accepted && body.session_token) {
       this.token = body.session_token;
       this.refreshToken = body.refresh_token ?? null;
@@ -325,11 +443,14 @@ export class PondApiClient {
   /** Revoke the current session token on the server. */
   async handshakeRevoke(): Promise<void> {
     if (!this.token) return;
-    await fetch(`${this.baseUrl}/api/v1/handshake/revoke`, {
+    const response = await this.send(`${this.baseUrl}/api/v1/handshake/revoke`, {
       method: 'POST',
       headers: this.headers(),
       body: JSON.stringify({ token: this.token }),
     });
+    if (!response.ok) throw new ApiError('Pond revocation failed', response.status, parseRetryAfter(response));
+    const result = await response.json();
+    if (result?.revoked !== true) throw new Error('Pond revocation was not acknowledged');
     this.token = null;
     this.refreshToken = null;
   }
@@ -344,19 +465,33 @@ export class PondApiClient {
    * turning one recoverable expiry into a forced re-pair.
    */
   async request<T>(path: string, init: RequestInit = {}): Promise<T> {
-    const url = `${this.baseUrl}${path}`;
+    if (!path.startsWith('/api/') || path.startsWith('//')) throw new Error('Invalid Pond API path');
+    const epoch = this.identityEpoch;
     const doFetch = () =>
-      fetch(url, {
+      this.send(`${this.baseUrl}${path}`, {
         ...init,
         headers: { ...this.headers(), ...(init.headers ?? {}) },
         signal: init.signal ?? timeoutSignal(REQUEST_TIMEOUT_MS),
       });
 
-    let res = await doFetch();
+    let res: Response;
+    try { res = await doFetch(); }
+    catch (error) {
+      if (init.signal?.aborted || epoch !== this.identityEpoch || !this.recovery) throw error;
+      const recovered = await this.recovery();
+      if (!recovered || epoch !== this.identityEpoch || !['GET', 'HEAD'].includes((init.method ?? 'GET').toUpperCase())) throw error;
+      this.setBaseUrl(recovered);
+      res = await doFetch();
+    }
     if (res.status === 401 && this.refreshToken) {
       const refreshed = await this.refreshOnce();
       if (refreshed?.accepted) res = await doFetch();
     }
+    // Still refused after the one refresh this client allows itself: the
+    // credentials are dead rather than stale, and no retry will revive them.
+    // Reported once here so the whole app can settle, instead of each screen
+    // discovering it separately and asking the transport to reconnect.
+    if (res.status === 401 && epoch === this.identityEpoch) this.authRevoked?.();
     if (!res.ok) {
       // Message format unchanged — existing logs stay readable.
       throw new ApiError(
@@ -379,7 +514,7 @@ export class PondApiClient {
   async open(path: string, init: RequestInit = {}): Promise<Response> {
     const url = `${this.baseUrl}${path}`;
     const doFetch = () =>
-      fetch(url, { ...init, headers: { ...this.headers(), ...(init.headers ?? {}) } });
+      this.send(url, { ...init, headers: { ...this.headers(), ...(init.headers ?? {}) } }, null);
 
     let res = await doFetch();
     if (res.status === 401 && this.refreshToken) {
@@ -408,6 +543,27 @@ export class PondApiClient {
     return this.token ? { uri, headers: { Authorization: `Bearer ${this.token}` } } : { uri };
   }
 
+  /** Local enrollment stays on the selected LAN endpoint even if normal traffic roams.
+   * No recovery or token rotation is attempted: the caller must restart explicitly
+   * after an expired session or ambiguous failure. Server peer checks remain authoritative.
+   */
+  async requestLocal<T>(endpoint: string, path: string, init: RequestInit = {}): Promise<T> {
+    if (!isLocalPairingUrl(endpoint)) throw new Error('Local Pond endpoint required');
+    if (!path.startsWith('/api/') || path.startsWith('//')) throw new Error('Invalid Pond API path');
+    const response = await this.send(`${normalizeHttpsUrl(endpoint)}${path}`, {
+      ...init,
+      headers: { ...this.headers(), ...(init.headers ?? {}) },
+      signal: init.signal ?? timeoutSignal(REQUEST_TIMEOUT_MS),
+    });
+    if (!response.ok) {
+      throw new ApiError(`${init.method ?? 'GET'} ${path} → ${response.status}`, response.status, parseRetryAfter(response));
+    }
+    return (await parseBody<T>(response)) as T;
+  }
+
+  /** Used by SSE without starting a competing token rotation. */
+  async refreshAuthentication(): Promise<boolean> { return !!(await this.refreshOnce())?.accepted; }
+
   /** Coalesce concurrent refreshes into the single in-flight attempt. */
   private refreshOnce(): Promise<HandshakeResponse | null> {
     if (!this.refreshInFlight) {
@@ -422,8 +578,8 @@ export class PondApiClient {
 
   /** `GET /devices`. The server wraps the list in an envelope; callers get the list. */
   async listDevices(): Promise<Device[]> {
-    const res = await this.request<{ devices: Device[] } | Device[]>('/api/v1/devices');
-    return Array.isArray(res) ? res : res.devices;
+    const res = await this.request<{ devices?: Device[] } | Device[]>('/api/v1/devices');
+    return collection<Device>(res, 'devices');
   }
 
   registerDevice(req: CreateDeviceRequest): Promise<Device> {
@@ -570,9 +726,17 @@ export class PondApiClient {
     await readSse(res, (event) => deliver(event, onFrame), { idleMs: STREAM_IDLE_MS });
   }
 
-  /** Stop a turn the Pond is still running. Cooperative: it may say one more thing. */
-  cancelRun(runId: string): Promise<unknown> {
-    return this.post(`/api/v1/chat/runs/${encodeURIComponent(runId)}/cancel`, {});
+  /**
+   * Stop a turn the Pond is still running. Cooperative: it may say one more
+   * thing. A 404 means the run already ended on its own, which is not a
+   * failure from the caller's side.
+   */
+  async cancelRun(runId: string): Promise<void> {
+    try {
+      await this.post(`/api/v1/chat/runs/${encodeURIComponent(runId)}/cancel`, {});
+    } catch (e) {
+      if (!(e instanceof ApiError && e.status === 404)) throw e;
+    }
   }
 
   /** What the Pond would offer to answer next. `sessionId` decides whose data it can read. */
@@ -607,7 +771,7 @@ export class PondApiClient {
   async transcribe(fileUri: string): Promise<string> {
     const form = new FormData();
     form.append('audio', { uri: fileUri, name: 'speech.wav', type: 'audio/wav' } as unknown as Blob);
-    const res = await fetch(`${this.baseUrl}/api/v1/transcribe`, {
+    const res = await this.send(`${this.baseUrl}/api/v1/transcribe`, {
       method: 'POST',
       // No Content-Type: the runtime writes the multipart boundary itself.
       headers: this.token ? { Authorization: `Bearer ${this.token}` } : {},
@@ -627,7 +791,7 @@ export class PondApiClient {
    * call after the Pond starts loads its voice model, which can take seconds.
    */
   async speak(text: string, signal?: AbortSignal): Promise<ArrayBuffer> {
-    const res = await fetch(`${this.baseUrl}/api/v1/tts`, {
+    const res = await this.send(`${this.baseUrl}/api/v1/tts`, {
       method: 'POST',
       headers: this.headers(),
       body: JSON.stringify({ text }),
@@ -642,10 +806,10 @@ export class PondApiClient {
   // ── Sessions ────────────────────────────────────────────────
 
   async listSessions(): Promise<SessionSummary[]> {
-    const res = await this.request<{ sessions: SessionSummary[] } | SessionSummary[]>(
+    const res = await this.request<{ sessions?: SessionSummary[] } | SessionSummary[]>(
       '/api/v1/sessions',
     );
-    return Array.isArray(res) ? res : res.sessions;
+    return collection<SessionSummary>(res, 'sessions');
   }
 
   getSession(id: string): Promise<SessionSummary> {
@@ -654,14 +818,21 @@ export class PondApiClient {
 
   async listSessionMessages(id: string, limit?: number): Promise<SessionMessage[]> {
     const q = limit ? `?limit=${limit}` : '';
-    const res = await this.request<{ messages: SessionMessage[] } | SessionMessage[]>(
+    const res = await this.request<{ messages?: SessionMessage[] } | SessionMessage[]>(
       `/api/v1/sessions/${encodeURIComponent(id)}/messages${q}`,
     );
-    return Array.isArray(res) ? res : res.messages;
+    return collection<SessionMessage>(res, 'messages');
   }
 
   deleteSession(id: string): Promise<void> {
     return this.del<void>(`/api/v1/sessions/${encodeURIComponent(id)}`);
+  }
+
+  renameSession(id: string, title: string): Promise<void> {
+    return this.request<void>(`/api/v1/sessions/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ title }),
+    });
   }
 
   usageSummary(): Promise<UsageSummary> {
@@ -672,10 +843,10 @@ export class PondApiClient {
 
   async listMemories(limit?: number): Promise<MemoryFragment[]> {
     const q = limit ? `?limit=${limit}` : '';
-    const res = await this.request<{ memories: MemoryFragment[] } | MemoryFragment[]>(
+    const res = await this.request<{ memories?: MemoryFragment[] } | MemoryFragment[]>(
       `/api/v1/memories${q}`,
     );
-    return Array.isArray(res) ? res : res.memories;
+    return collection<MemoryFragment>(res, 'memories');
   }
 
   addMemory(content: string, tags?: string[]): Promise<MemoryFragment> {
@@ -699,7 +870,13 @@ export class PondApiClient {
   async listModels(): Promise<ModelEntry[]> {
     const res = await this.request<ModelListResponse>('/api/v1/models');
     return MODEL_CATEGORIES.flatMap((category) =>
-      (res?.[category] ?? []).map((m) => ({ ...m, category, id: `${category}:${m.name}` })),
+      // A bucket that is missing, null or not a list answers nothing rather than
+      // throwing: the screen maps over what comes back.
+      (Array.isArray(res?.[category]) ? res[category] : []).map((m) => ({
+        ...m,
+        category,
+        id: `${category}:${m.name}`,
+      })),
     );
   }
 
@@ -725,8 +902,8 @@ export class PondApiClient {
   // ── Schedules ───────────────────────────────────────────────
 
   async listSchedules(): Promise<Schedule[]> {
-    const res = await this.request<{ schedules: Schedule[] } | Schedule[]>('/api/v1/schedules');
-    return Array.isArray(res) ? res : res.schedules;
+    const res = await this.request<{ schedules?: Schedule[] } | Schedule[]>('/api/v1/schedules');
+    return collection<Schedule>(res, 'schedules');
   }
 
   createSchedule(req: Omit<Schedule, 'id'>): Promise<Schedule> {
@@ -750,10 +927,10 @@ export class PondApiClient {
   }
 
   async listScheduleRuns(id: string, limit = 20): Promise<ScheduleRun[]> {
-    const res = await this.request<{ runs: ScheduleRun[] } | ScheduleRun[]>(
+    const res = await this.request<{ runs?: ScheduleRun[] } | ScheduleRun[]>(
       `/api/v1/schedules/${encodeURIComponent(id)}/runs?limit=${limit}`,
     );
-    return Array.isArray(res) ? res : res.runs;
+    return collection<ScheduleRun>(res, 'runs');
   }
 
   // ── Logs and activity ───────────────────────────────────────
@@ -763,10 +940,10 @@ export class PondApiClient {
     if (params?.limit) qs.set('limit', String(params.limit));
     if (params?.level) qs.set('level', params.level);
     const q = qs.toString();
-    const res = await this.request<{ logs: LogEntry[] } | LogEntry[]>(
+    const res = await this.request<{ logs?: LogEntry[] } | LogEntry[]>(
       `/api/v1/logs${q ? `?${q}` : ''}`,
     );
-    return Array.isArray(res) ? res : res.logs;
+    return collection<LogEntry>(res, 'logs');
   }
 
   listActivity(params?: {
@@ -791,10 +968,10 @@ export class PondApiClient {
   // ── Extensions and the marketplace ──────────────────────────
 
   async listExtensions(): Promise<Extension[]> {
-    const res = await this.request<{ extensions: Extension[] } | Extension[]>(
+    const res = await this.request<{ extensions?: Extension[] } | Extension[]>(
       '/api/v1/extensions',
     );
-    return Array.isArray(res) ? res : res.extensions;
+    return collection<Extension>(res, 'extensions');
   }
 
   setExtensionEnabled(name: string, enabled: boolean): Promise<void> {
@@ -859,10 +1036,54 @@ export class PondApiClient {
     return this.del<void>(`/api/v1/profiles/${encodeURIComponent(id)}`);
   }
 
+  /** Which household member this device belongs to, as the Pond sees it. */
+  deviceSelf(): Promise<DeviceSelf> {
+    return this.get<DeviceSelf>('/api/v1/devices/self');
+  }
+
+  /** The Pond's own description of itself: hostname and version. */
+  systemInfo(): Promise<SystemInfo> {
+    return this.get<SystemInfo>('/api/v1/system/info');
+  }
+
+  /** Outdoor weather where the Pond is configured to be, in Celsius. */
+  weather(): Promise<WeatherResponse> {
+    return this.get<WeatherResponse>('/api/v1/weather');
+  }
+
+  /** What Spotify is playing, as the Pond reports it. */
+  nowPlaying(): Promise<NowPlayingResponse> {
+    return this.get<NowPlayingResponse>('/api/v1/music/now-playing');
+  }
+
+  /** Active schedules, soonest first. The Pond sends a bare array; an envelope is tolerated. */
+  async upcomingSchedules(limit: number): Promise<UpcomingSchedule[]> {
+    const res = await this.get<{ schedules: UpcomingSchedule[] } | UpcomingSchedule[]>(
+      `/api/v1/schedules/upcoming?limit=${encodeURIComponent(String(limit))}`,
+    );
+    return Array.isArray(res) ? res : res.schedules;
+  }
+
   // ── Verb helpers ────────────────────────────────────────────
 
   private get<T>(path: string): Promise<T> {
     return this.request<T>(path);
+  }
+
+  /**
+   * Tell the Pond this device is still here.
+   *
+   * The Pond derives `is_online` at read time from `last_seen` against a
+   * five-minute threshold, and nothing refreshes a phone's row after pairing
+   * writes it once -- so the row ages out and the phone's own card reports
+   * "offline" while the app is open and in use. That is the one direction the
+   * answer must not be wrong in: offline is what somebody opens this screen to
+   * check.
+   *
+   * The route already exists on the Pond and had no caller.
+   */
+  deviceHeartbeat(deviceId: string): Promise<void> {
+    return this.post<void>(`/api/v1/devices/${encodeURIComponent(deviceId)}/heartbeat`, {});
   }
 
   private post<T>(path: string, body: unknown): Promise<T> {

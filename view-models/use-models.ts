@@ -5,12 +5,15 @@
  * `data` and calls `actions`, and never touches the network itself.
  */
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 
 import { useServer } from '@/providers/server-provider';
 import { ApiError, api } from '@/services/api-client';
 import { MODEL_CATEGORIES } from '@/services/types';
 import type { ModelCategory, ModelEntry } from '@/services/types';
+import { describeApiError } from './describe-error';
+import { useLive } from './use-live';
+import i18n from '@/services/i18n';
 
 /**
  * Human-readable size, or null when the server did not say.
@@ -62,6 +65,10 @@ export interface UseModels {
   };
 }
 
+
+/** Which model is loaded, and what finished downloading, changes on the Pond and not here. */
+export const MODELS_MS = 60_000;
+
 export function useModels(): UseModels {
   const [models, setModels] = useState<ModelEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -71,22 +78,30 @@ export function useModels(): UseModels {
   // land calls the default address unauthenticated and never retries.
   const { hydrated } = useServer();
 
-  const refresh = useCallback(async () => {
-    setLoading(true);
-    setError(null);
+  // Whether a read has ever succeeded. After one, a failed poll keeps what is on screen.
+  const loaded = useRef(false);
+
+  /** `loud` is a read somebody asked for; a poll is quiet and keeps the last good data. */
+  const load = useCallback(async (loud: boolean) => {
+    if (loud) {
+      setLoading(true);
+      setError(null);
+    }
     try {
       setModels(await api.listModels());
+      loaded.current = true;
+      setError(null);
     } catch (e) {
-      setError(describe(e));
+      if (loud || !loaded.current) setError(describe(e));
+      else console.warn('[models] refresh failed; showing the last result', e instanceof ApiError ? e.status : 'network');
     } finally {
       setLoading(false);
     }
   }, []);
 
-  useEffect(() => {
-    if (!hydrated) return;
-    void refresh();
-  }, [hydrated, refresh]);
+  const refresh = useCallback(() => load(true), [load]);
+
+  useLive(() => load(false), MODELS_MS, hydrated);
 
   /**
    * Activate optimistically, then reconcile with the server.
@@ -128,11 +143,9 @@ export function useModels(): UseModels {
   };
 }
 
-function describe(e: unknown): string {
-  if (e instanceof ApiError) {
-    if (e.status === 404) return 'This Pond does not expose a model catalogue.';
-    if (e.isRetryable) return 'Your Pond is busy. Try again in a moment.';
-    return `Your Pond refused the request (HTTP ${e.status}).`;
+function describe(e: unknown): string | null {
+  if (e instanceof ApiError && e.status === 404) {
+    return i18n.t('errors.noModelCatalogue');
   }
-  return 'Could not reach your Pond. Check that it is running on this network.';
+  return describeApiError(e);
 }

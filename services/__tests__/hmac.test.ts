@@ -11,7 +11,17 @@
  * does not apply — this module returns the full digest.
  */
 
-import { concat, fromBase64, hmacSha256, toHex, utf8 } from '@/services/hmac';
+import {
+  CLIENT_LABEL,
+  concat,
+  equalHex,
+  fromBase64,
+  hmacSha256,
+  pairTranscript,
+  SERVER_LABEL,
+  toHex,
+  utf8,
+} from '@/services/hmac';
 
 /** Bytes from a hex string, for the vectors that specify keys that way. */
 function hex(s: string): Uint8Array {
@@ -82,5 +92,62 @@ describe('helpers', () => {
 
   it('hex-encodes with a leading zero preserved', () => {
     expect(toHex(new Uint8Array([0, 15, 255]))).toBe('000fff');
+  });
+});
+
+/**
+ * The pairing transcript, against vectors computed outside both
+ * implementations.
+ *
+ * These exact strings are asserted again on the Pond side, in
+ * `crates/pond-infra/src/sqlite_handshake.rs :: the_transcript_matches_the_app`.
+ * That is the point of them: the two sides compute the same bytes in different
+ * languages, and a change to either that nobody carried across shows up here as
+ * a failing vector rather than in the field as a pairing that will not complete
+ * and says only `invalid_mac`.
+ */
+describe('the pairing transcript', () => {
+  const CHALLENGE = fromBase64('AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=');
+  const CODE = utf8('482915');
+  const CLIENT_ID = 'install-abcdef';
+  const SPKI = 'sha256/TnkUsN+AaLec3BDTh/KUwSokXTmCq2+4rlfBnmJxPkE=';
+
+  it('matches the vector for the bound client MAC', () => {
+    expect(toHex(hmacSha256(CODE, pairTranscript(CLIENT_LABEL, CHALLENGE, CLIENT_ID, SPKI)))).toBe(
+      '2cc63017ff6979d0f1c4009a4f37c3c95bc2d535897fc2fb19a0a496f6a649aa',
+    );
+  });
+
+  it('matches the vector for the server proof', () => {
+    expect(toHex(hmacSha256(CODE, pairTranscript(SERVER_LABEL, CHALLENGE, CLIENT_ID, SPKI)))).toBe(
+      '73171bac55bb3346045142bb0647057067d94712f5fab82d2260bf91c106ebe0',
+    );
+  });
+
+  // The original shape, for a Pond running a server older than the binding. It
+  // has to stay byte-for-byte what it was or every such pond stops pairing.
+  it('matches the vector for the unbound MAC, which predates the binding', () => {
+    expect(toHex(hmacSha256(CODE, pairTranscript(CLIENT_LABEL, CHALLENGE, CLIENT_ID)))).toBe(
+      'b922abd25f5f1519c9d0f8ccabab4ed17b3e888a3b868be9cfdc320de017ec30',
+    );
+  });
+
+  // The labels are inside the MAC so the pond's proof cannot be replayed as a
+  // client MAC, which would let anything that saw one pair as that client.
+  it('gives the two directions different bytes for the same inputs', () => {
+    expect(Array.from(pairTranscript(CLIENT_LABEL, CHALLENGE, CLIENT_ID, SPKI))).not.toEqual(
+      Array.from(pairTranscript(SERVER_LABEL, CHALLENGE, CLIENT_ID, SPKI)),
+    );
+  });
+});
+
+describe('equalHex', () => {
+  it('accepts an exact match and rejects everything else', () => {
+    expect(equalHex('00ff', '00ff')).toBe(true);
+    expect(equalHex('00ff', '00fe')).toBe(false);
+    expect(equalHex('00ff', '00ff00')).toBe(false);
+    expect(equalHex('', '')).toBe(true);
+    // A missing proof arrives as the empty string, and must not match one.
+    expect(equalHex('', '00ff')).toBe(false);
   });
 });

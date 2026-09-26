@@ -6,11 +6,20 @@ How to add, modify, and remove components in the Goose on The Go UI library.
 
 | Type | Location | Naming | Purpose |
 |------|----------|--------|---------|
-| **Primitive** | `components/ui/` | `g-*.tsx` (GButton, GCard) | Basic building blocks. No business logic. |
-| **Pattern** | `components/patterns/` | descriptive (chat-bubble, device-card) | Composed from primitives. Domain-aware. |
-| **Layout** | `components/layout/` | descriptive (screen-scroll-view) | Screen wrappers and containers. |
+| **Primitive** | `@jarida/ink/native` | `Ink*` (InkButton, InkSwitch) | Basic building blocks. No business logic. A few in-house exceptions live in `components/ui/`: `GIcon`, `GPressable`, `GKeyboardView` and `EqualizerBars` — see below. |
+| **Pattern** | `components/patterns/` | descriptive (conversation-card, voice-orb) | Composed from ink primitives. Domain-aware. |
 
-## Adding a New Primitive Component
+As of issue #17, in-house primitives (the old `GButton`/`GCard`/`GChip`/etc.
+`g-*.tsx` family) were replaced by `@jarida/ink/native`. Before adding a new
+primitive, check whether ink already has it — most basic building blocks
+should come from there, imported directly (e.g. `import { InkButton } from
+'@jarida/ink/native'`).
+
+## Adding a New In-House Primitive (exception case only)
+
+Only add a component to `components/ui/` if ink has no equivalent — as with
+`GKeyboardView`, or `GPressable`, which gives a hand-rolled tappable the press
+response ink's own controls already have.
 
 1. **Create the file** in `components/ui/` with kebab-case naming:
    ```
@@ -27,29 +36,46 @@ How to add, modify, and remove components in the Goose on The Go UI library.
    }
    ```
 
-3. **Use StyleSheet.create()** for all styles — no inline objects.
+3. **Build the sheet through `useThemedStyles`**, never a hardcoded surface —
+   and no inline objects:
+   ```tsx
+   import { useThemedStyles } from '@/hooks/use-themed-styles';
+   import type { ThemeColors } from '@/constants/colors';
+
+   const styles = useThemedStyles(makeStyles);
+
+   const makeStyles = (c: ThemeColors) =>
+     StyleSheet.create({ card: { backgroundColor: c.card, borderColor: c.border } });
+   ```
 
 4. **Import tokens** from individual constant files:
    ```tsx
-   import { JaridaPurple, Grey } from '@/constants/colors';
+   import { Accent, Grey } from '@/constants/colors';
    import { FontFamily, FontSize } from '@/constants/typography';
    import { Spacing } from '@/constants/spacing';
    import { Radii } from '@/constants/radii';
    ```
 
-5. **Add haptic feedback** for pressable components:
+5. **Add haptic feedback** for pressable components, named by what happened
+   (see [VIEW-LAYER.md](./VIEW-LAYER.md#haptics)):
    ```tsx
-   import { useHaptics } from '@/hooks/use-haptics';
-   const haptics = useHaptics();
-   // In onPress: haptics.light();
+   import { selectionTick } from '@/services/haptics';
+   // In onPress: void selectionTick();
    ```
 
-6. **Wrap with React.memo** if it's a leaf/list component:
+6. **Strings go through the catalogue.** `t('ns.key')` from `useTranslation()`,
+   with the key in `services/i18n/locales/en.json`. A key carried as data is
+   typed `TranslationKey`, and a key is never assembled at runtime
+   (`` t(`ns.${x}`) ``): `services/__tests__/i18n.test.ts` refuses it, because
+   the key-completeness check cannot see it. Map a value to its key with an
+   exhaustive `switch` instead.
+
+7. **Wrap with React.memo** if it's a leaf/list component:
    ```tsx
    export const GAvatar = React.memo(function GAvatar(props: GAvatarProps) { ... });
    ```
 
-7. **Export from barrel** in `components/ui/index.ts`:
+8. **Export from barrel** in `components/ui/index.ts`:
    ```tsx
    export { GAvatar } from './g-avatar';
    ```
@@ -61,9 +87,11 @@ How to add, modify, and remove components in the Goose on The Go UI library.
    components/patterns/notification-card.tsx
    ```
 
-2. **Compose from primitives** — import from `@/components/ui`:
+2. **Compose from ink primitives**, plus the in-house ones from `@/components/ui` where needed:
    ```tsx
-   import { GCard, GChip, GButton } from '@/components/ui';
+   import { InkButton, InkSwitch } from '@jarida/ink/native';
+   import { GIcon } from '@/components/ui/g-icon';
+   import { GPressable } from '@/components/ui/g-pressable';
    ```
 
 3. **Props should mirror ViewModel data shapes:**
@@ -102,46 +130,74 @@ How to add, modify, and remove components in the Goose on The Go UI library.
    - Stack screen: `app/(stack)/screen-name.tsx`
 5. **Register the route:**
    - Tab: add to `app/(tabs)/_layout.tsx`
-   - Stack: add to `app/(stack)/_layout.tsx`
-6. **Add navigation entry** in `constants/navigation.ts` if it should appear in the More hub.
+   - Stack: add `<Stack.Screen name="screen-name" options={{ title: t('screens.screenName') }} />`
+     to `app/(stack)/_layout.tsx`. An unregistered stack screen is headed by its raw route
+     name, and `constants/__tests__/navigation.test.ts` fails on it.
+6. **Add navigation entry** in `constants/navigation.ts` if it should appear in the Profile hub,
+   with `labelKey` a `TranslationKey`. See [NAVIGATION.md](./NAVIGATION.md#every-route-has-to-lead-somewhere).
 
 ## Existing Components
 
-### Primitives (components/ui/)
+### Primitives (@jarida/ink/native)
+Imported directly from the library — not re-exported through `components/ui/`.
+See ink's own docs for full prop lists; these are the ones the app leans on.
+
+| Component | Description |
+|-----------|-------------|
+| InkButton | Action button — 3 variants (GButton's old secondary/ghost/bordered variants collapsed into ink's `quiet`; `size` prop is gone) |
+| InkCard, InkEdge | Surfaces. A card already has a face and a plate; its own style carries layout only |
+| InkTitle, InkText, InkEyebrow | Type. A section heading is `InkTitle level={3}` |
+| InkRow, InkGroup | Settings-style rows and the group that titles them (the Profile hub) |
+| InkChoice, InkSegmented | Filters and segmented choices |
+| InkSwitch | Toggle switch |
+| InkNotice, InkEmptyState, InkSpinner, InkSkeleton | Status, empty and loading states |
+| InkBadge, InkBubble | Badges; chat bubbles |
+| InkIcon | Ink's icon slot, resolving from the same registry as `GIcon` |
+| InkBottomBar, InkNavbar | The tab bar and screen title bars |
+| InkProvider | Wraps the app (see `app/_layout.tsx`) |
+
+### Primitives — in-house exceptions (components/ui/)
 | Component | Props | Description |
 |-----------|-------|-------------|
-| GButton | variant, size, startIcon, endIcon, loading, disabled | Primary action button |
-| GCard | variant (default/elevated) | Surface container |
-| GChip | variant (6 colors), size, startIcon | Status badge |
-| GIcon | name, size, color, strokeWidth | Named lucide glyph from `constants/icons.ts` — see [VIEW-LAYER.md](./VIEW-LAYER.md) |
-| GInput | label, variant (bordered/flat), startIcon | Text input |
-| GTextArea | label, variant, minLines, maxLines | Multi-line input |
-| GSwitch | value, onValueChange, label | Toggle switch |
-| GTabs | tabs, activeKey, onTabChange, variant | Tab bar |
-| GSeparator | — | Divider line |
-| GRadioGroup | options, value, onValueChange, orientation | Radio options |
-| GSlider | value, onValueChange, min, max, label | Range slider |
-| GProgressBar | value, color, size, label | Progress indicator |
-| GSelect | options, selectedKey, onSelectionChange, label | Modal picker |
-| GSkeleton | width, height, borderRadius | Loading placeholder |
-| GEmptyState | icon, title, message, action | Empty content |
+| GIcon | name, size, color, strokeWidth | Named lucide glyph from `constants/icons.ts` — see [VIEW-LAYER.md](./VIEW-LAYER.md). `components/ui/ink-icons.ts` registers the same set with Ink, so `InkIcon` resolves the same artwork |
+| GPressable | feedback (`tint` / `lift`), Pressable props | A press that answers on the way down; `lift` dims instead under reduced motion. Imported by path, not through the barrel |
+| GKeyboardView | offset, style | Keeps the focused input above the on-screen keyboard — no ink equivalent |
+| EqualizerBars | color, count (8), height (20) | Animated level-meter bars for playing audio. See below. |
+
+### Animated components: the rules EqualizerBars follows
+
+`EqualizerBars` (`components/ui/equalizer-bars.tsx`) draws the Now Playing card's bars, each rising and falling at its own pace, so the row reads as "playing" at a glance. It is the first continuous animation in the app, and it sets the rules the next one should follow:
+
+- **Run it on the UI thread**, with Reanimated, so it keeps its rhythm while the JS thread is polling the Pond.
+- **Stop it when its screen is not in front.** Tab screens stay mounted, and an off-screen animation spends battery for nobody. It uses `useFocusEffect`.
+- **Honour Reduce Motion**, with Reanimated's `useReducedMotion`, and hold still.
+- **Keep render pure.** Each bar's motion is fixed per index (`equalizerMotion` in `equalizer-motion.ts`), not random.
+- **Draw it only when it is true.** The card shows bars only while something is playing, never over "Nothing playing".
+
+The motion numbers are in their own module because Reanimated's native worklets do not exist under Jest. That module is tested on its own (`components/ui/__tests__/equalizer-motion.test.ts`) without mocking Reanimated for the whole suite.
+
+Verified on a device from outside the app. Six rapid screenshots of the bar area were all different, while a static control area was identical in all six. uiautomator cannot reach an idle screen on Home while the bars move, and it can on another tab, which shows the animation stops off-screen. Reduce Motion has not been tested on a device.
+
+`VoiceOrb` is the other continuous animation, and it keeps the same rules by a different route: React Native's `Animated` on the native driver, one value per loop, with a still pose under reduced motion.
 
 ### Patterns (components/patterns/)
 | Component | Props | Description |
 |-----------|-------|-------------|
-| PageHeader | title, action | Screen title bar |
-| MetricCard | label, value, trend | Dashboard stat |
-| QuickAction | label, onPress | Dashboard action row |
-| ServerStatus | online, label | Connection indicator |
-| RoleChip | role, model, color | Model assignment badge |
-| ChatBubble | role, content, loading | Chat message |
-| ChatComposer | onSend, placeholder | Message input |
-| MoreMenuItem | label, onPress | More hub nav item |
-| MemoryItem | text, date, onDelete | Memory list row |
-| DeviceCard | device | Device display card |
-| ScheduleCard | schedule, onToggle | Schedule display card |
-| ModelItem | model, isActive, onPress | Model browser row |
-| LogRow | log | Log entry row |
-| SkillItem | skill, onToggle, onDelete | Skill list row |
-| VoiceOrb | state, onPress | Voice mode button |
-| VuMeter | level, active | Audio level bars |
+| ServerStatus | online, label | Whether the Pond is reachable, as a dot and a word |
+| ConnectionStatus | — | The connection banner; sends an unpaired or revoked phone to pairing |
+| RemoteAccessOffer | — | Home's dismissible offer of remote access to a Pond paired without it |
+| PondList | title, ponds, phase, onSelect | The Ponds on this network, shared by first run and Switch Pond |
+| ConversationWall | cards, loading, selecting, onOpen, … | The Chat tab's wall of conversation cards |
+| ConversationCard | card, onOpen, onAskDelete, … | One conversation on the wall |
+| ConversationList | sections, loading, header | The wall read as an index instead |
+| WallDock, WallMenu, WallSelectionBar | — | The wall's search and compose, its view menu, and its selection actions |
+| GreetingCard | name, prompts, onPick | The opening of a conversation that has not started |
+| MessageRow | message, position, status | One turn of the conversation |
+| ToolCard, SourceChips | tool / tools | What Goose did on the way to its answer |
+| ThinkingQuips | status, seed | What shows before Goose has written anything |
+| ChatDock | onSend, onVoice, onAttach | The composer: attach, the field, speak or send |
+| AttachMenu | open, onClose, onChoose | Camera, Photos or Files, from the composer |
+| VoiceDock | send, stop, onClose | Voice mode, in the composer's place |
+| VoiceOrb | state, level, size, onPress, accessibilityLabel | The voice control, and the face Goose talks with |
+| Goose | state, size, water | The Pond's bird, afloat |
+| ChromePuck, ChromePill | icon / label, onPress | One control floating over content, in the bar's material |

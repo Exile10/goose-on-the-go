@@ -5,10 +5,13 @@
  * (issue #17) — import those directly, e.g. `InkButton` from
  * '@jarida/ink/native'.
  *
- * Two exceptions remain and are exported here:
- *   - `GIcon`, pending the icon-registry work in #19.
- *   - `GKeyboardView`, which has no ink equivalent.
+ * Icons have one registry, `constants/icons.ts`, whose names are the set of
+ * valid icons. `GIcon` draws one directly; `components/ui/ink-icons.ts`
+ * registers the same set with Ink, so an `InkIcon` or an Ink `icon=` slot
+ * resolves the same artwork.
+ *
+ * `GKeyboardView` has no ink equivalent.
  */
 
-export { GIcon, type GIconProps } from './g-icon';
+export { GIcon } from './g-icon';
 export { GKeyboardView } from './g-keyboard-view';

@@ -1,0 +1,101 @@
+# Pull-request checks for the GOTG mobile client. Mirrors the Pond's own CI
+# workflow (goose-in-a-pond/.github/workflows/ci.yml) so both halves of the
+# system are held to one standard.
+#
+# This exists because nothing ran against a pull request in this repository.
+# Everything asserted about a branch -- that it typechecks, that its tests pass,
+# that it lints -- was run locally and reported by the person asking for the
+# review, which is the arrangement a reviewer is there to avoid.
+#
+# On enforcement, so nobody reads more into a green tick than it carries: this
+# repository is private and the org is on the free plan, where branch protection
+# and rulesets are both unavailable. These checks report; they cannot block a
+# merge. That removes the reviewer's dependence on the author's own account of
+# the branch. It does not yet stop a red branch from landing.
+
+name: CI
+
+on:
+  # No branch filter, for the reason security.yml already documents: `branches:`
+  # here matches the PR's BASE, so a PR stacked on another feature branch would
+  # never be checked at review time -- only after it had already landed, via the
+  # push trigger below. `push` stays scoped to main.
+  pull_request:
+    paths-ignore: &docs-only
+      - "**/*.md"
+      - "docs/**"
+      - "LICENSE"
+  push:
+    branches: [main]
+    paths-ignore: *docs-only
+  workflow_dispatch:
+
+# Minutes for a private repository come out of the org quota, so a run that has
+# already been superseded by another push is pure waste.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  mobile:
+    name: Mobile — tsc / jest / eslint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 1
+
+      - uses: actions/setup-node@v7
+        with:
+          # react-native@0.85 and every @react-native/* package declare
+          # "^20.19.4 || ^22.13.0 || ^24.3.0 || >= 25.0.0". Node 20 satisfies
+          # that but reached end-of-life on 2026-04-30.
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      # `npm ci`, never `npm install`. package.json carries expo and jest-expo as
+      # caret ranges, so the lockfile is the only thing holding the SDK-major
+      # pairing that docs/TESTING.md warns about; `npm install` would resolve a
+      # newer jest-expo against this React Native minor and fail inside
+      # @react-native/jest-preset.
+      #
+      # Note that this differs in posture from the audit gate in security.yml,
+      # which deliberately installs nothing so a compromised transitive package
+      # never executes. Running the test suite requires an install, and this
+      # repo has a postinstall. That is inherent to checking the tests at all,
+      # but it is a real difference between the two workflows.
+      - name: Install dependencies
+        run: npm ci
+
+      # Every check runs even after an earlier one fails. A reviewer should see
+      # all of one push's failures at once rather than uncovering them one per
+      # push, which is what a plain sequence of steps would produce.
+      - name: Typecheck
+        if: ${{ !cancelled() }}
+        run: npx tsc --noEmit
+
+      - name: Tests
+        if: ${{ !cancelled() }}
+        run: npx jest --ci
+
+      # `npx eslint .` and not `npm run lint`. The two are not equivalent:
+      # `expo lint` walks a narrower set of files and reports zero errors on a
+      # tree where eslint, over 111 files, reports nine. Pointed at one of the
+      # offending files, `expo lint` reports the identical error -- so the
+      # difference is traversal, not configuration, and the narrower command is
+      # the one that would let a regression through.
+      #
+      # Those nine errors predate this workflow (eight react-hooks/
+      # set-state-in-effect in view-models and hooks, one no-undef in
+      # jest.setup.js) and are tracked in #53. continue-on-error keeps them
+      # visible in the log without making this job red from the day it is
+      # introduced, which is reliably how a new gate gets trained out of a team.
+      # Remove this line when #53 is cleared. It is a deferral, not a pardon.
+      - name: Lint
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        run: npx eslint .

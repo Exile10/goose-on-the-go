@@ -1,3 +1,4 @@
+jest.mock('@/services/pond-trust', () => ({ assertPondTrust: jest.fn().mockResolvedValue(undefined) }));
 /**
  * The route wrappers, and the three things in `request()` every one of them
  * inherits: envelope unwrapping, empty-body tolerance, and one shared refresh.
@@ -40,7 +41,7 @@ describe('envelope unwrapping', () => {
    */
   it('returns the list from an enveloped collection', async () => {
     setFetch(async () => reply('{"devices":[{"id":"d1","name":"Lamp","is_online":true}]}'));
-    const api = new PondApiClient('http://pond.test:4000');
+    const api = new PondApiClient('https://pond.test:4000');
 
     await expect(api.listDevices()).resolves.toEqual([
       { id: 'd1', name: 'Lamp', is_online: true },
@@ -50,7 +51,7 @@ describe('envelope unwrapping', () => {
   /** Older ponds answer a bare array. Both shapes have to work. */
   it('returns the list when the server sends a bare array', async () => {
     setFetch(async () => reply('[{"id":"d1","name":"Lamp","is_online":true}]'));
-    const api = new PondApiClient('http://pond.test:4000');
+    const api = new PondApiClient('https://pond.test:4000');
 
     await expect(api.listDevices()).resolves.toHaveLength(1);
   });
@@ -63,14 +64,14 @@ describe('empty bodies', () => {
    */
   it('resolves a 204 instead of failing to parse it', async () => {
     setFetch(async () => reply('', { status: 204 }));
-    const api = new PondApiClient('http://pond.test:4000');
+    const api = new PondApiClient('https://pond.test:4000');
 
     await expect(api.deleteDevice('d1')).resolves.toBeUndefined();
   });
 
   it('resolves a 200 that carries no body', async () => {
     setFetch(async () => reply(''));
-    const api = new PondApiClient('http://pond.test:4000');
+    const api = new PondApiClient('https://pond.test:4000');
 
     await expect(api.pauseSchedule('s1')).resolves.toBeUndefined();
   });
@@ -101,7 +102,7 @@ describe('concurrent 401s', () => {
       return reply('{"devices":[]}');
     });
 
-    const api = new PondApiClient('http://pond.test:4000');
+    const api = new PondApiClient('https://pond.test:4000');
     api.setToken('stale');
     api.setRefreshToken('refresh-1');
 
@@ -112,5 +113,176 @@ describe('concurrent 401s', () => {
     ]);
 
     expect(refreshes).toBe(1);
+  });
+});
+
+/**
+ * Who this phone belongs to comes from the Pond, which reads it off the token it issued at
+ * pairing. The phone never says who it is; it asks. Pinned so the wrapper cannot drift onto a
+ * path that takes the device id from the client.
+ */
+it('asks the Pond which member this device belongs to, naming no device itself', async () => {
+  const seen: { url: string; method?: string }[] = [];
+  setFetch(async (url: string, init?: { method?: string }) => {
+    seen.push({ url, method: init?.method });
+    return reply('{"device_id":"install-77","profile":{"id":"p1","display_name":"Liz"}}');
+  });
+  const api = new PondApiClient('https://pond.test:4000');
+
+  await expect(api.deviceSelf()).resolves.toEqual({
+    device_id: 'install-77',
+    profile: { id: 'p1', display_name: 'Liz' },
+  });
+  expect(seen).toEqual([{ url: 'https://pond.test:4000/api/v1/devices/self', method: undefined }]);
+});
+
+it('reads which Pond this is from its own system info', async () => {
+  const seen: string[] = [];
+  setFetch(async (url: string) => { seen.push(url); return reply('{"hostname":"giap-mac","version":"0.1.0"}'); });
+  const api = new PondApiClient('https://pond.test:4000');
+
+  await expect(api.systemInfo()).resolves.toMatchObject({ hostname: 'giap-mac' });
+  expect(seen).toEqual(['https://pond.test:4000/api/v1/system/info']);
+});
+
+describe('right-now reads', () => {
+  it('reads the weather the Pond reports, which is in Celsius', async () => {
+    const seen: string[] = [];
+    setFetch(async (url: string) => { seen.push(url); return reply('{"enabled":true,"temp":22,"location_name":"Nairobi"}'); });
+    const api = new PondApiClient('https://pond.test:4000');
+
+    await expect(api.weather()).resolves.toMatchObject({ enabled: true, temp: 22 });
+    expect(seen).toEqual(['https://pond.test:4000/api/v1/weather']);
+  });
+
+  it('reads what is playing', async () => {
+    const seen: string[] = [];
+    setFetch(async (url: string) => { seen.push(url); return reply('{"connected":true,"playing":false}'); });
+    const api = new PondApiClient('https://pond.test:4000');
+
+    await expect(api.nowPlaying()).resolves.toEqual({ connected: true, playing: false });
+    expect(seen).toEqual(['https://pond.test:4000/api/v1/music/now-playing']);
+  });
+
+  // The Pond answers `json!(tasks)`: a bare array of its own Schedule, which has `label` and
+  // `paused` and no `name` or `enabled`. Read it as what it is.
+  it('reads the next routines as the bare array the Pond sends', async () => {
+    const seen: string[] = [];
+    setFetch(async (url: string) => {
+      seen.push(url);
+      return reply('[{"id":"s1","label":"Morning briefing","next_run":"2026-09-23T04:00:00Z","paused":false}]');
+    });
+    const api = new PondApiClient('https://pond.test:4000');
+
+    await expect(api.upcomingSchedules(1)).resolves.toEqual([
+      { id: 's1', label: 'Morning briefing', next_run: '2026-09-23T04:00:00Z', paused: false },
+    ]);
+    expect(seen).toEqual(['https://pond.test:4000/api/v1/schedules/upcoming?limit=1']);
+  });
+});
+
+/**
+ * The Pond derives `is_online` from `last_seen` against a five-minute threshold
+ * and has had a heartbeat route with no caller, so a paired phone aged out of its
+ * own device list and reported itself offline while in use. The path and method
+ * are what this pins; the interval that drives it is a provider concern and is
+ * verified against a real Pond rather than here.
+ */
+it('posts a heartbeat to the device path the Pond registered', async () => {
+  const seen: { url: string; method?: string }[] = [];
+  setFetch(async (url: string, init?: { method?: string }) => {
+    seen.push({ url, method: init?.method });
+    return reply('{"status":"ok"}');
+  });
+  const api = new PondApiClient('https://pond.test:4000');
+
+  await api.deviceHeartbeat('install-77');
+
+  expect(seen).toHaveLength(1);
+  expect(seen[0].method).toBe('POST');
+  expect(seen[0].url).toBe('https://pond.test:4000/api/v1/devices/install-77/heartbeat');
+});
+
+it('escapes a device id that would otherwise change the path', async () => {
+  const seen: string[] = [];
+  setFetch(async (url: string) => { seen.push(url); return reply('{}'); });
+  const api = new PondApiClient('https://pond.test:4000');
+
+  await api.deviceHeartbeat('a/../b');
+
+  expect(seen[0]).toBe('https://pond.test:4000/api/v1/devices/a%2F..%2Fb/heartbeat');
+});
+
+/**
+ * A response shape the wrapper did not expect must not reach a screen as
+ * `undefined`. The Pond answering `{}` -- or an envelope with the key missing or
+ * null -- crashed the AI Models screen with "Cannot read property 'find' of
+ * undefined", because the declared type asserted a key the body need not carry.
+ */
+describe('a catalogue the server did not send', () => {
+  it.each([
+    ['an envelope without the key', '{}'],
+    ['an envelope with a null list', '{"models":null}'],
+    ['an unrelated envelope', '{"items":[{"name":"x"}]}'],
+  ])('answers %s with an empty list rather than undefined', async (_label, body) => {
+    setFetch(async () => reply(body));
+    const api = new PondApiClient('https://pond.test:4000');
+    await expect(api.listModels()).resolves.toEqual([]);
+  });
+
+  // The Pond answers six arrays, one per category, never `{models}`; see
+  // `listModels`. Each entry comes back tagged with its bucket, and `id` is the
+  // `${category}:${name}` pair `/activate` keys on.
+  it('still unwraps a well-formed catalogue', async () => {
+    setFetch(async () => reply('{"gguf":[{"provider":"p","name":"m","is_active":true}],"ollama":null}'));
+    const api = new PondApiClient('https://pond.test:4000');
+    await expect(api.listModels()).resolves.toEqual([
+      { provider: 'p', name: 'm', is_active: true, category: 'gguf', id: 'gguf:m' },
+    ]);
+  });
+
+  /**
+   * Nine wrappers share the unwrapping, so pinning it through one of them proves
+   * little. Devices is the other end of the same helper: the Home and Devices
+   * screens both map over this list, and `undefined` there fails the same way the
+   * models screen did.
+   */
+  it('applies the same tolerance to the other collections', async () => {
+    setFetch(async () => reply('{}'));
+    const api = new PondApiClient('https://pond.test:4000');
+    await expect(api.listDevices()).resolves.toEqual([]);
+    await expect(api.listSchedules()).resolves.toEqual([]);
+  });
+});
+
+/**
+ * A refresh that did not complete is not a refusal. Treating a rate limit or a
+ * restarting Pond as one reported the phone revoked -- which ends the session and
+ * clears the stored pairing -- while its refresh token was still good.
+ */
+describe('a refresh that could not complete', () => {
+  function expired(refreshStatus: number) {
+    setFetch(async (url: string) => {
+      if (url.endsWith('/handshake/refresh')) return reply('', { status: refreshStatus });
+      return reply('', { status: 401 });
+    });
+    const api = new PondApiClient('https://pond.test:4000');
+    api.setToken('stale');
+    api.setRefreshToken('refresh-1');
+    const revoked = jest.fn();
+    api.setAuthRevoked(revoked);
+    return { api, revoked };
+  }
+
+  it.each([429, 500, 503])('does not report revocation when the refresh answers %i', async (status) => {
+    const { api, revoked } = expired(status);
+    await expect(api.listDevices()).rejects.toMatchObject({ status });
+    expect(revoked).not.toHaveBeenCalled();
+  });
+
+  it('still reports revocation when the Pond refuses the refresh token', async () => {
+    const { api, revoked } = expired(401);
+    await expect(api.listDevices()).rejects.toMatchObject({ status: 401 });
+    expect(revoked).toHaveBeenCalledTimes(1);
   });
 });

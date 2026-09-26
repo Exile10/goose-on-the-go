@@ -23,6 +23,7 @@ import { InkChoice, InkEmptyState, InkText } from '@jarida/ink/native';
 
 import { GIcon } from '@/components/ui/g-icon';
 import { selectionTick } from '@/services/haptics';
+import type { TranslationKey } from '@/services/i18n';
 import { SAMPLE_LOGS, type LogEntry, type LogType } from '@/models/log';
 import { Grey, Semantic } from '@/constants/colors';
 import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
@@ -38,6 +39,24 @@ const LEVEL_COLORS: Record<string, string> = {
   warn: Semantic.warning,
   error: Semantic.danger,
 };
+
+/**
+ * The label for a filter, and for the type badge, one literal key per branch.
+ *
+ * Not `activity.${tab}`: a key assembled at runtime is invisible to
+ * services/__tests__/i18n.test.ts, which refuses the construct outright. The
+ * switch is exhaustive, so TypeScript fails here if a type is added without a
+ * label, and the return type fails it if the key is not in the catalogue.
+ */
+function labelKey(tab: LogType | 'all'): TranslationKey {
+  switch (tab) {
+    case 'all': return 'activity.all';
+    case 'action': return 'activity.action';
+    case 'mcp': return 'activity.mcp';
+    case 'system': return 'activity.system';
+    case 'error': return 'activity.error';
+  }
+}
 
 const LogRow = React.memo(function LogRow({
   item,
@@ -65,7 +84,7 @@ const LogRow = React.memo(function LogRow({
           {showType ? (
             <View style={[styles.typeBadge, { backgroundColor: levelColor + '18' }]}>
               <Text style={[styles.typeText, { color: levelColor }]}>
-                {t(`activity.${item.type}` as const)}
+                {t(labelKey(item.type))}
               </Text>
             </View>
           ) : null}
@@ -114,7 +133,7 @@ export default function ActivityScreen() {
               setActiveTab(tab);
             }}
           >
-            {t(`activity.${tab}` as const)}
+            {t(labelKey(tab))}
           </InkChoice>
         ))}
       </ScrollView>

@@ -24,6 +24,7 @@ import {
 } from '@expo-google-fonts/jetbrains-mono';
 import { InkProvider } from '@jarida/ink/native';
 
+import { ConnectionStatus } from '@/components/patterns/connection-status';
 import { NotificationsProvider } from '@/providers/notifications-provider';
 import { ThemeProvider, useTheme } from '@/providers/theme-provider';
 // Registers the app's icons with Ink. Imported for the side effect: on native
@@ -122,6 +123,7 @@ function ThemedApp() {
   return (
     <NavThemeProvider value={isDark ? DarkTheme : DefaultTheme}>
       <InkProvider scheme={isDark ? 'dark' : 'light'} accent="Purple">
+        <ConnectionStatus />
         <Stack>
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="(stack)" options={{ headerShown: false }} />

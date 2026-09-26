@@ -1,20 +1,26 @@
 /**
- * ConnectDesktopScreen — scan the pairing QR shown on the Pond's dashboard.
+ * ConnectDesktopScreen — the viewfinder, for both QR codes the app reads.
+ *
+ * `?mode=matter` scans a Matter device's setup code for the commissioning
+ * screen; without it, the pairing QR shown on the Pond's dashboard, for the
+ * pairing wizard. One screen rather than two because everything around the
+ * decode is the same problem: camera permission with its no-second-prompt case,
+ * the hold-to-confirm rule, and a viewfinder that owns the whole screen.
  *
  * This screen only decodes. It performs no networking and never holds a token:
- * the decoded payload is handed to the pairing wizard, which runs the same
- * handshake as manual code entry, so there is one crypto path and one token
- * store rather than two.
+ * what it reads is handed to the screen that asked for it, which runs the same
+ * path as manual entry -- so there is one crypto path and one token store
+ * rather than two, and one commissioning call rather than two.
  *
- * The QR encodes a live pairing code. It is never logged, and the scanner's own
- * error copy never echoes it back.
+ * Both codes are credentials. Neither is ever logged, and the scanner's own
+ * error copy never echoes one back.
  */
 
 import { useTranslation } from 'react-i18next';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Animated, Easing, Linking, StyleSheet, Text, View } from 'react-native';
 import { InkButton } from '@jarida/ink/native';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CameraView, useCameraPermissions, type BarcodeScanningResult } from 'expo-camera';
 
@@ -22,10 +28,12 @@ import { GIcon } from '@/components/ui/g-icon';
 import { GPressable } from '@/components/ui/g-pressable';
 import {
   InvalidPairingCodeError,
+  isPairingPayload,
   looksLikeMatterSetupCode,
   parsePairingPayload,
+  type PairingPayload,
 } from '@/models/pairing';
-import { offerPairingPayload } from '@/services/pairing-handoff';
+import { offerPairingPayload, offerSetupCode } from '@/services/pairing-handoff';
 import { advanceHold, HOLD_STEADY_MS, LOST_AFTER_MS, type Hold } from '@/models/scan-hold';
 import { Brand, JaridaPurple, Semantic } from '@/constants/colors';
 import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
@@ -47,6 +55,8 @@ export default function ConnectDesktopScreen() {
   const styles = useThemedStyles(makeStyles);
   const { t } = useTranslation();
   const router = useRouter();
+  const { mode } = useLocalSearchParams<{ mode?: string }>();
+  const matter = mode === 'matter';
   const insets = useSafeAreaInsets();
   const [permission, requestPermission] = useCameraPermissions();
   const [error, setError] = useState<string | null>(null);
@@ -81,28 +91,41 @@ export default function ConnectDesktopScreen() {
     ({ data }: BarcodeScanningResult) => {
       if (!scanning) return;
 
-      let payload;
-      try {
-        payload = parsePairingPayload(data);
-      } catch (e) {
-        // Judged immediately rather than after the hold: a QR that is not a
-        // pairing code will never become one by being held longer, and the
-        // Matter case below is worth saying at once.
+      // Judged immediately rather than after the hold: a QR that is the wrong
+      // kind will never become the right one by being held longer, and each
+      // wrong kind is worth naming at once.
+      const reject = (message: string) => {
         setScanning(false);
         abandonHold();
-        if (!(e instanceof InvalidPairingCodeError)) {
-          setError('Could not read that code. Try again.');
-          return;
+        setError(message);
+      };
+
+      let payload: PairingPayload | null = null;
+      if (matter) {
+        if (!looksLikeMatterSetupCode(data)) {
+          // The mirror of the message below. Somebody who opened this from Add
+          // device and pointed it at the Pond's own dashboard is holding a code
+          // that is valid, just for the other flow.
+          return reject(
+            t(isPairingPayload(data) ? 'commission.isPondCode' : 'commission.notSetupCode'),
+          );
         }
-        // Name the mistake rather than just rejecting it: a Matter device's
-        // code is valid, only in a different part of the app, and sending the
-        // user back to hunt for "the right QR" is the unhelpful outcome here.
-        setError(
-          looksLikeMatterSetupCode(data)
-            ? 'That is a Matter device setup code, not a Pond pairing code. Use Devices, then Add device, to commission it. The pairing code is the one on your Pond dashboard.'
-            : 'That is not a Goose In A Pond pairing code. Open Pairing on your Pond and scan the code it shows.',
-        );
-        return;
+      } else {
+        try {
+          payload = parsePairingPayload(data);
+        } catch (e) {
+          if (!(e instanceof InvalidPairingCodeError)) {
+            return reject(t('pairing.codeUnreadable'));
+          }
+          // Name the mistake rather than just rejecting it: a Matter device's
+          // code is valid, only in a different part of the app, and sending the
+          // user back to hunt for "the right QR" is the unhelpful outcome here.
+          return reject(
+            looksLikeMatterSetupCode(data)
+              ? t('scanErrors.matterCode')
+              : t('scanErrors.notPondCode'),
+          );
+        }
       }
 
       const now = Date.now();
@@ -132,10 +155,11 @@ export default function ConnectDesktopScreen() {
       if (lostTimer.current) clearTimeout(lostTimer.current);
       setScanning(false);
       abandonHold();
-      offerPairingPayload(payload);
+      if (payload) offerPairingPayload(payload);
+      else offerSetupCode(data.trim());
       router.back();
     },
-    [router, scanning, abandonHold, progress],
+    [router, scanning, abandonHold, progress, matter, t],
   );
 
   const retry = useCallback(() => {
@@ -157,17 +181,18 @@ export default function ConnectDesktopScreen() {
         <GIcon name="camera" size={32} color={JaridaPurple[500]} />
         <Text style={styles.permissionTitle}>{t('desktop.cameraNeeded')}</Text>
         <Text style={styles.permissionDesc}>
-          Scanning the pairing code needs the camera. You can also enter the six digits by
-          hand instead.
+          {matter ? t('commission.camera') : t('pairing.cameraDesc')}
         </Text>
         <InkButton
           variant="primary"
           onPress={canPrompt ? requestPermission : () => void Linking.openSettings()}
         >
-          {canPrompt ? 'Enable Camera' : 'Open Settings'}
+          {canPrompt ? t('pairing.enableCamera') : t('pairing.openSettings')}
         </InkButton>
         <GPressable onPress={() => router.back()} hitSlop={8}>
-          <Text style={styles.cancel}>{t('desktop.enterCode')}</Text>
+          <Text style={styles.cancel}>
+            {matter ? t('commission.type') : t('desktop.enterCode')}
+          </Text>
         </GPressable>
       </View>
     );
@@ -185,11 +210,13 @@ export default function ConnectDesktopScreen() {
           it sits below the status bar rather than under it. */}
       <GPressable
         accessibilityRole="button"
-        accessibilityLabel="Close scanner"
+        accessibilityLabel={t('pairing.closeScanner')}
         onPress={() => router.back()}
         hitSlop={12}
         style={[styles.close, { top: insets.top + Spacing.sm }]}
       >
+        {/* Sits on a semi-black overlay over the live camera feed, so the icon is
+            white in either scheme rather than the theme's foreground. */}
         <GIcon name="arrow" size={22} color={Brand.white} />
       </GPressable>
 
@@ -230,13 +257,17 @@ export default function ConnectDesktopScreen() {
         ) : (
           <Text style={styles.hint}>
             {holding
-              ? 'Hold steady\u2026'
-              : "Point the camera at the QR code on your Pond's dashboard"}
+              ? t('pairing.holdSteady')
+              : matter
+                ? t('commission.aim')
+                : t('pairing.aimAtPond')}
           </Text>
         )}
 
         <GPressable onPress={() => router.back()} hitSlop={8}>
-          <Text style={styles.cancel}>{t('desktop.enterCode')}</Text>
+          <Text style={styles.cancel}>
+            {matter ? t('commission.type') : t('desktop.enterCode')}
+          </Text>
         </GPressable>
       </View>
     </View>

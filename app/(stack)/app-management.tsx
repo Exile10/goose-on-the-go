@@ -36,6 +36,7 @@ interface AppIntegration {
   category: string;
 }
 
+/* eslint-disable i18next/no-literal-string -- placeholder integrations, including two the Pond does not have; replaced when the screen reads the Pond's extensions (#13) */
 const APPS: AppIntegration[] = [
   { id: 'uber', name: 'Uber', icon: 'device', description: 'Ride requests and estimates', enabled: true, hasApiKey: true, category: 'Transport' },
   { id: 'glovo', name: 'Glovo', icon: 'package', description: 'Food and grocery delivery', enabled: true, hasApiKey: true, category: 'Delivery' },
@@ -44,6 +45,7 @@ const APPS: AppIntegration[] = [
   { id: 'notion', name: 'Notion', icon: 'edit', description: 'Notes and task management', enabled: false, hasApiKey: false, category: 'Productivity' },
   { id: 'hue', name: 'Philips Hue', icon: 'light', description: 'Smart lighting control', enabled: true, hasApiKey: true, category: 'Smart Home' },
 ];
+/* eslint-enable i18next/no-literal-string */
 
 /** App card */
 const AppCard = React.memo(function AppCard({
@@ -85,7 +87,7 @@ const AppCard = React.memo(function AppCard({
               placeholderTextColor={Grey[400]}
             />
             <GPressable onPress={() => setShowKey(!showKey)}>
-              <Text style={styles.showHideText}>{showKey ? 'Hide' : 'Show'}</Text>
+              <Text style={styles.showHideText}>{showKey ? t('appManagement.hide') : t('appManagement.show')}</Text>
             </GPressable>
           </View>
         </View>

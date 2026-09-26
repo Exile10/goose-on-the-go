@@ -103,30 +103,58 @@ implementation, which is the default backend.
 
 ## Providers
 
-Two React context providers wrap the app:
+`app/_layout.tsx` wraps the app in these, outermost first:
 
 - **ThemeProvider** (`providers/theme-provider.tsx`) — Jarida color tokens resolved for light/dark mode. Access via `useTheme()`.
-- **ServerProvider** (`providers/server-provider.tsx`) — Server connection state. Access via `useServer()`.
+- **ServerProvider** (`providers/server-provider.tsx`) — Server connection state and the dev mock/real toggles. Access via `useServer()`.
+- **NotificationsProvider** (`providers/notifications-provider.tsx`) — Push registration.
+- **InkProvider** (`@jarida/ink/native`) — Theme context for the ink primitives (#17).
+
+## Presence: telling the Pond this phone is still here
+
+The Pond does not store whether a device is online. It derives `is_online` at read time from `last_seen` against a **five-minute** threshold, so a paired phone has to keep refreshing its own row, or it ages out and reports itself offline in its own device list while in use. `ServerProvider` does that with `POST /api/v1/devices/{id}/heartbeat`, where `{id}` is the install id sent as `client_id` at pairing. The Pond keys the device row on exactly that id.
+
+| Rule | Why |
+|---|---|
+| Every **2 minutes** (`HEARTBEAT_MS`) | Inside the five-minute threshold with room for one dropped beat, and about 30 requests an hour against the Pond's per-IP budget. |
+| First beat once the **connection manager has reached the Pond** | The paired identity loads before the base URL resolves. A beat sent then goes to the client's default address and is lost, which on a cold start left the card offline until the interval came round. |
+| Stops only in a **known background** state | Backgrounding a React Native app suspends its networking, so claiming reachability then would be false. On an Android cold start AppState can still read `'unknown'`, and the app is on screen. |
+| A missed beat is **dropped, not retried**, and logged | The next one is already scheduled, and a retry loop against a rate-limited Pond is the failure the interval avoids. It is logged because a beat that always fails looks exactly like one that never fires. |
+
+The conditions live in `services/heartbeat.ts` (`canBeat`) and are unit tested there; the provider only wires them to its state. The cold-start behaviour was verified on a device, starting from a row that had aged out: the card read online 38 seconds after launch, before the interval could fire.
+
+The desktop app has the same problem and the same fix, on the Pond side (goose-in-a-pond#388).
 
 ## Navigation
 
 Uses Expo Router v6 with file-based routing:
 
-- **`(tabs)/`** — Bottom tab navigator (5 tabs: Dashboard, Chat, Canvas, Devices, More)
-- **`(stack)/`** — Stack navigator (8 screens: Memory, Skills, Models, Logs, Schedules, Prompts, Settings, Agent)
+- **`(tabs)/`** — Bottom tab navigator (4 tabs: Home, Chat, Devices, You)
+- **`(stack)/`** — Stack navigator for the You-tab sub-screens, plus Add Device, Connect Desktop and the dev-only Developer screen
 - **`modal.tsx`** — Modal presentation route
 
 See [NAVIGATION.md](./NAVIGATION.md) for detailed rationale.
 
 ## Component Library
 
-All UI components are in-house — no external UI library.
+Primitives come from **`@jarida/ink/native`** (`InkButton`, `InkInput`, `InkSwitch`, `InkProvider`, etc. — issue #17). Two in-house primitives remain in `components/ui/`, re-exported from its barrel: `GIcon` (pending the icon-registry work in #19) and `GKeyboardView` (no ink equivalent).
 
-- **`components/ui/`** — Primitive components (GButton, GCard, GChip, etc.)
-- **`components/patterns/`** — Composite components (ChatBubble, DeviceCard, etc.)
+- **`components/ui/`** — The two surviving in-house primitives (`GIcon`, `GKeyboardView`)
+- **`components/patterns/`** — Composite components (ChatBubble, ServerStatus, etc.), composed from ink primitives
 - **`components/layout/`** — Screen wrappers (ScreenScrollView, ScreenFlatList)
 
 See [COMPONENT-GUIDE.md](./COMPONENT-GUIDE.md) for how to add/modify components.
+
+## Developer Mode
+
+`app/(stack)/developer.tsx`, reached from the You tab's "Developer" section, is a
+dev-only screen (`if (!__DEV__) return <Redirect .../>`) that lets each
+migratable screen be flipped independently between its mock data and the real
+`PondApiClient` (issue #21). `MIGRATION_SCREENS` and `isScreenReal`/`setScreenMode`
+live on `ServerProvider` (`providers/server-provider.tsx`); mock and real code
+paths coexist per screen, so nothing needs to be deleted to test either one.
+It also has a "Pond server URL" field and a Test connection button that probes
+`/health`. The screen isn't linked from the You-tab menu in production builds.
 
 ## Performance
 

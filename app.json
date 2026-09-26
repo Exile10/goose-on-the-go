@@ -28,7 +28,9 @@
       "permissions": [
         "android.permission.ACCESS_WIFI_STATE",
         "android.permission.CHANGE_WIFI_MULTICAST_STATE",
-        "android.permission.CAMERA"
+        "android.permission.CAMERA",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_DATA_SYNC"
       ],
       "adaptiveIcon": {
         "backgroundColor": "#1C1C1E",
@@ -49,7 +51,7 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "Goose On The Go uses your camera to scan your Pond's pairing code, and to take photos you choose to send to Goose.",
+          "cameraPermission": "Goose On The Go uses your camera to scan QR codes, such as your Pond's pairing code and the setup code on a device you are adding, and to take photos you choose to send to Goose.",
           "recordAudioAndroid": false
         }
       ],
@@ -90,10 +92,11 @@
         "expo-image-picker",
         {
           "photosPermission": "Goose On The Go opens your photos so you can choose pictures to send to Goose.",
-          "cameraPermission": "Goose On The Go uses your camera to scan your Pond's pairing code, and to take photos you choose to send to Goose.",
+          "cameraPermission": "Goose On The Go uses your camera to scan QR codes, such as your Pond's pairing code and the setup code on a device you are adding, and to take photos you choose to send to Goose.",
           "microphonePermission": false
         }
-      ]
+      ],
+      "./plugins/with-pond-tls"
     ],
     "experiments": {
       "typedRoutes": true,

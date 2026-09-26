@@ -9,12 +9,16 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const KEYS = {
   serverUrl: '@goose/server-url',
+  connectionProfile: '@goose/connection-profile',
   lastScreen: '@goose/last-screen',
   settings: '@goose/settings',
   devScreenModes: '@goose/dev-screen-modes',
   themePreference: '@goose/theme-preference',
   onboardingDone: '@goose/onboarding-done',
   chatHistoryView: '@goose/chat-history-view',
+  remoteOfferDismissed: '@goose/remote-offer-dismissed',
+  /** When the Pond will drop remote access unless the phone is seen at home. Not a secret. */
+  remoteLapsesAt: '@goose/remote-lapses-at',
 } as const;
 
 /**

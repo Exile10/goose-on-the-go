@@ -1,9 +1,11 @@
 /**
  * Whether the first-run flow still has something to say.
  *
- * Paired is the real signal; the stored flag only records someone choosing
- * "set up later", so dismissing it does not strand them on a screen they
- * already refused.
+ * Paired is the real signal, and it is the stored pairing, the same one the
+ * tabs gate on: the in-memory token is empty for a moment after launch and
+ * after a revocation, and deciding from it disagreed with the gate. The stored
+ * flag only records someone choosing "set up later", so dismissing it does not
+ * strand them on a screen they already refused.
  */
 
 import { useCallback, useEffect, useState } from 'react';
@@ -18,7 +20,7 @@ export interface UseOnboarding {
 }
 
 export function useOnboarding(): UseOnboarding {
-  const { token, hydrated } = useServer();
+  const { paired, hydrated } = useServer();
   const [dismissed, setDismissed] = useState<boolean | null>(null);
 
   useEffect(() => {
@@ -41,7 +43,6 @@ export function useOnboarding(): UseOnboarding {
     void Storage.remove('onboardingDone');
   }, []);
 
-  const paired = Boolean(token);
   const loading = !hydrated || dismissed === null;
 
   return {

@@ -58,15 +58,15 @@ export default function HomeManagementScreen() {
   const [rooms, setRooms] = useState(ROOMS);
 
   const handleRemoveRoom = useCallback((id: string) => {
-    Alert.alert('Remove Room', 'Are you sure you want to remove this room?', [
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert(t('homeManagementAlert.removeTitle'), t('homeManagementAlert.removeBody'), [
+      { text: t('common.cancel'), style: 'cancel' },
       {
-        text: 'Remove',
+        text: t('homeManagementAlert.remove'),
         style: 'destructive',
         onPress: () => setRooms((prev) => prev.filter((r) => r.id !== id)),
       },
     ]);
-  }, []);
+  }, [t]);
 
   return (
     <GKeyboardView>
@@ -84,7 +84,9 @@ export default function HomeManagementScreen() {
             </View>
             <View style={styles.roomInfo}>
               <Text style={styles.roomName}>{room.name}</Text>
-              <Text style={styles.roomDevices}>{room.deviceCount} devices</Text>
+              <Text style={styles.roomDevices}>
+                {t('homeManagement.deviceCount', { count: room.deviceCount })}
+              </Text>
             </View>
             <GPressable style={styles.roomAction}>
               <GIcon name="edit" size={16} color={Grey[400]} />
@@ -118,7 +120,9 @@ export default function HomeManagementScreen() {
               <Text style={styles.pondName}>{pd.name}</Text>
             </View>
             <View style={styles.pondMeta}>
-              <Text style={styles.pondFirmware}>{pd.firmware}</Text>
+              <Text style={styles.pondFirmware}>
+                {t('homeManagement.firmware', { version: pd.firmware })}
+              </Text>
               <View style={styles.pondStatus}>
                 <Text
                   style={[
