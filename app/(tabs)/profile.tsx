@@ -195,7 +195,7 @@ export default function ProfileHub() {
         <View style={{ height: 100 }} />
       </View>
     ),
-    [router, t],
+    [router, t, signingOut],
   );
 
   return (

@@ -38,7 +38,7 @@ const TYPE_STYLE: Record<string, { icon: string; color: string; tone: InkTone }>
   camera: { icon: 'camera', color: '#C8383B', tone: 'danger' },
   speaker: { icon: 'speaker', color: '#8C4BFF', tone: 'brand' },
 };
-const DEFAULT_STYLE = { icon: 'devices', color: JaridaPurple[500], tone: 'brand' as InkTone };
+const DEFAULT_STYLE = { icon: 'device', color: JaridaPurple[500], tone: 'brand' as InkTone };
 
 function styleFor(device: Device) {
   return TYPE_STYLE[device.device_type?.toLowerCase() ?? ''] ?? DEFAULT_STYLE;
