@@ -30,7 +30,6 @@ export default function StackLayout() {
       <Stack.Screen name="app-management" options={{ title: i18n.t('nav.appManagement') }} />
       <Stack.Screen name="mcp-servers" options={{ title: i18n.t('nav.mcpServers') }} />
       <Stack.Screen name="add-users" options={{ title: i18n.t('nav.addUsers') }} />
-      <Stack.Screen name="biometrics" options={{ title: i18n.t('screens.biometrics') }} />
       <Stack.Screen name="privacy" options={{ title: i18n.t('nav.privacy') }} />
       <Stack.Screen name="remote-access" options={{ title: i18n.t('nav.remoteAccess') }} />
       <Stack.Screen name="home-management" options={{ title: i18n.t('nav.homeManagement') }} />

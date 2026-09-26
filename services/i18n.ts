@@ -173,21 +173,6 @@ void i18n.use(initReactI18next).init({
       servers: 'MCP SERVERS',
       addServer: 'Add MCP Server',
     },
-    biometrics: {
-      info: 'Biometric data is stored locally on your Pond device and never uploaded to the cloud.',
-      methods: 'BIOMETRIC METHODS',
-      enrolled: 'Enrolled',
-      reEnroll: 'Re-enroll',
-      enrolling: 'Enrolling\u2026',
-      startEnrollment: 'Start Enrollment',
-      setupRequires: 'Setup requires:',
-      faceCamera: 'Face the Pond camera',
-      turnHead: 'Turn head slowly left and right',
-      faceDuration: 'Takes about 10 seconds',
-      readPhrases: 'Read 3 sample phrases aloud',
-      normalVoice: 'Speak in your normal voice',
-      voiceDuration: 'Takes about 30 seconds',
-    },
     models: {
       onPond: 'On your Pond',
       cloud: 'Cloud',
@@ -268,7 +253,6 @@ void i18n.use(initReactI18next).init({
       appManagement: 'App Integrations',
       mcpServers: 'MCP Servers',
       addUsers: 'Users',
-      biometrics: 'Biometric Data',
       homeManagement: 'Home Management',
       privacy: 'Privacy & Licenses',
       remoteAccess: 'Remote Access',
@@ -302,12 +286,6 @@ void i18n.use(initReactI18next).init({
       emptyTitle: 'No conversations yet', emptyMessage: 'Start a chat to see it here.',
       renameFailed: 'Failed to rename conversation.', deleteFailed: 'Failed to delete conversation.',
     },
-    biometricsMethods: {
-      faceTitle: 'Face Recognition',
-      faceDesc: 'Identify household members by face using the Pond camera. Works locally \u2014 no cloud processing.',
-      voiceTitle: 'Voice Recognition',
-      voiceDesc: 'Identify who is speaking to personalize responses and apply per-user permissions.',
-    },
     homeManagementAlert: {
       removeTitle: 'Remove Room',
       removeBody: 'Are you sure you want to remove this room?',
@@ -338,7 +316,6 @@ void i18n.use(initReactI18next).init({
     },
     // Header titles whose wording differs from the navigation label for the same screen.
     screens: {
-      biometrics: 'Biometrics',
       developer: 'Developer',
       pondPairing: 'Pond Pairing',
     },

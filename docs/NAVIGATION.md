@@ -27,7 +27,6 @@ Floating glass pill bottom nav (iOS 26 "Liquid Glass" style):
 | App Integrations | `/(stack)/app-management` | Integrations |
 | MCP Servers | `/(stack)/mcp-servers` | Integrations |
 | Users | `/(stack)/add-users` | Household |
-| Biometrics | `/(stack)/biometrics` | Household |
 | Home Management | `/(stack)/home-management` | Household |
 | Privacy & Licenses | `/(stack)/privacy` | Data & Privacy |
 | Pond Pairing | `/(stack)/pond-pairing` | Devices |
@@ -46,14 +45,14 @@ expo-router resolves routes at runtime, so a menu row pointing at a deleted scre
 
 The third is this app's rule, not expo-router's. The stack sets `headerShown: true`, and a screen the layout does not register gets its route name as its header. That is how Remote Access shipped headed `remote-access`, lowercase and untranslated, until the guard caught it. So a new screen needs its `<Stack.Screen name=... options={{ title: i18n.t('nav....') }} />` line, and removing a screen means removing its file, its registration and its menu row together.
 
-Backup and Restore were removed rather than wired (#64): the Pond exposes no backup API, and a screen reporting a backup that never ran is worse than no screen.
+Backup and Restore were removed rather than wired (#64): the Pond exposes no backup API, and a screen reporting a backup that never ran is worse than no screen. Biometrics went for the same reason: it showed face recognition as enrolled from a hardcoded state and "enrolled" voice recognition on a two-second timer, with no call to the Pond -- which has no voice biometrics at all.
 
 ## Special Overlays
 - **Listening Overlay**: Full-screen dark overlay triggered by mic FAB or Ask bar
 - **Mic FAB**: Floating purple button, bottom-right, visible on Home & Devices tabs
 
 ## Onboarding Flow
-Welcome → What is Pond → Choose path (New/Restore) → Scan → WiFi → Name → Biometrics → Household → Done
+Welcome → What is Pond → Choose path (New/Restore) → Scan → WiFi → Name → Household → Done
 
 ## Pairing gate (2026-09-21)
 

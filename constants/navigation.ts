@@ -44,7 +44,6 @@ export const PROFILE_NAV: NavGroup[] = [
     groupKey: 'nav.groupHousehold',
     items: [
       { id: 'addUsers', labelKey: 'nav.addUsers', icon: 'users', route: '/(stack)/add-users' },
-      { id: 'biometrics', labelKey: 'nav.biometrics', icon: 'shield', route: '/(stack)/biometrics' },
       { id: 'homeManagement', labelKey: 'nav.homeManagement', icon: 'home', route: '/(stack)/home-management' },
     ],
   },
