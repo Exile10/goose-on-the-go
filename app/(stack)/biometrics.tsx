@@ -3,6 +3,7 @@
  * with enrollment flows.
  */
 
+import { useTranslation } from 'react-i18next';
 import React, { useState } from 'react';
 import { InkButton, InkSwitch } from '@jarida/ink/native';
 import {
@@ -10,14 +11,17 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  Pressable,
 } from 'react-native';
 
 import { GIcon } from '@/components/ui/g-icon';
-import { Grey, JaridaPurple, Brand, Semantic } from '@/constants/colors';
+import { GPressable } from '@/components/ui/g-pressable';
+import type { IconName } from '@/constants/icons';
+import { JaridaPurple, Semantic } from '@/constants/colors';
 import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
 import { Spacing } from '@/constants/spacing';
 import { Radii } from '@/constants/radii';
+import { useThemedStyles } from '@/hooks/use-themed-styles';
+import type { ThemeColors } from '@/constants/colors';
 
 
 type EnrollState = 'not_enrolled' | 'enrolling' | 'enrolled';
@@ -26,12 +30,14 @@ interface BiometricMethod {
   id: string;
   title: string;
   description: string;
-  icon: string;
+  icon: IconName;
   state: EnrollState;
   enabled: boolean;
 }
 
 export default function BiometricsScreen() {
+  const styles = useThemedStyles(makeStyles);
+  const { t } = useTranslation();
   const [methods, setMethods] = useState<BiometricMethod[]>([
     {
       id: 'face',
@@ -88,7 +94,6 @@ export default function BiometricsScreen() {
       </View>
 
       {/* Biometric methods */}
-      <Text style={styles.sectionLabel}>BIOMETRIC METHODS</Text>
       {methods.map((method) => (
         <View key={method.id} style={styles.methodCard}>
           <View style={styles.methodHeader}>
@@ -110,19 +115,19 @@ export default function BiometricsScreen() {
             {method.state === 'enrolled' ? (
               <View style={styles.enrolledRow}>
                 <View style={[styles.statusBadge, { backgroundColor: Semantic.successSoft }]}>
-                  <Text style={[styles.statusText, { color: Semantic.success }]}>Enrolled</Text>
+                  <Text style={[styles.statusText, { color: Semantic.success }]}>{t('biometrics.enrolled')}</Text>
                 </View>
-                <Pressable style={styles.reEnrollBtn}>
+                <GPressable style={styles.reEnrollBtn}>
                   <GIcon name="refresh" size={14} color={JaridaPurple[500]} />
-                  <Text style={styles.reEnrollText}>Re-enroll</Text>
-                </Pressable>
+                  <Text style={styles.reEnrollText}>{t('biometrics.reEnrol')}</Text>
+                </GPressable>
               </View>
             ) : method.state === 'enrolling' ? (
               <View style={styles.enrollingRow}>
                 <View style={styles.progressBar}>
                   <View style={styles.progressFill} />
                 </View>
-                <Text style={styles.enrollingText}>Enrolling...</Text>
+                <Text style={styles.enrollingText}>{t('biometrics.enrolling')}</Text>
               </View>
             ) : (
               <InkButton
@@ -137,7 +142,7 @@ export default function BiometricsScreen() {
           {/* Enrollment steps hint */}
           {method.state === 'not_enrolled' && (
             <View style={styles.stepsHint}>
-              <Text style={styles.stepsTitle}>Setup requires:</Text>
+              <Text style={styles.stepsTitle}>{t('biometrics.needs')}</Text>
               {method.id === 'face' ? (
                 <>
                   <Text style={styles.stepItem}>{'\u2022'} Face the Pond camera</Text>
@@ -161,15 +166,16 @@ export default function BiometricsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Grey[50] },
+const makeStyles = (c: ThemeColors) =>
+  StyleSheet.create({
+  container: { flex: 1, backgroundColor: c.background },
   scroll: { paddingHorizontal: Spacing.lg, paddingTop: Spacing.lg },
 
   /* Info banner */
   infoBanner: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    backgroundColor: JaridaPurple[50],
+    backgroundColor: c.tintSoft,
     borderRadius: Radii.xl,
     padding: Spacing.lg,
     gap: Spacing.md,
@@ -183,23 +189,13 @@ const styles = StyleSheet.create({
     lineHeight: FontSize.sm * 1.5,
   },
 
-  sectionLabel: {
-    fontFamily: FontFamily.body,
-    fontSize: 11,
-    fontWeight: FontWeight.bold,
-    color: Grey[500],
-    letterSpacing: 1,
-    textTransform: 'uppercase',
-    marginBottom: Spacing.md,
-  },
-
   /* Method card */
   methodCard: {
-    backgroundColor: Brand.white,
+    backgroundColor: c.card,
     borderRadius: Radii.xl,
     padding: Spacing.lg,
     borderWidth: 1,
-    borderColor: Grey[200],
+    borderColor: c.border,
     marginBottom: Spacing.md,
   },
   methodHeader: {
@@ -211,12 +207,12 @@ const styles = StyleSheet.create({
     fontFamily: FontFamily.heading,
     fontSize: FontSize.md,
     fontWeight: FontWeight.bold,
-    color: Brand.charcoal,
+    color: c.text,
   },
   methodDesc: {
     fontFamily: FontFamily.body,
     fontSize: FontSize.sm,
-    color: Grey[500],
+    color: c.textTertiary,
     lineHeight: FontSize.sm * 1.5,
     marginTop: 4,
   },
@@ -226,7 +222,7 @@ const styles = StyleSheet.create({
     marginTop: Spacing.md,
     paddingTop: Spacing.md,
     borderTopWidth: 1,
-    borderTopColor: Grey[100],
+    borderTopColor: c.border,
   },
   enrolledRow: {
     flexDirection: 'row',
@@ -259,7 +255,7 @@ const styles = StyleSheet.create({
   enrollingRow: { gap: Spacing.sm },
   progressBar: {
     height: 6,
-    backgroundColor: Grey[200],
+    backgroundColor: c.backgroundSecondary,
     borderRadius: 3,
     overflow: 'hidden',
   },
@@ -279,7 +275,7 @@ const styles = StyleSheet.create({
   /* Steps hint */
   stepsHint: {
     marginTop: Spacing.md,
-    backgroundColor: Grey[50],
+    backgroundColor: c.background,
     borderRadius: Radii.lg,
     padding: Spacing.md,
   },
@@ -287,13 +283,13 @@ const styles = StyleSheet.create({
     fontFamily: FontFamily.body,
     fontSize: FontSize.sm,
     fontWeight: FontWeight.semibold,
-    color: Grey[600],
+    color: c.textSecondary,
     marginBottom: Spacing.xs,
   },
   stepItem: {
     fontFamily: FontFamily.body,
     fontSize: FontSize.sm,
-    color: Grey[500],
+    color: c.textTertiary,
     lineHeight: FontSize.sm * 1.7,
   },
 });

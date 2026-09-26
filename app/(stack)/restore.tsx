@@ -3,20 +3,23 @@
  */
 
 import React, { useState, useCallback } from 'react';
-import { InkButton } from '@jarida/ink/native';
+import { useTranslation } from 'react-i18next';
+import { InkButton, InkTitle } from '@jarida/ink/native';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
-  Pressable,
 } from 'react-native';
 
 import { GIcon } from '@/components/ui/g-icon';
-import { Grey, JaridaPurple, Brand, Semantic } from '@/constants/colors';
+import { GPressable } from '@/components/ui/g-pressable';
+import { Grey, JaridaPurple, Semantic } from '@/constants/colors';
 import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
 import { Spacing } from '@/constants/spacing';
 import { Radii } from '@/constants/radii';
+import { useThemedStyles } from '@/hooks/use-themed-styles';
+import type { ThemeColors } from '@/constants/colors';
 
 type RestoreState = 'select' | 'progress' | 'complete';
 
@@ -35,6 +38,8 @@ const BACKUPS: BackupItem[] = [
 ];
 
 export default function RestoreScreen() {
+  const { t } = useTranslation();
+  const styles = useThemedStyles(makeStyles);
   const [state, setState] = useState<RestoreState>('select');
   const [selectedBackup, setSelectedBackup] = useState<string | null>(null);
   const [progress, setProgress] = useState(0);
@@ -80,9 +85,9 @@ export default function RestoreScreen() {
           </View>
 
           {/* Backup selection */}
-          <Text style={styles.sectionLabel}>SELECT A BACKUP</Text>
+          <InkTitle level={3}>{t('sections.chooseBackup')}</InkTitle>
           {BACKUPS.map((b) => (
-            <Pressable
+            <GPressable feedback="lift"
               key={b.id}
               style={[styles.backupCard, selectedBackup === b.id && styles.backupCardSelected]}
               onPress={() => setSelectedBackup(b.id)}
@@ -98,74 +103,44 @@ export default function RestoreScreen() {
               </View>
               <View style={styles.backupMeta}>
                 <View style={styles.metaChip}>
-                  <Text style={styles.metaText}>{b.devices} devices</Text>
+                  <Text style={styles.metaText}>{b.devices} {t('profile.devices')}</Text>
                 </View>
                 <View style={styles.metaChip}>
-                  <Text style={styles.metaText}>{b.rooms} rooms</Text>
+                  <Text style={styles.metaText}>{b.rooms} {t('profile.rooms')}</Text>
                 </View>
               </View>
-            </Pressable>
+            </GPressable>
           ))}
 
-          <InkButton
-            variant="primary"
-            onPress={handleRestore}
-            disabled={!selectedBackup}
-          >
-            Restore from Backup
+          <InkButton variant="primary" onPress={handleRestore} disabled={!selectedBackup}>
+            {t('screens.restore')}
           </InkButton>
         </>
       )}
 
       {state === 'progress' && (
         <View style={styles.progressWrap}>
-          <GIcon name="refresh" size={28} color="#8C4BFF" />
-          <Text style={styles.progressTitle}>Restoring...</Text>
-          <Text style={styles.progressDesc}>
-            Transferring data to your Pond device. Do not disconnect power.
-          </Text>
+          <GIcon name="refresh" size={28} color={JaridaPurple[500]} />
+          <Text style={styles.progressTitle}>{t('restore.restoring')}</Text>
           <View style={styles.progressBarWrap}>
             <View style={[styles.progressFill, { width: `${progress}%` }]} />
           </View>
           <Text style={styles.progressPercent}>{progress}%</Text>
           <View style={styles.progressSteps}>
-            <View style={styles.progressStepRow}>
-              {progress > 20
-                ? <GIcon name="check" size={12} color="#1F8A3C" />
-                : <View style={{ width: 12, height: 12, borderRadius: 6, borderWidth: 1.5, borderColor: '#D9D9D9' }} />}
-              <Text style={[styles.progressStep, progress > 20 && styles.progressStepDone]}>Settings</Text>
-            </View>
-            <View style={styles.progressStepRow}>
-              {progress > 50
-                ? <GIcon name="check" size={12} color="#1F8A3C" />
-                : <View style={{ width: 12, height: 12, borderRadius: 6, borderWidth: 1.5, borderColor: '#D9D9D9' }} />}
-              <Text style={[styles.progressStep, progress > 50 && styles.progressStepDone]}>Memories</Text>
-            </View>
-            <View style={styles.progressStepRow}>
-              {progress > 75
-                ? <GIcon name="check" size={12} color="#1F8A3C" />
-                : <View style={{ width: 12, height: 12, borderRadius: 6, borderWidth: 1.5, borderColor: '#D9D9D9' }} />}
-              <Text style={[styles.progressStep, progress > 75 && styles.progressStepDone]}>Devices</Text>
-            </View>
-            <View style={styles.progressStepRow}>
-              {progress >= 100
-                ? <GIcon name="check" size={12} color="#1F8A3C" />
-                : <View style={{ width: 12, height: 12, borderRadius: 6, borderWidth: 1.5, borderColor: '#D9D9D9' }} />}
-              <Text style={[styles.progressStep, progress >= 100 && styles.progressStepDone]}>Routines</Text>
-            </View>
+            <Step done={progress > 20} label={t('restore.settings')} styles={styles} />
+            <Step done={progress > 50} label={t('restore.memories')} styles={styles} />
+            <Step done={progress > 75} label={t('restore.devices')} styles={styles} />
+            <Step done={progress >= 100} label={t('restore.routines')} styles={styles} />
           </View>
         </View>
       )}
 
       {state === 'complete' && (
         <View style={styles.completeWrap}>
-          <GIcon name="sparkle" size={28} color="#1F8A3C" />
-          <Text style={styles.completeTitle}>Restore Complete!</Text>
-          <Text style={styles.completeDesc}>
-            Your Pond device has been restored successfully. All settings, memories, and device configurations are back.
-          </Text>
+          <GIcon name="sparkle" size={28} color={Semantic.success} />
+          <Text style={styles.completeTitle}>{t('restore.done')}</Text>
           <InkButton variant="primary" onPress={handleDone}>
-            Done
+            {t('common.done')}
           </InkButton>
         </View>
       )}
@@ -175,165 +150,171 @@ export default function RestoreScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Grey[50] },
-  scroll: { paddingHorizontal: Spacing.lg, paddingTop: Spacing.lg },
+/** One line of the transfer, ticked once its share of the progress has passed. */
+function Step({
+  done,
+  label,
+  styles,
+}: {
+  done: boolean;
+  label: string;
+  styles: ReturnType<typeof makeStyles>;
+}) {
+  return (
+    <View style={styles.progressStepRow}>
+      {done ? (
+        <GIcon name="check" size={12} color={Semantic.success} />
+      ) : (
+        <View style={styles.progressStepPending} />
+      )}
+      <Text style={[styles.progressStep, done && styles.progressStepDone]}>{label}</Text>
+    </View>
+  );
+}
 
-  /* Info banner */
-  infoBanner: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    backgroundColor: JaridaPurple[50],
-    borderRadius: Radii.xl,
-    padding: Spacing.lg,
-    gap: Spacing.md,
-    marginBottom: Spacing.xl,
-  },
-  infoText: {
-    flex: 1,
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.sm,
-    color: JaridaPurple[700],
-    lineHeight: FontSize.sm * 1.5,
-  },
+const makeStyles = (c: ThemeColors) =>
+  StyleSheet.create({
+    container: { flex: 1, backgroundColor: c.background },
+    scroll: { paddingHorizontal: Spacing.lg, paddingTop: Spacing.lg },
 
-  sectionLabel: {
-    fontFamily: FontFamily.body,
-    fontSize: 11,
-    fontWeight: FontWeight.bold,
-    color: Grey[500],
-    letterSpacing: 1,
-    textTransform: 'uppercase',
-    marginBottom: Spacing.md,
-  },
+    /* Info banner */
+    infoBanner: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      backgroundColor: c.tintSoft,
+      borderRadius: Radii.xl,
+      padding: Spacing.lg,
+      gap: Spacing.md,
+      marginBottom: Spacing.xl,
+    },
+    infoText: {
+      flex: 1,
+      fontFamily: FontFamily.body,
+      fontSize: FontSize.sm,
+      color: c.text,
+      lineHeight: FontSize.sm * 1.5,
+    },
 
-  /* Backup cards */
-  backupCard: {
-    backgroundColor: Brand.white,
-    borderRadius: Radii.xl,
-    padding: Spacing.lg,
-    borderWidth: 1,
-    borderColor: Grey[200],
-    marginBottom: Spacing.md,
-  },
-  backupCardSelected: {
-    borderColor: JaridaPurple[500],
-    borderWidth: 2,
-    backgroundColor: JaridaPurple[50] + '40',
-  },
-  backupHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  radioOuter: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    borderWidth: 2,
-    borderColor: Grey[300],
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: Spacing.md,
-  },
-  radioInner: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: JaridaPurple[500],
-  },
-  backupInfo: { flex: 1 },
-  backupDate: {
-    fontFamily: FontFamily.heading,
-    fontSize: FontSize.base,
-    fontWeight: FontWeight.semibold,
-    color: Brand.charcoal,
-  },
-  backupSize: {
-    fontFamily: FontFamily.mono,
-    fontSize: FontSize.sm,
-    color: Grey[500],
-    marginTop: 2,
-  },
-  backupMeta: {
-    flexDirection: 'row',
-    gap: Spacing.sm,
-    marginTop: Spacing.md,
-  },
-  metaChip: {
-    backgroundColor: Grey[100],
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: 2,
-    borderRadius: Radii.pill,
-  },
-  metaText: {
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.xs,
-    color: Grey[600],
-  },
+    /* Backup cards */
+    backupCard: {
+      backgroundColor: c.card,
+      borderRadius: Radii.xl,
+      padding: Spacing.lg,
+      borderWidth: 1,
+      borderColor: c.border,
+      marginBottom: Spacing.md,
+    },
+    backupCardSelected: {
+      borderColor: JaridaPurple[500],
+      borderWidth: 2,
+      backgroundColor: c.tintSoft,
+    },
+    backupHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    radioOuter: {
+      width: 22,
+      height: 22,
+      borderRadius: 11,
+      borderWidth: 2,
+      borderColor: c.borderStrong,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: Spacing.md,
+    },
+    radioInner: {
+      width: 12,
+      height: 12,
+      borderRadius: 6,
+      backgroundColor: JaridaPurple[500],
+    },
+    backupInfo: { flex: 1 },
+    backupDate: {
+      fontFamily: FontFamily.heading,
+      fontSize: FontSize.base,
+      fontWeight: FontWeight.semibold,
+      color: c.text,
+    },
+    backupSize: {
+      fontFamily: FontFamily.mono,
+      fontSize: FontSize.sm,
+      color: c.textTertiary,
+      marginTop: 2,
+    },
+    backupMeta: {
+      flexDirection: 'row',
+      gap: Spacing.sm,
+      marginTop: Spacing.md,
+    },
+    metaChip: {
+      backgroundColor: c.backgroundSecondary,
+      paddingHorizontal: Spacing.sm,
+      paddingVertical: 2,
+      borderRadius: Radii.pill,
+    },
+    metaText: {
+      fontFamily: FontFamily.body,
+      fontSize: FontSize.xs,
+      color: c.textSecondary,
+    },
 
-  /* Progress */
-  progressWrap: {
-    alignItems: 'center',
-    paddingVertical: Spacing['5xl'],
-    gap: Spacing.lg,
-  },
-  progressTitle: {
-    fontFamily: FontFamily.heading,
-    fontSize: FontSize.xl,
-    fontWeight: FontWeight.bold,
-    color: Brand.charcoal,
-  },
-  progressDesc: {
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.base,
-    color: Grey[500],
-    textAlign: 'center',
-    lineHeight: FontSize.base * 1.5,
-  },
-  progressBarWrap: {
-    width: '100%',
-    height: 8,
-    backgroundColor: Grey[200],
-    borderRadius: 4,
-    overflow: 'hidden',
-  },
-  progressFill: {
-    height: '100%',
-    backgroundColor: JaridaPurple[500],
-    borderRadius: 4,
-  },
-  progressPercent: {
-    fontFamily: FontFamily.heading,
-    fontSize: FontSize.xl,
-    fontWeight: FontWeight.bold,
-    color: JaridaPurple[500],
-  },
-  progressSteps: { gap: Spacing.sm, alignSelf: 'flex-start', width: '100%' },
-  progressStepRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
-  progressStep: {
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.base,
-    color: Grey[400],
-  },
-  progressStepDone: { color: Semantic.success },
+    /* Progress */
+    progressWrap: {
+      alignItems: 'center',
+      paddingVertical: Spacing['5xl'],
+      gap: Spacing.lg,
+    },
+    progressTitle: {
+      fontFamily: FontFamily.heading,
+      fontSize: FontSize.xl,
+      fontWeight: FontWeight.bold,
+      color: c.text,
+    },
+    progressBarWrap: {
+      width: '100%',
+      height: 8,
+      backgroundColor: c.backgroundSecondary,
+      borderRadius: 4,
+      overflow: 'hidden',
+    },
+    progressFill: {
+      height: '100%',
+      backgroundColor: JaridaPurple[500],
+      borderRadius: 4,
+    },
+    progressPercent: {
+      fontFamily: FontFamily.heading,
+      fontSize: FontSize.xl,
+      fontWeight: FontWeight.bold,
+      color: JaridaPurple[500],
+    },
+    progressSteps: { gap: Spacing.sm, alignSelf: 'flex-start', width: '100%' },
+    progressStepRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
+    progressStepPending: {
+      width: 12,
+      height: 12,
+      borderRadius: 6,
+      borderWidth: 1.5,
+      borderColor: c.border,
+    },
+    progressStep: {
+      fontFamily: FontFamily.body,
+      fontSize: FontSize.base,
+      color: Grey[400],
+    },
+    progressStepDone: { color: Semantic.success },
 
-  /* Complete */
-  completeWrap: {
-    alignItems: 'center',
-    paddingVertical: Spacing['5xl'],
-    gap: Spacing.lg,
-  },
-  completeTitle: {
-    fontFamily: FontFamily.heading,
-    fontSize: FontSize.xl,
-    fontWeight: FontWeight.bold,
-    color: Semantic.success,
-  },
-  completeDesc: {
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.base,
-    color: Grey[500],
-    textAlign: 'center',
-    lineHeight: FontSize.base * 1.5,
-  },
-});
+    /* Complete */
+    completeWrap: {
+      alignItems: 'center',
+      paddingVertical: Spacing['5xl'],
+      gap: Spacing.lg,
+    },
+    completeTitle: {
+      fontFamily: FontFamily.heading,
+      fontSize: FontSize.xl,
+      fontWeight: FontWeight.bold,
+      color: Semantic.success,
+    },
+  });

@@ -1,8 +1,11 @@
 /**
- * ProfileHub — "You" tab with profile card, stats, and grouped settings.
+ * ProfileHub — the "You" tab: who this Pond knows you as, and everything that
+ * configures it.
  *
- * Charcoal top band with avatar, overlapping stats row,
- * iOS-style grouped settings sections linking to sub-screens.
+ * The identity shown here is the first household profile the Pond returns, not
+ * an account. There is no login and no email field anywhere in GIAP, so the
+ * card reports the profile and the Pond it came from rather than inventing a
+ * user.
  */
 
 import React, { useCallback } from 'react';
@@ -10,159 +13,166 @@ import {
   View,
   Text,
   StyleSheet,
-  SectionList,
-  Pressable,
+  ScrollView,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { useBottomBarInset, useChromeScroll } from '@/providers/chrome-provider';
+import { useThemedStyles } from '@/hooks/use-themed-styles';
+import type { ThemeColors } from '@/constants/colors';
+
+import {
+  InkButton,
+  InkCard,
+  InkGroup,
+  InkRow,
+  InkText,
+  InkTitle,
+} from '@jarida/ink/native';
+
 import { GIcon } from '@/components/ui/g-icon';
-import { PROFILE_NAV, type NavItem, type NavGroup } from '@/constants/navigation';
+import { GPressable } from '@/components/ui/g-pressable';
+import { PROFILE_NAV, type NavItem } from '@/constants/navigation';
+import { useDevices } from '@/view-models/use-devices';
+import { useProfiles } from '@/view-models/use-profiles';
+import { useServer } from '@/providers/server-provider';
+import { hostOf } from '@/services/discovery';
+import { APP_VERSION } from '@/constants/app';
+import { selectionTick, caution } from '@/services/haptics';
 import { Grey, JaridaPurple, Brand, Semantic } from '@/constants/colors';
 import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
 import { Spacing } from '@/constants/spacing';
 import { Radii } from '@/constants/radii';
 import { Shadows } from '@/constants/shadows';
-import type { IconName } from '@/constants/icons';
 
-/** Stats data */
-const STATS = [
-  { label: 'Devices', value: '6' },
-  { label: 'Rooms', value: '3' },
-  { label: 'Routines', value: '4' },
-  { label: 'Users', value: '2' },
-];
-
-/** Navigation row */
 const NavRow = React.memo(function NavRow({
   item,
   onPress,
+  divided,
 }: {
   item: NavItem;
   onPress: (route: string) => void;
+  divided: boolean;
 }) {
+  const styles = useThemedStyles(makeStyles);
+  const { t } = useTranslation();
   const handlePress = useCallback(() => onPress(item.route), [item.route, onPress]);
 
   return (
-    <Pressable
-      style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
-      onPress={handlePress}
-    >
-      <View style={styles.rowLeft}>
-        <GIcon name={item.icon} size={16} color="#8C4BFF" />
-        <Text style={styles.rowLabel}>{item.label}</Text>
-      </View>
-      <GIcon name="chevron" size={16} color={Grey[400]} />
-    </Pressable>
+    <GPressable onPress={handlePress} accessibilityRole="button">
+      <InkRow
+        divided={divided}
+        label={
+          <View style={styles.rowLeft}>
+            <GIcon name={item.icon} size={16} color={JaridaPurple[500]} />
+            <Text style={styles.rowLabel}>{t(item.labelKey)}</Text>
+          </View>
+        }
+      >
+        <View style={styles.chevron}>
+          <GIcon name="chevron" size={16} color={Grey[400]} />
+        </View>
+      </InkRow>
+    </GPressable>
   );
 });
 
-/** SectionList sections from PROFILE_NAV */
-const sections = PROFILE_NAV.map((g) => ({
-  title: g.group,
-  data: g.items,
-}));
-
 export default function ProfileHub() {
+  const styles = useThemedStyles(makeStyles);
+  const { t } = useTranslation();
   const router = useRouter();
+  const devices = useDevices();
+  const profiles = useProfiles();
+  const { signOut, serverUrl } = useServer();
+  const chrome = useChromeScroll();
+  const bottomInset = useBottomBarInset();
+
+  const me = profiles.data.profiles[0];
 
   const handleNav = useCallback(
     (route: string) => {
+      void selectionTick();
       router.push(route as any);
     },
     [router],
   );
-
-  const renderItem = useCallback(
-    ({ item }: { item: NavItem }) => <NavRow item={item} onPress={handleNav} />,
-    [handleNav],
-  );
-
-  const renderSectionHeader = useCallback(
-    ({ section }: { section: { title: string } }) => (
-      <Text style={styles.sectionHeader}>{section.title}</Text>
-    ),
-    [],
-  );
-
-  const keyExtractor = useCallback((item: NavItem) => item.id, []);
-
-  const ListHeader = useCallback(
-    () => (
-      <>
-        {/* Charcoal top band + profile card */}
-        <View style={styles.profileCard}>
-          <View style={styles.charcoalBand} />
-          <View style={styles.profileContent}>
-            <View style={styles.avatarLarge}>
-              <Text style={styles.avatarLargeText}>J</Text>
-            </View>
-            <Text style={styles.profileName}>Jerry Ochieng</Text>
-            <Text style={styles.profileEmail}>jerryochieng178@gmail.com</Text>
-            <View style={styles.proBadge}>
-              <Text style={styles.proBadgeText}>Jarida Pro</Text>
-            </View>
-          </View>
-
-          {/* Overlapping stats row */}
-          <View style={styles.statsRow}>
-            {STATS.map((stat) => (
-              <View key={stat.label} style={styles.statItem}>
-                <Text style={styles.statValue}>{stat.value}</Text>
-                <Text style={styles.statLabel}>{stat.label}</Text>
-              </View>
-            ))}
-          </View>
-        </View>
-      </>
-    ),
-    [],
-  );
-
-  const ListFooter = useCallback(
-    () => (
-      <View style={styles.footerSection}>
-        <Pressable style={styles.signOutBtn}>
-          <Text style={styles.signOutText}>Sign Out</Text>
-        </Pressable>
-        <Text style={styles.versionText}>Goose on the Go v0.2.0</Text>
-        {/* Bottom spacer for tab bar */}
-        <View style={{ height: 100 }} />
-      </View>
-    ),
-    [],
-  );
+  const handleSignOut = useCallback(() => {
+    void caution();
+    void signOut();
+  }, [signOut]);
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
-      <SectionList
-        sections={sections}
-        keyExtractor={keyExtractor}
-        renderItem={renderItem}
-        renderSectionHeader={renderSectionHeader}
-        ListHeaderComponent={ListHeader}
-        ListFooterComponent={ListFooter}
-        contentContainerStyle={styles.listContent}
+      <ScrollView
+        {...chrome}
+        contentContainerStyle={[styles.listContent, { paddingBottom: bottomInset }]}
         showsVerticalScrollIndicator={false}
-        stickySectionHeadersEnabled={false}
-      />
+      >
+        <InkCard style={styles.profileCard}>
+          <View style={styles.profileContent}>
+            <View style={styles.avatarLarge}>
+              <Text style={styles.avatarLargeText}>
+                {me?.avatar_emoji || me?.display_name.charAt(0).toUpperCase() || '\u2014'}
+              </Text>
+            </View>
+            <InkTitle level={2}>{me?.display_name ?? t('profile.noProfile')}</InkTitle>
+            <InkText>
+              {serverUrl ? hostOf(serverUrl) : t('profile.notPaired')}
+            </InkText>
+          </View>
+
+          <View style={styles.statsRow}>
+            <View style={styles.statItem}>
+              <Text style={styles.statValue}>{devices.data.devices.length}</Text>
+              <Text style={styles.statLabel}>{t('profile.devices')}</Text>
+            </View>
+            <View style={styles.statItem}>
+              <Text style={styles.statValue}>{devices.data.rooms.length}</Text>
+              <Text style={styles.statLabel}>{t('profile.rooms')}</Text>
+            </View>
+            <View style={styles.statItem}>
+              <Text style={styles.statValue}>{profiles.data.profiles.length}</Text>
+              <Text style={styles.statLabel}>{t('profile.people')}</Text>
+            </View>
+          </View>
+        </InkCard>
+
+        {PROFILE_NAV.map((group) => (
+          <InkGroup key={group.groupKey} title={t(group.groupKey)} style={styles.group}>
+            {group.items.map((item, i) => (
+              <NavRow key={item.id} item={item} onPress={handleNav} divided={i > 0} />
+            ))}
+          </InkGroup>
+        ))}
+
+        <InkButton variant="danger" onPress={handleSignOut} style={styles.signOut}>
+          {t('common.signOut')}
+        </InkButton>
+        <Text style={styles.versionText}>{t('profile.version', { version: APP_VERSION })}</Text>
+      </ScrollView>
     </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: Grey[50] },
+const makeStyles = (c: ThemeColors) =>
+  StyleSheet.create({
+  chevron: { transform: [{ rotate: '-90deg' }] },
+  group: { marginBottom: Spacing.lg },
+  signOut: { marginTop: Spacing.md, alignSelf: 'flex-start' },
+  safe: { flex: 1, backgroundColor: c.background },
   listContent: { paddingHorizontal: Spacing.lg },
 
   /* Profile card */
   profileCard: {
-    backgroundColor: Brand.white,
+    backgroundColor: c.card,
     borderRadius: Radii.xl,
     overflow: 'hidden',
     marginTop: Spacing.lg,
     marginBottom: Spacing.xl,
     borderWidth: 1,
-    borderColor: Grey[200],
+    borderColor: c.border,
     ...Shadows.md,
   },
   charcoalBand: {
@@ -171,7 +181,6 @@ const styles = StyleSheet.create({
   },
   profileContent: {
     alignItems: 'center',
-    marginTop: -36,
     paddingBottom: Spacing.md,
   },
   avatarLarge: {
@@ -182,7 +191,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 4,
-    borderColor: Brand.white,
+    borderColor: c.background,
   },
   avatarLargeText: {
     fontFamily: FontFamily.heading,
@@ -194,17 +203,17 @@ const styles = StyleSheet.create({
     fontFamily: FontFamily.heading,
     fontSize: FontSize.lg,
     fontWeight: FontWeight.bold,
-    color: Brand.charcoal,
+    color: c.text,
     marginTop: Spacing.sm,
   },
   profileEmail: {
     fontFamily: FontFamily.body,
     fontSize: FontSize.sm,
-    color: Grey[500],
+    color: c.textTertiary,
     marginTop: 2,
   },
   proBadge: {
-    backgroundColor: JaridaPurple[50],
+    backgroundColor: c.tintSoft,
     paddingHorizontal: Spacing.md,
     paddingVertical: 4,
     borderRadius: Radii.pill,
@@ -222,7 +231,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     marginHorizontal: Spacing.lg,
     marginBottom: Spacing.lg,
-    backgroundColor: Grey[50],
+    backgroundColor: c.background,
     borderRadius: Radii.lg,
     paddingVertical: Spacing.md,
   },
@@ -234,26 +243,16 @@ const styles = StyleSheet.create({
     fontFamily: FontFamily.heading,
     fontSize: FontSize.lg,
     fontWeight: FontWeight.bold,
-    color: Brand.charcoal,
+    color: c.text,
   },
   statLabel: {
     fontFamily: FontFamily.body,
     fontSize: FontSize.xs,
-    color: Grey[500],
+    color: c.textTertiary,
     marginTop: 2,
   },
 
   /* Section headers */
-  sectionHeader: {
-    fontFamily: FontFamily.body,
-    fontSize: 11,
-    fontWeight: FontWeight.bold,
-    color: Grey[500],
-    letterSpacing: 1,
-    textTransform: 'uppercase',
-    marginTop: Spacing.xl,
-    marginBottom: Spacing.sm,
-  },
 
   /* Nav rows */
   row: {
@@ -263,14 +262,14 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.md,
     paddingHorizontal: Spacing.md,
     marginBottom: 1,
-    backgroundColor: Brand.white,
+    backgroundColor: c.card,
     borderRadius: Radii.md,
     borderWidth: 1,
-    borderColor: Grey[200],
+    borderColor: c.border,
     marginTop: Spacing.xs,
   },
   rowPressed: {
-    backgroundColor: JaridaPurple[50],
+    backgroundColor: c.tintSoft,
     borderColor: JaridaPurple[200],
   },
   rowLeft: {
@@ -282,7 +281,7 @@ const styles = StyleSheet.create({
     fontFamily: FontFamily.body,
     fontSize: FontSize.base,
     fontWeight: FontWeight.medium,
-    color: Brand.charcoal,
+    color: c.text,
   },
 
   /* Footer */

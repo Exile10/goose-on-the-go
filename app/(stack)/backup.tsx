@@ -3,7 +3,8 @@
  */
 
 import React, { useState } from 'react';
-import { InkButton, InkSwitch } from '@jarida/ink/native';
+import { useTranslation } from 'react-i18next';
+import { InkButton, InkSwitch, InkTitle } from '@jarida/ink/native';
 import {
   View,
   Text,
@@ -12,11 +13,13 @@ import {
 } from 'react-native';
 
 import { GIcon } from '@/components/ui/g-icon';
-import { Grey, JaridaPurple, Brand, Semantic } from '@/constants/colors';
+import { Grey, Brand, Semantic } from '@/constants/colors';
 import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
 import { Spacing } from '@/constants/spacing';
 import { Radii } from '@/constants/radii';
 import { Shadows } from '@/constants/shadows';
+import { useThemedStyles } from '@/hooks/use-themed-styles';
+import type { ThemeColors } from '@/constants/colors';
 
 const BACKUP_HISTORY = [
   { date: 'Apr 26, 2026', size: '142 MB', status: 'complete' },
@@ -26,6 +29,8 @@ const BACKUP_HISTORY = [
 ];
 
 export default function BackupScreen() {
+  const { t } = useTranslation();
+  const styles = useThemedStyles(makeStyles);
   const [autoBackup, setAutoBackup] = useState(true);
   const [includeMedia, setIncludeMedia] = useState(true);
   const [includeMemories, setIncludeMemories] = useState(true);
@@ -44,69 +49,69 @@ export default function BackupScreen() {
             <GIcon name="download" size={24} color={Semantic.success} />
           </View>
           <View style={styles.statusInfo}>
-            <Text style={styles.statusTitle}>Last Backup</Text>
+            <Text style={styles.statusTitle}>{t('backup.last')}</Text>
             <Text style={styles.statusDate}>Apr 26, 2026 at 3:00 AM</Text>
           </View>
         </View>
         <View style={styles.statusMeta}>
           <View style={styles.metaItem}>
-            <Text style={styles.metaLabel}>Size</Text>
+            <Text style={styles.metaLabel}>{t('backup.size')}</Text>
             <Text style={styles.metaValue}>142 MB</Text>
           </View>
           <View style={styles.metaItem}>
-            <Text style={styles.metaLabel}>Duration</Text>
+            <Text style={styles.metaLabel}>{t('backup.duration')}</Text>
             <Text style={styles.metaValue}>2m 14s</Text>
           </View>
           <View style={styles.metaItem}>
-            <Text style={styles.metaLabel}>Status</Text>
+            <Text style={styles.metaLabel}>{t('backup.status')}</Text>
             <View style={[styles.statusBadge, { backgroundColor: Semantic.successSoft }]}>
-              <Text style={[styles.statusBadgeText, { color: Semantic.success }]}>Complete</Text>
+              <Text style={[styles.statusBadgeText, { color: Semantic.success }]}>{t('backup.complete')}</Text>
             </View>
           </View>
         </View>
         <InkButton variant="primary" icon={<GIcon name="download" size={16} color={Brand.white} />}>
-          Backup Now
+          {t('backup.now')}
         </InkButton>
       </View>
 
       {/* Settings toggles */}
-      <Text style={styles.sectionLabel}>BACKUP SETTINGS</Text>
+      <InkTitle level={3}>{t('sections.backupSettings')}</InkTitle>
       <View style={styles.settingsCard}>
         <View style={styles.settingRow}>
           <View>
-            <Text style={styles.settingTitle}>Automatic Backup</Text>
-            <Text style={styles.settingDesc}>Weekly at 3:00 AM</Text>
+            <Text style={styles.settingTitle}>{t('backup.auto')}</Text>
+            <Text style={styles.settingDesc}>{t('backup.autoBody')}</Text>
           </View>
           <InkSwitch checked={autoBackup} onChange={setAutoBackup} />
         </View>
         <View style={styles.divider} />
         <View style={styles.settingRow}>
           <View>
-            <Text style={styles.settingTitle}>Include Media</Text>
-            <Text style={styles.settingDesc}>Photos, videos, and analysis</Text>
+            <Text style={styles.settingTitle}>{t('backup.media')}</Text>
+            <Text style={styles.settingDesc}>{t('backup.mediaBody')}</Text>
           </View>
           <InkSwitch checked={includeMedia} onChange={setIncludeMedia} />
         </View>
         <View style={styles.divider} />
         <View style={styles.settingRow}>
           <View>
-            <Text style={styles.settingTitle}>Include Memories</Text>
-            <Text style={styles.settingDesc}>AI memories and preferences</Text>
+            <Text style={styles.settingTitle}>{t('backup.memories')}</Text>
+            <Text style={styles.settingDesc}>{t('backup.memoriesBody')}</Text>
           </View>
           <InkSwitch checked={includeMemories} onChange={setIncludeMemories} />
         </View>
         <View style={styles.divider} />
         <View style={styles.settingRow}>
           <View>
-            <Text style={styles.settingTitle}>Encrypt Backup</Text>
-            <Text style={styles.settingDesc}>AES-256 encryption</Text>
+            <Text style={styles.settingTitle}>{t('backup.encrypt')}</Text>
+            <Text style={styles.settingDesc}>{t('backup.encryptBody')}</Text>
           </View>
           <InkSwitch checked={encryptBackup} onChange={setEncryptBackup} />
         </View>
       </View>
 
       {/* History */}
-      <Text style={styles.sectionLabel}>BACKUP HISTORY</Text>
+      <InkTitle level={3}>{t('sections.backupHistory')}</InkTitle>
       {BACKUP_HISTORY.map((b, i) => {
         const isComplete = b.status === 'complete';
         return (
@@ -118,7 +123,7 @@ export default function BackupScreen() {
             </View>
             <View style={[styles.historyBadge, { backgroundColor: isComplete ? Semantic.successSoft : Semantic.dangerSoft }]}>
               <Text style={[styles.historyBadgeText, { color: isComplete ? Semantic.success : Semantic.danger }]}>
-                {b.status}
+                {t(isComplete ? 'backup.complete' : 'backup.failed')}
               </Text>
             </View>
           </View>
@@ -130,17 +135,18 @@ export default function BackupScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Grey[50] },
+const makeStyles = (c: ThemeColors) =>
+  StyleSheet.create({
+  container: { flex: 1, backgroundColor: c.background },
   scroll: { paddingHorizontal: Spacing.lg, paddingTop: Spacing.lg },
 
   /* Status card */
   statusCard: {
-    backgroundColor: Brand.white,
+    backgroundColor: c.card,
     borderRadius: Radii.xl,
     padding: Spacing.lg,
     borderWidth: 1,
-    borderColor: Grey[200],
+    borderColor: c.border,
     marginBottom: Spacing.xl,
     ...Shadows.sm,
   },
@@ -163,12 +169,12 @@ const styles = StyleSheet.create({
     fontFamily: FontFamily.heading,
     fontSize: FontSize.md,
     fontWeight: FontWeight.bold,
-    color: Brand.charcoal,
+    color: c.text,
   },
   statusDate: {
     fontFamily: FontFamily.body,
     fontSize: FontSize.sm,
-    color: Grey[500],
+    color: c.textTertiary,
     marginTop: 2,
   },
   statusMeta: {
@@ -186,7 +192,7 @@ const styles = StyleSheet.create({
     fontFamily: FontFamily.mono,
     fontSize: FontSize.base,
     fontWeight: FontWeight.semibold,
-    color: Brand.charcoal,
+    color: c.text,
     marginTop: 2,
   },
   statusBadge: {
@@ -201,24 +207,13 @@ const styles = StyleSheet.create({
     fontWeight: FontWeight.bold,
   },
 
-  /* Section label */
-  sectionLabel: {
-    fontFamily: FontFamily.body,
-    fontSize: 11,
-    fontWeight: FontWeight.bold,
-    color: Grey[500],
-    letterSpacing: 1,
-    textTransform: 'uppercase',
-    marginBottom: Spacing.md,
-  },
-
   /* Settings card */
   settingsCard: {
-    backgroundColor: Brand.white,
+    backgroundColor: c.card,
     borderRadius: Radii.xl,
     padding: Spacing.lg,
     borderWidth: 1,
-    borderColor: Grey[200],
+    borderColor: c.border,
     marginBottom: Spacing.xl,
   },
   settingRow: {
@@ -231,17 +226,17 @@ const styles = StyleSheet.create({
     fontFamily: FontFamily.body,
     fontSize: FontSize.base,
     fontWeight: FontWeight.medium,
-    color: Brand.charcoal,
+    color: c.text,
   },
   settingDesc: {
     fontFamily: FontFamily.body,
     fontSize: FontSize.sm,
-    color: Grey[500],
+    color: c.textTertiary,
     marginTop: 2,
   },
   divider: {
     height: 1,
-    backgroundColor: Grey[100],
+    backgroundColor: c.backgroundSecondary,
     marginVertical: Spacing.sm,
   },
 
@@ -249,11 +244,11 @@ const styles = StyleSheet.create({
   historyRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Brand.white,
+    backgroundColor: c.card,
     borderRadius: Radii.lg,
     padding: Spacing.md,
     borderWidth: 1,
-    borderColor: Grey[200],
+    borderColor: c.border,
     marginBottom: Spacing.sm,
   },
   historyDot: {
@@ -266,12 +261,12 @@ const styles = StyleSheet.create({
   historyDate: {
     fontFamily: FontFamily.body,
     fontSize: FontSize.base,
-    color: Brand.charcoal,
+    color: c.text,
   },
   historySize: {
     fontFamily: FontFamily.mono,
     fontSize: FontSize.xs,
-    color: Grey[500],
+    color: c.textTertiary,
     marginTop: 2,
   },
   historyBadge: {

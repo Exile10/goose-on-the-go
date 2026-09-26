@@ -56,7 +56,12 @@ the app that calls `fetch`. It attaches the bearer token, refreshes once on 401
 carrying the status and any `Retry-After`. Wire types live in
 `services/types.ts`, in the server's own snake_case — deliberately separate from
 the display-shaped types in `models/`.
-`services/storage.ts` — typed AsyncStorage wrapper.
+`services/storage.ts` — typed AsyncStorage wrapper, with key families
+(`storageFamily`) for records that grow with use, one key per record.
+`services/card-cache.ts` — the tool cards the phone was shown, by conversation
+and call, because the Pond saves none. Conversations themselves are read from
+the Pond each time; these cards are kept in plain storage, capped at 100
+conversations, dropped with their conversation, and cleared on sign-out.
 `services/discovery.ts` — finds Ponds over mDNS, so step 0 of the pairing wizard
 can offer a hub rather than ask for its address. See "Finding the Pond" below.
 

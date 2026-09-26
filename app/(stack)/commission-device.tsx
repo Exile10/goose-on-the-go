@@ -8,6 +8,7 @@
  * work — so the screen commits to waiting rather than appearing to hang.
  */
 
+import { useTranslation } from 'react-i18next';
 import React, { useCallback, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, TextInput, View } from 'react-native';
 import { InkButton } from '@jarida/ink/native';
@@ -19,6 +20,8 @@ import { Grey, JaridaPurple, Semantic } from '@/constants/colors';
 import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
 import { Spacing } from '@/constants/spacing';
 import { Radii } from '@/constants/radii';
+import { useThemedStyles } from '@/hooks/use-themed-styles';
+import type { ThemeColors } from '@/constants/colors';
 
 /**
  * Accepts every form the controller does: a QR payload, an 11- or 21-digit
@@ -32,6 +35,8 @@ function looksLikeSetupCode(raw: string): boolean {
 }
 
 export default function CommissionDeviceScreen() {
+  const styles = useThemedStyles(makeStyles);
+  const { t } = useTranslation();
   const router = useRouter();
   const { data, error, actions } = useDevices();
   const [code, setCode] = useState('');
@@ -51,7 +56,7 @@ export default function CommissionDeviceScreen() {
     return (
       <View style={styles.centred}>
         <ActivityIndicator color={JaridaPurple[500]} />
-        <Text style={styles.title}>Adding the device</Text>
+        <Text style={styles.title}>{t('commission.adding')}</Text>
         <Text style={styles.desc}>
           This can take a couple of minutes. Keep the device powered and nearby.
         </Text>
@@ -62,7 +67,7 @@ export default function CommissionDeviceScreen() {
   return (
     <View style={styles.container}>
       <GIcon name="device" size={28} color={JaridaPurple[500]} />
-      <Text style={styles.title}>Add a Matter device</Text>
+      <Text style={styles.title}>{t('commission.title')}</Text>
       <Text style={styles.desc}>
         Enter the setup code printed on the device or its packaging. A device only accepts
         pairing for about 15 minutes after it starts up, so power-cycle it first if it has
@@ -77,12 +82,12 @@ export default function CommissionDeviceScreen() {
       ) : null}
 
       <View style={styles.inputGroup}>
-        <Text style={styles.inputLabel}>Setup code</Text>
+        <Text style={styles.inputLabel}>{t('commission.code')}</Text>
         <TextInput
           style={styles.textInput}
           value={code}
           onChangeText={setCode}
-          placeholder="12345678"
+          placeholder={t('commission.codePlaceholder')}
           placeholderTextColor={Grey[400]}
           autoCapitalize="characters"
           autoCorrect={false}
@@ -90,12 +95,12 @@ export default function CommissionDeviceScreen() {
       </View>
 
       <View style={styles.inputGroup}>
-        <Text style={styles.inputLabel}>Name (optional)</Text>
+        <Text style={styles.inputLabel}>{t('commission.name')}</Text>
         <TextInput
           style={styles.textInput}
           value={name}
           onChangeText={setName}
-          placeholder="Kitchen light"
+          placeholder={t('commission.namePlaceholder')}
           placeholderTextColor={Grey[400]}
         />
       </View>
@@ -119,11 +124,12 @@ export default function CommissionDeviceScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Grey[50], padding: Spacing.xl, gap: Spacing.md },
+const makeStyles = (c: ThemeColors) =>
+  StyleSheet.create({
+  container: { flex: 1, backgroundColor: c.background, padding: Spacing.xl, gap: Spacing.md },
   centred: {
     flex: 1,
-    backgroundColor: Grey[50],
+    backgroundColor: c.background,
     alignItems: 'center',
     justifyContent: 'center',
     padding: Spacing.xl,
@@ -133,13 +139,12 @@ const styles = StyleSheet.create({
     fontFamily: FontFamily.heading,
     fontSize: FontSize.xl,
     fontWeight: FontWeight.bold,
-    color: Grey[900],
-    textAlign: 'center',
+    color: c.text,
   },
   desc: {
     fontFamily: FontFamily.body,
     fontSize: FontSize.base,
-    color: Grey[500],
+    color: c.textTertiary,
     lineHeight: FontSize.base * 1.5,
   },
   notice: {
@@ -156,7 +161,7 @@ const styles = StyleSheet.create({
   footnote: {
     fontFamily: FontFamily.body,
     fontSize: FontSize.sm,
-    color: Grey[500],
+    color: c.textTertiary,
     lineHeight: FontSize.sm * 1.5,
   },
   inputGroup: { gap: Spacing.xs },
@@ -164,15 +169,15 @@ const styles = StyleSheet.create({
     fontFamily: FontFamily.body,
     fontSize: FontSize.sm,
     fontWeight: FontWeight.semibold,
-    color: Grey[700],
+    color: c.textSecondary,
   },
   textInput: {
     fontFamily: FontFamily.body,
     fontSize: FontSize.base,
-    color: Grey[900],
-    backgroundColor: '#FFFFFF',
+    color: c.text,
+    backgroundColor: c.backgroundSecondary,
     borderWidth: 1,
-    borderColor: Grey[200],
+    borderColor: c.border,
     borderRadius: Radii.md,
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.md,

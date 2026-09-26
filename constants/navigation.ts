@@ -1,90 +1,80 @@
 /**
- * Navigation structure — Goose On The Go v2 design.
- * Profile hub groups and sub-screen routes.
+ * The Profile hub's shape: which screens exist, and how they group.
+ *
+ * Labels are catalogue keys rather than text. A module constant is evaluated
+ * once at import, before i18next has a language, so a literal here would freeze
+ * the app in whatever the build shipped with.
  */
+
+import type { TranslationKey } from '@/services/i18n';
 
 import type { IconName } from './icons';
 
 export interface NavItem {
   id: string;
-  label: string;
+  /** Key into the string catalogue — resolve with `t()` at render. */
+  labelKey: TranslationKey;
   icon: IconName;
-  /** Route path for Expo Router */
+  /** Route path for expo-router */
   route: string;
 }
 
 export interface NavGroup {
-  group: string;
+  /** Key into the string catalogue — resolve with `t()` at render. */
+  groupKey: TranslationKey;
   items: NavItem[];
 }
 
-/** Screens accessible from the Profile hub */
 export const PROFILE_NAV: NavGroup[] = [
   {
-    group: 'GOOSE',
+    groupKey: 'nav.goose',
     items: [
-      { id: 'models', label: 'AI Models', icon: 'models', route: '/(stack)/models' },
-      { id: 'memories', label: 'Memories', icon: 'memory', route: '/(stack)/memories' },
-      { id: 'logs', label: 'Activity Logs', icon: 'logs', route: '/(stack)/logs' },
-      { id: 'schedule', label: 'Schedule', icon: 'schedule', route: '/(stack)/schedule' },
+      { id: 'models', labelKey: 'screens.models', icon: 'models', route: '/(stack)/models' },
+      { id: 'memories', labelKey: 'screens.memories', icon: 'memory', route: '/(stack)/memories' },
+      { id: 'logs', labelKey: 'screens.logs', icon: 'logs', route: '/(stack)/logs' },
+      { id: 'schedule', labelKey: 'screens.schedule', icon: 'schedule', route: '/(stack)/schedule' },
     ],
   },
   {
-    group: 'INTEGRATIONS',
+    groupKey: 'nav.integrations',
     items: [
-      { id: 'appManagement', label: 'App Integrations', icon: 'link', route: '/(stack)/app-management' },
-      { id: 'mcpServers', label: 'MCP Servers', icon: 'globe', route: '/(stack)/mcp-servers' },
+      { id: 'appManagement', labelKey: 'screens.appManagement', icon: 'link', route: '/(stack)/app-management' },
+      { id: 'mcpServers', labelKey: 'screens.mcpServers', icon: 'globe', route: '/(stack)/mcp-servers' },
     ],
   },
   {
-    group: 'MEDIA & DATA',
+    groupKey: 'nav.media',
     items: [
-      { id: 'userMedia', label: 'Photos & Videos', icon: 'photo', route: '/(stack)/user-media' },
-      { id: 'photoUpload', label: 'Upload for Analysis', icon: 'upload', route: '/(stack)/photo-upload' },
+      { id: 'userMedia', labelKey: 'screens.userMedia', icon: 'photo', route: '/(stack)/user-media' },
+      { id: 'photoUpload', labelKey: 'screens.photoUpload', icon: 'upload', route: '/(stack)/photo-upload' },
     ],
   },
   {
-    group: 'HOUSEHOLD',
+    groupKey: 'nav.household',
     items: [
-      { id: 'addUsers', label: 'Users', icon: 'users', route: '/(stack)/add-users' },
-      { id: 'biometrics', label: 'Biometric Data', icon: 'shield', route: '/(stack)/biometrics' },
-      { id: 'homeManagement', label: 'Home Management', icon: 'home', route: '/(stack)/home-management' },
+      { id: 'addUsers', labelKey: 'screens.addUsers', icon: 'users', route: '/(stack)/add-users' },
+      { id: 'biometrics', labelKey: 'screens.biometrics', icon: 'shield', route: '/(stack)/biometrics' },
+      { id: 'homeManagement', labelKey: 'screens.homeManagement', icon: 'home', route: '/(stack)/home-management' },
     ],
   },
   {
-    group: 'DATA & PRIVACY',
+    groupKey: 'nav.privacy',
     items: [
-      { id: 'backup', label: 'Backup', icon: 'cloud', route: '/(stack)/backup' },
-      { id: 'restore', label: 'Restore to Pond', icon: 'restore', route: '/(stack)/restore' },
-      { id: 'privacy', label: 'Privacy & Licenses', icon: 'shield', route: '/(stack)/privacy' },
+      { id: 'backup', labelKey: 'screens.backup', icon: 'cloud', route: '/(stack)/backup' },
+      { id: 'restore', labelKey: 'screens.restore', icon: 'restore', route: '/(stack)/restore' },
+      { id: 'privacy', labelKey: 'screens.privacy', icon: 'shield', route: '/(stack)/privacy' },
     ],
   },
   // Dev-only: the per-screen mock/real backend toggle (#21). Discoverable in a
   // dev build without a code change; absent entirely from production.
   ...(__DEV__
-    ? [
+    ? ([
         {
-          group: 'DEVELOPER',
+          groupKey: 'nav.developer',
           items: [
-            { id: 'developer', label: 'Developer Mode', icon: 'cpu', route: '/(stack)/developer' },
+            { id: 'developer', labelKey: 'nav.developerMode', icon: 'cpu', route: '/(stack)/developer' },
           ],
         },
-      ]
+      ] satisfies NavGroup[])
     : []),
-];
-
-/** Shortcut items for the home screen carousel */
-export interface ShortcutItem {
-  id: string;
-  label: string;
-  iconName: string;
-  color: string;
-}
-
-export const HOME_SHORTCUTS: ShortcutItem[] = [
-  { id: 'morning', label: 'Morning', iconName: 'sun', color: '#FEF3C7' },
-  { id: 'home', label: 'Home', iconName: 'home', color: '#DBEAFE' },
-  { id: 'night', label: 'Night', iconName: 'moon', color: '#EDE9FE' },
-  { id: 'music', label: 'Music', iconName: 'music', color: '#FCE7F3' },
-  { id: 'packages', label: 'Packages', iconName: 'package', color: '#FEE2E2' },
 ];

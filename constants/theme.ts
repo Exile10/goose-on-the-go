@@ -11,4 +11,4 @@ export { FontFamily, FontSize, FontWeight, LineHeight, LetterSpacing } from './t
 export { Spacing } from './spacing';
 export { Radii } from './radii';
 export { Shadows } from './shadows';
-export { IconPaths, type IconName } from './icons';
+export { ICONS, isIconName, type IconName } from './icons';

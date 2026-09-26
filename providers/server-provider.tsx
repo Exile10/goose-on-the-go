@@ -21,6 +21,7 @@ import React, {
   type PropsWithChildren,
 } from 'react';
 
+import { forgetAllCards } from '@/services/card-cache';
 import { Storage, purgeLegacyStorage } from '@/services/storage';
 import { SecureStorage } from '@/services/secure-storage';
 import { api, type HandshakeResponse } from '@/services/api-client';
@@ -53,6 +54,7 @@ interface ServerContextValue {
   signOut: () => Promise<void>;
   /** Per-screen mock/real backend flags (dev only) — see MIGRATION_SCREENS. */
   screenModes: ScreenModes;
+  /** The screen's toggle in dev, its default in a release build — see `resolveScreenReal`. */
   isScreenReal: (screen: MigrationScreen) => boolean;
   setScreenMode: (screen: MigrationScreen, useReal: boolean) => void;
   /**
@@ -72,7 +74,8 @@ interface ServerContextValue {
  * `devices` was on this list and is not any more: #30 wired the Devices and
  * Home tabs to the Pond's real device list unconditionally, as #28 did for
  * models, profiles and recent conversations. A toggle for a screen with no
- * mock branch left would be a switch that does nothing.
+ * mock branch left would be a switch that does nothing. `voice` went the same
+ * way when the unused listening overlay was deleted.
  *
  * Nothing enforces this list: each view-model has to call `isScreenReal`
  * itself, so a screen can read "Real" here while its hook still returns mock
@@ -80,7 +83,6 @@ interface ServerContextValue {
  */
 export const MIGRATION_SCREENS = [
   'chat',
-  'voice',
   'memory',
   'integrations',
   'schedule',
@@ -89,12 +91,41 @@ export const MIGRATION_SCREENS = [
 
 export type MigrationScreen = (typeof MIGRATION_SCREENS)[number];
 
-type ScreenModes = Record<MigrationScreen, boolean>;
+export type ScreenModes = Record<MigrationScreen, boolean>;
 
-const DEFAULT_SCREEN_MODES: ScreenModes = MIGRATION_SCREENS.reduce(
-  (acc, screen) => ({ ...acc, [screen]: false }),
+/**
+ * Which screens start on the real Pond, and so the ones a release build sends
+ * there: it has no toggle to flip.
+ *
+ * A screen belongs here once its wiring has been run against a Pond rather
+ * than against a test. `chat` earned it: `POST /api/v1/chat` is implemented,
+ * and the only reason it ever needed a toggle was that it was not.
+ */
+const REAL_BY_DEFAULT: readonly MigrationScreen[] = ['chat'];
+
+export const DEFAULT_SCREEN_MODES: ScreenModes = MIGRATION_SCREENS.reduce(
+  (acc, screen) => ({ ...acc, [screen]: REAL_BY_DEFAULT.includes(screen) }),
   {} as ScreenModes,
 );
+
+/**
+ * Whether a screen talks to the Pond or to its mock data.
+ *
+ * In dev it is the screen's toggle. A release build has no way to flip one —
+ * the Developer screen redirects outside `__DEV__` — so there it is the
+ * screen's default, and the toggles are not read at all. It is not a blanket
+ * `false`: that answer left a release build's chat on the mock reply while
+ * `REAL_BY_DEFAULT` said real.
+ *
+ * Handed `isDev` rather than reading `__DEV__`, because every test runs with
+ * `__DEV__` true and could not otherwise reach the release answer.
+ */
+export function resolveScreenReal(
+  screen: MigrationScreen,
+  { isDev, screenModes, defaults }: { isDev: boolean; screenModes: ScreenModes; defaults: ScreenModes },
+): boolean {
+  return isDev ? screenModes[screen] : defaults[screen];
+}
 
 const ServerContext = createContext<ServerContextValue | null>(null);
 
@@ -234,8 +265,8 @@ export function ServerProvider({ children }: PropsWithChildren) {
   }, [screenModes]);
 
   const isScreenReal = useCallback(
-    // Production has no way to flip these, so it never pays to read them.
-    (screen: MigrationScreen) => (__DEV__ ? screenModes[screen] : false),
+    (screen: MigrationScreen) =>
+      resolveScreenReal(screen, { isDev: __DEV__, screenModes, defaults: DEFAULT_SCREEN_MODES }),
     [screenModes],
   );
 
@@ -256,6 +287,8 @@ export function ServerProvider({ children }: PropsWithChildren) {
     setRefreshTokenState(null);
     await SecureStorage.remove('sessionToken');
     await SecureStorage.remove('refreshToken');
+    // The tool cards kept from its conversations are the household's too.
+    await forgetAllCards();
     setOnline(false);
   }, []);
 

@@ -1,12 +1,14 @@
 /** Memory types — Goose On The Go v2 design */
 
+import type { IconName } from '@/constants/icons';
+
 export type MemoryCategory = 'Preference' | 'Habit' | 'Person' | 'Reminder';
 
 export interface MemoryFragment {
   id: number;
   category: MemoryCategory;
   text: string;
-  icon: string;
+  icon: IconName;
   time: string;
   pinned: boolean;
 }

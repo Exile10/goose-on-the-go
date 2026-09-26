@@ -4,20 +4,23 @@
  */
 
 import React, { useState, useCallback } from 'react';
-import { InkButton } from '@jarida/ink/native';
+import { useTranslation } from 'react-i18next';
+import { InkButton, InkTitle } from '@jarida/ink/native';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
-  Pressable,
 } from 'react-native';
 
 import { GIcon } from '@/components/ui/g-icon';
-import { Grey, JaridaPurple, Brand, Semantic } from '@/constants/colors';
+import { GPressable } from '@/components/ui/g-pressable';
+import { Grey, JaridaPurple, Semantic } from '@/constants/colors';
 import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
 import { Spacing } from '@/constants/spacing';
 import { Radii } from '@/constants/radii';
+import { useThemedStyles } from '@/hooks/use-themed-styles';
+import type { ThemeColors } from '@/constants/colors';
 
 
 type AnalysisState = 'idle' | 'analysing' | 'done';
@@ -35,6 +38,8 @@ const MOCK_RESULTS: AnalysisResult[] = [
 ];
 
 export default function PhotoUploadScreen() {
+  const { t } = useTranslation();
+  const styles = useThemedStyles(makeStyles);
   const [state, setState] = useState<AnalysisState>('idle');
   const [results, setResults] = useState<AnalysisResult[]>([]);
 
@@ -58,7 +63,8 @@ export default function PhotoUploadScreen() {
       showsVerticalScrollIndicator={false}
     >
       {/* Upload area */}
-      <Pressable
+      <GPressable
+        feedback="lift"
         style={[styles.uploadArea, state !== 'idle' && styles.uploadAreaDisabled]}
         onPress={state === 'idle' ? handleUpload : undefined}
       >
@@ -67,12 +73,9 @@ export default function PhotoUploadScreen() {
             <View style={styles.uploadIconWrap}>
               <GIcon name="upload" size={32} color={JaridaPurple[400]} />
             </View>
-            <Text style={styles.uploadTitle}>Tap to upload a photo</Text>
-            <Text style={styles.uploadDesc}>
-              Goose will analyze the image and provide smart suggestions
-            </Text>
+            <Text style={styles.uploadTitle}>{t('photo.choose')}</Text>
             <View style={styles.uploadFormats}>
-              <Text style={styles.formatText}>JPG, PNG, HEIC up to 25MB</Text>
+              <Text style={styles.formatText}>{t('photo.formats')}</Text>
             </View>
           </>
         )}
@@ -80,31 +83,25 @@ export default function PhotoUploadScreen() {
         {state === 'analysing' && (
           <View style={styles.analysingWrap}>
             <GIcon name="search" size={28} color={JaridaPurple[500]} />
-            <Text style={styles.analysingTitle}>Analysing...</Text>
+            <Text style={styles.analysingTitle}>{t('photo.analysing')}</Text>
             <View style={styles.progressBar}>
               <View style={styles.progressFill} />
             </View>
-            <Text style={styles.analysingDesc}>
-              Goose is examining the image for objects, text, and context
-            </Text>
           </View>
         )}
 
         {state === 'done' && (
           <View style={styles.doneWrap}>
             <GIcon name="check" size={28} color={Semantic.success} />
-            <Text style={styles.doneTitle}>Analysis Complete</Text>
-            <Text style={styles.doneDesc}>
-              Found {results.length} items in your image
-            </Text>
+            <Text style={styles.doneTitle}>{t('photo.done')}</Text>
           </View>
         )}
-      </Pressable>
+      </GPressable>
 
       {/* Results */}
       {state === 'done' && (
         <>
-          <Text style={styles.sectionLabel}>GOOSE SUGGESTIONS</Text>
+          <InkTitle level={3}>{t('sections.suggestions')}</InkTitle>
           {results.map((r, i) => (
             <View key={i} style={styles.resultCard}>
               <View style={styles.resultHeader}>
@@ -117,20 +114,22 @@ export default function PhotoUploadScreen() {
               </View>
               <Text style={styles.resultSuggestion}>{r.suggestion}</Text>
               <View style={styles.resultActions}>
-                <Pressable style={styles.resultAction}>
+                <GPressable style={styles.resultAction}>
                   <GIcon name="check" size={14} color={Semantic.success} />
-                  <Text style={[styles.resultActionText, { color: Semantic.success }]}>Accept</Text>
-                </Pressable>
-                <Pressable style={styles.resultAction}>
+                  <Text style={[styles.resultActionText, { color: Semantic.success }]}>
+                    {t('photo.save')}
+                  </Text>
+                </GPressable>
+                <GPressable style={styles.resultAction}>
                   <GIcon name="edit" size={14} color={Grey[500]} />
-                  <Text style={styles.resultActionText}>Edit</Text>
-                </Pressable>
+                  <Text style={styles.resultActionText}>{t('photo.edit')}</Text>
+                </GPressable>
               </View>
             </View>
           ))}
 
           <InkButton variant="quiet" onPress={handleReset}>
-            Upload Another
+            {t('photo.another')}
           </InkButton>
         </>
       )}
@@ -140,170 +139,141 @@ export default function PhotoUploadScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Grey[50] },
-  scroll: { paddingHorizontal: Spacing.lg, paddingTop: Spacing.lg },
+const makeStyles = (c: ThemeColors) =>
+  StyleSheet.create({
+    container: { flex: 1, backgroundColor: c.background },
+    scroll: { paddingHorizontal: Spacing.lg, paddingTop: Spacing.lg },
 
-  /* Upload area */
-  uploadArea: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: 240,
-    borderRadius: Radii.xl,
-    borderWidth: 2,
-    borderStyle: 'dashed',
-    borderColor: JaridaPurple[200],
-    backgroundColor: JaridaPurple[50] + '40',
-    padding: Spacing.xl,
-    marginBottom: Spacing.xl,
-  },
-  uploadAreaDisabled: {
-    borderStyle: 'solid',
-    borderColor: Grey[200],
-    backgroundColor: Brand.white,
-  },
-  uploadIconWrap: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: JaridaPurple[50],
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: Spacing.lg,
-  },
-  uploadTitle: {
-    fontFamily: FontFamily.heading,
-    fontSize: FontSize.lg,
-    fontWeight: FontWeight.bold,
-    color: Brand.charcoal,
-    marginBottom: Spacing.sm,
-  },
-  uploadDesc: {
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.base,
-    color: Grey[500],
-    textAlign: 'center',
-    lineHeight: FontSize.base * 1.5,
-    marginBottom: Spacing.md,
-  },
-  uploadFormats: {
-    backgroundColor: Grey[100],
-    paddingHorizontal: Spacing.md,
-    paddingVertical: 4,
-    borderRadius: Radii.pill,
-  },
-  formatText: {
-    fontFamily: FontFamily.mono,
-    fontSize: FontSize.xs,
-    color: Grey[500],
-  },
+    /* Upload area */
+    uploadArea: {
+      alignItems: 'center',
+      justifyContent: 'center',
+      minHeight: 240,
+      borderRadius: Radii.xl,
+      borderWidth: 2,
+      borderStyle: 'dashed',
+      borderColor: JaridaPurple[200],
+      backgroundColor: c.tintSoft,
+      padding: Spacing.xl,
+      marginBottom: Spacing.xl,
+    },
+    uploadAreaDisabled: {
+      borderStyle: 'solid',
+      borderColor: c.border,
+      backgroundColor: c.card,
+    },
+    uploadIconWrap: {
+      width: 64,
+      height: 64,
+      borderRadius: 32,
+      backgroundColor: c.tintSoft,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: Spacing.lg,
+    },
+    uploadTitle: {
+      fontFamily: FontFamily.heading,
+      fontSize: FontSize.lg,
+      fontWeight: FontWeight.bold,
+      color: c.text,
+      marginBottom: Spacing.sm,
+    },
+    uploadFormats: {
+      backgroundColor: c.backgroundSecondary,
+      paddingHorizontal: Spacing.md,
+      paddingVertical: 4,
+      borderRadius: Radii.pill,
+    },
+    formatText: {
+      fontFamily: FontFamily.mono,
+      fontSize: FontSize.xs,
+      color: c.textTertiary,
+    },
 
-  /* Analysing */
-  analysingWrap: { alignItems: 'center', gap: Spacing.md },
-  analysingTitle: {
-    fontFamily: FontFamily.heading,
-    fontSize: FontSize.lg,
-    fontWeight: FontWeight.bold,
-    color: JaridaPurple[600],
-  },
-  progressBar: {
-    width: '80%',
-    height: 6,
-    backgroundColor: Grey[200],
-    borderRadius: 3,
-    overflow: 'hidden',
-  },
-  progressFill: {
-    width: '65%',
-    height: '100%',
-    backgroundColor: JaridaPurple[500],
-    borderRadius: 3,
-  },
-  analysingDesc: {
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.sm,
-    color: Grey[500],
-    textAlign: 'center',
-  },
+    /* Analysing */
+    analysingWrap: { alignItems: 'center', gap: Spacing.md },
+    analysingTitle: {
+      fontFamily: FontFamily.heading,
+      fontSize: FontSize.lg,
+      fontWeight: FontWeight.bold,
+      color: c.textBrand,
+    },
+    progressBar: {
+      width: '80%',
+      height: 6,
+      backgroundColor: c.backgroundSecondary,
+      borderRadius: 3,
+      overflow: 'hidden',
+    },
+    progressFill: {
+      width: '65%',
+      height: '100%',
+      backgroundColor: JaridaPurple[500],
+      borderRadius: 3,
+    },
 
-  /* Done */
-  doneWrap: { alignItems: 'center', gap: Spacing.sm },
-  doneTitle: {
-    fontFamily: FontFamily.heading,
-    fontSize: FontSize.lg,
-    fontWeight: FontWeight.bold,
-    color: Semantic.success,
-  },
-  doneDesc: {
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.base,
-    color: Grey[500],
-  },
+    /* Done */
+    doneWrap: { alignItems: 'center', gap: Spacing.sm },
+    doneTitle: {
+      fontFamily: FontFamily.heading,
+      fontSize: FontSize.lg,
+      fontWeight: FontWeight.bold,
+      color: Semantic.success,
+    },
 
-  /* Section label */
-  sectionLabel: {
-    fontFamily: FontFamily.body,
-    fontSize: 11,
-    fontWeight: FontWeight.bold,
-    color: Grey[500],
-    letterSpacing: 1,
-    textTransform: 'uppercase',
-    marginBottom: Spacing.md,
-  },
-
-  /* Result cards */
-  resultCard: {
-    backgroundColor: Brand.white,
-    borderRadius: Radii.xl,
-    padding: Spacing.lg,
-    borderWidth: 1,
-    borderColor: Grey[200],
-    marginBottom: Spacing.md,
-  },
-  resultHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: Spacing.sm,
-  },
-  resultLabel: {
-    fontFamily: FontFamily.heading,
-    fontSize: FontSize.base,
-    fontWeight: FontWeight.semibold,
-    color: Brand.charcoal,
-  },
-  confidenceBadge: {
-    backgroundColor: Semantic.successSoft,
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: 2,
-    borderRadius: Radii.pill,
-  },
-  confidenceText: {
-    fontFamily: FontFamily.mono,
-    fontSize: FontSize.xs,
-    fontWeight: FontWeight.bold,
-    color: Semantic.success,
-  },
-  resultSuggestion: {
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.sm,
-    color: Grey[600],
-    lineHeight: FontSize.sm * 1.5,
-    marginBottom: Spacing.md,
-  },
-  resultActions: {
-    flexDirection: 'row',
-    gap: Spacing.lg,
-  },
-  resultAction: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.xs,
-  },
-  resultActionText: {
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.sm,
-    fontWeight: FontWeight.medium,
-    color: Grey[500],
-  },
-});
+    /* Result cards */
+    resultCard: {
+      backgroundColor: c.card,
+      borderRadius: Radii.xl,
+      padding: Spacing.lg,
+      borderWidth: 1,
+      borderColor: c.border,
+      marginBottom: Spacing.md,
+    },
+    resultHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: Spacing.sm,
+    },
+    resultLabel: {
+      fontFamily: FontFamily.heading,
+      fontSize: FontSize.base,
+      fontWeight: FontWeight.semibold,
+      color: c.text,
+    },
+    confidenceBadge: {
+      backgroundColor: Semantic.successSoft,
+      paddingHorizontal: Spacing.sm,
+      paddingVertical: 2,
+      borderRadius: Radii.pill,
+    },
+    confidenceText: {
+      fontFamily: FontFamily.mono,
+      fontSize: FontSize.xs,
+      fontWeight: FontWeight.bold,
+      color: Semantic.success,
+    },
+    resultSuggestion: {
+      fontFamily: FontFamily.body,
+      fontSize: FontSize.sm,
+      color: c.textTertiary,
+      lineHeight: FontSize.sm * 1.5,
+      marginBottom: Spacing.md,
+    },
+    resultActions: {
+      flexDirection: 'row',
+      gap: Spacing.lg,
+    },
+    resultAction: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: Spacing.xs,
+    },
+    resultActionText: {
+      fontFamily: FontFamily.body,
+      fontSize: FontSize.sm,
+      fontWeight: FontWeight.medium,
+      color: c.textTertiary,
+    },
+  });

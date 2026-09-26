@@ -1,0 +1,106 @@
+/**
+ * VoiceDock — voice mode, in the place the composer was.
+ *
+ * Three things, the layout the user's reference sets: the speaker on the left,
+ * which says whether replies are spoken; the orb in the middle, which is the
+ * one control that matters and does what the moment needs; the keyboard on
+ * the right, back to typing. The conversation stays above it, so what was said
+ * and what Goose answered are both on screen while it talks.
+ *
+ * It owns the voice pipeline (`useVoice`), so the microphone stream exists only
+ * while voice mode is open, and closing it stops everything.
+ */
+
+import React from 'react';
+import { StyleSheet, Text, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
+import { inkText, useInkTheme } from '@jarida/ink/native';
+
+import { ChromePuck } from '@/components/patterns/chrome-puck';
+import { VoiceOrb } from '@/components/patterns/voice-orb';
+import type { TranslationKey } from '@/services/i18n';
+import type { VoiceState } from '@/models/voice';
+import { selectionTick } from '@/services/haptics';
+import type { UseChat } from '@/view-models/use-chat';
+import { useVoice } from '@/view-models/use-voice';
+
+const ORB = 132;
+
+const CAPTIONS: Record<VoiceState, TranslationKey> = {
+  idle: 'chat.voice.idle',
+  wait: 'chat.voice.listening',
+  recording: 'chat.voice.hearing',
+  thinking: 'chat.voice.thinking',
+  speaking: 'chat.voice.speaking',
+  error: 'chat.voice.idle',
+};
+
+const ORB_ACTIONS: Record<VoiceState, TranslationKey> = {
+  idle: 'chat.voice.tapToTalk',
+  wait: 'chat.voice.tapToStop',
+  recording: 'chat.voice.tapToSend',
+  thinking: 'chat.voice.tapToCancel',
+  speaking: 'chat.voice.tapToInterrupt',
+  error: 'chat.voice.tapToTalk',
+};
+
+export interface VoiceDockProps {
+  send: UseChat['actions']['send'];
+  stop: UseChat['actions']['stop'];
+  /** Back to the keyboard. */
+  onClose: () => void;
+  bottomInset: number;
+}
+
+export function VoiceDock({ send, stop, onClose, bottomInset }: VoiceDockProps) {
+  const theme = useInkTheme();
+  const { t } = useTranslation();
+  const voice = useVoice({ send, stop });
+  const { state, level, speaker, error } = voice.data;
+
+  const caption = inkText(theme, {
+    size: 'sm',
+    weight: theme.weight.semibold,
+    color: error ? theme.color.dangerFg : theme.color.textSecondary,
+  });
+
+  return (
+    <View style={[styles.dock, { paddingBottom: bottomInset + 8 }]}>
+      <Text style={[caption.style, styles.caption]} accessibilityLiveRegion="polite" numberOfLines={2}>
+        {error ?? t(CAPTIONS[state])}
+      </Text>
+      <View style={styles.row}>
+        <ChromePuck
+          icon={speaker ? 'volume' : 'volume-off'}
+          label={t(speaker ? 'chat.voice.speakerOn' : 'chat.voice.speakerOff')}
+          onPress={() => {
+            void selectionTick();
+            voice.actions.toggleSpeaker();
+          }}
+        />
+        <VoiceOrb
+          state={state}
+          level={level}
+          size={ORB}
+          onPress={voice.actions.tap}
+          accessibilityLabel={t(ORB_ACTIONS[state])}
+        />
+        <ChromePuck
+          icon="keyboard"
+          label={t('chat.voice.keyboard')}
+          onPress={() => {
+            void selectionTick();
+            voice.actions.end();
+            onClose();
+          }}
+        />
+      </View>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  dock: { paddingHorizontal: 16, paddingTop: 4, gap: 6 },
+  caption: { textAlign: 'center', minHeight: 18 },
+  row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+});

@@ -1,0 +1,606 @@
+/**
+ * Every conversation the Pond is holding, for the wall the Chat tab opens on.
+ *
+ * pond-desktop's `ChatHistory` is the reference for this screen, and the parts
+ * a reader could compare are deliberately the same: the three card heights,
+ * the "when" ladder, and search over the title and the preview. A conversation
+ * should not read as long on the desktop and short on the phone.
+ *
+ * `GET /api/v1/sessions` answers the whole household at once, newest first,
+ * with no paging and no search. So the list is held here and narrowed on the
+ * device: the Pond cannot search it, and a round trip per keystroke would be
+ * slower than the filter it replaced.
+ *
+ * Two fields arrive as JSON `null` rather than absent — `title` and `preview` —
+ * whatever `services/types.ts` says, so every read of them tolerates both.
+ *
+ * The same conversations can be read as a list instead, which the desktop has
+ * no need for: sections by when each last moved, counted in the same calendar
+ * days as the "when" labels, so a row that says "Yesterday" is never filed
+ * under Today.
+ */
+
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+
+import { useServer } from '@/providers/server-provider';
+import { api } from '@/services/api-client';
+import { forgetCards } from '@/services/card-cache';
+import { Storage } from '@/services/storage';
+import type { SessionSummary } from '@/services/types';
+
+/** How much conversation a card has to show, which is how tall it gets. */
+export type CardWeight = 'tile' | 'card' | 'column';
+
+/**
+ * Rows each weight spans, as the desktop's grid spends them.
+ *
+ * Deliberately coarse, for the desktop's reason: three heights tile
+ * predictably and read as deliberate, where a continuous mapping from length
+ * to pixels gives a wall of almost-equal cards that reads as a rendering bug.
+ */
+export const WEIGHT_SPAN: Record<CardWeight, number> = { tile: 3, card: 4, column: 5 };
+
+/** Which conversations the wall shows. */
+export type HistoryFilter = 'all' | 'chats' | 'routines';
+
+/** How they are laid out: the wall of cards, or the quieter list. */
+export type HistoryView = 'grid' | 'list';
+
+/** Whether a stored value is a layout this build knows, rather than an older one's. */
+export function isHistoryView(value: unknown): value is HistoryView {
+  return value === 'grid' || value === 'list';
+}
+
+/** A conversation, shaped for its card. */
+export interface HistoryCard {
+  id: string;
+  /** Null until the Pond has named it; the card says "Untitled". */
+  title: string | null;
+  /** Goose's first reply, whitespace collapsed and capped by the Pond. */
+  preview: string | null;
+  /** When it last moved, in the shortest form that is still unambiguous. */
+  when: string;
+  /**
+   * The same moment as epoch milliseconds, for the list's sections. NaN when
+   * the Pond sent a time that does not parse.
+   */
+  updatedAt: number;
+  /** Every stored row, tool traffic included — so more than the bubbles. */
+  messageCount: number;
+  weight: CardWeight;
+  /** The Pond opened it for itself, for a schedule or a rule. */
+  routine: boolean;
+}
+
+/**
+ * Bucket a conversation by how much was said in it — the desktop's
+ * `cardWeight`, thresholds and all.
+ */
+export function cardWeight(
+  session: Pick<SessionSummary, 'message_count' | 'preview'>,
+): CardWeight {
+  const messages = session.message_count ?? 0;
+  const preview = session.preview?.length ?? 0;
+  if (messages >= 20 || preview >= 160) return 'column';
+  if (messages >= 6 || preview >= 60) return 'card';
+  return 'tile';
+}
+
+/**
+ * How many local calendar days `now` is past `then`: 0 for the same day, 1 for
+ * the day before, negative when `then` is ahead of this clock.
+ *
+ * Midnight to midnight rather than a 24-hour span, and rounded, so a
+ * daylight-saving day of 23 or 25 hours still counts as one. The "when" labels
+ * and the list's sections both count with this, and have to: two rules for
+ * what "yesterday" means would put a row that says Yesterday under Today.
+ */
+export function calendarDaysBetween(then: Date, now: Date): number {
+  const startOfDay = (d: Date) =>
+    new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  return Math.round((startOfDay(now) - startOfDay(then)) / 86_400_000);
+}
+
+/**
+ * When a conversation last moved: a time for today, a word for yesterday, a
+ * weekday inside the last week, then a date.
+ *
+ * The desktop's ladder, compared on local calendar days rather than 24-hour
+ * spans, and rounded so a daylight-saving day of 23 or 25 hours still counts
+ * as one. It adds a year once the date is not this one — the desktop stops at
+ * "Sep 12", which a conversation from last September would also be.
+ */
+export function relativeWhen(
+  iso: string,
+  now: Date,
+  locale: string | undefined,
+  yesterday: string,
+): string {
+  const then = new Date(iso);
+  if (Number.isNaN(then.getTime())) return '';
+
+  const days = calendarDaysBetween(then, now);
+
+  if (days <= 0) return then.toLocaleTimeString(locale, { hour: 'numeric', minute: '2-digit' });
+  if (days === 1) return yesterday;
+  if (days < 7) return then.toLocaleDateString(locale, { weekday: 'long' });
+  if (then.getFullYear() === now.getFullYear()) {
+    return then.toLocaleDateString(locale, { month: 'short', day: 'numeric' });
+  }
+  return then.toLocaleDateString(locale, { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+/**
+ * The prefixes the Pond puts on sessions it opens for its own background work.
+ *
+ * A copy of `POND_AUTHORED_SESSION_PREFIXES` in pond-core's
+ * `session_activity.rs`, where the reasoning lives: it is a deny-list because a
+ * person's session id has no shape to require. The sessions table has no origin
+ * column, so the id is the only thing that says who started a conversation.
+ */
+const POND_AUTHORED_PREFIXES = ['sched-'] as const;
+
+export function isRoutine(id: string): boolean {
+  return POND_AUTHORED_PREFIXES.some((prefix) => id.startsWith(prefix));
+}
+
+/**
+ * Whether the Pond is holding a conversation or only the row for one.
+ *
+ * The scheduler opens a session before each run, so a run that stores nothing
+ * leaves an empty row behind, titled nothing and holding nothing to open. On a
+ * Pond that had been running schedules for a while, those rows were most of the
+ * first screen: two real conversations, then a wall of "Untitled" tiles. The
+ * desktop draws them; a phone has less room to spend on an absence.
+ *
+ * Only an explicit zero counts. A server old enough to send no count at all is
+ * not saying its conversations are empty, and reading it that way would hide
+ * the whole wall.
+ */
+export function isEmpty(session: Pick<SessionSummary, 'message_count'>): boolean {
+  return session.message_count === 0;
+}
+
+export function passesFilter(card: Pick<HistoryCard, 'routine'>, filter: HistoryFilter): boolean {
+  if (filter === 'chats') return !card.routine;
+  if (filter === 'routines') return card.routine;
+  return true;
+}
+
+/** Case and accents folded away, so "cafe" finds "Café". */
+export function fold(text: string): string {
+  const decomposed = typeof text.normalize === 'function' ? text.normalize('NFD') : text;
+  return decomposed.replace(/[̀-ͯ]/g, '').toLowerCase();
+}
+
+/**
+ * Whether a card answers a query: every word of it, somewhere in the title or
+ * the preview, in any order.
+ *
+ * The desktop matches the query as one run, so "cry devil" misses "Devil May
+ * Cry". Words in any order is closer to what a half-remembered conversation
+ * gives you to search with.
+ */
+export function matchesQuery(card: Pick<HistoryCard, 'title' | 'preview'>, query: string): boolean {
+  const words = fold(query).split(/\s+/).filter(Boolean);
+  if (words.length === 0) return true;
+  const haystack = fold(`${card.title ?? ''} ${card.preview ?? ''}`);
+  return words.every((word) => haystack.includes(word));
+}
+
+/** Where a card sits on the wall, in rows rather than points. */
+export interface WallSlot {
+  column: number;
+  row: number;
+  span: number;
+}
+
+/**
+ * Lay cards onto `columns` columns, in the order given.
+ *
+ * Each card goes to whichever column is shortest so far, the leftmost on a tie.
+ * That is what the desktop's grid auto-placement does with row spans, and it
+ * is why newest-first still reads from the top down: two CSS-style columns
+ * would put the newest half of the history down the left and the rest down
+ * the right — correct masonry, unreadable chronology.
+ *
+ * Rows rather than points because the heights are fixed per weight, so the
+ * wall needs no measuring pass: the screen multiplies out whatever unit it
+ * chose.
+ */
+export function placeOnWall(weights: CardWeight[], columns = 2): WallSlot[] {
+  const filled = new Array<number>(columns).fill(0);
+  return weights.map((weight) => {
+    let column = 0;
+    for (let c = 1; c < columns; c += 1) {
+      if (filled[c] < filled[column]) column = c;
+    }
+    const span = WEIGHT_SPAN[weight];
+    const slot = { column, row: filled[column], span };
+    filled[column] += span;
+    return slot;
+  });
+}
+
+/**
+ * Which section of the list a conversation is filed under, by when it last
+ * moved: `today`, `yesterday`, `week` for the rest of the last seven days,
+ * `month` for the rest of the last thirty, then its calendar month as
+ * `YYYY-MM`. A time that cannot be read is `undated`.
+ *
+ * Seven days are today and the six before it, which is exactly the stretch in
+ * which `relativeWhen` names a weekday — so every row under "Previous 7 days"
+ * reads as a day of the week, and the first row stamped with a date is the
+ * first one under "Previous 30 days". A clock running ahead of the Pond reads
+ * as today, as it does in the labels.
+ */
+export function recencyKey(updatedAt: number, now: Date): string {
+  if (!Number.isFinite(updatedAt)) return 'undated';
+  const then = new Date(updatedAt);
+  const days = calendarDaysBetween(then, now);
+  if (days <= 0) return 'today';
+  if (days === 1) return 'yesterday';
+  if (days < 7) return 'week';
+  if (days < 30) return 'month';
+  return `${then.getFullYear()}-${String(then.getMonth() + 1).padStart(2, '0')}`;
+}
+
+/** The spans above the calendar months, nearest first. */
+const SPANS = ['today', 'yesterday', 'week', 'month'] as const;
+
+type Span = (typeof SPANS)[number];
+
+/** What each span is called. Passed in rather than looked up, so a test needs no i18next. */
+export type RecencyLabels = Record<Span | 'undated', string>;
+
+/** A run of the list under one heading. `data` is SectionList's own name for its rows. */
+export interface HistorySection<T = HistoryCard> {
+  /** From `recencyKey`, so it holds still while the list refreshes underneath it. */
+  key: string;
+  title: string;
+  data: T[];
+}
+
+function isSpan(key: string): key is Span {
+  return (SPANS as readonly string[]).includes(key);
+}
+
+/** Newest first: the fixed spans in order, then the months, then whatever had no date. */
+function sectionOrder(a: string, b: string): number {
+  const tier = (key: string) =>
+    isSpan(key) ? SPANS.indexOf(key) : key === 'undated' ? SPANS.length + 1 : SPANS.length;
+  const byTier = tier(a) - tier(b);
+  if (byTier !== 0) return byTier;
+  // Two months: `YYYY-MM` sorts as text, and the later one goes first.
+  return a < b ? 1 : a > b ? -1 : 0;
+}
+
+function sectionTitle(
+  key: string,
+  updatedAt: number,
+  now: Date,
+  locale: string | undefined,
+  labels: RecencyLabels,
+): string {
+  if (key === 'undated' || isSpan(key)) return labels[key];
+  const then = new Date(updatedAt);
+  return then.toLocaleDateString(
+    locale,
+    then.getFullYear() === now.getFullYear()
+      ? { month: 'long' }
+      : { month: 'long', year: 'numeric' },
+  );
+}
+
+/**
+ * The list's sections, newest first, each holding its conversations in the
+ * order they were given — the Pond's, so the list and the wall agree about
+ * what came first.
+ *
+ * The sections are put in order rather than trusted to arrive in it: one
+ * conversation out of place in the Pond's answer, or one whose time did not
+ * parse, must not open a section above Today.
+ *
+ * A month is named alone in the current year and with its year otherwise, the
+ * way `relativeWhen` adds a year to a date: "August" means last month, and
+ * August a year ago needs saying.
+ */
+export function sectionByRecency<T extends Pick<HistoryCard, 'updatedAt'>>(
+  cards: readonly T[],
+  now: Date,
+  locale: string | undefined,
+  labels: RecencyLabels,
+): HistorySection<T>[] {
+  const sections = new Map<string, HistorySection<T>>();
+  for (const card of cards) {
+    const key = recencyKey(card.updatedAt, now);
+    let section = sections.get(key);
+    if (!section) {
+      section = { key, title: sectionTitle(key, card.updatedAt, now, locale, labels), data: [] };
+      sections.set(key, section);
+    }
+    section.data.push(card);
+  }
+  return [...sections.values()].sort((a, b) => sectionOrder(a.key, b.key));
+}
+
+/**
+ * Run `task` over every item, no more than `limit` at a time, and sort the
+ * items by how each one went — in the order they were given, not the order
+ * they finished in.
+ *
+ * `Promise.allSettled` over a map would put every request in flight at once,
+ * and a selection can be a whole screen of conversations.
+ */
+export async function settleEach<T>(
+  items: readonly T[],
+  task: (item: T) => Promise<unknown>,
+  limit: number,
+): Promise<{ fulfilled: T[]; rejected: T[] }> {
+  const succeeded = new Array<boolean>(items.length).fill(false);
+  let next = 0;
+  const worker = async () => {
+    while (next < items.length) {
+      const index = next;
+      next += 1;
+      try {
+        await task(items[index]);
+        succeeded[index] = true;
+      } catch {
+        // Counted below, by `succeeded` staying false.
+      }
+    }
+  };
+  const workers = Math.min(Math.max(1, Math.floor(limit)), items.length);
+  await Promise.all(Array.from({ length: workers }, () => worker()));
+  return {
+    fulfilled: items.filter((_, i) => succeeded[i]),
+    rejected: items.filter((_, i) => !succeeded[i]),
+  };
+}
+
+/**
+ * How many deletes are in flight at once when several go together.
+ *
+ * The Pond has no bulk delete, so a selection is one DELETE per conversation.
+ * Three at a time clears a screenful in a few round trips without landing
+ * dozens of requests at once on a small machine whose rate limit is per IP —
+ * the budget docs/TESTING.md's incident spent in seconds.
+ */
+const DELETE_CONCURRENCY = 3;
+
+export function toCard(
+  session: SessionSummary,
+  now: Date,
+  locale: string | undefined,
+  yesterday: string,
+): HistoryCard {
+  return {
+    id: session.id,
+    title: session.title?.trim() || null,
+    preview: session.preview?.trim() || null,
+    when: relativeWhen(session.updated_at, now, locale, yesterday),
+    updatedAt: Date.parse(session.updated_at),
+    messageCount: session.message_count ?? 0,
+    weight: cardWeight(session),
+    routine: isRoutine(session.id),
+  };
+}
+
+export interface UseChatHistory {
+  data: {
+    /** What the wall shows: filtered, then searched, in the Pond's order. */
+    cards: HistoryCard[];
+    /** The same cards under the list's headings, newest section first. */
+    sections: HistorySection[];
+    /** Every conversation the Pond holds, before any narrowing. Empty rows are not conversations. */
+    total: number;
+    query: string;
+    filter: HistoryFilter;
+    /** The layout last chosen on this device; the wall until one has been. */
+    view: HistoryView;
+  };
+  /**
+   * Nothing has arrived yet, or the stored layout has not been read back. A
+   * later refresh keeps the old wall up instead.
+   */
+  loading: boolean;
+  /** A pull-to-refresh is in flight. */
+  refreshing: boolean;
+  error: string | null;
+  actions: {
+    /** `quiet` keeps what is on screen until the answer lands. */
+    refresh: (mode?: 'pull' | 'quiet') => Promise<void>;
+    setQuery: (query: string) => void;
+    setFilter: (filter: HistoryFilter) => void;
+    /**
+     * Kept on the device rather than the Pond: it is how this phone likes to
+     * read, not a fact about the conversations.
+     */
+    setView: (view: HistoryView) => void;
+    /** Resolves false when the Pond refused; the wall is re-read either way. */
+    remove: (id: string) => Promise<boolean>;
+    /**
+     * Deletes each, three at a time, and re-reads the wall once all of them
+     * have settled. `failed` are the ones the Pond refused, which the re-read
+     * puts back.
+     */
+    removeMany: (ids: string[]) => Promise<{ deleted: string[]; failed: string[] }>;
+  };
+}
+
+export function useChatHistory(): UseChatHistory {
+  const { t, i18n } = useTranslation();
+  const [sessions, setSessions] = useState<SessionSummary[] | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  // Two, because they end differently: a load error ends when a load works,
+  // and a refused delete ends when the reader moves on — not when the re-read
+  // that follows it succeeds a moment later.
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [query, setQuery] = useState('');
+  const [filter, setFilter] = useState<HistoryFilter>('all');
+  // Null until the stored layout has been read back. The screen keeps its
+  // loading ghosts up until then, so a reader who left on the list is not
+  // shown the wall for a frame on the way back to it.
+  const [view, setViewState] = useState<HistoryView | null>(null);
+
+  useEffect(() => {
+    let live = true;
+    void Storage.get('chatHistoryView')
+      .then((stored) => {
+        if (live) setViewState(isHistoryView(stored) ? stored : 'grid');
+      })
+      .catch(() => {
+        if (live) setViewState('grid');
+      });
+    return () => {
+      live = false;
+    };
+  }, []);
+
+  // A convenience, not a record: a write that fails costs the next launch its
+  // layout and nothing else, which is not worth interrupting anyone over.
+  const setView = useCallback((next: HistoryView) => {
+    setViewState(next);
+    void Storage.set('chatHistoryView', next).catch(() => undefined);
+  }, []);
+
+  // The base URL and bearer token arrive asynchronously; fetching before they
+  // land calls the default address unauthenticated and never retries.
+  const { hydrated } = useServer();
+
+  // Mounting and focusing both ask for the list, on the same frame. One
+  // request answers both: the Pond runs several queries per session to build
+  // this, so a second copy of it is not free.
+  const inFlight = useRef<Promise<void> | null>(null);
+
+  // Sets nothing until the answer lands, so the effect below can call it
+  // without rendering twice. The spinner a pull wants is `pull`'s business.
+  const load = useCallback(() => {
+    if (!hydrated) return Promise.resolve();
+    if (inFlight.current) return inFlight.current;
+    const run = (async () => {
+      try {
+        const next = await api.listSessions();
+        setSessions(next);
+        setLoadError(null);
+      } catch {
+        setLoadError(t('chat.history.failed'));
+      } finally {
+        setRefreshing(false);
+        inFlight.current = null;
+      }
+    })();
+    inFlight.current = run;
+    return run;
+  }, [hydrated, t]);
+
+  // A read that must start after now. Joining one already in flight could
+  // hand back a list the Pond built before the change it is meant to show.
+  const resync = useCallback(
+    () => (inFlight.current ?? Promise.resolve()).then(load),
+    [load],
+  );
+
+  // What the screen calls: on focus, and on a pull. Either is the reader
+  // moving on, so a failed delete stops being news here and not before.
+  const refresh = useCallback(
+    (mode: 'pull' | 'quiet' = 'quiet') => {
+      setActionError(null);
+      if (mode === 'pull' && hydrated) setRefreshing(true);
+      return load();
+    },
+    [hydrated, load],
+  );
+
+  useEffect(() => {
+    if (!hydrated) return;
+    void load();
+  }, [hydrated, load]);
+
+  const remove = useCallback(
+    async (id: string) => {
+      setActionError(null);
+      setSessions((all) => all?.filter((s) => s.id !== id) ?? all);
+      try {
+        await api.deleteSession(id);
+        // The cards this phone kept for it go with it.
+        void forgetCards([id]);
+        return true;
+      } catch {
+        setActionError(t('chat.history.deleteFailed'));
+        return false;
+      } finally {
+        // Whatever the Pond did, the wall should say what it now holds. The
+        // re-read clears only a load error, so a refusal stays on screen.
+        void resync();
+      }
+    },
+    [resync, t],
+  );
+
+  const removeMany = useCallback(
+    async (ids: string[]) => {
+      if (ids.length === 0) return { deleted: [], failed: [] };
+      setActionError(null);
+      const doomed = new Set(ids);
+      setSessions((all) => all?.filter((s) => !doomed.has(s.id)) ?? all);
+      const { fulfilled, rejected } = await settleEach(
+        ids,
+        (id) => api.deleteSession(id),
+        DELETE_CONCURRENCY,
+      );
+      void forgetCards(fulfilled);
+      if (rejected.length > 0) {
+        setActionError(t('chat.history.deleteManyFailed', { count: rejected.length }));
+      }
+      // One re-read for the lot, once the last has settled rather than after
+      // each. It brings back whatever the Pond refused, and clears only a load
+      // error, so the refusal stays on screen.
+      void resync();
+      return { deleted: fulfilled, failed: rejected };
+    },
+    [resync, t],
+  );
+
+  // Shaped once per answer rather than per keystroke: the "when" labels and the
+  // weights do not change while someone types. The moment they were written at
+  // is kept beside them, so the list's sections are cut from the same one.
+  const { all, now } = useMemo(() => {
+    const at = new Date();
+    const yesterday = t('chat.history.yesterday');
+    return {
+      now: at,
+      all: (sessions ?? [])
+        .filter((s) => !isEmpty(s))
+        .map((s) => toCard(s, at, i18n.language, yesterday)),
+    };
+  }, [sessions, t, i18n.language]);
+
+  const cards = useMemo(
+    () => all.filter((c) => passesFilter(c, filter) && matchesQuery(c, query)),
+    [all, filter, query],
+  );
+
+  const sections = useMemo(
+    () =>
+      sectionByRecency(cards, now, i18n.language, {
+        today: t('chat.history.sectionToday'),
+        yesterday: t('chat.history.sectionYesterday'),
+        week: t('chat.history.sectionWeek'),
+        month: t('chat.history.sectionMonth'),
+        undated: t('chat.history.sectionUndated'),
+      }),
+    [cards, now, i18n.language, t],
+  );
+
+  return {
+    data: { cards, sections, total: all.length, query, filter, view: view ?? 'grid' },
+    loading: (sessions === null && loadError === null) || view === null,
+    refreshing,
+    error: actionError ?? loadError,
+    actions: { refresh, setQuery, setFilter, setView, remove, removeMany },
+  };
+}

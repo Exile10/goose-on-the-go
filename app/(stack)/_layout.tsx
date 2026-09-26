@@ -1,51 +1,98 @@
 /**
- * StackLayout — Sub-screen navigation for all profile hub destinations.
+ * StackLayout — the screens reached from the Profile hub and from Home.
  *
- * 15 screens matching Goose On The Go v2 design.
+ * The header is drawn by the navigator rather than by any screen, so it is the
+ * one surface `useThemedStyles` cannot reach. It reads `useTheme()` directly;
+ * without that it stayed `Brand.white` in dark mode, which is a white slab
+ * above every one of these screens.
  */
 
-import { Stack } from 'expo-router';
-import React from 'react';
+import { Stack, useRouter } from 'expo-router';
+import React, { useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 
-import { Brand, Grey, JaridaPurple } from '@/constants/colors';
+import { GIcon } from '@/components/ui/g-icon';
+import { GPressable } from '@/components/ui/g-pressable';
+import { useTheme } from '@/providers/theme-provider';
+import { selectionTick } from '@/services/haptics';
+import { JaridaPurple } from '@/constants/colors';
+import { FontFamily } from '@/constants/typography';
+
+/**
+ * A back control the navigator will not draw on its own.
+ *
+ * These screens are pushed from the tab group through the *root* stack, so this
+ * nested navigator has exactly one entry in its own history and suppresses the
+ * system back button. Without this, every one of them is a dead end reachable
+ * only by the edge-swipe gesture — which is invisible, and which a person who
+ * has turned it off does not have at all.
+ */
+function BackButton() {
+  const router = useRouter();
+  const { t } = useTranslation();
+  const onPress = useCallback(() => {
+    void selectionTick();
+    router.back();
+  }, [router]);
+
+  return (
+    <GPressable
+      onPress={onPress}
+      hitSlop={12}
+      accessibilityRole="button"
+      accessibilityLabel={t('common.back')}
+    >
+      <GIcon name="chevron-left" size={22} color={JaridaPurple[500]} />
+    </GPressable>
+  );
+}
 
 export default function StackLayout() {
+  const { colors } = useTheme();
+  const { t } = useTranslation();
+
   return (
     <Stack
       screenOptions={{
         headerShown: true,
-        headerStyle: { backgroundColor: Brand.white },
+        headerStyle: { backgroundColor: colors.card },
         headerTintColor: JaridaPurple[500],
-        headerTitleStyle: { color: Grey[900], fontFamily: 'Quicksand', fontWeight: '700' },
+        headerTitleStyle: {
+          color: colors.text,
+          fontFamily: FontFamily.heading,
+          fontWeight: '700',
+        },
         headerShadowVisible: false,
         headerBackButtonDisplayMode: 'minimal',
+        headerLeft: () => <BackButton />,
+        contentStyle: { backgroundColor: colors.background },
       }}
     >
-      <Stack.Screen name="models" options={{ title: 'AI Models' }} />
-      <Stack.Screen name="memories" options={{ title: 'Memories' }} />
-      <Stack.Screen name="logs" options={{ title: 'Activity Logs' }} />
-      <Stack.Screen name="schedule" options={{ title: 'Schedule' }} />
-      <Stack.Screen name="app-management" options={{ title: 'App Integrations' }} />
-      <Stack.Screen name="mcp-servers" options={{ title: 'MCP Servers' }} />
-      <Stack.Screen name="user-media" options={{ title: 'Photos & Videos' }} />
-      <Stack.Screen name="photo-upload" options={{ title: 'Upload for Analysis' }} />
-      <Stack.Screen name="add-users" options={{ title: 'Users' }} />
-      <Stack.Screen name="biometrics" options={{ title: 'Biometrics' }} />
-      <Stack.Screen name="backup" options={{ title: 'Backup' }} />
-      <Stack.Screen name="restore" options={{ title: 'Restore to Pond' }} />
-      <Stack.Screen name="privacy" options={{ title: 'Privacy & Licenses' }} />
-      <Stack.Screen name="home-management" options={{ title: 'Home Management' }} />
-      <Stack.Screen name="pond-pairing" options={{ title: 'Pond Pairing' }} />
-      <Stack.Screen name="developer" options={{ title: 'Developer' }} />
-      <Stack.Screen name="commission-device" options={{ title: 'Add Device' }} />
+      <Stack.Screen name="models" options={{ title: t('screens.models') }} />
+      <Stack.Screen name="memories" options={{ title: t('screens.memories') }} />
+      <Stack.Screen name="logs" options={{ title: t('screens.logs') }} />
+      <Stack.Screen name="schedule" options={{ title: t('screens.schedule') }} />
+      <Stack.Screen name="app-management" options={{ title: t('screens.appManagement') }} />
+      <Stack.Screen name="mcp-servers" options={{ title: t('screens.mcpServers') }} />
+      <Stack.Screen name="user-media" options={{ title: t('screens.userMedia') }} />
+      <Stack.Screen name="photo-upload" options={{ title: t('screens.photoUpload') }} />
+      <Stack.Screen name="add-users" options={{ title: t('screens.addUsers') }} />
+      <Stack.Screen name="biometrics" options={{ title: t('screens.biometrics') }} />
+      <Stack.Screen name="backup" options={{ title: t('screens.backup') }} />
+      <Stack.Screen name="restore" options={{ title: t('screens.restore') }} />
+      <Stack.Screen name="privacy" options={{ title: t('screens.privacy') }} />
+      <Stack.Screen name="home-management" options={{ title: t('screens.homeManagement') }} />
+      <Stack.Screen name="pond-pairing" options={{ title: t('screens.pondPairing') }} />
+      <Stack.Screen name="developer" options={{ title: t('screens.developer') }} />
+      <Stack.Screen name="commission-device" options={{ title: t('screens.commissionDevice') }} />
+      <Stack.Screen name="switch-pond" options={{ title: t('screens.switchPond') }} />
       <Stack.Screen
         name="connect-desktop"
         options={{
-          // No header at all. `headerTransparent` still reserved a white bar
-          // against the light navigation theme -- with a white tint on top of
-          // it, which is why the title was invisible and the camera started an
-          // inch down the screen. A viewfinder wants the whole screen, so the
-          // screen carries its own dismiss control instead.
+          // No header at all. `headerTransparent` still reserved a bar, with the
+          // tint on top of it, which is why the title was invisible and the
+          // camera started an inch down the screen. A viewfinder wants the whole
+          // screen, so it carries its own dismiss control instead.
           headerShown: false,
         }}
       />

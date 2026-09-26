@@ -9,24 +9,18 @@ import { useCallback, useEffect, useState } from 'react';
 
 import { useServer } from '@/providers/server-provider';
 import { ApiError, api } from '@/services/api-client';
-import type { ModelEntry } from '@/services/types';
+import { MODEL_CATEGORIES } from '@/services/types';
+import type { ModelCategory, ModelEntry } from '@/services/types';
 
 /**
- * Providers that run the model on the Pond itself.
+ * Human-readable size, or null when the server did not say.
  *
- * This is the one privacy claim the screen can make honestly: a local provider
- * means the prompt never leaves the house. Anything else is a cloud fallback,
- * which GIAP supports but does not assume.
+ * Zero is "not measured" rather than "empty": the catalogue records 0 for a
+ * file found by the filesystem sweep but never sized, and "0 MB" next to a
+ * multi-gigabyte model reads as a bug.
  */
-const LOCAL_PROVIDERS = ['ollama', 'llamafile', 'local', 'local-inference'];
-
-export function isLocalProvider(provider: string): boolean {
-  return LOCAL_PROVIDERS.includes(provider.toLowerCase());
-}
-
-/** Human-readable size, or null when the server did not say. */
 export function formatSize(megabytes: number | undefined): string | null {
-  if (megabytes === undefined) return null;
+  if (!megabytes) return null;
   if (megabytes >= 1024) return `${(megabytes / 1024).toFixed(1)} GB`;
   return `${Math.round(megabytes)} MB`;
 }
@@ -38,11 +32,27 @@ export function formatContextWindow(tokens: number | undefined): string | null {
   return `${tokens} tokens`;
 }
 
+/** Models under the category the server filed them in, empty groups dropped. */
+export interface ModelGroup {
+  category: ModelCategory;
+  models: ModelEntry[];
+}
+
+export function groupByCategory(models: ModelEntry[]): ModelGroup[] {
+  return MODEL_CATEGORIES.map((category) => ({
+    category,
+    models: models.filter((m) => m.category === category),
+  })).filter((g) => g.models.length > 0);
+}
+
 export interface UseModels {
   data: {
     models: ModelEntry[];
-    /** The model currently serving chat, or null when none is active. */
-    activeModel: ModelEntry | null;
+    /** The same models under their category, in the server's own order. */
+    groups: ModelGroup[];
+    /** Models assigned to a role. A Pond serves several at once — one for
+        chat, one for speech, one for embeddings — so this is a list. */
+    active: ModelEntry[];
   };
   loading: boolean;
   error: string | null;
@@ -88,11 +98,15 @@ export function useModels(): UseModels {
   const activate = useCallback(
     async (model: ModelEntry) => {
       const previous = models;
+      // Only rows of the same category change: activating a voice does not
+      // unassign the language model, because they hold different roles.
       setModels((current) =>
-        current.map((m) => ({ ...m, is_active: m.id === model.id })),
+        current.map((m) =>
+          m.category === model.category ? { ...m, active: m.id === model.id } : m,
+        ),
       );
       try {
-        await api.activateModel(model.provider, model.name);
+        await api.activateModel(model.category, model.name);
         setModels(await api.listModels());
       } catch (e) {
         setModels(previous);
@@ -105,7 +119,8 @@ export function useModels(): UseModels {
   return {
     data: {
       models,
-      activeModel: models.find((m) => m.is_active) ?? null,
+      groups: groupByCategory(models),
+      active: models.filter((m) => m.active),
     },
     loading,
     error,

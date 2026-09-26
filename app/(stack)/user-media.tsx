@@ -2,21 +2,24 @@
  * UserMediaScreen — Photo grid, video grid, and analysed items tab.
  */
 
-import React, { useState, useCallback } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
-  Pressable,
   Dimensions,
 } from 'react-native';
 
 import { GIcon } from '@/components/ui/g-icon';
-import { Grey, JaridaPurple, Brand, Semantic } from '@/constants/colors';
+import { GPressable } from '@/components/ui/g-pressable';
+import type { IconName } from '@/constants/icons';
+import { Grey, JaridaPurple, Brand } from '@/constants/colors';
 import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
 import { Spacing } from '@/constants/spacing';
 import { Radii } from '@/constants/radii';
+import { useThemedStyles } from '@/hooks/use-themed-styles';
+import type { ThemeColors } from '@/constants/colors';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const GRID_GAP = 4;
@@ -25,7 +28,7 @@ const TILE_SIZE = (SCREEN_WIDTH - Spacing.lg * 2 - GRID_GAP * (GRID_COLS - 1)) /
 
 type MediaTab = 'photos' | 'videos' | 'analysed';
 
-const TABS: Array<{ key: MediaTab; label: string }> = [
+const TABS: { key: MediaTab; label: string }[] = [
   { key: 'photos', label: 'Photos' },
   { key: 'videos', label: 'Videos' },
   { key: 'analysed', label: 'Analysed' },
@@ -42,8 +45,15 @@ const VIDEO_COLORS = [
   '#1C2A2A',
 ];
 
+const ANALYSED: { label: string; result: string; time: string; icon: IconName }[] = [
+  { label: 'Kitchen shelf photo', result: 'Identified: cereal, milk, bread, vitamins', time: '2h ago', icon: 'photo' },
+  { label: 'Package label scan', result: 'Tracking: 1Z999...4321 \u2014 arriving today', time: '1d ago', icon: 'package' },
+  { label: 'Pet cam screenshot', result: 'Goose detected: golden retriever, resting', time: '3d ago', icon: 'activity' },
+];
+
 /** Media tile placeholder */
 function MediaTile({ color, label, showPlay }: { color: string; label: string; showPlay?: boolean }) {
+  const styles = useThemedStyles(makeStyles);
   return (
     <View style={[styles.tile, { backgroundColor: color }]}>
       {showPlay && <View style={{ marginBottom: 4 }}><GIcon name="play" size={20} color="#fff" /></View>}
@@ -53,6 +63,7 @@ function MediaTile({ color, label, showPlay }: { color: string; label: string; s
 }
 
 export default function UserMediaScreen() {
+  const styles = useThemedStyles(makeStyles);
   const [activeTab, setActiveTab] = useState<MediaTab>('photos');
 
   return (
@@ -60,7 +71,7 @@ export default function UserMediaScreen() {
       {/* Tabs */}
       <View style={styles.tabsRow}>
         {TABS.map((tab) => (
-          <Pressable
+          <GPressable feedback="lift"
             key={tab.key}
             style={[styles.tab, activeTab === tab.key && styles.tabActive]}
             onPress={() => setActiveTab(tab.key)}
@@ -68,7 +79,7 @@ export default function UserMediaScreen() {
             <Text style={[styles.tabText, activeTab === tab.key && styles.tabTextActive]}>
               {tab.label}
             </Text>
-          </Pressable>
+          </GPressable>
         ))}
       </View>
 
@@ -94,11 +105,7 @@ export default function UserMediaScreen() {
 
         {activeTab === 'analysed' && (
           <View style={styles.analysedList}>
-            {[
-              { label: 'Kitchen shelf photo', result: 'Identified: cereal, milk, bread, vitamins', time: '2h ago', icon: 'photo' },
-              { label: 'Package label scan', result: 'Tracking: 1Z999...4321 \u2014 arriving today', time: '1d ago', icon: 'package' },
-              { label: 'Pet cam screenshot', result: 'Goose detected: golden retriever, resting', time: '3d ago', icon: 'activity' },
-            ].map((item, i) => (
+            {ANALYSED.map((item, i) => (
               <View key={i} style={styles.analysedCard}>
                 <View style={{ marginRight: Spacing.md }}>
                   <GIcon name={item.icon} size={22} color={JaridaPurple[500]} />
@@ -119,88 +126,87 @@ export default function UserMediaScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Grey[50] },
+const makeStyles = (c: ThemeColors) =>
+  StyleSheet.create({
+    container: { flex: 1, backgroundColor: c.background },
 
-  /* Tabs */
-  tabsRow: {
-    flexDirection: 'row',
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.md,
-    gap: Spacing.sm,
-    backgroundColor: Brand.white,
-    borderBottomWidth: 1,
-    borderBottomColor: Grey[200],
-  },
-  tab: {
-    flex: 1,
-    alignItems: 'center',
-    paddingVertical: 8,
-    borderRadius: Radii.pill,
-    backgroundColor: Grey[100],
-  },
-  tabActive: { backgroundColor: JaridaPurple[500] },
-  tabText: {
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.sm,
-    fontWeight: FontWeight.semibold,
-    color: Grey[600],
-  },
-  tabTextActive: { color: Brand.white },
+    /* Tabs */
+    tabsRow: {
+      flexDirection: 'row',
+      paddingHorizontal: Spacing.lg,
+      paddingVertical: Spacing.md,
+      gap: Spacing.sm,
+      backgroundColor: c.card,
+      borderBottomWidth: 1,
+      borderBottomColor: c.border,
+    },
+    tab: {
+      flex: 1,
+      alignItems: 'center',
+      paddingVertical: 8,
+      borderRadius: Radii.pill,
+      backgroundColor: c.backgroundSecondary,
+    },
+    tabActive: { backgroundColor: JaridaPurple[500] },
+    tabText: {
+      fontFamily: FontFamily.body,
+      fontSize: FontSize.sm,
+      fontWeight: FontWeight.semibold,
+      color: c.textTertiary,
+    },
+    tabTextActive: { color: Brand.white },
 
-  scroll: { paddingTop: Spacing.md },
+    scroll: { paddingTop: Spacing.md },
 
-  /* Grid */
-  grid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    paddingHorizontal: Spacing.lg,
-    gap: GRID_GAP,
-  },
-  tile: {
-    width: TILE_SIZE,
-    height: TILE_SIZE,
-    borderRadius: Radii.sm,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  tileLabel: {
-    fontFamily: FontFamily.mono,
-    fontSize: 8,
-    color: Grey[500],
-  },
+    /* Grid */
+    grid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      paddingHorizontal: Spacing.lg,
+      gap: GRID_GAP,
+    },
+    tile: {
+      width: TILE_SIZE,
+      height: TILE_SIZE,
+      borderRadius: Radii.sm,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    tileLabel: {
+      fontFamily: FontFamily.mono,
+      fontSize: 8,
+      color: Grey[500],
+    },
 
-  /* Analysed list */
-  analysedList: {
-    paddingHorizontal: Spacing.lg,
-  },
-  analysedCard: {
-    flexDirection: 'row',
-    backgroundColor: Brand.white,
-    borderRadius: Radii.xl,
-    padding: Spacing.lg,
-    borderWidth: 1,
-    borderColor: Grey[200],
-    marginBottom: Spacing.md,
-  },
-  analysedInfo: { flex: 1 },
-  analysedLabel: {
-    fontFamily: FontFamily.heading,
-    fontSize: FontSize.base,
-    fontWeight: FontWeight.semibold,
-    color: Brand.charcoal,
-  },
-  analysedResult: {
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.sm,
-    color: Grey[600],
-    lineHeight: FontSize.sm * 1.5,
-    marginTop: 4,
-  },
-  analysedTime: {
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.xs,
-    color: Grey[400],
-    marginTop: 4,
-  },
-});
+    /* Analysed list */
+    analysedList: { paddingHorizontal: Spacing.lg },
+    analysedCard: {
+      flexDirection: 'row',
+      backgroundColor: c.card,
+      borderRadius: Radii.xl,
+      padding: Spacing.lg,
+      borderWidth: 1,
+      borderColor: c.border,
+      marginBottom: Spacing.md,
+    },
+    analysedInfo: { flex: 1 },
+    analysedLabel: {
+      fontFamily: FontFamily.heading,
+      fontSize: FontSize.base,
+      fontWeight: FontWeight.semibold,
+      color: c.text,
+    },
+    analysedResult: {
+      fontFamily: FontFamily.body,
+      fontSize: FontSize.sm,
+      color: c.textTertiary,
+      lineHeight: FontSize.sm * 1.5,
+      marginTop: 4,
+    },
+    analysedTime: {
+      fontFamily: FontFamily.body,
+      fontSize: FontSize.xs,
+      color: Grey[400],
+      marginTop: 4,
+    },
+  });

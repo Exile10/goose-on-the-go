@@ -113,7 +113,7 @@ How to add, modify, and remove components in the Goose on The Go UI library.
 | GButton | variant, size, startIcon, endIcon, loading, disabled | Primary action button |
 | GCard | variant (default/elevated) | Surface container |
 | GChip | variant (6 colors), size, startIcon | Status badge |
-| GIcon | name, size, color, fill | SVG icon from IconPaths registry |
+| GIcon | name, size, color, strokeWidth | Named lucide glyph from `constants/icons.ts` — see [VIEW-LAYER.md](./VIEW-LAYER.md) |
 | GInput | label, variant (bordered/flat), startIcon | Text input |
 | GTextArea | label, variant, minLines, maxLines | Multi-line input |
 | GSwitch | value, onValueChange, label | Toggle switch |

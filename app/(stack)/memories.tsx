@@ -10,18 +10,20 @@ import {
   Text,
   StyleSheet,
   FlatList,
-  Pressable,
   ScrollView,
 } from 'react-native';
 
 import { GIcon } from '@/components/ui/g-icon';
+import { GPressable } from '@/components/ui/g-pressable';
 import { SAMPLE_MEMORIES, type MemoryFragment, type MemoryCategory } from '@/models/memory';
 import { Grey, JaridaPurple, Brand, Semantic } from '@/constants/colors';
 import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
 import { Spacing } from '@/constants/spacing';
 import { Radii } from '@/constants/radii';
+import { useThemedStyles } from '@/hooks/use-themed-styles';
+import type { ThemeColors } from '@/constants/colors';
 
-const CATEGORY_TABS: Array<MemoryCategory | 'All'> = ['All', 'Preference', 'Habit', 'Person', 'Reminder'];
+const CATEGORY_TABS: (MemoryCategory | 'All')[] = ['All', 'Preference', 'Habit', 'Person', 'Reminder'];
 
 const CATEGORY_COLORS: Record<MemoryCategory, string> = {
   Preference: JaridaPurple[500],
@@ -40,6 +42,7 @@ const MemoryCard = React.memo(function MemoryCard({
   onPin: (id: number) => void;
   onDelete: (id: number) => void;
 }) {
+  const styles = useThemedStyles(makeStyles);
   const catColor = CATEGORY_COLORS[item.category];
   return (
     <View style={styles.memoryCard}>
@@ -51,12 +54,12 @@ const MemoryCard = React.memo(function MemoryCard({
           <Text style={[styles.categoryText, { color: catColor }]}>{item.category}</Text>
         </View>
         <View style={styles.memoryActions}>
-          <Pressable onPress={() => onPin(item.id)} style={styles.actionBtn}>
+          <GPressable onPress={() => onPin(item.id)} style={styles.actionBtn}>
             <GIcon name={item.pinned ? 'check' : 'logs'} size={14} color={item.pinned ? JaridaPurple[500] : Grey[400]} />
-          </Pressable>
-          <Pressable onPress={() => onDelete(item.id)} style={styles.actionBtn}>
+          </GPressable>
+          <GPressable onPress={() => onDelete(item.id)} style={styles.actionBtn}>
             <GIcon name="trash" size={14} color={Grey[400]} />
-          </Pressable>
+          </GPressable>
         </View>
       </View>
       <Text style={styles.memoryText}>{item.text}</Text>
@@ -66,6 +69,7 @@ const MemoryCard = React.memo(function MemoryCard({
 });
 
 export default function MemoriesScreen() {
+  const styles = useThemedStyles(makeStyles);
   const [memories, setMemories] = useState(SAMPLE_MEMORIES);
   const [activeCategory, setActiveCategory] = useState<MemoryCategory | 'All'>('All');
 
@@ -102,7 +106,7 @@ export default function MemoriesScreen() {
         contentContainerStyle={styles.tabsRow}
       >
         {CATEGORY_TABS.map((tab) => (
-          <Pressable
+          <GPressable feedback="lift"
             key={tab}
             style={[styles.tab, activeCategory === tab && styles.tabActive]}
             onPress={() => setActiveCategory(tab)}
@@ -110,7 +114,7 @@ export default function MemoriesScreen() {
             <Text style={[styles.tabText, activeCategory === tab && styles.tabTextActive]}>
               {tab}
             </Text>
-          </Pressable>
+          </GPressable>
         ))}
       </ScrollView>
 
@@ -126,94 +130,95 @@ export default function MemoriesScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Grey[50] },
+const makeStyles = (c: ThemeColors) =>
+  StyleSheet.create({
+    container: { flex: 1, backgroundColor: c.background },
 
-  /* Tabs */
-  // Pins this ScrollView's own height to its content instead of letting it
-  // compete for leftover flex space with the list below — without this,
-  // filtering to a category with fewer results frees up vertical space
-  // that gets redistributed into the tab pills instead of staying blank,
-  // stretching them tall.
-  tabsScroll: {
-    flexGrow: 0,
-    flexShrink: 0,
-  },
-  tabsRow: {
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.md,
-    gap: Spacing.sm,
-    backgroundColor: Brand.white,
-    borderBottomWidth: 1,
-    borderBottomColor: Grey[200],
-  },
-  tab: {
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: 8,
-    borderRadius: Radii.pill,
-    backgroundColor: Grey[100],
-  },
-  tabActive: { backgroundColor: JaridaPurple[500] },
-  tabText: {
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.sm,
-    fontWeight: FontWeight.semibold,
-    color: Grey[600],
-  },
-  tabTextActive: { color: Brand.white },
+    /* Tabs */
+    // Pins this ScrollView's own height to its content instead of letting it
+    // compete for leftover flex space with the list below — without this,
+    // filtering to a category with fewer results frees up vertical space
+    // that gets redistributed into the tab pills instead of staying blank,
+    // stretching them tall.
+    tabsScroll: {
+      flexGrow: 0,
+      flexShrink: 0,
+    },
+    tabsRow: {
+      paddingHorizontal: Spacing.lg,
+      paddingVertical: Spacing.md,
+      gap: Spacing.sm,
+      backgroundColor: c.card,
+      borderBottomWidth: 1,
+      borderBottomColor: c.border,
+    },
+    tab: {
+      paddingHorizontal: Spacing.lg,
+      paddingVertical: 8,
+      borderRadius: Radii.pill,
+      backgroundColor: c.backgroundSecondary,
+    },
+    tabActive: { backgroundColor: JaridaPurple[500] },
+    tabText: {
+      fontFamily: FontFamily.body,
+      fontSize: FontSize.sm,
+      fontWeight: FontWeight.semibold,
+      color: c.textTertiary,
+    },
+    tabTextActive: { color: Brand.white },
 
-  /* List */
-  listContent: {
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.md,
-    paddingBottom: Spacing['3xl'],
-  },
+    /* List */
+    listContent: {
+      paddingHorizontal: Spacing.lg,
+      paddingVertical: Spacing.md,
+      paddingBottom: Spacing['3xl'],
+    },
 
-  /* Memory card */
-  memoryCard: {
-    backgroundColor: Brand.white,
-    borderRadius: Radii.xl,
-    padding: Spacing.lg,
-    borderWidth: 1,
-    borderColor: Grey[200],
-    marginBottom: Spacing.md,
-  },
-  memoryHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: Spacing.sm,
-  },
-  categoryBadge: {
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: 2,
-    borderRadius: Radii.pill,
-  },
-  categoryText: {
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.xs,
-    fontWeight: FontWeight.bold,
-  },
-  memoryActions: {
-    flexDirection: 'row',
-    marginLeft: 'auto',
-    gap: Spacing.sm,
-  },
-  actionBtn: {
-    width: 28,
-    height: 28,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  memoryText: {
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.base,
-    color: Brand.charcoal,
-    lineHeight: FontSize.base * 1.5,
-  },
-  memoryTime: {
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.xs,
-    color: Grey[400],
-    marginTop: Spacing.sm,
-  },
-});
+    /* Memory card */
+    memoryCard: {
+      backgroundColor: c.card,
+      borderRadius: Radii.xl,
+      padding: Spacing.lg,
+      borderWidth: 1,
+      borderColor: c.border,
+      marginBottom: Spacing.md,
+    },
+    memoryHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: Spacing.sm,
+    },
+    categoryBadge: {
+      paddingHorizontal: Spacing.sm,
+      paddingVertical: 2,
+      borderRadius: Radii.pill,
+    },
+    categoryText: {
+      fontFamily: FontFamily.body,
+      fontSize: FontSize.xs,
+      fontWeight: FontWeight.bold,
+    },
+    memoryActions: {
+      flexDirection: 'row',
+      marginLeft: 'auto',
+      gap: Spacing.sm,
+    },
+    actionBtn: {
+      width: 28,
+      height: 28,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    memoryText: {
+      fontFamily: FontFamily.body,
+      fontSize: FontSize.base,
+      color: c.text,
+      lineHeight: FontSize.base * 1.5,
+    },
+    memoryTime: {
+      fontFamily: FontFamily.body,
+      fontSize: FontSize.xs,
+      color: Grey[400],
+      marginTop: Spacing.sm,
+    },
+  });

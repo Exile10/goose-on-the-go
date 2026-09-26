@@ -122,6 +122,13 @@ export interface MatterStatus {
 
 // ── Sessions ──────────────────────────────────────────────────
 
+/** `POST /api/v1/chat` — one whole turn, not a stream. */
+export interface ChatTurn {
+  session_id: string;
+  response: string;
+  model_role: string;
+}
+
 export interface SessionSummary {
   id: string;
   title?: string;
@@ -170,6 +177,76 @@ export interface SessionMessage {
   liked?: boolean | null;
 }
 
+/**
+ * One picture sent with a turn: raw base64, no `data:` prefix.
+ *
+ * The Pond's own limits (`image_limits.rs`): four per turn, 4 MiB each and
+ * 8 MiB in all once decoded, and only JPEG, PNG, WebP, GIF or BMP.
+ */
+export interface ImageAttachment {
+  data: string;
+  mime_type: string;
+}
+
+/**
+ * `POST /api/v1/chat/stream`. The only chat route that honours `images` and
+ * `voice_mode`: `/chat` parses both and then drops them.
+ */
+export interface ChatStreamRequest {
+  message: string;
+  session_id?: string;
+  images?: ImageAttachment[];
+  /** Shorter answers and no reasoning passage, because they will be spoken. */
+  voice_mode?: boolean;
+  /** Keep the turn running if the connection drops, so it can be reattached. */
+  resumable?: boolean;
+}
+
+/**
+ * A frame of a streaming turn, as `routes.rs` writes it.
+ *
+ * Deliberately loose: most frames carry a `type`, but the two that end things
+ * — `{error}` and `{done: true, …}` — carry none, and the server adds frame
+ * types faster than a client needs to understand them. Anything unrecognised
+ * is ignored, not rejected.
+ */
+export interface ChatFrame {
+  type?: string;
+  /** `text`, `thinking`, `status`, `review_revision`, `tool_result`. */
+  content?: string;
+  /** `tool_call`, `tool_result`: the full name, `extension__tool`. */
+  tool?: string;
+  id?: string;
+  /** `tool_call`: the arguments as an object, or null. */
+  input?: unknown;
+  /** `tool_result`: a card hint, live only — history keeps just the text. */
+  ui?: { card_type?: string; data?: Record<string, unknown> };
+  run_id?: string;
+  session_id?: string;
+  epoch?: number | string;
+  error?: string;
+  done?: boolean;
+  interrupted?: boolean;
+  /** Our own: the stream's `id:` line, for reattaching after a drop. */
+  seq?: number;
+}
+
+/** `GET /api/v1/suggestions`: at most four, the Pond's own composed ones first. */
+export interface Suggestion {
+  id: string;
+  prompt: string;
+  /** Why the Pond is offering it, in its own words. */
+  because: string;
+  answered_by: string;
+  /** Written from a memory by the Pond's idle pass, rather than a template. */
+  composed: boolean;
+}
+
+export interface SuggestionList {
+  suggestions: Suggestion[];
+  audience: 'personal' | 'shared';
+}
+
 export interface UsageSummary {
   total_prompt_tokens: number;
   total_completion_tokens: number;
@@ -198,12 +275,31 @@ export interface MemoryFragment {
 
 // ── Models ────────────────────────────────────────────────────
 
+/**
+ * A row of `GET /api/v1/models`.
+ *
+ * The server answers six arrays keyed by category — `whisper`, `llamafile`,
+ * `tts`, `gguf`, `ollama`, `embedding` — not one list and not `{models}`. The
+ * client flattens them and carries `category` on each row, because that is both
+ * the grouping the screen shows and the first path segment of the activate
+ * call.
+ *
+ * There is no server-side id. `id` is synthesised in `listModels` from
+ * `category` and `name`, which is the pair the activate route keys on.
+ */
 export interface ModelEntry {
+  /** `${category}:${name}` — synthesised client-side; the API has no id. */
   id: string;
-  provider: string;
+  category: ModelCategory;
   name: string;
-  display_name?: string;
-  is_active: boolean;
+  description?: string;
+  size_mb?: number;
+  downloaded?: boolean;
+  /** Assigned to a role, i.e. this is one of the models actually serving. */
+  active: boolean;
+  url?: string;
+  hf_id?: string;
+  filename?: string;
   ram_estimate_mb?: number;
   recommended_role?: string;
   /**
@@ -212,12 +308,24 @@ export interface ModelEntry {
    * which has already moved on.
    */
   context_length?: number;
-  quantization?: string;
-  downloaded?: boolean;
-  description?: string;
-  size_mb?: number;
-  category?: string;
+  asr_language?: string;
+  asr_size?: string;
+  tts_engine?: string;
+  config_filename?: string;
 }
+
+/** The category buckets `GET /api/v1/models` answers with. */
+export const MODEL_CATEGORIES = [
+  'gguf',
+  'ollama',
+  'llamafile',
+  'whisper',
+  'tts',
+  'embedding',
+] as const;
+export type ModelCategory = (typeof MODEL_CATEGORIES)[number];
+
+export type ModelListResponse = Partial<Record<ModelCategory, ModelEntry[]>>;
 
 export interface ModelCapabilities {
   thinking: boolean;

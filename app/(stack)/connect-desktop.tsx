@@ -10,14 +10,16 @@
  * error copy never echoes it back.
  */
 
+import { useTranslation } from 'react-i18next';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Animated, Easing, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, Easing, Linking, StyleSheet, Text, View } from 'react-native';
 import { InkButton } from '@jarida/ink/native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CameraView, useCameraPermissions, type BarcodeScanningResult } from 'expo-camera';
 
 import { GIcon } from '@/components/ui/g-icon';
+import { GPressable } from '@/components/ui/g-pressable';
 import {
   InvalidPairingCodeError,
   looksLikeMatterSetupCode,
@@ -25,10 +27,12 @@ import {
 } from '@/models/pairing';
 import { offerPairingPayload } from '@/services/pairing-handoff';
 import { advanceHold, HOLD_STEADY_MS, LOST_AFTER_MS, type Hold } from '@/models/scan-hold';
-import { Brand, Grey, JaridaPurple, Semantic } from '@/constants/colors';
+import { Brand, JaridaPurple, Semantic } from '@/constants/colors';
 import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
 import { Spacing } from '@/constants/spacing';
 import { Radii } from '@/constants/radii';
+import { useThemedStyles } from '@/hooks/use-themed-styles';
+import type { ThemeColors } from '@/constants/colors';
 
 const FRAME_SIZE = 240;
 const CORNER_SIZE = 28;
@@ -40,6 +44,8 @@ const CORNER_SIZE = 28;
  */
 
 export default function ConnectDesktopScreen() {
+  const styles = useThemedStyles(makeStyles);
+  const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [permission, requestPermission] = useCameraPermissions();
@@ -149,7 +155,7 @@ export default function ConnectDesktopScreen() {
     return (
       <View style={styles.permissionContainer}>
         <GIcon name="camera" size={32} color={JaridaPurple[500]} />
-        <Text style={styles.permissionTitle}>Camera access needed</Text>
+        <Text style={styles.permissionTitle}>{t('desktop.cameraNeeded')}</Text>
         <Text style={styles.permissionDesc}>
           Scanning the pairing code needs the camera. You can also enter the six digits by
           hand instead.
@@ -160,9 +166,9 @@ export default function ConnectDesktopScreen() {
         >
           {canPrompt ? 'Enable Camera' : 'Open Settings'}
         </InkButton>
-        <Pressable onPress={() => router.back()} hitSlop={8}>
-          <Text style={styles.cancel}>Enter the code instead</Text>
-        </Pressable>
+        <GPressable onPress={() => router.back()} hitSlop={8}>
+          <Text style={styles.cancel}>{t('desktop.enterCode')}</Text>
+        </GPressable>
       </View>
     );
   }
@@ -177,7 +183,7 @@ export default function ConnectDesktopScreen() {
       />
       {/* The screen owns its dismiss control now that it draws full bleed, and
           it sits below the status bar rather than under it. */}
-      <Pressable
+      <GPressable
         accessibilityRole="button"
         accessibilityLabel="Close scanner"
         onPress={() => router.back()}
@@ -185,7 +191,7 @@ export default function ConnectDesktopScreen() {
         style={[styles.close, { top: insets.top + Spacing.sm }]}
       >
         <GIcon name="arrow" size={22} color={Brand.white} />
-      </Pressable>
+      </GPressable>
 
       <View style={styles.overlay}>
         <View style={styles.frame}>
@@ -215,10 +221,10 @@ export default function ConnectDesktopScreen() {
         {error ? (
           <View style={styles.statusCard}>
             <GIcon name="warn" size={28} color={Semantic.danger} />
-            <Text style={styles.statusTitle}>Could not use that code</Text>
+            <Text style={styles.statusTitle}>{t('desktop.badCode')}</Text>
             <Text style={styles.statusDesc}>{error}</Text>
             <InkButton variant="primary" onPress={retry}>
-              Scan again
+              {t('common.scanAgain')}
             </InkButton>
           </View>
         ) : (
@@ -229,15 +235,16 @@ export default function ConnectDesktopScreen() {
           </Text>
         )}
 
-        <Pressable onPress={() => router.back()} hitSlop={8}>
-          <Text style={styles.cancel}>Enter the code instead</Text>
-        </Pressable>
+        <GPressable onPress={() => router.back()} hitSlop={8}>
+          <Text style={styles.cancel}>{t('desktop.enterCode')}</Text>
+        </GPressable>
       </View>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (c: ThemeColors) =>
+  StyleSheet.create({
   container: { flex: 1, backgroundColor: Brand.charcoal },
   close: {
     position: 'absolute',
@@ -312,7 +319,7 @@ const styles = StyleSheet.create({
     width: '100%',
     alignItems: 'center',
     gap: Spacing.md,
-    backgroundColor: Brand.white,
+    backgroundColor: c.card,
     borderRadius: Radii.xl,
     paddingVertical: Spacing['2xl'],
     paddingHorizontal: Spacing.xl,
@@ -321,19 +328,19 @@ const styles = StyleSheet.create({
     fontFamily: FontFamily.heading,
     fontSize: FontSize.lg,
     fontWeight: FontWeight.bold,
-    color: Brand.charcoal,
+    color: c.text,
   },
   statusDesc: {
     fontFamily: FontFamily.body,
     fontSize: FontSize.base,
-    color: Grey[600],
+    color: c.textSecondary,
     textAlign: 'center',
   },
   cancelText: {
     fontFamily: FontFamily.body,
     fontSize: FontSize.sm,
     fontWeight: FontWeight.semibold,
-    color: Grey[500],
+    color: c.textTertiary,
   },
 
   /* Permission request */
@@ -343,19 +350,19 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: Spacing.lg,
     paddingHorizontal: Spacing['2xl'],
-    backgroundColor: Grey[50],
+    backgroundColor: c.background,
   },
   permissionTitle: {
     fontFamily: FontFamily.heading,
     fontSize: FontSize.xl,
     fontWeight: FontWeight.bold,
-    color: Brand.charcoal,
+    color: c.text,
     textAlign: 'center',
   },
   permissionDesc: {
     fontFamily: FontFamily.body,
     fontSize: FontSize.base,
-    color: Grey[500],
+    color: c.textTertiary,
     textAlign: 'center',
     lineHeight: FontSize.base * 1.5,
   },
