@@ -98,6 +98,8 @@ export function ServerProvider({ children }: PropsWithChildren) {
   const [snapshot, setSnapshot] = useState<ConnectionSnapshot>({ state: 'unpaired', url: null });
   const [identity, setIdentity] = useState<Identity | null>(null);
   const saved = useRef<Saved | null>(null);
+  // Mirrors whether `saved` holds a pairing, for render. Set wherever that changes.
+  const [hasPairing, setHasPairing] = useState(false);
   const staged = useRef<{ profile: ConnectionProfile; pin: string; client: PondApiClient } | null>(null);
   const operation = useRef(0);
   const committing = useRef<Promise<void> | null>(null);
@@ -159,7 +161,7 @@ export function ServerProvider({ children }: PropsWithChildren) {
   const forgetPairing = useCallback(async () => {
     await cancelRemoteAccess().catch(() => undefined);
     await restoreRemoteAccess('', '').catch(() => undefined);
-    operation.current++; staged.current = null; saved.current = null;
+    operation.current++; staged.current = null; saved.current = null; setHasPairing(false);
     api.invalidateIdentity(); setIdentity(null);
     await tokenWrite.current.catch(() => undefined);
     await SecureStorage.remove('pondIdentity');
@@ -220,6 +222,7 @@ export function ServerProvider({ children }: PropsWithChildren) {
         if (cancelled || staged.current) return;
         if (loaded.saved) {
           saved.current = loaded.saved;
+          setHasPairing(true);
           await restore();
         } else await manager.configure(null, '', loaded.upgrade);
       } catch {
@@ -371,6 +374,7 @@ export function ServerProvider({ children }: PropsWithChildren) {
       const commit = (async () => {
         await tokenWrite.current;
         saved.current = await commitPairedProfile(previous, { identity: next, profile: pending.profile });
+        setHasPairing(true);
         staged.current = null;
         await restore();
       })();
@@ -466,10 +470,10 @@ export function ServerProvider({ children }: PropsWithChildren) {
   const value = useMemo<ServerContextValue>(() => ({
     serverUrl: snapshot.url ?? '', online: !!snapshot.url, token: identity?.session ?? null,
     refreshToken: identity?.refresh ?? null, connectionState: snapshot.state,
-    profileId: identity?.id ?? '', paired: !!saved.current, remoteEnabled: saved.current?.profile.remoteAccess?.mode === 'embedded',
+    profileId: identity?.id ?? '', paired: hasPairing, remoteEnabled: saved.current?.profile.remoteAccess?.mode === 'embedded',
     keepLocalOnly, hydrated, screenModes, isScreenReal, setScreenMode,
     checkHealth, setRemoteEndpoint, recover: manager.recover, revoke: manager.revoke.bind(manager), stagePairing, cancelPairing, pair, signOut,
-  }), [snapshot, identity, hydrated, screenModes, isScreenReal, setScreenMode, checkHealth, setRemoteEndpoint, keepLocalOnly, manager, stagePairing, cancelPairing, pair, signOut]);
+  }), [snapshot, identity, hasPairing, hydrated, screenModes, isScreenReal, setScreenMode, checkHealth, setRemoteEndpoint, keepLocalOnly, manager, stagePairing, cancelPairing, pair, signOut]);
   return <ServerContext.Provider value={value}>{children}</ServerContext.Provider>;
 }
 export function useServer(): ServerContextValue {
