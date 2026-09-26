@@ -120,7 +120,7 @@ export class NotificationStream {
     const generation = this.generation;
     const { baseUrl, deviceId, token } = this.opts;
     try { await assertPondTrust(baseUrl); }
-    catch { if (!this.stopped && generation === this.generation) this.opts.onDisconnect?.(); return; }
+    catch { if (!this.stopped && generation === this.generation) this.retryLater(generation); return; }
     if (this.stopped || generation !== this.generation) return;
     const url = `${baseUrl}/api/v1/notifications/stream?device_id=${encodeURIComponent(deviceId)}`;
 
@@ -144,10 +144,7 @@ export class NotificationStream {
     };
 
     const scheduleReconnect = () => {
-      if (this.stopped) return;
-      if (this.opts.onDisconnect) { this.stop(); this.opts.onDisconnect(); return; }
-      this.reconnectTimer = setTimeout(() => this.connect(), this.backoffMs);
-      this.backoffMs = Math.min(this.backoffMs * 2, MAX_BACKOFF_MS);
+      if (!this.stopped && generation === this.generation) this.retryLater(generation);
     };
     xhr.onerror = scheduleReconnect;
     xhr.onload = () => {
@@ -165,6 +162,24 @@ export class NotificationStream {
     xhr.ontimeout = scheduleReconnect;
 
     xhr.send();
+  }
+
+  /**
+   * Tell the owner the stream dropped, then come back on our own after a backoff.
+   *
+   * Both, not either. The owner may move to another endpoint, and its cleanup
+   * stops this stream, which cancels the timer. But a recovery that finds the
+   * same endpoint changes nothing the owner reacts to, so a stream that only
+   * reported the drop and stopped stayed dead until the app was backgrounded.
+   */
+  private retryLater(generation: number): void {
+    this.opts.onDisconnect?.();
+    if (this.stopped || generation !== this.generation) return;
+    this.reconnectTimer = setTimeout(() => {
+      this.reconnectTimer = null;
+      if (generation === this.generation) void this.connect();
+    }, this.backoffMs);
+    this.backoffMs = Math.min(this.backoffMs * 2, MAX_BACKOFF_MS);
   }
 
   private handleFrame(data: string): void {

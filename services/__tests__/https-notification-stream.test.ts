@@ -27,3 +27,39 @@ it('never creates XHR when native trust is unavailable', async () => {
   const stream = new NotificationStream({ baseUrl: 'https://pond.local:4443', token: 'secret', deviceId: 'phone', onNotification: jest.fn(), onDisconnect: disconnected });
   stream.start(); await Promise.resolve(); expect(FakeXHR.instances).toHaveLength(0); expect(disconnected).toHaveBeenCalledTimes(1); stream.stop();
 });
+
+// A dropped stream reports the drop and comes back on its own. The owner's
+// recovery finding the same endpoint changes nothing it reacts to, so a stream
+// that only reported and stopped stayed silent until the app was backgrounded.
+it('reconnects after a drop even when an owner is told about it', async () => {
+  jest.useFakeTimers();
+  try {
+    const disconnected = jest.fn();
+    const stream = new NotificationStream({ baseUrl: 'https://pond.local:4443', token: 'secret', deviceId: 'phone', onNotification: jest.fn(), onDisconnect: disconnected });
+    stream.start(); await Promise.resolve();
+    const first = FakeXHR.instances[FakeXHR.instances.length - 1];
+    first.status = 200; first.onload();
+    expect(disconnected).toHaveBeenCalledTimes(1);
+    const before = FakeXHR.instances.length;
+    jest.advanceTimersByTime(1_000); await Promise.resolve(); await Promise.resolve();
+    expect(FakeXHR.instances.length).toBe(before + 1);
+    stream.stop();
+  } finally {
+    jest.useRealTimers();
+  }
+});
+
+it('does not reconnect after the owner stops it', async () => {
+  jest.useFakeTimers();
+  try {
+    const stream = new NotificationStream({ baseUrl: 'https://pond.local:4443', token: 'secret', deviceId: 'phone', onNotification: jest.fn(), onDisconnect: () => stream.stop() });
+    stream.start(); await Promise.resolve();
+    const first = FakeXHR.instances[FakeXHR.instances.length - 1];
+    first.status = 200; first.onload();
+    const before = FakeXHR.instances.length;
+    jest.advanceTimersByTime(60_000); await Promise.resolve();
+    expect(FakeXHR.instances.length).toBe(before);
+  } finally {
+    jest.useRealTimers();
+  }
+});
