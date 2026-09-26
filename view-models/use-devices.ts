@@ -159,6 +159,15 @@ export function listPollStillCurrent(pollStartedAt: number, listChangedAt: numbe
   return pollStartedAt > listChangedAt;
 }
 
+/**
+ * Whether a poll's power readings may be applied. Not if a poll that began later has already
+ * applied its own: reads are not awaited by the poll loop, so a slow one can land after a
+ * faster, newer one and would put an older state back on screen.
+ */
+export function powerPollStillCurrent(pollStartedAt: number, newestAppliedAt: number): boolean {
+  return pollStartedAt >= newestAppliedAt;
+}
+
 export function useDevices(): UseDevices {
   const [devices, setDevices] = useState<Device[]>([]);
   const [powerById, setPowerById] = useState<Record<string, boolean>>({});
@@ -168,6 +177,7 @@ export function useDevices(): UseDevices {
   // When this screen last changed something itself, so a poll that began earlier cannot undo it.
   const powerChangedAt = useRef<Record<string, number>>({});
   const listChangedAt = useRef(0);
+  const powerAppliedAt = useRef(0);
   // Whether a read has ever succeeded. Before that a failure is the screen's news; after it, a
   // failed poll keeps the last list rather than replacing it with an error.
   const loaded = useRef(false);
@@ -195,6 +205,8 @@ export function useDevices(): UseDevices {
     const fresh = Object.fromEntries(
       readings.filter((r): r is readonly [string, boolean] => r[1] !== undefined),
     );
+    if (!powerPollStillCurrent(startedAt, powerAppliedAt.current)) return;
+    powerAppliedAt.current = startedAt;
     setPowerById((current) => mergePower(current, fresh, powerChangedAt.current, startedAt));
   }, []);
 

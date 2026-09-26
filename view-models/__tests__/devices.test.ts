@@ -14,6 +14,7 @@ import {
   parsePowerState,
   supports,
   listPollStillCurrent,
+  powerPollStillCurrent,
   mergePower,
   ALL_ROOMS,
   roomLabel,
@@ -159,5 +160,20 @@ describe('room labels', () => {
     const named = { id: 'a', name: 'a', is_online: true, room: 'Unassigned' } as Device;
     const none = { id: 'b', name: 'b', is_online: true } as Device;
     expect(groupByRoom([named, none]).map((r) => r.name).sort()).toEqual(['Unassigned', UNASSIGNED_ROOM].sort());
+  });
+});
+
+/**
+ * The poll loop does not wait for power reads, so an older poll's reads can land after a newer
+ * poll's and must not be applied over them.
+ */
+describe('power readings from an older poll', () => {
+  it('are not applied once a newer poll has applied its own', () => {
+    expect(powerPollStillCurrent(1_000, 2_000)).toBe(false);
+  });
+
+  it('are applied when they are the newest', () => {
+    expect(powerPollStillCurrent(3_000, 2_000)).toBe(true);
+    expect(powerPollStillCurrent(1_000, 0)).toBe(true);
   });
 });
