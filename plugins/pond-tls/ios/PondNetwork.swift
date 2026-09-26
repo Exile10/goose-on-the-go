@@ -19,8 +19,14 @@ final class PondNetwork {
   }
   static func remote(_ value: String) -> Bool {
     let host = value.trimmingCharacters(in: CharacterSet(charactersIn: "[]"))
-    let bytes = host.split(separator: ".").compactMap { Int($0) }
-    return (bytes.count == 4 && bytes.allSatisfy { (0...255).contains($0) } && bytes[0] == 100 && (64...127).contains(bytes[1])) || host.lowercased().hasPrefix("fd7a:115c:a1e0:")
+    // Exactly four all-digit labels. Dropping the labels that do not parse let
+    // "100.64.0.1.attacker.example" pass as a tailnet address.
+    let parts = host.split(separator: ".", omittingEmptySubsequences: false)
+    let bytes = parts.compactMap { part -> Int? in
+      guard (1...3).contains(part.count), part.allSatisfy({ ("0"..."9").contains($0) }) else { return nil }
+      return Int(part)
+    }
+    return (parts.count == 4 && bytes.count == 4 && bytes.allSatisfy { (0...255).contains($0) } && bytes[0] == 100 && (64...127).contains(bytes[1])) || host.lowercased().hasPrefix("fd7a:115c:a1e0:")
   }
   static func configure(_ origins: [String]) throws {
     lock.lock(); defer { lock.unlock() }

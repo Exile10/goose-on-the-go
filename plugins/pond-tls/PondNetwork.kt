@@ -166,8 +166,11 @@ object PondNetwork {
   }
   private fun origin(url: HttpUrl) = "https://${url.host}:${url.port}"
   private fun remote(host: String): Boolean {
-    val bytes = host.split('.').mapNotNull { it.toIntOrNull() }
-    return (bytes.size == 4 && bytes.all { it in 0..255 } && bytes[0] == 100 && bytes[1] in 64..127) || host.lowercase().startsWith("fd7a:115c:a1e0:")
+    // Exactly four all-digit labels. Dropping the labels that do not parse let
+    // "100.64.0.1.attacker.example" pass as a tailnet address.
+    val parts = host.split('.')
+    val bytes = parts.mapNotNull { p -> if (p.length in 1..3 && p.all { it in '0'..'9' }) p.toInt() else null }
+    return (parts.size == 4 && bytes.size == 4 && bytes.all { it in 0..255 } && bytes[0] == 100 && bytes[1] in 64..127) || host.lowercase().startsWith("fd7a:115c:a1e0:")
   }
   @Synchronized fun configure(urls: Collection<HttpUrl>) {
     val nextOrigins = urls.filter { it.isHttps && remote(it.host) }.map(::origin).toSet()
