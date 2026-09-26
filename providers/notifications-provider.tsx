@@ -50,6 +50,9 @@ interface NotificationsContextValue {
 
 const NotificationsContext = createContext<NotificationsContextValue | null>(null);
 
+/** How long to wait before retrying a stream whose token refresh could not complete. */
+const AUTH_RETRY_MS = 30_000;
+
 export function NotificationsProvider({ children }: PropsWithChildren) {
   const { serverUrl, token, online, recover, revoke } = useServer();
   const deduplicator = useMemo(() => new NotificationDeduplicator(), []);
@@ -60,6 +63,7 @@ export function NotificationsProvider({ children }: PropsWithChildren) {
   useEffect(() => {
     if (!token || !serverUrl || !online) return;
     let cancelled = false;
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
 
     const startStream = async () => {
       const deviceId = await getInstallId();
@@ -87,7 +91,13 @@ export function NotificationsProvider({ children }: PropsWithChildren) {
           void api
             .refreshAuthentication()
             .then((ok) => (ok ? void recover() : revoke()))
-            .catch(() => revoke());
+            // A refresh that could not complete -- rate limited, Pond restarting,
+            // no network -- is not a refusal. Try the stream again later; a real
+            // refusal on that attempt still ends here as a revoke.
+            .catch(() => {
+              if (cancelled) return;
+              retryTimer = setTimeout(() => { retryTimer = null; if (!cancelled) void startStream(); }, AUTH_RETRY_MS);
+            });
         },
         onNotification: (n) => {
           setNotifications((prev) => [n, ...prev].slice(0, MAX_KEPT));
@@ -130,6 +140,7 @@ export function NotificationsProvider({ children }: PropsWithChildren) {
 
     return () => {
       cancelled = true;
+      if (retryTimer) clearTimeout(retryTimer);
       sub.remove();
       stopTokenWatch();
       streamRef.current?.stop();

@@ -249,3 +249,35 @@ describe('a catalogue the server did not send', () => {
     await expect(api.listSchedules()).resolves.toEqual([]);
   });
 });
+
+/**
+ * A refresh that did not complete is not a refusal. Treating a rate limit or a
+ * restarting Pond as one reported the phone revoked -- which ends the session and
+ * clears the stored pairing -- while its refresh token was still good.
+ */
+describe('a refresh that could not complete', () => {
+  function expired(refreshStatus: number) {
+    setFetch(async (url: string) => {
+      if (url.endsWith('/handshake/refresh')) return reply('', { status: refreshStatus });
+      return reply('', { status: 401 });
+    });
+    const api = new PondApiClient('https://pond.test:4000');
+    api.setToken('stale');
+    api.setRefreshToken('refresh-1');
+    const revoked = jest.fn();
+    api.setAuthRevoked(revoked);
+    return { api, revoked };
+  }
+
+  it.each([429, 500, 503])('does not report revocation when the refresh answers %i', async (status) => {
+    const { api, revoked } = expired(status);
+    await expect(api.listDevices()).rejects.toMatchObject({ status });
+    expect(revoked).not.toHaveBeenCalled();
+  });
+
+  it('still reports revocation when the Pond refuses the refresh token', async () => {
+    const { api, revoked } = expired(401);
+    await expect(api.listDevices()).rejects.toMatchObject({ status: 401 });
+    expect(revoked).toHaveBeenCalledTimes(1);
+  });
+});

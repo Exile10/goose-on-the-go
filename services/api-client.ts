@@ -164,6 +164,9 @@ function collection<T>(res: unknown, key: string): T[] {
   return Array.isArray(value) ? (value as T[]) : [];
 }
 
+/** Refresh responses that mean the Pond will not accept this refresh token. */
+const REFRESH_REFUSED = [400, 401, 403, 404, 410];
+
 export class PondApiClient {
   private baseUrl: string;
   private token: string | null = null;
@@ -364,7 +367,14 @@ export class PondApiClient {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ refresh_token: this.refreshToken }),
     });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      // Only the Pond refusing the refresh token says these credentials are dead.
+      // A rate limit, a restart or a gateway error says nothing about them, and
+      // treating it as a refusal revoked -- and since #59, wiped -- a pairing
+      // whose refresh token was still good.
+      if (REFRESH_REFUSED.includes(res.status)) return null;
+      throw new ApiError(`handshake/refresh → ${res.status}`, res.status, parseRetryAfter(res));
+    }
     const body = (await res.json()) as HandshakeResponse;
     if (epoch !== this.identityEpoch) throw new Error('Pond profile changed');
     if (body.accepted && body.session_token) {
