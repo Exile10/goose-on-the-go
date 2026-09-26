@@ -14,20 +14,50 @@ import {
   ScrollView,
 } from 'react-native';
 
-import { GIcon } from '@/components/ui/g-icon';
+import { InkIcon } from '@jarida/ink/native';
+import type { InkTone } from '@jarida/ink';
 import { SAMPLE_MEMORIES, type MemoryFragment, type MemoryCategory } from '@/models/memory';
 import { Grey, JaridaPurple, Brand, Semantic } from '@/constants/colors';
 import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
 import { Spacing } from '@/constants/spacing';
 import { Radii } from '@/constants/radii';
+import i18n from '@/services/i18n';
 
+// Identifiers, typed by MemoryCategory, not copy: the label each one shows comes from tabLabel().
+/* eslint-disable-next-line i18next/no-literal-string -- category ids; tabLabel() supplies the words */
 const CATEGORY_TABS: Array<MemoryCategory | 'All'> = ['All', 'Preference', 'Habit', 'Person', 'Reminder'];
+
+/**
+ * Tab labels, one literal key per branch.
+ *
+ * This used to assemble the key from the tab value at runtime, which reads
+ * better and is worse: a key built that way is invisible to
+ * services/__tests__/i18n.test.ts, so deleting memories.tabHabit would have left
+ * the test green and put the raw key on screen. The switch is exhaustive, so
+ * TypeScript fails here if a category is added without a label.
+ */
+function tabLabel(tab: MemoryCategory | 'All'): string {
+  switch (tab) {
+    case 'All': return i18n.t('memories.tabAll');
+    case 'Preference': return i18n.t('memories.tabPreference');
+    case 'Habit': return i18n.t('memories.tabHabit');
+    case 'Person': return i18n.t('memories.tabPerson');
+    case 'Reminder': return i18n.t('memories.tabReminder');
+  }
+}
 
 const CATEGORY_COLORS: Record<MemoryCategory, string> = {
   Preference: JaridaPurple[500],
   Habit: Semantic.info,
   Person: Semantic.success,
   Reminder: Semantic.warning,
+};
+
+const CATEGORY_TONES: Record<MemoryCategory, InkTone> = {
+  Preference: 'brand',
+  Habit: 'info',
+  Person: 'success',
+  Reminder: 'warning',
 };
 
 /** Memory card */
@@ -41,21 +71,22 @@ const MemoryCard = React.memo(function MemoryCard({
   onDelete: (id: number) => void;
 }) {
   const catColor = CATEGORY_COLORS[item.category];
+  const catTone = CATEGORY_TONES[item.category];
   return (
     <View style={styles.memoryCard}>
       <View style={styles.memoryHeader}>
         <View style={{ marginRight: Spacing.sm }}>
-          <GIcon name={item.icon} size={16} color={catColor} />
+          <InkIcon name={item.icon} size={16} tone={catTone} />
         </View>
         <View style={[styles.categoryBadge, { backgroundColor: catColor + '18' }]}>
-          <Text style={[styles.categoryText, { color: catColor }]}>{item.category}</Text>
+          <Text style={[styles.categoryText, { color: catColor }]}>{tabLabel(item.category)}</Text>
         </View>
         <View style={styles.memoryActions}>
           <Pressable onPress={() => onPin(item.id)} style={styles.actionBtn}>
-            <GIcon name={item.pinned ? 'check' : 'logs'} size={14} color={item.pinned ? JaridaPurple[500] : Grey[400]} />
+            <InkIcon name={item.pinned ? 'check' : 'logs'} size={14} tone={item.pinned ? 'brand' : 'neutral'} />
           </Pressable>
           <Pressable onPress={() => onDelete(item.id)} style={styles.actionBtn}>
-            <GIcon name="trash" size={14} color={Grey[400]} />
+            <InkIcon name="trash" size={14} tone="neutral" />
           </Pressable>
         </View>
       </View>
@@ -67,6 +98,7 @@ const MemoryCard = React.memo(function MemoryCard({
 
 export default function MemoriesScreen() {
   const [memories, setMemories] = useState(SAMPLE_MEMORIES);
+  // eslint-disable-next-line i18next/no-literal-string -- 'All' is the filter value, not copy
   const [activeCategory, setActiveCategory] = useState<MemoryCategory | 'All'>('All');
 
   const filtered = activeCategory === 'All'
@@ -108,7 +140,7 @@ export default function MemoriesScreen() {
             onPress={() => setActiveCategory(tab)}
           >
             <Text style={[styles.tabText, activeCategory === tab && styles.tabTextActive]}>
-              {tab}
+              {tabLabel(tab)}
             </Text>
           </Pressable>
         ))}

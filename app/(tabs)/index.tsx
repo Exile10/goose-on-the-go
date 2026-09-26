@@ -6,7 +6,7 @@
  */
 
 import React, { useState, useCallback } from 'react';
-import { InkSwitch } from '@jarida/ink/native';
+import { InkSwitch, InkIcon, InkProvider } from '@jarida/ink/native';
 import {
   View,
   Text,
@@ -18,9 +18,11 @@ import {
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { GIcon } from '@/components/ui/g-icon';
 import { useRecentSessions } from '@/view-models/use-recent-sessions';
 import { supports, useDevices } from '@/view-models/use-devices';
+import { initialOf, useMember } from '@/view-models/use-household';
+import { greetingFor, untilOf, useRightNow, type Until } from '@/view-models/use-right-now';
+import { useLive } from '@/view-models/use-live';
 import type { Device } from '@/services/types';
 import { HOME_SHORTCUTS } from '@/constants/navigation';
 import { Grey, JaridaPurple, Brand, Semantic } from '@/constants/colors';
@@ -28,14 +30,17 @@ import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
 import { Spacing } from '@/constants/spacing';
 import { Radii } from '@/constants/radii';
 import { Shadows } from '@/constants/shadows';
+import { RemoteAccessOffer } from '@/components/patterns/remote-access-offer';
+import { EqualizerBars } from '@/components/ui/equalizer-bars';
+import i18n from '@/services/i18n';
 
-/** Status chip data */
-const STATUS_CHIPS = [
-  { label: '4 Active', color: Semantic.success, bg: Semantic.successSoft },
-  { label: '72\u00B0F', color: Semantic.info, bg: Semantic.infoSoft },
-  { label: 'Meeting 2pm', color: Semantic.warning, bg: Semantic.warningSoft },
-  { label: 'Locked', color: Semantic.success, bg: Semantic.successSoft },
-];
+/** How far off a routine is, in words. */
+function untilText(until: Until): string {
+  if (until.unit === 'now') return i18n.t('home.dueNow');
+  if (until.unit === 'minutes') return i18n.t('home.inMinutes', { count: until.count });
+  if (until.unit === 'hours') return i18n.t('home.inHours', { count: until.count });
+  return i18n.t('home.inDays', { count: until.count });
+}
 
 function StatusChip({ label, color, bg }: { label: string; color: string; bg: string }) {
   return (
@@ -67,10 +72,10 @@ const DeviceGridItem = React.memo(function DeviceGridItem({
     <View style={styles.deviceCard}>
       <View style={styles.deviceCardTop}>
         <View style={[styles.deviceIconWrap, { backgroundColor: JaridaPurple[500] + '18' }]}>
-          <GIcon
+          <InkIcon
             name="device"
             size={17}
-            color={on && device.is_online ? JaridaPurple[500] : '#B5B5B5'}
+            tone={on && device.is_online ? 'brand' : 'neutral'}
           />
         </View>
         {canPower ? (
@@ -81,7 +86,7 @@ const DeviceGridItem = React.memo(function DeviceGridItem({
         {device.name}
       </Text>
       <Text style={styles.deviceDetail}>
-        {!device.is_online ? 'Offline' : power === undefined ? 'Online' : power ? 'On' : 'Off'}
+        {!device.is_online ? i18n.t('devices.stateOffline') : power === undefined ? i18n.t('devices.stateOnline') : power ? i18n.t('devices.stateOn') : i18n.t('devices.stateOff')}
       </Text>
     </View>
   );
@@ -90,19 +95,49 @@ const DeviceGridItem = React.memo(function DeviceGridItem({
 /** The home grid is a glance, not the full list — that is the Devices tab. */
 const HOME_GRID_LIMIT = 4;
 
+/** How often the greeting and the countdowns catch up with the clock. */
+const CLOCK_MS = 60_000;
+
 export default function HomeScreen() {
   const recent = useRecentSessions();
   const devices = useDevices();
+  const member = useMember();
+  const rightNow = useRightNow().data;
+  // The clock is state, advanced once a minute while Home is in front, so render stays pure and
+  // the greeting and "in 23 h" move with the time instead of freezing at the moment Home mounted.
+  const [now, setNow] = useState(() => new Date());
+  useLive(async () => setNow(new Date()), CLOCK_MS);
+  const greeting = greetingFor(now.getHours());
+  const initial = member ? initialOf(member.displayName) : null;
+
+  // Only chips with a source. The online count is the list the grid below shows, so the two
+  // cannot disagree, and it is not shown while that list is unknown. Meeting and Locked had no
+  // source at all and are gone rather than guessed.
+  const chips = [
+    ...(devices.loading || devices.error
+      ? []
+      : [{
+          key: 'online',
+          label: i18n.t('home.chipOnline', { count: devices.data.devices.filter((d) => d.is_online).length }),
+          color: Semantic.success,
+          bg: Semantic.successSoft,
+        }]),
+    ...(rightNow.outdoorTemp === null
+      ? []
+      : [{
+          key: 'outdoor',
+          label: i18n.t('home.chipOutdoorTemp', { temp: rightNow.outdoorTemp }),
+          color: Semantic.info,
+          bg: Semantic.infoSoft,
+        }]),
+  ];
+  const { nowPlaying, nextRoutine } = rightNow;
   const handleDeviceToggle = useCallback(
     (device: Device, on: boolean) => void devices.actions.setState(device, { power: on }),
     [devices.actions],
   );
   const router = useRouter();
   const [askText, setAskText] = useState('');
-  // Decorative waveform. Rolled once so render stays pure.
-  const [waveBarHeights] = useState(() =>
-    Array.from({ length: 8 }, () => 6 + Math.random() * 14),
-  );
 
   const handleMicPress = useCallback(() => {
     // Will trigger listening overlay in future
@@ -114,74 +149,106 @@ export default function HomeScreen() {
         contentContainerStyle={styles.scroll}
         showsVerticalScrollIndicator={false}
       >
+        {/* Offered once per pairing, and declinable. Pairing used to push a
+            remote-access screen you had to get past. */}
+        <RemoteAccessOffer />
+
         {/* Greeting header */}
         <View style={styles.greetingRow}>
           <View style={styles.greetingText}>
-            <Text style={styles.greetingLabel}>Good morning,</Text>
-            <Text style={styles.greetingName}>Jerry</Text>
+            <Text style={styles.greetingLabel}>
+              {greeting === 'morning'
+                ? i18n.t('home.greetingMorning')
+                : greeting === 'afternoon'
+                  ? i18n.t('home.greetingAfternoon')
+                  : i18n.t('home.greetingEvening')}
+            </Text>
+            {/* The member the Pond attributes this phone to. No name when nobody has claimed it. */}
+            {member ? <Text style={styles.greetingName}>{member.displayName}</Text> : null}
           </View>
           <View style={styles.avatar}>
-            <Text style={styles.avatarText}>J</Text>
+            {initial ? (
+              <Text style={styles.avatarText}>{initial}</Text>
+            ) : (
+              <InkProvider scheme="dark">
+                <InkIcon name="home" size={18} />
+              </InkProvider>
+            )}
           </View>
         </View>
 
         {/* Status chips */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.chipsRow}
-        >
-          {STATUS_CHIPS.map((chip) => (
-            <StatusChip key={chip.label} {...chip} />
-          ))}
-        </ScrollView>
+        {chips.length > 0 ? (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.chipsRow}
+          >
+            {chips.map(({ key, ...chip }) => (
+              <StatusChip key={key} {...chip} />
+            ))}
+          </ScrollView>
+        ) : null}
 
         {/* Ask Goose search bar */}
         <Pressable style={styles.askBar}>
-          <GIcon name="search" size={18} color={Grey[400]} />
+          <InkIcon name="search" size={18} tone="neutral" />
           <TextInput
             style={styles.askInput}
-            placeholder="Ask Goose anything..."
+            placeholder={i18n.t('home.askPlaceholder')}
             placeholderTextColor={Grey[400]}
             value={askText}
             onChangeText={setAskText}
           />
           <Pressable style={styles.askMicBtn} onPress={handleMicPress}>
-            <GIcon name="mic" size={18} color={JaridaPurple[500]} />
+            <InkIcon name="mic" size={18} tone="brand" />
           </Pressable>
         </Pressable>
 
-        {/* Right Now section */}
-        <Text style={styles.sectionLabel}>RIGHT NOW</Text>
-        <View style={styles.rightNowRow}>
-          {/* Now playing card */}
-          <View style={styles.nowPlayingCard}>
-            <Text style={styles.nowPlayingLabel}>Now Playing</Text>
-            <Text style={styles.nowPlayingTitle}>Lo-fi Beats</Text>
-            <Text style={styles.nowPlayingArtist}>Living Room Speaker</Text>
-            <View style={styles.waveformRow}>
-              {waveBarHeights.map((height, i) => (
-                <View
-                  key={i}
-                  style={[styles.waveBar, { height }]}
-                />
-              ))}
-            </View>
-          </View>
+        {/* Right Now section: a card with nothing true to say is not drawn, and a row with no
+            cards has no heading. */}
+        {nowPlaying || nextRoutine ? (
+          <>
+            <Text style={styles.sectionLabel}>{i18n.t('home.rightNow')}</Text>
+            <View style={styles.rightNowRow}>
+              {nowPlaying ? (
+                <View style={styles.nowPlayingCard}>
+                  <Text style={styles.nowPlayingLabel}>{i18n.t('home.nowPlaying')}</Text>
+                  {nowPlaying.state === 'playing' ? (
+                    <>
+                      <Text style={styles.nowPlayingTitle}>{nowPlaying.track}</Text>
+                      {nowPlaying.artist ? <Text style={styles.nowPlayingArtist}>{nowPlaying.artist}</Text> : null}
+                      {/* Moving, and only while something is playing: bars over silence would say
+                          music is on. They hold still under Reduce Motion and when Home is not in
+                          front. */}
+                      <View style={styles.waveformRow}>
+                        <EqualizerBars color={JaridaPurple[400]} />
+                      </View>
+                    </>
+                  ) : (
+                    <Text style={styles.nowPlayingTitle}>{i18n.t('home.nothingPlaying')}</Text>
+                  )}
+                </View>
+              ) : null}
 
-          {/* Next event card */}
-          <View style={styles.nextEventCard}>
-            <Text style={styles.nextEventLabel}>Next Event</Text>
-            <Text style={styles.nextEventTitle}>Team Standup</Text>
-            <Text style={styles.nextEventTime}>2:00 PM</Text>
-            <View style={styles.nextEventBadge}>
-              <Text style={styles.nextEventBadgeText}>In 45 min</Text>
+              {nextRoutine ? (
+                <View style={styles.nextRoutineCard}>
+                  <Text style={styles.nextRoutineLabel}>{i18n.t('home.nextRoutine')}</Text>
+                  <Text style={styles.nextRoutineTitle}>{nextRoutine.label}</Text>
+                  <Text style={styles.nextRoutineTime}>
+                    {nextRoutine.nextRun.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+                  </Text>
+                  <View style={styles.nextRoutineBadge}>
+                    <Text style={styles.nextRoutineBadgeText}>{untilText(untilOf(nextRoutine.nextRun, now))}</Text>
+                  </View>
+                </View>
+              ) : null}
             </View>
-          </View>
-        </View>
+          </>
+        ) : null}
 
         {/* Shortcuts carousel */}
-        <Text style={styles.sectionLabel}>SHORTCUTS</Text>
+        <Text style={styles.sectionLabel}>{i18n.t('home.shortcuts')}</Text>
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -189,17 +256,22 @@ export default function HomeScreen() {
         >
           {HOME_SHORTCUTS.map((s) => (
             <Pressable key={s.id} style={[styles.shortcutPill, { backgroundColor: s.color }]}>
-              <GIcon name={s.iconName} size={13} color={Brand.charcoal} />
-              <Text style={styles.shortcutLabel}>{s.label}</Text>
+              {/* Pills keep their own fixed pastel background regardless of
+                  theme (see shortcutLabel below), so the icon needs a scoped
+                  light-scheme provider to stay dark-on-light too. */}
+              <InkProvider scheme="light">
+                <InkIcon name={s.iconName} size={13} />
+              </InkProvider>
+              <Text style={styles.shortcutLabel}>{i18n.t(s.labelKey)}</Text>
             </Pressable>
           ))}
         </ScrollView>
 
         {/* Devices grid */}
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionLabel}>DEVICES</Text>
+          <Text style={styles.sectionLabel}>{i18n.t('home.devices')}</Text>
           <Pressable onPress={() => router.push('/(tabs)/devices')}>
-            <Text style={styles.seeAllText}>See all</Text>
+            <Text style={styles.seeAllText}>{i18n.t('home.seeAll')}</Text>
           </Pressable>
         </View>
         <View style={styles.devicesGrid}>
@@ -214,11 +286,11 @@ export default function HomeScreen() {
         </View>
 
         {/* Recent conversations */}
-        <Text style={styles.sectionLabel}>RECENT CONVERSATIONS</Text>
+        <Text style={styles.sectionLabel}>{i18n.t('home.recentConversations')}</Text>
         {recent.data.sessions.map((c) => (
           <Pressable key={c.id} style={styles.convoRow}>
             <View style={styles.convoIcon}>
-              <GIcon name="chat" size={14} color={JaridaPurple[400]} />
+              <InkIcon name="chat" size={14} tone="brand" />
             </View>
             <Text style={styles.convoText} numberOfLines={1}>{c.text}</Text>
             <Text style={styles.convoTime}>{c.time}</Text>
@@ -227,7 +299,7 @@ export default function HomeScreen() {
         {/* Say why the strip is empty. A blank gap reads as a broken screen. */}
         {!recent.loading && recent.data.sessions.length === 0 ? (
           <Text style={styles.convoEmpty}>
-            {recent.error ?? 'No conversations yet. Ask your Pond something.'}
+            {recent.error ?? i18n.t('home.noConversations')}
           </Text>
         ) : null}
 
@@ -374,19 +446,10 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   waveformRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    gap: 3,
     marginTop: Spacing.md,
-    height: 20,
-  },
-  waveBar: {
-    width: 4,
-    borderRadius: 2,
-    backgroundColor: JaridaPurple[400],
   },
 
-  nextEventCard: {
+  nextRoutineCard: {
     flex: 1,
     backgroundColor: Brand.white,
     borderRadius: Radii.xl,
@@ -394,25 +457,25 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Grey[200],
   },
-  nextEventLabel: {
+  nextRoutineLabel: {
     fontFamily: FontFamily.body,
     fontSize: FontSize.xs,
     color: Grey[500],
     marginBottom: Spacing.xs,
   },
-  nextEventTitle: {
+  nextRoutineTitle: {
     fontFamily: FontFamily.heading,
     fontSize: FontSize.md,
     fontWeight: FontWeight.bold,
     color: Brand.charcoal,
   },
-  nextEventTime: {
+  nextRoutineTime: {
     fontFamily: FontFamily.body,
     fontSize: FontSize.sm,
     color: Grey[500],
     marginTop: 2,
   },
-  nextEventBadge: {
+  nextRoutineBadge: {
     alignSelf: 'flex-start',
     backgroundColor: Semantic.warningSoft,
     borderRadius: Radii.pill,
@@ -420,7 +483,7 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
     marginTop: Spacing.md,
   },
-  nextEventBadgeText: {
+  nextRoutineBadgeText: {
     fontFamily: FontFamily.body,
     fontSize: FontSize.xs,
     fontWeight: FontWeight.semibold,

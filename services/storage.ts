@@ -9,9 +9,15 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const KEYS = {
   serverUrl: '@goose/server-url',
+  connectionProfile: '@goose/connection-profile',
   lastScreen: '@goose/last-screen',
   settings: '@goose/settings',
   devScreenModes: '@goose/dev-screen-modes',
+  remoteOfferDismissed: '@goose/remote-offer-dismissed',
+  /** When the Pond will drop remote access unless the phone is seen at home. Not a secret. */
+  remoteLapsesAt: '@goose/remote-lapses-at',
+  /** Pointer to whatever resumable run the server may still be driving — see view-models/chat-run-store.ts. */
+  chatRun: '@goose/chat-run',
 } as const;
 
 /**

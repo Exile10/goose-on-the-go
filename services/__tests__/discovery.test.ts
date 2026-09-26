@@ -50,7 +50,10 @@ jest.mock('react-native-zeroconf', () => ({
   default: jest.fn().mockImplementation(() => new MockZeroconf()),
 }));
 
-import { dedupe, findPondByHost, startDiscovery, toPond } from '../discovery';
+import { dedupe, findPondAt, findPondByHost, startDiscovery, toPond } from '../discovery';
+
+/** A real pin, in the `sha256/<base64>` form `tls_identity.pin()` emits. */
+const PIN = 'sha256/TnkUsN+AaLec3BDTh/KUwSokXTmCq2+4rlfBnmJxPkE=';
 
 /** A resolve as NsdServiceImpl reports one. */
 function resolved(overrides: Partial<Service> = {}): Service {
@@ -60,7 +63,7 @@ function resolved(overrides: Partial<Service> = {}): Service {
     host: 'nano.local.',
     port: 8080,
     addresses: ['192.168.1.7'],
-    txt: { v: '0.1.0' },
+    txt: { scheme: 'https', v: '0.1.0' },
     ...overrides,
   };
 }
@@ -76,7 +79,7 @@ describe('toPond', () => {
       name: 'Pond Hub @ nano',
       address: '192.168.1.7',
       port: 8080,
-      url: 'http://192.168.1.7:8080',
+      url: 'https://192.168.1.7:8080',
       version: '0.1.0',
       hostname: 'nano',
     });
@@ -99,8 +102,8 @@ describe('toPond', () => {
   });
 
   it('returns no version when the TXT record carries none', () => {
-    expect(toPond(resolved({ txt: {} }))?.version).toBeUndefined();
-    expect(toPond(resolved({ txt: { v: 7 } }))?.version).toBeUndefined();
+    expect(toPond(resolved({ txt: { scheme: 'https',} }))?.version).toBeUndefined();
+    expect(toPond(resolved({ txt: { scheme: 'https', v: 7 } }))?.version).toBeUndefined();
   });
 
   it('falls back to a generic name when the instance label is blank', () => {
@@ -220,7 +223,7 @@ describe('findPondByHost', () => {
       resolved({ host: 'Emmanueyugi4525.bbrouter', port: 4000, addresses: ['192.168.1.2'] }),
     );
 
-    await expect(pending).resolves.toMatchObject({ url: 'http://192.168.1.2:4000' });
+    await expect(pending).resolves.toMatchObject({ url: 'https://192.168.1.2:4000' });
   });
 
   it("matches when the router's domain differs from the server's own hostname", async () => {
@@ -234,7 +237,7 @@ describe('findPondByHost', () => {
       resolved({ host: 'nano.bbrouter', port: 8080, addresses: ['192.168.1.11'] }),
     );
 
-    await expect(pending).resolves.toMatchObject({ url: 'http://192.168.1.11:8080' });
+    await expect(pending).resolves.toMatchObject({ url: 'https://192.168.1.11:8080' });
   });
 
   it('will not take a different hub that happens to share the port', async () => {
@@ -284,5 +287,72 @@ describe('findPondByHost', () => {
   it('does not browse at all for an empty hostname', async () => {
     await expect(findPondByHost('  ', 8080, 1_000)).resolves.toBeNull();
     expect(instances).toHaveLength(0);
+  });
+});
+
+describe('the advertised pin', () => {
+  it('is carried through, so nobody has to copy it off a dashboard', () => {
+    expect(toPond(resolved({ txt: { scheme: 'https', v: '0.1.0', pin: PIN } }))?.pin).toBe(PIN);
+  });
+
+  // A Pond running a server older than the pin TXT record, which is every Pond
+  // deployed before this change. The pairing screen asks for the fingerprint by
+  // hand in that case, so the absence has to survive as an absence.
+  it('is absent rather than empty when the Pond did not publish one', () => {
+    expect(toPond(resolved())?.pin).toBeUndefined();
+  });
+
+  // Nothing authenticates an mDNS record, so a value that cannot be a pin is
+  // dropped instead of being prefilled into a field where it would look
+  // deliberate.
+  it('is dropped when it is not shaped like a pin', () => {
+    for (const pin of ['', 'nonsense', 'sha256/short=', PIN.slice(7)]) {
+      expect(toPond(resolved({ txt: { scheme: 'https', pin } }))?.pin).toBeUndefined();
+    }
+  });
+});
+
+describe('findPondAt', () => {
+  // What somebody types by hand on Android, where the address they were given
+  // is numeric and its first label is not a machine name.
+  it('matches the numeric address a typed URL carries', async () => {
+    const pending = findPondAt('192.168.1.7', 8080, 1_000);
+    instances[0].emit('resolved', resolved({ txt: { scheme: 'https', pin: PIN } }));
+
+    await expect(pending).resolves.toMatchObject({ pin: PIN });
+  });
+
+  it('still matches a hostname, for an address given as a name', async () => {
+    const pending = findPondAt('nano.local', 8080, 1_000);
+    instances[0].emit('resolved', resolved({ txt: { scheme: 'https', pin: PIN } }));
+
+    await expect(pending).resolves.toMatchObject({ pin: PIN });
+  });
+
+  // Matching the port as well as the address is what keeps a second Pond on the
+  // same host from answering for the one that was asked about.
+  it('does not match a hub on another port', async () => {
+    const pending = findPondAt('192.168.1.7', 4443, 50);
+    instances[0].emit('resolved', resolved({ port: 8080 }));
+
+    await expect(pending).resolves.toBeNull();
+  });
+});
+
+/**
+ * An address is not a machine name. Reduced to its first label it became "192",
+ * which matched any Pond on the subnet whose resolver fell back to an IP-literal
+ * hostname -- and never the Pond itself on a platform that reports real names.
+ */
+describe('a numeric address as a host', () => {
+  it('does not match a different Pond whose hostname is an address', async () => {
+    const pending = findPondAt('192.168.1.7', 8080, 50);
+    instances[0].emit('resolved', resolved({ host: '192.168.1.9', addresses: ['192.168.1.9'] }));
+
+    await expect(pending).resolves.toBeNull();
+  });
+
+  it('is not searched for as a name', async () => {
+    await expect(findPondByHost('192.168.1.7', 8080, 1_000)).resolves.toBeNull();
   });
 });

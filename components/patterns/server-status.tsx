@@ -7,6 +7,7 @@ import { View, Text, StyleSheet } from 'react-native';
 import { FontFamily, FontSize } from '@/constants/typography';
 import { Grey, Semantic } from '@/constants/colors';
 import { Spacing } from '@/constants/spacing';
+import i18n from '@/services/i18n';
 
 interface ServerStatusProps {
   online: boolean;
@@ -17,7 +18,7 @@ export const ServerStatus = React.memo(function ServerStatus({ online, label }: 
   return (
     <View style={styles.container}>
       <View style={[styles.dot, online ? styles.dotOnline : styles.dotOffline]} />
-      <Text style={styles.label}>{label ?? (online ? 'Connected' : 'Disconnected')}</Text>
+      <Text style={styles.label}>{label ?? (online ? i18n.t('connection.connected') : i18n.t('connection.offline'))}</Text>
     </View>
   );
 });

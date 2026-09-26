@@ -7,56 +7,50 @@ import type { IconName } from './icons';
 
 export interface NavItem {
   id: string;
-  label: string;
+  /** i18n key, not copy. The lint rule cannot see literals in a data structure, so the
+   *  type is what keeps them out: a bare label here would be a key that does not resolve,
+   *  and services/__tests__/i18n.test.ts fails on that. */
+  labelKey: string;
   icon: IconName;
   /** Route path for Expo Router */
   route: string;
 }
 
 export interface NavGroup {
-  group: string;
+  /** i18n key, not copy. */
+  groupKey: string;
   items: NavItem[];
 }
 
 /** Screens accessible from the Profile hub */
 export const PROFILE_NAV: NavGroup[] = [
   {
-    group: 'GOOSE',
+    groupKey: 'nav.groupGoose',
     items: [
-      { id: 'models', label: 'AI Models', icon: 'models', route: '/(stack)/models' },
-      { id: 'memories', label: 'Memories', icon: 'memory', route: '/(stack)/memories' },
-      { id: 'logs', label: 'Activity Logs', icon: 'logs', route: '/(stack)/logs' },
-      { id: 'schedule', label: 'Schedule', icon: 'schedule', route: '/(stack)/schedule' },
+      { id: 'models', labelKey: 'nav.models', icon: 'models', route: '/(stack)/models' },
+      { id: 'memories', labelKey: 'nav.memories', icon: 'memory', route: '/(stack)/memories' },
+      { id: 'logs', labelKey: 'nav.logs', icon: 'logs', route: '/(stack)/logs' },
+      { id: 'schedule', labelKey: 'nav.schedule', icon: 'schedule', route: '/(stack)/schedule' },
     ],
   },
   {
-    group: 'INTEGRATIONS',
+    groupKey: 'nav.groupIntegrations',
     items: [
-      { id: 'appManagement', label: 'App Integrations', icon: 'link', route: '/(stack)/app-management' },
-      { id: 'mcpServers', label: 'MCP Servers', icon: 'globe', route: '/(stack)/mcp-servers' },
+      { id: 'appManagement', labelKey: 'nav.appManagement', icon: 'link', route: '/(stack)/app-management' },
+      { id: 'mcpServers', labelKey: 'nav.mcpServers', icon: 'globe', route: '/(stack)/mcp-servers' },
     ],
   },
   {
-    group: 'MEDIA & DATA',
+    groupKey: 'nav.groupHousehold',
     items: [
-      { id: 'userMedia', label: 'Photos & Videos', icon: 'photo', route: '/(stack)/user-media' },
-      { id: 'photoUpload', label: 'Upload for Analysis', icon: 'upload', route: '/(stack)/photo-upload' },
+      { id: 'addUsers', labelKey: 'nav.addUsers', icon: 'users', route: '/(stack)/add-users' },
+      { id: 'homeManagement', labelKey: 'nav.homeManagement', icon: 'home', route: '/(stack)/home-management' },
     ],
   },
   {
-    group: 'HOUSEHOLD',
+    groupKey: 'nav.groupPrivacy',
     items: [
-      { id: 'addUsers', label: 'Users', icon: 'users', route: '/(stack)/add-users' },
-      { id: 'biometrics', label: 'Biometric Data', icon: 'shield', route: '/(stack)/biometrics' },
-      { id: 'homeManagement', label: 'Home Management', icon: 'home', route: '/(stack)/home-management' },
-    ],
-  },
-  {
-    group: 'DATA & PRIVACY',
-    items: [
-      { id: 'backup', label: 'Backup', icon: 'cloud', route: '/(stack)/backup' },
-      { id: 'restore', label: 'Restore to Pond', icon: 'restore', route: '/(stack)/restore' },
-      { id: 'privacy', label: 'Privacy & Licenses', icon: 'shield', route: '/(stack)/privacy' },
+      { id: 'privacy', labelKey: 'nav.privacy', icon: 'shield', route: '/(stack)/privacy' },
     ],
   },
   // Dev-only: the per-screen mock/real backend toggle (#21). Discoverable in a
@@ -64,9 +58,9 @@ export const PROFILE_NAV: NavGroup[] = [
   ...(__DEV__
     ? [
         {
-          group: 'DEVELOPER',
+          groupKey: 'nav.groupDeveloper',
           items: [
-            { id: 'developer', label: 'Developer Mode', icon: 'cpu', route: '/(stack)/developer' },
+            { id: 'developer', labelKey: 'nav.developer', icon: 'cpu', route: '/(stack)/developer' },
           ],
         },
       ]
@@ -76,15 +70,16 @@ export const PROFILE_NAV: NavGroup[] = [
 /** Shortcut items for the home screen carousel */
 export interface ShortcutItem {
   id: string;
-  label: string;
+  /** i18n key, not copy. */
+  labelKey: string;
   iconName: string;
   color: string;
 }
 
 export const HOME_SHORTCUTS: ShortcutItem[] = [
-  { id: 'morning', label: 'Morning', iconName: 'sun', color: '#FEF3C7' },
-  { id: 'home', label: 'Home', iconName: 'home', color: '#DBEAFE' },
-  { id: 'night', label: 'Night', iconName: 'moon', color: '#EDE9FE' },
-  { id: 'music', label: 'Music', iconName: 'music', color: '#FCE7F3' },
-  { id: 'packages', label: 'Packages', iconName: 'package', color: '#FEE2E2' },
+  { id: 'morning', labelKey: 'nav.shortcutMorning', iconName: 'sun', color: '#FEF3C7' },
+  { id: 'home', labelKey: 'nav.shortcutHome', iconName: 'home', color: '#DBEAFE' },
+  { id: 'night', labelKey: 'nav.shortcutNight', iconName: 'moon', color: '#EDE9FE' },
+  { id: 'music', labelKey: 'nav.shortcutMusic', iconName: 'music', color: '#FCE7F3' },
+  { id: 'packages', labelKey: 'nav.shortcutPackages', iconName: 'package', color: '#FEE2E2' },
 ];

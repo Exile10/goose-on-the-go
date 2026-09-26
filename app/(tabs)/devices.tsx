@@ -9,7 +9,8 @@
  */
 
 import React, { useCallback, useMemo, useState } from 'react';
-import { InkSwitch } from '@jarida/ink/native';
+import { InkSwitch, InkIcon } from '@jarida/ink/native';
+import type { InkTone } from '@jarida/ink';
 import {
   ActivityIndicator,
   View,
@@ -21,23 +22,23 @@ import {
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { GIcon } from '@/components/ui/g-icon';
-import { ALL_ROOMS, supports, useDevices } from '@/view-models/use-devices';
+import { ALL_ROOMS, roomLabel, supports, useDevices } from '@/view-models/use-devices';
 import type { Device } from '@/services/types';
 import { Grey, JaridaPurple, Brand, Semantic } from '@/constants/colors';
 import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
 import { Spacing } from '@/constants/spacing';
 import { Radii } from '@/constants/radii';
+import i18n from '@/services/i18n';
 
 /** Icon and accent by device type, falling back to something neutral. */
-const TYPE_STYLE: Record<string, { icon: string; color: string }> = {
-  light: { icon: 'light', color: '#F59E0B' },
-  thermostat: { icon: 'thermo', color: '#1C63D1' },
-  lock: { icon: 'lock', color: '#1F8A3C' },
-  camera: { icon: 'camera', color: '#C8383B' },
-  speaker: { icon: 'speaker', color: '#8C4BFF' },
+const TYPE_STYLE: Record<string, { icon: string; color: string; tone: InkTone }> = {
+  light: { icon: 'light', color: '#F59E0B', tone: 'warning' },
+  thermostat: { icon: 'thermo', color: '#1C63D1', tone: 'info' },
+  lock: { icon: 'lock', color: '#1F8A3C', tone: 'success' },
+  camera: { icon: 'camera', color: '#C8383B', tone: 'danger' },
+  speaker: { icon: 'speaker', color: '#8C4BFF', tone: 'brand' },
 };
-const DEFAULT_STYLE = { icon: 'devices', color: JaridaPurple[500] };
+const DEFAULT_STYLE = { icon: 'device', color: JaridaPurple[500], tone: 'brand' as InkTone };
 
 function styleFor(device: Device) {
   return TYPE_STYLE[device.device_type?.toLowerCase() ?? ''] ?? DEFAULT_STYLE;
@@ -51,10 +52,10 @@ function styleFor(device: Device) {
  * inventing a state.
  */
 function detailFor(device: Device, power: boolean | undefined): string {
-  if (!device.is_online) return 'Offline';
-  if (power !== undefined) return power ? 'On' : 'Off';
+  if (!device.is_online) return i18n.t('devices.stateOffline');
+  if (power !== undefined) return power ? i18n.t('devices.stateOn') : i18n.t('devices.stateOff');
   // Online is reachability, not power — a different fact, and labelled as one.
-  return 'Online';
+  return i18n.t('devices.stateOnline');
 }
 
 /** Device card. The switch appears only for devices that accept one. */
@@ -67,7 +68,7 @@ const DeviceCard = React.memo(function DeviceCard({
   power: boolean | undefined;
   onToggle: (device: Device, on: boolean) => void;
 }) {
-  const { icon, color } = styleFor(device);
+  const { icon, color, tone } = styleFor(device);
   const canPower = supports(device, 'power');
   const on = power ?? false;
 
@@ -80,7 +81,7 @@ const DeviceCard = React.memo(function DeviceCard({
     <View style={styles.deviceCard}>
       <View style={styles.deviceCardTop}>
         <View style={[styles.deviceIconWrap, { backgroundColor: color + '18' }]}>
-          <GIcon name={icon} size={17} color={on && device.is_online ? color : '#B5B5B5'} />
+          <InkIcon name={icon} size={17} tone={on && device.is_online ? tone : 'neutral'} />
         </View>
         {canPower ? (
           <InkSwitch checked={on} onChange={handleToggle} disabled={!device.is_online} />
@@ -116,13 +117,13 @@ export default function DevicesTab() {
     <SafeAreaView style={styles.safe} edges={['top']}>
       <View style={styles.header}>
         <View>
-          <Text style={styles.headerTitle}>Devices</Text>
+          <Text style={styles.headerTitle}>{i18n.t('devices.title')}</Text>
           <Text style={styles.headerSubtitle}>
-            {data.devices.length === 1 ? '1 device' : `${data.devices.length} devices`}
+            {data.devices.length === 1 ? i18n.t('devices.countOne') : i18n.t('devices.countMany', { count: data.devices.length })}
           </Text>
         </View>
         <Pressable style={styles.manageBtn} onPress={actions.refresh}>
-          <Text style={styles.manageBtnText}>Refresh</Text>
+          <Text style={styles.manageBtnText}>{i18n.t('devices.refresh')}</Text>
         </Pressable>
       </View>
 
@@ -140,7 +141,7 @@ export default function DevicesTab() {
             onPress={() => setActiveRoom(tab)}
           >
             <Text style={[styles.roomTabText, activeRoom === tab && styles.roomTabTextActive]}>
-              {tab}
+              {roomLabel(tab)}
             </Text>
           </Pressable>
         ))}
@@ -150,14 +151,10 @@ export default function DevicesTab() {
         {/* The controller can take minutes to come up on first use, and nothing
             can be commissioned until it has. Say so rather than failing later. */}
         {data.matter?.state === 'connecting' ? (
-          <Text style={styles.notice}>
-            Your Pond is still starting its Matter controller. New devices cannot be added yet.
-          </Text>
+          <Text style={styles.notice}>{i18n.t('devices.matterStarting')}</Text>
         ) : null}
         {data.matter?.state === 'unreachable' ? (
-          <Text style={styles.noticeError}>
-            Your Pond cannot reach its Matter controller. Existing devices still work.
-          </Text>
+          <Text style={styles.noticeError}>{i18n.t('devices.matterUnreachable')}</Text>
         ) : null}
 
         {loading ? <ActivityIndicator color={JaridaPurple[500]} /> : null}
@@ -165,14 +162,12 @@ export default function DevicesTab() {
         {error ? <Text style={styles.noticeError}>{error}</Text> : null}
 
         {!loading && data.devices.length === 0 ? (
-          <Text style={styles.notice}>
-            No devices registered yet. Commission one to get started.
-          </Text>
+          <Text style={styles.notice}>{i18n.t('devices.empty')}</Text>
         ) : null}
 
         {visibleRooms.map((room) => (
           <View key={room.name} style={styles.roomSection}>
-            <Text style={styles.roomLabel}>{room.name.toUpperCase()}</Text>
+            <Text style={styles.roomLabel}>{roomLabel(room.name).toUpperCase()}</Text>
             <View style={styles.deviceGrid}>
               {room.devices.map((d) => (
                 <DeviceCard
@@ -190,16 +185,16 @@ export default function DevicesTab() {
           style={styles.addDeviceBtn}
           onPress={() => router.push('/(stack)/commission-device')}
         >
-          <GIcon name="plus" size={20} color={JaridaPurple[500]} />
-          <Text style={styles.addDeviceText}>Add a device</Text>
+          <InkIcon name="plus" size={20} tone="brand" />
+          <Text style={styles.addDeviceText}>{i18n.t('devices.addDevice')}</Text>
         </Pressable>
 
         <Pressable
           style={styles.addDeviceBtn}
           onPress={() => router.push('/(stack)/pond-pairing')}
         >
-          <GIcon name="plus" size={20} color={JaridaPurple[500]} />
-          <Text style={styles.addDeviceText}>Pair another Pond</Text>
+          <InkIcon name="plus" size={20} tone="brand" />
+          <Text style={styles.addDeviceText}>{i18n.t('devices.pairAnother')}</Text>
         </Pressable>
 
         <View style={{ height: 100 }} />

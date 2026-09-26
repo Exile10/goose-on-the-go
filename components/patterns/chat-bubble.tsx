@@ -8,6 +8,7 @@ import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
 import { JaridaPurple, Grey } from '@/constants/colors';
 import { Radii } from '@/constants/radii';
 import { Spacing } from '@/constants/spacing';
+import i18n from '@/services/i18n';
 
 interface ChatBubbleProps {
   role: 'user' | 'assistant';
@@ -21,7 +22,7 @@ export const ChatBubble = React.memo(function ChatBubble({ role, content, loadin
   return (
     <View style={[styles.container, isUser && styles.containerUser]}>
       <Text style={[styles.author, isUser ? styles.authorUser : styles.authorAssistant]}>
-        {isUser ? 'You' : 'Pond'}
+        {isUser ? i18n.t('chat.you') : i18n.t('chat.pond')}
       </Text>
       <View style={[styles.body, isUser ? styles.bodyUser : styles.bodyAssistant]}>
         {loading ? (

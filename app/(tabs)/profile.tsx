@@ -5,8 +5,10 @@
  * iOS-style grouped settings sections linking to sub-screens.
  */
 
-import React, { useCallback } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
+import { InkIcon, InkProvider } from '@jarida/ink/native';
 import {
+  Alert,
   View,
   Text,
   StyleSheet,
@@ -14,9 +16,12 @@ import {
   Pressable,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { GIcon } from '@/components/ui/g-icon';
+import { useServer } from '@/providers/server-provider';
+import { initialOf, useHousehold } from '@/view-models/use-household';
+
 import { PROFILE_NAV, type NavItem, type NavGroup } from '@/constants/navigation';
 import { Grey, JaridaPurple, Brand, Semantic } from '@/constants/colors';
 import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
@@ -24,14 +29,7 @@ import { Spacing } from '@/constants/spacing';
 import { Radii } from '@/constants/radii';
 import { Shadows } from '@/constants/shadows';
 import type { IconName } from '@/constants/icons';
-
-/** Stats data */
-const STATS = [
-  { label: 'Devices', value: '6' },
-  { label: 'Rooms', value: '3' },
-  { label: 'Routines', value: '4' },
-  { label: 'Users', value: '2' },
-];
+import i18n from '@/services/i18n';
 
 /** Navigation row */
 const NavRow = React.memo(function NavRow({
@@ -49,22 +47,54 @@ const NavRow = React.memo(function NavRow({
       onPress={handlePress}
     >
       <View style={styles.rowLeft}>
-        <GIcon name={item.icon} size={16} color="#8C4BFF" />
-        <Text style={styles.rowLabel}>{item.label}</Text>
+        <InkIcon name={item.icon} size={16} tone="brand" />
+        <Text style={styles.rowLabel}>{i18n.t(item.labelKey)}</Text>
       </View>
-      <GIcon name="chevron" size={16} color={Grey[400]} />
+      <InkIcon name="chevron" size={16} tone="neutral" />
     </Pressable>
   );
 });
 
 /** SectionList sections from PROFILE_NAV */
 const sections = PROFILE_NAV.map((g) => ({
-  title: g.group,
+  title: i18n.t(g.groupKey),
   data: g.items,
 }));
 
 export default function ProfileHub() {
   const router = useRouter();
+  const { t } = useTranslation();
+  const { signOut } = useServer();
+  const [signingOut, setSigningOut] = useState(false);
+  const { data: household } = useHousehold();
+
+  /**
+   * Signing out is not undoable from the phone: it revokes this device's
+   * session on the Pond and releases its remote enrollment, so coming back
+   * means pairing at home again. Worth one question first.
+   */
+  const confirmSignOut = useCallback(() => {
+    Alert.alert(
+      t('profile.signOut'),
+      t('profile.signOutWarning'),
+      [
+        { text: t('profile.cancel'), style: 'cancel' },
+        {
+          text: t('profile.signOut'),
+          style: 'destructive',
+          onPress: () => {
+            setSigningOut(true);
+            // The provider clears stored credentials and reconfigures the
+            // connection, which puts the app back into `unpaired` -- and
+            // PairFirst takes it to pairing from there.
+            void signOut()
+              .catch(() => Alert.alert(t('profile.signOut'), t('profile.signOutFailed')))
+              .finally(() => setSigningOut(false));
+          },
+        },
+      ],
+    );
+  }, [signOut, t]);
 
   const handleNav = useCallback(
     (route: string) => {
@@ -87,6 +117,23 @@ export default function ProfileHub() {
 
   const keyExtractor = useCallback((item: NavItem) => item.id, []);
 
+  // Only what the Pond said. The name is the member it attributes this phone to -- there is no
+  // account, and so no email -- and each figure is one read, shown as a dash when that read
+  // failed rather than as a zero nobody counted.
+  const { member, pondName, counts } = household;
+  const initial = member ? initialOf(member.displayName) : null;
+  // Memoised because it feeds ListHeader's callback: a fresh array every render would rebuild the
+  // header component every render, and a SectionList remounts a header whose component changes.
+  const stats = useMemo(
+    () => [
+      { key: 'devices', label: t('profile.statDevices'), value: counts.devices },
+      { key: 'rooms', label: t('profile.statRooms'), value: counts.rooms },
+      { key: 'routines', label: t('profile.statRoutines'), value: counts.routines },
+      { key: 'users', label: t('profile.statUsers'), value: counts.users },
+    ],
+    [counts, t],
+  );
+
   const ListHeader = useCallback(
     () => (
       <>
@@ -95,20 +142,25 @@ export default function ProfileHub() {
           <View style={styles.charcoalBand} />
           <View style={styles.profileContent}>
             <View style={styles.avatarLarge}>
-              <Text style={styles.avatarLargeText}>J</Text>
+              {initial ? (
+                <Text style={styles.avatarLargeText}>{initial}</Text>
+              ) : (
+                <InkProvider scheme="dark">
+                  <InkIcon name="home" size={28} />
+                </InkProvider>
+              )}
             </View>
-            <Text style={styles.profileName}>Jerry Ochieng</Text>
-            <Text style={styles.profileEmail}>jerryochieng178@gmail.com</Text>
-            <View style={styles.proBadge}>
-              <Text style={styles.proBadgeText}>Jarida Pro</Text>
-            </View>
+            <Text style={styles.profileName}>{member?.displayName ?? pondName ?? t('profile.yourPond')}</Text>
+            {member && pondName ? (
+              <Text style={styles.profileSubtitle}>{t('profile.pairedTo', { pond: pondName })}</Text>
+            ) : null}
           </View>
 
           {/* Overlapping stats row */}
           <View style={styles.statsRow}>
-            {STATS.map((stat) => (
-              <View key={stat.label} style={styles.statItem}>
-                <Text style={styles.statValue}>{stat.value}</Text>
+            {stats.map((stat) => (
+              <View key={stat.key} style={styles.statItem}>
+                <Text style={styles.statValue}>{stat.value ?? '\u2014'}</Text>
                 <Text style={styles.statLabel}>{stat.label}</Text>
               </View>
             ))}
@@ -116,21 +168,34 @@ export default function ProfileHub() {
         </View>
       </>
     ),
-    [],
+    [initial, member, pondName, stats, t],
   );
 
   const ListFooter = useCallback(
     () => (
       <View style={styles.footerSection}>
-        <Pressable style={styles.signOutBtn}>
-          <Text style={styles.signOutText}>Sign Out</Text>
+        <Pressable style={styles.signOutBtn} onPress={() => router.push('/(stack)/remote-access')}>
+          <Text style={styles.signOutText}>{t('remote.title')}</Text>
         </Pressable>
+        {/* This had no handler at all: a button that looked like the way out
+            and did nothing when pressed. Signing out is also the only way to
+            release a remote enrollment the Pond still calls active, so its
+            absence stranded anyone whose phone needed re-enrolling. */}
+        <Pressable
+          accessibilityRole="button"
+          style={styles.signOutBtn}
+          disabled={signingOut}
+          onPress={confirmSignOut}
+        >
+          <Text style={styles.signOutText}>{signingOut ? t('profile.signingOut') : t('profile.signOut')}</Text>
+        </Pressable>
+        {/* eslint-disable-next-line i18next/no-literal-string -- product name and version, not translated */}
         <Text style={styles.versionText}>Goose on the Go v0.2.0</Text>
         {/* Bottom spacer for tab bar */}
         <View style={{ height: 100 }} />
       </View>
     ),
-    [],
+    [router, t, signingOut],
   );
 
   return (
@@ -197,24 +262,11 @@ const styles = StyleSheet.create({
     color: Brand.charcoal,
     marginTop: Spacing.sm,
   },
-  profileEmail: {
+  profileSubtitle: {
     fontFamily: FontFamily.body,
     fontSize: FontSize.sm,
     color: Grey[500],
     marginTop: 2,
-  },
-  proBadge: {
-    backgroundColor: JaridaPurple[50],
-    paddingHorizontal: Spacing.md,
-    paddingVertical: 4,
-    borderRadius: Radii.pill,
-    marginTop: Spacing.sm,
-  },
-  proBadgeText: {
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.xs,
-    fontWeight: FontWeight.bold,
-    color: JaridaPurple[600],
   },
 
   /* Stats row */

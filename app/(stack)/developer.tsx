@@ -9,11 +9,11 @@
 
 import React, { useCallback, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native';
-import { Redirect } from 'expo-router';
+import { Redirect, useRouter } from 'expo-router';
 
-import { InkInput, InkSwitch } from '@jarida/ink/native';
+import { InkSwitch, InkIcon } from '@jarida/ink/native';
 
-import { GIcon } from '@/components/ui/g-icon';
+import { useTranslation } from 'react-i18next';
 import { ServerStatus } from '@/components/patterns/server-status';
 import { useServer, MIGRATION_SCREENS, type MigrationScreen } from '@/providers/server-provider';
 import { Grey, JaridaPurple, Brand, Semantic } from '@/constants/colors';
@@ -21,6 +21,7 @@ import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
 import { Spacing } from '@/constants/spacing';
 import { Radii } from '@/constants/radii';
 import { Shadows } from '@/constants/shadows';
+import i18n from '@/services/i18n';
 
 const SCREEN_LABELS: Record<MigrationScreen, string> = {
   chat: 'Chat',
@@ -44,51 +45,34 @@ export default function DeveloperScreen() {
 }
 
 function DeveloperScreenContent() {
-  const { serverUrl, setServerUrl, online, checkHealth, isScreenReal, setScreenMode } = useServer();
-  const [urlDraft, setUrlDraft] = useState(serverUrl);
+  const { serverUrl, online, checkHealth, isScreenReal, setScreenMode } = useServer();
   const [checking, setChecking] = useState(false);
-
+  const { t } = useTranslation();
+  const router = useRouter();
   const handleTestConnection = useCallback(async () => {
-    // Mirrors the trailing-slash cleanup setServerUrl applies internally, so
-    // this comparison (and the draft resync below) line up with what actually
-    // ends up in `serverUrl` instead of drifting after the first change.
-    const clean = urlDraft.replace(/\/+$/, '');
     setChecking(true);
-    // setServerUrl already performs and awaits its own health check when the
-    // URL actually changes; only fire a separate one to retest the same URL.
-    if (clean !== serverUrl) {
-      setServerUrl(clean);
-      setUrlDraft(clean);
-    }
-    // `setServerUrl` here only records the address; the probe is always ours.
-    await checkHealth();
-    setChecking(false);
-  }, [urlDraft, serverUrl, setServerUrl, checkHealth]);
+    try { await checkHealth(); } finally { setChecking(false); }
+  }, [checkHealth]);
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <Text style={styles.sectionTitle}>Server connection</Text>
+      <Text style={styles.sectionTitle}>{i18n.t('developer.serverConnection')}</Text>
       <View style={styles.card}>
-        <InkInput
-          label="Pond server URL"
-          value={urlDraft}
-          onChange={setUrlDraft}
-          placeholder="http://pond.local:4000"
-        />
+        <Text style={styles.screenLabel}>{serverUrl || t('connection.unpaired')}</Text>
+        <Pressable onPress={() => router.push('/(stack)/pond-pairing')}>
+          <Text style={styles.sectionHint}>{t('connection.changePond')}</Text>
+        </Pressable>
         <View style={styles.connectionRow}>
           <ServerStatus online={online} />
           <Pressable style={styles.testButton} onPress={handleTestConnection} disabled={checking}>
-            <GIcon name="refresh" size={14} color={Brand.white} />
-            <Text style={styles.testButtonText}>{checking ? 'Checking…' : 'Test connection'}</Text>
+            <InkIcon name="refresh" size={14} />
+            <Text style={styles.testButtonText}>{checking ? i18n.t('developer.checking') : i18n.t('developer.testConnection')}</Text>
           </Pressable>
         </View>
       </View>
 
-      <Text style={styles.sectionTitle}>Per-screen backend mode</Text>
-      <Text style={styles.sectionHint}>
-        Flip a screen to “Real” once its backend wiring lands (#9–#15). Mock and real
-        code paths coexist — nothing needs to be deleted to test either one.
-      </Text>
+      <Text style={styles.sectionTitle}>{i18n.t('developer.backendMode')}</Text>
+      <Text style={styles.sectionHint}>{i18n.t('developer.backendHint')}</Text>
       <View style={styles.card}>
         {MIGRATION_SCREENS.map((screen, i) => (
           <View
@@ -98,7 +82,7 @@ function DeveloperScreenContent() {
             <View style={styles.screenRowLeft}>
               <Text style={styles.screenLabel}>{SCREEN_LABELS[screen]}</Text>
               <Text style={styles.screenModeText}>
-                {isScreenReal(screen) ? 'Real backend' : 'Mock data'}
+                {isScreenReal(screen) ? i18n.t('developer.realBackend') : i18n.t('developer.mockData')}
               </Text>
             </View>
             <InkSwitch
@@ -110,10 +94,8 @@ function DeveloperScreenContent() {
       </View>
 
       <View style={styles.warningBanner}>
-        <GIcon name="warn" size={16} color={Semantic.warning} />
-        <Text style={styles.warningText}>
-          This screen is dev-only. It isn’t linked from Settings in production builds.
-        </Text>
+        <InkIcon name="warn" size={16} tone="warning" />
+        <Text style={styles.warningText}>{i18n.t('developer.devOnly')}</Text>
       </View>
     </ScrollView>
   );
