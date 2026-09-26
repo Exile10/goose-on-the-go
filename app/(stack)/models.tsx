@@ -29,6 +29,7 @@ import { Grey, JaridaPurple, Brand, Semantic } from '@/constants/colors';
 import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
 import { Spacing } from '@/constants/spacing';
 import { Radii } from '@/constants/radii';
+import i18n from '@/services/i18n';
 
 
 /** One reported fact about a model. Rendered only when the server sent it. */
@@ -80,7 +81,7 @@ const ModelCard = React.memo(function ModelCard({
               { color: local ? Semantic.success : JaridaPurple[500] },
             ]}
           >
-            {local ? 'On your Pond' : 'Cloud'}
+            {local ? i18n.t('models.onPond') : i18n.t('models.cloud')}
           </Text>
         </View>
       </View>
@@ -88,22 +89,22 @@ const ModelCard = React.memo(function ModelCard({
       {model.description ? <Text style={styles.modelDesc}>{model.description}</Text> : null}
 
       <View style={styles.ratingsSection}>
-        <FactRow label="Context" value={formatContextWindow(model.context_length)} />
-        <FactRow label="Size" value={formatSize(model.size_mb)} />
-        <FactRow label="Quantisation" value={model.quantization ?? null} />
+        <FactRow label={i18n.t('models.context')} value={formatContextWindow(model.context_length)} />
+        <FactRow label={i18n.t('models.size')} value={formatSize(model.size_mb)} />
+        <FactRow label={i18n.t('models.quantisation')} value={model.quantization ?? null} />
         <FactRow
-          label="Memory"
-          value={model.ram_estimate_mb ? `${formatSize(model.ram_estimate_mb)} needed` : null}
+          label={i18n.t('models.memory')}
+          value={model.ram_estimate_mb ? i18n.t('models.ramNeeded', { size: formatSize(model.ram_estimate_mb) }) : null}
         />
       </View>
 
       {model.downloaded === false ? (
-        <Text style={styles.notDownloaded}>Not downloaded on this Pond</Text>
+        <Text style={styles.notDownloaded}>{i18n.t('models.notDownloaded')}</Text>
       ) : null}
 
       {isActive && (
         <View style={styles.selectedIndicator}>
-          <Text style={styles.selectedText}>Active</Text>
+          <Text style={styles.selectedText}>{i18n.t('models.active')}</Text>
         </View>
       )}
     </Pressable>
@@ -121,14 +122,14 @@ export default function AIModelsScreen() {
     >
       {data.activeModel ? (
         <View style={styles.contextRow}>
-          <Text style={styles.contextLabel}>Context Window</Text>
+          <Text style={styles.contextLabel}>{i18n.t('models.contextWindow')}</Text>
           <Text style={styles.contextValue}>
-            {formatContextWindow(data.activeModel.context_length) ?? 'Not reported'}
+            {formatContextWindow(data.activeModel.context_length) ?? i18n.t('models.notReported')}
           </Text>
         </View>
       ) : null}
 
-      <Text style={styles.sectionLabel}>AVAILABLE MODELS</Text>
+      <Text style={styles.sectionLabel}>{i18n.t('models.available')}</Text>
 
       {loading ? (
         <View style={styles.stateBlock}>
@@ -140,16 +141,14 @@ export default function AIModelsScreen() {
         <View style={styles.stateBlock}>
           <Text style={styles.stateError}>{error}</Text>
           <Pressable onPress={actions.refresh} hitSlop={8}>
-            <Text style={styles.stateAction}>Try again</Text>
+            <Text style={styles.stateAction}>{i18n.t('models.tryAgain')}</Text>
           </Pressable>
         </View>
       ) : null}
 
       {!loading && !error && data.models.length === 0 ? (
         <View style={styles.stateBlock}>
-          <Text style={styles.stateEmpty}>
-            This Pond has no models installed yet. Add one from the Pond dashboard.
-          </Text>
+          <Text style={styles.stateEmpty}>{i18n.t('models.empty')}</Text>
         </View>
       ) : null}
 

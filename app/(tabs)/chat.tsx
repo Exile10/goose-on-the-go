@@ -5,7 +5,8 @@
  * suggested prompts, input bar with mic and send.
  */
 
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
+import { InkIcon } from '@jarida/ink/native';
 import {
   View,
   Text,
@@ -15,8 +16,8 @@ import {
   Pressable,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 
-import { GIcon } from '@/components/ui/g-icon';
 import { GKeyboardView } from '@/components/ui/g-keyboard-view';
 import type { Message } from '@/models/chat';
 import { useChat } from '@/view-models/use-chat';
@@ -25,13 +26,21 @@ import { Grey, JaridaPurple, Brand, Semantic } from '@/constants/colors';
 import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
 import { Spacing } from '@/constants/spacing';
 import { Radii } from '@/constants/radii';
+import i18n from '@/services/i18n';
 
-const SUGGESTED_PROMPTS = [
-  'Turn off all lights',
-  'What\u2019s the weather?',
-  'Play some music',
-  'Lock the front door',
-];
+/**
+ * The suggested prompts, read from the catalogue when the screen renders -- literal keys, so
+ * services/__tests__/i18n.test.ts sees each one. Tapping one sends its text, so a reader in another
+ * language sends the prompt in that language too.
+ */
+function suggestedPrompts(): string[] {
+  return [
+    i18n.t('chat.suggestLights'),
+    i18n.t('chat.suggestWeather'),
+    i18n.t('chat.suggestMusic'),
+    i18n.t('chat.suggestLock'),
+  ];
+}
 
 /** Chat bubble component */
 const ChatBubble = React.memo(function ChatBubble({ item }: { item: Message }) {
@@ -40,7 +49,8 @@ const ChatBubble = React.memo(function ChatBubble({ item }: { item: Message }) {
     <View style={[styles.bubbleRow, isUser && styles.bubbleRowUser]}>
       {!isUser && (
         <View style={styles.gooseAvatar}>
-          <Text style={styles.gooseAvatarText}>G</Text>
+          {/* eslint-disable-next-line i18next/no-literal-string -- the Goose mark and product name */}
+        <Text style={styles.gooseAvatarText}>G</Text>
         </View>
       )}
       <View style={[styles.bubble, isUser ? styles.bubbleUser : styles.bubbleAssistant]}>
@@ -52,11 +62,12 @@ const ChatBubble = React.memo(function ChatBubble({ item }: { item: Message }) {
   );
 });
 
-/** Typing dots indicator */
+/** Typing dots indicator — shown while streaming with no more specific activity to report. */
 const TypingDots = React.memo(function TypingDots() {
   return (
     <View style={styles.bubbleRow}>
       <View style={styles.gooseAvatar}>
+        {/* eslint-disable-next-line i18next/no-literal-string -- the Goose mark and product name */}
         <Text style={styles.gooseAvatarText}>G</Text>
       </View>
       <View style={[styles.bubble, styles.bubbleAssistant]}>
@@ -70,17 +81,48 @@ const TypingDots = React.memo(function TypingDots() {
   );
 });
 
+/** Live "what's happening" row — thinking / tool use / status, driven by real stream events. */
+const ActivityRow = React.memo(function ActivityRow({ label }: { label: string }) {
+  return (
+    <View style={styles.bubbleRow}>
+      <View style={styles.gooseAvatar}>
+        {/* eslint-disable-next-line i18next/no-literal-string -- the Goose mark and product name */}
+        <Text style={styles.gooseAvatarText}>G</Text>
+      </View>
+      <View style={[styles.bubble, styles.bubbleAssistant]}>
+        <Text style={styles.activityText}>{label}</Text>
+      </View>
+    </View>
+  );
+});
+
 export default function ChatScreen() {
   const { data, actions } = useChat();
-  const { messages, streaming: isTyping } = data;
+  const { messages, streaming: isTyping, activity } = data;
+  const router = useRouter();
+  // The Sessions screen opens a conversation by sending its id here.
+  const { sessionId: requestedSession } = useLocalSearchParams<{ sessionId?: string }>();
+  const { loadSession } = actions;
+  const handledSession = useRef<string | null>(null);
+  useEffect(() => {
+    if (!requestedSession) { handledSession.current = null; return; }
+    if (requestedSession === handledSession.current) return;
+    handledSession.current = requestedSession;
+    loadSession(requestedSession);
+    router.setParams({ sessionId: undefined });
+  }, [requestedSession, loadSession, router]);
   const [draft, setDraft] = useState('');
   const flatListRef = useRef<FlatList<Message>>(null);
 
   const handleSend = useCallback(() => {
+    if (isTyping) {
+      actions.abortRun();
+      return;
+    }
     if (!draft.trim()) return;
     actions.send(draft);
     setDraft('');
-  }, [draft, actions]);
+  }, [draft, actions, isTyping]);
 
   const handleSuggestedPrompt = useCallback((prompt: string) => {
     setDraft(prompt);
@@ -105,22 +147,40 @@ export default function ChatScreen() {
         <View style={styles.header}>
           <View style={styles.headerLeft}>
             <View style={styles.headerAvatar}>
-              <Text style={styles.headerAvatarText}>G</Text>
+              {/* eslint-disable-next-line i18next/no-literal-string -- the Goose mark and product name */}
+          <Text style={styles.headerAvatarText}>G</Text>
             </View>
             <View>
-              <Text style={styles.headerName}>Goose</Text>
+              {/* eslint-disable-next-line i18next/no-literal-string -- the Goose mark and product name */}
+          <Text style={styles.headerName}>Goose</Text>
               <View style={styles.headerMeta}>
                 <View style={styles.modelBadge}>
-                  <Text style={styles.modelBadgeText}>Goose 2</Text>
+                  {/* eslint-disable-next-line i18next/no-literal-string -- the Goose mark and product name */}
+            <Text style={styles.modelBadgeText}>Goose 2</Text>
                 </View>
                 <View style={styles.statusDot} />
-                <Text style={styles.statusText}>Connected</Text>
+                <Text style={styles.statusText}>{i18n.t('chat.connected')}</Text>
               </View>
             </View>
           </View>
-          <Pressable style={styles.newChatBtn} onPress={actions.newConversation}>
-            <GIcon name="plus" size={18} color={Grey[600]} />
-          </Pressable>
+          <View style={styles.headerActions}>
+            <Pressable
+              style={styles.newChatBtn}
+              onPress={() => router.push('/(stack)/sessions')}
+              accessibilityRole="button"
+              accessibilityLabel={i18n.t('chat.history')}
+            >
+              <InkIcon name="logs" size={18} tone="neutral" />
+            </Pressable>
+            <Pressable
+              style={styles.newChatBtn}
+              onPress={actions.newConversation}
+              accessibilityRole="button"
+              accessibilityLabel={i18n.t('chat.newConversation')}
+            >
+              <InkIcon name="plus" size={18} tone="neutral" />
+            </Pressable>
+          </View>
         </View>
 
         {/* Message list */}
@@ -131,12 +191,12 @@ export default function ChatScreen() {
           renderItem={renderItem}
           inverted
           contentContainerStyle={styles.listContent}
-          ListHeaderComponent={isTyping ? <TypingDots /> : null}
+          ListHeaderComponent={isTyping ? (activity ? <ActivityRow label={activity} /> : <TypingDots />) : null}
         />
 
         {/* Suggested prompts */}
         <View style={styles.suggestedRow}>
-          {SUGGESTED_PROMPTS.map((p) => (
+          {suggestedPrompts().map((p) => (
             <Pressable
               key={p}
               style={styles.suggestedChip}
@@ -154,27 +214,31 @@ export default function ChatScreen() {
               style={styles.input}
               value={draft}
               onChangeText={setDraft}
-              placeholder="Message Goose..."
+              placeholder={i18n.t('chat.messagePlaceholder')}
               placeholderTextColor={Grey[400]}
               multiline
               maxLength={4000}
             />
             <Pressable style={styles.micBtn} onPress={() => startVoiceRecording()}>
-              <GIcon name="voice" size={18} color={JaridaPurple[500]} />
+              <InkIcon name="voice" size={18} tone="brand" />
             </Pressable>
           </View>
           <Pressable
-            style={[styles.sendBtn, draft.trim() ? styles.sendBtnActive : styles.sendBtnInactive]}
+            style={[styles.sendBtn, isTyping || draft.trim() ? styles.sendBtnActive : styles.sendBtnInactive]}
             onPress={handleSend}
-            disabled={!draft.trim()}
+            disabled={!isTyping && !draft.trim()}
           >
-            <GIcon name="send" size={16} color={draft.trim() ? Brand.white : Grey[400]} />
+            <InkIcon
+              name={isTyping ? 'pause' : 'send'}
+              size={16}
+              tone={isTyping || draft.trim() ? undefined : 'neutral'}
+            />
           </Pressable>
         </View>
 
         {/* Powered by footer */}
         <View style={styles.footer}>
-          <Text style={styles.footerText}>Powered by Goose 2</Text>
+          <Text style={styles.footerText}>{i18n.t('chat.poweredBy')}</Text>
         </View>
       </GKeyboardView>
     </SafeAreaView>
@@ -240,6 +304,10 @@ const styles = StyleSheet.create({
     fontFamily: FontFamily.body,
     fontSize: 10,
     color: Grey[500],
+  },
+  headerActions: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
   },
   newChatBtn: {
     width: 36,
@@ -314,6 +382,12 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   dotMid: { opacity: 0.9 },
+  activityText: {
+    fontFamily: FontFamily.body,
+    fontSize: FontSize.sm,
+    fontStyle: 'italic',
+    color: Grey[500],
+  },
 
   /* Suggested prompts */
   suggestedRow: {

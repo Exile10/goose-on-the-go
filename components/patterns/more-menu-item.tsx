@@ -4,7 +4,7 @@
 
 import React from 'react';
 import { Pressable, Text, StyleSheet } from 'react-native';
-import { GIcon } from '@/components/ui/g-icon';
+import { InkIcon } from '@jarida/ink/native';
 import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
 import { Grey, JaridaPurple } from '@/constants/colors';
 import { Radii } from '@/constants/radii';
@@ -22,7 +22,7 @@ export const MoreMenuItem = React.memo(function MoreMenuItem({ label, onPress }:
       onPress={onPress}
     >
       <Text style={styles.label}>{label}</Text>
-      <GIcon name="chevron" size={16} color="#B5B5B5" />
+      <InkIcon name="chevron" size={16} tone="neutral" />
     </Pressable>
   );
 });

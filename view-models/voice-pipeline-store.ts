@@ -17,6 +17,7 @@
 import { useSyncExternalStore } from 'react';
 
 import { api } from '@/services/api-client';
+import i18n from '@/services/i18n';
 import type { ChatStreamFrame } from '@/services/types';
 import { voicePlayer } from '@/services/voice-player';
 import { VoicePermissionError, voiceRecorder } from '@/services/voice-recorder';
@@ -198,12 +199,10 @@ async function runTurn(isAutoListen: boolean): Promise<void> {
     if (stale()) return;
     if (e instanceof VoicePermissionError) {
       toErrorThenIdle(
-        e.canAskAgain
-          ? 'Microphone access is needed to talk to Goose.'
-          : 'Microphone access is off — enable it in Settings to talk to Goose.',
+        e.canAskAgain ? i18n.t('voice.micNeeded') : i18n.t('voice.micDisabled'),
       );
     } else {
-      toErrorThenIdle('Could not start the microphone.');
+      toErrorThenIdle(i18n.t('voice.micStartFailed'));
     }
     return;
   }
@@ -227,7 +226,7 @@ async function runTurn(isAutoListen: boolean): Promise<void> {
     transcript = res.text;
   } catch {
     if (stale()) return;
-    toErrorThenIdle('Could not reach the server to transcribe that.');
+    toErrorThenIdle(i18n.t('voice.transcribeFailed'));
     return;
   }
 
@@ -242,9 +241,7 @@ async function runTurn(isAutoListen: boolean): Promise<void> {
   const dismissal = checkDismissal(transcript);
   if (dismissal.dismissed) {
     await speakFixedLineThenSettle(
-      dismissal.isExit
-        ? "Goodbye! I'll be here whenever you need me."
-        : 'Until next time. Just say if you need me again.',
+      dismissal.isExit ? i18n.t('voice.farewellExit') : i18n.t('voice.farewellPause'),
       mySeq,
     );
     return;

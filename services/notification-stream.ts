@@ -1,3 +1,4 @@
+import { assertPondTrust } from './pond-trust';
 /**
  * NotificationStream — consumes GIAP's `GET /api/v1/notifications/stream`
  * (SSE) so the phone receives server notifications in the foreground:
@@ -33,6 +34,7 @@ interface StreamOptions {
   deviceId: string;
   token: string;
   onNotification: (n: ServerNotification) => void;
+  deduplicator?: NotificationDeduplicator;
   /** Called when the stream drops and a reconnect is scheduled. */
   onDisconnect?: () => void;
   /**
@@ -69,27 +71,41 @@ export function parseSseChunk(
   return remainder;
 }
 
+/** Shared across stream instances so roaming cannot present a notification twice. */
+export class NotificationDeduplicator {
+  private ids = new Set<string>();
+  accept(id: string): boolean {
+    if (!id || this.ids.has(id)) return false;
+    this.ids.add(id);
+    if (this.ids.size > DEDUPE_CAPACITY) this.ids.delete(this.ids.values().next().value!);
+    return true;
+  }
+}
+
 export class NotificationStream {
   private opts: StreamOptions;
   private xhr: XMLHttpRequest | null = null;
   private stopped = false;
+  private generation = 0;
   private backoffMs = INITIAL_BACKOFF_MS;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
-  private seenIds: string[] = [];
-  private seenSet = new Set<string>();
+  private deduplicator: NotificationDeduplicator;
 
   constructor(opts: StreamOptions) {
     this.opts = opts;
+    this.deduplicator = opts.deduplicator ?? new NotificationDeduplicator();
   }
 
   start(): void {
     this.stopped = false;
-    this.connect();
+    this.generation++;
+    void this.connect();
   }
 
   /** Tear down the connection and cancel any pending reconnect. */
   stop(): void {
     this.stopped = true;
+    this.generation++;
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
@@ -98,10 +114,14 @@ export class NotificationStream {
     this.xhr = null;
   }
 
-  private connect(): void {
+  private async connect(): Promise<void> {
     if (this.stopped) return;
 
+    const generation = this.generation;
     const { baseUrl, deviceId, token } = this.opts;
+    try { await assertPondTrust(baseUrl); }
+    catch { if (!this.stopped && generation === this.generation) this.retryLater(generation); return; }
+    if (this.stopped || generation !== this.generation) return;
     const url = `${baseUrl}/api/v1/notifications/stream?device_id=${encodeURIComponent(deviceId)}`;
 
     const xhr = new XMLHttpRequest();
@@ -111,6 +131,7 @@ export class NotificationStream {
 
     xhr.open('GET', url);
     xhr.setRequestHeader('Accept', 'text/event-stream');
+    xhr.setRequestHeader('X-Pond-Transport', '1');
     xhr.setRequestHeader('Authorization', `Bearer ${token}`);
 
     xhr.onprogress = () => {
@@ -123,10 +144,7 @@ export class NotificationStream {
     };
 
     const scheduleReconnect = () => {
-      if (this.stopped) return;
-      this.opts.onDisconnect?.();
-      this.reconnectTimer = setTimeout(() => this.connect(), this.backoffMs);
-      this.backoffMs = Math.min(this.backoffMs * 2, MAX_BACKOFF_MS);
+      if (!this.stopped && generation === this.generation) this.retryLater(generation);
     };
     xhr.onerror = scheduleReconnect;
     xhr.onload = () => {
@@ -146,6 +164,24 @@ export class NotificationStream {
     xhr.send();
   }
 
+  /**
+   * Tell the owner the stream dropped, then come back on our own after a backoff.
+   *
+   * Both, not either. The owner may move to another endpoint, and its cleanup
+   * stops this stream, which cancels the timer. But a recovery that finds the
+   * same endpoint changes nothing the owner reacts to, so a stream that only
+   * reported the drop and stopped stayed dead until the app was backgrounded.
+   */
+  private retryLater(generation: number): void {
+    this.opts.onDisconnect?.();
+    if (this.stopped || generation !== this.generation) return;
+    this.reconnectTimer = setTimeout(() => {
+      this.reconnectTimer = null;
+      if (generation === this.generation) void this.connect();
+    }, this.backoffMs);
+    this.backoffMs = Math.min(this.backoffMs * 2, MAX_BACKOFF_MS);
+  }
+
   private handleFrame(data: string): void {
     let parsed: ServerNotification;
     try {
@@ -153,13 +189,7 @@ export class NotificationStream {
     } catch {
       return; // keep-alive / non-JSON frame
     }
-    if (!parsed.id || this.seenSet.has(parsed.id)) return;
-    this.seenSet.add(parsed.id);
-    this.seenIds.push(parsed.id);
-    if (this.seenIds.length > DEDUPE_CAPACITY) {
-      const evicted = this.seenIds.shift();
-      if (evicted) this.seenSet.delete(evicted);
-    }
+    if (!this.deduplicator.accept(parsed.id)) return;
     this.opts.onNotification(parsed);
   }
 }

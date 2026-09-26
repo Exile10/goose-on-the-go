@@ -1,26 +1,11 @@
-/**
- * Pairing payload — decoded from the QR code shown on Goose In A Pond desktop.
- *
- * Desktop encodes: pond://pair?host=<hostname>.local&port=<port>&code=<6-digit>
- * plus an optional &ip=<lan-address> and &ts=<tailnet-address>
- * (pond-desktop/src/sections/Pairing.tsx), refreshing it as the code expires.
- *
- * Three addresses, because none of them works everywhere. The mDNS name is the
- * best identifier — it survives a DHCP lease change — but Android's resolver
- * does no mDNS, so `<host>.local` fails outright there. The LAN address works
- * there and nowhere else: it stops meaning anything the moment the phone leaves
- * the house, which is what the tailnet address is for. Both extras are optional
- * because a Pond may have neither — an older server sends no `ip`, and one that
- * is not on a tailnet has no `ts`.
- *
- * The code is a short-lived secret proved via the two-phase handshake
- * (see `PondApiClient.pair` in services/api-client.ts) — it is never sent over
- * the wire, and must never be logged either.
- */
+import { normalizeHttpsUrl, validPin, type ConnectionProfile } from './connection';
+import i18n from '@/services/i18n';
 
 export interface PairingPayload {
   /** Base URL of the pond server, e.g. http://gooses-mac.local:4000 */
   serverUrl: string;
+  pin: string;
+  profile: ConnectionProfile;
   /**
    * The same server by its LAN address, when the QR carried one.
    *
@@ -45,7 +30,7 @@ export interface PairingPayload {
 
 export class InvalidPairingCodeError extends Error {
   constructor() {
-    super('This QR code isn’t a valid Goose In A Pond pairing code.');
+    super(i18n.t('pairing.invalid'));
     this.name = 'InvalidPairingCodeError';
   }
 }
@@ -70,35 +55,66 @@ export function looksLikeMatterSetupCode(raw: string): boolean {
   return /^\d{11}$|^\d{21}$/.test(trimmed.replace(/[\s-]/g, ''));
 }
 
+/**
+ * As above, plus the bare 8-digit passcode, for a code somebody types.
+ *
+ * The passcode is deliberately absent from the scannable forms: it is printed
+ * beside the QR, never inside one, and treating it as scannable would mean any
+ * eight digits on a label read as a device to commission. Typed, it is
+ * unambiguous, and the controller accepts it -- `parse_setup_code` in
+ * `pond-core/src/user_data/ports/device_commissioning.rs` maps it to
+ * `SetupCode::Passcode`.
+ *
+ * Loose on purpose, like its sibling: the controller remains the authority on
+ * what actually decodes, and this only decides whether the button is live.
+ */
+export function looksLikeTypedSetupCode(raw: string): boolean {
+  return looksLikeMatterSetupCode(raw) || /^\d{8}$/.test(raw.trim().replace(/[\s-]/g, ''));
+}
+
+/**
+ * Whether this text is a Pond pairing payload, without throwing.
+ *
+ * For telling somebody which of the two QR codes they are holding, where the
+ * answer is a sentence rather than a payload and a `try` around a parse would
+ * read as though the parse mattered.
+ */
+export function isPairingPayload(raw: string): boolean {
+  try {
+    parsePairingPayload(raw);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /** Parses raw QR code text into a pairing payload. Throws `InvalidPairingCodeError` if malformed. */
 export function parsePairingPayload(raw: string): PairingPayload {
-  let url: URL;
   try {
-    url = new URL(raw.trim());
-  } catch {
-    throw new InvalidPairingCodeError();
-  }
-
-  const host = url.searchParams.get('host');
-  const port = url.searchParams.get('port');
-  const code = url.searchParams.get('code');
-  if (url.protocol !== 'pond:' || !host || !port || !code) {
-    throw new InvalidPairingCodeError();
-  }
-  // The wizard's manual entry enforces six digits, and a scanned code takes the
-  // same handshake — so it is checked in the same place rather than only where
-  // someone types it.
-  if (!/^\d{6}$/.test(code)) {
-    throw new InvalidPairingCodeError();
-  }
-
-  const ip = url.searchParams.get('ip');
-  const tailnet = url.searchParams.get('ts');
-  return {
-    serverUrl: `http://${host}:${port}`,
-    fallbackUrl: ip ? `http://${ip}:${port}` : undefined,
-    remoteUrl: tailnet ? `http://${tailnet}:${port}` : undefined,
-    host,
-    code,
-  };
+    const url = new URL(raw.trim());
+    const params = url.searchParams;
+    for (const field of ['v', 'scheme', 'host', 'port', 'code', 'pin', 'ip', 'ts']) {
+      if (params.getAll(field).length > 1) throw new InvalidPairingCodeError();
+    }
+    const host = params.get('host') ?? '';
+    const portText = params.get('port') ?? '';
+    const port = Number(portText);
+    const code = params.get('code') ?? '';
+    const pin = params.get('pin') ?? '';
+    if (url.protocol !== 'pond:' || url.hostname !== 'pair' || url.pathname || url.hash ||
+        params.get('v') !== '2' || params.get('scheme') !== 'https' || !validPin(pin) ||
+        !/^\d{6}$/.test(code) || !/^\d+$/.test(portText) || port < 1 || port > 65535) {
+      throw new InvalidPairingCodeError();
+    }
+    const origin = (name: string) => {
+      if (!/^[a-zA-Z0-9.:-]+$/.test(name)) throw new InvalidPairingCodeError();
+      return normalizeHttpsUrl(`https://${name.includes(':') ? `[${name}]` : name}:${port}`);
+    };
+    const serverUrl = origin(host);
+    const fallbackUrl = params.get('ip') ? origin(params.get('ip')!) : undefined;
+    const remoteUrl = params.get('ts') ? origin(params.get('ts')!) : undefined;
+    return { serverUrl, fallbackUrl, remoteUrl, host, code, pin,
+      profile: { version: 2, host, port, localUrls: [...new Set([fallbackUrl, serverUrl].filter((u): u is string => !!u))], remoteUrl },
+    };
+  } catch { throw new InvalidPairingCodeError(); }
 }

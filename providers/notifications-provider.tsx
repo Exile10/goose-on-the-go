@@ -1,3 +1,4 @@
+import { api } from '@/services/api-client';
 /**
  * NotificationsProvider — live server notifications for the paired Pond.
  *
@@ -30,7 +31,7 @@ import { AppState, type AppStateStatus } from 'react-native';
 
 import { getInstallId } from '@/services/install-id';
 import {
-  NotificationStream,
+  NotificationStream, NotificationDeduplicator,
   type ServerNotification,
 } from '@/services/notification-stream';
 import { registerPushToken, watchPushTokenRotation } from '@/services/push-token';
@@ -49,23 +50,55 @@ interface NotificationsContextValue {
 
 const NotificationsContext = createContext<NotificationsContextValue | null>(null);
 
+/** How long to wait before retrying a stream whose token refresh could not complete. */
+const AUTH_RETRY_MS = 30_000;
+
 export function NotificationsProvider({ children }: PropsWithChildren) {
-  const { serverUrl, token } = useServer();
+  const { serverUrl, token, online, recover, revoke } = useServer();
+  const deduplicator = useMemo(() => new NotificationDeduplicator(), []);
   const [notifications, setNotifications] = useState<ServerNotification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const streamRef = useRef<NotificationStream | null>(null);
 
   useEffect(() => {
-    if (!token) return;
+    if (!token || !serverUrl || !online) return;
     let cancelled = false;
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
 
     const startStream = async () => {
       const deviceId = await getInstallId();
-      if (cancelled) return;
+      if (cancelled || AppState.currentState !== 'active') return;
       const stream = new NotificationStream({
         baseUrl: serverUrl,
+        deduplicator,
         deviceId,
         token,
+        // Quiet, deliberately. A dropped stream is not evidence that the
+        // transport is down -- the endpoint it just failed against may be
+        // answering everything else perfectly -- and a loud recover publishes
+        // "Reconnecting" before it has looked. When the stream fails in a loop,
+        // as it does against a pond that has stopped accepting it, that is a
+        // banner alternating between reconnecting and whatever the probe found,
+        // several times a second. A quiet pass still switches endpoints if it
+        // needs to; it just does not narrate.
+        onDisconnect: () => { void recover(true); },
+        // A refused stream that a refresh cannot rescue is the Pond saying it
+        // no longer knows this phone. Reported rather than logged: it used to
+        // warn to the console and leave the stream reconnecting into the same
+        // 401, which is what made the banner alternate between connected and
+        // reconnecting for as long as the app was open.
+        onAuthFailure: () => {
+          void api
+            .refreshAuthentication()
+            .then((ok) => (ok ? void recover() : revoke()))
+            // A refresh that could not complete -- rate limited, Pond restarting,
+            // no network -- is not a refusal. Try the stream again later; a real
+            // refusal on that attempt still ends here as a revoke.
+            .catch(() => {
+              if (cancelled) return;
+              retryTimer = setTimeout(() => { retryTimer = null; if (!cancelled) void startStream(); }, AUTH_RETRY_MS);
+            });
+        },
         onNotification: (n) => {
           setNotifications((prev) => [n, ...prev].slice(0, MAX_KEPT));
           setUnreadCount((prev) => prev + 1);
@@ -107,12 +140,13 @@ export function NotificationsProvider({ children }: PropsWithChildren) {
 
     return () => {
       cancelled = true;
+      if (retryTimer) clearTimeout(retryTimer);
       sub.remove();
       stopTokenWatch();
       streamRef.current?.stop();
       streamRef.current = null;
     };
-  }, [serverUrl, token]);
+  }, [serverUrl, token, online, recover, deduplicator]);
 
   const markAllRead = useCallback(() => setUnreadCount(0), []);
 

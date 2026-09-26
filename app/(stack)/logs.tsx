@@ -13,7 +13,8 @@ import {
   ScrollView,
 } from 'react-native';
 
-import { GIcon } from '@/components/ui/g-icon';
+import { InkIcon } from '@jarida/ink/native';
+import type { InkTone } from '@jarida/ink';
 import { SAMPLE_LOGS, type LogEntry, type LogType } from '@/models/log';
 import { Grey, JaridaPurple, Brand, Semantic } from '@/constants/colors';
 import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
@@ -28,13 +29,20 @@ const LEVEL_COLORS: Record<string, string> = {
   error: Semantic.danger,
 };
 
+const LEVEL_TONES: Record<string, InkTone> = {
+  info: 'neutral',
+  warn: 'warning',
+  error: 'danger',
+};
+
 /** Log row */
 const LogRow = React.memo(function LogRow({ item }: { item: LogEntry }) {
   const levelColor = LEVEL_COLORS[item.level] ?? Grey[600];
+  const levelTone = LEVEL_TONES[item.level] ?? 'neutral';
   return (
     <View style={styles.logRow}>
       <View style={{ marginRight: Spacing.md, marginTop: 2 }}>
-        <GIcon name={item.icon} size={16} color={levelColor} />
+        <InkIcon name={item.icon} size={16} tone={levelTone} />
       </View>
       <View style={styles.logBody}>
         <Text style={[styles.logText, { color: levelColor === Semantic.danger ? Semantic.danger : Brand.charcoal }]}>

@@ -1,3 +1,5 @@
+import i18n from '@/services/i18n';
+import { normalizeHttpsUrl, pinPreview, validPin } from '@/models/connection';
 /**
  * PondPairingScreen — 4-step pairing wizard:
  *   0. Find the GIAP server: discovered over mDNS, scanned from the QR, or typed
@@ -7,7 +9,7 @@
  */
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { InkButton } from '@jarida/ink/native';
+import { InkButton, InkIcon } from '@jarida/ink/native';
 import {
   ActivityIndicator,
   Pressable,
@@ -18,38 +20,47 @@ import {
   View,
 } from 'react-native';
 
-import { useFocusEffect, useRouter } from 'expo-router';
-import { GIcon } from '@/components/ui/g-icon';
+import { Stack, useFocusEffect, useRouter } from 'expo-router';
 import { GKeyboardView } from '@/components/ui/g-keyboard-view';
 import { Grey, JaridaPurple, Brand, Semantic } from '@/constants/colors';
 import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
 import { Spacing } from '@/constants/spacing';
 import { Radii } from '@/constants/radii';
-import { ApiError, api } from '@/services/api-client';
+import { ApiError } from '@/services/api-client';
 import { useServer } from '@/providers/server-provider';
 import { getInstallId } from '@/services/install-id';
 import { takePairingPayload } from '@/services/pairing-handoff';
-import { findPondByHost, type DiscoveredPond } from '@/services/discovery';
+import { findPondAt, type DiscoveredPond } from '@/services/discovery';
 import { useDiscovery } from '@/view-models/use-discovery';
+import { describeApiError } from '@/view-models/describe-error';
 
 type Step = 0 | 1 | 2 | 3;
-const STEP_LABELS = ['Find Pond', 'Pairing Code', 'Name Device', 'Complete'];
+const STEPS = ['find', 'code', 'name', 'complete'] as const;
 
-/** The port from a normalised base URL, defaulting to http's 80 as URL does. */
-function portOf(url: string): number {
-  const parsed = new URL(url);
-  return Number(parsed.port) || 80;
+/**
+ * A step's label, one literal key per branch, as the Memories tabs do: a key assembled at runtime
+ * is invisible to services/__tests__/i18n.test.ts, and the exhaustive switch makes TypeScript fail
+ * if a step is added without one. These were the one piece of pairing copy the i18n rule could not
+ * see, because it sat in an all-caps constant.
+ */
+function stepLabel(step: (typeof STEPS)[number]): string {
+  switch (step) {
+    case 'find': return i18n.t('pairing.stepFind');
+    case 'code': return i18n.t('pairing.stepCode');
+    case 'name': return i18n.t('pairing.stepName');
+    case 'complete': return i18n.t('pairing.stepComplete');
+  }
 }
 
 /** Step indicator */
 function StepIndicator({ current }: { current: Step }) {
   return (
     <View style={styles.stepRow}>
-      {STEP_LABELS.map((label, i) => {
+      {STEPS.map((step, i) => {
         const isActive = i === current;
         const isDone = i < current;
         return (
-          <View key={label} style={styles.stepItem}>
+          <View key={step} style={styles.stepItem}>
             <View
               style={[
                 styles.stepDot,
@@ -58,7 +69,7 @@ function StepIndicator({ current }: { current: Step }) {
               ]}
             >
               {isDone ? (
-                <GIcon name="check" size={14} color={Brand.white} />
+                <InkIcon name="check" size={14} />
               ) : (
                 <Text style={[styles.stepNumber, isActive && styles.stepNumberActive]}>
                   {i + 1}
@@ -66,7 +77,7 @@ function StepIndicator({ current }: { current: Step }) {
               )}
             </View>
             <Text style={[styles.stepLabel, isActive && styles.stepLabelActive]}>
-              {label}
+              {stepLabel(step)}
             </Text>
           </View>
         );
@@ -84,8 +95,8 @@ function StepIndicator({ current }: { current: Step }) {
 function ScanLink({ onPress }: { onPress: () => void }) {
   return (
     <Pressable onPress={onPress} hitSlop={8} style={styles.scanLink}>
-      <GIcon name="camera" size={16} color={JaridaPurple[500]} />
-      <Text style={styles.scanLinkText}>Scan QR code instead</Text>
+      <InkIcon name="camera" size={16} tone="brand" />
+      <Text style={styles.scanLinkText}>{i18n.t('pairing.scanInstead')}</Text>
     </Pressable>
   );
 }
@@ -98,19 +109,8 @@ function ScanLink({ onPress }: { onPress: () => void }) {
  * Pond on the LAN actually serves.
  */
 export function normalizeServerUrl(raw: string): string | null {
-  const trimmed = raw.trim();
-  if (!trimmed) return null;
-
-  const withScheme = /^https?:\/\//i.test(trimmed) ? trimmed : `http://${trimmed}`;
-  let parsed: URL;
-  try {
-    parsed = new URL(withScheme);
-  } catch {
-    return null;
-  }
-  if (!parsed.hostname) return null;
-
-  return `${parsed.protocol}//${parsed.host}`.replace(/\/+$/, '');
+  try { return normalizeHttpsUrl(raw.trim().includes('://') ? raw.trim() : `https://${raw.trim()}`); }
+  catch { return null; }
 }
 
 /**
@@ -151,77 +151,43 @@ function DiscoverStep({
   onManual,
   onScan,
 }: {
-  onNext: (url: string) => void;
+  onNext: (url: string, pin?: string) => void;
   onManual: () => void;
   onScan: () => void;
 }) {
   const { data, error, actions } = useDiscovery();
-  const [picking, setPicking] = useState<string | null>(null);
-  const [pickError, setPickError] = useState<string | null>(null);
-
-  // An advertisement is not a running server. mDNS records outlive the process
-  // that registered them, so a restarted hub leaves an entry that resolves and
-  // answers nothing — probe before advancing, exactly as manual entry does.
-  const pick = useCallback(
-    async (pond: DiscoveredPond) => {
-      setPicking(pond.id);
-      setPickError(null);
-      api.setBaseUrl(pond.url);
-      const { ok } = await api.health();
-      setPicking(null);
-
-      if (!ok) {
-        setPickError(
-          `${pond.name} is advertising itself but did not answer at ${pond.address}:${pond.port}. It may have been restarted — search again.`,
-        );
-        return;
-      }
-      onNext(pond.url);
-    },
-    [onNext],
-  );
+  // The advertisement already carried a pin, so hand it on rather than making
+  // the next step browse for the same record again. It is still only a claim:
+  // the next step has the user check it against the Pond's own screen.
+  const pick = (pond: DiscoveredPond) => onNext(pond.url, pond.pin);
 
   return (
     <StepBody>
       {data.phase === 'searching' ? (
         <ActivityIndicator color={JaridaPurple[500]} />
       ) : (
-        <GIcon name="search" size={28} color={JaridaPurple[500]} />
+        <InkIcon name="search" size={28} tone="brand" />
       )}
 
       <Text style={styles.stepTitle}>
-        {data.phase === 'searching' ? 'Looking for your Pond' : 'Connect to GIAP'}
+        {data.phase === 'searching' ? i18n.t('pairing.searchingTitle') : i18n.t('pairing.connectTitle')}
       </Text>
 
       {data.phase === 'searching' ? (
-        <Text style={styles.stepDesc}>Searching this Wi-Fi network.</Text>
+        <Text style={styles.stepDesc}>{i18n.t('pairing.searchingDesc')}</Text>
       ) : null}
 
       {data.phase === 'empty' ? (
-        <Text style={styles.stepDesc}>
-          No Pond answered on this network. Check that it is running and that this phone is on
-          the same Wi-Fi, or enter its address below.
-        </Text>
+        <Text style={styles.stepDesc}>{i18n.t('pairing.noneFound')}</Text>
       ) : null}
 
       {data.phase === 'failed' ? (
-        <Text style={styles.stepError}>
-          {error} You can still enter the address by hand.
-        </Text>
+        <Text style={styles.stepError}>{i18n.t('pairing.searchFailed', { error })}</Text>
       ) : null}
 
       {data.ponds.map((pond) => (
-        <Pressable
-          key={pond.id}
-          style={styles.pondRow}
-          disabled={picking !== null}
-          onPress={() => void pick(pond)}
-        >
-          {picking === pond.id ? (
-            <ActivityIndicator size="small" color={JaridaPurple[500]} />
-          ) : (
-            <GIcon name="wifi" size={18} color={JaridaPurple[500]} />
-          )}
+        <Pressable key={pond.id} style={styles.pondRow} onPress={() => pick(pond)}>
+          <InkIcon name="wifi" size={18} tone="brand" />
           <View style={styles.pondInfo}>
             <Text style={styles.pondName} numberOfLines={1}>
               {pond.name}
@@ -234,34 +200,75 @@ function DiscoverStep({
         </Pressable>
       ))}
 
-      {pickError ? <Text style={styles.stepError}>{pickError}</Text> : null}
-
       {data.phase !== 'searching' ? (
         <InkButton variant="quiet" onPress={actions.retry}>
-          Search again
+          {i18n.t('pairing.searchAgain')}
         </InkButton>
       ) : null}
 
       <Pressable onPress={onManual} hitSlop={8} style={styles.scanLink}>
-        <Text style={styles.scanLinkText}>Enter address manually</Text>
+        <Text style={styles.scanLinkText}>{i18n.t('pairing.enterManually')}</Text>
       </Pressable>
       <ScanLink onPress={onScan} />
     </StepBody>
   );
 }
 
+/**
+ * Ask the network for the pin of the Pond at `origin`, so the fingerprint field
+ * does not have to be typed.
+ *
+ * Only the Pond's own advertisement is consulted, and only when the address and
+ * port both match what was typed. Resolves null when nothing answers, which is
+ * what a network that filters multicast looks like and what a Pond running a
+ * server older than the `pin` TXT record looks like; the caller asks for the
+ * fingerprint by hand in both cases.
+ *
+ * A pin learned this way is only a claim. mDNS is unauthenticated, so anything
+ * on this network can answer with its own key -- and the handshake cannot catch
+ * that: whoever holds the pin terminates TLS, receives the phone's proof, and
+ * can recover a six-digit code from it offline in about a second, then forge the
+ * Pond's half. So the user confirms the pin against the Pond's own dashboard
+ * before it is used (see ServerStep), the out-of-band check that a QR scan or a
+ * typed fingerprint already is.
+ */
+async function discoverFingerprint(origin: string): Promise<string | null> {
+  const { hostname, port } = new URL(origin);
+  const found = await findPondAt(hostname, Number(port) || 443);
+  return found?.pin ?? null;
+}
+
 function ServerStep({
   initial,
+  initialPin,
   onNext,
   onScan,
 }: {
   initial: string;
-  onNext: (url: string) => void;
+  /** The pin discovery already learned for `initial`, when it had one. */
+  initialPin: string;
+  onNext: (url: string, pin: string) => Promise<void>;
   onScan: () => void;
 }) {
+  const [pin, setPin] = useState(initialPin);
+  // A pin that came off the network rather than from the user must be confirmed
+  // against the Pond's screen before it is trusted. See discoverFingerprint.
+  const [pinFromNetwork, setPinFromNetwork] = useState(!!initialPin);
+  const [confirming, setConfirming] = useState<{ url: string; pin: string } | null>(null);
   const [url, setUrl] = useState(initial);
   const [checking, setChecking] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /**
+   * Whether to ask for the fingerprint at all.
+   *
+   * Not asked by default, because on a Pond that publishes its pin nobody
+   * should have to know what a fingerprint is. An empty field with that label
+   * on it reads as required however the hint under it is worded, so the field
+   * appears only once the lookup has actually failed and there is nothing else
+   * left to try. Arriving with a pin already in hand -- picked off the
+   * discovery list -- never asks.
+   */
+  const [askForPin, setAskForPin] = useState(false);
 
   // Reach the Pond before advancing. Without this the address is only exercised
   // three steps later, during the handshake, where a typo surfaces as a failed
@@ -269,35 +276,86 @@ function ServerStep({
   const submit = useCallback(async () => {
     const normalized = normalizeServerUrl(url);
     if (!normalized) {
-      setError('That does not look like a server address. Try http://pond.local:4000');
+      setError(i18n.t('pairing.invalid'));
       return;
     }
-
-    setChecking(true);
-    setError(null);
-    api.setBaseUrl(normalized);
-    const { ok } = await api.health();
-    setChecking(false);
-
-    if (!ok) {
-      setError(
-        `No Pond answered at ${normalized}. Check the address, and that the phone is on the same network.`,
-      );
-      return;
+    setChecking(true); setError(null);
+    try {
+      // No fingerprint in hand is a request to look one up, not a mistake: the
+      // Pond publishes its own pin beside the service phones already discover
+      // it by, so the only things anybody should have to read off a screen are
+      // the address and the six-digit code.
+      let fingerprint = pin.trim();
+      if (!fingerprint) {
+        const discovered = await discoverFingerprint(normalized);
+        if (!discovered) {
+          // Only now is there a question worth putting to the user. A Pond
+          // running a server older than the pin record looks like this, and so
+          // does a network that filters multicast.
+          setAskForPin(true);
+          setError(i18n.t('pairing.fingerprintMissing'));
+          return;
+        }
+        setPin(discovered);
+        setPinFromNetwork(true);
+        fingerprint = discovered;
+      }
+      if (!validPin(fingerprint)) {
+        setError(i18n.t('pairing.invalid'));
+        return;
+      }
+      if (pinFromNetwork || fingerprint !== pin.trim()) {
+        setConfirming({ url: normalized, pin: fingerprint });
+        return;
+      }
+      await onNext(normalized, fingerprint);
     }
-    onNext(normalized);
-  }, [url, onNext]);
+    catch (error) { setError(error instanceof Error ? error.message : i18n.t('pairing.failed')); }
+    finally { setChecking(false); }
+  }, [url, pin, pinFromNetwork, onNext]);
+
+  const confirmMatch = useCallback(async () => {
+    if (!confirming) return;
+    setChecking(true); setError(null);
+    try { await onNext(confirming.url, confirming.pin); }
+    catch (error) { setError(error instanceof Error ? error.message : i18n.t('pairing.failed')); }
+    finally { setChecking(false); setConfirming(null); }
+  }, [confirming, onNext]);
+
+  const rejectMatch = useCallback(() => {
+    setConfirming(null);
+    setPin('');
+    setPinFromNetwork(false);
+    setAskForPin(true);
+    setError(i18n.t('pairing.fingerprintMismatch'));
+  }, []);
+
+  if (confirming) {
+    return (
+      <StepBody>
+        <InkIcon name="shield" size={28} tone="brand" />
+        <Text style={styles.stepTitle}>{i18n.t('pairing.fingerprintConfirmTitle')}</Text>
+        <Text style={styles.stepDesc}>{i18n.t('pairing.fingerprintConfirmDesc')}</Text>
+        <Text style={styles.pinPreview} selectable>{pinPreview(confirming.pin)}</Text>
+        <Text style={styles.stepDesc}>{i18n.t('pairing.fingerprintConfirmWhy')}</Text>
+        {error ? <Text style={styles.stepError}>{error}</Text> : null}
+        <InkButton variant="primary" disabled={checking} onPress={confirmMatch}>
+          {checking ? i18n.t('pairing.fingerprintSearching') : i18n.t('pairing.fingerprintMatches')}
+        </InkButton>
+        <InkButton variant="quiet" disabled={checking} onPress={rejectMatch}>
+          {i18n.t('pairing.fingerprintDiffers')}
+        </InkButton>
+      </StepBody>
+    );
+  }
 
   return (
     <StepBody>
-      <GIcon name="search" size={28} color={JaridaPurple[500]} />
-      <Text style={styles.stepTitle}>Connect to GIAP</Text>
-      <Text style={styles.stepDesc}>
-        Enter the URL of your Goose In A Pond server — shown in the dashboard
-        banner on the host machine.
-      </Text>
+      <InkIcon name="search" size={28} tone="brand" />
+      <Text style={styles.stepTitle}>{i18n.t('pairing.connectTitle')}</Text>
+      <Text style={styles.stepDesc}>{i18n.t('pairing.connectDesc')}</Text>
       <View style={styles.inputGroup}>
-        <Text style={styles.inputLabel}>Server URL</Text>
+        <Text style={styles.inputLabel}>{i18n.t('pairing.serverUrl')}</Text>
         <TextInput
           style={styles.textInput}
           value={url}
@@ -305,20 +363,29 @@ function ServerStep({
             setUrl(t);
             setError(null);
           }}
-          placeholder="http://pond.local:4000"
+          placeholder="https://pond.local:4443"
           placeholderTextColor={Grey[400]}
           autoCapitalize="none"
           autoCorrect={false}
           editable={!checking}
         />
       </View>
+      {askForPin ? (
+        <View style={styles.inputGroup}>
+          <Text style={styles.inputLabel}>{i18n.t('pairing.fingerprint')}</Text>
+          <TextInput style={styles.textInput} value={pin}
+            onChangeText={(t) => { setPin(t); setPinFromNetwork(false); setError(null); }}
+            placeholder="sha256/..." autoCapitalize="none" autoCorrect={false} editable={!checking} />
+          <Text style={styles.stepDesc}>{i18n.t('pairing.fingerprintHint')}</Text>
+        </View>
+      ) : null}
       {error ? <Text style={styles.stepError}>{error}</Text> : null}
       <InkButton
         variant="primary"
         disabled={!url.trim() || checking}
         onPress={submit}
       >
-        {checking ? 'Checking…' : 'Continue'}
+        {checking ? i18n.t('pairing.fingerprintSearching') : i18n.t('pairing.continueAction')}
       </InkButton>
       <ScanLink onPress={onScan} />
     </StepBody>
@@ -339,14 +406,11 @@ function PairingCodeStep({
   const valid = /^\d{6}$/.test(code);
   return (
     <StepBody>
-      <GIcon name="wifi" size={28} color={JaridaPurple[500]} />
-      <Text style={styles.stepTitle}>Enter Pairing Code</Text>
-      <Text style={styles.stepDesc}>
-        The 6-digit code is shown on the GIAP host&apos;s dashboard or terminal
-        when the server starts. It expires after 10 minutes.
-      </Text>
+      <InkIcon name="wifi" size={28} tone="brand" />
+      <Text style={styles.stepTitle}>{i18n.t('pairing.codeTitle')}</Text>
+      <Text style={styles.stepDesc}>{i18n.t('pairing.codeDesc')}</Text>
       <View style={styles.inputGroup}>
-        <Text style={styles.inputLabel}>Code</Text>
+        <Text style={styles.inputLabel}>{i18n.t('pairing.codeLabel')}</Text>
         <TextInput
           style={styles.textInput}
           value={code}
@@ -362,7 +426,7 @@ function PairingCodeStep({
         disabled={!valid}
         onPress={() => onNext(code)}
       >
-        Continue
+        {i18n.t('pairing.continueAction')}
       </InkButton>
       <ScanLink onPress={onScan} />
     </StepBody>
@@ -374,19 +438,16 @@ function NameStep({ onNext }: { onNext: (name: string) => void }) {
   const [name, setName] = useState('');
   return (
     <StepBody>
-      <GIcon name="edit" size={28} color={JaridaPurple[500]} />
-      <Text style={styles.stepTitle}>Name This Phone</Text>
-      <Text style={styles.stepDesc}>
-        This name shows up in the GIAP devices list — pick something you&apos;ll
-        recognize.
-      </Text>
+      <InkIcon name="edit" size={28} tone="brand" />
+      <Text style={styles.stepTitle}>{i18n.t('pairing.nameTitle')}</Text>
+      <Text style={styles.stepDesc}>{i18n.t('pairing.nameDesc')}</Text>
       <View style={styles.inputGroup}>
-        <Text style={styles.inputLabel}>Device Name</Text>
+        <Text style={styles.inputLabel}>{i18n.t('pairing.nameLabel')}</Text>
         <TextInput
           style={styles.textInput}
           value={name}
           onChangeText={setName}
-          placeholder="e.g., Emmanuel's iPhone"
+          placeholder={i18n.t('pairing.namePlaceholder')}
           placeholderTextColor={Grey[400]}
         />
       </View>
@@ -395,7 +456,7 @@ function NameStep({ onNext }: { onNext: (name: string) => void }) {
         disabled={!name.trim()}
         onPress={() => onNext(name.trim())}
       >
-        Pair Device
+        {i18n.t('pairing.pairDevice')}
       </InkButton>
     </StepBody>
   );
@@ -431,87 +492,105 @@ function describeTransportFailure(e: unknown): string {
     if (e.status === 429) {
       const wait = e.retryAfterSecs;
       return wait
-        ? `Your Pond is rate-limiting pairing attempts. Wait ${wait} second${wait === 1 ? '' : 's'} and try again.`
-        : 'Your Pond is rate-limiting pairing attempts. Wait a minute and try again.';
+        ? i18n.t('pairingErrors.rateLimited', { count: wait, plural: wait === 1 ? '' : 's' })
+        : i18n.t('pairingErrors.rateLimitedNoHint');
     }
     if (e.status >= 500) {
-      return 'Your Pond returned an error while pairing. Check that it is still running, then try again.';
+      return i18n.t('pairingErrors.serverError');
     }
-    return `Your Pond refused the pairing request (HTTP ${e.status}).`;
+    // The wizard runs before there is a session to revoke, so a refusal here
+    // is about this attempt and the screen has to say so itself.
+    return (
+      describeApiError(e) ??
+      i18n.t('pairingErrors.refused')
+    );
   }
-  return 'Could not reach your Pond. Check that the phone is on the same network and the server is running.';
+  return i18n.t('pairingErrors.unreachable');
 }
 
 function explainRejection(reason: string | null): string {
   switch (reason) {
     case 'invalid_mac':
     case 'bad_mac_hex':
-      return 'That pairing code did not match. Check the six digits on your Pond and try again \u2014 a wrong code costs nothing but this attempt.';
+      return i18n.t('pairingErrors.badCode');
     case 'challenge_expired':
     case 'challenge_used':
     case 'unknown_challenge':
-      return 'This attempt took too long \u2014 the server holds a challenge for only 60 seconds. Enter the same code again; you do not need a new one.';
+      return i18n.t('pairingErrors.expired');
     case 'no_active_pairing_code':
-      return 'Your Pond has no pairing code right now. Codes last 10 minutes \u2014 open the dashboard on the host machine to show a fresh one.';
+      return i18n.t('pairingErrors.noCode');
     default:
-      return 'The server rejected the pairing attempt. Double-check the code and try again.';
+      return i18n.t('pairingErrors.rejected');
   }
 }
 
 function CompleteStep({
   state,
   reason,
-  onDone,
   onRetry,
 }: {
-  state: 'pending' | 'ok' | 'error';
+  state: 'pending' | 'error';
   reason: string | null;
-  onDone: () => void;
   onRetry: () => void;
 }) {
   if (state === 'pending') {
     return (
       <StepBody>
         <ActivityIndicator size="large" color={JaridaPurple[500]} />
-        <Text style={styles.stepTitle}>Pairing…</Text>
-        <Text style={styles.stepDesc}>
-          Verifying the code and exchanging tokens with your GIAP server.
-        </Text>
+        <Text style={styles.stepTitle}>{i18n.t('pairing.inProgress')}</Text>
+        <Text style={styles.stepDesc}>{i18n.t('pairing.inProgressDesc')}</Text>
       </StepBody>
     );
   }
   if (state === 'error') {
     return (
       <StepBody>
-        <GIcon name="x" size={28} color={Semantic.danger} />
-        <Text style={styles.stepTitle}>Pairing failed</Text>
+        <InkIcon name="x" size={28} tone="danger" />
+        <Text style={styles.stepTitle}>{i18n.t('pairing.failedTitle')}</Text>
         <Text style={styles.stepDesc}>
-          {reason ?? 'The server rejected the pairing attempt. Double-check the code and try again.'}
+          {reason ?? i18n.t('pairing.failedDesc')}
         </Text>
         <InkButton variant="primary" onPress={onRetry}>
-          Try again
+          {i18n.t('pairing.tryAgain')}
         </InkButton>
       </StepBody>
     );
   }
+  // There is no success screen: pairing leaves for Home the moment it
+  // succeeds, so the only states this renders are the wait and the failure.
   return (
     <StepBody>
-      <GIcon name="check" size={28} color={Semantic.success} />
-      <Text style={styles.stepTitle}>All Set!</Text>
-      <Text style={styles.stepDesc}>
-        Your phone is paired. The session token is stored securely on this
-        device and used for every API call.
-      </Text>
-      <InkButton variant="primary" onPress={onDone}>
-        Go to Home
-      </InkButton>
+      <ActivityIndicator size="large" color={JaridaPurple[500]} />
+      <Text style={styles.stepTitle}>{i18n.t('pairing.inProgress')}</Text>
     </StepBody>
   );
 }
 
 export default function PondPairingScreen() {
   const router = useRouter();
-  const { serverUrl, setServerUrl, pair } = useServer();
+  const { serverUrl, stagePairing, cancelPairing, pair, profileId } = useServer();
+  /**
+   * Whether this screen was reached with somewhere to go back to, decided once.
+   *
+   * Reached from inside the app to change or repair a pond, there is; reached
+   * because there is no pond -- a fresh install, a sign out, or the Pond revoking
+   * this phone -- the tab layout redirected here precisely because the app cannot
+   * be used, and a back arrow would offer a way to a screen whose every request
+   * fails.
+   *
+   * Captured at mount and never revised, which is the whole point. Binding the
+   * header option to the live value crashed the app on every completed pairing:
+   * the profile appears and the redirect starts in the same frame, and
+   * react-native-screens re-evaluated canNavigateBack on a fragment that was no
+   * longer in a stack -- IllegalStateException on the main thread, from
+   * ScreenStackHeaderConfig.onUpdate. The condition was right; changing it while
+   * the screen was being torn down was not.
+   */
+  const [reachedWithHistory] = useState(() => Boolean(profileId));
+  const [manualUrl, setManualUrl] = useState(serverUrl);
+  const [manualPin, setManualPin] = useState('');
+  const [pairingError, setPairingError] = useState<string | null>(null);
+  useEffect(() => () => { void cancelPairing(); }, [cancelPairing]);
   // Stable per-install client_id, hydrated from SecureStorage on mount. The
   // server uses this to recognize a returning device and revoke prior tokens
   // instead of creating a duplicate entry on every re-pair.
@@ -547,56 +626,18 @@ export default function PondPairingScreen() {
       const scanned = takePairingPayload();
       if (!scanned) return;
 
-      // Order matters: the mDNS name first because it survives a DHCP lease,
-      // the LAN address next because Android cannot resolve that name, and the
-      // tailnet address last because at home the LAN hop is direct and needs no
-      // VPN running. Away from home it is the only one that answers.
-      const candidates = [scanned.serverUrl, scanned.fallbackUrl, scanned.remoteUrl]
-        .map((u) => (u ? normalizeServerUrl(u) : null))
-        .filter((u): u is string => u !== null);
-      if (candidates.length === 0) return;
-
-      void (async () => {
-        let reached: string | null = null;
-        for (const candidate of candidates) {
-          api.setBaseUrl(candidate);
-          if ((await api.health()).ok) {
-            reached = candidate;
-            break;
-          }
-        }
-
-        // Nothing in the QR was reachable. That is the ordinary outcome on
-        // Android for a Pond whose server predates the `ip=` fix, or a desktop
-        // build packaged before it: the QR carries only a `.local` name, which
-        // this phone cannot resolve, and the code in it is perfectly good.
-        // Discovery already knows that hub's numeric address, so look it up by
-        // the name the QR did give rather than sending the user back a step.
-        if (!reached) {
-          const found = await findPondByHost(scanned.host, portOf(candidates[0]));
-          if (found) {
-            api.setBaseUrl(found.url);
-            if ((await api.health()).ok) reached = found.url;
-          }
-        }
-
-        // Fall back to showing the first candidate, so an unreachable Pond
-        // drops the user on the step that owns the address with something
-        // filled in, rather than failing later as a rejected code.
-        const chosen = reached ?? candidates[0];
-        api.setBaseUrl(chosen);
-        setServerUrl(chosen);
-        setCode(scanned.code);
-        // A scan that could not be reached returns to step 0 with the address
-        // already filled in, so show the field holding it rather than starting
-        // a search that would discard what the QR provided.
-        if (!reached) setManualEntry(true);
-        setStep(reached ? 2 : 0);
-      })();
-    }, [setServerUrl]),
+      let cancelled = false;
+      setPairingError(null);
+      void stagePairing(scanned.profile, scanned.pin).then(() => {
+        if (!cancelled) { setCode(scanned.code); setStep(2); }
+      }).catch((error) => {
+        if (!cancelled) setPairingError(error instanceof Error ? error.message : i18n.t('pairing.failed'));
+      });
+      return () => { cancelled = true; };
+    }, [stagePairing]),
   );
   const [completionState, setCompletionState] =
-    useState<'pending' | 'ok' | 'error'>('pending');
+    useState<'pending' | 'error'>('pending');
   const [completionReason, setCompletionReason] = useState<string | null>(null);
 
   const runPair = useCallback(
@@ -613,7 +654,10 @@ export default function PondPairingScreen() {
           deviceName,
         });
         if (resp.accepted) {
-          setCompletionState('ok');
+          // Leave on success rather than waiting to be dismissed. The wizard
+          // has nothing left to say, and the remote access offer it used to
+          // push you onto is a dismissible card on Home now.
+          router.replace('/(tabs)');
         } else {
           setCompletionState('error');
           setCompletionReason(explainRejection(resp.rejection_reason));
@@ -622,36 +666,40 @@ export default function PondPairingScreen() {
         // A throw means the request never reached the verifier, so there is no
         // rejection_reason to explain — only an HTTP or transport failure.
         setCompletionState('error');
-        setCompletionReason(describeTransportFailure(e));
+        setCompletionReason(e instanceof ApiError && e.status === 403 ? i18n.t('pairing.lan') : describeTransportFailure(e));
       }
     },
-    [code, pair],
+    [code, pair, router],
   );
 
-  const onServerNext = useCallback(
-    (url: string) => {
-      setServerUrl(url);
-      setStep(1);
-    },
-    [setServerUrl],
-  );
+  const onServerNext = useCallback(async (url: string, pin: string) => {
+    const parsed = new URL(url);
+    await stagePairing({ version: 2, host: parsed.hostname, port: Number(parsed.port) || 443, localUrls: [url] }, pin);
+    setManualUrl(url); setStep(1);
+  }, [stagePairing]);
 
   const onCodeNext = useCallback((nextCode: string) => {
     setCode(nextCode);
     setStep(2);
   }, []);
 
-  const done = useCallback(() => router.back(), [router]);
 
   return (
     <GKeyboardView style={styles.container}>
+      <Stack.Screen options={{ headerBackVisible: reachedWithHistory, gestureEnabled: reachedWithHistory }} />
       <StepIndicator current={step} />
+      {pairingError ? <Text style={styles.stepError}>{pairingError}</Text> : null}
       {step === 0 &&
         (manualEntry ? (
-          <ServerStep initial={serverUrl} onNext={onServerNext} onScan={openScanner} />
+          <ServerStep
+            initial={manualUrl}
+            initialPin={manualPin}
+            onNext={onServerNext}
+            onScan={openScanner}
+          />
         ) : (
           <DiscoverStep
-            onNext={onServerNext}
+            onNext={(url, pin) => { setManualUrl(url); setManualPin(pin ?? ''); setManualEntry(true); }}
             onManual={() => setManualEntry(true)}
             onScan={openScanner}
           />
@@ -664,7 +712,6 @@ export default function PondPairingScreen() {
         <CompleteStep
           state={completionState}
           reason={completionReason}
-          onDone={done}
           onRetry={() => setStep(1)}
         />
       )}
@@ -735,6 +782,13 @@ const styles = StyleSheet.create({
     color: Grey[500],
     textAlign: 'center',
     lineHeight: FontSize.base * 1.5,
+  },
+  pinPreview: {
+    fontFamily: FontFamily.mono,
+    fontSize: FontSize.lg,
+    color: Brand.charcoal,
+    textAlign: 'center',
+    letterSpacing: 1,
   },
   stepError: {
     fontFamily: FontFamily.body,

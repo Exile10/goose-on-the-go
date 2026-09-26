@@ -16,7 +16,7 @@ Inspired by Alexa, Google Home, and Claude Mobile -- combining smart home contro
 - AI Models, Memories, Activity Logs, Schedule
 - App Integrations (MCP), MCP Servers
 - Photos & Videos, Photo Upload/Analysis
-- Users, Biometric Data, Home Management
+- Users, Home Management
 - Backup, Restore to Pond, Privacy & Licenses
 - Pond Device Pairing wizard
 

@@ -170,6 +170,111 @@ export interface SessionMessage {
   liked?: boolean | null;
 }
 
+// ── Chat streaming ────────────────────────────────────────────
+
+/** Image attachment for a chat turn. `data` is raw base64 — no `data:...;base64,` prefix. */
+export interface ImageAttachment {
+  data: string;
+  mime_type: string;
+}
+
+/** Request body for `POST /chat/stream`. Only `message` is required server-side. */
+export interface ChatStreamRequest {
+  message: string;
+  session_id?: string;
+  images?: ImageAttachment[];
+  voice_mode?: boolean;
+  canvas_mode?: boolean;
+  tool_group_allowlist?: string[];
+  /**
+   * Detach this turn from the response body: it keeps running server-side
+   * when the client disconnects, and can be reattached through
+   * `GET /chat/runs/{run_id}/events`. Defaults to false server-side.
+   */
+  resumable?: boolean;
+}
+
+/**
+ * SSE frames pond-server's `/chat/stream` (and `/chat/runs/{id}/events`)
+ * actually emit.
+ *
+ * `done` and `error` carry no `type` field — check for those keys before
+ * switching on `type`.
+ *
+ * `seq` rides in the SSE `id:` field, not the JSON body — the api client
+ * stamps it on from the frame's `lastEventId` before handing it to `onFrame`.
+ * Only present on frames pushed onto a run's replay ring (i.e. not on
+ * `reattached` / `replay_gap` / `run_evicted`, which are subscriber-local).
+ */
+export type ChatStreamFrame =
+  | { type: 'text'; content: string; token?: string; seq?: number }
+  | { type: 'thinking'; content: string; seq?: number }
+  | { type: 'tool_call'; tool: string; id: string; input: unknown; seq?: number }
+  | {
+      type: 'tool_result';
+      tool: string;
+      id: string;
+      content: string;
+      ui?: { card_type?: string; data?: Record<string, unknown> };
+      seq?: number;
+    }
+  | { type: 'status'; content: string; seq?: number }
+  | { type: 'review_status'; content: string; seq?: number }
+  | { type: 'review_revision'; content: string; score?: number; rounds?: number; seq?: number }
+  | { type: 'tool_revision'; seq?: number }
+  | { type: 'turn_limit_reached'; max_turns: number; seq?: number }
+  | {
+      type: 'context_warning';
+      utilization_pct: number;
+      turns_remaining: number;
+      avg_growth_rate: number;
+      warning: string | null;
+      seq?: number;
+    }
+  | { type: 'subagent_progress'; task_id: string; role: string; status: string; detail?: string; seq?: number }
+  | { type: 'turn_stats'; seq?: number }
+  /** First frame of a resumable run — names the run so the client can persist it. */
+  | { type: 'run_started'; run_id: string; session_id: string; epoch: string; resumable: true; seq?: number }
+  /** First frame of a reattach response only; never appears on the original stream. */
+  | {
+      type: 'reattached';
+      run_id: string;
+      session_id: string;
+      from_seq: number;
+      replay_depth: number;
+      state: 'running' | 'finished' | 'failed' | 'cancelled';
+      epoch: string;
+    }
+  /** The ring rolled past what this client had — frames before `first_available_seq` are gone for good. */
+  | { type: 'replay_gap'; requested_after_seq: number; first_available_seq: number; advice: string }
+  /** The run handle was dropped from the registry while this client was attached (aged out, or the process restarted). */
+  | { type: 'run_evicted'; run_id: string; advice: string }
+  /** Non-terminal bookkeeping frame; the `done` frame with `interrupted:true` that follows is what actually ends the turn. */
+  | { type: 'cancelled'; run_id: string; at_seq: number; seq?: number }
+  | {
+      done: true;
+      session_id: string;
+      run_id?: string;
+      /** True when the turn was cancelled or timed out rather than finishing on its own. */
+      interrupted?: boolean;
+      model_role?: string;
+      model_name?: string;
+      usage?: { prompt_tokens: number; completion_tokens: number };
+      seq?: number;
+    }
+  | { error: string };
+
+/** Mirrors `GET /sessions/{id}/active-run` — what, if anything, the server is still driving. */
+export interface ActiveRun {
+  run_id: string;
+  session_id: string;
+  state: 'running' | 'finished' | 'failed' | 'cancelled';
+  started_at: string;
+  first_seq: number;
+  last_seq: number;
+  epoch: string;
+}
+
 export interface UsageSummary {
   total_prompt_tokens: number;
   total_completion_tokens: number;
@@ -372,35 +477,68 @@ export interface TranscribeResponse {
   text: string;
 }
 
-/**
- * Request body for POST /api/v1/chat/stream. Scoped to what the voice
- * pipeline needs — `feat/streaming-chat-v2` has a richer version of this
- * same request (images, canvas_mode, tool_group_allowlist, etc.); reconcile
- * the two when that branch merges.
- */
-export interface ChatStreamRequest {
-  message: string;
-  session_id?: string;
-  /** Disables `<think>` capture server-side and injects a spoken-answer system prompt. */
-  voice_mode: boolean;
-  /** Voice turns don't reattach after backgrounding — always false here. */
-  resumable: boolean;
-}
-
-/**
- * SSE frames pond-server's `/chat/stream` emits, scoped to the subset the
- * voice pipeline consumes (text tokens, tool calls, and turn end/error).
- */
-export type ChatStreamFrame =
-  | { type: 'text'; content: string }
-  | { type: 'tool_call'; tool: string; id: string }
-  | { done: true; session_id: string }
-  | { error: string };
-
 // ── Profiles ──────────────────────────────────────────────────
 
 export interface Profile {
   id: string;
   display_name: string;
   avatar_emoji: string;
+}
+
+/**
+ * `GET /api/v1/devices/self` -- this device, and the household member it is attributed to.
+ *
+ * The Pond reads the device off the token it issued at pairing; the phone never names itself.
+ * `profile: null` means nobody has claimed this device, which is the normal case: pairing
+ * happens before anyone says who they are. Display only -- it proves nothing to the Pond.
+ */
+export interface DeviceSelf {
+  device_id: string;
+  profile: { id: string; display_name: string } | null;
+}
+
+/**
+ * `GET /api/v1/weather` -- outdoor conditions where the Pond is configured to be.
+ *
+ * Temperatures are Celsius: the adapter asks open-meteo for `temperature_unit=celsius` and the
+ * field is `temperature_c` rounded. `{enabled: false}` means no location is configured, which
+ * is a setting, not a failure. Only the fields read here.
+ */
+export interface WeatherResponse {
+  enabled: boolean;
+  temp?: number;
+  location_name?: string;
+}
+
+/**
+ * `GET /api/v1/music/now-playing` -- a Spotify snapshot. `connected: false` is no account (or a
+ * refused network); `connected: true, playing: false` is the only genuine "nothing playing".
+ * `error` is set when Spotify answered and refused, in which case nothing here can be trusted.
+ */
+export interface NowPlayingResponse {
+  connected: boolean;
+  playing?: boolean;
+  track?: string;
+  artist?: string;
+  error?: string;
+}
+
+/**
+ * One entry of `GET /api/v1/schedules/upcoming`: the Pond's own `Schedule`, serialised as-is.
+ *
+ * Declared separately because it is not the shape `Schedule` above claims. The Pond sends
+ * `label` and `paused`; there is no `name`, no `enabled` and no top-level `prompt` on the wire.
+ * Only the fields read here.
+ */
+export interface UpcomingSchedule {
+  id: string;
+  label: string;
+  next_run: string | null;
+  paused: boolean;
+}
+
+/** `GET /api/v1/system/info` -- the Pond describing itself. Only the fields read here. */
+export interface SystemInfo {
+  hostname: string;
+  version?: string;
 }

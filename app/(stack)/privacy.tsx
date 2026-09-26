@@ -1,8 +1,10 @@
 /**
- * PrivacyScreen — Expandable privacy sections, data rights, licence list.
+ * PrivacyScreen — what happens to a household's data, what can be done from here, and what
+ * this app is built from. The content is in `constants/privacy.ts`, verified against the Pond.
  */
 
-import React, { useState, useCallback } from 'react';
+import React, { useState } from 'react';
+import { InkIcon } from '@jarida/ink/native';
 import {
   View,
   Text,
@@ -11,43 +13,12 @@ import {
   Pressable,
 } from 'react-native';
 
-import { GIcon } from '@/components/ui/g-icon';
-import { Grey, JaridaPurple, Brand, Semantic } from '@/constants/colors';
+import { Grey, JaridaPurple, Brand } from '@/constants/colors';
 import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
 import { Spacing } from '@/constants/spacing';
 import { Radii } from '@/constants/radii';
-
-interface PrivacySection {
-  id: string;
-  title: string;
-  icon: string;
-  content: string;
-}
-
-const PRIVACY_SECTIONS: PrivacySection[] = [
-  { id: 'data', title: 'Data Collection', icon: 'activity', content: 'Goose collects voice commands, device interactions, and usage patterns to improve your experience. All data is processed on-device via Pond when possible. Cloud processing is only used when explicitly enabled.' },
-  { id: 'storage', title: 'Data Storage', icon: 'server', content: 'Your data is stored locally on your Pond device with AES-256 encryption. Cloud backups are encrypted end-to-end. We never sell or share your personal data with third parties.' },
-  { id: 'sharing', title: 'Third-Party Sharing', icon: 'link', content: 'MCP integrations (Uber, Glovo, Spotify) only receive the minimum data needed to fulfill your requests. API keys are stored encrypted and never leave your device.' },
-  { id: 'voice', title: 'Voice Data', icon: 'mic', content: 'Voice recordings are processed locally by default. Recordings are not stored after transcription unless you enable voice history. Wake word detection runs entirely on-device.' },
-  { id: 'biometric', title: 'Biometric Data', icon: 'shield', content: 'Face and voice biometric templates are stored only on your Pond device. Biometric data is never uploaded to the cloud and cannot be reverse-engineered into images or audio.' },
-];
-
-const DATA_RIGHTS = [
-  'Download all your data',
-  'Delete all stored memories',
-  'Revoke third-party access',
-  'Opt out of analytics',
-  'Export conversation history',
-];
-
-const LICENSES = [
-  { name: 'React Native', license: 'MIT' },
-  { name: 'Expo', license: 'MIT' },
-  { name: 'Whisper', license: 'MIT' },
-  { name: 'Piper TTS', license: 'MIT' },
-  { name: 'llama.cpp', license: 'MIT' },
-  { name: 'react-native-svg', license: 'MIT' },
-];
+import i18n from '@/services/i18n';
+import { APP_LICENSES, DATA_RIGHT_KEYS, PRIVACY_SECTIONS, type PrivacySection } from '@/constants/privacy';
 
 /** Expandable section */
 function ExpandableSection({ section }: { section: PrivacySection }) {
@@ -59,15 +30,15 @@ function ExpandableSection({ section }: { section: PrivacySection }) {
     >
       <View style={styles.sectionHeader}>
         <View style={{ marginRight: Spacing.md }}>
-          <GIcon name={section.icon} size={16} color={JaridaPurple[500]} />
+          <InkIcon name={section.icon} size={16} tone="brand" />
         </View>
-        <Text style={styles.sectionTitle}>{section.title}</Text>
+        <Text style={styles.sectionTitle}>{i18n.t(section.titleKey)}</Text>
         <View style={expanded ? { transform: [{ rotate: '180deg' }] } : undefined}>
-          <GIcon name="chevron" size={16} color="#B5B5B5" />
+          <InkIcon name="chevron" size={16} tone="neutral" />
         </View>
       </View>
       {expanded && (
-        <Text style={styles.sectionContent}>{section.content}</Text>
+        <Text style={styles.sectionContent}>{i18n.t(section.bodyKey)}</Text>
       )}
     </Pressable>
   );
@@ -81,27 +52,28 @@ export default function PrivacyScreen() {
       showsVerticalScrollIndicator={false}
     >
       {/* Privacy sections */}
-      <Text style={styles.label}>PRIVACY POLICY</Text>
+      <Text style={styles.label}>{i18n.t('privacy.policyLabel')}</Text>
       {PRIVACY_SECTIONS.map((s) => (
         <ExpandableSection key={s.id} section={s} />
       ))}
 
       {/* Data rights */}
-      <Text style={styles.label}>YOUR DATA RIGHTS</Text>
+      <Text style={styles.label}>{i18n.t('privacy.rightsLabel')}</Text>
       <View style={styles.rightsCard}>
-        {DATA_RIGHTS.map((right, i) => (
-          <Pressable key={i} style={styles.rightRow}>
-            <Text style={styles.rightText}>{right}</Text>
-            <GIcon name="chevron" size={16} color={Grey[400]} />
-          </Pressable>
+        {/* Statements, not buttons. These rows used to be Pressables with a chevron and no
+            handler, offering five rights of which none worked. */}
+        {DATA_RIGHT_KEYS.map((key) => (
+          <View key={key} style={styles.rightRow}>
+            <Text style={styles.rightText}>{i18n.t(key)}</Text>
+          </View>
         ))}
       </View>
 
       {/* Licenses */}
-      <Text style={styles.label}>OPEN SOURCE LICENSES</Text>
+      <Text style={styles.label}>{i18n.t('privacy.licensesLabel')}</Text>
       <View style={styles.licensesCard}>
-        {LICENSES.map((l, i) => (
-          <View key={i} style={[styles.licenseRow, i < LICENSES.length - 1 && styles.licenseDivider]}>
+        {APP_LICENSES.map((l, i) => (
+          <View key={l.pkg} style={[styles.licenseRow, i < APP_LICENSES.length - 1 && styles.licenseDivider]}>
             <Text style={styles.licenseName}>{l.name}</Text>
             <View style={styles.licenseBadge}>
               <Text style={styles.licenseText}>{l.license}</Text>

@@ -1,0 +1,44 @@
+# Catches an icon-name typo before it ships (issue #19).
+#
+# `InkIconName` stays an open string type on purpose (see @jarida/ink's own
+# docs and constants/icon-registry.ts), so `name="serach"` is not a type
+# error — sweepIconNames is what catches it, by reading the source for every
+# icon-name literal and checking it against the registered set.
+#
+# Runs on every PR/push to main. No branch filter on pull_request, same
+# reasoning as the Security workflow: `branches:` there matches the PR's
+# base, so a PR stacked on another feature branch would only get checked
+# after landing, via the push trigger, without this.
+
+name: Icons
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  sweep-icon-names:
+    name: Icon names — no unregistered names
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - uses: actions/setup-node@v4
+        with:
+          # 22+ for unflagged native TypeScript import — the sweep script
+          # reads constants/icons.ts directly rather than duplicating its
+          # icon-name list. --experimental-strip-types in the npm script
+          # covers any 22.x patch that predates the unflagging.
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - run: npm ci
+
+      - run: npm run check-icons

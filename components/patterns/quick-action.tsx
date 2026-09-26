@@ -4,7 +4,7 @@
 
 import React from 'react';
 import { Pressable, Text, View, StyleSheet } from 'react-native';
-import { GIcon } from '@/components/ui/g-icon';
+import { InkIcon } from '@jarida/ink/native';
 import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
 import { Grey, JaridaPurple } from '@/constants/colors';
 import { Radii } from '@/constants/radii';
@@ -22,10 +22,10 @@ export const QuickAction = React.memo(function QuickAction({ label, onPress }: Q
       onPress={onPress}
     >
       <View style={styles.icon}>
-        <GIcon name="sparkle" size={12} color="#3D3D3D" />
+        <InkIcon name="sparkle" size={12} tone="neutral" />
       </View>
       <Text style={styles.label}>{label}</Text>
-      <GIcon name="chevron" size={14} color="#B5B5B5" />
+      <InkIcon name="chevron" size={14} tone="neutral" />
     </Pressable>
   );
 });

@@ -9,27 +9,19 @@
  */
 
 import React, { useCallback, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, TextInput, View } from 'react-native';
-import { InkButton } from '@jarida/ink/native';
-import { useRouter } from 'expo-router';
+import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { InkButton, InkIcon } from '@jarida/ink/native';
+import { useFocusEffect, useRouter } from 'expo-router';
 
-import { GIcon } from '@/components/ui/g-icon';
+import { GKeyboardView } from '@/components/ui/g-keyboard-view';
+import i18n from '@/services/i18n';
+import { looksLikeTypedSetupCode } from '@/models/pairing';
+import { takeSetupCode } from '@/services/pairing-handoff';
 import { useDevices } from '@/view-models/use-devices';
 import { Grey, JaridaPurple, Semantic } from '@/constants/colors';
 import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
 import { Spacing } from '@/constants/spacing';
 import { Radii } from '@/constants/radii';
-
-/**
- * Accepts every form the controller does: a QR payload, an 11- or 21-digit
- * manual code, or a bare 8-digit passcode. Only obviously-empty input is
- * refused here — the controller is the authority on what decodes.
- */
-function looksLikeSetupCode(raw: string): boolean {
-  const trimmed = raw.trim();
-  if (trimmed.startsWith('MT:')) return trimmed.length > 3;
-  return /^\d{8}$|^\d{11}$|^\d{21}$/.test(trimmed.replace(/[\s-]/g, ''));
-}
 
 export default function CommissionDeviceScreen() {
   const router = useRouter();
@@ -39,6 +31,17 @@ export default function CommissionDeviceScreen() {
   const [busy, setBusy] = useState(false);
 
   const commissioning = data.matter?.state === 'connecting';
+
+  // Collect whatever the scanner left on the way back. On focus rather than on
+  // mount, because this screen is still mounted underneath the scanner and
+  // never remounts when it closes. `takeSetupCode` clears as it reads, so
+  // returning here later cannot resurrect an old scan.
+  useFocusEffect(
+    useCallback(() => {
+      const scanned = takeSetupCode();
+      if (scanned) setCode(scanned);
+    }, []),
+  );
 
   const submit = useCallback(async () => {
     setBusy(true);
@@ -51,33 +54,24 @@ export default function CommissionDeviceScreen() {
     return (
       <View style={styles.centred}>
         <ActivityIndicator color={JaridaPurple[500]} />
-        <Text style={styles.title}>Adding the device</Text>
-        <Text style={styles.desc}>
-          This can take a couple of minutes. Keep the device powered and nearby.
-        </Text>
+        <Text style={styles.title}>{i18n.t('commission.adding')}</Text>
+        <Text style={styles.desc}>{i18n.t('commission.addingDesc')}</Text>
       </View>
     );
   }
 
   return (
-    <View style={styles.container}>
-      <GIcon name="device" size={28} color={JaridaPurple[500]} />
-      <Text style={styles.title}>Add a Matter device</Text>
-      <Text style={styles.desc}>
-        Enter the setup code printed on the device or its packaging. A device only accepts
-        pairing for about 15 minutes after it starts up, so power-cycle it first if it has
-        been sitting.
-      </Text>
+    <GKeyboardView style={styles.container}>
+      <InkIcon name="device" size={28} tone="brand" />
+      <Text style={styles.title}>{i18n.t('commission.title')}</Text>
+      <Text style={styles.desc}>{i18n.t('commission.desc')}</Text>
 
       {commissioning ? (
-        <Text style={styles.notice}>
-          Your Pond is still starting its Matter controller. Adding a device will not work
-          until it has finished.
-        </Text>
+        <Text style={styles.notice}>{i18n.t('commission.controllerStarting')}</Text>
       ) : null}
 
       <View style={styles.inputGroup}>
-        <Text style={styles.inputLabel}>Setup code</Text>
+        <Text style={styles.inputLabel}>{i18n.t('commission.setupCode')}</Text>
         <TextInput
           style={styles.textInput}
           value={code}
@@ -87,15 +81,28 @@ export default function CommissionDeviceScreen() {
           autoCapitalize="characters"
           autoCorrect={false}
         />
+        {/* A Matter QR payload is around ninety characters of base-38, which is
+            not a thing to read off a box and type. Scanning is the ordinary
+            route; the field stays because the manual code beside the QR exists
+            for exactly the times the camera cannot be used. */}
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => router.push('/(stack)/connect-desktop?mode=matter')}
+          hitSlop={8}
+          style={styles.scanLink}
+        >
+          <InkIcon name="camera" size={16} tone="brand" />
+          <Text style={styles.scanLinkText}>{i18n.t('commission.scan')}</Text>
+        </Pressable>
       </View>
 
       <View style={styles.inputGroup}>
-        <Text style={styles.inputLabel}>Name (optional)</Text>
+        <Text style={styles.inputLabel}>{i18n.t('commission.nameOptional')}</Text>
         <TextInput
           style={styles.textInput}
           value={name}
           onChangeText={setName}
-          placeholder="Kitchen light"
+          placeholder={i18n.t('commission.namePlaceholder')}
           placeholderTextColor={Grey[400]}
         />
       </View>
@@ -104,18 +111,16 @@ export default function CommissionDeviceScreen() {
 
       <InkButton
         variant="primary"
-        disabled={!looksLikeSetupCode(code) || commissioning}
+        disabled={!looksLikeTypedSetupCode(code) || commissioning}
         onPress={submit}
       >
-        Add Device
+        {i18n.t('commission.addDevice')}
       </InkButton>
 
       <Text style={styles.footnote}>
-        A device straight out of the box has no Wi-Fi yet and can only be reached over
-        Bluetooth. If it is not found, turn on Bluetooth pairing in your Pond&apos;s Matter
-        settings and try again.
+        {i18n.t('commission.bluetoothFootnote')}
       </Text>
-    </View>
+    </GKeyboardView>
   );
 }
 
@@ -160,6 +165,19 @@ const styles = StyleSheet.create({
     lineHeight: FontSize.sm * 1.5,
   },
   inputGroup: { gap: Spacing.xs },
+  scanLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: Spacing.xs,
+    paddingTop: Spacing.xs,
+  },
+  scanLinkText: {
+    fontFamily: FontFamily.body,
+    fontSize: FontSize.sm,
+    fontWeight: FontWeight.semibold,
+    color: JaridaPurple[500],
+  },
   inputLabel: {
     fontFamily: FontFamily.body,
     fontSize: FontSize.sm,

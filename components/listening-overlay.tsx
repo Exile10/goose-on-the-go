@@ -17,32 +17,43 @@
 
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, Pressable, Animated, Modal, Linking } from 'react-native';
-import { InkButton } from '@jarida/ink/native';
+import { InkButton, InkIcon } from '@jarida/ink/native';
 
 import { VuMeter } from '@/components/patterns/vu-meter';
-import { GIcon } from '@/components/ui/g-icon';
 import { useMicrophonePermission } from '@/hooks/use-microphone-permission';
 import type { VoiceState } from '@/models/voice';
 import { Brand, JaridaPurple, Grey, Semantic } from '@/constants/colors';
 import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
 import { Spacing } from '@/constants/spacing';
 import { Radii } from '@/constants/radii';
+import i18n from '@/services/i18n';
 
-const SUGGESTED_PHRASES = [
-  'Turn off the lights',
-  "What's the weather like?",
-  'Set a timer for 10 minutes',
-  'Play my evening playlist',
-];
+/** Example phrases for the listening overlay, from literal keys so the i18n test sees each one. */
+function suggestedPhrases(): string[] {
+  return [
+    i18n.t('voice.phraseLights'),
+    i18n.t('voice.phraseWeather'),
+    i18n.t('voice.phraseTimer'),
+    i18n.t('voice.phrasePlaylist'),
+  ];
+}
 
-const STATE_LABEL: Record<VoiceState, string> = {
-  idle: 'Listening...',
-  waiting: 'Listening...',
-  recording: 'Listening...',
-  thinking: 'Thinking...',
-  speaking: 'Speaking...',
-  error: "Didn't catch that",
-};
+/** State label, from literal keys so the i18n test sees each one. */
+function stateLabel(state: VoiceState): string {
+  switch (state) {
+    case 'idle':
+      return i18n.t('voice.idle');
+    case 'waiting':
+    case 'recording':
+      return i18n.t('voice.listening');
+    case 'thinking':
+      return i18n.t('voice.thinking');
+    case 'speaking':
+      return i18n.t('voice.speaking');
+    case 'error':
+      return i18n.t('voice.error');
+  }
+}
 
 export interface ListeningOverlayProps {
   /** Whether the overlay is visible */
@@ -137,17 +148,17 @@ function ListeningOverlayInner({ visible, state, vuLevel, transcript, errorMessa
       <Modal visible={visible} animationType="fade" transparent statusBarTranslucent onRequestClose={onCancel}>
         <View style={styles.overlay}>
           <View style={styles.permissionContainer}>
-            <GIcon name="voice" size={32} color={JaridaPurple[400]} />
-            <Text style={styles.permissionTitle}>Microphone access needed</Text>
-            <Text style={styles.permissionDesc}>Talking to Goose needs the microphone.</Text>
+            <InkIcon name="voice" size={32} tone="brand" />
+            <Text style={styles.permissionTitle}>{i18n.t('voice.micPermissionTitle')}</Text>
+            <Text style={styles.permissionDesc}>{i18n.t('voice.micPermissionDesc')}</Text>
             <InkButton
               variant="primary"
               onPress={canPrompt ? requestPermission : () => void Linking.openSettings()}
             >
-              {canPrompt ? 'Enable Microphone' : 'Open Settings'}
+              {canPrompt ? i18n.t('voice.enableMicrophone') : i18n.t('voice.openSettings')}
             </InkButton>
             <Pressable onPress={onCancel} hitSlop={8}>
-              <Text style={styles.cancelText}>Not now</Text>
+              <Text style={styles.cancelText}>{i18n.t('voice.notNow')}</Text>
             </Pressable>
           </View>
         </View>
@@ -166,13 +177,14 @@ function ListeningOverlayInner({ visible, state, vuLevel, transcript, errorMessa
 
           {/* Center Goose logo */}
           <View style={styles.logoCircle}>
+            {/* eslint-disable-next-line i18next/no-literal-string -- the Goose mark, not copy */}
             <Text style={styles.logoText}>G</Text>
           </View>
         </View>
 
         {/* State label */}
         <Text style={[styles.listeningLabel, state === 'error' && styles.errorLabel]}>
-          {STATE_LABEL[state]}
+          {stateLabel(state)}
         </Text>
 
         {/* The specific reason, when there is one to show */}
@@ -187,8 +199,8 @@ function ListeningOverlayInner({ visible, state, vuLevel, transcript, errorMessa
         {/* Suggested phrases — decorative, shown before/while recording */}
         {showSuggestions && (
           <View style={styles.suggestedSection}>
-            <Text style={styles.suggestedTitle}>Try saying:</Text>
-            {SUGGESTED_PHRASES.map((phrase) => (
+            <Text style={styles.suggestedTitle}>{i18n.t('voice.trySaying')}</Text>
+            {suggestedPhrases().map((phrase) => (
               <Pressable key={phrase} style={styles.phraseChip}>
                 <Text style={styles.phraseText}>{`"${phrase}"`}</Text>
               </Pressable>
@@ -198,7 +210,7 @@ function ListeningOverlayInner({ visible, state, vuLevel, transcript, errorMessa
 
         {/* Cancel button — also barges in mid-turn */}
         <Pressable style={styles.cancelBtn} onPress={onCancel}>
-          <Text style={styles.cancelText}>Cancel</Text>
+          <Text style={styles.cancelText}>{i18n.t('common.cancel')}</Text>
         </Pressable>
       </View>
     </Modal>

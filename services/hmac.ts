@@ -121,3 +121,55 @@ export function concat(a: Uint8Array, b: Uint8Array): Uint8Array {
   out.set(b, a.length);
   return out;
 }
+
+/** Label for the MAC this client sends. Must match the Pond's `CLIENT_LABEL`. */
+export const CLIENT_LABEL = 'goose-pair-client-v1';
+/** Label for the proof the Pond sends back. Must match its `SERVER_LABEL`. */
+export const SERVER_LABEL = 'goose-pair-server-v1';
+
+/**
+ * The bytes a pairing MAC is computed over, keyed by the pairing code.
+ *
+ * Two shapes, selected by whether this connection had a certificate to bind to:
+ *
+ *   bound     label | 0x00 | challenge | 0x00 | clientId | 0x00 | spki
+ *   unbound   challenge | clientId
+ *
+ * The unbound shape is the original and is kept byte-for-byte, for a Pond
+ * running a server older than the binding. `0x00` separates the bound fields
+ * unambiguously: `clientId` and the pin are text and cannot contain a NUL, and
+ * the challenge is a fixed 32 bytes. The label is inside the MAC rather than
+ * beside it so the two directions cannot be replayed against each other -- a
+ * server proof is not a client MAC.
+ *
+ * Kept here beside `hmacSha256` rather than in the api client, because the Pond
+ * computes the same bytes in `sqlite_handshake.rs :: pair_mac` and the two
+ * definitions have to be findable together.
+ */
+export function pairTranscript(
+  label: string,
+  challenge: Uint8Array,
+  clientId: string,
+  spki?: string,
+): Uint8Array {
+  if (!spki) return concat(challenge, utf8(clientId));
+  const nul = new Uint8Array([0]);
+  return concat(
+    concat(concat(utf8(label), nul), concat(challenge, nul)),
+    concat(concat(utf8(clientId), nul), utf8(spki)),
+  );
+}
+
+/**
+ * Compare two hex MACs without leaking where they first differ.
+ *
+ * The threat is thin -- each wrong guess burns a challenge and a pairing code --
+ * but a length-and-XOR compare costs nothing next to the HMAC that produced the
+ * values.
+ */
+export function equalHex(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}

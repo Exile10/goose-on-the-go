@@ -1,3 +1,4 @@
+import { ConnectionStatus } from '@/components/patterns/connection-status';
 /**
  * Root Layout — loads brand fonts, manages splash screen,
  * and wraps the app tree with ThemeProvider + ServerProvider.
@@ -31,6 +32,7 @@ import { NotificationsProvider } from '@/providers/notifications-provider';
 import { ThemeProvider } from '@/providers/theme-provider';
 import { ServerProvider } from '@/providers/server-provider';
 import { useVoice } from '@/view-models/use-voice';
+import '@/constants/icon-registry';
 
 /**
  * Keep the splash up until the app can draw itself.
@@ -108,6 +110,7 @@ export default function RootLayout() {
         <NotificationsProvider>
           <NavThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
             <InkProvider>
+              <ConnectionStatus />
               <Stack>
                 <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
                 <Stack.Screen name="(stack)" options={{ headerShown: false }} />
