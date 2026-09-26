@@ -3,7 +3,7 @@ import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { ServerProvider, useServer } from '../server-provider';
 import { SecureStorage } from '@/services/secure-storage';
 import { Storage } from '@/services/storage';
-import { api } from '@/services/api-client';
+import { api, ApiError } from '@/services/api-client';
 
 jest.mock('@react-native-community/netinfo', () => ({
   configure: jest.fn(), addEventListener: jest.fn(() => () => undefined),
@@ -12,7 +12,7 @@ jest.mock('@react-native-community/netinfo', () => ({
 jest.mock('@/services/storage', () => ({ Storage: { set: jest.fn(), remove: jest.fn(), getJSON: jest.fn(async () => null), setJSON: jest.fn() }, purgeLegacyStorage: jest.fn() }));
 jest.mock('@/services/secure-storage', () => ({ SecureStorage: { set: jest.fn(), remove: jest.fn(), getJSON: jest.fn(async () => null), setJSON: jest.fn() } }));
 jest.mock('@/services/pond-trust', () => ({ configurePondTrust: jest.fn(async () => undefined), PondTrustError: class extends Error {} }));
-jest.mock('@/services/discovery', () => ({ findPondByHost: jest.fn(async () => null) }));
+jest.mock('@/services/discovery', () => ({ findPondByHost: jest.fn(async () => null), findPondAt: jest.fn(async () => null) }));
 jest.mock('@/services/remote-access', () => ({
   cancelRemoteAccess: jest.fn(async () => undefined),
   restoreRemoteAccess: jest.fn(async () => undefined),
@@ -81,6 +81,39 @@ it('still asks the Pond to release the device on an explicit sign out', async ()
   await act(async () => { await server.signOut(); });
   expect(api.handshakeRevoke).toHaveBeenCalledTimes(1);
   expect(server.profileId).toBe('');
+
+  await act(async () => { tree.unmount(); });
+});
+
+// A Pond that already refuses the session answers the revoke with a 401. That is the
+// release having happened, not a failure to retry: a phone the Pond dropped could
+// otherwise never sign out.
+it('signs out when the Pond has already dropped the session', async () => {
+  (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+  let server!: ReturnType<typeof useServer>;
+  const Child = () => { server = useServer(); return null; };
+  let tree!: ReactTestRenderer;
+  await act(async () => { tree = create(<ServerProvider><Child /></ServerProvider>); });
+
+  jest.mocked(api.handshakeRevoke).mockRejectedValueOnce(new (ApiError as unknown as new () => Error)());
+  await act(async () => { await server.signOut(); });
+  expect(server.profileId).toBe('');
+
+  await act(async () => { tree.unmount(); });
+});
+
+// Anything else is ambiguous: the Pond may still hold the session, so the pairing stays
+// for an explicit retry.
+it('keeps the pairing when the revoke did not reach the Pond', async () => {
+  (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+  let server!: ReturnType<typeof useServer>;
+  const Child = () => { server = useServer(); return null; };
+  let tree!: ReactTestRenderer;
+  await act(async () => { tree = create(<ServerProvider><Child /></ServerProvider>); });
+
+  jest.mocked(api.handshakeRevoke).mockRejectedValueOnce(new Error('network'));
+  await act(async () => { await expect(server.signOut()).rejects.toThrow('network'); });
+  expect(server.profileId).toBe('profile-1');
 
   await act(async () => { tree.unmount(); });
 });

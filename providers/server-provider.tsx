@@ -211,7 +211,9 @@ export function ServerProvider({ children }: PropsWithChildren) {
     });
     void (async () => {
       try {
-        await purgeLegacyStorage();
+        // Best effort: a store that cannot delete the old plaintext keys must not keep a
+        // valid pairing from loading.
+        try { await purgeLegacyStorage(); } catch { console.warn('[storage] could not purge legacy plaintext keys'); }
         const loaded = await loadPairedProfile();
         if (cancelled || staged.current) return;
         if (loaded.saved) {
@@ -419,8 +421,11 @@ export function ServerProvider({ children }: PropsWithChildren) {
     await committing.current?.catch(() => undefined);
     await cancelRemoteAccess();
     // Preserve the authenticated transport until the Pond has durably accepted revocation.
-    // Failure keeps the pairing available for an explicit retry.
-    await api.handshakeRevoke();
+    // Failure keeps the pairing available for an explicit retry -- except when the Pond
+    // refuses the session outright, which means it is already gone there and a retry can
+    // only fail the same way.
+    try { await api.handshakeRevoke(); }
+    catch (e) { if (!(e instanceof ApiError && (e.status === 401 || e.status === 403))) throw e; }
     await forgetPairing();
   }, [forgetPairing]);
   const updateRemoteProfile = useCallback(async (url: string | null, control: string, check: () => void) => {
