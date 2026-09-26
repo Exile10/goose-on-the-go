@@ -116,7 +116,6 @@ to each store, so this section matches it]
 - **Decline remote access.** The app works without it, and you can turn it down when asked.
 - **Turn it off later.** Signing out releases this phone's access to your Pond, including
   its remote access. You pair again at home to come back.
-- **Reset the app's identifier**, which makes your next pairing look like a new device.
 - **Your data is on your own hardware.** Deleting it is something you do on your Pond, not
   something you ask us for. We do not hold a copy.
 
