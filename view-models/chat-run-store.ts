@@ -48,6 +48,8 @@ interface InternalState extends ChatRunSnapshot {
   /** Bumped per turn/session-switch; a run whose seq no longer matches must stop writing. */
   runSeq: number;
   activeStream: { close: () => void } | null;
+  /** The turn `activeStream` belongs to. */
+  activeTurn: TurnCtx | null;
   snapshot: ChatRunSnapshot;
   subs: Set<() => void>;
 }
@@ -63,6 +65,7 @@ const state: InternalState = {
   lastSeq: 0,
   runSeq: 0,
   activeStream: null,
+  activeTurn: null,
   snapshot: { messages: [], sessionId: null, streaming: false, activity: null, error: null },
   subs: new Set(),
 };
@@ -171,7 +174,16 @@ async function reloadFromHistory(sessionId: string, stale: () => boolean): Promi
 interface TurnCtx {
   stale: () => boolean;
   assistantId: string;
+  /**
+   * Stopped before the server said which run it started. The stream stays open
+   * only to learn that id and cancel the run, which otherwise keeps generating
+   * on the Pond with nothing left that knows about it.
+   */
+  cancelOnStart?: boolean;
 }
+
+/** How long a stopped, unstarted turn's stream may wait for its run id. */
+const CANCEL_ON_START_MS = 60_000;
 
 function appendAssistantText(assistantId: string, text: string): void {
   if (!text) return;
@@ -265,6 +277,15 @@ function attachStream(
 ): void {
   const handle = open({
     onFrame: (frame) => {
+      if (ctx.cancelOnStart) {
+        if ('type' in frame && frame.type === 'run_started') {
+          void api.cancelRun(frame.run_id).catch(() => undefined);
+          handle.close();
+        } else if ('done' in frame || 'error' in frame) {
+          handle.close();
+        }
+        return;
+      }
       const result = consume(frame, ctx);
       if (result === 'reload') {
         state.activeStream?.close();
@@ -278,6 +299,7 @@ function attachStream(
       }
     },
     onNetworkError: (message) => {
+      if (ctx.cancelOnStart) { handle.close(); return; }
       if (ctx.stale()) return;
       state.error = message;
       state.streaming = false;
@@ -287,6 +309,26 @@ function attachStream(
     },
   });
   state.activeStream = handle;
+  state.activeTurn = ctx;
+}
+
+/**
+ * Let go of the current turn's stream. A turn the server has not yet named is
+ * left running just long enough to learn its id and cancel it (see TurnCtx).
+ * Must run before `streaming` or `runId` are reset.
+ */
+function releaseActiveStream(): void {
+  const handle = state.activeStream;
+  const turn = state.activeTurn;
+  state.activeStream = null;
+  state.activeTurn = null;
+  if (!handle) return;
+  if (turn && state.streaming && !state.runId) {
+    turn.cancelOnStart = true;
+    setTimeout(() => handle.close(), CANCEL_ON_START_MS);
+    return;
+  }
+  handle.close();
 }
 
 // ── Sending ───────────────────────────────────────────────────────────────────
@@ -323,6 +365,7 @@ export function send(text: string): void {
 /** Stop a run on purpose — the only way, now that a resumable turn keeps generating after disconnect. */
 function stopServerRun(): void {
   const runId = state.runId;
+  state.runId = null;
   forgetRun();
   if (!runId) return;
   void api.cancelRun(runId).catch(() => {
@@ -332,8 +375,7 @@ function stopServerRun(): void {
 
 export function abortRun(): void {
   ++state.runSeq;
-  state.activeStream?.close();
-  state.activeStream = null;
+  releaseActiveStream();
   state.streaming = false;
   state.activity = null;
   commit();
@@ -342,8 +384,7 @@ export function abortRun(): void {
 
 export function newConversation(): void {
   ++state.runSeq;
-  state.activeStream?.close();
-  state.activeStream = null;
+  releaseActiveStream();
   stopServerRun();
   state.messages = [];
   state.sessionId = null;
@@ -357,9 +398,8 @@ export function newConversation(): void {
 }
 
 export async function loadSession(id: string): Promise<void> {
-  ++state.runSeq;
-  state.activeStream?.close();
-  state.activeStream = null;
+  const runSeq = ++state.runSeq;
+  releaseActiveStream();
   stopServerRun();
   state.error = null;
   state.streaming = false;
@@ -369,7 +409,8 @@ export async function loadSession(id: string): Promise<void> {
   state.epoch = null;
   state.lastSeq = 0;
   commit();
-  await reloadFromHistory(id, () => false);
+  // A later session switch or send owns the transcript; this load must not land over it.
+  await reloadFromHistory(id, () => runSeq !== state.runSeq);
 }
 
 // ── Surviving a background/foreground cycle, or a full relaunch ─────────────
