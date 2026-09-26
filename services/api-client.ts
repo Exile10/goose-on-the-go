@@ -11,11 +11,16 @@
  * before bubbling the error up to the caller.
  */
 
+import { File, Paths } from 'expo-file-system';
+import EventSource from 'react-native-sse';
+
 import { concat, fromBase64, hmacSha256, toHex, utf8 } from './hmac';
 import { timeoutSignal } from './http';
 import type {
   ActivityResponse,
   ActivitySummary,
+  ChatStreamFrame,
+  ChatStreamRequest,
   CommissionDeviceRequest,
   CommissionDeviceResponse,
   CreateDeviceRequest,
@@ -38,6 +43,7 @@ import type {
   SessionMessage,
   SessionSummary,
   ToolCallResult,
+  TranscribeResponse,
   UpdateDeviceRequest,
   UsageSummary,
 } from './types';
@@ -608,6 +614,107 @@ export class PondApiClient {
 
   deleteProfile(id: string): Promise<void> {
     return this.del<void>(`/api/v1/profiles/${encodeURIComponent(id)}`);
+  }
+
+  // ── Voice ─────────────────────────────────────────────────────
+
+  /**
+   * `POST /transcribe`. Multipart, field name `audio`. Bypasses `request<T>()`
+   * — `FormData` needs its own auto-computed `Content-Type` boundary, which
+   * spreading `this.headers()` (fixed at `application/json`) would stomp on.
+   * Public server-side by design, but the token is attached anyway when one
+   * exists — cheap, and forward-compatible with that changing.
+   *
+   * React Native's `FormData` needs a file-like `{uri, name, type}` descriptor
+   * rather than a raw `Blob`, so the WAV bytes go to a temp cache file first —
+   * cleaned up in `finally` regardless of how the request turns out.
+   */
+  async transcribe(wav: ArrayBuffer): Promise<TranscribeResponse> {
+    const headers: Record<string, string> = {};
+    if (this.token) headers['Authorization'] = `Bearer ${this.token}`;
+
+    const file = new File(Paths.cache, `transcribe-${Date.now()}.wav`);
+    file.write(new Uint8Array(wav));
+    try {
+      const form = new FormData();
+      form.append('audio', { uri: file.uri, name: 'audio.wav', type: 'audio/wav' } as unknown as Blob);
+
+      const res = await fetch(`${this.baseUrl}/api/v1/transcribe`, {
+        method: 'POST',
+        headers,
+        body: form,
+        signal: timeoutSignal(REQUEST_TIMEOUT_MS),
+      });
+      if (!res.ok) {
+        throw new ApiError(`transcribe → ${res.status}`, res.status, parseRetryAfter(res));
+      }
+      return (await res.json()) as TranscribeResponse;
+    } finally {
+      try {
+        file.delete();
+      } catch {
+        // Best-effort cleanup — the OS reclaims the cache dir regardless.
+      }
+    }
+  }
+
+  /** `POST /tts`. JSON body, raw WAV bytes back — not a JSON envelope. */
+  async synthesizeSpeech(text: string): Promise<ArrayBuffer> {
+    const res = await fetch(`${this.baseUrl}/api/v1/tts`, {
+      method: 'POST',
+      headers: this.headers(),
+      body: JSON.stringify({ text }),
+      signal: timeoutSignal(REQUEST_TIMEOUT_MS),
+    });
+    if (!res.ok) {
+      throw new ApiError(`tts → ${res.status}`, res.status, parseRetryAfter(res));
+    }
+    return res.arrayBuffer();
+  }
+
+  /**
+   * Open a streaming chat turn against `POST /chat/stream` (SSE). Voice
+   * turns are always `resumable: false` — no reattach-after-backgrounding,
+   * unlike the richer chat-tab version of this on `feat/streaming-chat-v2`.
+   *
+   * Uses `react-native-sse` rather than native `EventSource` because
+   * `/chat/stream` requires a POST body — the browser-standard `EventSource`
+   * is GET-only. `pollingInterval: 0` is load-bearing: the library
+   * auto-reconnects by default when the server closes the stream, which here
+   * would silently re-POST the same message after the server already
+   * finished replying.
+   */
+  streamChat(
+    req: ChatStreamRequest,
+    handlers: {
+      onFrame: (frame: ChatStreamFrame) => void;
+      onNetworkError?: (message: string) => void;
+    },
+  ): { close: () => void } {
+    const es = new EventSource(`${this.baseUrl}/api/v1/chat/stream`, {
+      method: 'POST',
+      headers: this.headers(),
+      body: JSON.stringify(req),
+      pollingInterval: 0,
+    });
+
+    es.addEventListener('message', (event) => {
+      if (!event.data) return;
+      try {
+        const frame = JSON.parse(event.data) as ChatStreamFrame;
+        handlers.onFrame(frame);
+      } catch {
+        // Malformed frame — drop it, don't kill the stream over one bad line.
+      }
+    });
+
+    es.addEventListener('error', (event) => {
+      const message =
+        event.type === 'timeout' ? 'Request timed out' : event.message || 'Could not reach the server';
+      handlers.onNetworkError?.(message);
+    });
+
+    return { close: () => es.close() };
   }
 
   // ── Verb helpers ────────────────────────────────────────────

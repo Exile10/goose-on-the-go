@@ -372,6 +372,31 @@ export interface TranscribeResponse {
   text: string;
 }
 
+/**
+ * Request body for POST /api/v1/chat/stream. Scoped to what the voice
+ * pipeline needs — `feat/streaming-chat-v2` has a richer version of this
+ * same request (images, canvas_mode, tool_group_allowlist, etc.); reconcile
+ * the two when that branch merges.
+ */
+export interface ChatStreamRequest {
+  message: string;
+  session_id?: string;
+  /** Disables `<think>` capture server-side and injects a spoken-answer system prompt. */
+  voice_mode: boolean;
+  /** Voice turns don't reattach after backgrounding — always false here. */
+  resumable: boolean;
+}
+
+/**
+ * SSE frames pond-server's `/chat/stream` emits, scoped to the subset the
+ * voice pipeline consumes (text tokens, tool calls, and turn end/error).
+ */
+export type ChatStreamFrame =
+  | { type: 'text'; content: string }
+  | { type: 'tool_call'; tool: string; id: string }
+  | { done: true; session_id: string }
+  | { error: string };
+
 // ── Profiles ──────────────────────────────────────────────────
 
 export interface Profile {

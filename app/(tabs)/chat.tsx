@@ -20,6 +20,7 @@ import { GIcon } from '@/components/ui/g-icon';
 import { GKeyboardView } from '@/components/ui/g-keyboard-view';
 import type { Message } from '@/models/chat';
 import { useChat } from '@/view-models/use-chat';
+import { startRecording as startVoiceRecording } from '@/view-models/voice-pipeline-store';
 import { Grey, JaridaPurple, Brand, Semantic } from '@/constants/colors';
 import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
 import { Spacing } from '@/constants/spacing';
@@ -158,7 +159,7 @@ export default function ChatScreen() {
               multiline
               maxLength={4000}
             />
-            <Pressable style={styles.micBtn}>
+            <Pressable style={styles.micBtn} onPress={() => startVoiceRecording()}>
               <GIcon name="voice" size={18} color={JaridaPurple[500]} />
             </Pressable>
           </View>

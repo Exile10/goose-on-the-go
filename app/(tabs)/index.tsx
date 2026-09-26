@@ -19,6 +19,7 @@ import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { GIcon } from '@/components/ui/g-icon';
+import { startRecording as startVoiceRecording } from '@/view-models/voice-pipeline-store';
 import { useRecentSessions } from '@/view-models/use-recent-sessions';
 import { supports, useDevices } from '@/view-models/use-devices';
 import type { Device } from '@/services/types';
@@ -105,7 +106,7 @@ export default function HomeScreen() {
   );
 
   const handleMicPress = useCallback(() => {
-    // Will trigger listening overlay in future
+    startVoiceRecording();
   }, []);
 
   return (

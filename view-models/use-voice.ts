@@ -1,54 +1,29 @@
 /**
- * Voice ViewModel
- * Voice state machine for the canvas voice mode.
+ * Voice ViewModel — thin wrapper around `voice-pipeline-store`'s real
+ * mic → transcribe → stream → speak pipeline.
+ *
+ * The state machine, VAD, and TTS queueing all live in the module-scoped
+ * store (same reasoning as `chat-run-store.ts`: a voice turn can outlive
+ * whichever screen opened it). This hook is just a `useSyncExternalStore`
+ * subscription plus the same `{data, actions}` shape callers already use.
  */
 
-import { useState, useCallback, useRef, useEffect } from 'react';
 import type { VoiceState } from '@/models/voice';
+import { cancel, startRecording, useVoiceSnapshot } from '@/view-models/voice-pipeline-store';
 
 export function useVoice() {
-  const [state, setState] = useState<VoiceState>('idle');
-  const [vuLevel, setVuLevel] = useState(0);
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  // Simulate VU meter when recording
-  useEffect(() => {
-    if (state === 'recording') {
-      intervalRef.current = setInterval(() => {
-        setVuLevel(Math.random() * 0.4 + 0.1);
-      }, 200);
-    } else {
-      setVuLevel(0);
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-        intervalRef.current = null;
-      }
-    }
-    return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
-    };
-  }, [state]);
-
-  const startRecording = useCallback(() => {
-    setState('recording');
-    // Simulate: after 2.2s, transition to thinking
-    setTimeout(() => {
-      setState('thinking');
-      // Then speaking after another 1s
-      setTimeout(() => {
-        setState('speaking');
-        // Then back to idle
-        setTimeout(() => setState('idle'), 1500);
-      }, 1000);
-    }, 2200);
-  }, []);
-
-  const stop = useCallback(() => {
-    setState('idle');
-  }, []);
+  const snapshot = useVoiceSnapshot();
 
   return {
-    data: { state, vuLevel },
-    actions: { startRecording, stop },
+    data: {
+      state: snapshot.state as VoiceState,
+      vuLevel: snapshot.vuLevel,
+      transcript: snapshot.transcript,
+      errorMessage: snapshot.errorMessage,
+    },
+    actions: {
+      startRecording,
+      stop: cancel,
+    },
   };
 }

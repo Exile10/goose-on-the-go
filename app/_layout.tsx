@@ -24,10 +24,13 @@ import {
 } from '@expo-google-fonts/jetbrains-mono';
 import { InkProvider } from '@jarida/ink/native';
 
+import { ListeningOverlay } from '@/components/listening-overlay';
+import { VoiceAudioBridge } from '@/components/voice-audio-bridge';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { NotificationsProvider } from '@/providers/notifications-provider';
 import { ThemeProvider } from '@/providers/theme-provider';
 import { ServerProvider } from '@/providers/server-provider';
+import { useVoice } from '@/view-models/use-voice';
 
 /**
  * Keep the splash up until the app can draw itself.
@@ -74,6 +77,7 @@ export const unstable_settings = {
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
+  const voice = useVoice();
 
   const [fontsLoaded, fontError] = useFonts({
     Quicksand: require('../assets/fonts/Quicksand.ttf'),
@@ -110,6 +114,15 @@ export default function RootLayout() {
                 <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
               </Stack>
               <StatusBar style="auto" />
+              <VoiceAudioBridge />
+              <ListeningOverlay
+                visible={voice.data.state !== 'idle'}
+                state={voice.data.state}
+                vuLevel={voice.data.vuLevel}
+                transcript={voice.data.transcript}
+                errorMessage={voice.data.errorMessage}
+                onCancel={voice.actions.stop}
+              />
             </InkProvider>
           </NavThemeProvider>
         </NotificationsProvider>

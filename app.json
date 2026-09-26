@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Goose On The Go",
+    "name": "Goose On The Go",  
     "slug": "goose-on-the-go",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -42,6 +42,14 @@
         {
           "cameraPermission": "Goose On The Go uses your camera to scan the pairing QR code shown on your Pond.",
           "recordAudioAndroid": false
+        }
+      ],
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "Goose On The Go uses your microphone so you can talk to Goose.",
+          "enableBackgroundRecording": false,
+          "enableBackgroundPlayback": false
         }
       ],
       [

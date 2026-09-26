@@ -1,43 +1,61 @@
 /**
- * ListeningOverlay — Full-screen dark overlay with pulsing rings,
- * Goose logo, waveform bars, suggested phrases, and cancel button.
+ * ListeningOverlay — Full-screen dark overlay with pulsing rings, Goose
+ * logo, a real VU meter, the recognized transcript, and a cancel button.
  *
- * Triggered by mic FAB or "Ask Goose" bar.
+ * Driven by `useVoice()`'s real pipeline state — not a fixed "Listening..."
+ * label. Triggered by mic FAB or "Ask Goose" bar.
  *
  * @example
- *   <ListeningOverlay visible={isListening} onCancel={() => setIsListening(false)} />
+ *   <ListeningOverlay
+ *     visible={isListening}
+ *     state={data.state}
+ *     vuLevel={data.vuLevel}
+ *     transcript={data.transcript}
+ *     onCancel={actions.stop}
+ *   />
  */
 
 import React, { useEffect, useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  Pressable,
-  Animated,
-  Modal,
-  Dimensions,
-} from 'react-native';
+import { View, Text, StyleSheet, Pressable, Animated, Modal, Linking } from 'react-native';
+import { InkButton } from '@jarida/ink/native';
 
+import { VuMeter } from '@/components/patterns/vu-meter';
 import { GIcon } from '@/components/ui/g-icon';
-import { Brand, JaridaPurple, Grey } from '@/constants/colors';
+import { useMicrophonePermission } from '@/hooks/use-microphone-permission';
+import type { VoiceState } from '@/models/voice';
+import { Brand, JaridaPurple, Grey, Semantic } from '@/constants/colors';
 import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
 import { Spacing } from '@/constants/spacing';
 import { Radii } from '@/constants/radii';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-
 const SUGGESTED_PHRASES = [
   'Turn off the lights',
-  'What\'s the weather like?',
+  "What's the weather like?",
   'Set a timer for 10 minutes',
   'Play my evening playlist',
 ];
 
+const STATE_LABEL: Record<VoiceState, string> = {
+  idle: 'Listening...',
+  waiting: 'Listening...',
+  recording: 'Listening...',
+  thinking: 'Thinking...',
+  speaking: 'Speaking...',
+  error: "Didn't catch that",
+};
+
 export interface ListeningOverlayProps {
   /** Whether the overlay is visible */
   visible: boolean;
-  /** Called when the user cancels listening */
+  /** Current pipeline state — drives the label, the VU meter, and the pulse rings. */
+  state: VoiceState;
+  /** 0..1 display level from the real mic input (already visually scaled — see the store). */
+  vuLevel: number;
+  /** The user's recognized utterance for this turn, once transcribed. */
+  transcript: string | null;
+  /** The specific reason for `state === 'error'` — shown under the heading. */
+  errorMessage?: string | null;
+  /** Called when the user cancels — also how a mid-turn tap barges in. */
   onCancel: () => void;
 }
 
@@ -96,38 +114,49 @@ function PulseRing({ delay, size }: { delay: number; size: number }) {
   );
 }
 
-/** Waveform bars */
-function WaveformBars() {
-  // Heights are decorative. Drawing them once keeps render pure — re-rolling
-  // them on every render is what the impure-function rule objects to.
-  const [bars] = useState(() =>
-    Array.from({ length: 20 }, () => 8 + Math.random() * 24),
-  );
-  return (
-    <View style={styles.waveform}>
-      {bars.map((height, i) => {
-        return (
-          <View
-            key={i}
-            style={[styles.waveBar, { height }]}
-          />
-        );
-      })}
-    </View>
-  );
-}
+function ListeningOverlayInner({ visible, state, vuLevel, transcript, errorMessage, onCancel }: ListeningOverlayProps) {
+  const [permission, requestPermission] = useMicrophonePermission();
 
-function ListeningOverlayInner({ visible, onCancel }: ListeningOverlayProps) {
   if (!visible) return null;
 
+  const showSuggestions = state === 'idle' || state === 'waiting' || state === 'recording';
+
+  // Permission not yet determined — the hook answers on the next render.
+  if (!permission) {
+    return (
+      <Modal visible={visible} animationType="fade" transparent statusBarTranslucent onRequestClose={onCancel}>
+        <View style={styles.overlay} />
+      </Modal>
+    );
+  }
+
+  if (!permission.granted) {
+    // Once `canAskAgain` is false the OS won't show the prompt again — Settings is the only way back.
+    const canPrompt = permission.canAskAgain;
+    return (
+      <Modal visible={visible} animationType="fade" transparent statusBarTranslucent onRequestClose={onCancel}>
+        <View style={styles.overlay}>
+          <View style={styles.permissionContainer}>
+            <GIcon name="voice" size={32} color={JaridaPurple[400]} />
+            <Text style={styles.permissionTitle}>Microphone access needed</Text>
+            <Text style={styles.permissionDesc}>Talking to Goose needs the microphone.</Text>
+            <InkButton
+              variant="primary"
+              onPress={canPrompt ? requestPermission : () => void Linking.openSettings()}
+            >
+              {canPrompt ? 'Enable Microphone' : 'Open Settings'}
+            </InkButton>
+            <Pressable onPress={onCancel} hitSlop={8}>
+              <Text style={styles.cancelText}>Not now</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
+    );
+  }
+
   return (
-    <Modal
-      visible={visible}
-      animationType="fade"
-      transparent
-      statusBarTranslucent
-      onRequestClose={onCancel}
-    >
+    <Modal visible={visible} animationType="fade" transparent statusBarTranslucent onRequestClose={onCancel}>
       <View style={styles.overlay}>
         {/* Pulsing rings */}
         <View style={styles.ringsContainer}>
@@ -141,23 +170,33 @@ function ListeningOverlayInner({ visible, onCancel }: ListeningOverlayProps) {
           </View>
         </View>
 
-        {/* Listening label */}
-        <Text style={styles.listeningLabel}>Listening...</Text>
+        {/* State label */}
+        <Text style={[styles.listeningLabel, state === 'error' && styles.errorLabel]}>
+          {STATE_LABEL[state]}
+        </Text>
 
-        {/* Waveform */}
-        <WaveformBars />
+        {/* The specific reason, when there is one to show */}
+        {state === 'error' && errorMessage ? <Text style={styles.transcript}>{errorMessage}</Text> : null}
 
-        {/* Suggested phrases */}
-        <View style={styles.suggestedSection}>
-          <Text style={styles.suggestedTitle}>Try saying:</Text>
-          {SUGGESTED_PHRASES.map((phrase) => (
-            <Pressable key={phrase} style={styles.phraseChip}>
-              <Text style={styles.phraseText}>{`"${phrase}"`}</Text>
-            </Pressable>
-          ))}
-        </View>
+        {/* Recognized transcript, once available */}
+        {transcript ? <Text style={styles.transcript}>{`"${transcript}"`}</Text> : null}
 
-        {/* Cancel button */}
+        {/* Real mic level while recording */}
+        <VuMeter level={vuLevel} active={state === 'recording'} barCount={20} />
+
+        {/* Suggested phrases — decorative, shown before/while recording */}
+        {showSuggestions && (
+          <View style={styles.suggestedSection}>
+            <Text style={styles.suggestedTitle}>Try saying:</Text>
+            {SUGGESTED_PHRASES.map((phrase) => (
+              <Pressable key={phrase} style={styles.phraseChip}>
+                <Text style={styles.phraseText}>{`"${phrase}"`}</Text>
+              </Pressable>
+            ))}
+          </View>
+        )}
+
+        {/* Cancel button — also barges in mid-turn */}
         <Pressable style={styles.cancelBtn} onPress={onCancel}>
           <Text style={styles.cancelText}>Cancel</Text>
         </Pressable>
@@ -175,6 +214,26 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: Spacing.lg,
+  },
+
+  /* Permission gate */
+  permissionContainer: {
+    alignItems: 'center',
+    gap: Spacing.lg,
+    paddingHorizontal: Spacing['2xl'],
+  },
+  permissionTitle: {
+    fontFamily: FontFamily.heading,
+    fontSize: FontSize.xl,
+    fontWeight: FontWeight.bold,
+    color: Brand.white,
+    textAlign: 'center',
+  },
+  permissionDesc: {
+    fontFamily: FontFamily.body,
+    fontSize: FontSize.base,
+    color: 'rgba(255,255,255,0.7)',
+    textAlign: 'center',
   },
 
   /* Rings */
@@ -212,27 +271,25 @@ const styles = StyleSheet.create({
     fontSize: FontSize.xl,
     fontWeight: FontWeight.bold,
     color: Brand.white,
-    marginBottom: Spacing.xl,
+    marginBottom: Spacing.md,
+  },
+  errorLabel: {
+    color: Semantic.danger,
   },
 
-  /* Waveform */
-  waveform: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-    height: 32,
-    marginBottom: Spacing['3xl'],
-  },
-  waveBar: {
-    width: 3,
-    borderRadius: 1.5,
-    backgroundColor: JaridaPurple[400],
-    opacity: 0.8,
+  /* Transcript */
+  transcript: {
+    fontFamily: FontFamily.body,
+    fontSize: FontSize.base,
+    color: 'rgba(255,255,255,0.7)',
+    marginBottom: Spacing.lg,
+    textAlign: 'center',
   },
 
   /* Suggested phrases */
   suggestedSection: {
     alignItems: 'center',
+    marginTop: Spacing['3xl'],
     marginBottom: Spacing['3xl'],
   },
   suggestedTitle: {
@@ -257,6 +314,7 @@ const styles = StyleSheet.create({
 
   /* Cancel */
   cancelBtn: {
+    marginTop: Spacing['3xl'],
     paddingHorizontal: Spacing['3xl'],
     paddingVertical: Spacing.md,
     borderRadius: Radii.pill,
