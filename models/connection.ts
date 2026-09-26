@@ -25,6 +25,17 @@ export function validPin(pin: string): boolean {
   return /^sha256\/[A-Za-z0-9+/]{43}=$/.test(pin);
 }
 
+/**
+ * The start of a pin, grouped for reading aloud against the Pond's own screen.
+ *
+ * Twelve characters are 72 bits: nobody can generate a key whose pin shares them
+ * with the real one, so matching these is as good as matching the whole pin.
+ */
+export function pinPreview(pin: string): string {
+  const body = pin.replace(/^sha256\//, '').slice(0, 12);
+  return `sha256/${body.match(/.{1,4}/g)?.join(' ') ?? ''}`;
+}
+
 export function normalizeHttpsUrl(raw: string): string {
   const url = new URL(raw);
   if (url.protocol !== 'https:' || !url.hostname || url.username || url.password ||

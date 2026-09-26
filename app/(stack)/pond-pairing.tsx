@@ -1,5 +1,5 @@
 import i18n from '@/services/i18n';
-import { normalizeHttpsUrl, validPin } from '@/models/connection';
+import { normalizeHttpsUrl, pinPreview, validPin } from '@/models/connection';
 /**
  * PondPairingScreen — 4-step pairing wizard:
  *   0. Find the GIAP server: discovered over mDNS, scanned from the QR, or typed
@@ -156,8 +156,9 @@ function DiscoverStep({
   onScan: () => void;
 }) {
   const { data, error, actions } = useDiscovery();
-  // The advertisement already carried this Pond's pin, so hand it on rather
-  // than making the next step browse for the same record again.
+  // The advertisement already carried a pin, so hand it on rather than making
+  // the next step browse for the same record again. It is still only a claim:
+  // the next step has the user check it against the Pond's own screen.
   const pick = (pond: DiscoveredPond) => onNext(pond.url, pond.pin);
 
   return (
@@ -223,12 +224,13 @@ function DiscoverStep({
  * server older than the `pin` TXT record looks like; the caller asks for the
  * fingerprint by hand in both cases.
  *
- * A pin learned this way is not trusted on the strength of where it came from.
- * mDNS is unauthenticated, so anything on this network can claim to be the Pond
- * and offer its own key. What makes that harmless is the handshake: it binds the
- * certificate actually served into the proof it computes from the pairing code,
- * so a pin belonging to anyone but the Pond ends the pair with a failure rather
- * than a wrong success.
+ * A pin learned this way is only a claim. mDNS is unauthenticated, so anything
+ * on this network can answer with its own key -- and the handshake cannot catch
+ * that: whoever holds the pin terminates TLS, receives the phone's proof, and
+ * can recover a six-digit code from it offline in about a second, then forge the
+ * Pond's half. So the user confirms the pin against the Pond's own dashboard
+ * before it is used (see ServerStep), the out-of-band check that a QR scan or a
+ * typed fingerprint already is.
  */
 async function discoverFingerprint(origin: string): Promise<string | null> {
   const { hostname, port } = new URL(origin);
@@ -249,6 +251,10 @@ function ServerStep({
   onScan: () => void;
 }) {
   const [pin, setPin] = useState(initialPin);
+  // A pin that came off the network rather than from the user must be confirmed
+  // against the Pond's screen before it is trusted. See discoverFingerprint.
+  const [pinFromNetwork, setPinFromNetwork] = useState(!!initialPin);
+  const [confirming, setConfirming] = useState<{ url: string; pin: string } | null>(null);
   const [url, setUrl] = useState(initial);
   const [checking, setChecking] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -291,17 +297,57 @@ function ServerStep({
           return;
         }
         setPin(discovered);
+        setPinFromNetwork(true);
         fingerprint = discovered;
       }
       if (!validPin(fingerprint)) {
         setError(i18n.t('pairing.invalid'));
         return;
       }
+      if (pinFromNetwork || fingerprint !== pin.trim()) {
+        setConfirming({ url: normalized, pin: fingerprint });
+        return;
+      }
       await onNext(normalized, fingerprint);
     }
     catch (error) { setError(error instanceof Error ? error.message : i18n.t('pairing.failed')); }
     finally { setChecking(false); }
-  }, [url, pin, onNext]);
+  }, [url, pin, pinFromNetwork, onNext]);
+
+  const confirmMatch = useCallback(async () => {
+    if (!confirming) return;
+    setChecking(true); setError(null);
+    try { await onNext(confirming.url, confirming.pin); }
+    catch (error) { setError(error instanceof Error ? error.message : i18n.t('pairing.failed')); }
+    finally { setChecking(false); setConfirming(null); }
+  }, [confirming, onNext]);
+
+  const rejectMatch = useCallback(() => {
+    setConfirming(null);
+    setPin('');
+    setPinFromNetwork(false);
+    setAskForPin(true);
+    setError(i18n.t('pairing.fingerprintMismatch'));
+  }, []);
+
+  if (confirming) {
+    return (
+      <StepBody>
+        <InkIcon name="shield" size={28} tone="brand" />
+        <Text style={styles.stepTitle}>{i18n.t('pairing.fingerprintConfirmTitle')}</Text>
+        <Text style={styles.stepDesc}>{i18n.t('pairing.fingerprintConfirmDesc')}</Text>
+        <Text style={styles.pinPreview} selectable>{pinPreview(confirming.pin)}</Text>
+        <Text style={styles.stepDesc}>{i18n.t('pairing.fingerprintConfirmWhy')}</Text>
+        {error ? <Text style={styles.stepError}>{error}</Text> : null}
+        <InkButton variant="primary" disabled={checking} onPress={confirmMatch}>
+          {checking ? i18n.t('pairing.fingerprintSearching') : i18n.t('pairing.fingerprintMatches')}
+        </InkButton>
+        <InkButton variant="quiet" disabled={checking} onPress={rejectMatch}>
+          {i18n.t('pairing.fingerprintDiffers')}
+        </InkButton>
+      </StepBody>
+    );
+  }
 
   return (
     <StepBody>
@@ -328,7 +374,7 @@ function ServerStep({
         <View style={styles.inputGroup}>
           <Text style={styles.inputLabel}>{i18n.t('pairing.fingerprint')}</Text>
           <TextInput style={styles.textInput} value={pin}
-            onChangeText={(t) => { setPin(t); setError(null); }}
+            onChangeText={(t) => { setPin(t); setPinFromNetwork(false); setError(null); }}
             placeholder="sha256/..." autoCapitalize="none" autoCorrect={false} editable={!checking} />
           <Text style={styles.stepDesc}>{i18n.t('pairing.fingerprintHint')}</Text>
         </View>
@@ -736,6 +782,13 @@ const styles = StyleSheet.create({
     color: Grey[500],
     textAlign: 'center',
     lineHeight: FontSize.base * 1.5,
+  },
+  pinPreview: {
+    fontFamily: FontFamily.mono,
+    fontSize: FontSize.lg,
+    color: Brand.charcoal,
+    textAlign: 'center',
+    letterSpacing: 1,
   },
   stepError: {
     fontFamily: FontFamily.body,
