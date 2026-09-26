@@ -117,3 +117,26 @@ it('keeps the pairing when the revoke did not reach the Pond', async () => {
 
   await act(async () => { tree.unmount(); });
 });
+
+// The tab layout redirects to pairing when nothing is paired. Staging another pairing clears the
+// in-memory identity while the stored one stays, so the gate must key on the stored pairing, or
+// starting "Pair another Pond" throws the user out of the tabs mid-wizard.
+it('still reports a stored pairing while another is being staged', async () => {
+  (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+  let server!: ReturnType<typeof useServer>;
+  const Child = () => { server = useServer(); return null; };
+  let tree!: ReactTestRenderer;
+  await act(async () => { tree = create(<ServerProvider><Child /></ServerProvider>); });
+  expect(server.paired).toBe(true);
+
+  let staging!: Promise<unknown>;
+  await act(async () => {
+    staging = server.stagePairing({ version: 2, host: 'other.local', port: 4443,
+      localUrls: ['https://192.168.1.3:4443'] }, `sha256/${'B'.repeat(43)}=`).catch((error: Error) => error);
+  });
+  expect(server.profileId).toBe('');
+  expect(server.paired).toBe(true);
+
+  await act(async () => { await server.cancelPairing(); await staging; });
+  await act(async () => { tree.unmount(); });
+});

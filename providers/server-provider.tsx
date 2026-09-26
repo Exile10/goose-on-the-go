@@ -30,6 +30,8 @@ interface ServerContextValue {
   /** Announce that the Pond has stopped recognising this phone. Terminal. */
   revoke: () => void;
   profileId: string;
+  /** Whether a pairing is stored, including while another pairing is being staged over it. */
+  paired: boolean;
   remoteEnabled: boolean;
   keepLocalOnly: () => Promise<void>;
   setRemoteEndpoint: (url: string, control: string, current: () => void) => Promise<void>;
@@ -464,7 +466,7 @@ export function ServerProvider({ children }: PropsWithChildren) {
   const value = useMemo<ServerContextValue>(() => ({
     serverUrl: snapshot.url ?? '', online: !!snapshot.url, token: identity?.session ?? null,
     refreshToken: identity?.refresh ?? null, connectionState: snapshot.state,
-    profileId: identity?.id ?? '', remoteEnabled: saved.current?.profile.remoteAccess?.mode === 'embedded',
+    profileId: identity?.id ?? '', paired: !!saved.current, remoteEnabled: saved.current?.profile.remoteAccess?.mode === 'embedded',
     keepLocalOnly, hydrated, screenModes, isScreenReal, setScreenMode,
     checkHealth, setRemoteEndpoint, recover: manager.recover, revoke: manager.revoke.bind(manager), stagePairing, cancelPairing, pair, signOut,
   }), [snapshot, identity, hydrated, screenModes, isScreenReal, setScreenMode, checkHealth, setRemoteEndpoint, keepLocalOnly, manager, stagePairing, cancelPairing, pair, signOut]);

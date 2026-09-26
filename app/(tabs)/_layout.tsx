@@ -145,7 +145,7 @@ function CustomTabBar({ state, navigation }: any) {
 }
 
 export default function TabLayout() {
-  const { hydrated, profileId } = useServer();
+  const { hydrated, paired } = useServer();
 
   // Nothing in this app works without a paired Pond, so an app that has none
   // reaches none of it. A fresh install and a phone that just signed out land
@@ -157,10 +157,14 @@ export default function TabLayout() {
   // connection would throw somebody onto the pairing screen in the middle of
   // setting remote access up, which is what the previous attempt did.
   //
+  // Nor on the in-memory identity. Staging another pairing clears that while the
+  // stored one stays, and redirecting then replaced the tabs mid-wizard, so
+  // backing out of "Pair another Pond" no longer led back to them.
+  //
   // `hydrated` is what says the stored identity has been read back. Without
   // it, every cold start would bounce through pairing before discovering it is
   // already paired.
-  if (hydrated && !profileId) return <Redirect href="/(stack)/pond-pairing" />;
+  if (hydrated && !paired) return <Redirect href="/(stack)/pond-pairing" />;
 
   return (
     <Tabs tabBar={(props) => <CustomTabBar {...props} />} screenOptions={{ headerShown: false }}>
