@@ -14,7 +14,7 @@ jest.mock('@/services/paired-profile', () => ({
   loadPairedProfile: jest.fn(async () => ({ saved: null, upgrade: false })), commitPairedProfile: jest.fn(),
 }));
 jest.mock('@/services/pond-trust', () => ({ configurePondTrust: jest.fn(async () => undefined), PondTrustError: class extends Error {} }));
-jest.mock('@/services/discovery', () => ({ findPondByHost: jest.fn(async () => null) }));
+jest.mock('@/services/discovery', () => ({ findPondByHost: jest.fn(async () => null), findPondAt: jest.fn(async () => null) }));
 jest.mock('@/services/api-client', () => ({
   api: { setRecovery: jest.fn(), setAuthRevoked: jest.fn(), setOnTokensRotated: jest.fn(), invalidateIdentity: jest.fn() },
   PondApiClient: jest.fn(),

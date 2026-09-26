@@ -338,3 +338,21 @@ describe('findPondAt', () => {
     await expect(pending).resolves.toBeNull();
   });
 });
+
+/**
+ * An address is not a machine name. Reduced to its first label it became "192",
+ * which matched any Pond on the subnet whose resolver fell back to an IP-literal
+ * hostname -- and never the Pond itself on a platform that reports real names.
+ */
+describe('a numeric address as a host', () => {
+  it('does not match a different Pond whose hostname is an address', async () => {
+    const pending = findPondAt('192.168.1.7', 8080, 50);
+    instances[0].emit('resolved', resolved({ host: '192.168.1.9', addresses: ['192.168.1.9'] }));
+
+    await expect(pending).resolves.toBeNull();
+  });
+
+  it('is not searched for as a name', async () => {
+    await expect(findPondByHost('192.168.1.7', 8080, 1_000)).resolves.toBeNull();
+  });
+});

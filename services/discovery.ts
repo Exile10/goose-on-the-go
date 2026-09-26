@@ -121,6 +121,9 @@ function advertisedPin(raw: unknown): string | undefined {
  * match, which is what keeps this from being a loose match on a common name.
  */
 function normalizeHostname(host: string | undefined): string | undefined {
+  // An address is not a machine name. Its first label ("192") would match every
+  // Pond on the same subnet, and never the one that was meant.
+  if (host && /^\d{1,3}(\.\d{1,3}){3}\.?$/.test(host.trim())) return undefined;
   const trimmed = host
     ?.trim()
     .replace(/\.$/, '')

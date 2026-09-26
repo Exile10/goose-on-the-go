@@ -8,12 +8,14 @@ import { SecureStorage } from '@/services/secure-storage';
 import { ApiError, api, PondApiClient, type HandshakeResponse } from '@/services/api-client';
 import { ConnectionManager, type ConnectionSnapshot } from '@/services/connection-manager';
 import { configurePondTrust, PondTrustError } from '@/services/pond-trust';
-import { findPondByHost } from '@/services/discovery';
+import { findPondAt, findPondByHost } from '@/services/discovery';
 import { parseConnectionProfile, validPin, isLocalPairingUrl, type ConnectionProfile } from '@/models/connection';
 import i18n from '@/services/i18n';
 import { cancelRemoteAccess, restoreRemoteAccess, resumeRemoteAccess } from '@/services/remote-access';
 import { getInstallId } from '@/services/install-id';
 import { canBeat, HEARTBEAT_MS } from '@/services/heartbeat';
+
+const NUMERIC_HOST = /^\d{1,3}(\.\d{1,3}){3}$/;
 
 interface PairOptions { clientId: string; pairingCode: string; deviceName?: string }
 interface ServerContextValue {
@@ -314,8 +316,15 @@ export function ServerProvider({ children }: PropsWithChildren) {
       await trust(profile.localUrls, pin);
       if (op !== operation.current) throw new Error(i18n.t('pairing.failed'));
       const candidates = [...profile.localUrls];
-      const found = await findPondByHost(profile.host, profile.port);
+      // A numeric host names no machine, so rediscovery after the Pond's lease changes
+      // could never find it again. Ask the network which Pond answers at that address
+      // and keep its advertised name instead.
+      const numericHost = NUMERIC_HOST.test(profile.host);
+      const found = numericHost
+        ? await findPondAt(profile.host, profile.port, 3_000)
+        : await findPondByHost(profile.host, profile.port);
       if (op !== operation.current) throw new Error(i18n.t('pairing.failed'));
+      const host = numericHost && found?.hostname ? found.hostname : profile.host;
       if (found && isLocalPairingUrl(found.url) && !candidates.includes(found.url)) candidates.push(found.url);
       await trust(candidates, pin);
       let trustRejected = false;
@@ -325,7 +334,7 @@ export function ServerProvider({ children }: PropsWithChildren) {
         try { verified = await probe(url); } catch (error) { if (error instanceof PondTrustError) trustRejected = true; }
         if (verified) {
           if (op !== operation.current) throw new Error(i18n.t('pairing.failed'));
-          staged.current = { profile: { ...profile, localUrls: candidates }, pin, client: new PondApiClient(url) };
+          staged.current = { profile: { ...profile, host, localUrls: candidates }, pin, client: new PondApiClient(url) };
           return;
         }
       }
