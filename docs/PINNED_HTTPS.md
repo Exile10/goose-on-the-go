@@ -162,12 +162,14 @@ symbols even though compilation passed. `EXPO_USE_PRECOMPILED_MODULES=false`
 now builds the installed Expo sources together; React Native's supported prebuilt
 core remains in use. No linker checks are suppressed.
 
-The SDK 56 template also lacked the [scene lifecycle required by iOS 27](https://developer.apple.com/documentation/uikit/transitioning-to-the-uikit-scene-based-life-cycle).
-`PondSceneDelegate` now creates the window, forwards Expo lifecycle events and
-warm links, and supplies cold links to React Native's launch options. The plugin
-registers the scene and installs TLS before React Native initialization. These
-changes survive Expo prebuild. Background/foreground AppState delivery and
-successful pinned requests after resume are verified in the simulator.
+The SDK 56 template also lacked the [scene lifecycle required by iOS 27](https://developer.apple.com/documentation/uikit/transitioning-to-the-uikit-scene-based-life-cycle),
+so this plugin once carried its own `PondSceneDelegate`. SDK 57.0.23 ships
+`ExpoAppSceneDelegate` behind expo-build-properties' `ios.enableSceneSupport`,
+and the app now uses that instead: it creates the window, forwards lifecycle
+events, warm and cold links, user activities and quick actions to every
+`ExpoAppDelegate` subscriber. Keeping both fails prebuild, because each declares
+`UIApplicationSceneManifest` and each rewrites the AppDelegate's window startup.
+This plugin now only installs TLS before React Native initialization.
 
 Final Debug/simulator and unsigned Release/iphoneos builds both pass with these
 compatibility changes. Device Release compilation does not establish physical
