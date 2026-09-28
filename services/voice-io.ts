@@ -73,7 +73,30 @@ export const useMicStream: (onBuffer: (buffer: MicBuffer) => void) => {
       });
       return {
         start: () => stream.start(),
-        stop: () => stream.stop(),
+        // Stopping a stream that is already gone is not an error, and it is the
+        // normal path out of voice mode. Leaving the dock runs `end()`, which
+        // stops the stream, and then unmounts VoiceDock -- at which point
+        // expo-audio's own hook releases the native AudioStream while our
+        // cleanup effect is still queued to stop it. The released object then
+        // rejects the call:
+        //
+        //   Call to function 'AudioStream.stop' has been rejected.
+        //   -> Cannot use shared object that was already released
+        //
+        // which React raises as a fatal JavascriptException from
+        // commitHookEffectListUnmount, taking the app down every time the user
+        // switched from the orb back to the keyboard. Both callers are right to
+        // ask; there is simply nothing left to stop, so say so by returning
+        // rather than by throwing.
+        stop: () => {
+          try {
+            stream.stop();
+          } catch {
+            // Already stopped or already released. Not logged: this is the
+            // expected teardown order, not a failure, and it happens on every
+            // exit from voice mode.
+          }
+        },
       };
     }
   : () => ({ start: async () => {}, stop: () => {} });
