@@ -180,7 +180,9 @@
     "voice": {
       "open": "Talk to Goose",
       "needsUpdate": "Voice needs the newest build of the app.",
-      "micDenied": "Microphone access is off for Goose On The Go. Turn it on in Settings to talk to Goose.",
+      "micDenied": "Goose On The Go needs the microphone to hear you. Tap the orb to allow it.",
+      "micBlocked": "Microphone access is off. Tap here to turn it on in Settings.",
+      "micBlockedHint": "Opens this app's settings, where the microphone can be turned on.",
       "micFailed": "The microphone could not start.",
       "hearFailed": "Your Pond could not make that out. Tap to try again.",
       "speakFailed": "Your Pond could not say that out loud. The answer is above.",
