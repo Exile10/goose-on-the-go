@@ -150,7 +150,7 @@ function NowPlayingCard({ playing }: { playing: NowPlaying }) {
   const { t } = useTranslation();
 
   return (
-    <InkCard style={styles.rightNowCard}>
+    <InkCard style={styles.rightNowCard} contentStyle={styles.rightNowFace}>
       <Text style={styles.cardEyebrow}>{t('home.nowPlaying')}</Text>
       {playing.state === 'playing' ? (
         <>
@@ -183,7 +183,7 @@ function NextRoutineCard({ routine, now }: { routine: NextRoutine; now: Date }) 
   const until = untilOf(routine.nextRun, now);
 
   return (
-    <InkCard style={styles.rightNowCard}>
+    <InkCard style={styles.rightNowCard} contentStyle={styles.rightNowFace}>
       <Text style={styles.cardEyebrow}>{t('home.nextRoutine')}</Text>
       <Text style={styles.cardTitle} numberOfLines={2}>
         {routine.label}
@@ -517,6 +517,11 @@ const makeStyles = (c: ThemeColors) =>
     marginBottom: Spacing.lg,
   },
   rightNowCard: { flex: 1 },
+  // The row stretches both cards to the taller one, but InkCard's raised plate
+  // fills that height while its face only wraps its content — so the card with
+  // less to say showed a slab of bare ink below it. The face takes the height
+  // too, and the pair reads as one row again.
+  rightNowFace: { flex: 1 },
   cardEyebrow: {
     fontFamily: FontFamily.body,
     fontSize: FontSize.xs,
@@ -535,8 +540,8 @@ const makeStyles = (c: ThemeColors) =>
     color: c.textSecondary,
     marginTop: 2,
   },
-  waveformRow: { marginTop: Spacing.md },
-  routineBadge: { alignSelf: 'flex-start', marginTop: Spacing.md },
+  waveformRow: { marginTop: 'auto', paddingTop: Spacing.md },
+  routineBadge: { alignSelf: 'flex-start', marginTop: 'auto', paddingTop: Spacing.md },
 
   convoRow: {
     flexDirection: 'row',
