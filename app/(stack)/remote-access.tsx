@@ -59,7 +59,7 @@ export default function RemoteAccessScreen() {
  */
 const makeStyles = (c: ThemeColors) =>
   StyleSheet.create({
-    page: { flex: 1, padding: 28, paddingTop: 80, gap: 24, backgroundColor: c.background },
+    page: { flex: 1, padding: 28, gap: 24, backgroundColor: c.background },
     title: { fontSize: 28, fontWeight: '600', color: c.text },
     body: { fontSize: 16, lineHeight: 24, color: c.textSecondary },
     tone: { fontSize: 16, lineHeight: 24 },
