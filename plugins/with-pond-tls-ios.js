@@ -35,6 +35,10 @@ module.exports = function withPondTlsIOS(config) {
     return mod;
   });
   config = withPodfile(config, (mod) => {
+    // The framework is a gitignored build output; without it pod install vendors nothing.
+    if (!fs.existsSync(path.join(mod.modRequest.projectRoot, 'native/pondnet/Pondnet.xcframework'))) {
+      throw new Error('Pond embedded networking is missing native/pondnet/Pondnet.xcframework; run scripts/build-embedded-network.sh ios');
+    }
     if (!mod.modResults.contents.includes("pod 'Pondnet'")) mod.modResults.contents = mod.modResults.contents.replace(/(target '[^']+' do)/, "$1\n  pod 'Pondnet', :path => '../native/pondnet'");
     const marker = '# Align resource bundle targets with the app minimum supported iOS.';
     if (!mod.modResults.contents.includes(marker)) {

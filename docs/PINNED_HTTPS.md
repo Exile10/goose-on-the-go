@@ -209,11 +209,17 @@ secure persistence, foreground and scratch-Pond integration suites. These suites
 exercise LAN/loopback transport with the embedded library linked; they do not yet
 prove embedded proxy activation or cellular roaming.
 
-Run `scripts/build-embedded-network.sh android|ios|all` against the adjacent Pond
-checkout (override `POND_SOURCE_ROOT` if necessary). Go and gomobile versions come
-from that checkout's `native/pondnet/go.mod`; the script builds its pinned gobind
-rather than depending on a globally installed version. Regenerate through Expo
-prebuild afterward. Keep iOS Debug and Release builds serialized: React Native
+Run `npm run build:network` (or `scripts/build-embedded-network.sh android|ios|all`)
+against the adjacent Pond checkout (override `POND_SOURCE_ROOT` if necessary). Go and
+gomobile versions come from that checkout's `native/pondnet/go.mod`; the script builds
+its pinned gobind rather than depending on a globally installed version. It finds the
+Android SDK and the newest complete NDK itself, and checks every prerequisite before
+compiling anything. It skips a platform whose inputs are unchanged since its last build,
+recorded under the gitignored `native/pondnet/.build/` (`--force` overrides that).
+It refuses to start while another build is writing `native/pondnet`, and swaps a
+library into place only once it is complete. A cold Android build compiles Tailscale
+for four ABIs and is slow, so the script reports its elapsed time every 30 seconds.
+Regenerate through Expo prebuild afterward. Keep iOS Debug and Release builds serialized: React Native
 replaces shared prebuilt frameworks under `ios/Pods`, even when DerivedData differs.
 
 Logout now requires the Pond's positive revocation acknowledgment before clearing
