@@ -4,6 +4,8 @@ import type { TFunction } from 'i18next';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useServer } from '@/providers/server-provider';
+import { useThemedStyles } from '@/hooks/use-themed-styles';
+import type { ThemeColors } from '@/constants/colors';
 import '@/services/i18n';
 import type { ConnectionState } from '@/models/connection';
 
@@ -49,6 +51,7 @@ const NEEDS_ATTENTION: readonly ConnectionState[] = [
 
 export function ConnectionStatus() {
   const { connectionState, recover } = useServer();
+  const styles = useThemedStyles(makeStyles);
   const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -65,7 +68,23 @@ export function ConnectionStatus() {
     <Text accessibilityLiveRegion="polite" style={styles.text}>{stateLabel(t, connectionState)}</Text>
   </Pressable>;
 }
-const styles = StyleSheet.create({
-  container: { paddingHorizontal: 16, paddingVertical: 6, backgroundColor: '#f3f0fa' },
-  text: { color: '#46336b', fontSize: 12, textAlign: 'center' },
-});
+/*
+ * Themed, because this strip is drawn behind the notification bar.
+ *
+ * The colours were a hardcoded pale lavender on deep purple. The root layout
+ * sets the system status bar's content to light in dark mode, so those white
+ * icons landed on a near-white strip and the clock, signal and battery became
+ * unreadable -- the notification bar was there, and could not be seen. A
+ * surface that follows the scheme keeps the contrast the system is expecting.
+ */
+const makeStyles = (c: ThemeColors) =>
+  StyleSheet.create({
+    container: {
+      paddingHorizontal: 16,
+      paddingVertical: 6,
+      backgroundColor: c.backgroundSecondary,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: c.border,
+    },
+    text: { color: c.text, fontSize: 12, textAlign: 'center' },
+  });
