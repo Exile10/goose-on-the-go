@@ -27,6 +27,26 @@ function stateLabel(t: TFunction, state: ConnectionState): string {
   }
 }
 
+/**
+ * The states that need saying. A working connection is not one of them.
+ *
+ * This banner sits above the navigator in the root layout, so whatever it draws
+ * it draws over the notification bar and pushes every screen down -- and the
+ * screens below apply the top inset again, which is the empty strip under it.
+ * Paying that permanently to report "Connected locally" spent the status bar on
+ * news that nothing is wrong, which Home already shows beside the Pond's
+ * address. Healthy connections say nothing; the banner appears when there is
+ * something to act on, and is the control that acts on it.
+ */
+const NEEDS_ATTENTION: readonly ConnectionState[] = [
+  'trust',
+  'unpaired',
+  'upgrade',
+  'reconnecting',
+  'disconnected',
+  'revoked',
+];
+
 export function ConnectionStatus() {
   const { connectionState, recover } = useServer();
   const { t } = useTranslation();
@@ -40,6 +60,7 @@ export function ConnectionStatus() {
     if (['unpaired', 'upgrade', 'revoked'].includes(connectionState)) router.push('/(stack)/pond-pairing');
     else void recover();
   };
+  if (!NEEDS_ATTENTION.includes(connectionState)) return null;
   return <Pressable accessibilityRole="button" onPress={act} style={[styles.container, { paddingTop: insets.top + 6 }]}>
     <Text accessibilityLiveRegion="polite" style={styles.text}>{stateLabel(t, connectionState)}</Text>
   </Pressable>;
