@@ -358,9 +358,12 @@ export default function HomeScreen() {
           </>
         ) : null}
 
-        <InkTitle level={3} style={styles.section}>
-          {t('home.conversations')}
-        </InkTitle>
+        <View style={styles.sectionHeader}>
+          <InkTitle level={3}>{t('home.conversations')}</InkTitle>
+          <GPressable onPress={() => router.push('/(tabs)/chat')}>
+            <Text style={styles.seeAllText}>{t('common.seeAll')}</Text>
+          </GPressable>
+        </View>
         {recent.data.sessions.map((c) => (
           <GPressable
             key={c.id}
