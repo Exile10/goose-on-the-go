@@ -118,7 +118,11 @@ export function ChatDock({ onSend, onVoice, onAttach, busy, bottomInset = 0 }: C
     borderWidth: theme.edge.hairlineWidth,
   };
   const field = inkText(theme, { size: 'md' });
-  const foot = keyboard ? Spacing.sm : bottomInset + Spacing.xs;
+  // Clear of the keyboard by a full step, not half of one. Vendor keyboards
+  // (Samsung's among them) draw a toolbar row of their own inside the height
+  // they report, so 8px put the composer visually against that row rather than
+  // above it — the input read as part of the keyboard.
+  const foot = keyboard ? Spacing.lg : bottomInset + Spacing.xs;
 
   return (
     <View pointerEvents="box-none" style={[styles.dock, { paddingBottom: foot }]}>
