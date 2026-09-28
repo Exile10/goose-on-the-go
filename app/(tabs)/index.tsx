@@ -567,9 +567,14 @@ const makeStyles = (c: ThemeColors) =>
   devicesGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: Spacing.md,
+    // `space-between` rather than a column gap, so the pair spans the full
+    // content width and its right edge lands where the Right now row's does.
+    // At 47% plus a gap the grid stopped ~25px short of every other card on
+    // the screen, which is the ragged edge under "Devices".
+    justifyContent: 'space-between',
+    rowGap: Spacing.md,
   },
-  deviceCard: { width: '47%' },
+  deviceCard: { width: '48%' },
   deviceIconWrap: {
     width: 34,
     height: 34,
