@@ -252,17 +252,17 @@ describe('pair() channel binding', () => {
     }
   });
 
-  // The dashboard, and a Pond older than the binding: no pin, the original
-  // transcript, and no proof to demand back.
-  it('sends the unbound MAC and asks for no proof when there is no pin', async () => {
-    const fetch = pairingFetch(accepted); setFetch(fetch);
+  // The Pond names why it refused, so the screen can say something truer than "not on the LAN".
+  it('carries the Pond\'s refusal identifier on a failed verify', async () => {
+    const fetch = jest.fn(async (url: string) =>
+      String(url).endsWith('/init')
+        ? new Response(JSON.stringify({ challenge_id: 'c1', challenge: CHALLENGE, expires_at: '' }), { status: 200 })
+        : new Response(JSON.stringify({ error: 'channel_binding_required' }), { status: 403 }),
+    );
+    setFetch(fetch);
     const client = new PondApiClient('https://192.168.1.7:4443');
-
-    await expect(client.pair({ clientId: CLIENT_ID, pairingCode: CODE })).resolves.toMatchObject({
-      accepted: true,
-    });
-    const body = JSON.parse(String(fetch.mock.calls[1]?.[1]?.body));
-    expect(body.channel_binding).toBeNull();
-    expect(body.mac).toBe('b922abd25f5f1519c9d0f8ccabab4ed17b3e888a3b868be9cfdc320de017ec30');
+    await expect(
+      client.pair({ clientId: CLIENT_ID, pairingCode: CODE, channelBinding: PIN }),
+    ).rejects.toMatchObject({ status: 403, code: 'channel_binding_required' });
   });
 });

@@ -77,12 +77,15 @@ import { MODEL_CATEGORIES } from './types';
 export class ApiError extends Error {
   readonly status: number;
   readonly retryAfterSecs: number | null;
+  /** The Pond's own `{error}` identifier, when it sent one, e.g. `channel_binding_required`. */
+  readonly code: string | null;
 
-  constructor(message: string, status: number, retryAfterSecs: number | null) {
+  constructor(message: string, status: number, retryAfterSecs: number | null, code: string | null = null) {
     super(message);
     this.name = 'ApiError';
     this.status = status;
     this.retryAfterSecs = retryAfterSecs;
+    this.code = code;
   }
 
   /** True when retrying later could plausibly succeed. */
@@ -337,7 +340,7 @@ export class PondApiClient {
     challengeId: string;
     mac: string;
     deviceName?: string;
-    channelBinding?: string;
+    channelBinding: string;
   }): Promise<HandshakeResponse> {
     const res = await this.send(`${this.baseUrl}/api/v1/handshake/verify`, {
       method: 'POST',
@@ -346,14 +349,19 @@ export class PondApiClient {
         challenge_id: input.challengeId,
         mac: input.mac,
         device_name: input.deviceName ?? null,
-        channel_binding: input.channelBinding ?? null,
+        channel_binding: input.channelBinding,
       }),
     });
     if (!res.ok) {
+      const code = await res
+        .json()
+        .then((body: { error?: unknown }) => (typeof body.error === 'string' ? body.error : null))
+        .catch(() => null);
       throw new ApiError(
         `handshake/verify failed: ${res.status}`,
         res.status,
         parseRetryAfter(res),
+        code,
       );
     }
     return (await res.json()) as HandshakeResponse;
@@ -370,9 +378,10 @@ export class PondApiClient {
     /**
      * The Pond public-key pin this connection is pinned to, folded into the
      * proof so it is this pairing that certifies the key rather than the other
-     * way round. See {@link pairTranscript}.
+     * way round. Required: the Pond refuses an unbound pairing from a phone.
+     * See {@link pairTranscript}.
      */
-    channelBinding?: string;
+    channelBinding: string;
   }): Promise<HandshakeResponse> {
     const epoch = this.identityEpoch;
     const init = await this.handshakeInit({ clientId: input.clientId });
@@ -393,7 +402,7 @@ export class PondApiClient {
     // own, and this phone would be paired with the interceptor. Only something
     // holding the pairing code can produce the proof, so checking it is what
     // makes a pin that arrived over an untrusted route safe to use.
-    if (input.channelBinding && resp.accepted) {
+    if (resp.accepted) {
       const expected = toHex(
         hmacSha256(key, pairTranscript(SERVER_LABEL, challenge, input.clientId, input.channelBinding)),
       );

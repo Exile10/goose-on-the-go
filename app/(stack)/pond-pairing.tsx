@@ -690,7 +690,7 @@ export default function PondPairingScreen() {
         setCompletionState('error');
         setCompletionReason(
           e instanceof ApiError && e.status === 403
-            ? t('pairing.lan')
+            ? t(e.code === 'channel_binding_required' ? 'pairingErrors.bindingRequired' : 'pairing.lan')
             : describeTransportFailure(e, t),
         );
       }
