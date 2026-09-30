@@ -26,6 +26,9 @@ final class PondNetwork {
       guard (1...3).contains(part.count), part.allSatisfy({ ("0"..."9").contains($0) }) else { return nil }
       return Int(part)
     }
+    // Tailscale's own service address (MagicDNS and the local API) is never a Pond, and
+    // proxying to it would hand the page a way to query this node's resolver.
+    if bytes == [100, 100, 100, 100] || ["fd7a:115c:a1e0::53", "fd7a:115c:a1e0:0:0:0:0:53"].contains(host.lowercased()) { return false }
     return (parts.count == 4 && bytes.count == 4 && bytes.allSatisfy { (0...255).contains($0) } && bytes[0] == 100 && (64...127).contains(bytes[1])) || host.lowercased().hasPrefix("fd7a:115c:a1e0:")
   }
   static func configure(_ origins: [String]) throws {

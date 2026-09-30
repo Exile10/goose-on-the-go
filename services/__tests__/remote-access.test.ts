@@ -2,7 +2,7 @@ jest.mock('../api-client', () => ({ api: { requestLocal: jest.fn() } }));
 import i18n from '../i18n';
 import { AppState, NativeModules } from 'react-native';
 import { api } from '../api-client';
-import { enableRemoteAccess, cancelRemoteAccess, restoreRemoteAccess, resumeRemoteAccess } from '../remote-access';
+import { enableRemoteAccess, cancelRemoteAccess, machineKeyPreview, restoreRemoteAccess, resumeRemoteAccess } from '../remote-access';
 const local = 'https://192.168.1.2:4443';
 const control = 'https://coord.example';
 const pending = JSON.stringify({ state: 'NeedsLogin', machineKey: 'mkey:' + 'b'.repeat(64), authUrl: `${control}/register/pending-registration`, addresses: [] });
@@ -99,7 +99,8 @@ it('requires an explicit recovery request, waits for local approval and executes
   const commit = jest.fn(async () => undefined), onReview = jest.fn();
   const result = enableRemoteAccess('new-local-profile', local, jest.fn(), commit, { onReview });
   await jest.advanceTimersByTimeAsync(1000); await result;
-  expect(onReview).toHaveBeenCalledWith(id);
+  // The native node's own key, as the Pond's review will show it.
+  expect(onReview).toHaveBeenCalledWith(id, 'mkey:bbbb bbbb bbbb bbbb');
   expect(commit).toHaveBeenCalledTimes(1);
   expect(jest.mocked(api.requestLocal).mock.calls.filter(([, path, init]) => path.endsWith(id) && init?.method === 'POST')).toHaveLength(1);
   expect(jest.mocked(api.requestLocal).mock.calls.some(([, path]) => path.endsWith('/enrollment'))).toBe(false);
@@ -133,4 +134,9 @@ it('never replays an ambiguous replacement and preserves the saved profile', asy
   await expect(enableRemoteAccess('new-local-profile', local, jest.fn(), commit, { onReview: jest.fn() })).rejects.toThrow('replacement response lost');
   expect(commit).not.toHaveBeenCalled();
   expect(jest.mocked(api.requestLocal).mock.calls.filter(([, path, init]) => path.endsWith(id) && init?.method === 'POST')).toHaveLength(1);
+});
+
+it('shows the same start of the machine key as the Pond\'s review', () => {
+  expect(machineKeyPreview(`mkey:0123456789abcdef${'0'.repeat(48)}`)).toBe('mkey:0123 4567 89ab cdef');
+  expect(machineKeyPreview('')).toBe('mkey:');
 });
