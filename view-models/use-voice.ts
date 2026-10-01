@@ -69,7 +69,39 @@ export function isPhantom(text: string): boolean {
   const t = text.trim().toLowerCase().replace(/[.!?]+$/, '');
   if (!t) return true;
   if (/^[[(].*[\])]$/.test(t)) return true; // [BLANK_AUDIO], (music), [inaudible]
-  return ['you', 'thank you', 'thanks', 'thanks for watching', 'bye'].includes(t);
+  // 'bye' is excluded here: checkDismissal below gives it a proper spoken farewell
+  // instead of silently discarding it as noise.
+  return ['you', 'thank you', 'thanks', 'thanks for watching'].includes(t);
+}
+
+const EXIT_PHRASES = ['exit', 'quit'];
+const DISMISSAL_PHRASES = [
+  'bye',
+  'goodbye',
+  'good bye',
+  'see you',
+  'see ya',
+  'dismissed',
+  'stop',
+  'stop listening',
+  'shut up',
+  "that's all",
+  'that is all',
+  'go to sleep',
+  'never mind',
+  'nevermind',
+];
+
+/**
+ * Whole-utterance match (never a substring — "stop the kitchen timer" is not a
+ * dismissal) against a goodbye/stop phrase, so the auto-listen loop can end a
+ * conversation with a spoken farewell instead of asking the LLM.
+ */
+export function checkDismissal(text: string): { dismissed: boolean; isExit: boolean } {
+  const lower = text.trim().toLowerCase().replace(/[.!]+$/, '');
+  if (EXIT_PHRASES.some((p) => lower === p)) return { dismissed: true, isExit: true };
+  if (DISMISSAL_PHRASES.some((p) => lower === p)) return { dismissed: true, isExit: false };
+  return { dismissed: false, isExit: false };
 }
 
 export interface UseVoice {
@@ -206,10 +238,15 @@ export function useVoice(chat: {
   const listen = useCallback(async () => {
     // Asked first, and awaited, even where the answer is already known: every
     // state change here then happens after the effect that opened voice mode.
-    const allowed = await requestMicrophone();
+    const permission = await requestMicrophone();
     if (!alive.current) return;
-    if (!allowed) {
-      setError(t(voiceSupported() ? 'chat.voice.micDenied' : 'chat.voice.needsUpdate'));
+    if (!permission.granted) {
+      const key = !voiceSupported()
+        ? 'chat.voice.needsUpdate'
+        : permission.canAskAgain
+          ? 'chat.voice.micNeeded'
+          : 'chat.voice.micDisabled';
+      setError(t(key));
       setState('error');
       return;
     }
@@ -290,6 +327,36 @@ export function useVoice(chat: {
     }
   }, [listen, reportLevel, setState, t]);
 
+  /** A fixed spoken line (farewell/exit) — no LLM turn, then voice mode goes idle. */
+  const speakFarewell = useCallback(
+    async (line: string) => {
+      if (!speakerRef.current) {
+        setState('idle');
+        return;
+      }
+      setState('speaking');
+      try {
+        const bytes = await api.speak(line);
+        if (!alive.current) return;
+        const wav = new Uint8Array(bytes);
+        const env = envelope(wav);
+        const uri = cacheFile('reply', wav);
+        const playing = playFile(uri, (seconds) => {
+          const at = Math.floor((seconds * 1000) / env.stepMs);
+          reportLevel(env.levels.length ? orbLevel(env.levels[at] ?? 0) : 0.4);
+        });
+        await playing.done;
+        discardFile(uri);
+      } catch {
+        // A farewell that fails to play still ends the turn quietly.
+      } finally {
+        setLevel(0);
+        if (alive.current) setState('idle');
+      }
+    },
+    [reportLevel, setState],
+  );
+
   const converse = useCallback(
     async (text: string) => {
       const v = voice.current;
@@ -352,9 +419,14 @@ export function useVoice(chat: {
         void listen();
         return;
       }
+      const dismissal = checkDismissal(text);
+      if (dismissal.dismissed) {
+        void speakFarewell(t(dismissal.isExit ? 'chat.voice.farewellExit' : 'chat.voice.farewellPause'));
+        return;
+      }
       void converse(text);
     },
-    [converse, listen, setState, t],
+    [converse, listen, setState, speakFarewell, t],
   );
 
   // The microphone callback is created before `finish` exists, and must always

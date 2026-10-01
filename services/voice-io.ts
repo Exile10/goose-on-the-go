@@ -78,11 +78,17 @@ export const useMicStream: (onBuffer: (buffer: MicBuffer) => void) => {
     }
   : () => ({ start: async () => {}, stop: () => {} });
 
-/** Ask for the microphone. False when refused, or when there is no audio module. */
-export async function requestMicrophone(): Promise<boolean> {
-  if (!audio) return false;
+export interface MicPermission {
+  granted: boolean;
+  /** False once the OS requires Settings instead of a fresh prompt — denied permanently. */
+  canAskAgain: boolean;
+}
+
+/** Ask for the microphone. `granted` is false when refused, or when there is no audio module. */
+export async function requestMicrophone(): Promise<MicPermission> {
+  if (!audio) return { granted: false, canAskAgain: false };
   const permission = await audio.requestRecordingPermissionsAsync();
-  return permission.granted;
+  return { granted: permission.granted, canAskAgain: permission.canAskAgain };
 }
 
 /**
