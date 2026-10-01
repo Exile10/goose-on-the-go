@@ -34,6 +34,29 @@ HTTP-date form that is deliberately not supported.
 A regression test that passes against the buggy code is worthless. When you
 add one, confirm it fails before you apply the fix.
 
+## Prebuild
+
+```bash
+npm run check:prebuild   # expo prebuild for both platforms, in a scratch copy
+```
+
+The config plugins are code nothing else runs: jest does not load them, `tsc`
+does not type them and no CI prebuilds. Two of them once each adopted the iOS
+scene lifecycle, and the clash surfaced only at the next native build. The check
+copies the working tree to a temporary directory, links `node_modules`, and runs
+`expo prebuild --no-install` there, so it never clears this checkout's own `ios/`
+and `android/`.
+
+It needs what prebuild itself needs, including the untracked inputs: the
+Firebase config files and the `native/pondnet` libraries that
+`scripts/build-embedded-network.sh` produces. Without the libraries the plugins
+fail and name the command to run.
+
+`.githooks/pre-push` runs the same check against each pushed commit that changes
+`app.json`, `package.json`, the lockfile, `plugins/`, `patches/` or `native/`.
+`npm install` points `core.hooksPath` at `.githooks` through the `prepare` script;
+`git push --no-verify` skips it.
+
 ## Setup notes
 
 Two pieces of configuration are load-bearing and non-obvious:

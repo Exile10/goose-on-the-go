@@ -58,6 +58,8 @@ app-example
 /native/pondnet/*.aar
 /native/pondnet/*.jar
 /native/pondnet/*.xcframework/
+# scripts/build-embedded-network.sh: its lock, staging and up-to-date stamps
+/native/pondnet/.build/
 
 # Python native integration harness bytecode
 __pycache__/

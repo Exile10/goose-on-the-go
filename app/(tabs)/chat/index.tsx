@@ -1,0 +1,411 @@
+/**
+ * ConversationsScreen — the wall the Chat tab opens on.
+ *
+ * Every conversation the Pond is holding, as cards you scan rather than a list
+ * you read: pond-desktop's "Conversations" wall, brought to a phone. Three
+ * things carry it.
+ *
+ * - **The cards are the only loud thing.** They wear Ink's edge because they
+ *   are what the screen is for. The three controls floating over them are
+ *   chrome, in the bar's material, and stay quiet.
+ * - **A card is as tall as its conversation was long.** Three heights, by the
+ *   desktop's own rule, so the wall is a rough map of where the household's
+ *   attention went — which is what you scan for when you half remember a
+ *   conversation.
+ * - **The controls sit where a thumb is.** Search and a new conversation float
+ *   above the bar; the menu keeps the top corner until it is wanted.
+ *
+ * The menu holds the layout — this wall, or a quieter list of the same
+ * conversations under headings by date — the filter, and Select. Choosing
+ * several trades the corner's puck for Done and the dock for a bar that
+ * deletes what was chosen. Leaving the screen puts all of it away.
+ *
+ * The list is re-read whenever the wall comes back into view. The Pond names a
+ * conversation after its first exchange, so the one just left may have a title
+ * now that it did not have when it was opened.
+ */
+
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { BackHandler, Keyboard, LayoutAnimation, StyleSheet, View } from 'react-native';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import {
+  InkEmptyState,
+  InkNotice,
+  InkText,
+  InkTitle,
+  useReduceMotion,
+} from '@jarida/ink/native';
+
+import { ChromePill } from '@/components/patterns/chrome-pill';
+import { ChromePuck, PUCK_SIZE } from '@/components/patterns/chrome-puck';
+import { ConversationList } from '@/components/patterns/conversation-list';
+import { ConversationWall, WALL_GUTTER } from '@/components/patterns/conversation-wall';
+import { DOCK_GAP, WallDock } from '@/components/patterns/wall-dock';
+import { WallMenu } from '@/components/patterns/wall-menu';
+import { WallSelectionBar } from '@/components/patterns/wall-selection-bar';
+import { useThemedStyles } from '@/hooks/use-themed-styles';
+import {
+  useBottomBarInset,
+  useChromeRestore,
+  useChromeScroll,
+} from '@/providers/chrome-provider';
+import { useServer } from '@/providers/server-provider';
+import { caution, confirm, reject, selectionTick } from '@/services/haptics';
+import type { TranslationKey } from '@/services/i18n';
+import type { ThemeColors } from '@/constants/colors';
+import { Spacing } from '@/constants/spacing';
+import {
+  useChatHistory,
+  type HistoryFilter,
+  type HistoryView,
+} from '@/view-models/use-chat-history';
+
+/** The corner control's inset from the top of the safe area. The title aligns to it. */
+const CORNER_TOP = Spacing.sm;
+
+const VIEW_LABELS = {
+  grid: 'chat.history.viewGrid',
+  list: 'chat.history.viewList',
+} as const satisfies Record<HistoryView, TranslationKey>;
+
+const FILTER_LABELS = {
+  all: 'chat.history.filterAll',
+  chats: 'chat.history.filterChats',
+  routines: 'chat.history.filterRoutines',
+} as const satisfies Record<HistoryFilter, TranslationKey>;
+
+/** One empty selection, shared, so clearing one that is already clear renders nothing. */
+const NOTHING_SELECTED: ReadonlySet<string> = new Set();
+
+export default function ConversationsScreen() {
+  const styles = useThemedStyles(makeStyles);
+  const { t } = useTranslation();
+  const router = useRouter();
+  const reduced = useReduceMotion();
+  const history = useChatHistory();
+  const { online, hydrated } = useServer();
+  const chrome = useChromeScroll();
+  const restoreChrome = useChromeRestore();
+  const barInset = useBottomBarInset();
+
+  const { cards, sections, total, query, filter, view } = history.data;
+  const { refresh, setQuery, setFilter, setView, remove, removeMany } = history.actions;
+
+  const [searching, setSearching] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [confirmingId, setConfirmingId] = useState<string | null>(null);
+  // Choosing several to delete. Ids rather than cards, so a refresh underneath
+  // unchooses nothing that is still on the wall.
+  const [selecting, setSelecting] = useState(false);
+  const [selected, setSelected] = useState<ReadonlySet<string>>(NOTHING_SELECTED);
+  const [confirmingMany, setConfirmingMany] = useState(false);
+
+  // Back on the wall: read the list again. Leaving it: put away anything that
+  // was asking a question, so it is not still asking on return — a selection
+  // included, which would otherwise be waiting there to be deleted.
+  useFocusEffect(
+    useCallback(() => {
+      void refresh();
+      return () => {
+        setMenuOpen(false);
+        setConfirmingId(null);
+        setSelecting(false);
+        setSelected(NOTHING_SELECTED);
+        setConfirmingMany(false);
+      };
+    }, [refresh]),
+  );
+
+  // Whatever changes shape next moves there rather than jumping.
+  const animate = useCallback(() => {
+    if (!reduced) LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+  }, [reduced]);
+
+  const open = useCallback(
+    (id: string) => {
+      setConfirmingId(null);
+      // The title travels with the link, so the conversation's bar names it
+      // on its first frame instead of after a read of the whole list.
+      const title = cards.find((c) => c.id === id)?.title;
+      router.push({ pathname: '/conversation', params: title ? { session: id, title } : { session: id } });
+    },
+    [cards, router],
+  );
+
+  const compose = useCallback(() => {
+    void selectionTick();
+    router.push('/conversation');
+  }, [router]);
+
+  const askDelete = useCallback(
+    (id: string) => {
+      void caution();
+      // A card asks inside its own frame. A row grows to ask, and the rows
+      // under it make room rather than jumping.
+      if (view === 'list') animate();
+      setConfirmingId(id);
+    },
+    [animate, view],
+  );
+
+  const keep = useCallback(() => {
+    if (view === 'list') animate();
+    setConfirmingId(null);
+  }, [animate, view]);
+
+  const deleteCard = useCallback(
+    (id: string) => {
+      setConfirmingId(null);
+      // The cards after it close the gap rather than jumping into it.
+      animate();
+      void remove(id).then((ok) => (ok ? confirm() : reject()));
+    },
+    [animate, remove],
+  );
+
+  const toggleMenu = useCallback(() => {
+    void selectionTick();
+    setMenuOpen((shown) => !shown);
+  }, []);
+  const closeMenu = useCallback(() => setMenuOpen(false), []);
+
+  // The other layout opens at its top, so the bar comes back with it rather
+  // than staying contracted over a list nobody has scrolled yet.
+  const changeView = useCallback(
+    (next: HistoryView) => {
+      setView(next);
+      restoreChrome();
+    },
+    [restoreChrome, setView],
+  );
+
+  const startSelecting = useCallback(() => {
+    // A search left behind the selection bar would narrow the wall with
+    // nothing on screen to say so, so choosing starts from the whole of it.
+    Keyboard.dismiss();
+    setQuery('');
+    setSearching(false);
+    setConfirmingId(null);
+    animate();
+    setSelecting(true);
+  }, [animate, setQuery]);
+
+  const stopSelecting = useCallback(() => {
+    animate();
+    setSelecting(false);
+    setSelected(NOTHING_SELECTED);
+    setConfirmingMany(false);
+  }, [animate]);
+
+  const finishSelecting = useCallback(() => {
+    void selectionTick();
+    stopSelecting();
+  }, [stopSelecting]);
+
+  const toggleSelected = useCallback((id: string) => {
+    void selectionTick();
+    // Changing what is chosen while the bar is asking about it answers "not
+    // these", so the question goes.
+    setConfirmingMany(false);
+    setSelected((current) => {
+      const next = new Set(current);
+      if (!next.delete(id)) next.add(id);
+      return next;
+    });
+  }, []);
+
+  // Only what is on the wall counts. A refresh can take a chosen conversation
+  // away, and a count that still held it would delete something nobody sees.
+  const chosen = useMemo(
+    () => cards.filter((card) => selected.has(card.id)).map((card) => card.id),
+    [cards, selected],
+  );
+  const allChosen = cards.length > 0 && chosen.length === cards.length;
+
+  const toggleAll = useCallback(() => {
+    void selectionTick();
+    setConfirmingMany(false);
+    setSelected(allChosen ? NOTHING_SELECTED : new Set(cards.map((card) => card.id)));
+  }, [allChosen, cards]);
+
+  const askDeleteMany = useCallback(() => {
+    if (chosen.length === 0) return;
+    void caution();
+    setConfirmingMany(true);
+  }, [chosen.length]);
+
+  const keepMany = useCallback(() => setConfirmingMany(false), []);
+
+  const deleteMany = useCallback(() => {
+    // The chosen cards close up and the bar gives way to the dock in the same
+    // movement. Whatever the Pond refuses comes back with the re-read, and
+    // the notice above the wall says how many.
+    animate();
+    setSelecting(false);
+    setSelected(NOTHING_SELECTED);
+    setConfirmingMany(false);
+    void removeMany(chosen).then(({ failed }) => (failed.length > 0 ? reject() : confirm()));
+  }, [animate, chosen, removeMany]);
+
+  // Android's back button steps out of the question first, then out of choosing.
+  useEffect(() => {
+    if (!selecting) return;
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (confirmingMany) setConfirmingMany(false);
+      else stopSelecting();
+      return true;
+    });
+    return () => sub.remove();
+  }, [confirmingMany, selecting, stopSelecting]);
+
+  const offline = hydrated && !online;
+  const subtitle = history.loading
+    ? null
+    : total === 0
+      ? t('chat.history.subtitleEmpty')
+      : t('chat.history.subtitle', { count: total });
+
+  const header = (
+    <View style={styles.head}>
+      <View style={styles.heading}>
+        <InkTitle level={1}>{t('chat.history.title')}</InkTitle>
+        {subtitle ? (
+          <InkText size="base" tone="tertiary">
+            {subtitle}
+          </InkText>
+        ) : null}
+      </View>
+      {offline ? <InkNotice tone="warning">{t('chat.history.offlineBody')}</InkNotice> : null}
+      {history.error ? <InkNotice tone="danger">{history.error}</InkNotice> : null}
+    </View>
+  );
+
+  const searched = query.trim();
+  const empty = searched ? (
+    <InkEmptyState icon="search" title={t('chat.history.noMatch', { query: searched })}>
+      {t('chat.history.noMatchBody')}
+    </InkEmptyState>
+  ) : filter !== 'all' && total > 0 ? (
+    <InkEmptyState
+      icon="list-filter"
+      title={t(filter === 'routines' ? 'chat.history.noRoutines' : 'chat.history.noChats')}
+    >
+      {t('chat.history.noneBody')}
+    </InkEmptyState>
+  ) : history.error ? null : (
+    <InkEmptyState icon="chat" title={t('home.noConversations')}>
+      {t('home.noConversationsBody')}
+    </InkEmptyState>
+  );
+
+  // Both layouts take exactly these, so the bar follows either one the same
+  // way and each clears the same foot.
+  const shared = {
+    loading: history.loading,
+    header,
+    empty,
+    confirmingId,
+    selecting,
+    selected,
+    onOpen: open,
+    onAskDelete: askDelete,
+    onDelete: deleteCard,
+    onKeep: keep,
+    onToggle: toggleSelected,
+    refreshing: history.refreshing,
+    onRefresh: () => void refresh('pull'),
+    onScroll: chrome.onScroll,
+    scrollEventThrottle: chrome.scrollEventThrottle,
+    bottomInset: barInset + DOCK_GAP + PUCK_SIZE + Spacing.lg,
+  };
+
+  return (
+    <SafeAreaView style={styles.safe} edges={['top']}>
+      {/* No padding on this box, so every absolute inset inside it is measured
+          from the same corner on both platforms. */}
+      <View style={styles.stage}>
+        {view === 'list' ? (
+          <ConversationList sections={sections} {...shared} />
+        ) : (
+          <ConversationWall cards={cards} {...shared} />
+        )}
+
+        {selecting ? (
+          <ChromePill
+            label={t('chat.history.done')}
+            onPress={finishSelecting}
+            style={styles.corner}
+          />
+        ) : (
+          <ChromePuck
+            // The reference's glyph for this same menu of layout, filter and
+            // Select — lines narrowing, which reads as "arrange this list".
+            icon="list-filter"
+            label={t('chat.history.options')}
+            value={`${t(VIEW_LABELS[view])}, ${t(FILTER_LABELS[filter])}`}
+            // The filter only: it hides conversations, and a layout hides none.
+            marked={filter !== 'all'}
+            expanded={menuOpen}
+            onPress={toggleMenu}
+            style={styles.corner}
+          />
+        )}
+
+        {selecting ? (
+          <WallSelectionBar
+            count={chosen.length}
+            available={cards.length}
+            confirming={confirmingMany}
+            onToggleAll={toggleAll}
+            onAskDelete={askDeleteMany}
+            onDelete={deleteMany}
+            onKeep={keepMany}
+            bottomInset={barInset}
+          />
+        ) : (
+          <WallDock
+            query={query}
+            onQuery={setQuery}
+            open={searching}
+            onOpenChange={setSearching}
+            onCompose={compose}
+            bottomInset={barInset}
+          />
+        )}
+
+        {/* Last, so its backdrop is over everything else on the wall: a tap
+            anywhere but the panel puts it away, the puck that opened it
+            included. */}
+        <WallMenu
+          open={menuOpen}
+          onClose={closeMenu}
+          view={view}
+          onViewChange={changeView}
+          filter={filter}
+          onFilterChange={setFilter}
+          canSelect={!history.loading && cards.length > 0}
+          onSelect={startSelecting}
+          top={CORNER_TOP + PUCK_SIZE + Spacing.sm}
+          right={WALL_GUTTER}
+        />
+      </View>
+    </SafeAreaView>
+  );
+}
+
+const makeStyles = (c: ThemeColors) =>
+  StyleSheet.create({
+    safe: { flex: 1, backgroundColor: c.background },
+    stage: { flex: 1 },
+    head: {
+      paddingHorizontal: WALL_GUTTER,
+      paddingTop: CORNER_TOP,
+      paddingBottom: Spacing.lg,
+      gap: Spacing.md,
+    },
+    // Clear of the corner control, which floats over this corner.
+    heading: { paddingRight: PUCK_SIZE + Spacing.md, gap: Spacing.xs },
+    corner: { position: 'absolute', top: CORNER_TOP, right: WALL_GUTTER },
+  });

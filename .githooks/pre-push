@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+# Prebuild the commit being pushed when it touches anything a config plugin reads. There is
+# no CI that runs prebuild, so a plugin that stops applying otherwise surfaces at the next
+# native build. Skip with `git push --no-verify`.
+set -euo pipefail
+root="$(git rev-parse --show-toplevel)"
+# The all-zero id git sends for a side that does not exist, at this repository's hash length.
+zero="$(git hash-object --stdin </dev/null | sed 's/./0/g')"
+watched='^(app\.json|app\.config\.[cjmt]?[jt]s|package(-lock)?\.json|plugins/|patches/|native/)'
+
+check=()
+while read -r _ local_sha _ remote_sha; do
+  [[ "$local_sha" == "$zero" ]] && continue
+  if [[ "$remote_sha" == "$zero" ]] || ! git cat-file -e "$remote_sha^{commit}" 2>/dev/null; then
+    # A new branch, or a remote tip this clone has not fetched: look at what no remote has.
+    changed="$(git log --format= --name-only "$local_sha" --not --remotes)"
+  else
+    changed="$(git diff --name-only "$remote_sha" "$local_sha")"
+  fi
+  if grep -Eq "$watched" <<<"$changed"; then check+=("$local_sha"); fi
+done
+[[ ${#check[@]} -gt 0 ]] || exit 0
+
+for sha in "${check[@]}"; do
+  printf 'pre-push: prebuilding %s, which changes native config\n' "$(git rev-parse --short "$sha")" >&2
+  PREBUILD_REF="$sha" "$root/scripts/check-prebuild.sh" >/dev/null
+done

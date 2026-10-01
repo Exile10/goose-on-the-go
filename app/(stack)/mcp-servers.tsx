@@ -3,21 +3,24 @@
  * and configure/remove/retry actions.
  */
 
-import React, { useState, useCallback } from 'react';
-import { InkIcon } from '@jarida/ink/native';
+import { useTranslation } from 'react-i18next';
+import React from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
-  Pressable,
 } from 'react-native';
 
-import { Grey, JaridaPurple, Brand, Semantic } from '@/constants/colors';
+import { GIcon } from '@/components/ui/g-icon';
+import { GPressable } from '@/components/ui/g-pressable';
+import { Grey, JaridaPurple, Semantic } from '@/constants/colors';
 import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
 import { Spacing } from '@/constants/spacing';
 import { Radii } from '@/constants/radii';
-import i18n from '@/services/i18n';
+import { useThemedStyles } from '@/hooks/use-themed-styles';
+import type { ThemeColors } from '@/constants/colors';
+import type { TranslationKey } from '@/services/i18n';
 
 interface McpServer {
   id: string;
@@ -43,7 +46,18 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 /** Server card */
+/** One literal key per status, so the key-completeness test can see every one. */
+function statusKey(status: McpServer['status']): TranslationKey {
+  switch (status) {
+    case 'online': return 'integrations.online';
+    case 'offline': return 'integrations.offline';
+    case 'error': return 'integrations.error';
+  }
+}
+
 const ServerCard = React.memo(function ServerCard({ server }: { server: McpServer }) {
+  const styles = useThemedStyles(makeStyles);
+  const { t } = useTranslation();
   const statusColor = STATUS_COLORS[server.status];
   return (
     <View style={styles.serverCard}>
@@ -54,7 +68,7 @@ const ServerCard = React.memo(function ServerCard({ server }: { server: McpServe
         </View>
         <View style={[styles.statusBadge, { backgroundColor: statusColor + '18' }]}>
           <Text style={[styles.statusText, { color: statusColor }]}>
-            {server.status}
+            {t(statusKey(server.status))}
           </Text>
         </View>
       </View>
@@ -63,178 +77,170 @@ const ServerCard = React.memo(function ServerCard({ server }: { server: McpServe
 
       <View style={styles.metricsRow}>
         <View style={styles.metric}>
-          <Text style={styles.metricLabel}>{i18n.t('mcp.latency')}</Text>
+          <Text style={styles.metricLabel}>{t('integrations.latency')}</Text>
           <Text style={styles.metricValue}>{server.latency}</Text>
         </View>
         <View style={styles.metric}>
-          <Text style={styles.metricLabel}>{i18n.t('mcp.tools')}</Text>
+          <Text style={styles.metricLabel}>{t('integrations.tools')}</Text>
           <Text style={styles.metricValue}>{server.tools}</Text>
         </View>
       </View>
 
       {/* Actions */}
       <View style={styles.actionsRow}>
-        <Pressable style={styles.actionBtn}>
-          <InkIcon name="settings" size={14} tone="neutral" />
-          <Text style={styles.actionText}>{i18n.t('mcp.configure')}</Text>
-        </Pressable>
+        <GPressable style={styles.actionBtn}>
+          <GIcon name="settings" size={14} color={Grey[500]} />
+          <Text style={styles.actionText}>{t('integrations.configure')}</Text>
+        </GPressable>
         {server.status === 'error' && (
-          <Pressable style={styles.actionBtn}>
-            <InkIcon name="refresh" size={14} tone="warning" />
-            <Text style={[styles.actionText, { color: Semantic.warning }]}>{i18n.t('mcp.retry')}</Text>
-          </Pressable>
+          <GPressable style={styles.actionBtn}>
+            <GIcon name="refresh" size={14} color={Semantic.warning} />
+            <Text style={[styles.actionText, { color: Semantic.warning }]}>{t('common.retry')}</Text>
+          </GPressable>
         )}
-        <Pressable style={styles.actionBtn}>
-          <InkIcon name="trash" size={14} tone="danger" />
-          <Text style={[styles.actionText, { color: Semantic.danger }]}>{i18n.t('mcp.remove')}</Text>
-        </Pressable>
+        <GPressable style={styles.actionBtn}>
+          <GIcon name="trash" size={14} color={Semantic.danger} />
+          <Text style={[styles.actionText, { color: Semantic.danger }]}>{t('common.remove')}</Text>
+        </GPressable>
       </View>
     </View>
   );
 });
 
 export default function McpServersScreen() {
+  const styles = useThemedStyles(makeStyles);
+  const { t } = useTranslation();
   return (
     <ScrollView
       style={styles.container}
       contentContainerStyle={styles.scroll}
       showsVerticalScrollIndicator={false}
     >
-      <Text style={styles.sectionLabel}>{i18n.t('mcp.servers')}</Text>
       {SERVERS.map((s) => (
         <ServerCard key={s.id} server={s} />
       ))}
 
       {/* Add server button */}
-      <Pressable style={styles.addBtn}>
-        <InkIcon name="plus" size={18} tone="brand" />
-        <Text style={styles.addBtnText}>{i18n.t('mcp.addServer')}</Text>
-      </Pressable>
+      <GPressable feedback="lift" style={styles.addBtn}>
+        <GIcon name="plus" size={18} color={JaridaPurple[500]} />
+        <Text style={styles.addBtnText}>{t('integrations.addServer')}</Text>
+      </GPressable>
 
       <View style={{ height: 32 }} />
     </ScrollView>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Grey[50] },
-  scroll: { paddingHorizontal: Spacing.lg, paddingTop: Spacing.lg },
+const makeStyles = (c: ThemeColors) =>
+  StyleSheet.create({
+    container: { flex: 1, backgroundColor: c.background },
+    scroll: { paddingHorizontal: Spacing.lg, paddingTop: Spacing.lg },
 
-  sectionLabel: {
-    fontFamily: FontFamily.body,
-    fontSize: 11,
-    fontWeight: FontWeight.bold,
-    color: Grey[500],
-    letterSpacing: 1,
-    textTransform: 'uppercase',
-    marginBottom: Spacing.md,
-  },
+    /* Server card */
+    serverCard: {
+      backgroundColor: c.card,
+      borderRadius: Radii.xl,
+      padding: Spacing.lg,
+      borderWidth: 1,
+      borderColor: c.border,
+      marginBottom: Spacing.md,
+    },
+    serverHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: Spacing.sm,
+    },
+    serverNameRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: Spacing.sm,
+    },
+    statusDot: {
+      width: 8,
+      height: 8,
+      borderRadius: 4,
+    },
+    serverName: {
+      fontFamily: FontFamily.heading,
+      fontSize: FontSize.md,
+      fontWeight: FontWeight.bold,
+      color: c.text,
+    },
+    statusBadge: {
+      paddingHorizontal: Spacing.sm,
+      paddingVertical: 2,
+      borderRadius: Radii.pill,
+    },
+    statusText: {
+      fontFamily: FontFamily.body,
+      fontSize: FontSize.xs,
+      fontWeight: FontWeight.bold,
+    },
+    serverUrl: {
+      fontFamily: FontFamily.mono,
+      fontSize: FontSize.xs,
+      color: c.textTertiary,
+      marginBottom: Spacing.md,
+    },
 
-  /* Server card */
-  serverCard: {
-    backgroundColor: Brand.white,
-    borderRadius: Radii.xl,
-    padding: Spacing.lg,
-    borderWidth: 1,
-    borderColor: Grey[200],
-    marginBottom: Spacing.md,
-  },
-  serverHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: Spacing.sm,
-  },
-  serverNameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
-  },
-  statusDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  serverName: {
-    fontFamily: FontFamily.heading,
-    fontSize: FontSize.md,
-    fontWeight: FontWeight.bold,
-    color: Brand.charcoal,
-  },
-  statusBadge: {
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: 2,
-    borderRadius: Radii.pill,
-  },
-  statusText: {
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.xs,
-    fontWeight: FontWeight.bold,
-  },
-  serverUrl: {
-    fontFamily: FontFamily.mono,
-    fontSize: FontSize.xs,
-    color: Grey[500],
-    marginBottom: Spacing.md,
-  },
+    /* Metrics */
+    metricsRow: {
+      flexDirection: 'row',
+      gap: Spacing.xl,
+      marginBottom: Spacing.md,
+      paddingBottom: Spacing.md,
+      borderBottomWidth: 1,
+      borderBottomColor: c.border,
+    },
+    metric: {},
+    metricLabel: {
+      fontFamily: FontFamily.body,
+      fontSize: FontSize.xs,
+      color: Grey[400],
+    },
+    metricValue: {
+      fontFamily: FontFamily.mono,
+      fontSize: FontSize.base,
+      fontWeight: FontWeight.semibold,
+      color: c.text,
+      marginTop: 2,
+    },
 
-  /* Metrics */
-  metricsRow: {
-    flexDirection: 'row',
-    gap: Spacing.xl,
-    marginBottom: Spacing.md,
-    paddingBottom: Spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: Grey[100],
-  },
-  metric: {},
-  metricLabel: {
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.xs,
-    color: Grey[400],
-  },
-  metricValue: {
-    fontFamily: FontFamily.mono,
-    fontSize: FontSize.base,
-    fontWeight: FontWeight.semibold,
-    color: Brand.charcoal,
-    marginTop: 2,
-  },
+    /* Actions */
+    actionsRow: {
+      flexDirection: 'row',
+      gap: Spacing.lg,
+    },
+    actionBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: Spacing.xs,
+    },
+    actionText: {
+      fontFamily: FontFamily.body,
+      fontSize: FontSize.xs,
+      fontWeight: FontWeight.medium,
+      color: c.textTertiary,
+    },
 
-  /* Actions */
-  actionsRow: {
-    flexDirection: 'row',
-    gap: Spacing.lg,
-  },
-  actionBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.xs,
-  },
-  actionText: {
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.xs,
-    fontWeight: FontWeight.medium,
-    color: Grey[500],
-  },
-
-  /* Add button */
-  addBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: Spacing.sm,
-    paddingVertical: Spacing.lg,
-    borderRadius: Radii.xl,
-    borderWidth: 2,
-    borderStyle: 'dashed',
-    borderColor: JaridaPurple[200],
-    backgroundColor: JaridaPurple[50],
-  },
-  addBtnText: {
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.base,
-    fontWeight: FontWeight.semibold,
-    color: JaridaPurple[500],
-  },
-});
+    /* Add button */
+    addBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: Spacing.sm,
+      paddingVertical: Spacing.lg,
+      borderRadius: Radii.xl,
+      borderWidth: 2,
+      borderStyle: 'dashed',
+      borderColor: JaridaPurple[200],
+      backgroundColor: c.tintSoft,
+    },
+    addBtnText: {
+      fontFamily: FontFamily.body,
+      fontSize: FontSize.base,
+      fontWeight: FontWeight.semibold,
+      color: JaridaPurple[500],
+    },
+  });

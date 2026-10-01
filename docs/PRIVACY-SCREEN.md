@@ -1,6 +1,6 @@
 # The privacy screen, and the evidence behind it
 
-`app/(stack)/privacy.tsx` tells a household what happens to its data. Every statement it makes was checked against the Pond's source (#73), and several replaced claims that were not true. This file keeps the evidence next to the claim, so that changing one means checking the other. The copy itself lives in `services/i18n.ts` under `privacy.*`, and the structure in `constants/privacy.ts`.
+`app/(stack)/privacy.tsx` tells a household what happens to its data. Every statement it makes was checked against the Pond's source (#73), and several replaced claims that were not true. This file keeps the evidence next to the claim, so that changing one means checking the other. The copy itself lives in `services/i18n/locales/en.json` under `privacy.*`, and the structure in `constants/privacy.ts`.
 
 **Change a statement only with the same kind of evidence: a file in the Pond, not a belief about it.**
 

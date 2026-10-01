@@ -10,6 +10,8 @@ jest.mock('@react-native-community/netinfo', () => ({
   fetch: jest.fn(async () => ({ type: 'wifi' })),
 }));
 jest.mock('@/services/storage', () => ({ Storage: { set: jest.fn(), remove: jest.fn(), getJSON: jest.fn(async () => null), setJSON: jest.fn() }, purgeLegacyStorage: jest.fn() }));
+// Signing out also forgets the tool cards; that store is not what these tests are about.
+jest.mock('@/services/card-cache', () => ({ forgetAllCards: jest.fn(async () => undefined) }));
 jest.mock('@/services/secure-storage', () => ({ SecureStorage: { set: jest.fn(), remove: jest.fn(), getJSON: jest.fn(async () => null), setJSON: jest.fn() } }));
 jest.mock('@/services/pond-trust', () => ({ configurePondTrust: jest.fn(async () => undefined), PondTrustError: class extends Error {} }));
 jest.mock('@/services/discovery', () => ({ findPondByHost: jest.fn(async () => null), findPondAt: jest.fn(async () => null) }));

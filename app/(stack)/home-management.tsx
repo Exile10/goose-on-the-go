@@ -3,30 +3,33 @@
  */
 
 import React, { useState, useCallback } from 'react';
-import { InkIcon } from '@jarida/ink/native';
+import { useTranslation } from 'react-i18next';
+import { InkTitle } from '@jarida/ink/native';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
-  Pressable,
-  TextInput,
   Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 
+import { GIcon } from '@/components/ui/g-icon';
+import { GPressable } from '@/components/ui/g-pressable';
+import type { IconName } from '@/constants/icons';
 import { GKeyboardView } from '@/components/ui/g-keyboard-view';
-import { Grey, JaridaPurple, Brand, Semantic } from '@/constants/colors';
+import { Grey, JaridaPurple, Semantic } from '@/constants/colors';
 import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
 import { Spacing } from '@/constants/spacing';
 import { Radii } from '@/constants/radii';
-import i18n from '@/services/i18n';
+import { useThemedStyles } from '@/hooks/use-themed-styles';
+import type { ThemeColors } from '@/constants/colors';
 
 interface RoomItem {
   id: string;
   name: string;
   deviceCount: number;
-  icon: string;
+  icon: IconName;
 }
 
 interface PondDevice {
@@ -49,19 +52,21 @@ const POND_DEVICES: PondDevice[] = [
 ];
 
 export default function HomeManagementScreen() {
+  const { t } = useTranslation();
+  const styles = useThemedStyles(makeStyles);
   const router = useRouter();
   const [rooms, setRooms] = useState(ROOMS);
 
   const handleRemoveRoom = useCallback((id: string) => {
-    Alert.alert(i18n.t('homeManagementAlert.removeTitle'), i18n.t('homeManagementAlert.removeBody'), [
-      { text: i18n.t('common.cancel'), style: 'cancel' },
+    Alert.alert(t('homeManagementAlert.removeTitle'), t('homeManagementAlert.removeBody'), [
+      { text: t('common.cancel'), style: 'cancel' },
       {
-        text: i18n.t('homeManagementAlert.remove'),
+        text: t('homeManagementAlert.remove'),
         style: 'destructive',
         onPress: () => setRooms((prev) => prev.filter((r) => r.id !== id)),
       },
     ]);
-  }, []);
+  }, [t]);
 
   return (
     <GKeyboardView>
@@ -71,47 +76,61 @@ export default function HomeManagementScreen() {
         showsVerticalScrollIndicator={false}
       >
         {/* Rooms */}
-        <Text style={styles.sectionLabel}>{i18n.t('homeManagement.rooms')}</Text>
+        <InkTitle level={3}>{t('sections.rooms')}</InkTitle>
         {rooms.map((room) => (
           <View key={room.id} style={styles.roomCard}>
             <View style={{ marginRight: Spacing.md }}>
-              <InkIcon name={room.icon} size={20} tone="brand" />
+              <GIcon name={room.icon} size={20} color={JaridaPurple[500]} />
             </View>
             <View style={styles.roomInfo}>
               <Text style={styles.roomName}>{room.name}</Text>
-              <Text style={styles.roomDevices}>{i18n.t('homeManagement.deviceCount', { count: room.deviceCount })}</Text>
+              <Text style={styles.roomDevices}>
+                {t('homeManagement.deviceCount', { count: room.deviceCount })}
+              </Text>
             </View>
-            <Pressable style={styles.roomAction}>
-              <InkIcon name="edit" size={16} tone="neutral" />
-            </Pressable>
-            <Pressable
+            <GPressable style={styles.roomAction}>
+              <GIcon name="edit" size={16} color={Grey[400]} />
+            </GPressable>
+            <GPressable
               style={styles.roomAction}
               onPress={() => handleRemoveRoom(room.id)}
             >
-              <InkIcon name="trash" size={16} tone="danger" />
-            </Pressable>
+              <GIcon name="trash" size={16} color={Semantic.danger} />
+            </GPressable>
           </View>
         ))}
 
         {/* Add room */}
-        <Pressable style={styles.addBtn}>
-          <InkIcon name="plus" size={16} tone="brand" />
-          <Text style={styles.addBtnText}>{i18n.t('homeManagement.addRoom')}</Text>
-        </Pressable>
+        <GPressable feedback="lift" style={styles.addBtn}>
+          <GIcon name="plus" size={16} color={JaridaPurple[500]} />
+          <Text style={styles.addBtnText}>{t('rooms.add')}</Text>
+        </GPressable>
 
         {/* Pond devices */}
-        <Text style={styles.sectionLabel}>{i18n.t('homeManagement.pondDevices')}</Text>
+        <InkTitle level={3}>{t('sections.pondDevices')}</InkTitle>
         {POND_DEVICES.map((pd) => (
           <View key={pd.id} style={styles.pondCard}>
             <View style={styles.pondHeader}>
-              <View style={[styles.pondDot, { backgroundColor: pd.status === 'online' ? Semantic.success : Grey[400] }]} />
+              <View
+                style={[
+                  styles.pondDot,
+                  { backgroundColor: pd.status === 'online' ? Semantic.success : Grey[400] },
+                ]}
+              />
               <Text style={styles.pondName}>{pd.name}</Text>
             </View>
             <View style={styles.pondMeta}>
-              <Text style={styles.pondFirmware}>{i18n.t('homeManagement.firmware', { version: pd.firmware })}</Text>
-              <View style={[styles.pondStatus, { backgroundColor: pd.status === 'online' ? Semantic.successSoft : Grey[100] }]}>
-                <Text style={[styles.pondStatusText, { color: pd.status === 'online' ? Semantic.success : Grey[500] }]}>
-                  {pd.status}
+              <Text style={styles.pondFirmware}>
+                {t('homeManagement.firmware', { version: pd.firmware })}
+              </Text>
+              <View style={styles.pondStatus}>
+                <Text
+                  style={[
+                    styles.pondStatusText,
+                    { color: pd.status === 'online' ? Semantic.success : Grey[500] },
+                  ]}
+                >
+                  {t(pd.status === 'online' ? 'common.online' : 'common.offline')}
                 </Text>
               </View>
             </View>
@@ -119,13 +138,14 @@ export default function HomeManagementScreen() {
         ))}
 
         {/* Pair new device */}
-        <Pressable
+        <GPressable
+          feedback="lift"
           style={styles.addBtn}
           onPress={() => router.push('/(stack)/pond-pairing')}
         >
-          <InkIcon name="plus" size={16} tone="brand" />
-          <Text style={styles.addBtnText}>{i18n.t('homeManagement.pairDevice')}</Text>
-        </Pressable>
+          <GIcon name="plus" size={16} color={JaridaPurple[500]} />
+          <Text style={styles.addBtnText}>{t('rooms.pairDevice')}</Text>
+        </GPressable>
 
         <View style={{ height: 32 }} />
       </ScrollView>
@@ -133,117 +153,108 @@ export default function HomeManagementScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Grey[50] },
-  scroll: { paddingHorizontal: Spacing.lg, paddingTop: Spacing.lg },
+const makeStyles = (c: ThemeColors) =>
+  StyleSheet.create({
+    container: { flex: 1, backgroundColor: c.background },
+    scroll: { paddingHorizontal: Spacing.lg, paddingTop: Spacing.lg },
 
-  sectionLabel: {
-    fontFamily: FontFamily.body,
-    fontSize: 11,
-    fontWeight: FontWeight.bold,
-    color: Grey[500],
-    letterSpacing: 1,
-    textTransform: 'uppercase',
-    marginBottom: Spacing.md,
-    marginTop: Spacing.lg,
-  },
+    /* Room card */
+    roomCard: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: c.card,
+      borderRadius: Radii.xl,
+      padding: Spacing.md,
+      borderWidth: 1,
+      borderColor: c.border,
+      marginBottom: Spacing.sm,
+    },
+    roomInfo: { flex: 1 },
+    roomName: {
+      fontFamily: FontFamily.heading,
+      fontSize: FontSize.base,
+      fontWeight: FontWeight.semibold,
+      color: c.text,
+    },
+    roomDevices: {
+      fontFamily: FontFamily.body,
+      fontSize: FontSize.sm,
+      color: c.textTertiary,
+      marginTop: 2,
+    },
+    roomAction: {
+      width: 36,
+      height: 36,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
 
-  /* Room card */
-  roomCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Brand.white,
-    borderRadius: Radii.xl,
-    padding: Spacing.md,
-    borderWidth: 1,
-    borderColor: Grey[200],
-    marginBottom: Spacing.sm,
-  },
-  roomInfo: { flex: 1 },
-  roomName: {
-    fontFamily: FontFamily.heading,
-    fontSize: FontSize.base,
-    fontWeight: FontWeight.semibold,
-    color: Brand.charcoal,
-  },
-  roomDevices: {
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.sm,
-    color: Grey[500],
-    marginTop: 2,
-  },
-  roomAction: {
-    width: 36,
-    height: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+    /* Add button */
+    addBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: Spacing.sm,
+      paddingVertical: Spacing.md,
+      borderRadius: Radii.xl,
+      borderWidth: 2,
+      borderStyle: 'dashed',
+      borderColor: JaridaPurple[200],
+      backgroundColor: c.tintSoft,
+      marginBottom: Spacing.lg,
+    },
+    addBtnText: {
+      fontFamily: FontFamily.body,
+      fontSize: FontSize.base,
+      fontWeight: FontWeight.semibold,
+      color: JaridaPurple[500],
+    },
 
-  /* Add button */
-  addBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: Spacing.sm,
-    paddingVertical: Spacing.md,
-    borderRadius: Radii.xl,
-    borderWidth: 2,
-    borderStyle: 'dashed',
-    borderColor: JaridaPurple[200],
-    backgroundColor: JaridaPurple[50],
-    marginBottom: Spacing.lg,
-  },
-  addBtnText: {
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.base,
-    fontWeight: FontWeight.semibold,
-    color: JaridaPurple[500],
-  },
-
-  /* Pond device */
-  pondCard: {
-    backgroundColor: Brand.white,
-    borderRadius: Radii.xl,
-    padding: Spacing.lg,
-    borderWidth: 1,
-    borderColor: Grey[200],
-    marginBottom: Spacing.sm,
-  },
-  pondHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
-    marginBottom: Spacing.sm,
-  },
-  pondDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  pondName: {
-    fontFamily: FontFamily.heading,
-    fontSize: FontSize.md,
-    fontWeight: FontWeight.bold,
-    color: Brand.charcoal,
-  },
-  pondMeta: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  pondFirmware: {
-    fontFamily: FontFamily.mono,
-    fontSize: FontSize.xs,
-    color: Grey[500],
-  },
-  pondStatus: {
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: 2,
-    borderRadius: Radii.pill,
-  },
-  pondStatusText: {
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.xs,
-    fontWeight: FontWeight.bold,
-  },
-});
+    /* Pond device */
+    pondCard: {
+      backgroundColor: c.card,
+      borderRadius: Radii.xl,
+      padding: Spacing.lg,
+      borderWidth: 1,
+      borderColor: c.border,
+      marginBottom: Spacing.sm,
+    },
+    pondHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: Spacing.sm,
+      marginBottom: Spacing.sm,
+    },
+    pondDot: {
+      width: 8,
+      height: 8,
+      borderRadius: 4,
+    },
+    pondName: {
+      fontFamily: FontFamily.heading,
+      fontSize: FontSize.md,
+      fontWeight: FontWeight.bold,
+      color: c.text,
+    },
+    pondMeta: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+    },
+    pondFirmware: {
+      fontFamily: FontFamily.mono,
+      fontSize: FontSize.xs,
+      color: c.textTertiary,
+    },
+    pondStatus: {
+      paddingHorizontal: Spacing.sm,
+      paddingVertical: 2,
+      borderRadius: Radii.pill,
+      backgroundColor: c.backgroundSecondary,
+    },
+    pondStatusText: {
+      fontFamily: FontFamily.body,
+      fontSize: FontSize.xs,
+      fontWeight: FontWeight.bold,
+    },
+  });

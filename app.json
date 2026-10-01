@@ -1,10 +1,10 @@
 {
   "expo": {
-    "name": "Goose On The Go",  
+    "name": "Goose On The Go",
     "slug": "goose-on-the-go",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/GooseOnTheGoAppIcons/GooseInAPond-iOS-Default-1024@1x.png",
     "scheme": "gooseonthego",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
@@ -16,12 +16,19 @@
         "NSBonjourServices": [
           "_pond._tcp"
         ]
+      },
+      "appleTeamId": "5J6QNMRQQR",
+      "icon": {
+        "light": "./assets/GooseOnTheGoAppIcons/GooseInAPond-iOS-Default-1024@1x.png",
+        "dark": "./assets/GooseOnTheGoAppIcons/GooseInAPond-iOS-Dark-1024@1x.png",
+        "tinted": "./assets/GooseOnTheGoAppIcons/GooseInAPond-iOS-TintedDark-1024@1x.png"
       }
     },
     "android": {
       "permissions": [
         "android.permission.ACCESS_WIFI_STATE",
         "android.permission.CHANGE_WIFI_MULTICAST_STATE",
+        "android.permission.CAMERA",
         "android.permission.FOREGROUND_SERVICE",
         "android.permission.FOREGROUND_SERVICE_DATA_SYNC"
       ],
@@ -44,7 +51,7 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "Goose On The Go uses your camera to scan QR codes: the pairing code shown on your Pond, and the setup code on a device you are adding.",
+          "cameraPermission": "Goose On The Go uses your camera to scan QR codes, such as your Pond's pairing code and the setup code on a device you are adding, and to take photos you choose to send to Goose.",
           "recordAudioAndroid": false
         }
       ],
@@ -74,6 +81,29 @@
       "expo-status-bar",
       "expo-web-browser",
       "expo-notifications",
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "enableSceneSupport": true
+          }
+        }
+      ],
+      "expo-localization",
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "Goose On The Go uses the microphone when you talk to Goose. What you say goes to your own Pond, nowhere else."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Goose On The Go opens your photos so you can choose pictures to send to Goose.",
+          "cameraPermission": "Goose On The Go uses your camera to scan QR codes, such as your Pond's pairing code and the setup code on a device you are adding, and to take photos you choose to send to Goose.",
+          "microphonePermission": false
+        }
+      ],
       "./plugins/with-pond-tls"
     ],
     "experiments": {

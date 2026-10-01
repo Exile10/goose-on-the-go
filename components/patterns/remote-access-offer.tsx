@@ -13,16 +13,14 @@
  */
 
 import { useCallback, useEffect, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import { InkButton, InkCard, InkText, InkTitle } from '@jarida/ink/native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 
 import { Storage } from '@/services/storage';
 import { useServer } from '@/providers/server-provider';
-import { Grey, JaridaPurple, Brand } from '@/constants/colors';
-import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
 import { Spacing } from '@/constants/spacing';
-import { Radii } from '@/constants/radii';
 
 export function RemoteAccessOffer() {
   const { hydrated, profileId, remoteEnabled, connectionState } = useServer();
@@ -51,65 +49,23 @@ export function RemoteAccessOffer() {
   if (dismissed === profileId) return null;
 
   return (
-    <View style={styles.card}>
-      <Text style={styles.title}>{t('remote.title')}</Text>
-      <Text style={styles.body}>{t('remote.description')}</Text>
+    <InkCard style={styles.card}>
+      <InkTitle level={3}>{t('remote.title')}</InkTitle>
+      <InkText>{t('remote.description')}</InkText>
       <View style={styles.actions}>
-        <Pressable
-          accessibilityRole="button"
-          style={styles.primary}
-          onPress={() => router.push('/(stack)/remote-access')}
-        >
-          <Text style={styles.primaryText}>{t('remote.continue')}</Text>
-        </Pressable>
-        <Pressable accessibilityRole="button" style={styles.secondary} onPress={dismiss}>
-          <Text style={styles.secondaryText}>{t('remote.notNow')}</Text>
-        </Pressable>
+        <InkButton variant="primary" block onPress={() => router.push('/(stack)/remote-access')}>
+          {t('remote.continue')}
+        </InkButton>
+        <InkButton variant="quiet" block onPress={dismiss}>
+          {t('remote.notNow')}
+        </InkButton>
       </View>
-    </View>
+    </InkCard>
   );
 }
 
+// An InkCard already has its own face and plate; its style carries layout only.
 const styles = StyleSheet.create({
-  card: {
-    backgroundColor: Brand.white,
-    borderRadius: Radii.xl,
-    borderWidth: 1,
-    borderColor: Grey[200],
-    padding: Spacing.lg,
-    gap: Spacing.sm,
-    marginBottom: Spacing.lg,
-  },
-  title: {
-    fontFamily: FontFamily.heading,
-    fontSize: FontSize.lg,
-    fontWeight: FontWeight.bold,
-    color: Grey[900],
-  },
-  body: {
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.sm,
-    color: Grey[600],
-    lineHeight: FontSize.sm * 1.5,
-  },
-  actions: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, paddingTop: Spacing.xs },
-  primary: {
-    paddingVertical: Spacing.sm,
-    paddingHorizontal: Spacing.lg,
-    borderRadius: Radii.md,
-    backgroundColor: JaridaPurple[500],
-  },
-  primaryText: {
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.sm,
-    fontWeight: FontWeight.semibold,
-    color: Brand.white,
-  },
-  secondary: { paddingVertical: Spacing.sm, paddingHorizontal: Spacing.sm },
-  secondaryText: {
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.sm,
-    fontWeight: FontWeight.semibold,
-    color: Grey[600],
-  },
+  card: { gap: Spacing.sm },
+  actions: { marginTop: Spacing.xs, gap: Spacing.sm },
 });

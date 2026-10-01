@@ -69,6 +69,16 @@ function firstIPv4(addresses: string[] | undefined): string | null {
  * shown: its `host` would be a `.local` name, which is precisely what this
  * feature exists to avoid handing to the user.
  */
+/**
+ * The address as a person reads it: `http://192.168.1.4:4000` -> `192.168.1.4:4000`.
+ *
+ * Shown wherever the app names the Pond it is talking to. The scheme is an
+ * implementation detail of the transport and carries nothing for the reader.
+ */
+export function hostOf(url: string): string {
+  return url.replace(/^https?:\/\//, '').replace(/\/$/, '');
+}
+
 export function toPond(service: Service): DiscoveredPond | null {
   const address = firstIPv4(service.addresses);
   const port = service.port;

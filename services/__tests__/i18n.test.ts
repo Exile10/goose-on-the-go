@@ -16,6 +16,17 @@ import path from 'path';
 
 import i18n from '../i18n';
 
+// Keys here are read out of source or made up on purpose, so they are strings, not
+// `TranslationKey`: checking them at runtime is the whole point.
+const lookup = i18n.t as unknown as (key: string) => string;
+
+/**
+ * Whether the catalogue holds a key, counting i18next plurals: `t('a.b', { count })`
+ * resolves through `a.b_one` / `a.b_other`, so the bare `a.b` never exists and is
+ * not supposed to.
+ */
+const known = (key: string) => [key, `${key}_one`, `${key}_other`].some((k) => lookup(k) !== k);
+
 const ROOT = path.resolve(__dirname, '..', '..');
 const SEARCHED = ['app', 'components', 'view-models', 'providers', 'services', 'models'];
 
@@ -27,7 +38,8 @@ function sources(dir: string): string[] {
   return fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
     const full = path.join(dir, entry.name);
     if (entry.isDirectory()) return entry.name === '__tests__' ? [] : sources(full);
-    return /\.tsx?$/.test(entry.name) ? [full] : [];
+    // Declaration files hold types and doc examples, not calls a screen makes.
+    return /\.tsx?$/.test(entry.name) && !entry.name.endsWith('.d.ts') ? [full] : [];
   });
 }
 
@@ -49,7 +61,7 @@ it('resolves every key the app actually asks for', () => {
   // If this trips, the scan stopped finding call sites and the rest of the test is vacuous.
   expect(keys.size).toBeGreaterThan(20);
 
-  const missing = [...keys].filter(([key]) => i18n.t(key) === key).map(([key, file]) => `${key} (${file})`);
+  const missing = [...keys].filter(([key]) => !known(key)).map(([key, file]) => `${key} (${file})`);
   expect(missing).toEqual([]);
 });
 
@@ -68,5 +80,5 @@ it('refuses keys assembled at runtime, which the check above cannot see', () => 
 });
 
 it('returns the key itself for a key that does not exist, which is why the test above exists', () => {
-  expect(i18n.t('pairing.notAKeyAnybodyDefined')).toBe('pairing.notAKeyAnybodyDefined');
+  expect(lookup('pairing.notAKeyAnybodyDefined')).toBe('pairing.notAKeyAnybodyDefined');
 });

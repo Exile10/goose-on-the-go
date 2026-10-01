@@ -1,53 +1,208 @@
 /**
- * HomeScreen — Smart home AI assistant landing tab.
+ * HomeScreen — what the Pond is doing right now.
  *
- * Personalized greeting, status chips, "Ask Goose" bar, "Right Now" cards,
- * shortcuts carousel, device grid with toggles, recent conversations.
+ * The app is inert without a Pond, so its reachability is the first thing on
+ * the screen rather than a grey line under the fold. Everything below it is
+ * something the Pond actually told us: what is playing, the next routine,
+ * conversations it is holding, devices it can see. A card with nothing true to
+ * say is not drawn. Surfaces are Ink's printed plate, not a shadow.
  */
 
-import React, { useState, useCallback } from 'react';
-import { InkSwitch, InkIcon, InkProvider } from '@jarida/ink/native';
+import React, { useCallback, useState } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  Pressable,
-  TextInput,
-} from 'react-native';
+  InkBadge,
+  InkButton,
+  InkCard,
+  InkEmptyState,
+  InkNotice,
+  InkSwitch,
+  InkText,
+  InkTitle,
+} from '@jarida/ink/native';
+import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { startRecording as startVoiceRecording } from '@/view-models/voice-pipeline-store';
+import { useBottomBarInset, useChromeScroll } from '@/providers/chrome-provider';
+import { useThemedStyles } from '@/hooks/use-themed-styles';
+import type { ThemeColors } from '@/constants/colors';
+
+import { GIcon } from '@/components/ui/g-icon';
+import { GPressable } from '@/components/ui/g-pressable';
+import { EqualizerBars } from '@/components/ui/equalizer-bars';
+import { RemoteAccessOffer } from '@/components/patterns/remote-access-offer';
 import { useRecentSessions } from '@/view-models/use-recent-sessions';
 import { supports, useDevices } from '@/view-models/use-devices';
 import { initialOf, useMember } from '@/view-models/use-household';
-import { greetingFor, untilOf, useRightNow, type Until } from '@/view-models/use-right-now';
+import { untilOf, useRightNow, type NextRoutine, type NowPlaying } from '@/view-models/use-right-now';
 import { useLive } from '@/view-models/use-live';
+import { useServer } from '@/providers/server-provider';
+import { hostOf } from '@/services/discovery';
+import { deviceStyle } from '@/constants/device-style';
+import { toggle } from '@/services/haptics';
 import type { Device } from '@/services/types';
-import { HOME_SHORTCUTS } from '@/constants/navigation';
-import { Grey, JaridaPurple, Brand, Semantic } from '@/constants/colors';
+import { Brand, Grey, JaridaPurple } from '@/constants/colors';
 import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
 import { Spacing } from '@/constants/spacing';
 import { Radii } from '@/constants/radii';
-import { Shadows } from '@/constants/shadows';
-import { RemoteAccessOffer } from '@/components/patterns/remote-access-offer';
-import { EqualizerBars } from '@/components/ui/equalizer-bars';
-import i18n from '@/services/i18n';
 
-/** How far off a routine is, in words. */
-function untilText(until: Until): string {
-  if (until.unit === 'now') return i18n.t('home.dueNow');
-  if (until.unit === 'minutes') return i18n.t('home.inMinutes', { count: until.count });
-  if (until.unit === 'hours') return i18n.t('home.inHours', { count: until.count });
-  return i18n.t('home.inDays', { count: until.count });
+/** The home grid is a glance, not the full list — that is the Devices tab. */
+const HOME_GRID_LIMIT = 4;
+
+/** How often the greeting and the countdowns catch up with the clock. */
+const CLOCK_MS = 60_000;
+
+/** A greeting uses the name someone is called, not their full record. */
+function firstName(displayName: string | undefined): string | null {
+  const first = displayName?.trim().split(/\s+/)[0];
+  return first || null;
 }
 
-function StatusChip({ label, color, bg }: { label: string; color: string; bg: string }) {
+function greetingKey(hour: number) {
+  if (hour < 5) return 'greeting.night' as const;
+  if (hour < 12) return 'greeting.morning' as const;
+  if (hour < 18) return 'greeting.afternoon' as const;
+  return 'greeting.evening' as const;
+}
+
+/**
+ * The Pond's reachability, as the page's opening statement.
+ *
+ * Three states, not two: until `hydrated` the stored URL has not been read
+ * back, so claiming "unreachable" would be reporting a race rather than a
+ * fact.
+ */
+function PondCard() {
+  const styles = useThemedStyles(makeStyles);
+  const { t } = useTranslation();
+  const { online, serverUrl, checkHealth, hydrated } = useServer();
+  const [checking, setChecking] = useState(false);
+  const router = useRouter();
+
+  const retry = useCallback(async () => {
+    setChecking(true);
+    try {
+      await checkHealth();
+    } finally {
+      setChecking(false);
+    }
+  }, [checkHealth]);
+
+  if (!hydrated) {
+    return (
+      <InkCard style={styles.pond}>
+        <InkTitle level={2}>{t('pond.searching')}</InkTitle>
+        <InkText>{t('pond.searchingBody')}</InkText>
+      </InkCard>
+    );
+  }
+
   return (
-    <View style={[styles.statusChip, { backgroundColor: bg }]}>
-      <Text style={[styles.statusChipText, { color }]}>{label}</Text>
-    </View>
+    <InkCard style={styles.pond}>
+      <View style={styles.pondTop}>
+        <InkTitle level={2}>{t(online ? 'pond.connected' : 'pond.unreachable')}</InkTitle>
+        <InkBadge tone={online ? 'success' : 'danger'}>
+          {t(online ? 'common.online' : 'common.offline')}
+        </InkBadge>
+      </View>
+      <InkText>{hostOf(serverUrl)}</InkText>
+      <View style={styles.pondActions}>
+        {online ? (
+          <>
+            <InkButton
+              variant="primary"
+              icon="chat"
+              onPress={() => router.push('/conversation')}
+            >
+              {t('pond.askGoose')}
+            </InkButton>
+            <InkButton
+              variant="quiet"
+              icon="server"
+              onPress={() => router.push('/(stack)/switch-pond')}
+            >
+              {t('pond.switch')}
+            </InkButton>
+          </>
+        ) : (
+          <>
+            <InkButton variant="primary" disabled={checking} onPress={retry}>
+              {t(checking ? 'pond.checking' : 'common.retry')}
+            </InkButton>
+            <InkButton variant="quiet" onPress={() => router.push('/(stack)/switch-pond')}>
+              {t('pond.switch')}
+            </InkButton>
+          </>
+        )}
+      </View>
+    </InkCard>
+  );
+}
+
+/**
+ * What is playing. Idle is said in words; the bars move only while something
+ * plays, because bars over silence would say music is on. They hold still
+ * under Reduce Motion and when Home is not in front.
+ */
+function NowPlayingCard({ playing }: { playing: NowPlaying }) {
+  const styles = useThemedStyles(makeStyles);
+  const { t } = useTranslation();
+
+  return (
+    <InkCard style={styles.rightNowCard}>
+      <Text style={styles.cardEyebrow}>{t('home.nowPlaying')}</Text>
+      {playing.state === 'playing' ? (
+        <>
+          <Text style={styles.cardTitle} numberOfLines={2}>
+            {playing.track}
+          </Text>
+          {playing.artist ? (
+            <Text style={styles.cardDetail} numberOfLines={1}>
+              {playing.artist}
+            </Text>
+          ) : null}
+          <View style={styles.waveformRow}>
+            <EqualizerBars color={JaridaPurple[400]} />
+          </View>
+        </>
+      ) : (
+        <Text style={styles.cardTitle}>{t('home.nothingPlaying')}</Text>
+      )}
+    </InkCard>
+  );
+}
+
+/**
+ * The soonest routine that will actually run. Labelled a routine, never an
+ * event: the data is the Pond's own schedules, not a calendar.
+ */
+function NextRoutineCard({ routine, now }: { routine: NextRoutine; now: Date }) {
+  const styles = useThemedStyles(makeStyles);
+  const { t } = useTranslation();
+  const until = untilOf(routine.nextRun, now);
+
+  return (
+    <InkCard style={styles.rightNowCard}>
+      <Text style={styles.cardEyebrow}>{t('home.nextRoutine')}</Text>
+      <Text style={styles.cardTitle} numberOfLines={2}>
+        {routine.label}
+      </Text>
+      <Text style={styles.cardDetail}>
+        {routine.nextRun.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+      </Text>
+      <View style={styles.routineBadge}>
+        <InkBadge tone="warning">
+          {until.unit === 'now'
+            ? t('home.dueNow')
+            : until.unit === 'minutes'
+              ? t('home.inMinutes', { count: until.count })
+              : until.unit === 'hours'
+                ? t('home.inHours', { count: until.count })
+                : t('home.inDays', { count: until.count })}
+        </InkBadge>
+      </View>
+    </InkCard>
   );
 }
 
@@ -65,19 +220,24 @@ const DeviceGridItem = React.memo(function DeviceGridItem({
   power: boolean | undefined;
   onToggle: (device: Device, on: boolean) => void;
 }) {
+  const styles = useThemedStyles(makeStyles);
+  const { t } = useTranslation();
+  const { icon, color } = deviceStyle(device);
   const canPower = supports(device, 'power');
   const on = power ?? false;
-  const handleToggle = useCallback((next: boolean) => onToggle(device, next), [device, onToggle]);
+  const handleToggle = useCallback(
+    (next: boolean) => {
+      void toggle();
+      onToggle(device, next);
+    },
+    [device, onToggle],
+  );
 
   return (
-    <View style={styles.deviceCard}>
+    <InkCard style={styles.deviceCard}>
       <View style={styles.deviceCardTop}>
-        <View style={[styles.deviceIconWrap, { backgroundColor: JaridaPurple[500] + '18' }]}>
-          <InkIcon
-            name="device"
-            size={17}
-            tone={on && device.is_online ? 'brand' : 'neutral'}
-          />
+        <View style={[styles.deviceIconWrap, { backgroundColor: color + '1F' }]}>
+          <GIcon name={icon} size={17} color={on && device.is_online ? color : Grey[500]} />
         </View>
         {canPower ? (
           <InkSwitch checked={on} onChange={handleToggle} disabled={!device.is_online} />
@@ -87,235 +247,204 @@ const DeviceGridItem = React.memo(function DeviceGridItem({
         {device.name}
       </Text>
       <Text style={styles.deviceDetail}>
-        {!device.is_online ? i18n.t('devices.stateOffline') : power === undefined ? i18n.t('devices.stateOnline') : power ? i18n.t('devices.stateOn') : i18n.t('devices.stateOff')}
+        {!device.is_online
+          ? t('common.offline')
+          : power === undefined
+            ? t('common.online')
+            : t(power ? 'common.on' : 'common.off')}
       </Text>
-    </View>
+    </InkCard>
   );
 });
 
-/** The home grid is a glance, not the full list — that is the Devices tab. */
-const HOME_GRID_LIMIT = 4;
-
-/** How often the greeting and the countdowns catch up with the clock. */
-const CLOCK_MS = 60_000;
-
 export default function HomeScreen() {
+  const styles = useThemedStyles(makeStyles);
+  const { t } = useTranslation();
+  const { online, hydrated } = useServer();
+  const offline = hydrated && !online;
   const recent = useRecentSessions();
   const devices = useDevices();
+  // The member the Pond attributes this phone to. No name when nobody has
+  // claimed it — the first household profile is not necessarily whoever holds
+  // this phone.
   const member = useMember();
   const rightNow = useRightNow().data;
+  const router = useRouter();
+  const chrome = useChromeScroll();
+  const bottomInset = useBottomBarInset();
+
   // The clock is state, advanced once a minute while Home is in front, so render stays pure and
   // the greeting and "in 23 h" move with the time instead of freezing at the moment Home mounted.
   const [now, setNow] = useState(() => new Date());
   useLive(async () => setNow(new Date()), CLOCK_MS);
-  const greeting = greetingFor(now.getHours());
-  const initial = member ? initialOf(member.displayName) : null;
 
-  // Only chips with a source. The online count is the list the grid below shows, so the two
-  // cannot disagree, and it is not shown while that list is unknown. Meeting and Locked had no
-  // source at all and are gone rather than guessed.
-  const chips = [
-    ...(devices.loading || devices.error
-      ? []
-      : [{
-          key: 'online',
-          label: i18n.t('home.chipOnline', { count: devices.data.devices.filter((d) => d.is_online).length }),
-          color: Semantic.success,
-          bg: Semantic.successSoft,
-        }]),
-    ...(rightNow.outdoorTemp === null
-      ? []
-      : [{
-          key: 'outdoor',
-          label: i18n.t('home.chipOutdoorTemp', { temp: rightNow.outdoorTemp }),
-          color: Semantic.info,
-          bg: Semantic.infoSoft,
-        }]),
-  ];
+  const initial = member ? initialOf(member.displayName) : null;
   const { nowPlaying, nextRoutine } = rightNow;
+
   const handleDeviceToggle = useCallback(
     (device: Device, on: boolean) => void devices.actions.setState(device, { power: on }),
     [devices.actions],
   );
-  const router = useRouter();
-  const [askText, setAskText] = useState('');
 
-  const handleMicPress = useCallback(() => {
-    startVoiceRecording();
-  }, []);
+  const shown = devices.data.devices.slice(0, HOME_GRID_LIMIT);
+
+  // Only badges with a source. The online count is the list the grid below
+  // shows, so the two cannot disagree, and it is not shown while that list is
+  // unknown.
+  const showOnlineCount = !devices.loading && !devices.error;
+  const showOutdoor = rightNow.outdoorTemp !== null;
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <ScrollView
-        contentContainerStyle={styles.scroll}
+        {...chrome}
+        contentContainerStyle={[styles.scroll, { paddingBottom: bottomInset }]}
         showsVerticalScrollIndicator={false}
       >
-        {/* Offered once per pairing, and declinable. Pairing used to push a
-            remote-access screen you had to get past. */}
-        <RemoteAccessOffer />
-
-        {/* Greeting header */}
         <View style={styles.greetingRow}>
           <View style={styles.greetingText}>
-            <Text style={styles.greetingLabel}>
-              {greeting === 'morning'
-                ? i18n.t('home.greetingMorning')
-                : greeting === 'afternoon'
-                  ? i18n.t('home.greetingAfternoon')
-                  : i18n.t('home.greetingEvening')}
-            </Text>
-            {/* The member the Pond attributes this phone to. No name when nobody has claimed it. */}
-            {member ? <Text style={styles.greetingName}>{member.displayName}</Text> : null}
+            <Text style={styles.greetingLabel}>{t(greetingKey(now.getHours()))}</Text>
+            <InkTitle level={1}>{firstName(member?.displayName) ?? t('home.you')}</InkTitle>
           </View>
-          <View style={styles.avatar}>
+          <GPressable feedback="lift"
+            style={styles.avatar}
+            onPress={() => router.push('/(tabs)/profile')}
+            accessibilityRole="button"
+            accessibilityLabel={t('tabs.you')}
+          >
             {initial ? (
               <Text style={styles.avatarText}>{initial}</Text>
             ) : (
-              <InkProvider scheme="dark">
-                <InkIcon name="home" size={18} />
-              </InkProvider>
+              <GIcon name="home" size={18} color={Brand.white} />
             )}
-          </View>
+          </GPressable>
         </View>
 
-        {/* Status chips */}
-        {chips.length > 0 ? (
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.chipsRow}
-          >
-            {chips.map(({ key, ...chip }) => (
-              <StatusChip key={key} {...chip} />
-            ))}
-          </ScrollView>
+        {!offline && (showOnlineCount || showOutdoor) ? (
+          <View style={styles.badges}>
+            {showOnlineCount ? (
+              <InkBadge tone="success">
+                {t('home.chipOnline', { count: devices.data.onlineCount })}
+              </InkBadge>
+            ) : null}
+            {showOutdoor ? (
+              <InkBadge tone="info">
+                {t('home.chipOutdoorTemp', { temp: rightNow.outdoorTemp })}
+              </InkBadge>
+            ) : null}
+          </View>
         ) : null}
 
-        {/* Ask Goose search bar */}
-        <Pressable style={styles.askBar}>
-          <InkIcon name="search" size={18} tone="neutral" />
-          <TextInput
-            style={styles.askInput}
-            placeholder={i18n.t('home.askPlaceholder')}
-            placeholderTextColor={Grey[400]}
-            value={askText}
-            onChangeText={setAskText}
-          />
-          <Pressable style={styles.askMicBtn} onPress={handleMicPress}>
-            <InkIcon name="mic" size={18} tone="brand" />
-          </Pressable>
-        </Pressable>
+        <PondCard />
 
-        {/* Right Now section: a card with nothing true to say is not drawn, and a row with no
+        {/* Offered once per pairing, and declinable. It draws nothing unless
+            the Pond is reachable and remote access is off, so it sits under the
+            card that says the Pond is reachable. */}
+        <RemoteAccessOffer />
+
+        {offline ? null : (
+          <>
+        {/* A card with nothing true to say is not drawn, and a row with no
             cards has no heading. */}
         {nowPlaying || nextRoutine ? (
           <>
-            <Text style={styles.sectionLabel}>{i18n.t('home.rightNow')}</Text>
+            <InkTitle level={3} style={styles.section}>
+              {t('home.rightNowTitle')}
+            </InkTitle>
             <View style={styles.rightNowRow}>
-              {nowPlaying ? (
-                <View style={styles.nowPlayingCard}>
-                  <Text style={styles.nowPlayingLabel}>{i18n.t('home.nowPlaying')}</Text>
-                  {nowPlaying.state === 'playing' ? (
-                    <>
-                      <Text style={styles.nowPlayingTitle}>{nowPlaying.track}</Text>
-                      {nowPlaying.artist ? <Text style={styles.nowPlayingArtist}>{nowPlaying.artist}</Text> : null}
-                      {/* Moving, and only while something is playing: bars over silence would say
-                          music is on. They hold still under Reduce Motion and when Home is not in
-                          front. */}
-                      <View style={styles.waveformRow}>
-                        <EqualizerBars color={JaridaPurple[400]} />
-                      </View>
-                    </>
-                  ) : (
-                    <Text style={styles.nowPlayingTitle}>{i18n.t('home.nothingPlaying')}</Text>
-                  )}
-                </View>
-              ) : null}
-
-              {nextRoutine ? (
-                <View style={styles.nextRoutineCard}>
-                  <Text style={styles.nextRoutineLabel}>{i18n.t('home.nextRoutine')}</Text>
-                  <Text style={styles.nextRoutineTitle}>{nextRoutine.label}</Text>
-                  <Text style={styles.nextRoutineTime}>
-                    {nextRoutine.nextRun.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
-                  </Text>
-                  <View style={styles.nextRoutineBadge}>
-                    <Text style={styles.nextRoutineBadgeText}>{untilText(untilOf(nextRoutine.nextRun, now))}</Text>
-                  </View>
-                </View>
-              ) : null}
+              {nowPlaying ? <NowPlayingCard playing={nowPlaying} /> : null}
+              {nextRoutine ? <NextRoutineCard routine={nextRoutine} now={now} /> : null}
             </View>
           </>
         ) : null}
 
-        {/* Shortcuts carousel */}
-        <Text style={styles.sectionLabel}>{i18n.t('home.shortcuts')}</Text>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.shortcutsRow}
-        >
-          {HOME_SHORTCUTS.map((s) => (
-            <Pressable key={s.id} style={[styles.shortcutPill, { backgroundColor: s.color }]}>
-              {/* Pills keep their own fixed pastel background regardless of
-                  theme (see shortcutLabel below), so the icon needs a scoped
-                  light-scheme provider to stay dark-on-light too. */}
-              <InkProvider scheme="light">
-                <InkIcon name={s.iconName} size={13} />
-              </InkProvider>
-              <Text style={styles.shortcutLabel}>{i18n.t(s.labelKey)}</Text>
-            </Pressable>
-          ))}
-        </ScrollView>
-
-        {/* Devices grid */}
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionLabel}>{i18n.t('home.devices')}</Text>
-          <Pressable onPress={() => router.push('/(tabs)/devices')}>
-            <Text style={styles.seeAllText}>{i18n.t('home.seeAll')}</Text>
-          </Pressable>
-        </View>
-        <View style={styles.devicesGrid}>
-          {devices.data.devices.slice(0, HOME_GRID_LIMIT).map((d) => (
-            <DeviceGridItem
-              key={d.id}
-              device={d}
-              power={devices.data.powerById[d.id]}
-              onToggle={handleDeviceToggle}
-            />
-          ))}
-        </View>
-
-        {/* Recent conversations */}
-        <Text style={styles.sectionLabel}>{i18n.t('home.recentConversations')}</Text>
+        <InkTitle level={3} style={styles.section}>
+          {t('home.conversations')}
+        </InkTitle>
         {recent.data.sessions.map((c) => (
-          <Pressable key={c.id} style={styles.convoRow}>
-            <View style={styles.convoIcon}>
-              <InkIcon name="chat" size={14} tone="brand" />
-            </View>
-            <Text style={styles.convoText} numberOfLines={1}>{c.text}</Text>
+          <GPressable
+            key={c.id}
+            style={styles.convoRow}
+            onPress={() =>
+              router.push({
+                pathname: '/conversation',
+                params: c.title ? { session: c.id, title: c.title } : { session: c.id },
+              })
+            }
+          >
+            <GIcon name="chat" size={14} color={JaridaPurple[400]} />
+            <Text style={styles.convoText} numberOfLines={1}>
+              {c.text}
+            </Text>
             <Text style={styles.convoTime}>{c.time}</Text>
-          </Pressable>
+          </GPressable>
         ))}
-        {/* Say why the strip is empty. A blank gap reads as a broken screen. */}
+        {/* Say why the strip is empty: a read that failed is not "no
+            conversations yet". */}
         {!recent.loading && recent.data.sessions.length === 0 ? (
-          <Text style={styles.convoEmpty}>
-            {recent.error ?? i18n.t('home.noConversations')}
-          </Text>
+          recent.error ? (
+            <InkNotice tone="danger">{recent.error}</InkNotice>
+          ) : (
+            <InkEmptyState icon="chat" title={t('home.noConversations')}>
+              <InkText>{t('home.noConversationsBody')}</InkText>
+            </InkEmptyState>
+          )
         ) : null}
 
-        {/* Bottom spacer for tab bar */}
-        <View style={{ height: 100 }} />
+        <View style={styles.sectionHeader}>
+          <InkTitle level={3}>{t('home.devices')}</InkTitle>
+          <GPressable onPress={() => router.push('/(tabs)/devices')}>
+            <Text style={styles.seeAllText}>{t('common.seeAll')}</Text>
+          </GPressable>
+        </View>
+        {shown.length > 0 ? (
+          <View style={styles.devicesGrid}>
+            {shown.map((d) => (
+              <DeviceGridItem
+                key={d.id}
+                device={d}
+                power={devices.data.powerById[d.id]}
+                onToggle={handleDeviceToggle}
+              />
+            ))}
+          </View>
+        ) : null}
+        {/* An empty grid used to render as a blank gap, which reads as a broken
+            screen rather than as an absence. A list that failed to load is
+            neither, and says so. */}
+        {!devices.loading && shown.length === 0 ? (
+          devices.error ? (
+            <InkNotice tone="danger">{devices.error}</InkNotice>
+          ) : (
+            <InkEmptyState
+              icon="device"
+              title={t('home.noDevices')}
+              action={
+                <InkButton
+                  variant="primary"
+                  onPress={() => router.push('/(stack)/commission-device')}
+                >
+                  {t('home.addDevice')}
+                </InkButton>
+              }
+            >
+              <InkText>{t('home.noDevicesBody')}</InkText>
+            </InkEmptyState>
+          )
+        ) : null}
+          </>
+        )}
+
       </ScrollView>
     </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: Grey[50] },
+const makeStyles = (c: ThemeColors) =>
+  StyleSheet.create({
+  safe: { flex: 1, backgroundColor: c.background },
   scroll: { paddingHorizontal: Spacing.lg },
 
-  /* Greeting */
   greetingRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -327,13 +456,7 @@ const styles = StyleSheet.create({
   greetingLabel: {
     fontFamily: FontFamily.body,
     fontSize: FontSize.base,
-    color: Grey[500],
-  },
-  greetingName: {
-    fontFamily: FontFamily.heading,
-    fontSize: FontSize['2xl'],
-    fontWeight: FontWeight.bold,
-    color: Brand.charcoal,
+    color: c.textTertiary,
   },
   avatar: {
     width: 44,
@@ -350,242 +473,117 @@ const styles = StyleSheet.create({
     color: Brand.white,
   },
 
-  /* Status chips */
-  chipsRow: { gap: Spacing.sm, marginBottom: Spacing.lg },
-  statusChip: {
-    paddingHorizontal: Spacing.md,
-    paddingVertical: 6,
-    borderRadius: Radii.pill,
-  },
-  statusChipText: {
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.sm,
-    fontWeight: FontWeight.semibold,
-  },
-
-  /* Ask bar */
-  askBar: {
+  badges: {
     flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Brand.white,
-    borderRadius: Radii.xl,
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.md,
-    marginBottom: Spacing.xl,
-    borderWidth: 1,
-    borderColor: Grey[200],
-    ...Shadows.sm,
-  },
-  askInput: {
-    flex: 1,
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.base,
-    color: Brand.charcoal,
-    marginLeft: Spacing.sm,
-    paddingVertical: 0,
-  },
-  askMicBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: JaridaPurple[50],
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-
-  /* Section labels */
-  sectionLabel: {
-    fontFamily: FontFamily.body,
-    fontSize: 11,
-    fontWeight: FontWeight.bold,
-    color: Grey[500],
-    letterSpacing: 1,
-    textTransform: 'uppercase',
+    flexWrap: 'wrap',
+    gap: Spacing.sm,
     marginBottom: Spacing.md,
   },
+
+  /* The plate sits 4px below the face, so every card reserves room for it. */
+  pond: { marginBottom: Spacing.lg },
+  pondTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: Spacing.sm,
+  },
+  pondActions: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
+    marginTop: Spacing.md,
+    flexWrap: 'wrap',
+  },
+
+  section: { marginBottom: Spacing.sm },
   sectionHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: Spacing.md,
+    justifyContent: 'space-between',
+    marginTop: Spacing.lg,
+    marginBottom: Spacing.sm,
   },
   seeAllText: {
     fontFamily: FontFamily.body,
     fontSize: FontSize.sm,
     fontWeight: FontWeight.semibold,
-    color: JaridaPurple[500],
+    color: JaridaPurple[600],
   },
 
-  /* Right Now cards */
+  /* Right now. InkCard draws its own face and plate; its style is layout only. */
   rightNowRow: {
     flexDirection: 'row',
     gap: Spacing.md,
-    marginBottom: Spacing.xl,
+    marginBottom: Spacing.lg,
   },
-  nowPlayingCard: {
-    flex: 1,
-    backgroundColor: Brand.charcoal,
-    borderRadius: Radii.xl,
-    padding: Spacing.lg,
-  },
-  nowPlayingLabel: {
+  rightNowCard: { flex: 1 },
+  cardEyebrow: {
     fontFamily: FontFamily.body,
     fontSize: FontSize.xs,
-    color: Grey[400],
+    color: c.textTertiary,
     marginBottom: Spacing.xs,
   },
-  nowPlayingTitle: {
+  cardTitle: {
     fontFamily: FontFamily.heading,
     fontSize: FontSize.md,
     fontWeight: FontWeight.bold,
-    color: Brand.white,
+    color: c.text,
   },
-  nowPlayingArtist: {
+  cardDetail: {
     fontFamily: FontFamily.body,
     fontSize: FontSize.sm,
-    color: Grey[400],
+    color: c.textSecondary,
     marginTop: 2,
   },
-  waveformRow: {
-    marginTop: Spacing.md,
-  },
+  waveformRow: { marginTop: Spacing.md },
+  routineBadge: { alignSelf: 'flex-start', marginTop: Spacing.md },
 
-  nextRoutineCard: {
-    flex: 1,
-    backgroundColor: Brand.white,
-    borderRadius: Radii.xl,
-    padding: Spacing.lg,
-    borderWidth: 1,
-    borderColor: Grey[200],
-  },
-  nextRoutineLabel: {
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.xs,
-    color: Grey[500],
-    marginBottom: Spacing.xs,
-  },
-  nextRoutineTitle: {
-    fontFamily: FontFamily.heading,
-    fontSize: FontSize.md,
-    fontWeight: FontWeight.bold,
-    color: Brand.charcoal,
-  },
-  nextRoutineTime: {
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.sm,
-    color: Grey[500],
-    marginTop: 2,
-  },
-  nextRoutineBadge: {
-    alignSelf: 'flex-start',
-    backgroundColor: Semantic.warningSoft,
-    borderRadius: Radii.pill,
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: 3,
-    marginTop: Spacing.md,
-  },
-  nextRoutineBadgeText: {
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.xs,
-    fontWeight: FontWeight.semibold,
-    color: Semantic.warning,
-  },
-
-  /* Shortcuts carousel */
-  shortcutsRow: { gap: Spacing.md, marginBottom: Spacing.xl },
-  shortcutPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.sm,
-    borderRadius: Radii.pill,
-    gap: Spacing.sm,
-  },
-  shortcutLabel: {
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.sm,
-    fontWeight: FontWeight.semibold,
-    color: Brand.charcoal,
-  },
-
-  /* Devices grid */
-  devicesGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: Spacing.md,
-    marginBottom: Spacing.xl,
-  },
-  deviceCard: {
-    width: '47%',
-    backgroundColor: Brand.white,
-    borderRadius: Radii.xl,
-    padding: Spacing.md,
-    borderWidth: 1,
-    borderColor: Grey[200],
-  },
-  deviceCardTop: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: Spacing.sm,
-  },
-  deviceIconWrap: {
-    width: 36,
-    height: 36,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  deviceLabel: {
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.sm,
-    fontWeight: FontWeight.semibold,
-    color: Brand.charcoal,
-  },
-  deviceDetail: {
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.xs,
-    color: Grey[500],
-    marginTop: 2,
-  },
-
-  /* Recent conversations */
   convoRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Brand.white,
-    borderRadius: Radii.lg,
-    paddingVertical: Spacing.md,
-    paddingHorizontal: Spacing.md,
-    marginBottom: Spacing.sm,
-    borderWidth: 1,
-    borderColor: Grey[200],
-  },
-  convoIcon: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: JaridaPurple[50],
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: Spacing.md,
+    gap: Spacing.sm,
+    paddingVertical: Spacing.sm,
   },
   convoText: {
     flex: 1,
     fontFamily: FontFamily.body,
     fontSize: FontSize.base,
-    color: Brand.charcoal,
+    color: c.text,
   },
   convoTime: {
     fontFamily: FontFamily.body,
     fontSize: FontSize.xs,
-    color: Grey[400],
-    marginLeft: Spacing.sm,
+    color: c.textTertiary,
   },
-  convoEmpty: {
+
+  devicesGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.md,
+  },
+  deviceCard: { width: '47%' },
+  deviceIconWrap: {
+    width: 34,
+    height: 34,
+    borderRadius: Radii.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  deviceCardTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: Spacing.sm,
+  },
+  deviceLabel: {
     fontFamily: FontFamily.body,
-    fontSize: FontSize.sm,
-    color: Grey[500],
-    paddingVertical: Spacing.sm,
+    fontSize: FontSize.base,
+    fontWeight: FontWeight.semibold,
+    color: c.text,
+  },
+  deviceDetail: {
+    fontFamily: FontFamily.body,
+    fontSize: FontSize.xs,
+    color: c.textTertiary,
   },
 });

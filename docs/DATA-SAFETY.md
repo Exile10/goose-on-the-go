@@ -132,7 +132,7 @@ and which should be selected deliberately rather than by defaulting to "collecte
 | Device or other IDs | Collected, not shared. Sent only to the user's own Pond | `install-id.ts`, `push-token.ts` |
 | App activity, personal info, location, contacts, photos, files | Not collected | no such permission or code path |
 | Is data encrypted in transit? | Yes — pinned HTTPS locally, encrypted tunnel remotely | `services/api-client.ts`, `PondNetwork.kt` |
-| Can users request data deletion? | Yes — signing out releases this phone's access, and the Pond is the user's own hardware | `profile.signOutWarning`, `services/i18n.ts:34` |
+| Can users request data deletion? | Yes — signing out releases this phone's access, and the Pond is the user's own hardware | `profile.signOutWarning` in `services/i18n/locales/en.json` |
 
 ### Apple — privacy nutrition labels
 

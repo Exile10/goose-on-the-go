@@ -1,118 +1,128 @@
 /**
- * AIModelsScreen — the models this Pond actually has, and which one is serving.
+ * ModelsScreen — the models this Pond has, and which of them are serving.
  *
- * The cards used to show invented Speed/Quality/Privacy ratings. Nothing in the
- * API produces those numbers, so they have been replaced by facts the server
- * does report: where the model runs, its context window, its size on disk and
- * its quantisation. "Runs on your Pond" is the one privacy claim that can be
- * made honestly, and it is derived from the provider rather than asserted.
+ * Grouped by the category the server files each model under, because that is
+ * also what a role is scoped to: a Pond serves a language model, a voice and an
+ * embedder at the same time, so "active" is a list rather than one row.
+ *
+ * Every fact on a card comes from the catalogue row. The cards once showed
+ * invented Speed/Quality/Privacy ratings and a cloud-versus-local badge; the
+ * API produces neither, and every category it returns runs on the Pond anyway.
  */
 
 import React, { useCallback } from 'react';
-import {
-  ActivityIndicator,
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  Pressable,
-} from 'react-native';
+import { View, StyleSheet, ScrollView } from 'react-native';
 
+import { GPressable } from '@/components/ui/g-pressable';
+import { useTranslation } from 'react-i18next';
 import {
-  formatContextWindow,
-  formatSize,
-  isLocalProvider,
-  useModels,
-} from '@/view-models/use-models';
-import type { ModelEntry } from '@/services/types';
-import { Grey, JaridaPurple, Brand, Semantic } from '@/constants/colors';
-import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
+  InkBadge,
+  InkCard,
+  InkGroup,
+  InkRow,
+  InkEmptyState,
+  InkNotice,
+  InkSpinner,
+  InkText,
+  InkTitle,
+} from '@jarida/ink/native';
+
+import { formatContextWindow, formatSize, useModels } from '@/view-models/use-models';
+import { selectionTick, confirm } from '@/services/haptics';
+import type { ModelCategory, ModelEntry } from '@/services/types';
+import type { TranslationKey } from '@/services/i18n';
 import { Spacing } from '@/constants/spacing';
-import { Radii } from '@/constants/radii';
-import i18n from '@/services/i18n';
+import { useThemedStyles } from '@/hooks/use-themed-styles';
+import type { ThemeColors } from '@/constants/colors';
 
+/** One literal key per category, so the key-completeness test can see every one. */
+function categoryKey(category: ModelCategory): TranslationKey {
+  switch (category) {
+    case 'gguf': return 'models.category.gguf';
+    case 'ollama': return 'models.category.ollama';
+    case 'llamafile': return 'models.category.llamafile';
+    case 'whisper': return 'models.category.whisper';
+    case 'tts': return 'models.category.tts';
+    case 'embedding': return 'models.category.embedding';
+  }
+}
 
 /** One reported fact about a model. Rendered only when the server sent it. */
-function FactRow({ label, value }: { label: string; value: string | null }) {
+function Fact({ label, value }: { label: string; value: string | null }) {
+  const styles = useThemedStyles(makeStyles);
   if (!value) return null;
   return (
-    <View style={styles.ratingRow}>
-      <Text style={styles.ratingLabel}>{label}</Text>
-      <Text style={styles.factValue}>{value}</Text>
+    <View style={styles.factRow}>
+      <InkText>{label}</InkText>
+      <InkText>{value}</InkText>
     </View>
   );
 }
 
-/** Model card */
 const ModelCard = React.memo(function ModelCard({
   model,
-  isActive,
   onSelect,
 }: {
   model: ModelEntry;
-  isActive: boolean;
   onSelect: (model: ModelEntry) => void;
 }) {
-  const handlePress = useCallback(() => onSelect(model), [model, onSelect]);
-  const local = isLocalProvider(model.provider);
+  const styles = useThemedStyles(makeStyles);
+  const { t } = useTranslation();
+  const missing = model.downloaded === false;
+
+  const handlePress = useCallback(() => {
+    if (missing) return;
+    void confirm();
+    onSelect(model);
+  }, [missing, model, onSelect]);
 
   return (
-    <Pressable
-      style={[styles.modelCard, isActive && styles.modelCardSelected]}
+    <GPressable
       onPress={handlePress}
+      accessibilityRole="button"
+      accessibilityState={{ selected: model.active, disabled: missing }}
       // A model that is not on disk cannot be activated from here; downloading
       // one is the Pond's own job, not the phone's.
-      disabled={model.downloaded === false}
+      disabled={missing}
+      style={missing ? styles.cardMuted : undefined}
     >
-      <View style={styles.modelCardHeader}>
-        <View>
-          <Text style={styles.modelName}>{model.display_name ?? model.name}</Text>
-          <Text style={styles.modelProvider}>{model.provider}</Text>
+      <InkCard style={styles.card}>
+        <View style={styles.cardHead}>
+          <InkTitle level={3}>{model.name}</InkTitle>
+          {model.active ? <InkBadge tone="success">{t('models.active')}</InkBadge> : null}
         </View>
-        <View
-          style={[
-            styles.modelBadge,
-            { backgroundColor: (local ? Semantic.success : JaridaPurple[500]) + '18' },
-          ]}
-        >
-          <Text
-            style={[
-              styles.modelBadgeText,
-              { color: local ? Semantic.success : JaridaPurple[500] },
-            ]}
-          >
-            {local ? i18n.t('models.onPond') : i18n.t('models.cloud')}
-          </Text>
+
+        {model.description ? <InkText>{model.description}</InkText> : null}
+
+        <View style={styles.facts}>
+          <Fact label={t('models.context')} value={formatContextWindow(model.context_length)} />
+          <Fact label={t('models.size')} value={formatSize(model.size_mb)} />
+          <Fact
+            label={t('models.memory')}
+            value={
+              model.ram_estimate_mb
+                ? t('models.memoryValue', { size: formatSize(model.ram_estimate_mb) })
+                : null
+            }
+          />
+          <Fact label={t('models.role')} value={model.recommended_role ?? null} />
         </View>
-      </View>
 
-      {model.description ? <Text style={styles.modelDesc}>{model.description}</Text> : null}
-
-      <View style={styles.ratingsSection}>
-        <FactRow label={i18n.t('models.context')} value={formatContextWindow(model.context_length)} />
-        <FactRow label={i18n.t('models.size')} value={formatSize(model.size_mb)} />
-        <FactRow label={i18n.t('models.quantisation')} value={model.quantization ?? null} />
-        <FactRow
-          label={i18n.t('models.memory')}
-          value={model.ram_estimate_mb ? i18n.t('models.ramNeeded', { size: formatSize(model.ram_estimate_mb) }) : null}
-        />
-      </View>
-
-      {model.downloaded === false ? (
-        <Text style={styles.notDownloaded}>{i18n.t('models.notDownloaded')}</Text>
-      ) : null}
-
-      {isActive && (
-        <View style={styles.selectedIndicator}>
-          <Text style={styles.selectedText}>{i18n.t('models.active')}</Text>
-        </View>
-      )}
-    </Pressable>
+        {missing ? <InkText>{t('models.notDownloaded')}</InkText> : null}
+      </InkCard>
+    </GPressable>
   );
 });
 
-export default function AIModelsScreen() {
+export default function ModelsScreen() {
+  const styles = useThemedStyles(makeStyles);
+  const { t } = useTranslation();
   const { data, loading, error, actions } = useModels();
+
+  const handleRetry = useCallback(() => {
+    void selectionTick();
+    void actions.refresh();
+  }, [actions]);
 
   return (
     <ScrollView
@@ -120,45 +130,47 @@ export default function AIModelsScreen() {
       contentContainerStyle={styles.scroll}
       showsVerticalScrollIndicator={false}
     >
-      {data.activeModel ? (
-        <View style={styles.contextRow}>
-          <Text style={styles.contextLabel}>{i18n.t('models.contextWindow')}</Text>
-          <Text style={styles.contextValue}>
-            {formatContextWindow(data.activeModel.context_length) ?? i18n.t('models.notReported')}
-          </Text>
+      {/* What is serving right now, before the catalogue of what could.
+          Named by the role each one fills, since a Pond runs several at once. */}
+      {data.active.length > 0 ? (
+        <InkGroup title={t('models.serving')} style={styles.serving}>
+          {data.active.map((m, i) => (
+            <InkRow key={m.id} divided={i > 0} label={t(categoryKey(m.category))}>
+              <InkText>{m.name}</InkText>
+            </InkRow>
+          ))}
+        </InkGroup>
+      ) : (
+        <View style={styles.serving}>
+          <InkTitle level={3}>{t('models.serving')}</InkTitle>
+          <InkText>{t('models.noneActive')}</InkText>
         </View>
-      ) : null}
+      )}
 
-      <Text style={styles.sectionLabel}>{i18n.t('models.available')}</Text>
-
-      {loading ? (
-        <View style={styles.stateBlock}>
-          <ActivityIndicator color={JaridaPurple[500]} />
-        </View>
-      ) : null}
+      {loading ? <InkSpinner label={t('pond.checking')} /> : null}
 
       {error ? (
         <View style={styles.stateBlock}>
-          <Text style={styles.stateError}>{error}</Text>
-          <Pressable onPress={actions.refresh} hitSlop={8}>
-            <Text style={styles.stateAction}>{i18n.t('models.tryAgain')}</Text>
-          </Pressable>
+          <InkNotice tone="danger">{error}</InkNotice>
+          <GPressable onPress={handleRetry} hitSlop={8}>
+            <InkText>{t('common.retry')}</InkText>
+          </GPressable>
         </View>
       ) : null}
 
       {!loading && !error && data.models.length === 0 ? (
-        <View style={styles.stateBlock}>
-          <Text style={styles.stateEmpty}>{i18n.t('models.empty')}</Text>
-        </View>
+        <InkEmptyState icon="models" title={t('models.empty')}>
+          <InkText>{t('models.emptyBody')}</InkText>
+        </InkEmptyState>
       ) : null}
 
-      {data.models.map((m) => (
-        <ModelCard
-          key={m.id}
-          model={m}
-          isActive={m.is_active}
-          onSelect={actions.activate}
-        />
+      {data.groups.map((group) => (
+        <View key={group.category} style={styles.group}>
+          <InkTitle level={3}>{t(categoryKey(group.category))}</InkTitle>
+          {group.models.map((m) => (
+            <ModelCard key={m.id} model={m} onSelect={actions.activate} />
+          ))}
+        </View>
       ))}
 
       <View style={{ height: 32 }} />
@@ -166,158 +178,26 @@ export default function AIModelsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Grey[50] },
-  scroll: { paddingHorizontal: Spacing.lg, paddingTop: Spacing.lg },
+const makeStyles = (c: ThemeColors) =>
+  StyleSheet.create({
+    container: { flex: 1, backgroundColor: c.background },
+    scroll: { paddingHorizontal: Spacing.lg, paddingTop: Spacing.lg },
 
-  /* Slider card */
+    serving: { marginBottom: Spacing.xl, gap: Spacing.sm },
 
-  /* Context window */
-  contextRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: Brand.white,
-    borderRadius: Radii.lg,
-    padding: Spacing.md,
-    borderWidth: 1,
-    borderColor: Grey[200],
-    marginBottom: Spacing.xl,
-  },
-  contextLabel: {
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.sm,
-    color: Grey[600],
-  },
-  contextValue: {
-    fontFamily: FontFamily.mono,
-    fontSize: FontSize.sm,
-    fontWeight: FontWeight.semibold,
-    color: Brand.charcoal,
-  },
+    group: { marginBottom: Spacing.xl, gap: Spacing.md },
 
-  /* Section label */
-  sectionLabel: {
-    fontFamily: FontFamily.body,
-    fontSize: 11,
-    fontWeight: FontWeight.bold,
-    color: Grey[500],
-    letterSpacing: 1,
-    textTransform: 'uppercase',
-    marginBottom: Spacing.md,
-  },
+    card: { gap: Spacing.sm },
+    cardMuted: { opacity: 0.55 },
+    cardHead: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: Spacing.sm,
+    },
 
-  /* Model card */
-  modelCard: {
-    backgroundColor: Brand.white,
-    borderRadius: Radii.xl,
-    padding: Spacing.lg,
-    borderWidth: 1,
-    borderColor: Grey[200],
-    marginBottom: Spacing.md,
-  },
-  modelCardSelected: {
-    borderColor: JaridaPurple[500],
-    borderWidth: 2,
-  },
-  modelCardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: Spacing.sm,
-  },
-  modelName: {
-    fontFamily: FontFamily.heading,
-    fontSize: FontSize.md,
-    fontWeight: FontWeight.bold,
-    color: Brand.charcoal,
-  },
-  modelProvider: {
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.sm,
-    color: Grey[500],
-    marginTop: 2,
-  },
-  modelBadge: {
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: 3,
-    borderRadius: Radii.pill,
-  },
-  modelBadgeText: {
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.xs,
-    fontWeight: FontWeight.bold,
-  },
-  modelDesc: {
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.sm,
-    color: Grey[600],
-    lineHeight: FontSize.sm * 1.5,
-    marginBottom: Spacing.md,
-  },
+    facts: { gap: 2 },
+    factRow: { flexDirection: 'row', justifyContent: 'space-between' },
 
-  /* Ratings */
-  ratingsSection: { gap: Spacing.sm },
-  ratingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  ratingLabel: {
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.xs,
-    color: Grey[500],
-    width: 60,
-  },
-  factValue: {
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.sm,
-    fontWeight: FontWeight.semibold,
-    color: Grey[700],
-  },
-  notDownloaded: {
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.sm,
-    color: Grey[500],
-    marginTop: Spacing.sm,
-  },
-  stateBlock: {
-    alignItems: 'center',
-    gap: Spacing.sm,
-    paddingVertical: Spacing['2xl'],
-  },
-  stateError: {
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.base,
-    color: Semantic.danger,
-    textAlign: 'center',
-  },
-  stateAction: {
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.base,
-    fontWeight: FontWeight.semibold,
-    color: JaridaPurple[500],
-  },
-  stateEmpty: {
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.base,
-    color: Grey[500],
-    textAlign: 'center',
-  },
-
-  /* Selected indicator */
-  selectedIndicator: {
-    alignSelf: 'flex-start',
-    backgroundColor: Semantic.successSoft,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: 4,
-    borderRadius: Radii.pill,
-    marginTop: Spacing.md,
-  },
-  selectedText: {
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.xs,
-    fontWeight: FontWeight.bold,
-    color: Semantic.success,
-  },
-});
+    stateBlock: { gap: Spacing.sm, marginBottom: Spacing.lg },
+  });

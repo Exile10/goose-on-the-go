@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet, Pressable, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import { useRemoteAccess } from '@/view-models/use-remote-access';
 import type { RemoteProgress } from '@/services/remote-access';
 /**
@@ -12,7 +13,7 @@ import type { RemoteProgress } from '@/services/remote-access';
  * a setup they cannot otherwise observe. The switch is exhaustive, so a new step
  * fails the typecheck here rather than at runtime.
  */
-function progressLabel(t: (key: string) => string, progress: RemoteProgress): string {
+function progressLabel(t: TFunction, progress: RemoteProgress): string {
   switch (progress) {
     case 'approval': return t('remote.approval');
     case 'review': return t('remote.review');

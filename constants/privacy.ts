@@ -1,5 +1,5 @@
 /**
- * What the privacy screen says, as catalogue keys. The copy lives in `services/i18n.ts`.
+ * What the privacy screen says, as catalogue keys. The copy lives in `services/i18n/locales/en.json`.
  *
  * Every statement behind these keys was checked against the Pond's source (#73), and several
  * replace claims that were not true: AES-256 encryption the Pond does not do, integrations with
@@ -8,11 +8,13 @@
  */
 import type { IconName } from './icons';
 
+import type { TranslationKey } from '@/services/i18n';
+
 export interface PrivacySection {
   id: string;
   icon: IconName;
-  titleKey: string;
-  bodyKey: string;
+  titleKey: TranslationKey;
+  bodyKey: TranslationKey;
 }
 
 export const PRIVACY_SECTIONS: PrivacySection[] = [

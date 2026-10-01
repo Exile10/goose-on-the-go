@@ -16,14 +16,16 @@
  * error copy never echoes one back.
  */
 
+import { useTranslation } from 'react-i18next';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Animated, Easing, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
-import { InkButton, InkIcon, InkProvider } from '@jarida/ink/native';
+import { Animated, Easing, Linking, StyleSheet, Text, View } from 'react-native';
+import { InkButton } from '@jarida/ink/native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CameraView, useCameraPermissions, type BarcodeScanningResult } from 'expo-camera';
 
-import i18n from '@/services/i18n';
+import { GIcon } from '@/components/ui/g-icon';
+import { GPressable } from '@/components/ui/g-pressable';
 import {
   InvalidPairingCodeError,
   isPairingPayload,
@@ -33,10 +35,12 @@ import {
 } from '@/models/pairing';
 import { offerPairingPayload, offerSetupCode } from '@/services/pairing-handoff';
 import { advanceHold, HOLD_STEADY_MS, LOST_AFTER_MS, type Hold } from '@/models/scan-hold';
-import { Brand, Grey, JaridaPurple, Semantic } from '@/constants/colors';
+import { Brand, JaridaPurple, Semantic } from '@/constants/colors';
 import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
 import { Spacing } from '@/constants/spacing';
 import { Radii } from '@/constants/radii';
+import { useThemedStyles } from '@/hooks/use-themed-styles';
+import type { ThemeColors } from '@/constants/colors';
 
 const FRAME_SIZE = 240;
 const CORNER_SIZE = 28;
@@ -48,6 +52,8 @@ const CORNER_SIZE = 28;
  */
 
 export default function ConnectDesktopScreen() {
+  const styles = useThemedStyles(makeStyles);
+  const { t } = useTranslation();
   const router = useRouter();
   const { mode } = useLocalSearchParams<{ mode?: string }>();
   const matter = mode === 'matter';
@@ -101,7 +107,7 @@ export default function ConnectDesktopScreen() {
           // device and pointed it at the Pond's own dashboard is holding a code
           // that is valid, just for the other flow.
           return reject(
-            i18n.t(isPairingPayload(data) ? 'commission.isPondCode' : 'commission.notSetupCode'),
+            t(isPairingPayload(data) ? 'commission.isPondCode' : 'commission.notSetupCode'),
           );
         }
       } else {
@@ -109,15 +115,15 @@ export default function ConnectDesktopScreen() {
           payload = parsePairingPayload(data);
         } catch (e) {
           if (!(e instanceof InvalidPairingCodeError)) {
-            return reject(i18n.t('pairing.codeUnreadable'));
+            return reject(t('pairing.codeUnreadable'));
           }
           // Name the mistake rather than just rejecting it: a Matter device's
           // code is valid, only in a different part of the app, and sending the
           // user back to hunt for "the right QR" is the unhelpful outcome here.
           return reject(
             looksLikeMatterSetupCode(data)
-              ? i18n.t('scanErrors.matterCode')
-              : i18n.t('scanErrors.notPondCode'),
+              ? t('scanErrors.matterCode')
+              : t('scanErrors.notPondCode'),
           );
         }
       }
@@ -153,7 +159,7 @@ export default function ConnectDesktopScreen() {
       else offerSetupCode(data.trim());
       router.back();
     },
-    [router, scanning, abandonHold, progress, matter],
+    [router, scanning, abandonHold, progress, matter, t],
   );
 
   const retry = useCallback(() => {
@@ -172,24 +178,22 @@ export default function ConnectDesktopScreen() {
     const canPrompt = permission.canAskAgain;
     return (
       <View style={styles.permissionContainer}>
-        <InkIcon name="camera" size={32} tone="brand" />
-        <Text style={styles.permissionTitle}>{i18n.t('pairing.cameraTitle')}</Text>
+        <GIcon name="camera" size={32} color={JaridaPurple[500]} />
+        <Text style={styles.permissionTitle}>{t('desktop.cameraNeeded')}</Text>
         <Text style={styles.permissionDesc}>
-          {matter
-            ? i18n.t('commission.camera')
-            : i18n.t('pairing.cameraDesc')}
+          {matter ? t('commission.camera') : t('pairing.cameraDesc')}
         </Text>
         <InkButton
           variant="primary"
           onPress={canPrompt ? requestPermission : () => void Linking.openSettings()}
         >
-          {canPrompt ? i18n.t('pairing.enableCamera') : i18n.t('pairing.openSettings')}
+          {canPrompt ? t('pairing.enableCamera') : t('pairing.openSettings')}
         </InkButton>
-        <Pressable onPress={() => router.back()} hitSlop={8}>
+        <GPressable onPress={() => router.back()} hitSlop={8}>
           <Text style={styles.cancel}>
-            {matter ? i18n.t('commission.type') : i18n.t('pairing.typeInstead')}
+            {matter ? t('commission.type') : t('desktop.enterCode')}
           </Text>
-        </Pressable>
+        </GPressable>
       </View>
     );
   }
@@ -204,19 +208,17 @@ export default function ConnectDesktopScreen() {
       />
       {/* The screen owns its dismiss control now that it draws full bleed, and
           it sits below the status bar rather than under it. */}
-      <Pressable
+      <GPressable
         accessibilityRole="button"
-        accessibilityLabel={i18n.t('pairing.closeScanner')}
+        accessibilityLabel={t('pairing.closeScanner')}
         onPress={() => router.back()}
         hitSlop={12}
         style={[styles.close, { top: insets.top + Spacing.sm }]}
       >
-        {/* Sits on a semi-black overlay over the live camera feed, so the icon takes the
-            dark scheme's foreground rather than the app's light-scheme default. */}
-        <InkProvider scheme="dark">
-          <InkIcon name="arrow" size={22} />
-        </InkProvider>
-      </Pressable>
+        {/* Sits on a semi-black overlay over the live camera feed, so the icon is
+            white in either scheme rather than the theme's foreground. */}
+        <GIcon name="arrow" size={22} color={Brand.white} />
+      </GPressable>
 
       <View style={styles.overlay}>
         <View style={styles.frame}>
@@ -245,34 +247,35 @@ export default function ConnectDesktopScreen() {
 
         {error ? (
           <View style={styles.statusCard}>
-            <InkIcon name="warn" size={28} tone="danger" />
-            <Text style={styles.statusTitle}>{i18n.t('pairing.codeRejected')}</Text>
+            <GIcon name="warn" size={28} color={Semantic.danger} />
+            <Text style={styles.statusTitle}>{t('desktop.badCode')}</Text>
             <Text style={styles.statusDesc}>{error}</Text>
             <InkButton variant="primary" onPress={retry}>
-              {i18n.t('pairing.scanAgain')}
+              {t('common.scanAgain')}
             </InkButton>
           </View>
         ) : (
           <Text style={styles.hint}>
             {holding
-              ? i18n.t('pairing.holdSteady')
+              ? t('pairing.holdSteady')
               : matter
-                ? i18n.t('commission.aim')
-                : i18n.t('pairing.aimAtPond')}
+                ? t('commission.aim')
+                : t('pairing.aimAtPond')}
           </Text>
         )}
 
-        <Pressable onPress={() => router.back()} hitSlop={8}>
+        <GPressable onPress={() => router.back()} hitSlop={8}>
           <Text style={styles.cancel}>
-            {matter ? i18n.t('commission.type') : i18n.t('pairing.typeInstead')}
+            {matter ? t('commission.type') : t('desktop.enterCode')}
           </Text>
-        </Pressable>
+        </GPressable>
       </View>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (c: ThemeColors) =>
+  StyleSheet.create({
   container: { flex: 1, backgroundColor: Brand.charcoal },
   close: {
     position: 'absolute',
@@ -347,7 +350,7 @@ const styles = StyleSheet.create({
     width: '100%',
     alignItems: 'center',
     gap: Spacing.md,
-    backgroundColor: Brand.white,
+    backgroundColor: c.card,
     borderRadius: Radii.xl,
     paddingVertical: Spacing['2xl'],
     paddingHorizontal: Spacing.xl,
@@ -356,19 +359,19 @@ const styles = StyleSheet.create({
     fontFamily: FontFamily.heading,
     fontSize: FontSize.lg,
     fontWeight: FontWeight.bold,
-    color: Brand.charcoal,
+    color: c.text,
   },
   statusDesc: {
     fontFamily: FontFamily.body,
     fontSize: FontSize.base,
-    color: Grey[600],
+    color: c.textSecondary,
     textAlign: 'center',
   },
   cancelText: {
     fontFamily: FontFamily.body,
     fontSize: FontSize.sm,
     fontWeight: FontWeight.semibold,
-    color: Grey[500],
+    color: c.textTertiary,
   },
 
   /* Permission request */
@@ -378,19 +381,19 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: Spacing.lg,
     paddingHorizontal: Spacing['2xl'],
-    backgroundColor: Grey[50],
+    backgroundColor: c.background,
   },
   permissionTitle: {
     fontFamily: FontFamily.heading,
     fontSize: FontSize.xl,
     fontWeight: FontWeight.bold,
-    color: Brand.charcoal,
+    color: c.text,
     textAlign: 'center',
   },
   permissionDesc: {
     fontFamily: FontFamily.body,
     fontSize: FontSize.base,
-    color: Grey[500],
+    color: c.textTertiary,
     textAlign: 'center',
     lineHeight: FontSize.base * 1.5,
   },

@@ -2,6 +2,7 @@
  * ScheduleScreen — Day picker and timeline with events and routine toggles.
  */
 
+import { useTranslation } from 'react-i18next';
 import React, { useState, useCallback } from 'react';
 import { InkSwitch } from '@jarida/ink/native';
 import {
@@ -9,14 +10,15 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  Pressable,
 } from 'react-native';
 
+import { GPressable } from '@/components/ui/g-pressable';
 import { Grey, JaridaPurple, Brand, Semantic } from '@/constants/colors';
 import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
 import { Spacing } from '@/constants/spacing';
 import { Radii } from '@/constants/radii';
-import i18n from '@/services/i18n';
+import { useThemedStyles } from '@/hooks/use-themed-styles';
+import type { ThemeColors } from '@/constants/colors';
 
 /**
  * Day data for the picker. A fixed week -- the 21st to the 27th, with Saturday chosen -- rather than
@@ -31,15 +33,15 @@ const DATES = [21, 22, 23, 24, 25, 26, 27];
 /** Sample timeline events */
 /* eslint-disable i18next/no-literal-string -- placeholder schedule, replaced when the screen reads the Pond's schedules (#14) */
 const TIMELINE = [
-  { time: '7:00 AM', title: 'Morning Routine', type: 'routine' as const, detail: 'Lights warm up, thermostat to 72\u00B0F, coffee maker on', enabled: true },
+  { time: '7:00 AM', title: 'Morning Routine', type: 'routine' as const, detail: 'Lights warm up, thermostat to 72°F, coffee maker on', enabled: true },
   { time: '9:00 AM', title: 'Focus Mode', type: 'routine' as const, detail: 'DND enabled, office lights to 80%', enabled: true },
   { time: '12:00 PM', title: 'Lunch Break', type: 'event' as const, detail: 'Calendar: Lunch with Sarah', enabled: false },
-  { time: '2:00 PM', title: 'Team Standup', type: 'event' as const, detail: 'Zoom meeting \u2014 30 min', enabled: false },
-  { time: '6:00 PM', title: 'Evening Routine', type: 'routine' as const, detail: 'Lights dim, thermostat to 68\u00B0F, ambient music', enabled: true },
+  { time: '2:00 PM', title: 'Team Standup', type: 'event' as const, detail: 'Zoom meeting — 30 min', enabled: false },
+  { time: '6:00 PM', title: 'Evening Routine', type: 'routine' as const, detail: 'Lights dim, thermostat to 68°F, ambient music', enabled: true },
   { time: '10:00 PM', title: 'Night Mode', type: 'routine' as const, detail: 'All lights off, doors locked, DND on', enabled: true },
 ];
-
 /* eslint-enable i18next/no-literal-string */
+
 /** Timeline event row */
 const TimelineRow = React.memo(function TimelineRow({
   item,
@@ -50,6 +52,8 @@ const TimelineRow = React.memo(function TimelineRow({
   index: number;
   onToggle: (index: number) => void;
 }) {
+  const styles = useThemedStyles(makeStyles);
+  const { t } = useTranslation();
   const isRoutine = item.type === 'routine';
   return (
     <View style={styles.timelineRow}>
@@ -77,7 +81,7 @@ const TimelineRow = React.memo(function TimelineRow({
         </View>
         {!isRoutine && (
           <View style={styles.eventBadge}>
-            <Text style={styles.eventBadgeText}>{i18n.t('schedule.eventBadge')}</Text>
+            <Text style={styles.eventBadgeText}>{t('schedule.event')}</Text>
           </View>
         )}
       </View>
@@ -86,6 +90,7 @@ const TimelineRow = React.memo(function TimelineRow({
 });
 
 export default function ScheduleScreen() {
+  const styles = useThemedStyles(makeStyles);
   const [selectedDay, setSelectedDay] = useState(5); // Saturday (index)
   const [events, setEvents] = useState(TIMELINE);
 
@@ -104,7 +109,8 @@ export default function ScheduleScreen() {
       {/* Day picker */}
       <View style={styles.dayPicker}>
         {DAYS.map((day, i) => (
-          <Pressable
+          <GPressable
+            feedback="lift"
             key={day}
             style={[styles.dayItem, selectedDay === i && styles.dayItemActive]}
             onPress={() => setSelectedDay(i)}
@@ -115,7 +121,7 @@ export default function ScheduleScreen() {
             <Text style={[styles.dayDate, selectedDay === i && styles.dayDateActive]}>
               {DATES[i]}
             </Text>
-          </Pressable>
+          </GPressable>
         ))}
       </View>
 
@@ -131,8 +137,9 @@ export default function ScheduleScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Grey[50] },
+const makeStyles = (c: ThemeColors) =>
+  StyleSheet.create({
+  container: { flex: 1, backgroundColor: c.background },
   scroll: { paddingTop: Spacing.md },
 
   /* Day picker */
@@ -141,9 +148,9 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: Spacing.lg,
     paddingVertical: Spacing.md,
-    backgroundColor: Brand.white,
+    backgroundColor: c.card,
     borderBottomWidth: 1,
-    borderBottomColor: Grey[200],
+    borderBottomColor: c.border,
   },
   dayItem: {
     alignItems: 'center',
@@ -155,7 +162,7 @@ const styles = StyleSheet.create({
   dayLabel: {
     fontFamily: FontFamily.body,
     fontSize: FontSize.xs,
-    color: Grey[500],
+    color: c.textTertiary,
     marginBottom: 4,
   },
   dayLabelActive: { color: JaridaPurple[100] },
@@ -163,7 +170,7 @@ const styles = StyleSheet.create({
     fontFamily: FontFamily.heading,
     fontSize: FontSize.md,
     fontWeight: FontWeight.bold,
-    color: Brand.charcoal,
+    color: c.text,
   },
   dayDateActive: { color: Brand.white },
 
@@ -178,7 +185,7 @@ const styles = StyleSheet.create({
   timeText: {
     fontFamily: FontFamily.mono,
     fontSize: FontSize.xs,
-    color: Grey[500],
+    color: c.textTertiary,
   },
   lineCol: {
     width: 24,
@@ -195,20 +202,20 @@ const styles = StyleSheet.create({
   line: {
     flex: 1,
     width: 2,
-    backgroundColor: Grey[200],
+    backgroundColor: c.backgroundSecondary,
   },
   eventCard: {
     flex: 1,
-    backgroundColor: Brand.white,
+    backgroundColor: c.card,
     borderRadius: Radii.lg,
     padding: Spacing.md,
     marginLeft: Spacing.sm,
     borderWidth: 1,
-    borderColor: Grey[200],
+    borderColor: c.border,
   },
   eventCardRoutine: {
     borderColor: JaridaPurple[200],
-    backgroundColor: JaridaPurple[50] + '40',
+    backgroundColor: c.tintSoft,
   },
   eventHeader: {
     flexDirection: 'row',
@@ -219,12 +226,12 @@ const styles = StyleSheet.create({
     fontFamily: FontFamily.heading,
     fontSize: FontSize.base,
     fontWeight: FontWeight.semibold,
-    color: Brand.charcoal,
+    color: c.text,
   },
   eventDetail: {
     fontFamily: FontFamily.body,
     fontSize: FontSize.sm,
-    color: Grey[500],
+    color: c.textTertiary,
     marginTop: 2,
     maxWidth: 200,
   },

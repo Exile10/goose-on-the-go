@@ -1,4 +1,3 @@
-import { ConnectionStatus } from '@/components/patterns/connection-status';
 /**
  * Root Layout — loads brand fonts, manages splash screen,
  * and wraps the app tree with ThemeProvider + ServerProvider.
@@ -25,14 +24,15 @@ import {
 } from '@expo-google-fonts/jetbrains-mono';
 import { InkProvider } from '@jarida/ink/native';
 
-import { ListeningOverlay } from '@/components/listening-overlay';
-import { VoiceAudioBridge } from '@/components/voice-audio-bridge';
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { ConnectionStatus } from '@/components/patterns/connection-status';
 import { NotificationsProvider } from '@/providers/notifications-provider';
-import { ThemeProvider } from '@/providers/theme-provider';
+import { ThemeProvider, useTheme } from '@/providers/theme-provider';
+// Registers the app's icons with Ink. Imported for the side effect: on native
+// every Ink `icon=` slot draws an empty gap until something is registered.
+import '@/components/ui/ink-icons';
+// Initialises i18next before the first screen renders.
+import '@/services/i18n';
 import { ServerProvider } from '@/providers/server-provider';
-import { useVoice } from '@/view-models/use-voice';
-import '@/constants/icon-registry';
 
 /**
  * Keep the splash up until the app can draw itself.
@@ -78,8 +78,6 @@ export const unstable_settings = {
 };
 
 export default function RootLayout() {
-  const colorScheme = useColorScheme();
-  const voice = useVoice();
 
   const [fontsLoaded, fontError] = useFonts({
     Quicksand: require('../assets/fonts/Quicksand.ttf'),
@@ -108,28 +106,35 @@ export default function RootLayout() {
     <ThemeProvider>
       <ServerProvider>
         <NotificationsProvider>
-          <NavThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-            <InkProvider>
-              <ConnectionStatus />
-              <Stack>
-                <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-                <Stack.Screen name="(stack)" options={{ headerShown: false }} />
-                <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
-              </Stack>
-              <StatusBar style="auto" />
-              <VoiceAudioBridge />
-              <ListeningOverlay
-                visible={voice.data.state !== 'idle'}
-                state={voice.data.state}
-                vuLevel={voice.data.vuLevel}
-                transcript={voice.data.transcript}
-                errorMessage={voice.data.errorMessage}
-                onCancel={voice.actions.stop}
-              />
-            </InkProvider>
-          </NavThemeProvider>
+          <ThemedApp />
         </NotificationsProvider>
       </ServerProvider>
     </ThemeProvider>
+  );
+}
+
+
+/**
+ * Sits inside ThemeProvider so Navigation and Ink derive from the same resolved
+ * scheme rather than each reading the system on its own.
+ */
+function ThemedApp() {
+  const { isDark } = useTheme();
+  return (
+    <NavThemeProvider value={isDark ? DarkTheme : DefaultTheme}>
+      <InkProvider scheme={isDark ? 'dark' : 'light'} accent="Purple">
+        <ConnectionStatus />
+        <Stack>
+          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          <Stack.Screen name="(stack)" options={{ headerShown: false }} />
+          <Stack.Screen name="(onboarding)" options={{ headerShown: false }} />
+          {/* Over the tabs rather than inside one, so a conversation has the
+              whole screen: no bar under the composer. It draws its own header. */}
+          <Stack.Screen name="conversation" options={{ headerShown: false }} />
+          <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
+        </Stack>
+        <StatusBar style={isDark ? 'light' : 'dark'} />
+      </InkProvider>
+    </NavThemeProvider>
   );
 }

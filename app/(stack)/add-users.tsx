@@ -11,18 +11,20 @@
  * add, remove.
  */
 
+import { useTranslation } from 'react-i18next';
 import React, { useCallback, useState } from 'react';
-import { InkButton, InkIcon } from '@jarida/ink/native';
+import { InkButton } from '@jarida/ink/native';
 import {
   ActivityIndicator,
   View,
   Text,
   StyleSheet,
   ScrollView,
-  Pressable,
   TextInput,
 } from 'react-native';
 
+import { GIcon } from '@/components/ui/g-icon';
+import { GPressable } from '@/components/ui/g-pressable';
 import { GKeyboardView } from '@/components/ui/g-keyboard-view';
 import { useProfiles } from '@/view-models/use-profiles';
 import type { Profile } from '@/services/types';
@@ -30,7 +32,8 @@ import { Grey, JaridaPurple, Brand, Semantic } from '@/constants/colors';
 import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
 import { Spacing } from '@/constants/spacing';
 import { Radii } from '@/constants/radii';
-import i18n from '@/services/i18n';
+import { useThemedStyles } from '@/hooks/use-themed-styles';
+import type { ThemeColors } from '@/constants/colors';
 
 /** Fallback when a profile has no emoji, so the avatar is never blank. */
 function initial(displayName: string): string {
@@ -45,6 +48,8 @@ const ProfileCard = React.memo(function ProfileCard({
   profile: Profile;
   onRemove: (id: string) => void;
 }) {
+  const styles = useThemedStyles(makeStyles);
+  const { t } = useTranslation();
   const handleRemove = useCallback(() => onRemove(profile.id), [profile.id, onRemove]);
 
   return (
@@ -61,16 +66,18 @@ const ProfileCard = React.memo(function ProfileCard({
       </View>
 
       <View style={styles.actionsRow}>
-        <Pressable style={styles.actionBtn} onPress={handleRemove}>
-          <InkIcon name="trash" size={14} tone="danger" />
-          <Text style={[styles.actionText, { color: Semantic.danger }]}>{i18n.t('addUsers.remove')}</Text>
-        </Pressable>
+        <GPressable style={styles.actionBtn} onPress={handleRemove}>
+          <GIcon name="trash" size={14} color={Semantic.danger} />
+          <Text style={[styles.actionText, { color: Semantic.danger }]}>{t('common.remove')}</Text>
+        </GPressable>
       </View>
     </View>
   );
 });
 
 export default function AddUsersScreen() {
+  const styles = useThemedStyles(makeStyles);
+  const { t } = useTranslation();
   const { data, loading, error, actions } = useProfiles();
   const [showAdd, setShowAdd] = useState(false);
   const [name, setName] = useState('');
@@ -96,14 +103,13 @@ export default function AddUsersScreen() {
         contentContainerStyle={styles.scroll}
         showsVerticalScrollIndicator={false}
       >
-        <Text style={styles.sectionLabel}>{i18n.t('addUsers.profiles')}</Text>
 
         {loading ? <ActivityIndicator color={JaridaPurple[500]} /> : null}
 
         {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
         {!loading && data.profiles.length === 0 ? (
-          <Text style={styles.emptyText}>{i18n.t('addUsers.empty')}</Text>
+          <Text style={styles.emptyText}>{t('people.emptyBody')}</Text>
         ) : null}
 
         {data.profiles.map((p) => (
@@ -112,48 +118,52 @@ export default function AddUsersScreen() {
 
         {showAdd ? (
           <View style={styles.inviteCard}>
-            <Text style={styles.inviteTitle}>{i18n.t('addUsers.addProfile')}</Text>
+            <Text style={styles.inviteTitle}>{t('people.addTitle')}</Text>
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>{i18n.t('addUsers.name')}</Text>
+              <Text style={styles.inputLabel}>{t('people.name')}</Text>
               <TextInput
                 style={styles.textInput}
                 value={name}
                 onChangeText={setName}
-                placeholder={i18n.t('addUsers.namePlaceholder')}
+                placeholder={t('people.namePlaceholder')}
                 placeholderTextColor={Grey[400]}
                 autoCapitalize="words"
                 editable={!saving}
               />
             </View>
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>{i18n.t('addUsers.emoji')}</Text>
+              <Text style={styles.inputLabel}>{t('people.emoji')}</Text>
               <TextInput
                 style={styles.textInput}
                 value={emoji}
                 onChangeText={setEmoji}
-                placeholder={i18n.t('addUsers.emojiPlaceholder')}
+                placeholder={t('people.emojiHint')}
                 placeholderTextColor={Grey[400]}
                 editable={!saving}
               />
             </View>
             <View style={styles.inviteActions}>
               <InkButton variant="quiet" onPress={() => setShowAdd(false)}>
-                {i18n.t('common.cancel')}
+                {t('common.cancel')}
               </InkButton>
               <InkButton
                 variant="primary"
                 disabled={!name.trim() || saving}
                 onPress={submit}
               >
-                {saving ? i18n.t('addUsers.adding') : i18n.t('addUsers.add')}
+                {saving ? t('addUsers.adding') : t('common.add')}
               </InkButton>
             </View>
           </View>
         ) : (
-          <Pressable style={styles.addBtn} onPress={() => setShowAdd(true)}>
-            <InkIcon name="plus" size={16} tone="brand" />
-            <Text style={styles.addBtnText}>{i18n.t('addUsers.add')}</Text>
-          </Pressable>
+          <GPressable
+            feedback="lift"
+            style={styles.addBtn}
+            onPress={() => setShowAdd(true)}
+          >
+            <GIcon name="plus" size={18} color={JaridaPurple[500]} />
+            <Text style={styles.addBtnText}>{t('people.add')}</Text>
+          </GPressable>
         )}
 
         <View style={{ height: 32 }} />
@@ -162,147 +172,137 @@ export default function AddUsersScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Grey[50] },
-  scroll: { paddingHorizontal: Spacing.lg, paddingTop: Spacing.lg },
+const makeStyles = (c: ThemeColors) =>
+  StyleSheet.create({
+    container: { flex: 1, backgroundColor: c.background },
+    scroll: { paddingHorizontal: Spacing.lg, paddingTop: Spacing.lg },
 
-  sectionLabel: {
-    fontFamily: FontFamily.body,
-    fontSize: 11,
-    fontWeight: FontWeight.bold,
-    color: Grey[500],
-    letterSpacing: 1,
-    textTransform: 'uppercase',
-    marginBottom: Spacing.md,
-  },
-  errorText: {
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.sm,
-    color: Semantic.danger,
-    marginBottom: Spacing.md,
-  },
-  emptyText: {
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.base,
-    color: Grey[500],
-    marginBottom: Spacing.md,
-  },
+    errorText: {
+      fontFamily: FontFamily.body,
+      fontSize: FontSize.sm,
+      color: Semantic.danger,
+      marginBottom: Spacing.md,
+    },
+    emptyText: {
+      fontFamily: FontFamily.body,
+      fontSize: FontSize.base,
+      color: c.textTertiary,
+      marginBottom: Spacing.md,
+    },
 
-  /* User card */
-  userCard: {
-    backgroundColor: Brand.white,
-    borderRadius: Radii.xl,
-    padding: Spacing.lg,
-    borderWidth: 1,
-    borderColor: Grey[200],
-    marginBottom: Spacing.md,
-  },
-  userHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: Spacing.md,
-  },
-  avatarText: {
-    fontFamily: FontFamily.heading,
-    fontSize: FontSize.md,
-    fontWeight: FontWeight.bold,
-    color: Brand.white,
-  },
-  userInfo: { flex: 1 },
-  userName: {
-    fontFamily: FontFamily.heading,
-    fontSize: FontSize.base,
-    fontWeight: FontWeight.bold,
-    color: Brand.charcoal,
-  },
+    /* Profile card */
+    userCard: {
+      backgroundColor: c.card,
+      borderRadius: Radii.xl,
+      padding: Spacing.lg,
+      borderWidth: 1,
+      borderColor: c.border,
+      marginBottom: Spacing.md,
+    },
+    userHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    avatar: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: Spacing.md,
+    },
+    avatarText: {
+      fontFamily: FontFamily.heading,
+      fontSize: FontSize.md,
+      fontWeight: FontWeight.bold,
+      color: Brand.white,
+    },
+    userInfo: { flex: 1 },
+    userName: {
+      fontFamily: FontFamily.heading,
+      fontSize: FontSize.base,
+      fontWeight: FontWeight.bold,
+      color: c.text,
+    },
 
-  /* Permissions */
+    /* Actions */
+    actionsRow: {
+      flexDirection: 'row',
+      gap: Spacing.lg,
+      marginTop: Spacing.md,
+      paddingTop: Spacing.md,
+      borderTopWidth: 1,
+      borderTopColor: c.border,
+    },
+    actionBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: Spacing.xs,
+    },
+    actionText: {
+      fontFamily: FontFamily.body,
+      fontSize: FontSize.xs,
+      fontWeight: FontWeight.medium,
+      color: c.textTertiary,
+    },
 
-  /* Actions */
-  actionsRow: {
-    flexDirection: 'row',
-    gap: Spacing.lg,
-    marginTop: Spacing.md,
-    paddingTop: Spacing.md,
-    borderTopWidth: 1,
-    borderTopColor: Grey[100],
-  },
-  actionBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.xs,
-  },
-  actionText: {
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.xs,
-    fontWeight: FontWeight.medium,
-    color: Grey[500],
-  },
+    /* Add button */
+    addBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: Spacing.sm,
+      paddingVertical: Spacing.lg,
+      borderRadius: Radii.xl,
+      borderWidth: 2,
+      borderStyle: 'dashed',
+      borderColor: JaridaPurple[200],
+      backgroundColor: c.tintSoft,
+    },
+    addBtnText: {
+      fontFamily: FontFamily.body,
+      fontSize: FontSize.base,
+      fontWeight: FontWeight.semibold,
+      color: JaridaPurple[500],
+    },
 
-  /* Add button */
-  addBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: Spacing.sm,
-    paddingVertical: Spacing.lg,
-    borderRadius: Radii.xl,
-    borderWidth: 2,
-    borderStyle: 'dashed',
-    borderColor: JaridaPurple[200],
-    backgroundColor: JaridaPurple[50],
-  },
-  addBtnText: {
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.base,
-    fontWeight: FontWeight.semibold,
-    color: JaridaPurple[500],
-  },
-
-  /* Invite card */
-  inviteCard: {
-    backgroundColor: Brand.white,
-    borderRadius: Radii.xl,
-    padding: Spacing.lg,
-    borderWidth: 1,
-    borderColor: JaridaPurple[200],
-  },
-  inviteTitle: {
-    fontFamily: FontFamily.heading,
-    fontSize: FontSize.md,
-    fontWeight: FontWeight.bold,
-    color: Brand.charcoal,
-    marginBottom: Spacing.md,
-  },
-  inputGroup: { marginBottom: Spacing.md },
-  inputLabel: {
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.sm,
-    fontWeight: FontWeight.semibold,
-    color: Grey[700],
-    marginBottom: Spacing.xs,
-  },
-  textInput: {
-    backgroundColor: Grey[50],
-    borderRadius: Radii.lg,
-    borderWidth: 1,
-    borderColor: Grey[200],
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.md,
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.base,
-    color: Brand.charcoal,
-  },
-  inviteActions: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    gap: Spacing.sm,
-  },
-});
+    /* Add form */
+    inviteCard: {
+      backgroundColor: c.card,
+      borderRadius: Radii.xl,
+      padding: Spacing.lg,
+      borderWidth: 1,
+      borderColor: JaridaPurple[200],
+    },
+    inviteTitle: {
+      fontFamily: FontFamily.heading,
+      fontSize: FontSize.md,
+      fontWeight: FontWeight.bold,
+      color: c.text,
+      marginBottom: Spacing.md,
+    },
+    inputGroup: { marginBottom: Spacing.md },
+    inputLabel: {
+      fontFamily: FontFamily.body,
+      fontSize: FontSize.sm,
+      fontWeight: FontWeight.semibold,
+      color: c.textSecondary,
+      marginBottom: Spacing.xs,
+    },
+    textInput: {
+      backgroundColor: c.backgroundSecondary,
+      borderRadius: Radii.lg,
+      borderWidth: 1,
+      borderColor: c.border,
+      paddingHorizontal: Spacing.md,
+      paddingVertical: Spacing.md,
+      fontFamily: FontFamily.body,
+      fontSize: FontSize.base,
+      color: c.text,
+    },
+    inviteActions: {
+      flexDirection: 'row',
+      justifyContent: 'flex-end',
+      gap: Spacing.sm,
+    },
+  });

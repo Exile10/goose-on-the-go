@@ -1,72 +1,112 @@
 /**
- * ProfileHub — "You" tab with profile card, stats, and grouped settings.
+ * ProfileHub — the "You" tab: who this Pond knows you as, and everything that
+ * configures it.
  *
- * Charcoal top band with avatar, overlapping stats row,
- * iOS-style grouped settings sections linking to sub-screens.
+ * The identity shown here is the member the Pond attributes this phone to, not
+ * an account. There is no login and no email field anywhere in GIAP, so the
+ * card reports that member and the Pond it came from rather than inventing a
+ * user — and each figure under it is one read, shown as a dash when that read
+ * failed rather than as a zero nobody counted.
  */
 
-import React, { useCallback, useMemo, useState } from 'react';
-import { InkIcon, InkProvider } from '@jarida/ink/native';
+import React, { useCallback, useState } from 'react';
 import {
   Alert,
   View,
   Text,
   StyleSheet,
-  SectionList,
-  Pressable,
+  ScrollView,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { useServer } from '@/providers/server-provider';
-import { initialOf, useHousehold } from '@/view-models/use-household';
+import { useBottomBarInset, useChromeScroll } from '@/providers/chrome-provider';
+import { useThemedStyles } from '@/hooks/use-themed-styles';
+import type { ThemeColors } from '@/constants/colors';
 
-import { PROFILE_NAV, type NavItem, type NavGroup } from '@/constants/navigation';
-import { Grey, JaridaPurple, Brand, Semantic } from '@/constants/colors';
+import {
+  InkButton,
+  InkCard,
+  InkGroup,
+  InkRow,
+  InkText,
+  InkTitle,
+} from '@jarida/ink/native';
+
+import { GIcon } from '@/components/ui/g-icon';
+import { GPressable } from '@/components/ui/g-pressable';
+import { PROFILE_NAV, type NavItem } from '@/constants/navigation';
+import { initialOf, useHousehold } from '@/view-models/use-household';
+import { useServer } from '@/providers/server-provider';
+import { hostOf } from '@/services/discovery';
+import { APP_VERSION } from '@/constants/app';
+import { selectionTick, caution } from '@/services/haptics';
+import { Grey, JaridaPurple, Brand } from '@/constants/colors';
 import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
 import { Spacing } from '@/constants/spacing';
 import { Radii } from '@/constants/radii';
-import { Shadows } from '@/constants/shadows';
-import type { IconName } from '@/constants/icons';
-import i18n from '@/services/i18n';
 
-/** Navigation row */
 const NavRow = React.memo(function NavRow({
   item,
   onPress,
+  divided,
 }: {
   item: NavItem;
   onPress: (route: string) => void;
+  divided: boolean;
 }) {
+  const styles = useThemedStyles(makeStyles);
+  const { t } = useTranslation();
   const handlePress = useCallback(() => onPress(item.route), [item.route, onPress]);
 
   return (
-    <Pressable
-      style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
-      onPress={handlePress}
-    >
-      <View style={styles.rowLeft}>
-        <InkIcon name={item.icon} size={16} tone="brand" />
-        <Text style={styles.rowLabel}>{i18n.t(item.labelKey)}</Text>
-      </View>
-      <InkIcon name="chevron" size={16} tone="neutral" />
-    </Pressable>
+    <GPressable onPress={handlePress} accessibilityRole="button">
+      <InkRow
+        divided={divided}
+        label={
+          <View style={styles.rowLeft}>
+            <GIcon name={item.icon} size={16} color={JaridaPurple[500]} />
+            <Text style={styles.rowLabel}>{t(item.labelKey)}</Text>
+          </View>
+        }
+      >
+        <View style={styles.chevron}>
+          <GIcon name="chevron" size={16} color={Grey[400]} />
+        </View>
+      </InkRow>
+    </GPressable>
   );
 });
 
-/** SectionList sections from PROFILE_NAV */
-const sections = PROFILE_NAV.map((g) => ({
-  title: i18n.t(g.groupKey),
-  data: g.items,
-}));
-
 export default function ProfileHub() {
-  const router = useRouter();
+  const styles = useThemedStyles(makeStyles);
   const { t } = useTranslation();
-  const { signOut } = useServer();
-  const [signingOut, setSigningOut] = useState(false);
+  const router = useRouter();
   const { data: household } = useHousehold();
+  const { signOut, serverUrl } = useServer();
+  const [signingOut, setSigningOut] = useState(false);
+  const chrome = useChromeScroll();
+  const bottomInset = useBottomBarInset();
+
+  // Only what the Pond said. The name is the member it attributes this phone to -- there is no
+  // account, and so no email.
+  const { member, pondName, counts } = household;
+  const initial = member ? initialOf(member.displayName) : null;
+  const stats = [
+    { key: 'devices', label: t('profile.statDevices'), value: counts.devices },
+    { key: 'rooms', label: t('profile.statRooms'), value: counts.rooms },
+    { key: 'routines', label: t('profile.statRoutines'), value: counts.routines },
+    { key: 'users', label: t('profile.statUsers'), value: counts.users },
+  ];
+
+  const handleNav = useCallback(
+    (route: string) => {
+      void selectionTick();
+      router.push(route as any);
+    },
+    [router],
+  );
 
   /**
    * Signing out is not undoable from the phone: it revokes this device's
@@ -74,21 +114,22 @@ export default function ProfileHub() {
    * means pairing at home again. Worth one question first.
    */
   const confirmSignOut = useCallback(() => {
+    void caution();
     Alert.alert(
-      t('profile.signOut'),
+      t('common.signOut'),
       t('profile.signOutWarning'),
       [
-        { text: t('profile.cancel'), style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: t('profile.signOut'),
+          text: t('common.signOut'),
           style: 'destructive',
           onPress: () => {
             setSigningOut(true);
             // The provider clears stored credentials and reconfigures the
-            // connection, which puts the app back into `unpaired` -- and
-            // PairFirst takes it to pairing from there.
+            // connection, which leaves no stored pairing -- and the tab
+            // layout's gate takes the app to pairing from there.
             void signOut()
-              .catch(() => Alert.alert(t('profile.signOut'), t('profile.signOutFailed')))
+              .catch(() => Alert.alert(t('common.signOut'), t('profile.signOutFailed')))
               .finally(() => setSigningOut(false));
           },
         },
@@ -96,147 +137,81 @@ export default function ProfileHub() {
     );
   }, [signOut, t]);
 
-  const handleNav = useCallback(
-    (route: string) => {
-      router.push(route as any);
-    },
-    [router],
-  );
-
-  const renderItem = useCallback(
-    ({ item }: { item: NavItem }) => <NavRow item={item} onPress={handleNav} />,
-    [handleNav],
-  );
-
-  const renderSectionHeader = useCallback(
-    ({ section }: { section: { title: string } }) => (
-      <Text style={styles.sectionHeader}>{section.title}</Text>
-    ),
-    [],
-  );
-
-  const keyExtractor = useCallback((item: NavItem) => item.id, []);
-
-  // Only what the Pond said. The name is the member it attributes this phone to -- there is no
-  // account, and so no email -- and each figure is one read, shown as a dash when that read
-  // failed rather than as a zero nobody counted.
-  const { member, pondName, counts } = household;
-  const initial = member ? initialOf(member.displayName) : null;
-  // Memoised because it feeds ListHeader's callback: a fresh array every render would rebuild the
-  // header component every render, and a SectionList remounts a header whose component changes.
-  const stats = useMemo(
-    () => [
-      { key: 'devices', label: t('profile.statDevices'), value: counts.devices },
-      { key: 'rooms', label: t('profile.statRooms'), value: counts.rooms },
-      { key: 'routines', label: t('profile.statRoutines'), value: counts.routines },
-      { key: 'users', label: t('profile.statUsers'), value: counts.users },
-    ],
-    [counts, t],
-  );
-
-  const ListHeader = useCallback(
-    () => (
-      <>
-        {/* Charcoal top band + profile card */}
-        <View style={styles.profileCard}>
-          <View style={styles.charcoalBand} />
+  return (
+    <SafeAreaView style={styles.safe} edges={['top']}>
+      <ScrollView
+        {...chrome}
+        contentContainerStyle={[styles.listContent, { paddingBottom: bottomInset }]}
+        showsVerticalScrollIndicator={false}
+      >
+        <InkCard style={styles.profileCard}>
           <View style={styles.profileContent}>
             <View style={styles.avatarLarge}>
               {initial ? (
                 <Text style={styles.avatarLargeText}>{initial}</Text>
               ) : (
-                <InkProvider scheme="dark">
-                  <InkIcon name="home" size={28} />
-                </InkProvider>
+                <GIcon name="home" size={28} color={Brand.white} />
               )}
             </View>
-            <Text style={styles.profileName}>{member?.displayName ?? pondName ?? t('profile.yourPond')}</Text>
+            <InkTitle level={2}>{member?.displayName ?? pondName ?? t('profile.yourPond')}</InkTitle>
             {member && pondName ? (
-              <Text style={styles.profileSubtitle}>{t('profile.pairedTo', { pond: pondName })}</Text>
+              <InkText>{t('profile.pairedTo', { pond: pondName })}</InkText>
+            ) : serverUrl ? (
+              <InkText>{hostOf(serverUrl)}</InkText>
             ) : null}
           </View>
 
-          {/* Overlapping stats row */}
           <View style={styles.statsRow}>
             {stats.map((stat) => (
               <View key={stat.key} style={styles.statItem}>
-                <Text style={styles.statValue}>{stat.value ?? '\u2014'}</Text>
+                <Text style={styles.statValue}>{stat.value ?? '—'}</Text>
                 <Text style={styles.statLabel}>{stat.label}</Text>
               </View>
             ))}
           </View>
-        </View>
-      </>
-    ),
-    [initial, member, pondName, stats, t],
-  );
+        </InkCard>
 
-  const ListFooter = useCallback(
-    () => (
-      <View style={styles.footerSection}>
-        <Pressable style={styles.signOutBtn} onPress={() => router.push('/(stack)/remote-access')}>
-          <Text style={styles.signOutText}>{t('remote.title')}</Text>
-        </Pressable>
-        {/* This had no handler at all: a button that looked like the way out
-            and did nothing when pressed. Signing out is also the only way to
-            release a remote enrollment the Pond still calls active, so its
-            absence stranded anyone whose phone needed re-enrolling. */}
-        <Pressable
-          accessibilityRole="button"
-          style={styles.signOutBtn}
+        {PROFILE_NAV.map((group) => (
+          <InkGroup key={group.groupKey} title={t(group.groupKey)} style={styles.group}>
+            {group.items.map((item, i) => (
+              <NavRow key={item.id} item={item} onPress={handleNav} divided={i > 0} />
+            ))}
+          </InkGroup>
+        ))}
+
+        {/* Signing out is also the only way to release a remote enrollment the
+            Pond still calls active, so it has to work — and say that it is
+            working, rather than take a second press for a second sign-out. */}
+        <InkButton
+          variant="danger"
           disabled={signingOut}
           onPress={confirmSignOut}
+          style={styles.signOut}
         >
-          <Text style={styles.signOutText}>{signingOut ? t('profile.signingOut') : t('profile.signOut')}</Text>
-        </Pressable>
-        {/* eslint-disable-next-line i18next/no-literal-string -- product name and version, not translated */}
-        <Text style={styles.versionText}>Goose on the Go v0.2.0</Text>
-        {/* Bottom spacer for tab bar */}
-        <View style={{ height: 100 }} />
-      </View>
-    ),
-    [router, t, signingOut],
-  );
-
-  return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
-      <SectionList
-        sections={sections}
-        keyExtractor={keyExtractor}
-        renderItem={renderItem}
-        renderSectionHeader={renderSectionHeader}
-        ListHeaderComponent={ListHeader}
-        ListFooterComponent={ListFooter}
-        contentContainerStyle={styles.listContent}
-        showsVerticalScrollIndicator={false}
-        stickySectionHeadersEnabled={false}
-      />
+          {signingOut ? t('profile.signingOut') : t('common.signOut')}
+        </InkButton>
+        <Text style={styles.versionText}>{t('profile.version', { version: APP_VERSION })}</Text>
+      </ScrollView>
     </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: Grey[50] },
+const makeStyles = (c: ThemeColors) =>
+  StyleSheet.create({
+  chevron: { transform: [{ rotate: '-90deg' }] },
+  group: { marginBottom: Spacing.lg },
+  signOut: { marginTop: Spacing.md, alignSelf: 'flex-start' },
+  safe: { flex: 1, backgroundColor: c.background },
   listContent: { paddingHorizontal: Spacing.lg },
 
-  /* Profile card */
+  /* Profile card. InkCard draws its own face and plate, so its style carries
+     layout only: a background, border or radius here paints a second card. */
   profileCard: {
-    backgroundColor: Brand.white,
-    borderRadius: Radii.xl,
-    overflow: 'hidden',
     marginTop: Spacing.lg,
     marginBottom: Spacing.xl,
-    borderWidth: 1,
-    borderColor: Grey[200],
-    ...Shadows.md,
-  },
-  charcoalBand: {
-    height: 80,
-    backgroundColor: Brand.charcoal,
   },
   profileContent: {
     alignItems: 'center',
-    marginTop: -36,
     paddingBottom: Spacing.md,
   },
   avatarLarge: {
@@ -247,7 +222,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 4,
-    borderColor: Brand.white,
+    borderColor: c.background,
   },
   avatarLargeText: {
     fontFamily: FontFamily.heading,
@@ -255,26 +230,13 @@ const styles = StyleSheet.create({
     fontWeight: FontWeight.bold,
     color: Brand.white,
   },
-  profileName: {
-    fontFamily: FontFamily.heading,
-    fontSize: FontSize.lg,
-    fontWeight: FontWeight.bold,
-    color: Brand.charcoal,
-    marginTop: Spacing.sm,
-  },
-  profileSubtitle: {
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.sm,
-    color: Grey[500],
-    marginTop: 2,
-  },
 
   /* Stats row */
   statsRow: {
     flexDirection: 'row',
     marginHorizontal: Spacing.lg,
     marginBottom: Spacing.lg,
-    backgroundColor: Grey[50],
+    backgroundColor: c.background,
     borderRadius: Radii.lg,
     paddingVertical: Spacing.md,
   },
@@ -286,45 +248,16 @@ const styles = StyleSheet.create({
     fontFamily: FontFamily.heading,
     fontSize: FontSize.lg,
     fontWeight: FontWeight.bold,
-    color: Brand.charcoal,
+    color: c.text,
   },
   statLabel: {
     fontFamily: FontFamily.body,
     fontSize: FontSize.xs,
-    color: Grey[500],
+    color: c.textTertiary,
     marginTop: 2,
   },
 
-  /* Section headers */
-  sectionHeader: {
-    fontFamily: FontFamily.body,
-    fontSize: 11,
-    fontWeight: FontWeight.bold,
-    color: Grey[500],
-    letterSpacing: 1,
-    textTransform: 'uppercase',
-    marginTop: Spacing.xl,
-    marginBottom: Spacing.sm,
-  },
-
   /* Nav rows */
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: Spacing.md,
-    paddingHorizontal: Spacing.md,
-    marginBottom: 1,
-    backgroundColor: Brand.white,
-    borderRadius: Radii.md,
-    borderWidth: 1,
-    borderColor: Grey[200],
-    marginTop: Spacing.xs,
-  },
-  rowPressed: {
-    backgroundColor: JaridaPurple[50],
-    borderColor: JaridaPurple[200],
-  },
   rowLeft: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -334,27 +267,9 @@ const styles = StyleSheet.create({
     fontFamily: FontFamily.body,
     fontSize: FontSize.base,
     fontWeight: FontWeight.medium,
-    color: Brand.charcoal,
+    color: c.text,
   },
 
-  /* Footer */
-  footerSection: {
-    alignItems: 'center',
-    marginTop: Spacing['3xl'],
-  },
-  signOutBtn: {
-    paddingVertical: Spacing.md,
-    paddingHorizontal: Spacing['3xl'],
-    borderRadius: Radii.md,
-    borderWidth: 1,
-    borderColor: Semantic.danger,
-  },
-  signOutText: {
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.base,
-    fontWeight: FontWeight.semibold,
-    color: Semantic.danger,
-  },
   versionText: {
     fontFamily: FontFamily.body,
     fontSize: FontSize.xs,

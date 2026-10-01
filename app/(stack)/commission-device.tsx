@@ -8,13 +8,15 @@
  * work — so the screen commits to waiting rather than appearing to hang.
  */
 
+import { useTranslation } from 'react-i18next';
 import React, { useCallback, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
-import { InkButton, InkIcon } from '@jarida/ink/native';
+import { ActivityIndicator, StyleSheet, Text, TextInput, View } from 'react-native';
+import { InkButton } from '@jarida/ink/native';
 import { useFocusEffect, useRouter } from 'expo-router';
 
+import { GIcon } from '@/components/ui/g-icon';
 import { GKeyboardView } from '@/components/ui/g-keyboard-view';
-import i18n from '@/services/i18n';
+import { GPressable } from '@/components/ui/g-pressable';
 import { looksLikeTypedSetupCode } from '@/models/pairing';
 import { takeSetupCode } from '@/services/pairing-handoff';
 import { useDevices } from '@/view-models/use-devices';
@@ -22,8 +24,12 @@ import { Grey, JaridaPurple, Semantic } from '@/constants/colors';
 import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
 import { Spacing } from '@/constants/spacing';
 import { Radii } from '@/constants/radii';
+import { useThemedStyles } from '@/hooks/use-themed-styles';
+import type { ThemeColors } from '@/constants/colors';
 
 export default function CommissionDeviceScreen() {
+  const styles = useThemedStyles(makeStyles);
+  const { t } = useTranslation();
   const router = useRouter();
   const { data, error, actions } = useDevices();
   const [code, setCode] = useState('');
@@ -54,29 +60,29 @@ export default function CommissionDeviceScreen() {
     return (
       <View style={styles.centred}>
         <ActivityIndicator color={JaridaPurple[500]} />
-        <Text style={styles.title}>{i18n.t('commission.adding')}</Text>
-        <Text style={styles.desc}>{i18n.t('commission.addingDesc')}</Text>
+        <Text style={styles.title}>{t('commission.adding')}</Text>
+        <Text style={styles.desc}>{t('commission.addingDesc')}</Text>
       </View>
     );
   }
 
   return (
     <GKeyboardView style={styles.container}>
-      <InkIcon name="device" size={28} tone="brand" />
-      <Text style={styles.title}>{i18n.t('commission.title')}</Text>
-      <Text style={styles.desc}>{i18n.t('commission.desc')}</Text>
+      <GIcon name="device" size={28} color={JaridaPurple[500]} />
+      <Text style={styles.title}>{t('commission.title')}</Text>
+      <Text style={styles.desc}>{t('commission.desc')}</Text>
 
       {commissioning ? (
-        <Text style={styles.notice}>{i18n.t('commission.controllerStarting')}</Text>
+        <Text style={styles.notice}>{t('commission.controllerStarting')}</Text>
       ) : null}
 
       <View style={styles.inputGroup}>
-        <Text style={styles.inputLabel}>{i18n.t('commission.setupCode')}</Text>
+        <Text style={styles.inputLabel}>{t('commission.setupCode')}</Text>
         <TextInput
           style={styles.textInput}
           value={code}
           onChangeText={setCode}
-          placeholder="12345678"
+          placeholder={t('commission.codePlaceholder')}
           placeholderTextColor={Grey[400]}
           autoCapitalize="characters"
           autoCorrect={false}
@@ -85,24 +91,24 @@ export default function CommissionDeviceScreen() {
             not a thing to read off a box and type. Scanning is the ordinary
             route; the field stays because the manual code beside the QR exists
             for exactly the times the camera cannot be used. */}
-        <Pressable
+        <GPressable
           accessibilityRole="button"
           onPress={() => router.push('/(stack)/connect-desktop?mode=matter')}
           hitSlop={8}
           style={styles.scanLink}
         >
-          <InkIcon name="camera" size={16} tone="brand" />
-          <Text style={styles.scanLinkText}>{i18n.t('commission.scan')}</Text>
-        </Pressable>
+          <GIcon name="camera" size={16} color={JaridaPurple[500]} />
+          <Text style={styles.scanLinkText}>{t('commission.scan')}</Text>
+        </GPressable>
       </View>
 
       <View style={styles.inputGroup}>
-        <Text style={styles.inputLabel}>{i18n.t('commission.nameOptional')}</Text>
+        <Text style={styles.inputLabel}>{t('commission.nameOptional')}</Text>
         <TextInput
           style={styles.textInput}
           value={name}
           onChangeText={setName}
-          placeholder={i18n.t('commission.namePlaceholder')}
+          placeholder={t('commission.namePlaceholder')}
           placeholderTextColor={Grey[400]}
         />
       </View>
@@ -114,21 +120,20 @@ export default function CommissionDeviceScreen() {
         disabled={!looksLikeTypedSetupCode(code) || commissioning}
         onPress={submit}
       >
-        {i18n.t('commission.addDevice')}
+        {t('commission.addDevice')}
       </InkButton>
 
-      <Text style={styles.footnote}>
-        {i18n.t('commission.bluetoothFootnote')}
-      </Text>
+      <Text style={styles.footnote}>{t('commission.bluetoothFootnote')}</Text>
     </GKeyboardView>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Grey[50], padding: Spacing.xl, gap: Spacing.md },
+const makeStyles = (c: ThemeColors) =>
+  StyleSheet.create({
+  container: { flex: 1, backgroundColor: c.background, padding: Spacing.xl, gap: Spacing.md },
   centred: {
     flex: 1,
-    backgroundColor: Grey[50],
+    backgroundColor: c.background,
     alignItems: 'center',
     justifyContent: 'center',
     padding: Spacing.xl,
@@ -138,13 +143,12 @@ const styles = StyleSheet.create({
     fontFamily: FontFamily.heading,
     fontSize: FontSize.xl,
     fontWeight: FontWeight.bold,
-    color: Grey[900],
-    textAlign: 'center',
+    color: c.text,
   },
   desc: {
     fontFamily: FontFamily.body,
     fontSize: FontSize.base,
-    color: Grey[500],
+    color: c.textTertiary,
     lineHeight: FontSize.base * 1.5,
   },
   notice: {
@@ -161,7 +165,7 @@ const styles = StyleSheet.create({
   footnote: {
     fontFamily: FontFamily.body,
     fontSize: FontSize.sm,
-    color: Grey[500],
+    color: c.textTertiary,
     lineHeight: FontSize.sm * 1.5,
   },
   inputGroup: { gap: Spacing.xs },
@@ -176,21 +180,21 @@ const styles = StyleSheet.create({
     fontFamily: FontFamily.body,
     fontSize: FontSize.sm,
     fontWeight: FontWeight.semibold,
-    color: JaridaPurple[500],
+    color: c.textBrand,
   },
   inputLabel: {
     fontFamily: FontFamily.body,
     fontSize: FontSize.sm,
     fontWeight: FontWeight.semibold,
-    color: Grey[700],
+    color: c.textSecondary,
   },
   textInput: {
     fontFamily: FontFamily.body,
     fontSize: FontSize.base,
-    color: Grey[900],
-    backgroundColor: '#FFFFFF',
+    color: c.text,
+    backgroundColor: c.backgroundSecondary,
     borderWidth: 1,
-    borderColor: Grey[200],
+    borderColor: c.border,
     borderRadius: Radii.md,
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.md,

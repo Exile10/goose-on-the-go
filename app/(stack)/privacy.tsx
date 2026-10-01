@@ -1,50 +1,59 @@
 /**
  * PrivacyScreen — what happens to a household's data, what can be done from here, and what
- * this app is built from. The content is in `constants/privacy.ts`, verified against the Pond.
+ * this app is built from. The content is in `constants/privacy.ts`, verified against the Pond;
+ * `docs/PRIVACY-SCREEN.md` keeps the evidence for each statement.
  */
 
 import React, { useState } from 'react';
-import { InkIcon } from '@jarida/ink/native';
+import { useTranslation } from 'react-i18next';
+import { InkTitle } from '@jarida/ink/native';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
-  Pressable,
 } from 'react-native';
 
-import { Grey, JaridaPurple, Brand } from '@/constants/colors';
+import { GIcon } from '@/components/ui/g-icon';
+import { GPressable } from '@/components/ui/g-pressable';
+import { Grey, JaridaPurple } from '@/constants/colors';
 import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
 import { Spacing } from '@/constants/spacing';
 import { Radii } from '@/constants/radii';
-import i18n from '@/services/i18n';
 import { APP_LICENSES, DATA_RIGHT_KEYS, PRIVACY_SECTIONS, type PrivacySection } from '@/constants/privacy';
+import { useThemedStyles } from '@/hooks/use-themed-styles';
+import type { ThemeColors } from '@/constants/colors';
 
 /** Expandable section */
 function ExpandableSection({ section }: { section: PrivacySection }) {
+  const styles = useThemedStyles(makeStyles);
+  const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
   return (
-    <Pressable
+    <GPressable feedback="lift"
       style={styles.section}
       onPress={() => setExpanded(!expanded)}
     >
       <View style={styles.sectionHeader}>
         <View style={{ marginRight: Spacing.md }}>
-          <InkIcon name={section.icon} size={16} tone="brand" />
+          <GIcon name={section.icon} size={16} color={JaridaPurple[500]} />
         </View>
-        <Text style={styles.sectionTitle}>{i18n.t(section.titleKey)}</Text>
+        <Text style={styles.sectionTitle}>{t(section.titleKey)}</Text>
         <View style={expanded ? { transform: [{ rotate: '180deg' }] } : undefined}>
-          <InkIcon name="chevron" size={16} tone="neutral" />
+          <GIcon name="chevron" size={16} color={Grey[400]} />
         </View>
       </View>
       {expanded && (
-        <Text style={styles.sectionContent}>{i18n.t(section.bodyKey)}</Text>
+        <Text style={styles.sectionContent}>{t(section.bodyKey)}</Text>
       )}
-    </Pressable>
+    </GPressable>
   );
 }
 
 export default function PrivacyScreen() {
+  const styles = useThemedStyles(makeStyles);
+  const { t } = useTranslation();
+
   return (
     <ScrollView
       style={styles.container}
@@ -52,25 +61,25 @@ export default function PrivacyScreen() {
       showsVerticalScrollIndicator={false}
     >
       {/* Privacy sections */}
-      <Text style={styles.label}>{i18n.t('privacy.policyLabel')}</Text>
+      <InkTitle level={3}>{t('privacy.policyHeading')}</InkTitle>
       {PRIVACY_SECTIONS.map((s) => (
         <ExpandableSection key={s.id} section={s} />
       ))}
 
       {/* Data rights */}
-      <Text style={styles.label}>{i18n.t('privacy.rightsLabel')}</Text>
+      <InkTitle level={3}>{t('privacy.rightsHeading')}</InkTitle>
       <View style={styles.rightsCard}>
         {/* Statements, not buttons. These rows used to be Pressables with a chevron and no
             handler, offering five rights of which none worked. */}
         {DATA_RIGHT_KEYS.map((key) => (
           <View key={key} style={styles.rightRow}>
-            <Text style={styles.rightText}>{i18n.t(key)}</Text>
+            <Text style={styles.rightText}>{t(key)}</Text>
           </View>
         ))}
       </View>
 
       {/* Licenses */}
-      <Text style={styles.label}>{i18n.t('privacy.licensesLabel')}</Text>
+      <InkTitle level={3}>{t('privacy.licensesHeading')}</InkTitle>
       <View style={styles.licensesCard}>
         {APP_LICENSES.map((l, i) => (
           <View key={l.pkg} style={[styles.licenseRow, i < APP_LICENSES.length - 1 && styles.licenseDivider]}>
@@ -87,108 +96,99 @@ export default function PrivacyScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Grey[50] },
-  scroll: { paddingHorizontal: Spacing.lg, paddingTop: Spacing.lg },
+const makeStyles = (c: ThemeColors) =>
+  StyleSheet.create({
+    container: { flex: 1, backgroundColor: c.background },
+    scroll: { paddingHorizontal: Spacing.lg, paddingTop: Spacing.lg },
 
-  label: {
-    fontFamily: FontFamily.body,
-    fontSize: 11,
-    fontWeight: FontWeight.bold,
-    color: Grey[500],
-    letterSpacing: 1,
-    textTransform: 'uppercase',
-    marginBottom: Spacing.md,
-    marginTop: Spacing.lg,
-  },
+    /* Expandable sections */
+    section: {
+      backgroundColor: c.card,
+      borderRadius: Radii.xl,
+      padding: Spacing.lg,
+      borderWidth: 1,
+      borderColor: c.border,
+      marginBottom: Spacing.sm,
+    },
+    sectionHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    sectionTitle: {
+      flex: 1,
+      fontFamily: FontFamily.heading,
+      fontSize: FontSize.base,
+      fontWeight: FontWeight.semibold,
+      color: c.text,
+    },
+    sectionContent: {
+      fontFamily: FontFamily.body,
+      fontSize: FontSize.sm,
+      color: c.textTertiary,
+      lineHeight: FontSize.sm * 1.6,
+      marginTop: Spacing.md,
+      paddingTop: Spacing.md,
+      borderTopWidth: 1,
+      borderTopColor: c.border,
+    },
 
-  /* Expandable sections */
-  section: {
-    backgroundColor: Brand.white,
-    borderRadius: Radii.xl,
-    padding: Spacing.lg,
-    borderWidth: 1,
-    borderColor: Grey[200],
-    marginBottom: Spacing.sm,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  sectionTitle: {
-    flex: 1,
-    fontFamily: FontFamily.heading,
-    fontSize: FontSize.base,
-    fontWeight: FontWeight.semibold,
-    color: Brand.charcoal,
-  },
-  sectionContent: {
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.sm,
-    color: Grey[600],
-    lineHeight: FontSize.sm * 1.6,
-    marginTop: Spacing.md,
-    paddingTop: Spacing.md,
-    borderTopWidth: 1,
-    borderTopColor: Grey[100],
-  },
+    /* Rights */
+    rightsCard: {
+      backgroundColor: c.card,
+      borderRadius: Radii.xl,
+      borderWidth: 1,
+      borderColor: c.border,
+      overflow: 'hidden',
+    },
+    rightRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingVertical: Spacing.md,
+      paddingHorizontal: Spacing.lg,
+      borderBottomWidth: 1,
+      borderBottomColor: c.border,
+    },
+    rightText: {
+      flex: 1,
+      fontFamily: FontFamily.body,
+      fontSize: FontSize.base,
+      color: c.text,
+    },
 
-  /* Rights */
-  rightsCard: {
-    backgroundColor: Brand.white,
-    borderRadius: Radii.xl,
-    borderWidth: 1,
-    borderColor: Grey[200],
-    overflow: 'hidden',
-  },
-  rightRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: Spacing.md,
-    paddingHorizontal: Spacing.lg,
-    borderBottomWidth: 1,
-    borderBottomColor: Grey[100],
-  },
-  rightText: {
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.base,
-    color: Brand.charcoal,
-  },
-
-  /* Licenses */
-  licensesCard: {
-    backgroundColor: Brand.white,
-    borderRadius: Radii.xl,
-    padding: Spacing.lg,
-    borderWidth: 1,
-    borderColor: Grey[200],
-  },
-  licenseRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: Spacing.sm,
-  },
-  licenseDivider: {
-    borderBottomWidth: 1,
-    borderBottomColor: Grey[100],
-    paddingBottom: Spacing.sm,
-  },
-  licenseName: {
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.base,
-    color: Brand.charcoal,
-  },
-  licenseBadge: {
-    backgroundColor: Grey[100],
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: 2,
-    borderRadius: Radii.pill,
-  },
-  licenseText: {
-    fontFamily: FontFamily.mono,
-    fontSize: FontSize.xs,
-    color: Grey[600],
-  },
-});
+    /* Licenses */
+    licensesCard: {
+      backgroundColor: c.card,
+      borderRadius: Radii.xl,
+      padding: Spacing.lg,
+      borderWidth: 1,
+      borderColor: c.border,
+    },
+    licenseRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingVertical: Spacing.sm,
+    },
+    licenseDivider: {
+      borderBottomWidth: 1,
+      borderBottomColor: c.border,
+      paddingBottom: Spacing.sm,
+    },
+    licenseName: {
+      fontFamily: FontFamily.body,
+      fontSize: FontSize.base,
+      color: c.text,
+    },
+    licenseBadge: {
+      backgroundColor: c.backgroundSecondary,
+      paddingHorizontal: Spacing.sm,
+      paddingVertical: 2,
+      borderRadius: Radii.pill,
+    },
+    licenseText: {
+      fontFamily: FontFamily.mono,
+      fontSize: FontSize.xs,
+      color: c.textTertiary,
+    },
+  });

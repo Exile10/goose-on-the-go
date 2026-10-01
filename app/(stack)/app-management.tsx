@@ -4,28 +4,32 @@
  * Cards for each integrated service with toggle and API key input.
  */
 
+import { useTranslation } from 'react-i18next';
 import React, { useState, useCallback } from 'react';
-import { InkSwitch, InkIcon } from '@jarida/ink/native';
+import { InkSwitch } from '@jarida/ink/native';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
-  Pressable,
   TextInput,
 } from 'react-native';
 
+import { GIcon } from '@/components/ui/g-icon';
+import { GPressable } from '@/components/ui/g-pressable';
+import type { IconName } from '@/constants/icons';
 import { GKeyboardView } from '@/components/ui/g-keyboard-view';
-import { Grey, JaridaPurple, Brand, Semantic } from '@/constants/colors';
+import { Grey, JaridaPurple, Semantic } from '@/constants/colors';
 import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
 import { Spacing } from '@/constants/spacing';
 import { Radii } from '@/constants/radii';
-import i18n from '@/services/i18n';
+import { useThemedStyles } from '@/hooks/use-themed-styles';
+import type { ThemeColors } from '@/constants/colors';
 
 interface AppIntegration {
   id: string;
   name: string;
-  icon: string;
+  icon: IconName;
   description: string;
   enabled: boolean;
   hasApiKey: boolean;
@@ -41,8 +45,8 @@ const APPS: AppIntegration[] = [
   { id: 'notion', name: 'Notion', icon: 'edit', description: 'Notes and task management', enabled: false, hasApiKey: false, category: 'Productivity' },
   { id: 'hue', name: 'Philips Hue', icon: 'light', description: 'Smart lighting control', enabled: true, hasApiKey: true, category: 'Smart Home' },
 ];
-
 /* eslint-enable i18next/no-literal-string */
+
 /** App card */
 const AppCard = React.memo(function AppCard({
   app,
@@ -51,6 +55,8 @@ const AppCard = React.memo(function AppCard({
   app: AppIntegration;
   onToggle: (id: string) => void;
 }) {
+  const styles = useThemedStyles(makeStyles);
+  const { t } = useTranslation();
   const [showKey, setShowKey] = useState(false);
   const [apiKey, setApiKey] = useState(app.hasApiKey ? '\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022' : '');
 
@@ -58,7 +64,7 @@ const AppCard = React.memo(function AppCard({
     <View style={styles.appCard}>
       <View style={styles.appHeader}>
         <View style={{ marginRight: Spacing.md }}>
-          <InkIcon name={app.icon} size={24} tone="brand" />
+          <GIcon name={app.icon} size={24} color={JaridaPurple[500]} />
         </View>
         <View style={styles.appInfo}>
           <Text style={styles.appName}>{app.name}</Text>
@@ -70,19 +76,19 @@ const AppCard = React.memo(function AppCard({
       {/* API key row */}
       {app.enabled && (
         <View style={styles.apiKeyRow}>
-          <Text style={styles.apiKeyLabel}>{i18n.t('appManagement.apiKey')}</Text>
+          <Text style={styles.apiKeyLabel}>{t('integrations.apiKey')}</Text>
           <View style={styles.apiKeyInput}>
             <TextInput
               style={styles.apiKeyText}
               value={apiKey}
               onChangeText={setApiKey}
               secureTextEntry={!showKey}
-              placeholder={i18n.t('appManagement.apiKeyPlaceholder')}
+              placeholder={t('integrations.apiKeyPlaceholder')}
               placeholderTextColor={Grey[400]}
             />
-            <Pressable onPress={() => setShowKey(!showKey)}>
-              <Text style={styles.showHideText}>{showKey ? i18n.t('appManagement.hide') : i18n.t('appManagement.show')}</Text>
-            </Pressable>
+            <GPressable onPress={() => setShowKey(!showKey)}>
+              <Text style={styles.showHideText}>{showKey ? t('appManagement.hide') : t('appManagement.show')}</Text>
+            </GPressable>
           </View>
         </View>
       )}
@@ -94,7 +100,7 @@ const AppCard = React.memo(function AppCard({
         </View>
         {app.hasApiKey && app.enabled && (
           <View style={[styles.statusBadge, { backgroundColor: Semantic.successSoft }]}>
-            <Text style={[styles.statusText, { color: Semantic.success }]}>{i18n.t('appManagement.connected')}</Text>
+            <Text style={[styles.statusText, { color: Semantic.success }]}>{t('integrations.connected')}</Text>
           </View>
         )}
       </View>
@@ -103,6 +109,7 @@ const AppCard = React.memo(function AppCard({
 });
 
 export default function AppManagementScreen() {
+  const styles = useThemedStyles(makeStyles);
   const [apps, setApps] = useState(APPS);
 
   const handleToggle = useCallback((id: string) => {
@@ -118,7 +125,6 @@ export default function AppManagementScreen() {
         contentContainerStyle={styles.scroll}
         showsVerticalScrollIndicator={false}
       >
-        <Text style={styles.sectionLabel}>{i18n.t('appManagement.connectedApps')}</Text>
         {apps.map((app) => (
           <AppCard key={app.id} app={app} onToggle={handleToggle} />
         ))}
@@ -128,27 +134,18 @@ export default function AppManagementScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Grey[50] },
+const makeStyles = (c: ThemeColors) =>
+  StyleSheet.create({
+  container: { flex: 1, backgroundColor: c.background },
   scroll: { paddingHorizontal: Spacing.lg, paddingTop: Spacing.lg },
-
-  sectionLabel: {
-    fontFamily: FontFamily.body,
-    fontSize: 11,
-    fontWeight: FontWeight.bold,
-    color: Grey[500],
-    letterSpacing: 1,
-    textTransform: 'uppercase',
-    marginBottom: Spacing.md,
-  },
 
   /* App card */
   appCard: {
-    backgroundColor: Brand.white,
+    backgroundColor: c.card,
     borderRadius: Radii.xl,
     padding: Spacing.lg,
     borderWidth: 1,
-    borderColor: Grey[200],
+    borderColor: c.border,
     marginBottom: Spacing.md,
   },
   appHeader: {
@@ -160,12 +157,12 @@ const styles = StyleSheet.create({
     fontFamily: FontFamily.heading,
     fontSize: FontSize.md,
     fontWeight: FontWeight.bold,
-    color: Brand.charcoal,
+    color: c.text,
   },
   appDesc: {
     fontFamily: FontFamily.body,
     fontSize: FontSize.sm,
-    color: Grey[500],
+    color: c.textTertiary,
     marginTop: 2,
   },
 
@@ -174,19 +171,19 @@ const styles = StyleSheet.create({
     marginTop: Spacing.md,
     paddingTop: Spacing.md,
     borderTopWidth: 1,
-    borderTopColor: Grey[100],
+    borderTopColor: c.border,
   },
   apiKeyLabel: {
     fontFamily: FontFamily.body,
     fontSize: FontSize.xs,
     fontWeight: FontWeight.semibold,
-    color: Grey[500],
+    color: c.textTertiary,
     marginBottom: Spacing.xs,
   },
   apiKeyInput: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Grey[100],
+    backgroundColor: c.backgroundSecondary,
     borderRadius: Radii.md,
     paddingHorizontal: Spacing.md,
     paddingVertical: 8,
@@ -195,7 +192,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontFamily: FontFamily.mono,
     fontSize: FontSize.sm,
-    color: Brand.charcoal,
+    color: c.text,
   },
   showHideText: {
     fontFamily: FontFamily.body,
@@ -212,7 +209,7 @@ const styles = StyleSheet.create({
     marginTop: Spacing.md,
   },
   categoryBadge: {
-    backgroundColor: Grey[100],
+    backgroundColor: c.backgroundSecondary,
     paddingHorizontal: Spacing.sm,
     paddingVertical: 2,
     borderRadius: Radii.pill,
@@ -221,7 +218,7 @@ const styles = StyleSheet.create({
     fontFamily: FontFamily.body,
     fontSize: FontSize.xs,
     fontWeight: FontWeight.semibold,
-    color: Grey[600],
+    color: c.textSecondary,
   },
   statusBadge: {
     paddingHorizontal: Spacing.sm,

@@ -122,6 +122,13 @@ export interface MatterStatus {
 
 // ── Sessions ──────────────────────────────────────────────────
 
+/** `POST /api/v1/chat` — one whole turn, not a stream. */
+export interface ChatTurn {
+  session_id: string;
+  response: string;
+  model_role: string;
+}
+
 export interface SessionSummary {
   id: string;
   title?: string;
@@ -170,109 +177,74 @@ export interface SessionMessage {
   liked?: boolean | null;
 }
 
-// ── Chat streaming ────────────────────────────────────────────
-
-/** Image attachment for a chat turn. `data` is raw base64 — no `data:...;base64,` prefix. */
+/**
+ * One picture sent with a turn: raw base64, no `data:` prefix.
+ *
+ * The Pond's own limits (`image_limits.rs`): four per turn, 4 MiB each and
+ * 8 MiB in all once decoded, and only JPEG, PNG, WebP, GIF or BMP.
+ */
 export interface ImageAttachment {
   data: string;
   mime_type: string;
 }
 
-/** Request body for `POST /chat/stream`. Only `message` is required server-side. */
+/**
+ * `POST /api/v1/chat/stream`. The only chat route that honours `images` and
+ * `voice_mode`: `/chat` parses both and then drops them.
+ */
 export interface ChatStreamRequest {
   message: string;
   session_id?: string;
   images?: ImageAttachment[];
+  /** Shorter answers and no reasoning passage, because they will be spoken. */
   voice_mode?: boolean;
-  canvas_mode?: boolean;
-  tool_group_allowlist?: string[];
-  /**
-   * Detach this turn from the response body: it keeps running server-side
-   * when the client disconnects, and can be reattached through
-   * `GET /chat/runs/{run_id}/events`. Defaults to false server-side.
-   */
+  /** Keep the turn running if the connection drops, so it can be reattached. */
   resumable?: boolean;
 }
 
 /**
- * SSE frames pond-server's `/chat/stream` (and `/chat/runs/{id}/events`)
- * actually emit.
+ * A frame of a streaming turn, as `routes.rs` writes it.
  *
- * `done` and `error` carry no `type` field — check for those keys before
- * switching on `type`.
- *
- * `seq` rides in the SSE `id:` field, not the JSON body — the api client
- * stamps it on from the frame's `lastEventId` before handing it to `onFrame`.
- * Only present on frames pushed onto a run's replay ring (i.e. not on
- * `reattached` / `replay_gap` / `run_evicted`, which are subscriber-local).
+ * Deliberately loose: most frames carry a `type`, but the two that end things
+ * — `{error}` and `{done: true, …}` — carry none, and the server adds frame
+ * types faster than a client needs to understand them. Anything unrecognised
+ * is ignored, not rejected.
  */
-export type ChatStreamFrame =
-  | { type: 'text'; content: string; token?: string; seq?: number }
-  | { type: 'thinking'; content: string; seq?: number }
-  | { type: 'tool_call'; tool: string; id: string; input: unknown; seq?: number }
-  | {
-      type: 'tool_result';
-      tool: string;
-      id: string;
-      content: string;
-      ui?: { card_type?: string; data?: Record<string, unknown> };
-      seq?: number;
-    }
-  | { type: 'status'; content: string; seq?: number }
-  | { type: 'review_status'; content: string; seq?: number }
-  | { type: 'review_revision'; content: string; score?: number; rounds?: number; seq?: number }
-  | { type: 'tool_revision'; seq?: number }
-  | { type: 'turn_limit_reached'; max_turns: number; seq?: number }
-  | {
-      type: 'context_warning';
-      utilization_pct: number;
-      turns_remaining: number;
-      avg_growth_rate: number;
-      warning: string | null;
-      seq?: number;
-    }
-  | { type: 'subagent_progress'; task_id: string; role: string; status: string; detail?: string; seq?: number }
-  | { type: 'turn_stats'; seq?: number }
-  /** First frame of a resumable run — names the run so the client can persist it. */
-  | { type: 'run_started'; run_id: string; session_id: string; epoch: string; resumable: true; seq?: number }
-  /** First frame of a reattach response only; never appears on the original stream. */
-  | {
-      type: 'reattached';
-      run_id: string;
-      session_id: string;
-      from_seq: number;
-      replay_depth: number;
-      state: 'running' | 'finished' | 'failed' | 'cancelled';
-      epoch: string;
-    }
-  /** The ring rolled past what this client had — frames before `first_available_seq` are gone for good. */
-  | { type: 'replay_gap'; requested_after_seq: number; first_available_seq: number; advice: string }
-  /** The run handle was dropped from the registry while this client was attached (aged out, or the process restarted). */
-  | { type: 'run_evicted'; run_id: string; advice: string }
-  /** Non-terminal bookkeeping frame; the `done` frame with `interrupted:true` that follows is what actually ends the turn. */
-  | { type: 'cancelled'; run_id: string; at_seq: number; seq?: number }
-  | {
-      done: true;
-      session_id: string;
-      run_id?: string;
-      /** True when the turn was cancelled or timed out rather than finishing on its own. */
-      interrupted?: boolean;
-      model_role?: string;
-      model_name?: string;
-      usage?: { prompt_tokens: number; completion_tokens: number };
-      seq?: number;
-    }
-  | { error: string };
+export interface ChatFrame {
+  type?: string;
+  /** `text`, `thinking`, `status`, `review_revision`, `tool_result`. */
+  content?: string;
+  /** `tool_call`, `tool_result`: the full name, `extension__tool`. */
+  tool?: string;
+  id?: string;
+  /** `tool_call`: the arguments as an object, or null. */
+  input?: unknown;
+  /** `tool_result`: a card hint, live only — history keeps just the text. */
+  ui?: { card_type?: string; data?: Record<string, unknown> };
+  run_id?: string;
+  session_id?: string;
+  epoch?: number | string;
+  error?: string;
+  done?: boolean;
+  interrupted?: boolean;
+  /** Our own: the stream's `id:` line, for reattaching after a drop. */
+  seq?: number;
+}
 
-/** Mirrors `GET /sessions/{id}/active-run` — what, if anything, the server is still driving. */
-export interface ActiveRun {
-  run_id: string;
-  session_id: string;
-  state: 'running' | 'finished' | 'failed' | 'cancelled';
-  started_at: string;
-  first_seq: number;
-  last_seq: number;
-  epoch: string;
+/** `GET /api/v1/suggestions`: at most four, the Pond's own composed ones first. */
+export interface Suggestion {
+  id: string;
+  prompt: string;
+  /** Why the Pond is offering it, in its own words. */
+  because: string;
+  answered_by: string;
+  /** Written from a memory by the Pond's idle pass, rather than a template. */
+  composed: boolean;
+}
+
+export interface SuggestionList {
+  suggestions: Suggestion[];
+  audience: 'personal' | 'shared';
 }
 
 export interface UsageSummary {
@@ -303,12 +275,31 @@ export interface MemoryFragment {
 
 // ── Models ────────────────────────────────────────────────────
 
+/**
+ * A row of `GET /api/v1/models`.
+ *
+ * The server answers six arrays keyed by category — `whisper`, `llamafile`,
+ * `tts`, `gguf`, `ollama`, `embedding` — not one list and not `{models}`. The
+ * client flattens them and carries `category` on each row, because that is both
+ * the grouping the screen shows and the first path segment of the activate
+ * call.
+ *
+ * There is no server-side id. `id` is synthesised in `listModels` from
+ * `category` and `name`, which is the pair the activate route keys on.
+ */
 export interface ModelEntry {
+  /** `${category}:${name}` — synthesised client-side; the API has no id. */
   id: string;
-  provider: string;
+  category: ModelCategory;
   name: string;
-  display_name?: string;
-  is_active: boolean;
+  description?: string;
+  size_mb?: number;
+  downloaded?: boolean;
+  /** Assigned to a role, i.e. this is one of the models actually serving. */
+  active: boolean;
+  url?: string;
+  hf_id?: string;
+  filename?: string;
   ram_estimate_mb?: number;
   recommended_role?: string;
   /**
@@ -317,12 +308,24 @@ export interface ModelEntry {
    * which has already moved on.
    */
   context_length?: number;
-  quantization?: string;
-  downloaded?: boolean;
-  description?: string;
-  size_mb?: number;
-  category?: string;
+  asr_language?: string;
+  asr_size?: string;
+  tts_engine?: string;
+  config_filename?: string;
 }
+
+/** The category buckets `GET /api/v1/models` answers with. */
+export const MODEL_CATEGORIES = [
+  'gguf',
+  'ollama',
+  'llamafile',
+  'whisper',
+  'tts',
+  'embedding',
+] as const;
+export type ModelCategory = (typeof MODEL_CATEGORIES)[number];
+
+export type ModelListResponse = Partial<Record<ModelCategory, ModelEntry[]>>;
 
 export interface ModelCapabilities {
   thinking: boolean;

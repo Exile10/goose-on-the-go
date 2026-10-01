@@ -87,7 +87,10 @@ tasks.named('preBuild').configure { dependsOn 'verifyPondNetworkAbis' }
     fs.copyFileSync(path.join(mod.modRequest.projectRoot, 'native/pondnet/THIRD_PARTY_NOTICES.txt'), path.join(assets, 'pond-network-notices.txt'));
     const libs = path.join(mod.modRequest.platformProjectRoot, 'app/libs');
     fs.mkdirSync(libs, { recursive: true });
-    fs.copyFileSync(path.join(mod.modRequest.projectRoot, 'native/pondnet/pondnet.aar'), path.join(libs, 'pondnet.aar'));
+    const archive = path.join(mod.modRequest.projectRoot, 'native/pondnet/pondnet.aar');
+    // The archive is a gitignored build output, so a fresh clone has none.
+    if (!fs.existsSync(archive)) throw new Error('Pond embedded networking is missing native/pondnet/pondnet.aar; run scripts/build-embedded-network.sh android');
+    fs.copyFileSync(archive, path.join(libs, 'pondnet.aar'));
     const tests = path.join(root, 'test/java/io/jarida/pondtls');
     fs.mkdirSync(tests, { recursive: true });
     for (const test of ['PondTlsTest.kt', 'PondProxyTest.kt']) {

@@ -152,22 +152,24 @@ cancellation remain distinct from the native/API harness checks.
 ### Xcode 27 compatibility
 
 The config plugin aligns dependency resource-bundle targets with the app's iOS
-16.4 minimum. `scripts/patch-expo-jsi.cjs` runs after npm install to fix SDK 56's
-nullable C callback construction: each branch passes a direct function reference
-or nil, retaining the nil setter for read-only host objects. The patch fails
-visibly if Expo changes this source and must be reviewed on SDK upgrades.
+16.4 minimum. SDK 56 needed `scripts/patch-expo-jsi.cjs` after npm install to fix
+its nullable C callback construction. SDK 57 fixed the same construction upstream,
+passing a typed optional setter that stays nil for read-only host objects, so the
+patch was retired with the upgrade.
 
 The first runtime launch exposed incompatible precompiled ExpoCamera/Core Swift
 symbols even though compilation passed. `EXPO_USE_PRECOMPILED_MODULES=false`
 now builds the installed Expo sources together; React Native's supported prebuilt
 core remains in use. No linker checks are suppressed.
 
-The SDK 56 template also lacked the [scene lifecycle required by iOS 27](https://developer.apple.com/documentation/uikit/transitioning-to-the-uikit-scene-based-life-cycle).
-`PondSceneDelegate` now creates the window, forwards Expo lifecycle events and
-warm links, and supplies cold links to React Native's launch options. The plugin
-registers the scene and installs TLS before React Native initialization. These
-changes survive Expo prebuild. Background/foreground AppState delivery and
-successful pinned requests after resume are verified in the simulator.
+The SDK 56 template also lacked the [scene lifecycle required by iOS 27](https://developer.apple.com/documentation/uikit/transitioning-to-the-uikit-scene-based-life-cycle),
+so this plugin once carried its own `PondSceneDelegate`. SDK 57.0.23 ships
+`ExpoAppSceneDelegate` behind expo-build-properties' `ios.enableSceneSupport`,
+and the app now uses that instead: it creates the window, forwards lifecycle
+events, warm and cold links, user activities and quick actions to every
+`ExpoAppDelegate` subscriber. Keeping both fails prebuild, because each declares
+`UIApplicationSceneManifest` and each rewrites the AppDelegate's window startup.
+This plugin now only installs TLS before React Native initialization.
 
 Final Debug/simulator and unsigned Release/iphoneos builds both pass with these
 compatibility changes. Device Release compilation does not establish physical
@@ -207,11 +209,17 @@ secure persistence, foreground and scratch-Pond integration suites. These suites
 exercise LAN/loopback transport with the embedded library linked; they do not yet
 prove embedded proxy activation or cellular roaming.
 
-Run `scripts/build-embedded-network.sh android|ios|all` against the adjacent Pond
-checkout (override `POND_SOURCE_ROOT` if necessary). Go and gomobile versions come
-from that checkout's `native/pondnet/go.mod`; the script builds its pinned gobind
-rather than depending on a globally installed version. Regenerate through Expo
-prebuild afterward. Keep iOS Debug and Release builds serialized: React Native
+Run `npm run build:network` (or `scripts/build-embedded-network.sh android|ios|all`)
+against the adjacent Pond checkout (override `POND_SOURCE_ROOT` if necessary). Go and
+gomobile versions come from that checkout's `native/pondnet/go.mod`; the script builds
+its pinned gobind rather than depending on a globally installed version. It finds the
+Android SDK and the newest complete NDK itself, and checks every prerequisite before
+compiling anything. It skips a platform whose inputs are unchanged since its last build,
+recorded under the gitignored `native/pondnet/.build/` (`--force` overrides that).
+It refuses to start while another build is writing `native/pondnet`, and swaps a
+library into place only once it is complete. A cold Android build compiles Tailscale
+for four ABIs and is slow, so the script reports its elapsed time every 30 seconds.
+Regenerate through Expo prebuild afterward. Keep iOS Debug and Release builds serialized: React Native
 replaces shared prebuilt frameworks under `ios/Pods`, even when DerivedData differs.
 
 Logout now requires the Pond's positive revocation acknowledgment before clearing

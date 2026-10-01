@@ -1,5 +1,6 @@
 import { Pressable, StyleSheet, Text } from 'react-native';
 import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useServer } from '@/providers/server-provider';
@@ -13,7 +14,7 @@ import type { ConnectionState } from '@/models/connection';
  * key-completeness test, and this banner is the one piece of UI that is supposed
  * to be trustworthy when everything else is failing.
  */
-function stateLabel(t: (key: string) => string, state: ConnectionState): string {
+function stateLabel(t: TFunction, state: ConnectionState): string {
   switch (state) {
     case 'trust': return t('connection.trust');
     case 'unpaired': return t('connection.unpaired');

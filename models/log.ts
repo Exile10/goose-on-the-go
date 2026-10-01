@@ -1,12 +1,14 @@
 /** Log types — Goose On The Go v2 design */
 
+import type { IconName } from '@/constants/icons';
+
 export type LogType = 'action' | 'mcp' | 'system' | 'error';
 export type LogLevel = 'info' | 'warn' | 'error';
 
 export interface LogEntry {
   time: string;
   type: LogType;
-  icon: string;
+  icon: IconName;
   text: string;
   level: LogLevel;
 }

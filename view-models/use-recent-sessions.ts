@@ -43,6 +43,8 @@ export interface RecentSession {
   id: string;
   /** The session's title, falling back to how the conversation opened. */
   text: string;
+  /** The title alone, for the conversation's own bar: the preview is not a name. */
+  title: string | null;
   time: string;
 }
 
@@ -104,6 +106,7 @@ function toRecent(s: SessionSummary): RecentSession {
   return {
     id: s.id,
     text: s.title?.trim() || s.preview?.trim() || i18n.t('sessions.untitled'),
+    title: s.title?.trim() || null,
     time: formatRelativeTime(s.updated_at),
   };
 }

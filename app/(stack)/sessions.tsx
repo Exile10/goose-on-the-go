@@ -1,22 +1,24 @@
 /**
  * SessionsScreen — browse, rename, delete, and resume past conversations.
  *
- * Tap a row to open it in Chat; the pencil icon switches the title into an
- * inline rename field.
+ * Tap a row to open it in the conversation screen; the pencil icon switches
+ * the title into an inline rename field.
  */
 
 import React, { useCallback, useState } from 'react';
-import { InkIcon } from '@jarida/ink/native';
-import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, FlatList, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
 
-import { ScreenFlatList } from '@/components/layout/screen-flat-list';
+import { GIcon } from '@/components/ui/g-icon';
+import { GPressable } from '@/components/ui/g-pressable';
 import type { SessionSummary } from '@/services/types';
 import { useSessions } from '@/view-models/use-sessions';
-import { Brand, Grey, Semantic } from '@/constants/colors';
+import { Semantic, type ThemeColors } from '@/constants/colors';
 import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
 import { Spacing } from '@/constants/spacing';
 import { Radii } from '@/constants/radii';
+import { useThemedStyles } from '@/hooks/use-themed-styles';
+import { useTheme } from '@/providers/theme-provider';
 import i18n from '@/services/i18n';
 
 const SessionRow = React.memo(function SessionRow({
@@ -30,6 +32,8 @@ const SessionRow = React.memo(function SessionRow({
   onRename: (title: string) => void;
   onDelete: () => void;
 }) {
+  const styles = useThemedStyles(makeStyles);
+  const { colors } = useTheme();
   const title = session.title?.trim() || i18n.t('sessions.untitled');
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(title);
@@ -42,7 +46,7 @@ const SessionRow = React.memo(function SessionRow({
 
   return (
     <View style={styles.row}>
-      <Pressable onPress={editing ? undefined : onPress} style={styles.rowBody}>
+      <GPressable onPress={editing ? undefined : onPress} style={styles.rowBody}>
         {editing ? (
           <View style={styles.editRow}>
             <TextInput
@@ -50,11 +54,11 @@ const SessionRow = React.memo(function SessionRow({
               value={draft}
               onChangeText={setDraft}
               autoFocus
-              placeholderTextColor={Grey[400]}
+              placeholderTextColor={colors.textTertiary}
             />
-            <Pressable onPress={confirmRename} hitSlop={8}>
-              <InkIcon name="check" size={18} tone="success" />
-            </Pressable>
+            <GPressable onPress={confirmRename} hitSlop={8}>
+              <GIcon name="check" size={18} color={Semantic.success} />
+            </GPressable>
           </View>
         ) : (
           <>
@@ -65,15 +69,15 @@ const SessionRow = React.memo(function SessionRow({
             <Text style={styles.updatedAt}>{new Date(session.updated_at).toLocaleString()}</Text>
           </>
         )}
-      </Pressable>
+      </GPressable>
       {!editing && (
         <View style={styles.actions}>
-          <Pressable onPress={() => { setDraft(title); setEditing(true); }} hitSlop={8}>
-            <InkIcon name="edit" size={16} tone="neutral" />
-          </Pressable>
-          <Pressable onPress={onDelete} hitSlop={8}>
-            <InkIcon name="trash" size={16} tone="neutral" />
-          </Pressable>
+          <GPressable onPress={() => { setDraft(title); setEditing(true); }} hitSlop={8}>
+            <GIcon name="edit" size={16} color={colors.icon} />
+          </GPressable>
+          <GPressable onPress={onDelete} hitSlop={8}>
+            <GIcon name="trash" size={16} color={colors.icon} />
+          </GPressable>
         </View>
       )}
     </View>
@@ -81,12 +85,17 @@ const SessionRow = React.memo(function SessionRow({
 });
 
 export default function SessionsScreen() {
+  const styles = useThemedStyles(makeStyles);
   const { data, loading, actions } = useSessions();
   const router = useRouter();
 
   const openSession = useCallback(
-    (id: string) => {
-      router.push({ pathname: '/(tabs)/chat', params: { sessionId: id } });
+    (session: SessionSummary) => {
+      const title = session.title?.trim();
+      router.push({
+        pathname: '/conversation',
+        params: title ? { session: session.id, title } : { session: session.id },
+      });
     },
     [router],
   );
@@ -105,7 +114,7 @@ export default function SessionsScreen() {
     ({ item }: { item: SessionSummary }) => (
       <SessionRow
         session={item}
-        onPress={() => openSession(item.id)}
+        onPress={() => openSession(item)}
         onRename={(title) => actions.rename(item.id, title)}
         onDelete={() => confirmDelete(item.id)}
       />
@@ -122,7 +131,10 @@ export default function SessionsScreen() {
   }
 
   return (
-    <ScreenFlatList
+    <FlatList
+      style={styles.list}
+      contentContainerStyle={styles.listContent}
+      showsVerticalScrollIndicator={false}
       data={data.sessions}
       keyExtractor={(item) => item.id}
       renderItem={renderItem}
@@ -138,73 +150,76 @@ export default function SessionsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  centered: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+const makeStyles = (c: ThemeColors) =>
+  StyleSheet.create({
+    centered: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: c.background },
+    list: { flex: 1, backgroundColor: c.background },
+    listContent: { paddingHorizontal: Spacing.lg, paddingBottom: Spacing.xl },
 
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Brand.white,
-    borderRadius: Radii.md,
-    padding: Spacing.md,
-    marginTop: Spacing.sm,
-    gap: Spacing.md,
-    borderWidth: 1,
-    borderColor: Grey[200],
-  },
-  rowBody: { flex: 1 },
-  title: {
-    fontFamily: FontFamily.heading,
-    fontSize: FontSize.base,
-    fontWeight: FontWeight.semibold,
-    color: Grey[900],
-  },
-  preview: {
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.sm,
-    color: Grey[600],
-    marginTop: 2,
-  },
-  updatedAt: {
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.xs,
-    color: Grey[400],
-    marginTop: Spacing.xs,
-  },
-  actions: {
-    flexDirection: 'row',
-    gap: Spacing.md,
-  },
-  editRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
-  },
-  editInput: {
-    flex: 1,
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.base,
-    color: Grey[900],
-    borderBottomWidth: 1,
-    borderBottomColor: Grey[300],
-    paddingVertical: 2,
-  },
+    row: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: c.card,
+      borderRadius: Radii.md,
+      padding: Spacing.md,
+      marginTop: Spacing.sm,
+      gap: Spacing.md,
+      borderWidth: 1,
+      borderColor: c.border,
+    },
+    rowBody: { flex: 1 },
+    title: {
+      fontFamily: FontFamily.heading,
+      fontSize: FontSize.base,
+      fontWeight: FontWeight.semibold,
+      color: c.text,
+    },
+    preview: {
+      fontFamily: FontFamily.body,
+      fontSize: FontSize.sm,
+      color: c.textSecondary,
+      marginTop: 2,
+    },
+    updatedAt: {
+      fontFamily: FontFamily.body,
+      fontSize: FontSize.xs,
+      color: c.textTertiary,
+      marginTop: Spacing.xs,
+    },
+    actions: {
+      flexDirection: 'row',
+      gap: Spacing.md,
+    },
+    editRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: Spacing.sm,
+    },
+    editInput: {
+      flex: 1,
+      fontFamily: FontFamily.body,
+      fontSize: FontSize.base,
+      color: c.text,
+      borderBottomWidth: 1,
+      borderBottomColor: c.borderStrong,
+      paddingVertical: 2,
+    },
 
-  empty: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingTop: Spacing.xl * 2,
-    gap: Spacing.xs,
-  },
-  emptyTitle: {
-    fontFamily: FontFamily.heading,
-    fontSize: FontSize.base,
-    fontWeight: FontWeight.semibold,
-    color: Grey[700],
-  },
-  emptyMessage: {
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.sm,
-    color: Grey[500],
-  },
-});
+    empty: {
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingTop: Spacing.xl * 2,
+      gap: Spacing.xs,
+    },
+    emptyTitle: {
+      fontFamily: FontFamily.heading,
+      fontSize: FontSize.base,
+      fontWeight: FontWeight.semibold,
+      color: c.text,
+    },
+    emptyMessage: {
+      fontFamily: FontFamily.body,
+      fontSize: FontSize.sm,
+      color: c.textSecondary,
+    },
+  });

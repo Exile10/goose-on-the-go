@@ -82,6 +82,18 @@ export function supports(device: Device, verb: string): boolean {
   return device.capabilities?.includes(verb) ?? false;
 }
 
+/**
+ * Reachable devices first, then by name.
+ *
+ * A household accumulates devices that are unplugged, moved or replaced, and
+ * they keep their catalogue row. Ordering by whatever the server returned puts
+ * a dead bulb above a lamp someone is reaching for.
+ */
+export function byReachability(a: Device, b: Device): number {
+  if (a.is_online !== b.is_online) return a.is_online ? -1 : 1;
+  return a.name.localeCompare(b.name);
+}
+
 /** Group devices into the rooms the screen renders, in a stable order. */
 export function groupByRoom(devices: Device[]): DeviceRoom[] {
   const rooms = new Map<string, Device[]>();
@@ -92,7 +104,7 @@ export function groupByRoom(devices: Device[]): DeviceRoom[] {
     else rooms.set(name, [d]);
   }
   return [...rooms.entries()]
-    .map(([name, list]) => ({ name, devices: list }))
+    .map(([name, list]) => ({ name, devices: [...list].sort(byReachability) }))
     .sort((a, b) => {
       // Unassigned sits last; it is a fallback, not a room anyone named.
       if (a.name === UNASSIGNED_ROOM) return 1;
@@ -105,8 +117,13 @@ export interface UseDevices {
   data: {
     devices: Device[];
     rooms: DeviceRoom[];
-    /** Room names for the filter tabs, derived rather than hardcoded. */
+    /**
+     * Room names for the filter tabs, derived rather than hardcoded. Empty
+     * when there is only one room: a filter with a single option is chrome.
+     */
     roomTabs: string[];
+    /** How many devices the Pond can currently reach. */
+    onlineCount: number;
     /** Power state by device id. Absent means the device did not report one. */
     powerById: Record<string, boolean>;
     matter: MatterStatus | null;
@@ -334,7 +351,10 @@ export function useDevices(): UseDevices {
     data: {
       devices,
       rooms,
-      roomTabs: [ALL_ROOMS, ...rooms.map((r) => r.name)],
+      // One room means one destination, and a filter that cannot change what
+      // is shown is chrome. The screen renders no tabs at all in that case.
+      roomTabs: rooms.length > 1 ? [ALL_ROOMS, ...rooms.map((r) => r.name)] : [],
+      onlineCount: devices.filter((d) => d.is_online).length,
       powerById,
       matter,
     },

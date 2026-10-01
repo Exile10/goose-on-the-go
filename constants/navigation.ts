@@ -1,85 +1,76 @@
 /**
- * Navigation structure — Goose On The Go v2 design.
- * Profile hub groups and sub-screen routes.
+ * The Profile hub's shape: which screens exist, and how they group.
+ *
+ * Labels are catalogue keys rather than text. A module constant is evaluated
+ * once at import, before i18next has a language, so a literal here would freeze
+ * the app in whatever the build shipped with.
+ *
+ * Every row has to reach a screen file: `constants/__tests__/navigation.test.ts`
+ * fails on one that does not, because expo-router resolves routes at runtime and
+ * nothing else would notice until someone tapped it.
  */
+
+import type { TranslationKey } from '@/services/i18n';
 
 import type { IconName } from './icons';
 
 export interface NavItem {
   id: string;
-  /** i18n key, not copy. The lint rule cannot see literals in a data structure, so the
-   *  type is what keeps them out: a bare label here would be a key that does not resolve,
-   *  and services/__tests__/i18n.test.ts fails on that. */
-  labelKey: string;
+  /** Key into the string catalogue — resolve with `t()` at render. */
+  labelKey: TranslationKey;
   icon: IconName;
-  /** Route path for Expo Router */
+  /** Route path for expo-router */
   route: string;
 }
 
 export interface NavGroup {
-  /** i18n key, not copy. */
-  groupKey: string;
+  /** Key into the string catalogue — resolve with `t()` at render. */
+  groupKey: TranslationKey;
   items: NavItem[];
 }
 
-/** Screens accessible from the Profile hub */
 export const PROFILE_NAV: NavGroup[] = [
   {
-    groupKey: 'nav.groupGoose',
+    groupKey: 'nav.goose',
     items: [
-      { id: 'models', labelKey: 'nav.models', icon: 'models', route: '/(stack)/models' },
-      { id: 'memories', labelKey: 'nav.memories', icon: 'memory', route: '/(stack)/memories' },
-      { id: 'logs', labelKey: 'nav.logs', icon: 'logs', route: '/(stack)/logs' },
-      { id: 'schedule', labelKey: 'nav.schedule', icon: 'schedule', route: '/(stack)/schedule' },
+      { id: 'models', labelKey: 'screens.models', icon: 'models', route: '/(stack)/models' },
+      { id: 'memories', labelKey: 'screens.memories', icon: 'memory', route: '/(stack)/memories' },
+      { id: 'sessions', labelKey: 'screens.sessions', icon: 'chat', route: '/(stack)/sessions' },
+      { id: 'logs', labelKey: 'screens.logs', icon: 'logs', route: '/(stack)/logs' },
+      { id: 'schedule', labelKey: 'screens.schedule', icon: 'schedule', route: '/(stack)/schedule' },
     ],
   },
   {
-    groupKey: 'nav.groupIntegrations',
+    groupKey: 'nav.integrations',
     items: [
-      { id: 'appManagement', labelKey: 'nav.appManagement', icon: 'link', route: '/(stack)/app-management' },
-      { id: 'mcpServers', labelKey: 'nav.mcpServers', icon: 'globe', route: '/(stack)/mcp-servers' },
+      { id: 'appManagement', labelKey: 'screens.appManagement', icon: 'link', route: '/(stack)/app-management' },
+      { id: 'mcpServers', labelKey: 'screens.mcpServers', icon: 'globe', route: '/(stack)/mcp-servers' },
     ],
   },
   {
-    groupKey: 'nav.groupHousehold',
+    groupKey: 'nav.household',
     items: [
-      { id: 'addUsers', labelKey: 'nav.addUsers', icon: 'users', route: '/(stack)/add-users' },
-      { id: 'homeManagement', labelKey: 'nav.homeManagement', icon: 'home', route: '/(stack)/home-management' },
+      { id: 'addUsers', labelKey: 'screens.addUsers', icon: 'users', route: '/(stack)/add-users' },
+      { id: 'homeManagement', labelKey: 'screens.homeManagement', icon: 'home', route: '/(stack)/home-management' },
     ],
   },
   {
-    groupKey: 'nav.groupPrivacy',
+    groupKey: 'nav.privacy',
     items: [
-      { id: 'privacy', labelKey: 'nav.privacy', icon: 'shield', route: '/(stack)/privacy' },
+      { id: 'remoteAccess', labelKey: 'screens.remoteAccess', icon: 'lock', route: '/(stack)/remote-access' },
+      { id: 'privacy', labelKey: 'screens.privacy', icon: 'shield', route: '/(stack)/privacy' },
     ],
   },
   // Dev-only: the per-screen mock/real backend toggle (#21). Discoverable in a
   // dev build without a code change; absent entirely from production.
   ...(__DEV__
-    ? [
+    ? ([
         {
-          groupKey: 'nav.groupDeveloper',
+          groupKey: 'nav.developer',
           items: [
-            { id: 'developer', labelKey: 'nav.developer', icon: 'cpu', route: '/(stack)/developer' },
+            { id: 'developer', labelKey: 'nav.developerMode', icon: 'cpu', route: '/(stack)/developer' },
           ],
         },
-      ]
+      ] satisfies NavGroup[])
     : []),
-];
-
-/** Shortcut items for the home screen carousel */
-export interface ShortcutItem {
-  id: string;
-  /** i18n key, not copy. */
-  labelKey: string;
-  iconName: string;
-  color: string;
-}
-
-export const HOME_SHORTCUTS: ShortcutItem[] = [
-  { id: 'morning', labelKey: 'nav.shortcutMorning', iconName: 'sun', color: '#FEF3C7' },
-  { id: 'home', labelKey: 'nav.shortcutHome', iconName: 'home', color: '#DBEAFE' },
-  { id: 'night', labelKey: 'nav.shortcutNight', iconName: 'moon', color: '#EDE9FE' },
-  { id: 'music', labelKey: 'nav.shortcutMusic', iconName: 'music', color: '#FCE7F3' },
-  { id: 'packages', labelKey: 'nav.shortcutPackages', iconName: 'package', color: '#FEE2E2' },
 ];

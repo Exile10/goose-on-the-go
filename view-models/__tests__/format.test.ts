@@ -6,7 +6,7 @@
  * timestamp that should stop being relative once relative stops helping.
  */
 
-import { formatContextWindow, formatSize, isLocalProvider } from '@/view-models/use-models';
+import { formatContextWindow, formatSize } from '@/view-models/use-models';
 import { formatRelativeTime } from '@/view-models/use-recent-sessions';
 
 describe('formatSize', () => {
@@ -16,9 +16,14 @@ describe('formatSize', () => {
     expect(formatSize(4300)).toBe('4.2 GB');
   });
 
-  /** Absent is not zero: a Pond that did not report a size shows nothing. */
+  /**
+   * Nothing is shown unless the Pond measured the file. The catalogue records
+   * 0 for a model the filesystem sweep found but never sized, and "0 MB" beside
+   * a multi-gigabyte model reads as a bug rather than as missing data.
+   */
   it('returns null when the server did not report a size', () => {
     expect(formatSize(undefined)).toBeNull();
+    expect(formatSize(0)).toBeNull();
   });
 });
 
@@ -31,20 +36,6 @@ describe('formatContextWindow', () => {
   it('returns null for absent or zero, rather than "0 tokens"', () => {
     expect(formatContextWindow(undefined)).toBeNull();
     expect(formatContextWindow(0)).toBeNull();
-  });
-});
-
-describe('isLocalProvider', () => {
-  /** This drives the "On your Pond" badge, which is a privacy claim. */
-  it('recognises the on-device providers, case-insensitively', () => {
-    expect(isLocalProvider('ollama')).toBe(true);
-    expect(isLocalProvider('Llamafile')).toBe(true);
-    expect(isLocalProvider('local-inference')).toBe(true);
-  });
-
-  it('treats anything else as cloud', () => {
-    expect(isLocalProvider('openai')).toBe(false);
-    expect(isLocalProvider('anthropic')).toBe(false);
   });
 });
 

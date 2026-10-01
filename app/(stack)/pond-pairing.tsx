@@ -1,5 +1,3 @@
-import i18n from '@/services/i18n';
-import { normalizeHttpsUrl, pinPreview, validPin } from '@/models/connection';
 /**
  * PondPairingScreen — 4-step pairing wizard:
  *   0. Find the GIAP server: discovered over mDNS, scanned from the QR, or typed
@@ -9,10 +7,9 @@ import { normalizeHttpsUrl, pinPreview, validPin } from '@/models/connection';
  */
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { InkButton, InkIcon } from '@jarida/ink/native';
+import { InkButton } from '@jarida/ink/native';
 import {
   ActivityIndicator,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -21,6 +18,8 @@ import {
 } from 'react-native';
 
 import { Stack, useFocusEffect, useRouter } from 'expo-router';
+import { GIcon } from '@/components/ui/g-icon';
+import { GPressable } from '@/components/ui/g-pressable';
 import { GKeyboardView } from '@/components/ui/g-keyboard-view';
 import { Grey, JaridaPurple, Brand, Semantic } from '@/constants/colors';
 import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
@@ -28,11 +27,17 @@ import { Spacing } from '@/constants/spacing';
 import { Radii } from '@/constants/radii';
 import { ApiError } from '@/services/api-client';
 import { useServer } from '@/providers/server-provider';
+import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
+
+import { normalizeHttpsUrl, pinPreview, validPin } from '@/models/connection';
 import { getInstallId } from '@/services/install-id';
 import { takePairingPayload } from '@/services/pairing-handoff';
 import { findPondAt, type DiscoveredPond } from '@/services/discovery';
 import { useDiscovery } from '@/view-models/use-discovery';
 import { describeApiError } from '@/view-models/describe-error';
+import { useThemedStyles } from '@/hooks/use-themed-styles';
+import type { ThemeColors } from '@/constants/colors';
 
 type Step = 0 | 1 | 2 | 3;
 const STEPS = ['find', 'code', 'name', 'complete'] as const;
@@ -40,20 +45,22 @@ const STEPS = ['find', 'code', 'name', 'complete'] as const;
 /**
  * A step's label, one literal key per branch, as the Memories tabs do: a key assembled at runtime
  * is invisible to services/__tests__/i18n.test.ts, and the exhaustive switch makes TypeScript fail
- * if a step is added without one. These were the one piece of pairing copy the i18n rule could not
- * see, because it sat in an all-caps constant.
+ * if a step is added without one. It takes `t` rather than reaching for a module-level
+ * translator: a constant is evaluated at import, before i18next has a language.
  */
-function stepLabel(step: (typeof STEPS)[number]): string {
+function stepLabel(step: (typeof STEPS)[number], t: TFunction): string {
   switch (step) {
-    case 'find': return i18n.t('pairing.stepFind');
-    case 'code': return i18n.t('pairing.stepCode');
-    case 'name': return i18n.t('pairing.stepName');
-    case 'complete': return i18n.t('pairing.stepComplete');
+    case 'find': return t('pairing.stepFind');
+    case 'code': return t('pairing.stepCode');
+    case 'name': return t('pairing.stepName');
+    case 'complete': return t('pairing.stepDone');
   }
 }
 
 /** Step indicator */
 function StepIndicator({ current }: { current: Step }) {
+  const styles = useThemedStyles(makeStyles);
+  const { t } = useTranslation();
   return (
     <View style={styles.stepRow}>
       {STEPS.map((step, i) => {
@@ -69,7 +76,7 @@ function StepIndicator({ current }: { current: Step }) {
               ]}
             >
               {isDone ? (
-                <InkIcon name="check" size={14} />
+                <GIcon name="check" size={14} color={Brand.white} />
               ) : (
                 <Text style={[styles.stepNumber, isActive && styles.stepNumberActive]}>
                   {i + 1}
@@ -77,7 +84,7 @@ function StepIndicator({ current }: { current: Step }) {
               )}
             </View>
             <Text style={[styles.stepLabel, isActive && styles.stepLabelActive]}>
-              {stepLabel(step)}
+              {stepLabel(step, t)}
             </Text>
           </View>
         );
@@ -93,11 +100,13 @@ function StepIndicator({ current }: { current: Step }) {
  * permission, and a QR that will not decode has to have a way past it.
  */
 function ScanLink({ onPress }: { onPress: () => void }) {
+  const styles = useThemedStyles(makeStyles);
+  const { t } = useTranslation();
   return (
-    <Pressable onPress={onPress} hitSlop={8} style={styles.scanLink}>
-      <InkIcon name="camera" size={16} tone="brand" />
-      <Text style={styles.scanLinkText}>{i18n.t('pairing.scanInstead')}</Text>
-    </Pressable>
+    <GPressable onPress={onPress} hitSlop={8} style={styles.scanLink}>
+      <GIcon name="camera" size={16} color={JaridaPurple[500]} />
+      <Text style={styles.scanLinkText}>{t('pairing.scanQr')}</Text>
+    </GPressable>
   );
 }
 
@@ -105,8 +114,8 @@ function ScanLink({ onPress }: { onPress: () => void }) {
  * Normalise a hand-typed server address, or return null if it cannot be one.
  *
  * The host machine's dashboard shows a bare `host:port`, so a missing scheme is
- * the common case rather than a mistake; it defaults to http, which is what a
- * Pond on the LAN actually serves.
+ * the common case rather than a mistake; it defaults to https, the only scheme
+ * `normalizeHttpsUrl` accepts for a pinned Pond origin.
  */
 export function normalizeServerUrl(raw: string): string | null {
   try { return normalizeHttpsUrl(raw.trim().includes('://') ? raw.trim() : `https://${raw.trim()}`); }
@@ -123,6 +132,7 @@ export function normalizeServerUrl(raw: string): string | null {
  * answer, which is not a number the layout gets to assume.
  */
 function StepBody({ children }: { children: React.ReactNode }) {
+  const styles = useThemedStyles(makeStyles);
   return (
     <ScrollView
       style={styles.stepScroll}
@@ -155,6 +165,8 @@ function DiscoverStep({
   onManual: () => void;
   onScan: () => void;
 }) {
+  const styles = useThemedStyles(makeStyles);
+  const { t } = useTranslation();
   const { data, error, actions } = useDiscovery();
   // The advertisement already carried a pin, so hand it on rather than making
   // the next step browse for the same record again. It is still only a claim:
@@ -166,28 +178,33 @@ function DiscoverStep({
       {data.phase === 'searching' ? (
         <ActivityIndicator color={JaridaPurple[500]} />
       ) : (
-        <InkIcon name="search" size={28} tone="brand" />
+        <GIcon name="search" size={28} color={JaridaPurple[500]} />
       )}
 
       <Text style={styles.stepTitle}>
-        {data.phase === 'searching' ? i18n.t('pairing.searchingTitle') : i18n.t('pairing.connectTitle')}
+        {data.phase === 'searching' ? t('pond.searching') : t('pairing.addressTitle')}
       </Text>
 
       {data.phase === 'searching' ? (
-        <Text style={styles.stepDesc}>{i18n.t('pairing.searchingDesc')}</Text>
+        <Text style={styles.stepDesc}>{t('pairing.searching')}</Text>
       ) : null}
 
       {data.phase === 'empty' ? (
-        <Text style={styles.stepDesc}>{i18n.t('pairing.noneFound')}</Text>
+        <Text style={styles.stepDesc}>{t('pairing.noneFound')}</Text>
       ) : null}
 
       {data.phase === 'failed' ? (
-        <Text style={styles.stepError}>{i18n.t('pairing.searchFailed', { error })}</Text>
+        <Text style={styles.stepError}>{t('pairing.searchFailed', { error })}</Text>
       ) : null}
 
       {data.ponds.map((pond) => (
-        <Pressable key={pond.id} style={styles.pondRow} onPress={() => pick(pond)}>
-          <InkIcon name="wifi" size={18} tone="brand" />
+        <GPressable
+          feedback="lift"
+          key={pond.id}
+          style={styles.pondRow}
+          onPress={() => pick(pond)}
+        >
+          <GIcon name="wifi" size={18} color={JaridaPurple[500]} />
           <View style={styles.pondInfo}>
             <Text style={styles.pondName} numberOfLines={1}>
               {pond.name}
@@ -197,18 +214,18 @@ function DiscoverStep({
               {pond.version ? ` · v${pond.version}` : ''}
             </Text>
           </View>
-        </Pressable>
+        </GPressable>
       ))}
 
       {data.phase !== 'searching' ? (
         <InkButton variant="quiet" onPress={actions.retry}>
-          {i18n.t('pairing.searchAgain')}
+          {t('common.searchAgain')}
         </InkButton>
       ) : null}
 
-      <Pressable onPress={onManual} hitSlop={8} style={styles.scanLink}>
-        <Text style={styles.scanLinkText}>{i18n.t('pairing.enterManually')}</Text>
-      </Pressable>
+      <GPressable onPress={onManual} hitSlop={8} style={styles.scanLink}>
+        <Text style={styles.scanLinkText}>{t('pairing.manual')}</Text>
+      </GPressable>
       <ScanLink onPress={onScan} />
     </StepBody>
   );
@@ -238,6 +255,7 @@ async function discoverFingerprint(origin: string): Promise<string | null> {
   return found?.pin ?? null;
 }
 
+/** Step 0, the fallback: type the address in, and establish whose key it serves. */
 function ServerStep({
   initial,
   initialPin,
@@ -250,6 +268,8 @@ function ServerStep({
   onNext: (url: string, pin: string) => Promise<void>;
   onScan: () => void;
 }) {
+  const styles = useThemedStyles(makeStyles);
+  const { t } = useTranslation();
   const [pin, setPin] = useState(initialPin);
   // A pin that came off the network rather than from the user must be confirmed
   // against the Pond's screen before it is trusted. See discoverFingerprint.
@@ -272,11 +292,11 @@ function ServerStep({
 
   // Reach the Pond before advancing. Without this the address is only exercised
   // three steps later, during the handshake, where a typo surfaces as a failed
-  // pairing rather than as a bad URL on the screen that asked for it.
+  // pairing rather than as a bad address on the screen that asked for it.
   const submit = useCallback(async () => {
     const normalized = normalizeServerUrl(url);
     if (!normalized) {
-      setError(i18n.t('pairing.invalid'));
+      setError(t('pairing.invalid'));
       return;
     }
     setChecking(true); setError(null);
@@ -293,7 +313,7 @@ function ServerStep({
           // running a server older than the pin record looks like this, and so
           // does a network that filters multicast.
           setAskForPin(true);
-          setError(i18n.t('pairing.fingerprintMissing'));
+          setError(t('pairing.fingerprintMissing'));
           return;
         }
         setPin(discovered);
@@ -301,7 +321,7 @@ function ServerStep({
         fingerprint = discovered;
       }
       if (!validPin(fingerprint)) {
-        setError(i18n.t('pairing.invalid'));
+        setError(t('pairing.invalid'));
         return;
       }
       if (pinFromNetwork || fingerprint !== pin.trim()) {
@@ -310,40 +330,40 @@ function ServerStep({
       }
       await onNext(normalized, fingerprint);
     }
-    catch (error) { setError(error instanceof Error ? error.message : i18n.t('pairing.failed')); }
+    catch (error) { setError(error instanceof Error ? error.message : t('pairing.failed')); }
     finally { setChecking(false); }
-  }, [url, pin, pinFromNetwork, onNext]);
+  }, [url, pin, pinFromNetwork, onNext, t]);
 
   const confirmMatch = useCallback(async () => {
     if (!confirming) return;
     setChecking(true); setError(null);
     try { await onNext(confirming.url, confirming.pin); }
-    catch (error) { setError(error instanceof Error ? error.message : i18n.t('pairing.failed')); }
+    catch (error) { setError(error instanceof Error ? error.message : t('pairing.failed')); }
     finally { setChecking(false); setConfirming(null); }
-  }, [confirming, onNext]);
+  }, [confirming, onNext, t]);
 
   const rejectMatch = useCallback(() => {
     setConfirming(null);
     setPin('');
     setPinFromNetwork(false);
     setAskForPin(true);
-    setError(i18n.t('pairing.fingerprintMismatch'));
-  }, []);
+    setError(t('pairing.fingerprintMismatch'));
+  }, [t]);
 
   if (confirming) {
     return (
       <StepBody>
-        <InkIcon name="shield" size={28} tone="brand" />
-        <Text style={styles.stepTitle}>{i18n.t('pairing.fingerprintConfirmTitle')}</Text>
-        <Text style={styles.stepDesc}>{i18n.t('pairing.fingerprintConfirmDesc')}</Text>
+        <GIcon name="shield" size={28} color={JaridaPurple[500]} />
+        <Text style={styles.stepTitle}>{t('pairing.fingerprintConfirmTitle')}</Text>
+        <Text style={styles.stepDesc}>{t('pairing.fingerprintConfirmDesc')}</Text>
         <Text style={styles.pinPreview} selectable>{pinPreview(confirming.pin)}</Text>
-        <Text style={styles.stepDesc}>{i18n.t('pairing.fingerprintConfirmWhy')}</Text>
+        <Text style={styles.stepDesc}>{t('pairing.fingerprintConfirmWhy')}</Text>
         {error ? <Text style={styles.stepError}>{error}</Text> : null}
         <InkButton variant="primary" disabled={checking} onPress={confirmMatch}>
-          {checking ? i18n.t('pairing.fingerprintSearching') : i18n.t('pairing.fingerprintMatches')}
+          {checking ? t('pairing.fingerprintSearching') : t('pairing.fingerprintMatches')}
         </InkButton>
         <InkButton variant="quiet" disabled={checking} onPress={rejectMatch}>
-          {i18n.t('pairing.fingerprintDiffers')}
+          {t('pairing.fingerprintDiffers')}
         </InkButton>
       </StepBody>
     );
@@ -351,16 +371,15 @@ function ServerStep({
 
   return (
     <StepBody>
-      <InkIcon name="search" size={28} tone="brand" />
-      <Text style={styles.stepTitle}>{i18n.t('pairing.connectTitle')}</Text>
-      <Text style={styles.stepDesc}>{i18n.t('pairing.connectDesc')}</Text>
+      <GIcon name="search" size={28} color={JaridaPurple[500]} />
+      <Text style={styles.stepTitle}>{t('pairing.addressTitle')}</Text>
       <View style={styles.inputGroup}>
-        <Text style={styles.inputLabel}>{i18n.t('pairing.serverUrl')}</Text>
+        <Text style={styles.inputLabel}>{t('pairing.addressLabel')}</Text>
         <TextInput
           style={styles.textInput}
           value={url}
-          onChangeText={(t) => {
-            setUrl(t);
+          onChangeText={(next) => {
+            setUrl(next);
             setError(null);
           }}
           placeholder="https://pond.local:4443"
@@ -372,27 +391,34 @@ function ServerStep({
       </View>
       {askForPin ? (
         <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>{i18n.t('pairing.fingerprint')}</Text>
-          <TextInput style={styles.textInput} value={pin}
-            onChangeText={(t) => { setPin(t); setPinFromNetwork(false); setError(null); }}
-            placeholder="sha256/..." autoCapitalize="none" autoCorrect={false} editable={!checking} />
-          <Text style={styles.stepDesc}>{i18n.t('pairing.fingerprintHint')}</Text>
+          <Text style={styles.inputLabel}>{t('pairing.fingerprint')}</Text>
+          <TextInput
+            style={styles.textInput}
+            value={pin}
+            onChangeText={(next) => {
+              setPin(next);
+              setPinFromNetwork(false);
+              setError(null);
+            }}
+            placeholder="sha256/..."
+            placeholderTextColor={Grey[400]}
+            autoCapitalize="none"
+            autoCorrect={false}
+            editable={!checking}
+          />
+          <Text style={styles.inputHint}>{t('pairing.fingerprintHint')}</Text>
         </View>
       ) : null}
       {error ? <Text style={styles.stepError}>{error}</Text> : null}
-      <InkButton
-        variant="primary"
-        disabled={!url.trim() || checking}
-        onPress={submit}
-      >
-        {checking ? i18n.t('pairing.fingerprintSearching') : i18n.t('pairing.continueAction')}
+      <InkButton variant="primary" disabled={!url.trim() || checking} onPress={submit}>
+        {checking ? t('pairing.fingerprintSearching') : t('pairing.continueAction')}
       </InkButton>
       <ScanLink onPress={onScan} />
     </StepBody>
   );
 }
 
-/** Step 1: Pairing code */
+/** Step 1: the six digits the Pond is showing. */
 function PairingCodeStep({
   initial,
   onNext,
@@ -402,67 +428,94 @@ function PairingCodeStep({
   onNext: (code: string) => void;
   onScan: () => void;
 }) {
+  const styles = useThemedStyles(makeStyles);
+  const { t } = useTranslation();
   const [code, setCode] = useState(initial);
   const valid = /^\d{6}$/.test(code);
   return (
     <StepBody>
-      <InkIcon name="wifi" size={28} tone="brand" />
-      <Text style={styles.stepTitle}>{i18n.t('pairing.codeTitle')}</Text>
-      <Text style={styles.stepDesc}>{i18n.t('pairing.codeDesc')}</Text>
+      <GIcon name="wifi" size={28} color={JaridaPurple[500]} />
+      <Text style={styles.stepTitle}>{t('pairing.codeTitle')}</Text>
+      <Text style={styles.stepDesc}>{t('pairing.codeBody')}</Text>
       <View style={styles.inputGroup}>
-        <Text style={styles.inputLabel}>{i18n.t('pairing.codeLabel')}</Text>
+        <Text style={styles.inputLabel}>{t('pairing.codeLabel')}</Text>
         <TextInput
           style={styles.textInput}
           value={code}
-          onChangeText={(t) => setCode(t.replace(/\D/g, '').slice(0, 6))}
-          placeholder="123456"
+          onChangeText={(next) => setCode(next.replace(/\D/g, '').slice(0, 6))}
+          placeholder={t('pairing.codePlaceholder')}
           placeholderTextColor={Grey[400]}
           keyboardType="number-pad"
           autoFocus
         />
       </View>
-      <InkButton
-        variant="primary"
-        disabled={!valid}
-        onPress={() => onNext(code)}
-      >
-        {i18n.t('pairing.continueAction')}
+      <InkButton variant="primary" disabled={!valid} onPress={() => onNext(code)}>
+        {t('pairing.continueAction')}
       </InkButton>
       <ScanLink onPress={onScan} />
     </StepBody>
   );
 }
 
-/** Step 2: Name Device */
+/** Step 2: what this phone is called in the Pond's device list. */
 function NameStep({ onNext }: { onNext: (name: string) => void }) {
+  const styles = useThemedStyles(makeStyles);
+  const { t } = useTranslation();
   const [name, setName] = useState('');
   return (
     <StepBody>
-      <InkIcon name="edit" size={28} tone="brand" />
-      <Text style={styles.stepTitle}>{i18n.t('pairing.nameTitle')}</Text>
-      <Text style={styles.stepDesc}>{i18n.t('pairing.nameDesc')}</Text>
+      <GIcon name="edit" size={28} color={JaridaPurple[500]} />
+      <Text style={styles.stepTitle}>{t('pairing.nameTitle')}</Text>
+      <Text style={styles.stepDesc}>{t('pairing.nameBody')}</Text>
       <View style={styles.inputGroup}>
-        <Text style={styles.inputLabel}>{i18n.t('pairing.nameLabel')}</Text>
+        <Text style={styles.inputLabel}>{t('pairing.nameLabel')}</Text>
         <TextInput
           style={styles.textInput}
           value={name}
           onChangeText={setName}
-          placeholder={i18n.t('pairing.namePlaceholder')}
+          placeholder={t('pairing.namePlaceholder')}
           placeholderTextColor={Grey[400]}
         />
       </View>
-      <InkButton
-        variant="primary"
-        disabled={!name.trim()}
-        onPress={() => onNext(name.trim())}
-      >
-        {i18n.t('pairing.pairDevice')}
+      <InkButton variant="primary" disabled={!name.trim()} onPress={() => onNext(name.trim())}>
+        {t('pairing.pairDevice')}
       </InkButton>
     </StepBody>
   );
 }
 
-/** Step 3: Run handshake + show outcome. */
+/**
+ * Describe a failure that never reached the verifier — a transport or HTTP
+ * error rather than a rejected code.
+ *
+ * The 429 case is the one that matters. GIAP gives pairing its own rate-limit
+ * budget (30/60s, with /handshake/verify further limited to 10/60s), and it
+ * sends Retry-After when it throttles. Showing "handshake/init failed: 429",
+ * which is what this screen used to print, tells a user nothing and invites
+ * them to hammer the button — which is how a phone spends the budget it needs
+ * to recover. Naming the wait turns a dead end into an instruction.
+ *
+ * It takes `t` rather than reaching for a module-level translator: a constant
+ * is evaluated at import, before i18next has a language.
+ */
+function describeTransportFailure(e: unknown, t: TFunction): string {
+  if (e instanceof ApiError) {
+    if (e.status === 429) {
+      const wait = e.retryAfterSecs;
+      return wait
+        ? t('pairingErrors.rateLimited', { count: wait, plural: wait === 1 ? '' : 's' })
+        : t('pairingErrors.rateLimitedNoHint');
+    }
+    if (e.status >= 500) {
+      return t('pairingErrors.serverError');
+    }
+    // The wizard runs before there is a session to revoke, so a refusal here
+    // is about this attempt and the screen has to say so itself.
+    return describeApiError(e) ?? t('pairingErrors.refused');
+  }
+  return t('pairingErrors.unreachable');
+}
+
 /**
  * Turn the server's rejection code into something a person can act on.
  *
@@ -476,54 +529,23 @@ function NameStep({ onNext }: { onNext: (name: string) => void }) {
  * generic retry message. It is far shorter than the code's ten minutes, so it is
  * the limit a user actually hits.
  */
-/**
- * Describe a failure that never reached the verifier — a transport or HTTP
- * error rather than a rejected code.
- *
- * The 429 case is the one that matters. GIAP gives pairing its own rate-limit
- * budget (30/60s, with /handshake/verify further limited to 10/60s), and it
- * sends Retry-After when it throttles. Showing "handshake/init failed: 429",
- * which is what this screen used to print, tells a user nothing and invites
- * them to hammer the button — which is how a phone spends the budget it needs
- * to recover. Naming the wait turns a dead end into an instruction.
- */
-function describeTransportFailure(e: unknown): string {
-  if (e instanceof ApiError) {
-    if (e.status === 429) {
-      const wait = e.retryAfterSecs;
-      return wait
-        ? i18n.t('pairingErrors.rateLimited', { count: wait, plural: wait === 1 ? '' : 's' })
-        : i18n.t('pairingErrors.rateLimitedNoHint');
-    }
-    if (e.status >= 500) {
-      return i18n.t('pairingErrors.serverError');
-    }
-    // The wizard runs before there is a session to revoke, so a refusal here
-    // is about this attempt and the screen has to say so itself.
-    return (
-      describeApiError(e) ??
-      i18n.t('pairingErrors.refused')
-    );
-  }
-  return i18n.t('pairingErrors.unreachable');
-}
-
-function explainRejection(reason: string | null): string {
+function explainRejection(reason: string | null, t: TFunction): string {
   switch (reason) {
     case 'invalid_mac':
     case 'bad_mac_hex':
-      return i18n.t('pairingErrors.badCode');
+      return t('pairingErrors.badCode');
     case 'challenge_expired':
     case 'challenge_used':
     case 'unknown_challenge':
-      return i18n.t('pairingErrors.expired');
+      return t('pairingErrors.expired');
     case 'no_active_pairing_code':
-      return i18n.t('pairingErrors.noCode');
+      return t('pairingErrors.noCode');
     default:
-      return i18n.t('pairingErrors.rejected');
+      return t('pairingErrors.rejected');
   }
 }
 
+/** Step 3: run the handshake, then say how it went. */
 function CompleteStep({
   state,
   reason,
@@ -533,25 +555,26 @@ function CompleteStep({
   reason: string | null;
   onRetry: () => void;
 }) {
+  const styles = useThemedStyles(makeStyles);
+  const { t } = useTranslation();
+
   if (state === 'pending') {
     return (
       <StepBody>
         <ActivityIndicator size="large" color={JaridaPurple[500]} />
-        <Text style={styles.stepTitle}>{i18n.t('pairing.inProgress')}</Text>
-        <Text style={styles.stepDesc}>{i18n.t('pairing.inProgressDesc')}</Text>
+        <Text style={styles.stepTitle}>{t('pairing.pairing')}</Text>
+        <Text style={styles.stepDesc}>{t('pairing.pairingBody')}</Text>
       </StepBody>
     );
   }
   if (state === 'error') {
     return (
       <StepBody>
-        <InkIcon name="x" size={28} tone="danger" />
-        <Text style={styles.stepTitle}>{i18n.t('pairing.failedTitle')}</Text>
-        <Text style={styles.stepDesc}>
-          {reason ?? i18n.t('pairing.failedDesc')}
-        </Text>
+        <GIcon name="x" size={28} color={Semantic.danger} />
+        <Text style={styles.stepTitle}>{t('pairing.failed')}</Text>
+        <Text style={styles.stepDesc}>{reason ?? t('pairingErrors.rejected')}</Text>
         <InkButton variant="primary" onPress={onRetry}>
-          {i18n.t('pairing.tryAgain')}
+          {t('common.retry')}
         </InkButton>
       </StepBody>
     );
@@ -561,12 +584,14 @@ function CompleteStep({
   return (
     <StepBody>
       <ActivityIndicator size="large" color={JaridaPurple[500]} />
-      <Text style={styles.stepTitle}>{i18n.t('pairing.inProgress')}</Text>
+      <Text style={styles.stepTitle}>{t('pairing.pairing')}</Text>
     </StepBody>
   );
 }
 
 export default function PondPairingScreen() {
+  const styles = useThemedStyles(makeStyles);
+  const { t } = useTranslation();
   const router = useRouter();
   const { serverUrl, stagePairing, cancelPairing, pair, profileId } = useServer();
   /**
@@ -592,7 +617,7 @@ export default function PondPairingScreen() {
   const [pairingError, setPairingError] = useState<string | null>(null);
   useEffect(() => () => { void cancelPairing(); }, [cancelPairing]);
   // Stable per-install client_id, hydrated from SecureStorage on mount. The
-  // server uses this to recognize a returning device and revoke prior tokens
+  // server uses this to recognise a returning device and revoke prior tokens
   // instead of creating a duplicate entry on every re-pair.
   const clientIdRef = useRef<string>('');
   useEffect(() => {
@@ -631,13 +656,13 @@ export default function PondPairingScreen() {
       void stagePairing(scanned.profile, scanned.pin).then(() => {
         if (!cancelled) { setCode(scanned.code); setStep(2); }
       }).catch((error) => {
-        if (!cancelled) setPairingError(error instanceof Error ? error.message : i18n.t('pairing.failed'));
+        if (!cancelled) setPairingError(error instanceof Error ? error.message : t('pairing.failed'));
       });
       return () => { cancelled = true; };
-    }, [stagePairing]),
+    }, [stagePairing, t]),
   );
-  const [completionState, setCompletionState] =
-    useState<'pending' | 'error'>('pending');
+
+  const [completionState, setCompletionState] = useState<'pending' | 'error'>('pending');
   const [completionReason, setCompletionReason] = useState<string | null>(null);
 
   const runPair = useCallback(
@@ -648,11 +673,7 @@ export default function PondPairingScreen() {
       try {
         const clientId = clientIdRef.current || (await getInstallId());
         clientIdRef.current = clientId;
-        const resp = await pair({
-          clientId,
-          pairingCode: code,
-          deviceName,
-        });
+        const resp = await pair({ clientId, pairingCode: code, deviceName });
         if (resp.accepted) {
           // Leave on success rather than waiting to be dismissed. The wizard
           // has nothing left to say, and the remote access offer it used to
@@ -660,16 +681,21 @@ export default function PondPairingScreen() {
           router.replace('/(tabs)');
         } else {
           setCompletionState('error');
-          setCompletionReason(explainRejection(resp.rejection_reason));
+          setCompletionReason(explainRejection(resp.rejection_reason, t));
         }
       } catch (e) {
         // A throw means the request never reached the verifier, so there is no
-        // rejection_reason to explain — only an HTTP or transport failure.
+        // rejection_reason to explain — only an HTTP or transport failure. A 403
+        // is the Pond refusing enrolment from off its own network.
         setCompletionState('error');
-        setCompletionReason(e instanceof ApiError && e.status === 403 ? i18n.t('pairing.lan') : describeTransportFailure(e));
+        setCompletionReason(
+          e instanceof ApiError && e.status === 403
+            ? t('pairing.lan')
+            : describeTransportFailure(e, t),
+        );
       }
     },
-    [code, pair, router],
+    [code, pair, router, t],
   );
 
   const onServerNext = useCallback(async (url: string, pin: string) => {
@@ -682,7 +708,6 @@ export default function PondPairingScreen() {
     setCode(nextCode);
     setStep(2);
   }, []);
-
 
   return (
     <GKeyboardView style={styles.container}>
@@ -719,147 +744,153 @@ export default function PondPairingScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Grey[50],
-    paddingHorizontal: Spacing.lg,
-  },
+const makeStyles = (c: ThemeColors) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: c.background,
+      paddingHorizontal: Spacing.lg,
+    },
 
-  /* Step indicator */
-  stepRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: Spacing.xl,
-  },
-  stepItem: { alignItems: 'center', flex: 1 },
-  stepDot: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: Grey[200],
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 6,
-  },
-  stepDotActive: { backgroundColor: JaridaPurple[500] },
-  stepDotDone: { backgroundColor: Semantic.success },
-  stepNumber: {
-    fontFamily: FontFamily.heading,
-    fontSize: FontSize.sm,
-    fontWeight: FontWeight.bold,
-    color: Grey[500],
-  },
-  stepNumberActive: { color: Brand.white },
-  stepLabel: {
-    fontFamily: FontFamily.body,
-    fontSize: 10,
-    color: Grey[500],
-  },
-  stepLabelActive: {
-    color: JaridaPurple[600],
-    fontWeight: FontWeight.semibold,
-  },
+    /* Step indicator */
+    stepRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      paddingVertical: Spacing.xl,
+    },
+    stepItem: { alignItems: 'center', flex: 1 },
+    stepDot: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      backgroundColor: c.backgroundSecondary,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: 6,
+    },
+    stepDotActive: { backgroundColor: JaridaPurple[500] },
+    stepDotDone: { backgroundColor: Semantic.success },
+    stepNumber: {
+      fontFamily: FontFamily.heading,
+      fontSize: FontSize.sm,
+      fontWeight: FontWeight.bold,
+      color: c.textTertiary,
+    },
+    stepNumberActive: { color: Brand.white },
+    stepLabel: {
+      fontFamily: FontFamily.body,
+      fontSize: 10,
+      color: c.textTertiary,
+    },
+    stepLabelActive: {
+      color: c.textBrand,
+      fontWeight: FontWeight.semibold,
+    },
 
-  /* Step content */
-  stepContent: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: Spacing.lg,
-    gap: Spacing.lg,
-  },
-  stepTitle: {
-    fontFamily: FontFamily.heading,
-    fontSize: FontSize.xl,
-    fontWeight: FontWeight.bold,
-    color: Brand.charcoal,
-    textAlign: 'center',
-  },
-  stepDesc: {
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.base,
-    color: Grey[500],
-    textAlign: 'center',
-    lineHeight: FontSize.base * 1.5,
-  },
-  pinPreview: {
-    fontFamily: FontFamily.mono,
-    fontSize: FontSize.lg,
-    color: Brand.charcoal,
-    textAlign: 'center',
-    letterSpacing: 1,
-  },
-  stepError: {
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.sm,
-    color: Semantic.danger,
-    textAlign: 'center',
-    lineHeight: FontSize.sm * 1.5,
-  },
-  scanLink: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
-    paddingVertical: Spacing.sm,
-  },
-  scanLinkText: {
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.base,
-    fontWeight: FontWeight.semibold,
-    color: JaridaPurple[500],
-  },
+    /* Step content. Left-aligned: a wizard reads as a form, and centred body
+       copy makes every line start in a different place. */
+    stepContent: {
+      flex: 1,
+      justifyContent: 'center',
+      paddingHorizontal: Spacing.lg,
+      gap: Spacing.lg,
+    },
+    stepTitle: {
+      fontFamily: FontFamily.heading,
+      fontSize: FontSize.xl,
+      fontWeight: FontWeight.bold,
+      color: c.text,
+    },
+    stepDesc: {
+      fontFamily: FontFamily.body,
+      fontSize: FontSize.base,
+      color: c.textTertiary,
+      lineHeight: FontSize.base * 1.5,
+    },
+    // The fingerprint is read aloud against the Pond's own screen, so it is set
+    // in the mono face at a size where each group of four is unambiguous.
+    pinPreview: {
+      fontFamily: FontFamily.mono,
+      fontSize: FontSize.lg,
+      color: c.text,
+      letterSpacing: 1,
+    },
+    stepError: {
+      fontFamily: FontFamily.body,
+      fontSize: FontSize.sm,
+      color: Semantic.danger,
+      lineHeight: FontSize.sm * 1.5,
+    },
+    scanLink: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: Spacing.sm,
+      paddingVertical: Spacing.sm,
+    },
+    scanLinkText: {
+      fontFamily: FontFamily.body,
+      fontSize: FontSize.base,
+      fontWeight: FontWeight.semibold,
+      color: JaridaPurple[500],
+    },
 
-  // stepContent centres with `flex: 1`, which a scroll view's content container
-  // may not use — `flexGrow` keeps the centring while letting the content grow
-  // past the screen.
-  stepScroll: { flex: 1 },
-  stepScrollContent: { flex: undefined, flexGrow: 1, paddingVertical: Spacing.lg },
+    // stepContent fills with `flex: 1`, which a scroll view's content container
+    // may not use — `flexGrow` keeps that while letting the content grow past
+    // the screen.
+    stepScroll: { flex: 1 },
+    stepScrollContent: { flex: undefined, flexGrow: 1, paddingVertical: Spacing.lg },
 
-  /* Discovered ponds */
-  pondRow: {
-    width: '100%',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.md,
-    paddingVertical: Spacing.md,
-    paddingHorizontal: Spacing.lg,
-    borderRadius: Radii.md,
-    borderWidth: 1,
-    borderColor: Grey[200],
-    backgroundColor: Brand.white,
-  },
-  pondInfo: { flex: 1 },
-  pondName: {
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.base,
-    fontWeight: FontWeight.semibold,
-    color: Brand.charcoal,
-  },
-  pondAddr: {
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.sm,
-    color: Grey[500],
-  },
+    /* Discovered ponds */
+    pondRow: {
+      width: '100%',
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: Spacing.md,
+      paddingVertical: Spacing.md,
+      paddingHorizontal: Spacing.lg,
+      borderRadius: Radii.md,
+      borderWidth: 1,
+      borderColor: c.border,
+      backgroundColor: c.card,
+    },
+    pondInfo: { flex: 1 },
+    pondName: {
+      fontFamily: FontFamily.body,
+      fontSize: FontSize.base,
+      fontWeight: FontWeight.semibold,
+      color: c.text,
+    },
+    pondAddr: {
+      fontFamily: FontFamily.body,
+      fontSize: FontSize.sm,
+      color: c.textTertiary,
+    },
 
-  /* Input groups */
-  inputGroup: { width: '100%' },
-  inputLabel: {
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.sm,
-    fontWeight: FontWeight.semibold,
-    color: Grey[700],
-    marginBottom: Spacing.xs,
-  },
-  textInput: {
-    backgroundColor: Brand.white,
-    borderRadius: Radii.lg,
-    borderWidth: 1,
-    borderColor: Grey[200],
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.md,
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.base,
-    color: Brand.charcoal,
-  },
-});
+    /* Input groups */
+    inputGroup: { width: '100%' },
+    inputLabel: {
+      fontFamily: FontFamily.body,
+      fontSize: FontSize.sm,
+      fontWeight: FontWeight.semibold,
+      color: c.textSecondary,
+      marginBottom: Spacing.xs,
+    },
+    inputHint: {
+      fontFamily: FontFamily.body,
+      fontSize: FontSize.sm,
+      color: c.textTertiary,
+      lineHeight: FontSize.sm * 1.5,
+      marginTop: Spacing.xs,
+    },
+    textInput: {
+      backgroundColor: c.card,
+      borderRadius: Radii.lg,
+      borderWidth: 1,
+      borderColor: c.border,
+      paddingHorizontal: Spacing.lg,
+      paddingVertical: Spacing.md,
+      fontFamily: FontFamily.body,
+      fontSize: FontSize.base,
+      color: c.text,
+    },
+  });

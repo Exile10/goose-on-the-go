@@ -7,29 +7,32 @@
  * coordinated cutover.
  */
 
+import { useTranslation } from 'react-i18next';
 import React, { useCallback, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native';
+import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { Redirect, useRouter } from 'expo-router';
 
-import { InkSwitch, InkIcon } from '@jarida/ink/native';
+import { InkSwitch, InkNotice } from '@jarida/ink/native';
 
-import { useTranslation } from 'react-i18next';
+import { GIcon } from '@/components/ui/g-icon';
+import { GPressable } from '@/components/ui/g-pressable';
 import { ServerStatus } from '@/components/patterns/server-status';
 import { useServer, MIGRATION_SCREENS, type MigrationScreen } from '@/providers/server-provider';
-import { Grey, JaridaPurple, Brand, Semantic } from '@/constants/colors';
+import { JaridaPurple, Brand } from '@/constants/colors';
 import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
 import { Spacing } from '@/constants/spacing';
 import { Radii } from '@/constants/radii';
 import { Shadows } from '@/constants/shadows';
-import i18n from '@/services/i18n';
+import { useThemedStyles } from '@/hooks/use-themed-styles';
+import type { ThemeColors } from '@/constants/colors';
+import type { TranslationKey } from '@/services/i18n';
 
-const SCREEN_LABELS: Record<MigrationScreen, string> = {
-  chat: 'Chat',
-  voice: 'Voice / Listening Overlay',
-  memory: 'Memories',
-  integrations: 'App Integrations & MCP Servers',
-  schedule: 'Schedule',
-  logs: 'Activity Logs',
+const SCREEN_LABELS: Record<MigrationScreen, TranslationKey> = {
+  chat: 'dev.screens.chat',
+  memory: 'dev.screens.memory',
+  integrations: 'dev.screens.integrations',
+  schedule: 'dev.screens.schedule',
+  logs: 'dev.screens.logs',
 };
 
 export default function DeveloperScreen() {
@@ -45,10 +48,14 @@ export default function DeveloperScreen() {
 }
 
 function DeveloperScreenContent() {
-  const { serverUrl, online, checkHealth, isScreenReal, setScreenMode } = useServer();
-  const [checking, setChecking] = useState(false);
+  const styles = useThemedStyles(makeStyles);
   const { t } = useTranslation();
   const router = useRouter();
+  const { serverUrl, online, checkHealth, isScreenReal, setScreenMode } = useServer();
+  const [checking, setChecking] = useState(false);
+
+  // The address is whatever pairing stored; it is changed by pairing again,
+  // not typed here. The probe re-selects an endpoint and reports the result.
   const handleTestConnection = useCallback(async () => {
     setChecking(true);
     try { await checkHealth(); } finally { setChecking(false); }
@@ -56,23 +63,30 @@ function DeveloperScreenContent() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <Text style={styles.sectionTitle}>{i18n.t('developer.serverConnection')}</Text>
+      <Text style={styles.sectionTitle}>{t('dev.connection')}</Text>
       <View style={styles.card}>
         <Text style={styles.screenLabel}>{serverUrl || t('connection.unpaired')}</Text>
-        <Pressable onPress={() => router.push('/(stack)/pond-pairing')}>
-          <Text style={styles.sectionHint}>{t('connection.changePond')}</Text>
-        </Pressable>
+        <GPressable onPress={() => router.push('/(stack)/pond-pairing')} hitSlop={8}>
+          <Text style={styles.changeLink}>{t('connection.changePond')}</Text>
+        </GPressable>
         <View style={styles.connectionRow}>
           <ServerStatus online={online} />
-          <Pressable style={styles.testButton} onPress={handleTestConnection} disabled={checking}>
-            <InkIcon name="refresh" size={14} />
-            <Text style={styles.testButtonText}>{checking ? i18n.t('developer.checking') : i18n.t('developer.testConnection')}</Text>
-          </Pressable>
+          <GPressable
+            feedback="lift"
+            style={styles.testButton}
+            onPress={handleTestConnection}
+            disabled={checking}
+          >
+            <GIcon name="refresh" size={14} color={Brand.white} />
+            <Text style={styles.testButtonText}>
+              {checking ? t('developer.checking') : t('developer.testConnection')}
+            </Text>
+          </GPressable>
         </View>
       </View>
 
-      <Text style={styles.sectionTitle}>{i18n.t('developer.backendMode')}</Text>
-      <Text style={styles.sectionHint}>{i18n.t('developer.backendHint')}</Text>
+      <Text style={styles.sectionTitle}>{t('dev.screenMode')}</Text>
+      <Text style={styles.sectionHint}>{t('developer.backendHint')}</Text>
       <View style={styles.card}>
         {MIGRATION_SCREENS.map((screen, i) => (
           <View
@@ -80,9 +94,9 @@ function DeveloperScreenContent() {
             style={[styles.screenRow, i < MIGRATION_SCREENS.length - 1 && styles.screenRowDivider]}
           >
             <View style={styles.screenRowLeft}>
-              <Text style={styles.screenLabel}>{SCREEN_LABELS[screen]}</Text>
+              <Text style={styles.screenLabel}>{t(SCREEN_LABELS[screen])}</Text>
               <Text style={styles.screenModeText}>
-                {isScreenReal(screen) ? i18n.t('developer.realBackend') : i18n.t('developer.mockData')}
+                {isScreenReal(screen) ? t('developer.realBackend') : t('developer.mockData')}
               </Text>
             </View>
             <InkSwitch
@@ -93,106 +107,96 @@ function DeveloperScreenContent() {
         ))}
       </View>
 
-      <View style={styles.warningBanner}>
-        <InkIcon name="warn" size={16} tone="warning" />
-        <Text style={styles.warningText}>{i18n.t('developer.devOnly')}</Text>
+      <View style={styles.notice}>
+        <InkNotice tone="warning">{t('dev.devOnly')}</InkNotice>
       </View>
     </ScrollView>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Grey[50] },
-  content: { padding: Spacing.lg, paddingBottom: Spacing['3xl'] },
+const makeStyles = (c: ThemeColors) =>
+  StyleSheet.create({
+    container: { flex: 1, backgroundColor: c.background },
+    content: { padding: Spacing.lg, paddingBottom: Spacing['3xl'] },
 
-  sectionTitle: {
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.xs,
-    fontWeight: FontWeight.bold,
-    color: Grey[500],
-    letterSpacing: 1,
-    textTransform: 'uppercase',
-    marginBottom: Spacing.sm,
-    marginTop: Spacing.lg,
-  },
-  sectionHint: {
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.sm,
-    color: Grey[500],
-    marginBottom: Spacing.md,
-    marginTop: -Spacing.xs,
-    lineHeight: FontSize.sm * 1.5,
-  },
+    sectionTitle: {
+      fontFamily: FontFamily.body,
+      fontSize: FontSize.base,
+      fontWeight: FontWeight.semibold,
+      color: c.text,
+      marginBottom: Spacing.sm,
+      marginTop: Spacing.lg,
+    },
+    sectionHint: {
+      fontFamily: FontFamily.body,
+      fontSize: FontSize.sm,
+      color: c.textTertiary,
+      marginBottom: Spacing.md,
+      marginTop: -Spacing.xs,
+      lineHeight: FontSize.sm * 1.5,
+    },
+    changeLink: {
+      fontFamily: FontFamily.body,
+      fontSize: FontSize.sm,
+      color: c.textBrand,
+      marginTop: Spacing.xs,
+      lineHeight: FontSize.sm * 1.5,
+    },
 
-  card: {
-    backgroundColor: Brand.white,
-    borderRadius: Radii.lg,
-    borderWidth: 1,
-    borderColor: Grey[200],
-    padding: Spacing.md,
-    ...Shadows.sm,
-  },
+    card: {
+      backgroundColor: c.card,
+      borderRadius: Radii.lg,
+      borderWidth: 1,
+      borderColor: c.border,
+      padding: Spacing.md,
+      ...Shadows.sm,
+    },
 
-  connectionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: Spacing.md,
-  },
-  testButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.xs,
-    backgroundColor: JaridaPurple[500],
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    borderRadius: Radii.md,
-  },
-  testButtonText: {
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.sm,
-    fontWeight: FontWeight.semibold,
-    color: Brand.white,
-  },
+    connectionRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginTop: Spacing.md,
+    },
+    testButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: Spacing.xs,
+      backgroundColor: JaridaPurple[500],
+      paddingHorizontal: Spacing.md,
+      paddingVertical: Spacing.sm,
+      borderRadius: Radii.md,
+    },
+    testButtonText: {
+      fontFamily: FontFamily.body,
+      fontSize: FontSize.sm,
+      fontWeight: FontWeight.semibold,
+      color: Brand.white,
+    },
 
-  screenRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: Spacing.md,
-  },
-  screenRowDivider: {
-    borderBottomWidth: 1,
-    borderBottomColor: Grey[100],
-  },
-  screenRowLeft: { flex: 1, marginRight: Spacing.md },
-  screenLabel: {
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.base,
-    fontWeight: FontWeight.medium,
-    color: Brand.charcoal,
-  },
-  screenModeText: {
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.xs,
-    color: Grey[500],
-    marginTop: 2,
-  },
+    screenRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingVertical: Spacing.md,
+    },
+    screenRowDivider: {
+      borderBottomWidth: 1,
+      borderBottomColor: c.border,
+    },
+    screenRowLeft: { flex: 1, marginRight: Spacing.md },
+    screenLabel: {
+      fontFamily: FontFamily.body,
+      fontSize: FontSize.base,
+      fontWeight: FontWeight.medium,
+      color: c.text,
+    },
+    screenModeText: {
+      fontFamily: FontFamily.body,
+      fontSize: FontSize.xs,
+      color: c.textTertiary,
+      marginTop: 2,
+    },
 
-  warningBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
-    backgroundColor: Semantic.warningSoft,
-    borderRadius: Radii.md,
-    padding: Spacing.md,
-    marginTop: Spacing.xl,
-  },
-  warningText: {
-    flex: 1,
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.xs,
-    color: Grey[700],
-    lineHeight: FontSize.xs * 1.5,
-  },
-});
+    notice: { marginTop: Spacing.xl },
+  });

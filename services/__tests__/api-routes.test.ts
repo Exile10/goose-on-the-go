@@ -230,10 +230,15 @@ describe('a catalogue the server did not send', () => {
     await expect(api.listModels()).resolves.toEqual([]);
   });
 
-  it('still unwraps a well-formed envelope', async () => {
-    setFetch(async () => reply('{"models":[{"provider":"p","name":"m","is_active":true}]}'));
+  // The Pond answers six arrays, one per category, never `{models}`; see
+  // `listModels`. Each entry comes back tagged with its bucket, and `id` is the
+  // `${category}:${name}` pair `/activate` keys on.
+  it('still unwraps a well-formed catalogue', async () => {
+    setFetch(async () => reply('{"gguf":[{"provider":"p","name":"m","is_active":true}],"ollama":null}'));
     const api = new PondApiClient('https://pond.test:4000');
-    await expect(api.listModels()).resolves.toEqual([{ provider: 'p', name: 'm', is_active: true }]);
+    await expect(api.listModels()).resolves.toEqual([
+      { provider: 'p', name: 'm', is_active: true, category: 'gguf', id: 'gguf:m' },
+    ]);
   });
 
   /**
