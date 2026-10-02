@@ -507,7 +507,7 @@ const makeStyles = (c: ThemeColors) =>
     fontFamily: FontFamily.body,
     fontSize: FontSize.sm,
     fontWeight: FontWeight.semibold,
-    color: JaridaPurple[600],
+    color: c.textBrand,
   },
 
   /* Right now. InkCard draws its own face and plate; its style is layout only. */

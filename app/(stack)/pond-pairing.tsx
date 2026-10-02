@@ -831,7 +831,7 @@ const makeStyles = (c: ThemeColors) =>
       fontFamily: FontFamily.body,
       fontSize: FontSize.base,
       fontWeight: FontWeight.semibold,
-      color: JaridaPurple[500],
+      color: c.textBrand,
     },
 
     // stepContent fills with `flex: 1`, which a scroll view's content container

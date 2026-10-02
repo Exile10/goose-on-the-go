@@ -6,6 +6,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useServer } from '@/providers/server-provider';
 import '@/services/i18n';
 import type { ConnectionState } from '@/models/connection';
+import type { ThemeColors } from '@/constants/colors';
+import { useThemedStyles } from '@/hooks/use-themed-styles';
 
 /** Persistent feedback with local pairing or recovery as the relevant action. */
 /**
@@ -32,6 +34,7 @@ export function ConnectionStatus() {
   const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const styles = useThemedStyles(makeStyles);
   // `revoked` joins the states that send you to pairing rather than retrying:
   // the Pond is reachable and has stopped recognising this phone, so `recover`
   // -- which probes endpoints without a token -- would report success and
@@ -44,7 +47,9 @@ export function ConnectionStatus() {
     <Text accessibilityLiveRegion="polite" style={styles.text}>{stateLabel(t, connectionState)}</Text>
   </Pressable>;
 }
-const styles = StyleSheet.create({
-  container: { paddingHorizontal: 16, paddingVertical: 6, backgroundColor: '#f3f0fa' },
-  text: { color: '#46336b', fontSize: 12, textAlign: 'center' },
+// The brand's soft tint under brand text, so the banner reads as the same
+// lavender strip in light and as its dark counterpart in dark.
+const makeStyles = (c: ThemeColors) => StyleSheet.create({
+  container: { paddingHorizontal: 16, paddingVertical: 6, backgroundColor: c.tintSoft },
+  text: { color: c.textBrand, fontSize: 12, textAlign: 'center' },
 });
