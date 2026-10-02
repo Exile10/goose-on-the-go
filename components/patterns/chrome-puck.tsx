@@ -1,12 +1,13 @@
 /**
- * ChromePuck — one round control floating over content, in the bar's material.
+ * ChromePuck — one round control floating over content, in opaque chrome.
  *
  * It floats over a wall of ink-edged cards, and the edge marks content, never
  * chrome: a control wearing the plate there would read as one more card. So a
- * puck is made of what the bottom bar is made of — the opaque `chrome` fill, a
- * `lineStrong` hairline, Ink's lift — and parked above the bar the two read as
- * one layer. Ink's derived glass would be a tint of `surface`, the very colour
- * the cards are, and would separate nothing; VIEW-LAYER.md has the numbers.
+ * puck is the opaque `chrome` fill, a `lineStrong` hairline and Ink's lift. It
+ * stays solid while the bottom bar is glass, on purpose: at a puck's size glass
+ * over a card buys little and costs the glyph its contrast, and a tint of
+ * `surface`, the very colour the cards are, would separate nothing.
+ * VIEW-LAYER.md has the numbers.
  *
  * `marked` puts a dot on it, for a control whose setting is not the default.
  * The dot is `accentLine`, the accent as a mark rather than a fill, because a
