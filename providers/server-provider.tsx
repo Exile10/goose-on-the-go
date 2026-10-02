@@ -39,7 +39,7 @@ interface ServerContextValue {
   stagePairing: (profile: ConnectionProfile, pin: string) => Promise<void>;
   cancelPairing: () => Promise<void>;
   pair: (opts: PairOptions) => Promise<HandshakeResponse>;
-  signOut: () => Promise<void>;
+  unpair: () => Promise<void>;
   /** Per-screen mock/real backend flags (dev only) — see MIGRATION_SCREENS. */
   screenModes: ScreenModes;
   /** The screen's toggle in dev, its default in a release build — see `resolveScreenReal`. */
@@ -182,7 +182,7 @@ export function ServerProvider({ children }: PropsWithChildren) {
   /**
    * Drop this phone's pairing locally, without asking the Pond to release it.
    *
-   * signOut tells the Pond first and deliberately keeps the pairing when that
+   * unpair tells the Pond first and deliberately keeps the pairing when that
    * call fails, so a failed sign-out can be retried. Revocation is the opposite
    * situation: the Pond has already stopped recognising this phone, so there is
    * nothing to tell it and nothing to retry. Holding dead credentials only means
@@ -456,7 +456,7 @@ export function ServerProvider({ children }: PropsWithChildren) {
     })();
   }, []);
 
-  const signOut = useCallback(async () => {
+  const unpair = useCallback(async () => {
     await committing.current?.catch(() => undefined);
     await cancelRemoteAccess();
     // Preserve the authenticated transport until the Pond has durably accepted revocation.
@@ -505,8 +505,8 @@ export function ServerProvider({ children }: PropsWithChildren) {
     refreshToken: identity?.refresh ?? null, connectionState: snapshot.state,
     profileId: identity?.id ?? '', paired: hasPairing, remoteEnabled: saved.current?.profile.remoteAccess?.mode === 'embedded',
     keepLocalOnly, hydrated, screenModes, isScreenReal, setScreenMode,
-    checkHealth, setRemoteEndpoint, recover: manager.recover, revoke: manager.revoke.bind(manager), stagePairing, cancelPairing, pair, signOut,
-  }), [snapshot, identity, hasPairing, hydrated, screenModes, isScreenReal, setScreenMode, checkHealth, setRemoteEndpoint, keepLocalOnly, manager, stagePairing, cancelPairing, pair, signOut]);
+    checkHealth, setRemoteEndpoint, recover: manager.recover, revoke: manager.revoke.bind(manager), stagePairing, cancelPairing, pair, unpair,
+  }), [snapshot, identity, hasPairing, hydrated, screenModes, isScreenReal, setScreenMode, checkHealth, setRemoteEndpoint, keepLocalOnly, manager, stagePairing, cancelPairing, pair, unpair]);
   return <ServerContext.Provider value={value}>{children}</ServerContext.Provider>;
 }
 export function useServer(): ServerContextValue {

@@ -3,6 +3,10 @@ import { View, Text, StyleSheet, Pressable, ActivityIndicator } from 'react-nati
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
+import { useInkTheme } from '@jarida/ink/native';
+
+import { useThemedStyles } from '@/hooks/use-themed-styles';
+import type { ThemeColors } from '@/constants/colors';
 import { useRemoteAccess } from '@/view-models/use-remote-access';
 import type { RemoteProgress } from '@/services/remote-access';
 import type { ThemeColors } from '@/constants/colors';
@@ -38,6 +42,8 @@ function progressLabel(t: TFunction, progress: RemoteProgress): string {
 
 export default function RemoteAccessScreen() {
   const { t } = useTranslation();
+  const styles = useThemedStyles(makeStyles);
+  const theme = useInkTheme();
   const router = useRouter();
   const { setupUnavailable, progress, error, busy, enable, recover, reviewId, localOnly, lapse } = useRemoteAccess();
   const styles = useThemedStyles(makeStyles);
@@ -47,8 +53,8 @@ export default function RemoteAccessScreen() {
     <Text style={styles.body}>{t('remote.description')}</Text>
     {progress && !error && <Text accessibilityLiveRegion="polite" style={styles.body}>{progressLabel(t, progress)}</Text>}
     {reviewId && busy && <Text selectable style={styles.body}>{t('remote.reviewCode', { id: reviewId })}</Text>}
-    {lapse && <Text accessibilityRole="alert" style={[styles.warning, { color: alert.warning }]}>{lapse}</Text>}
-    {error && <Text accessibilityRole="alert" style={[styles.error, { color: alert.error }]}>{error}</Text>}
+    {lapse && <Text accessibilityRole="alert" style={[styles.tone, { color: theme.color.warningFg }]}>{lapse}</Text>}
+    {error && <Text accessibilityRole="alert" style={[styles.tone, { color: theme.color.dangerFg }]}>{error}</Text>}
     {busy && <ActivityIndicator />}
     {progress !== 'enabled' && <Pressable accessibilityRole="button" disabled={busy} onPress={enable} style={styles.primary}><Text style={styles.primaryText}>{t('remote.enable')}</Text></Pressable>}
     {error && !setupUnavailable && progress !== 'enabled' && <Pressable accessibilityRole="button" disabled={busy} onPress={recover} style={styles.secondary}><Text style={styles.secondaryText}>{t('remote.recover')}</Text></Pressable>}
@@ -56,12 +62,24 @@ export default function RemoteAccessScreen() {
 
   </View>;
 }
-const makeStyles = (c: ThemeColors) => StyleSheet.create({
-  page: { flex: 1, padding: 28, paddingTop: 80, gap: 24, backgroundColor: c.background },
-  title: { fontSize: 28, fontWeight: '600', color: c.text }, body: { fontSize: 16, lineHeight: 24, color: c.textSecondary },
-  error: { fontSize: 16 },
-  warning: { fontSize: 16, lineHeight: 24 },
-  primary: { padding: 18, borderRadius: 12, backgroundColor: c.tint, alignItems: 'center' },
-  primaryText: { color: c.textOnBrand, fontSize: 16 }, secondary: { padding: 18, alignItems: 'center' },
-  secondaryText: { color: c.text },
-});
+/*
+ * Themed. This screen was written with its palette spelled out in hex --
+ * a near-white page, grey body text, a purple button -- so it stayed light
+ * while the rest of the app went dark, and its heading and both secondary
+ * labels, which carried no colour at all, fell back to black on black.
+ *
+ * The two tone colours are taken from the ink theme at render rather than from
+ * here, because `error` and `warning` need a dark-mode variant and ThemeColors
+ * carries no tone tokens.
+ */
+const makeStyles = (c: ThemeColors) =>
+  StyleSheet.create({
+    page: { flex: 1, padding: 28, gap: 24, backgroundColor: c.background },
+    title: { fontSize: 28, fontWeight: '600', color: c.text },
+    body: { fontSize: 16, lineHeight: 24, color: c.textSecondary },
+    tone: { fontSize: 16, lineHeight: 24 },
+    primary: { padding: 18, borderRadius: 12, backgroundColor: c.tint, alignItems: 'center' },
+    primaryText: { color: c.textOnBrand, fontSize: 16 },
+    secondary: { padding: 18, alignItems: 'center' },
+    secondaryText: { color: c.textBrand, fontSize: 16 },
+  });
