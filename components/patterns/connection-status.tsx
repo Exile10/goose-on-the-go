@@ -8,6 +8,8 @@ import { useThemedStyles } from '@/hooks/use-themed-styles';
 import type { ThemeColors } from '@/constants/colors';
 import '@/services/i18n';
 import type { ConnectionState } from '@/models/connection';
+import type { ThemeColors } from '@/constants/colors';
+import { useThemedStyles } from '@/hooks/use-themed-styles';
 
 /** Persistent feedback with local pairing or recovery as the relevant action. */
 /**
@@ -55,6 +57,7 @@ export function ConnectionStatus() {
   const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const styles = useThemedStyles(makeStyles);
   // `revoked` joins the states that send you to pairing rather than retrying:
   // the Pond is reachable and has stopped recognising this phone, so `recover`
   // -- which probes endpoints without a token -- would report success and

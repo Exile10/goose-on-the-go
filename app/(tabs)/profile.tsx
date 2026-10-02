@@ -23,6 +23,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useBottomBarInset, useChromeScroll } from '@/providers/chrome-provider';
 import { useThemedStyles } from '@/hooks/use-themed-styles';
+import { useTheme, type ThemePreference } from '@/providers/theme-provider';
 import type { ThemeColors } from '@/constants/colors';
 
 import {
@@ -30,6 +31,7 @@ import {
   InkCard,
   InkGroup,
   InkRow,
+  InkSegmented,
   InkText,
   InkTitle,
 } from '@jarida/ink/native';
@@ -78,6 +80,41 @@ const NavRow = React.memo(function NavRow({
     </GPressable>
   );
 });
+
+/**
+ * The light/dark/system choice, as a card row like the rest of the page. The
+ * icon follows the scheme in effect (sun in light, moon in dark), so on
+ * `system` it still shows what the phone resolved to.
+ */
+function AppearanceRow() {
+  const styles = useThemedStyles(makeStyles);
+  const { t } = useTranslation();
+  const { colors, isDark, preference, setPreference } = useTheme();
+
+  const options: { value: ThemePreference; label: string }[] = [
+    { value: 'system', label: t('profile.appearanceSystem') },
+    { value: 'light', label: t('profile.appearanceLight') },
+    { value: 'dark', label: t('profile.appearanceDark') },
+  ];
+
+  return (
+    <InkRow
+      label={
+        <View style={styles.rowLeft}>
+          <GIcon name={isDark ? 'moon' : 'sun'} size={16} color={colors.textBrand} />
+          <Text style={styles.rowLabel}>{t('profile.appearance')}</Text>
+        </View>
+      }
+    >
+      <InkSegmented
+        label={t('profile.appearance')}
+        value={preference}
+        options={options}
+        onChange={setPreference}
+      />
+    </InkRow>
+  );
+}
 
 export default function ProfileHub() {
   const styles = useThemedStyles(makeStyles);
@@ -178,6 +215,10 @@ export default function ProfileHub() {
             ))}
           </InkGroup>
         ))}
+
+        <InkGroup title={t('profile.appearance')} style={styles.group}>
+          <AppearanceRow />
+        </InkGroup>
 
         {/* Signing out is also the only way to release a remote enrollment the
             Pond still calls active, so it has to work — and say that it is

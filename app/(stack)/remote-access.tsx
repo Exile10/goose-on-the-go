@@ -9,6 +9,19 @@ import { useThemedStyles } from '@/hooks/use-themed-styles';
 import type { ThemeColors } from '@/constants/colors';
 import { useRemoteAccess } from '@/view-models/use-remote-access';
 import type { RemoteProgress } from '@/services/remote-access';
+import type { ThemeColors } from '@/constants/colors';
+import { useThemedStyles } from '@/hooks/use-themed-styles';
+import { useTheme } from '@/providers/theme-provider';
+
+/**
+ * The two alert colours, per scheme. The palette's `Semantic` red and amber each
+ * miss 4.5:1 on one of the two grounds (red on dark, amber on white), so light
+ * keeps this screen's original deep tones and dark gets lighter ones.
+ */
+const ALERT = {
+  light: { error: '#A02020', warning: '#8A5A00' },
+  dark: { error: '#FF8A80', warning: '#E0A82E' },
+} as const;
 /**
  * One literal key per step, so services/__tests__/i18n.test.ts can see them.
  *
@@ -33,6 +46,8 @@ export default function RemoteAccessScreen() {
   const theme = useInkTheme();
   const router = useRouter();
   const { setupUnavailable, progress, error, busy, enable, recover, reviewId, localOnly, lapse } = useRemoteAccess();
+  const styles = useThemedStyles(makeStyles);
+  const alert = ALERT[useTheme().isDark ? 'dark' : 'light'];
   return <View style={styles.page}>
     <Text style={styles.title}>{t('remote.title')}</Text>
     <Text style={styles.body}>{t('remote.description')}</Text>

@@ -198,7 +198,7 @@ const makeStyles = (c: ThemeColors) =>
     fontFamily: FontFamily.body,
     fontSize: FontSize.sm,
     fontWeight: FontWeight.semibold,
-    color: JaridaPurple[500],
+    color: c.textBrand,
   },
 
   /* Category */

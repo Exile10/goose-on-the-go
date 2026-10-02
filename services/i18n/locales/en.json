@@ -461,7 +461,11 @@
     "statDevices": "Devices",
     "statRooms": "Rooms",
     "statRoutines": "Routines",
-    "statUsers": "Users"
+    "statUsers": "Users",
+    "appearance": "Appearance",
+    "appearanceSystem": "System",
+    "appearanceLight": "Light",
+    "appearanceDark": "Dark"
   },
   "models": {
     "serving": "Serving now",
