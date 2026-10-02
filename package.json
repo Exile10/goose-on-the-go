@@ -16,7 +16,7 @@
     "audit": "node scripts/audit-check.mjs --threshold high",
     "build:network": "scripts/build-embedded-network.sh",
     "check:prebuild": "scripts/check-prebuild.sh",
-    "check-icons": "node --experimental-strip-types scripts/sweep-icons.mjs"
+    "check-icons": "node scripts/sweep-icons.mjs"
   },
   "dependencies": {
     "@expo-google-fonts/jetbrains-mono": "^0.4.1",
