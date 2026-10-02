@@ -4,6 +4,8 @@ import type { TFunction } from 'i18next';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useServer } from '@/providers/server-provider';
+import { useThemedStyles } from '@/hooks/use-themed-styles';
+import type { ThemeColors } from '@/constants/colors';
 import '@/services/i18n';
 import type { ConnectionState } from '@/models/connection';
 
@@ -27,8 +29,29 @@ function stateLabel(t: TFunction, state: ConnectionState): string {
   }
 }
 
+/**
+ * The states that need saying. A working connection is not one of them.
+ *
+ * This banner sits above the navigator in the root layout, so whatever it draws
+ * it draws over the notification bar and pushes every screen down -- and the
+ * screens below apply the top inset again, which is the empty strip under it.
+ * Paying that permanently to report "Connected locally" spent the status bar on
+ * news that nothing is wrong, which Home already shows beside the Pond's
+ * address. Healthy connections say nothing; the banner appears when there is
+ * something to act on, and is the control that acts on it.
+ */
+const NEEDS_ATTENTION: readonly ConnectionState[] = [
+  'trust',
+  'unpaired',
+  'upgrade',
+  'reconnecting',
+  'disconnected',
+  'revoked',
+];
+
 export function ConnectionStatus() {
   const { connectionState, recover } = useServer();
+  const styles = useThemedStyles(makeStyles);
   const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -40,11 +63,28 @@ export function ConnectionStatus() {
     if (['unpaired', 'upgrade', 'revoked'].includes(connectionState)) router.push('/(stack)/pond-pairing');
     else void recover();
   };
+  if (!NEEDS_ATTENTION.includes(connectionState)) return null;
   return <Pressable accessibilityRole="button" onPress={act} style={[styles.container, { paddingTop: insets.top + 6 }]}>
     <Text accessibilityLiveRegion="polite" style={styles.text}>{stateLabel(t, connectionState)}</Text>
   </Pressable>;
 }
-const styles = StyleSheet.create({
-  container: { paddingHorizontal: 16, paddingVertical: 6, backgroundColor: '#f3f0fa' },
-  text: { color: '#46336b', fontSize: 12, textAlign: 'center' },
-});
+/*
+ * Themed, because this strip is drawn behind the notification bar.
+ *
+ * The colours were a hardcoded pale lavender on deep purple. The root layout
+ * sets the system status bar's content to light in dark mode, so those white
+ * icons landed on a near-white strip and the clock, signal and battery became
+ * unreadable -- the notification bar was there, and could not be seen. A
+ * surface that follows the scheme keeps the contrast the system is expecting.
+ */
+const makeStyles = (c: ThemeColors) =>
+  StyleSheet.create({
+    container: {
+      paddingHorizontal: 16,
+      paddingVertical: 6,
+      backgroundColor: c.backgroundSecondary,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: c.border,
+    },
+    text: { color: c.text, fontSize: 12, textAlign: 'center' },
+  });

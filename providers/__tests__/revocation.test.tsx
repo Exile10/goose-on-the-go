@@ -80,7 +80,7 @@ it('still asks the Pond to release the device on an explicit sign out', async ()
   await act(async () => { tree = create(<ServerProvider><Child /></ServerProvider>); });
 
   jest.mocked(api.handshakeRevoke).mockClear();
-  await act(async () => { await server.signOut(); });
+  await act(async () => { await server.unpair(); });
   expect(api.handshakeRevoke).toHaveBeenCalledTimes(1);
   expect(server.profileId).toBe('');
 
@@ -98,7 +98,7 @@ it('signs out when the Pond has already dropped the session', async () => {
   await act(async () => { tree = create(<ServerProvider><Child /></ServerProvider>); });
 
   jest.mocked(api.handshakeRevoke).mockRejectedValueOnce(new (ApiError as unknown as new () => Error)());
-  await act(async () => { await server.signOut(); });
+  await act(async () => { await server.unpair(); });
   expect(server.profileId).toBe('');
 
   await act(async () => { tree.unmount(); });
@@ -114,7 +114,7 @@ it('keeps the pairing when the revoke did not reach the Pond', async () => {
   await act(async () => { tree = create(<ServerProvider><Child /></ServerProvider>); });
 
   jest.mocked(api.handshakeRevoke).mockRejectedValueOnce(new Error('network'));
-  await act(async () => { await expect(server.signOut()).rejects.toThrow('network'); });
+  await act(async () => { await expect(server.unpair()).rejects.toThrow('network'); });
   expect(server.profileId).toBe('profile-1');
 
   await act(async () => { tree.unmount(); });
