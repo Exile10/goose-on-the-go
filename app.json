@@ -7,7 +7,6 @@
     "icon": "./assets/GooseOnTheGoAppIcons/GooseInAPond-iOS-Default-1024@1x.png",
     "scheme": "gooseonthego",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "io.jarida.gooseonthego",
@@ -96,7 +95,8 @@
           "microphonePermission": false
         }
       ],
-      "./plugins/with-pond-tls"
+      "./plugins/with-pond-tls",
+      "expo-asset"
     ],
     "experiments": {
       "typedRoutes": true,
