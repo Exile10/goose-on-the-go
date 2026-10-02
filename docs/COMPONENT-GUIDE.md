@@ -200,4 +200,4 @@ Verified on a device from outside the app. Six rapid screenshots of the bar area
 | VoiceDock | send, stop, onClose | Voice mode, in the composer's place |
 | VoiceOrb | state, level, size, onPress, accessibilityLabel | The voice control, and the face Goose talks with |
 | Goose | state, size, water | The Pond's bird, afloat |
-| ChromePuck, ChromePill | icon / label, onPress | One control floating over content, in the bar's material |
+| ChromePuck, ChromePill | icon / label, onPress | One control floating over content: opaque `chrome`, not the bar's glass |

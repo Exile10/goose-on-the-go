@@ -1,5 +1,5 @@
 /**
- * ChromePill — a worded control floating over content, in the bar's material.
+ * ChromePill — a worded control floating over content, in opaque chrome.
  *
  * `ChromePuck`'s sibling for the rare control whose job no glyph says as
  * plainly as its word: "Done", in the corner, while the wall is being chosen

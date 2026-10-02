@@ -5,8 +5,9 @@
  * along its top, standing on the strip the tab bar floated over — a chin of
  * chrome nearly a sixth of the screen tall under every conversation. The
  * conversation now opens over the tabs, so the only thing under the dock is the
- * home indicator, and the controls are three pieces of the bar's own material
- * sitting on the page rather than a panel holding them.
+ * home indicator, and the controls are three pieces of opaque chrome sitting
+ * on the page rather than a panel holding them. Solid, not the tab bar's glass,
+ * for the reason in `chrome-puck.tsx`.
  *
  * The right-hand control is two in one place. With nothing written it is the
  * microphone, which opens voice mode; once there is something to send it is

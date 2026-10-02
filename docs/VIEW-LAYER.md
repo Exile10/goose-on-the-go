@@ -152,7 +152,7 @@ re-render every list on every change.
 The last stage is Ink's: the bar contracts to a single control carrying the
 current destination's glyph, and pressing it restores the bar rather than
 navigating. That needs `patches/@jarida+ink+1.0.0.patch`, which fixes two things
-in `InkBottomBar`. The puck answered its own press with local state
+in `InkBottomBar` (a third change, the blur slot, is under *The bar's glass*). The puck answered its own press with local state
 (`setPushed`) that nothing ever cleared, so `collapse` worked exactly once —
 press it and the bar was pinned open for the life of the app. The patch clears
 that push when the stage changes, and adds an `onExpand` so a host can own the
@@ -175,13 +175,31 @@ stretch or it measures its own content and the four destinations bunch into a
 corner; after it, the width is Ink's animated one and `flex-end` is what makes
 the bar contract towards the right rather than the left.
 
-The bar draws itself in `theme.color.chrome` with a hairline in `lineStrong`,
-both overriding what Ink would do. The derived glass tint is 0.638 of `#1E1B26`
-and this app's cards are also `#1E1B26`: it separates nothing, and the 36% it
-lets through is enough to read a card's white label across the bar. `glassLift`
-is a shadow, and a shadow on a dark ground is nothing, so the edge is what says
-the bar is a plane. The web glass draws that hairline too; the native binding
-does not.
+### The bar's glass
+
+The bar is glass in both schemes: a real blur, a light tint of `surface` over
+it, and a hairline in `lineStrong`. This is what #18 asked for, and the
+conversation-wall rebuild had replaced it with an opaque `chrome` fill.
+
+- **The blur.** Ink's native `InkBottomBar` drew only a tint; the patch adds a
+  `blurComponent` slot, the same one `InkNavbar` has, and draws the blur behind
+  the bar's content so the padding, the morph and the puck are unchanged. The
+  app passes `TabBarBlur`, a function wrapping expo-blur's `BlurView`: a class
+  component's props would have to match the slot's exactly, and `BlurView`
+  takes more tints than the `light` and `dark` Ink passes.
+- **Reduce Transparency.** With it on, the patched bar skips the blur and fills
+  with Ink's `glass.solid`, as the navbar does. The app needs no second path.
+- **How clear it is.** Ink's blur intensity (60), with the tint lowered to
+  `TINT_ALPHA` (0.3) in `app/(tabs)/_layout.tsx`. Ink derives about 0.50 light
+  and 0.64 dark, the least opacity that keeps the labels at 4.5:1 over any
+  backdrop *with no blur at all*. #18 asked for Ink's derived tint; the app
+  goes clearer than that by choice and leans on the blur for legibility. Raise
+  `TINT_ALPHA` if labels struggle over busy content.
+- **The hairline.** The tint is `surface`, the colour the cards are made of, so
+  on its own it cannot tell the bar from a card passing under it. In light the
+  lift does that; on a dark ground a shadow is nothing. The edge is what says
+  the bar is a plane, in both schemes. The web glass draws the same hairline;
+  the native binding does not.
 
 `accentLine` is blanked through an `InkProvider` scoped to the bar. Ink draws a
 dash over the selected destination and exposes no way to turn it off; inside the
@@ -231,10 +249,11 @@ and short on the other:
   the cards near the viewport.
 - **The cards are the only loud thing.** They wear the edge, on `InkEdge` at
   radius `xl` rather than `InkCard`, whose radius is fixed at `lg`. The three
-  pucks over them (`chrome-puck.tsx`) are chrome in the bar's own material —
-  opaque `chrome`, a `lineStrong` hairline, Ink's lift — for the reason under
-  *Navigation chrome*: a glass tint of `surface` separates nothing from cards
-  made of `surface`.
+  pucks over them (`chrome-puck.tsx`) are opaque `chrome` with a `lineStrong`
+  hairline and Ink's lift. They stay solid while the bar is glass, on purpose:
+  a puck is one small glyph, and at that size glass over a card buys little
+  and costs the glyph its contrast. A tint of `surface` alone would separate it
+  from nothing (see *The bar's glass*).
 - **The filter is the one distinction the Pond draws.** `isRoutine` copies
   pond-core's `POND_AUTHORED_SESSION_PREFIXES`: `sched-` sessions are ones the
   Pond opened itself, for a schedule or a rule. They share the list with
