@@ -1,3 +1,5 @@
+import { File } from 'expo-file-system';
+
 import { assertPondTrust, PondTrustError, pondTrustFailed } from './pond-trust';
 import { isLocalPairingUrl, normalizeHttpsUrl } from '@/models/connection';
 /**
@@ -770,7 +772,9 @@ export class PondApiClient {
    */
   async transcribe(fileUri: string): Promise<string> {
     const form = new FormData();
-    form.append('audio', { uri: fileUri, name: 'speech.wav', type: 'audio/wav' } as unknown as Blob);
+    // A real `File` — it implements `Blob` — not the `{uri,name,type}` shape older RN
+    // FormData once special-cased; this RN's FormData rejects anything that isn't one.
+    form.append('audio', new File(fileUri), 'speech.wav');
     const res = await this.send(`${this.baseUrl}/api/v1/transcribe`, {
       method: 'POST',
       // No Content-Type: the runtime writes the multipart boundary itself.

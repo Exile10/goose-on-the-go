@@ -406,7 +406,8 @@ export function useVoice(chat: {
       let text = '';
       try {
         text = await api.transcribe(uri);
-      } catch {
+      } catch (e) {
+        console.warn('[voice] transcribe failed:', e);
         if (!alive.current) return;
         setError(t('chat.voice.hearFailed'));
         setState('error');
