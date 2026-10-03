@@ -23,6 +23,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useBottomBarInset, useChromeScroll } from '@/providers/chrome-provider';
 import { useThemedStyles } from '@/hooks/use-themed-styles';
+import { useTheme, type ThemePreference } from '@/providers/theme-provider';
 import type { ThemeColors } from '@/constants/colors';
 
 import {
@@ -30,6 +31,7 @@ import {
   InkCard,
   InkGroup,
   InkRow,
+  InkSegmented,
   InkText,
   InkTitle,
 } from '@jarida/ink/native';
@@ -79,13 +81,48 @@ const NavRow = React.memo(function NavRow({
   );
 });
 
+/**
+ * The light/dark/system choice, as a card row like the rest of the page. The
+ * icon follows the scheme in effect (sun in light, moon in dark), so on
+ * `system` it still shows what the phone resolved to.
+ */
+function AppearanceRow() {
+  const styles = useThemedStyles(makeStyles);
+  const { t } = useTranslation();
+  const { colors, isDark, preference, setPreference } = useTheme();
+
+  const options: { value: ThemePreference; label: string }[] = [
+    { value: 'system', label: t('profile.appearanceSystem') },
+    { value: 'light', label: t('profile.appearanceLight') },
+    { value: 'dark', label: t('profile.appearanceDark') },
+  ];
+
+  return (
+    <InkRow
+      label={
+        <View style={styles.rowLeft}>
+          <GIcon name={isDark ? 'moon' : 'sun'} size={16} color={colors.textBrand} />
+          <Text style={styles.rowLabel}>{t('profile.appearance')}</Text>
+        </View>
+      }
+    >
+      <InkSegmented
+        label={t('profile.appearance')}
+        value={preference}
+        options={options}
+        onChange={setPreference}
+      />
+    </InkRow>
+  );
+}
+
 export default function ProfileHub() {
   const styles = useThemedStyles(makeStyles);
   const { t } = useTranslation();
   const router = useRouter();
   const { data: household } = useHousehold();
-  const { signOut, serverUrl } = useServer();
-  const [signingOut, setSigningOut] = useState(false);
+  const { unpair, serverUrl } = useServer();
+  const [unpairing, setUnpairing] = useState(false);
   const chrome = useChromeScroll();
   const bottomInset = useBottomBarInset();
 
@@ -109,33 +146,33 @@ export default function ProfileHub() {
   );
 
   /**
-   * Signing out is not undoable from the phone: it revokes this device's
-   * session on the Pond and releases its remote enrollment, so coming back
-   * means pairing at home again. Worth one question first.
+   * Unpairing is not undoable from the phone: it revokes this device's session
+   * on the Pond and releases its remote enrollment, so coming back means
+   * pairing at home again. Worth one question first.
    */
-  const confirmSignOut = useCallback(() => {
+  const confirmUnpair = useCallback(() => {
     void caution();
     Alert.alert(
-      t('common.signOut'),
-      t('profile.signOutWarning'),
+      t('common.unpair'),
+      t('profile.unpairWarning'),
       [
         { text: t('common.cancel'), style: 'cancel' },
         {
-          text: t('common.signOut'),
+          text: t('common.unpair'),
           style: 'destructive',
           onPress: () => {
-            setSigningOut(true);
+            setUnpairing(true);
             // The provider clears stored credentials and reconfigures the
             // connection, which leaves no stored pairing -- and the tab
             // layout's gate takes the app to pairing from there.
-            void signOut()
-              .catch(() => Alert.alert(t('common.signOut'), t('profile.signOutFailed')))
-              .finally(() => setSigningOut(false));
+            void unpair()
+              .catch(() => Alert.alert(t('common.unpair'), t('profile.unpairFailed')))
+              .finally(() => setUnpairing(false));
           },
         },
       ],
     );
-  }, [signOut, t]);
+  }, [unpair, t]);
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -179,16 +216,20 @@ export default function ProfileHub() {
           </InkGroup>
         ))}
 
+        <InkGroup title={t('profile.appearance')} style={styles.group}>
+          <AppearanceRow />
+        </InkGroup>
+
         {/* Signing out is also the only way to release a remote enrollment the
             Pond still calls active, so it has to work — and say that it is
             working, rather than take a second press for a second sign-out. */}
         <InkButton
           variant="danger"
-          disabled={signingOut}
-          onPress={confirmSignOut}
-          style={styles.signOut}
+          disabled={unpairing}
+          onPress={confirmUnpair}
+          style={styles.unpair}
         >
-          {signingOut ? t('profile.signingOut') : t('common.signOut')}
+          {unpairing ? t('profile.unpairing') : t('common.unpair')}
         </InkButton>
         <Text style={styles.versionText}>{t('profile.version', { version: APP_VERSION })}</Text>
       </ScrollView>
@@ -200,7 +241,7 @@ const makeStyles = (c: ThemeColors) =>
   StyleSheet.create({
   chevron: { transform: [{ rotate: '-90deg' }] },
   group: { marginBottom: Spacing.lg },
-  signOut: { marginTop: Spacing.md, alignSelf: 'flex-start' },
+  unpair: { marginTop: Spacing.md, alignSelf: 'flex-start' },
   safe: { flex: 1, backgroundColor: c.background },
   listContent: { paddingHorizontal: Spacing.lg },
 

@@ -12,7 +12,7 @@
  */
 
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { inkText, useInkTheme } from '@jarida/ink/native';
 
@@ -61,7 +61,7 @@ export function VoiceDock({ send, stop, onClose, bottomInset }: VoiceDockProps) 
   const theme = useInkTheme();
   const { t } = useTranslation();
   const voice = useVoice({ send, stop });
-  const { state, level, speaker, error } = voice.data;
+  const { state, level, speaker, error, micBlocked } = voice.data;
 
   const caption = inkText(theme, {
     size: 'sm',
@@ -72,9 +72,32 @@ export function VoiceDock({ send, stop, onClose, bottomInset }: VoiceDockProps) 
 
   return (
     <View style={[styles.dock, { paddingBottom: bottomInset + 8 }]}>
-      <Text style={[caption.style, styles.caption]} accessibilityLiveRegion="polite" numberOfLines={2}>
-        {error ?? t(CAPTIONS[state])}
-      </Text>
+      {/* A microphone the OS will not prompt for again is only recoverable in
+          Settings, so the caption that says so is the control that goes there.
+          Every other caption is a status line and stays inert. */}
+      {micBlocked ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityHint={t('chat.voice.micBlockedHint')}
+          onPress={() => void Linking.openSettings()}
+        >
+          <Text
+            style={[caption.style, styles.caption, styles.captionAction]}
+            accessibilityLiveRegion="polite"
+            numberOfLines={2}
+          >
+            {error}
+          </Text>
+        </Pressable>
+      ) : (
+        <Text
+          style={[caption.style, styles.caption]}
+          accessibilityLiveRegion="polite"
+          numberOfLines={2}
+        >
+          {error ?? t(CAPTIONS[state])}
+        </Text>
+      )}
       {SUGGESTIONS_VISIBLE.has(state) && (
         <View style={styles.suggestions}>
           <Text style={[hint.style, styles.suggestionsLabel]}>{t('voice.trySaying')}</Text>
@@ -123,6 +146,7 @@ export function VoiceDock({ send, stop, onClose, bottomInset }: VoiceDockProps) 
 const styles = StyleSheet.create({
   dock: { paddingHorizontal: 16, paddingTop: 4, gap: 6 },
   caption: { textAlign: 'center', minHeight: 18 },
+  captionAction: { textDecorationLine: 'underline' },
   suggestions: { alignItems: 'center', gap: 6 },
   suggestionsLabel: { textAlign: 'center' },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 6 },

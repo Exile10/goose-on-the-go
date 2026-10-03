@@ -711,7 +711,22 @@ export default function PondPairingScreen() {
 
   return (
     <GKeyboardView style={styles.container}>
-      <Stack.Screen options={{ headerBackVisible: reachedWithHistory, gestureEnabled: reachedWithHistory }} />
+      {/*
+        The stack draws its own back control as `headerLeft`, because this
+        nested navigator suppresses the system one. `headerBackVisible` governs
+        only that suppressed native button, so it never decided anything here:
+        with history it brought the native arrow back *beside* the stack's own,
+        and without history the stack's own still offered a way out of a screen
+        the app was redirected to because it cannot work yet. Hiding
+        `headerLeft` is what the condition always meant.
+      */}
+      <Stack.Screen
+        options={
+          reachedWithHistory
+            ? { gestureEnabled: true }
+            : { headerLeft: () => null, gestureEnabled: false }
+        }
+      />
       <StepIndicator current={step} />
       {pairingError ? <Text style={styles.stepError}>{pairingError}</Text> : null}
       {step === 0 &&
@@ -831,7 +846,7 @@ const makeStyles = (c: ThemeColors) =>
       fontFamily: FontFamily.body,
       fontSize: FontSize.base,
       fontWeight: FontWeight.semibold,
-      color: JaridaPurple[500],
+      color: c.textBrand,
     },
 
     // stepContent fills with `flex: 1`, which a scroll view's content container

@@ -103,13 +103,20 @@ export const useMicStream: (onBuffer: (buffer: MicBuffer) => void) => {
     }
   : () => ({ start: async () => {}, stop: () => {} });
 
+/** The microphone answer, and whether asking a second time can still help. */
 export interface MicPermission {
   granted: boolean;
-  /** False once the OS requires Settings instead of a fresh prompt — denied permanently. */
+  /**
+   * False once the OS has stopped showing the prompt — a second refusal on
+   * Android, any refusal on iOS. `requestRecordingPermissionsAsync` then
+   * returns instantly and silently, so a caller that only reads `granted`
+   * leaves the user tapping a control that can never work. Only the Settings
+   * app can undo it.
+   */
   canAskAgain: boolean;
 }
 
-/** Ask for the microphone. `granted` is false when refused, or when there is no audio module. */
+/** Ask for the microphone. Refused, or no audio module at all, is not granted. */
 export async function requestMicrophone(): Promise<MicPermission> {
   if (!audio) return { granted: false, canAskAgain: false };
   const permission = await audio.requestRecordingPermissionsAsync();

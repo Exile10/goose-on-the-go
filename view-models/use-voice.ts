@@ -112,6 +112,12 @@ export interface UseVoice {
     /** Whether replies are spoken. Off, voice mode still hears; Goose answers in text. */
     speaker: boolean;
     error: string | null;
+    /**
+     * The microphone is refused and the OS will not ask again, so the only
+     * way back is the Settings app. Distinct from a plain refusal, which a
+     * further tap can still resolve.
+     */
+    micBlocked: boolean;
     /** False on a build that predates the audio module. */
     supported: boolean;
   };
@@ -133,6 +139,7 @@ export function useVoice(chat: {
   const [level, setLevel] = useState(0);
   const [speaker, setSpeaker] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [micBlocked, setMicBlocked] = useState(false);
 
   const stateRef = useRef<VoiceState>('idle');
   const setState = useCallback((next: VoiceState) => {
@@ -238,18 +245,26 @@ export function useVoice(chat: {
   const listen = useCallback(async () => {
     // Asked first, and awaited, even where the answer is already known: every
     // state change here then happens after the effect that opened voice mode.
-    const permission = await requestMicrophone();
+    const mic = await requestMicrophone();
     if (!alive.current) return;
-    if (!permission.granted) {
-      const key = !voiceSupported()
-        ? 'chat.voice.needsUpdate'
-        : permission.canAskAgain
-          ? 'chat.voice.micNeeded'
-          : 'chat.voice.micDisabled';
-      setError(t(key));
+    if (!mic.granted) {
+      // A refusal the OS will still reconsider asks again on the next tap; one
+      // it will not needs the user sent to Settings, and says so.
+      const blocked = voiceSupported() && !mic.canAskAgain;
+      setMicBlocked(blocked);
+      setError(
+        t(
+          !voiceSupported()
+            ? 'chat.voice.needsUpdate'
+            : blocked
+              ? 'chat.voice.micBlocked'
+              : 'chat.voice.micDenied',
+        ),
+      );
       setState('error');
       return;
     }
+    setMicBlocked(false);
     await beginVoiceSession();
     if (!alive.current) return;
     take.current = {
@@ -491,7 +506,7 @@ export function useVoice(chat: {
   }, [listen, stopSpeaking]);
 
   return {
-    data: { state, level, speaker, error, supported: voiceSupported() },
+    data: { state, level, speaker, error, micBlocked, supported: voiceSupported() },
     actions: { tap, toggleSpeaker, end },
   };
 }

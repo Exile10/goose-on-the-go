@@ -7,7 +7,7 @@
  *
  * - **The cards are the only loud thing.** They wear Ink's edge because they
  *   are what the screen is for. The three controls floating over them are
- *   chrome, in the bar's material, and stay quiet.
+ *   opaque chrome, solid rather than the tab bar's glass, and stay quiet.
  * - **A card is as tall as its conversation was long.** Three heights, by the
  *   desktop's own rule, so the wall is a rough map of where the household's
  *   attention went — which is what you scan for when you half remember a

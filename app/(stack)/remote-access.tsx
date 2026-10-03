@@ -3,8 +3,23 @@ import { View, Text, StyleSheet, Pressable, ActivityIndicator } from 'react-nati
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
+import { useInkTheme } from '@jarida/ink/native';
+
+import { useThemedStyles } from '@/hooks/use-themed-styles';
+import type { ThemeColors } from '@/constants/colors';
 import { useRemoteAccess } from '@/view-models/use-remote-access';
 import type { RemoteProgress } from '@/services/remote-access';
+import { useTheme } from '@/providers/theme-provider';
+
+/**
+ * The two alert colours, per scheme. The palette's `Semantic` red and amber each
+ * miss 4.5:1 on one of the two grounds (red on dark, amber on white), so light
+ * keeps this screen's original deep tones and dark gets lighter ones.
+ */
+const ALERT = {
+  light: { error: '#A02020', warning: '#8A5A00' },
+  dark: { error: '#FF8A80', warning: '#E0A82E' },
+} as const;
 /**
  * One literal key per step, so services/__tests__/i18n.test.ts can see them.
  *
@@ -25,27 +40,43 @@ function progressLabel(t: TFunction, progress: RemoteProgress): string {
 
 export default function RemoteAccessScreen() {
   const { t } = useTranslation();
+  const styles = useThemedStyles(makeStyles);
+  const theme = useInkTheme();
   const router = useRouter();
   const { setupUnavailable, progress, error, busy, enable, recover, reviewId, localOnly, lapse } = useRemoteAccess();
+  const alert = ALERT[useTheme().isDark ? 'dark' : 'light'];
   return <View style={styles.page}>
     <Text style={styles.title}>{t('remote.title')}</Text>
     <Text style={styles.body}>{t('remote.description')}</Text>
     {progress && !error && <Text accessibilityLiveRegion="polite" style={styles.body}>{progressLabel(t, progress)}</Text>}
     {reviewId && busy && <Text selectable style={styles.body}>{t('remote.reviewCode', { id: reviewId })}</Text>}
-    {lapse && <Text accessibilityRole="alert" style={styles.warning}>{lapse}</Text>}
-    {error && <Text accessibilityRole="alert" style={styles.error}>{error}</Text>}
+    {lapse && <Text accessibilityRole="alert" style={[styles.tone, { color: theme.color.warningFg }]}>{lapse}</Text>}
+    {error && <Text accessibilityRole="alert" style={[styles.tone, { color: theme.color.dangerFg }]}>{error}</Text>}
     {busy && <ActivityIndicator />}
     {progress !== 'enabled' && <Pressable accessibilityRole="button" disabled={busy} onPress={enable} style={styles.primary}><Text style={styles.primaryText}>{t('remote.enable')}</Text></Pressable>}
-    {error && !setupUnavailable && progress !== 'enabled' && <Pressable accessibilityRole="button" disabled={busy} onPress={recover} style={styles.secondary}><Text>{t('remote.recover')}</Text></Pressable>}
-    <Pressable accessibilityRole="button" onPress={async () => { if (progress === 'enabled' || await localOnly()) router.replace('/(tabs)'); }} style={styles.secondary}><Text>{t(progress === 'enabled' ? 'remote.done' : 'remote.localOnly')}</Text></Pressable>
+    {error && !setupUnavailable && progress !== 'enabled' && <Pressable accessibilityRole="button" disabled={busy} onPress={recover} style={styles.secondary}><Text style={styles.secondaryText}>{t('remote.recover')}</Text></Pressable>}
+    <Pressable accessibilityRole="button" onPress={async () => { if (progress === 'enabled' || await localOnly()) router.replace('/(tabs)'); }} style={styles.secondary}><Text style={styles.secondaryText}>{t(progress === 'enabled' ? 'remote.done' : 'remote.localOnly')}</Text></Pressable>
 
   </View>;
 }
-const styles = StyleSheet.create({
-  page: { flex: 1, padding: 28, paddingTop: 80, gap: 24, backgroundColor: '#FAFAFA' },
-  title: { fontSize: 28, fontWeight: '600' }, body: { fontSize: 16, lineHeight: 24, color: '#444444' },
-  error: { fontSize: 16, color: '#A02020' },
-  warning: { fontSize: 16, color: '#8A5A00', lineHeight: 24 },
-  primary: { padding: 18, borderRadius: 12, backgroundColor: '#6030A0', alignItems: 'center' },
-  primaryText: { color: '#FFFFFF', fontSize: 16 }, secondary: { padding: 18, alignItems: 'center' },
-});
+/*
+ * Themed. This screen was written with its palette spelled out in hex --
+ * a near-white page, grey body text, a purple button -- so it stayed light
+ * while the rest of the app went dark, and its heading and both secondary
+ * labels, which carried no colour at all, fell back to black on black.
+ *
+ * The two tone colours are taken from the ink theme at render rather than from
+ * here, because `error` and `warning` need a dark-mode variant and ThemeColors
+ * carries no tone tokens.
+ */
+const makeStyles = (c: ThemeColors) =>
+  StyleSheet.create({
+    page: { flex: 1, padding: 28, gap: 24, backgroundColor: c.background },
+    title: { fontSize: 28, fontWeight: '600', color: c.text },
+    body: { fontSize: 16, lineHeight: 24, color: c.textSecondary },
+    tone: { fontSize: 16, lineHeight: 24 },
+    primary: { padding: 18, borderRadius: 12, backgroundColor: c.tint, alignItems: 'center' },
+    primaryText: { color: c.textOnBrand, fontSize: 16 },
+    secondary: { padding: 18, alignItems: 'center' },
+    secondaryText: { color: c.textBrand, fontSize: 16 },
+  });

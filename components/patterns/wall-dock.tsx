@@ -104,7 +104,10 @@ export function WallDock({
     const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
     const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
     const show = Keyboard.addListener(showEvent, (e) => {
-      const rise = e.endCoordinates.height + theme.space[2] - (bottomInset + DOCK_GAP);
+      // space[4], not space[2]: the same clearance ChatDock keeps, and for the
+      // same reason — a keyboard's own toolbar row sits inside the height it
+      // reports, so half a step leaves the dock touching it.
+      const rise = e.endCoordinates.height + theme.space[4] - (bottomInset + DOCK_GAP);
       move(-Math.max(0, rise), e.duration);
     });
     const hide = Keyboard.addListener(hideEvent, (e) => move(0, e.duration));

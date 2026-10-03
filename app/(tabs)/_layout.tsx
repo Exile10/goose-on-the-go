@@ -19,7 +19,9 @@
 
 import React, { useCallback, useMemo, useState } from 'react';
 import { Redirect, Tabs } from 'expo-router';
+import { BlurView } from 'expo-blur';
 import { useTranslation } from 'react-i18next';
+import { alpha } from '@jarida/ink';
 import {
   InkBottomBar,
   InkProvider,
@@ -41,6 +43,30 @@ import { useOnboarding } from '@/view-models/use-onboarding';
 import { selectionTick } from '@/services/haptics';
 import type { IconName } from '@/constants/icons';
 import type { TranslationKey } from '@/services/i18n';
+
+/**
+ * How much of the bar's `surface` tint sits over the blur.
+ *
+ * Ink derives ~0.50 light and ~0.64 dark: the least that keeps the labels at
+ * 4.5:1 over any backdrop with no blur at all. The bar is clearer than that by
+ * choice, and leans on the blur (Ink's, at 60) for legibility. Raise this if
+ * labels struggle over busy content.
+ */
+const TINT_ALPHA = 0.3;
+
+/**
+ * expo-blur's `BlurView` for Ink's `blurComponent` slot, with a lighter tint.
+ *
+ * A function rather than `BlurView` itself: a class component's props must
+ * match the slot's exactly, and `BlurView` accepts more tints than the two Ink
+ * passes.
+ */
+function TabBarBlur({ style, ...props }: React.ComponentProps<typeof BlurView>) {
+  const theme = useInkTheme();
+  return (
+    <BlurView {...props} style={[style, { backgroundColor: alpha(theme.color.surface, TINT_ALPHA) }]} />
+  );
+}
 
 const DESTINATIONS: { name: string; labelKey: TranslationKey; icon: IconName }[] = [
   { name: 'index', labelKey: 'tabs.home', icon: 'home' },
@@ -152,6 +178,10 @@ function AppTabBar({ state, navigation }: TabBarProps) {
           // first screenful — so `auto` spends the whole scroll drawing labels
           // straight onto cards.
           material="always"
+          // Real blur behind Ink's tint, in both schemes. Ink drops it for its
+          // solid fill when Reduce Transparency is on, so that needs no second
+          // path here.
+          blurComponent={TabBarBlur}
           bottomInset={insets.bottom}
           style={{
             // Two placements, one prop. Ink's shell is `alignSelf: flex-end`
@@ -161,17 +191,13 @@ function AppTabBar({ state, navigation }: TabBarProps) {
             // Ink's animated one, and `flex-end` is what makes the bar contract
             // towards the right rather than the left.
             alignSelf: height > 0 ? 'flex-end' : 'stretch',
-            // Glass cannot work on this ground: the derived tint is 0.638 of
-            // #1E1B26 and the cards it passes over are also #1E1B26, so it
-            // separates nothing, and the 36% it lets through is enough to read
-            // a card's white label straight across the bar. Ink names the
-            // answer — `chrome`, opaque, not the `surface` content is made of.
-            // Opaque is also what Reduce Transparency asks for, so the bar
-            // needs no second path for it.
-            backgroundColor: theme.color.chrome,
-            // The lift is a shadow, and a shadow on a dark ground is nothing.
-            // An edge is what says this is a plane. The web glass draws the
-            // same hairline; the native binding does not.
+            // The tint is `surface`, the colour the cards are made of, so on its
+            // own it cannot tell the bar from a card passing under it, in dark
+            // or in light. In light the lift does that; on a dark ground a
+            // shadow is nothing. An edge is what says this is a plane, in both
+            // schemes, and the blur keeps a card's label from reading straight
+            // across it. The web glass draws the same hairline; the native
+            // binding does not.
             borderWidth: theme.edge.hairlineWidth,
             borderColor: theme.color.lineStrong,
           }}

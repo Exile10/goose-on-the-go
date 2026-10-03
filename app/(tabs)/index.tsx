@@ -150,7 +150,7 @@ function NowPlayingCard({ playing }: { playing: NowPlaying }) {
   const { t } = useTranslation();
 
   return (
-    <InkCard style={styles.rightNowCard}>
+    <InkCard style={styles.rightNowCard} contentStyle={styles.rightNowFace}>
       <Text style={styles.cardEyebrow}>{t('home.nowPlaying')}</Text>
       {playing.state === 'playing' ? (
         <>
@@ -183,7 +183,7 @@ function NextRoutineCard({ routine, now }: { routine: NextRoutine; now: Date }) 
   const until = untilOf(routine.nextRun, now);
 
   return (
-    <InkCard style={styles.rightNowCard}>
+    <InkCard style={styles.rightNowCard} contentStyle={styles.rightNowFace}>
       <Text style={styles.cardEyebrow}>{t('home.nextRoutine')}</Text>
       <Text style={styles.cardTitle} numberOfLines={2}>
         {routine.label}
@@ -358,9 +358,12 @@ export default function HomeScreen() {
           </>
         ) : null}
 
-        <InkTitle level={3} style={styles.section}>
-          {t('home.conversations')}
-        </InkTitle>
+        <View style={styles.sectionHeader}>
+          <InkTitle level={3}>{t('home.conversations')}</InkTitle>
+          <GPressable onPress={() => router.push('/(tabs)/chat')}>
+            <Text style={styles.seeAllText}>{t('common.seeAll')}</Text>
+          </GPressable>
+        </View>
         {recent.data.sessions.map((c) => (
           <GPressable
             key={c.id}
@@ -507,7 +510,7 @@ const makeStyles = (c: ThemeColors) =>
     fontFamily: FontFamily.body,
     fontSize: FontSize.sm,
     fontWeight: FontWeight.semibold,
-    color: JaridaPurple[600],
+    color: c.textBrand,
   },
 
   /* Right now. InkCard draws its own face and plate; its style is layout only. */
@@ -517,6 +520,11 @@ const makeStyles = (c: ThemeColors) =>
     marginBottom: Spacing.lg,
   },
   rightNowCard: { flex: 1 },
+  // The row stretches both cards to the taller one, but InkCard's raised plate
+  // fills that height while its face only wraps its content — so the card with
+  // less to say showed a slab of bare ink below it. The face takes the height
+  // too, and the pair reads as one row again.
+  rightNowFace: { flex: 1 },
   cardEyebrow: {
     fontFamily: FontFamily.body,
     fontSize: FontSize.xs,
@@ -535,8 +543,8 @@ const makeStyles = (c: ThemeColors) =>
     color: c.textSecondary,
     marginTop: 2,
   },
-  waveformRow: { marginTop: Spacing.md },
-  routineBadge: { alignSelf: 'flex-start', marginTop: Spacing.md },
+  waveformRow: { marginTop: 'auto', paddingTop: Spacing.md },
+  routineBadge: { alignSelf: 'flex-start', marginTop: 'auto', paddingTop: Spacing.md },
 
   convoRow: {
     flexDirection: 'row',
@@ -559,9 +567,14 @@ const makeStyles = (c: ThemeColors) =>
   devicesGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: Spacing.md,
+    // `space-between` rather than a column gap, so the pair spans the full
+    // content width and its right edge lands where the Right now row's does.
+    // At 47% plus a gap the grid stopped ~25px short of every other card on
+    // the screen, which is the ragged edge under "Devices".
+    justifyContent: 'space-between',
+    rowGap: Spacing.md,
   },
-  deviceCard: { width: '47%' },
+  deviceCard: { width: '48%' },
   deviceIconWrap: {
     width: 34,
     height: 34,

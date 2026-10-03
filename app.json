@@ -7,7 +7,6 @@
     "icon": "./assets/GooseOnTheGoAppIcons/GooseInAPond-iOS-Default-1024@1x.png",
     "scheme": "gooseonthego",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "io.jarida.gooseonthego",
@@ -86,6 +85,12 @@
         {
           "ios": {
             "enableSceneSupport": true
+          },
+          "android": {
+            "buildArchs": [
+              "armeabi-v7a",
+              "arm64-v8a"
+            ]
           }
         }
       ],
@@ -101,10 +106,11 @@
         {
           "photosPermission": "Goose On The Go opens your photos so you can choose pictures to send to Goose.",
           "cameraPermission": "Goose On The Go uses your camera to scan QR codes, such as your Pond's pairing code and the setup code on a device you are adding, and to take photos you choose to send to Goose.",
-          "microphonePermission": false
+          "microphonePermission": "Goose On The Go uses the microphone when you talk to Goose. What you say goes to your own Pond, nowhere else."
         }
       ],
-      "./plugins/with-pond-tls"
+      "./plugins/with-pond-tls",
+      "expo-asset"
     ],
     "experiments": {
       "typedRoutes": true,
