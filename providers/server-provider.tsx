@@ -229,6 +229,10 @@ export function ServerProvider({ children }: PropsWithChildren) {
       const key = `${state.type}:${state.isConnected}:${address}`;
       if (key === networkKey) return;
       networkKey = key;
+      // Android reports no network for a moment between Wi-Fi and cellular. Probing then can
+      // only fail, and announced "disconnected" for a second on every switch; the network that
+      // follows raises its own event. A network that stays gone is reported by the next request.
+      if (state.isConnected === false) return;
       environment.current.cellular = state.type === 'cellular';
       if (!staged.current) manager.environment(environment.current.cellular, environment.current.active);
     });

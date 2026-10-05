@@ -27,6 +27,14 @@ export interface ConnectionDependencies {
  */
 const LOCAL_HEAD_START_MS = 250;
 
+/**
+ * The pause before a route that was working is checked once more, rather than its first failure
+ * being announced. On cellular the tailnet path drops for about a second now and then -- seen on
+ * the A57 on 2026-10-05 as a request failing instantly and the retry a second later succeeding --
+ * and each of those showed "Pond unavailable" and failed a refresh for nothing.
+ */
+const SECOND_CHANCE_MS = 1_000;
+
 type Route = { state: 'local' | 'remote'; url: string; discovered?: boolean };
 
 export class ConnectionManager {
@@ -118,6 +126,7 @@ export class ConnectionManager {
     let trustRejected = false;
     const generation = this.generation;
     const profile = this.profile;
+    const wasWorking = this.snapshot.state === 'local' || this.snapshot.state === 'remote';
     if (!quiet) this.publish('reconnecting');
     const current = () => generation === this.generation && this.active;
     const probe = async (url: string) => {
@@ -176,24 +185,32 @@ export class ConnectionManager {
       else if (remote !== null) headStart = setTimeout(() => { headStart = null; if (!settled && current()) startRemote(); }, LOCAL_HEAD_START_MS);
     });
     const work = async () => {
-      try {
-        const route = await race();
-        if (!current()) return null;
-        if (route?.state === 'local') {
-          if (route.discovered) this.profile = { ...profile, localUrls: [...new Set([route.url, ...profile.localUrls])].slice(0, 8) };
-          this.clearTimer(); this.attempts = 0; this.localRechecks = 0; this.publish('local', route.url); return route.url;
+      // A route that was working gets a second pass, inside this same recovery, so the read that
+      // asked for it is retried against the route it finds instead of failing.
+      for (let pass = 0; pass < (wasWorking ? 2 : 1); pass++) {
+        if (pass > 0) {
+          await new Promise((resolve) => setTimeout(resolve, SECOND_CHANCE_MS));
+          if (!current()) return null;
         }
-        if (route?.state === 'remote') {
-          this.attempts = 0; this.publish('remote', route.url);
-          // While on Wi-Fi, periodically reconsider LAN after a temporary local outage.
-          // Stop after six unsuccessful passes; network/resume events reset this budget.
-          if (!this.cellular && this.localRechecks++ < 6) {
-            this.timer = setTimeout(() => { this.timer = null; if (current()) void this.recover(true); }, 30_000);
+        try {
+          const route = await race();
+          if (!current()) return null;
+          if (route?.state === 'local') {
+            if (route.discovered) this.profile = { ...profile, localUrls: [...new Set([route.url, ...profile.localUrls])].slice(0, 8) };
+            this.clearTimer(); this.attempts = 0; this.localRechecks = 0; this.publish('local', route.url); return route.url;
           }
-          return route.url;
+          if (route?.state === 'remote') {
+            this.attempts = 0; this.publish('remote', route.url);
+            // While on Wi-Fi, periodically reconsider LAN after a temporary local outage.
+            // Stop after six unsuccessful passes; network/resume events reset this budget.
+            if (!this.cellular && this.localRechecks++ < 6) {
+              this.timer = setTimeout(() => { this.timer = null; if (current()) void this.recover(true); }, 30_000);
+            }
+            return route.url;
+          }
+        } catch {
+          // Native TLS validation and discovery failures cannot change the saved pin.
         }
-      } catch {
-        // Native TLS validation and discovery failures cannot change the saved pin.
       }
       if (current()) {
         this.retryAfter = Date.now() + Math.min(30_000, 1000 * 2 ** Math.min(this.attempts++, 5)) * (0.75 + Math.random() * 0.5);

@@ -220,3 +220,29 @@ it('tries remote alongside discovery instead of waiting for it', async () => {
   expect(deps.discover).toHaveBeenCalled();
   manager.environment(false, false);
 });
+
+it('rides out a working route that drops for a moment, without announcing it', async () => {
+  jest.useFakeTimers();
+  const { deps, manager } = fixture();
+  await manager.configure(profile, pin); await manager.recover();
+  expect(manager.current.state).toBe('local');
+  deps.changed.mockClear();
+  // The first pass finds nothing; the route is back by the second.
+  deps.probe.mockResolvedValueOnce(false).mockResolvedValueOnce(false);
+  const recovery = manager.recover(true);
+  await jest.advanceTimersByTimeAsync(1_000);
+  expect(await recovery).toBe(profile.localUrls[0]);
+  const states = deps.changed.mock.calls.map(([snapshot]: [{ state: string }]) => snapshot.state);
+  expect(states).toEqual(['local']);
+  manager.environment(false, false);
+});
+
+it('gives a route that was never working no second pass', async () => {
+  jest.useFakeTimers();
+  const { deps, manager } = fixture();
+  deps.probe.mockResolvedValue(false);
+  await manager.configure(profile, pin);
+  await manager.recover();
+  expect(manager.current.state).toBe('disconnected');
+  manager.environment(false, false);
+});

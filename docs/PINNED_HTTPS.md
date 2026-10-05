@@ -71,6 +71,14 @@ refuses the phone. The banner waits 1.5 s before reporting `reconnecting`, and
 says nothing until the saved pairing has loaded, because it pushes every screen
 down.
 
+A route that was working and then fails gets one more pass a second later, inside
+the same recovery, before the failure is announced; the read that asked for it is
+retried against whatever that pass finds. On cellular the tailnet path drops for
+about a second now and then, and each drop used to show `disconnected` and fail a
+refresh. A network event that reports no connection at all is ignored: Android
+sends one between Wi-Fi and cellular, probing then could only fail, and the
+network that follows raises its own event.
+
 Failures use coalesced, bounded recovery with stale-generation rejection and no
 background probes. NetInfo uses native reachability, never an external internet
 check or SSID collection. While connected remotely on Wi-Fi, six bounded LAN
