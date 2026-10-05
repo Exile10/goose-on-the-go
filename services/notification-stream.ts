@@ -38,7 +38,7 @@ interface StreamOptions {
   /** Called when the stream drops and a reconnect is scheduled. */
   onDisconnect?: () => void;
   /**
-   * Called when the server rejected the token itself (401/403). The stream has
+   * Called when the server rejected the token itself (401). The stream has
    * stopped and will not retry: only a fresh token can recover it.
    */
   onAuthFailure?: () => void;
@@ -149,13 +149,23 @@ export class NotificationStream {
     xhr.onerror = scheduleReconnect;
     xhr.onload = () => {
       // The token is captured once at construction and never refreshed here, so
-      // a 401/403 means every reconnect would replay the same dead credential
+      // a 401 means every reconnect would replay the same dead credential
       // forever behind capped backoff, with nothing surfacing that notifications
       // had stopped. Stop, and tell the caller — it owns the token.
-      if (xhr.status === 401 || xhr.status === 403) {
+      if (xhr.status === 401) {
         this.stop();
         this.opts.onAuthFailure?.();
         return;
+      }
+      // A 403 is not about the token: the Pond answers 401 for a token it does not
+      // accept, and 403 for a request it understood and will not serve yet, such as
+      // before onboarding completes. Treated as a dead token, it sent the owner to
+      // refresh -- which succeeded, since the token was fine -- and then to reconnect
+      // loudly, which restarted this stream into the same 403: about ten rounds a
+      // second, each spending a refresh token, on a Pond that was not yet onboarded
+      // (2026-10-05). Retried with the usual backoff instead, which reaches 30 s.
+      if (xhr.status === 403) {
+        console.warn('[notifications] the Pond refused the stream (403); retrying with backoff:', xhr.responseText.slice(0, 200));
       }
       scheduleReconnect(); // server closed the stream → reconnect
     };
