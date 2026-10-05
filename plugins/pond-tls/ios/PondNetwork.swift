@@ -67,8 +67,9 @@ final class PondNetwork {
   static func status() throws -> String { lock.lock(); defer { lock.unlock() }; return try checked { MobileStatus($0) } }
   static func activate(_ profile: String, _ control: String) throws {
     lock.lock(); defer { lock.unlock() }
+    let previous = activeProfile?.first ?? runningProfile?.first
     activeProfile = control.isEmpty ? nil : [profile, control]
-    guard let active = activeProfile else { stop(); return }
+    guard let active = activeProfile else { stop(); forgetNetworkMap(previous); return }
     if runningProfile != active || port == nil {
       do { _ = try stage(active[0], active[1]) } catch { stop(); throw error }
     }
@@ -78,7 +79,21 @@ final class PondNetwork {
     guard let active = activeProfile else { stop(); return }
     if runningProfile != active { _ = try stage(active[0], active[1]) }
   }
-  static func disable() { lock.lock(); defer { lock.unlock() }; activeProfile = nil; stop() }
+  static func disable() {
+    lock.lock(); defer { lock.unlock() }
+    let previous = activeProfile?.first ?? runningProfile?.first
+    activeProfile = nil; stop(); forgetNetworkMap(previous)
+  }
+  /// Remote access is off for this profile, by choice or because the Pond forgot the phone, so
+  /// the network map the node cached -- its peers, their addresses, the access rules -- has no
+  /// reason to stay on the phone. Leaving local-only and a forgotten pairing both arrive here
+  /// through activate with no coordinator.
+  private static func forgetNetworkMap(_ profile: String?) {
+    guard let profile, let base = try? FileManager.default.url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: false) else { return }
+    let directory = base.appendingPathComponent("pond-network", isDirectory: true).appendingPathComponent(profile, isDirectory: true)
+    do { _ = try checked { MobileDisable(directory.path, $0) } }
+    catch { NSLog("PondNetwork: remote access is off but its cached network map was not erased: %@", String(describing: error)) }
+  }
   private static func stop() { port = nil; password = nil; runningProfile = nil; MobileStop() }
 
   static func apply(_ config: URLSessionConfiguration, url: URL) throws {

@@ -201,6 +201,14 @@ per-profile node restoration and an authenticated local CONNECT transport. Local
 profiles do not start the node or probe tailnet addresses. Enrollment administration
 credentials remain on the Goose service; the phone never receives them.
 
+When remote access goes off for a profile -- "keep local only", or a pairing the Pond
+forgot -- the native layer erases the network map the node cached for it (2026-10-05).
+The coordinator lets phones cache their map so a cold start can reach the Pond before
+the control login finishes; the map lists the household's peers, their addresses and the
+access rules, and holds no private keys. Both paths reach `PondNetwork.activate` with no
+coordinator, which stops the node and calls `Mobile.disable` on the profile's directory;
+a map that cannot be erased is logged. See the Pond's `docs/remote-access.md`.
+
 Measured on this branch: 151 app tests and typecheck pass; lint has zero errors and
 19 existing warnings. The ARM64 iOS simulator Debug and unsigned iOS device Release
 builds pass. The connected Galaxy A57 and existing iPhone simulator both pass the
