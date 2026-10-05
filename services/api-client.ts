@@ -1,7 +1,7 @@
 import { File } from 'expo-file-system';
 
 import { assertPondTrust, PondTrustError, pondTrustFailed } from './pond-trust';
-import { isLocalPairingUrl, normalizeHttpsUrl } from '@/models/connection';
+import { isInsecureDevOrigin, isLocalPairingUrl, normalizePondUrl } from '@/models/connection';
 /**
  * PondApiClient — HTTP client for goose-in-a-pond.
  *
@@ -244,11 +244,11 @@ export class PondApiClient {
   invalidateIdentity() { this.identityEpoch++; this.token = null; this.refreshToken = null; }
 
   constructor(baseUrl = 'https://127.0.0.1:4443') {
-    this.baseUrl = normalizeHttpsUrl(baseUrl);
+    this.baseUrl = normalizePondUrl(baseUrl);
   }
 
   setBaseUrl(url: string) {
-    this.baseUrl = normalizeHttpsUrl(url);
+    this.baseUrl = normalizePondUrl(url);
   }
 
   setToken(token: string | null) {
@@ -271,10 +271,13 @@ export class PondApiClient {
    */
   private async send(url: string, init: RequestInit, timeoutMs: number | null = REQUEST_TIMEOUT_MS): Promise<Response> {
     const epoch = this.identityEpoch;
-    await assertPondTrust(new URL(url).origin);
+    const origin = new URL(url).origin;
+    await assertPondTrust(origin);
     if (epoch !== this.identityEpoch) throw new Error('Pond profile changed');
     const headers = new Headers(init.headers);
-    headers.set('X-Pond-Transport', '1');
+    // The marker asks PondTls to pin this request, and PondTls refuses it over plain HTTP.
+    // A plaintext development origin has no pin, so it goes out as an ordinary fetch.
+    if (!isInsecureDevOrigin(origin)) headers.set('X-Pond-Transport', '1');
     const response = await fetch(url, { ...init, headers, redirect: 'error',
       signal: init.signal ?? (timeoutMs === null ? undefined : timeoutSignal(timeoutMs)) });
     if (epoch !== this.identityEpoch) throw new Error('Pond profile changed');
@@ -375,17 +378,24 @@ export class PondApiClient {
     channelBinding?: string;
   }): Promise<HandshakeResponse> {
     const epoch = this.identityEpoch;
+    // Plaintext (insecure development mode only) has no TLS key for the binding to name,
+    // so the pair is unbound and there is no server proof to check. Everywhere else the
+    // caller's binding is used as given.
+    const channelBinding = isInsecureDevOrigin(this.baseUrl) ? undefined : input.channelBinding;
+    if (input.channelBinding && !channelBinding) {
+      console.warn('[pairing] unbound pairing over a plaintext development connection');
+    }
     const init = await this.handshakeInit({ clientId: input.clientId });
     const challenge = fromBase64(init.challenge);
     const key = utf8(input.pairingCode);
     const mac = toHex(
-      hmacSha256(key, pairTranscript(CLIENT_LABEL, challenge, input.clientId, input.channelBinding)),
+      hmacSha256(key, pairTranscript(CLIENT_LABEL, challenge, input.clientId, channelBinding)),
     );
     const resp = await this.handshakeVerify({
       challengeId: init.challenge_id,
       mac,
       deviceName: input.deviceName,
-      channelBinding: input.channelBinding,
+      channelBinding,
     });
     if (epoch !== this.identityEpoch) throw new Error('Pond profile changed');
     // The Pond's half. Without it, something that terminated this connection
@@ -393,9 +403,9 @@ export class PondApiClient {
     // own, and this phone would be paired with the interceptor. Only something
     // holding the pairing code can produce the proof, so checking it is what
     // makes a pin that arrived over an untrusted route safe to use.
-    if (input.channelBinding && resp.accepted) {
+    if (channelBinding && resp.accepted) {
       const expected = toHex(
-        hmacSha256(key, pairTranscript(SERVER_LABEL, challenge, input.clientId, input.channelBinding)),
+        hmacSha256(key, pairTranscript(SERVER_LABEL, challenge, input.clientId, channelBinding)),
       );
       if (!equalHex(resp.server_proof ?? '', expected)) {
         this.token = null;
@@ -552,7 +562,7 @@ export class PondApiClient {
   async requestLocal<T>(endpoint: string, path: string, init: RequestInit = {}): Promise<T> {
     if (!isLocalPairingUrl(endpoint)) throw new Error('Local Pond endpoint required');
     if (!path.startsWith('/api/') || path.startsWith('//')) throw new Error('Invalid Pond API path');
-    const response = await this.send(`${normalizeHttpsUrl(endpoint)}${path}`, {
+    const response = await this.send(`${normalizePondUrl(endpoint)}${path}`, {
       ...init,
       headers: { ...this.headers(), ...(init.headers ?? {}) },
       signal: init.signal ?? timeoutSignal(REQUEST_TIMEOUT_MS),

@@ -544,4 +544,6 @@ export interface UpcomingSchedule {
 export interface SystemInfo {
   hostname: string;
   version?: string;
+  /** The Pond's public-key pin, `sha256/<base64>`; null when it has no TLS identity. */
+  tls_spki_sha256?: string | null;
 }

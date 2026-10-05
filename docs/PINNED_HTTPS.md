@@ -6,6 +6,11 @@ This milestone targets native Android and iOS builds. Expo Go and browsers do no
 provide the required native trust module. Existing HTTP-only profiles require a
 fresh QR scan on the Pond's LAN. There is no insecure pin discovery fallback.
 
+For development without a release build, see [development.md](development.md):
+a development build keeps every Pond connection pinned, and Expo Go can use an
+explicitly insecure, development-only plaintext mode (2026-10-05) that release
+bundles cannot enable.
+
 Both fork and upstream remotes were fetched on 2026-09-19. The branch was
 rebased onto upstream main `aee8e4d`, which contains W1 and the earlier integration
 work; the remaining keyboard adjustment is `e7f374d`. Pond was rebased onto

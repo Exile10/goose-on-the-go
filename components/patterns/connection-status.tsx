@@ -8,6 +8,8 @@ import { useThemedStyles } from '@/hooks/use-themed-styles';
 import type { ThemeColors } from '@/constants/colors';
 import '@/services/i18n';
 import type { ConnectionState } from '@/models/connection';
+// The insecure development banner above this one takes the top inset when it is shown.
+import { insecureDevMode } from '@/services/dev-mode';
 
 /** Persistent feedback with local pairing or recovery as the relevant action. */
 /**
@@ -64,7 +66,7 @@ export function ConnectionStatus() {
     else void recover();
   };
   if (!NEEDS_ATTENTION.includes(connectionState)) return null;
-  return <Pressable accessibilityRole="button" onPress={act} style={[styles.container, { paddingTop: insets.top + 6 }]}>
+  return <Pressable accessibilityRole="button" onPress={act} style={[styles.container, { paddingTop: (insecureDevMode ? 0 : insets.top) + 6 }]}>
     <Text accessibilityLiveRegion="polite" style={styles.text}>{stateLabel(t, connectionState)}</Text>
   </Pressable>;
 }

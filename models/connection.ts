@@ -1,3 +1,5 @@
+import { insecureDevMode } from '@/services/dev-mode';
+
 /** Non-secret endpoint metadata. The public-key pin is held in SecureStore. */
 export interface ConnectionProfile {
   version: 2;
@@ -36,13 +38,46 @@ export function pinPreview(pin: string): string {
   return `sha256/${body.match(/.{1,4}/g)?.join(' ') ?? ''}`;
 }
 
-export function normalizeHttpsUrl(raw: string): string {
+/** An origin with no credentials, path, query or fragment, under `protocol`. */
+function bareOrigin(raw: string, protocol: 'https:' | 'http:'): URL | null {
   const url = new URL(raw);
-  if (url.protocol !== 'https:' || !url.hostname || url.username || url.password ||
-      (url.pathname !== '/' && url.pathname !== '') || url.search || url.hash) {
-    throw new Error('Invalid HTTPS Pond origin');
-  }
+  if (url.protocol !== protocol || !url.hostname || url.username || url.password ||
+      (url.pathname !== '/' && url.pathname !== '') || url.search || url.hash) return null;
+  return url;
+}
+
+export function normalizeHttpsUrl(raw: string): string {
+  const url = bareOrigin(raw, 'https:');
+  if (!url) throw new Error('Invalid HTTPS Pond origin');
   return url.origin;
+}
+
+/**
+ * A plaintext `http://` Pond origin on a LAN address, for insecure development mode.
+ *
+ * The same address rules as {@link isLocalPairingUrl}: loopback, `.local`, a bare
+ * host name, or a private IPv4 address. It does not consult the flag itself; callers
+ * reach it only through {@link normalizePondUrl} and {@link isInsecureDevOrigin}.
+ */
+export function normalizeInsecureDevUrl(raw: string): string {
+  const url = bareOrigin(raw, 'http:');
+  if (!url || !isLanHost(url.hostname.toLowerCase())) throw new Error('Invalid plaintext development Pond origin');
+  return url.origin;
+}
+
+/**
+ * Normalise a Pond origin: HTTPS always, and also plaintext on a LAN address when
+ * `insecureDevMode` is on. Outside that mode it is exactly {@link normalizeHttpsUrl}.
+ */
+export function normalizePondUrl(raw: string): string {
+  if (insecureDevMode && new URL(raw).protocol === 'http:') return normalizeInsecureDevUrl(raw);
+  return normalizeHttpsUrl(raw);
+}
+
+/** Whether `url` is a plaintext LAN origin this build may use: only in `insecureDevMode`. */
+export function isInsecureDevOrigin(url: string): boolean {
+  if (!insecureDevMode) return false;
+  try { normalizeInsecureDevUrl(url); return true; } catch { return false; }
 }
 
 export function parseConnectionProfile(raw: unknown): ConnectionProfile | null {
@@ -55,7 +90,7 @@ export function parseConnectionProfile(raw: unknown): ConnectionProfile | null {
     if (remote && remote.mode !== 'local' && remote.mode !== 'embedded') return null;
     if (remote?.mode === 'embedded' && !p.remoteUrl) return null;
     return { version: 2, host: p.host, port: p.port,
-      localUrls: [...new Set(p.localUrls.map(normalizeHttpsUrl))],
+      localUrls: [...new Set(p.localUrls.map(normalizePondUrl))],
       ...(remote ? { remoteAccess: remote.mode === 'embedded'
         ? { mode: 'embedded' as const, controlUrl: normalizeHttpsUrl(remote.controlUrl) }
         : { mode: 'local' as const } } : {}),
@@ -67,8 +102,13 @@ export function parseConnectionProfile(raw: unknown): ConnectionProfile | null {
 /** The phone rejects known remote addresses; the server checks the actual source subnet. */
 export function isLocalPairingUrl(url: string): boolean {
   let host: string;
-  try { host = new URL(normalizeHttpsUrl(url)).hostname.toLowerCase(); }
+  try { host = new URL(normalizePondUrl(url)).hostname.toLowerCase(); }
   catch { return false; }
+  return isLanHost(host);
+}
+
+/** Loopback, `.local`, a bare host name, or a private IPv4 address. */
+function isLanHost(host: string): boolean {
   if (host === 'localhost' || host === '[::1]' || host.endsWith('.local')) return true;
   const parts = host.split('.').map(Number);
   if (parts.length === 4 && parts.every((n) => Number.isInteger(n) && n >= 0 && n <= 255)) {

@@ -881,5 +881,10 @@
     "tabHabit": "Habit",
     "tabPerson": "Person",
     "tabReminder": "Reminder"
+  },
+  "devMode": {
+    "insecureBanner": "Insecure development connection",
+    "insecureBannerDetail": "Pond traffic may be plaintext and unpinned. Anyone on this network can read it.",
+    "addressHint": "Development mode: a plain http:// address on this network is accepted and is not encrypted."
   }
 }
