@@ -306,6 +306,23 @@ with the rebuilt library. Normal iOS Debug simulator and unsigned Release device
 builds pass, as do Android Debug/Release builds and all 13 native TLS/proxy tests
 with zero skips. Both Android APKs contain all four required Go-library ABIs.
 
+### Superseded node identities are erased (2026-10-05)
+
+Each pairing's node runs in its own directory under `pond-network/`
+(`noBackupFilesDir` on Android, Application Support on iOS), named after the
+pairing's profile, and that directory holds the node's private machine and node
+keys. A new pairing used to leave the previous directory behind: the Galaxy A57
+held 33 of them on 2026-10-05, each with keys. `PondNetwork.activate` on both
+platforms now calls the Pond library's `Mobile.prune` with the active profile once
+its node has started, or with no coordinator once it has stopped. Every other
+directory is erased. A forgotten pairing activates with an empty profile and keeps
+none. A failed start prunes nothing, so it never costs the identity it was meant
+to use. The library refuses a directory whose node lock is held, reports the count
+and any failure in the event log, and the plugin logs the failure too. The
+behaviour and its tests are in goose-in-a-pond `native/pondnet/mobile/prune.go`;
+this app needs a `pondnet.aar` and `Pondnet.xcframework` built from a Pond that has
+it, or the call fails to link.
+
 
 ## Current embedded validation and platform fixes (2026-09-20)
 

@@ -68,10 +68,24 @@ final class PondNetwork {
   static func activate(_ profile: String, _ control: String) throws {
     lock.lock(); defer { lock.unlock() }
     activeProfile = control.isEmpty ? nil : [profile, control]
-    guard let active = activeProfile else { stop(); return }
+    guard let active = activeProfile else { stop(); pruneSupersededIdentities(profile); return }
     if runningProfile != active || port == nil {
       do { _ = try stage(active[0], active[1]) } catch { stop(); throw error }
     }
+    pruneSupersededIdentities(profile)
+  }
+  /// The app keeps one pairing at a time, so once `keep` is the active profile every other node
+  /// directory belongs to a pairing it replaced or forgot, and each still holds that node's
+  /// private key. A forgotten pairing passes an empty profile and keeps none. Called only after
+  /// the profile's node started, or was stopped for want of a coordinator, so a failed start never
+  /// costs the identity it was meant to use. The Go side refuses a directory whose node lock is
+  /// held, and reports what it erased and what it could not.
+  private static func pruneSupersededIdentities(_ keep: String) {
+    // No Application Support directory means no node was ever started, so nothing to erase.
+    guard let base = try? FileManager.default.url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: false) else { return }
+    let directory = base.appendingPathComponent("pond-network", isDirectory: true)
+    do { _ = try checked { MobilePrune(directory.path, keep, $0) } }
+    catch { NSLog("PondNetwork: superseded node identities were not all erased: %@", String(describing: error)) }
   }
   static func cancel() throws {
     lock.lock(); defer { lock.unlock() }
