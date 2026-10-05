@@ -1,7 +1,8 @@
 /**
  * Carries a scanned credential from the scanner screen back to the screen that
  * asked for it: a Pond pairing payload to the wizard, or a Matter setup code to
- * the commissioning screen.
+ * the commissioning screen. It also carries where the welcome screen left the
+ * wizard to begin (`PairingStart`).
  *
  * Expo Router has no return value for a pushed screen, and the obvious
  * alternative — route params — would put a live pairing code in the URL. On web
@@ -20,6 +21,13 @@
  * One slot per kind, and each `take` is typed. Sharing a slot would let a Matter
  * scan be read as a Pond payload by whichever screen happened to look first,
  * which is a mix-up the compiler can rule out instead.
+ *
+ * The start slot is not a credential, but it stays out of route params too: any
+ * `gooseonthego://` link can supply a param, which would let a web page open the
+ * wizard with an address and pin already filled. It is read differently: with
+ * `peekPairingStart`, then cleared with `clearPairingStart` after the wizard has
+ * mounted, because a state initialiser runs twice under React's strict mode and
+ * a `take` there would hand the second run nothing.
  */
 
 import type { PairingPayload } from '@/models/pairing';
