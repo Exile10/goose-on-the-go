@@ -2,7 +2,7 @@ jest.mock('../api-client', () => ({ api: { requestLocal: jest.fn() } }));
 import i18n from '../i18n';
 import { AppState, NativeModules } from 'react-native';
 import { api } from '../api-client';
-import { enableRemoteAccess, cancelRemoteAccess, restoreRemoteAccess, resumeRemoteAccess } from '../remote-access';
+import { enableRemoteAccess, cancelRemoteAccess, remoteNodeRunning, restoreRemoteAccess, resumeRemoteAccess } from '../remote-access';
 const local = 'https://192.168.1.2:4443';
 const control = 'https://coord.example';
 const pending = JSON.stringify({ state: 'NeedsLogin', machineKey: 'mkey:' + 'b'.repeat(64), authUrl: `${control}/register/pending-registration`, addresses: [] });
@@ -133,4 +133,28 @@ it('never replays an ambiguous replacement and preserves the saved profile', asy
   await expect(enableRemoteAccess('new-local-profile', local, jest.fn(), commit, { onReview: jest.fn() })).rejects.toThrow('replacement response lost');
   expect(commit).not.toHaveBeenCalled();
   expect(jest.mocked(api.requestLocal).mock.calls.filter(([, path, init]) => path.endsWith(id) && init?.method === 'POST')).toHaveLength(1);
+});
+
+it('waits for the node to start before a tailnet probe, and no longer than its budget', async () => {
+  const starting = JSON.stringify({ state: 'Starting', addresses: [] });
+  bridge.remoteStatus.mockResolvedValueOnce(starting).mockRejectedValueOnce(new Error('not yet')).mockResolvedValueOnce(running);
+  const ready = remoteNodeRunning(() => false);
+  await jest.advanceTimersByTimeAsync(500);
+  await expect(ready).resolves.toBe(true);
+  expect(bridge.remoteStatus).toHaveBeenCalledTimes(3);
+
+  bridge.remoteStatus.mockResolvedValue(starting);
+  const never = remoteNodeRunning(() => false);
+  await jest.advanceTimersByTimeAsync(10_250);
+  await expect(never).resolves.toBe(false);
+});
+
+it('stops waiting for the node once the answer is no longer wanted', async () => {
+  bridge.remoteStatus.mockResolvedValue(JSON.stringify({ state: 'Starting', addresses: [] }));
+  let abandoned = false;
+  const ready = remoteNodeRunning(() => abandoned);
+  await jest.advanceTimersByTimeAsync(250);
+  abandoned = true;
+  await jest.advanceTimersByTimeAsync(250);
+  await expect(ready).resolves.toBe(false);
 });

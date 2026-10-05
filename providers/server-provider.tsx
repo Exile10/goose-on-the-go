@@ -12,7 +12,7 @@ import { configurePondTrust, PondTrustError } from '@/services/pond-trust';
 import { findPondAt, findPondByHost } from '@/services/discovery';
 import { parseConnectionProfile, validPin, isLocalPairingUrl, type ConnectionProfile } from '@/models/connection';
 import i18n from '@/services/i18n';
-import { cancelRemoteAccess, restoreRemoteAccess, resumeRemoteAccess } from '@/services/remote-access';
+import { cancelRemoteAccess, remoteNodeRunning, restoreRemoteAccess, resumeRemoteAccess } from '@/services/remote-access';
 import { getInstallId } from '@/services/install-id';
 import { canBeat, HEARTBEAT_MS } from '@/services/heartbeat';
 
@@ -144,7 +144,7 @@ export function ServerProvider({ children }: PropsWithChildren) {
   const tokenWrite = useRef<Promise<void>>(Promise.resolve());
   const environment = useRef({ cellular: false, active: AppState.currentState === 'active' });
   const manager = useMemo(() => new ConnectionManager({
-    probe, trust, routes: rememberedRoutes,
+    probe, trust, routes: rememberedRoutes, remoteReady: remoteNodeRunning,
     discover: async (host, port) => (await findPondByHost(host, port))?.url ?? null,
     changed: (next) => {
       console.info('[connection]', next.state);

@@ -17,6 +17,11 @@ export interface ConnectionDependencies {
    * re-checked straight away.
    */
   routes?: Map<string, ConnectionSnapshot>;
+  /**
+   * Resolves once this phone's own tailnet node can carry a request, or false when it will not
+   * soon. Until then a probe of the tailnet address can only fail. Omitted, the probe decides.
+   */
+  remoteReady?: (abandoned: () => boolean) => Promise<boolean>;
 }
 
 /**
@@ -155,7 +160,12 @@ export class ConnectionManager {
       const startRemote = () => {
         if (remoteStarted || remote === null) return;
         remoteStarted = true;
-        void probe(remote).then((ok) => { remoteDone = true; if (ok) finish({ state: 'remote', url: remote }); else failIfExhausted(); });
+        void (async () => {
+          const ready = this.deps.remoteReady ? await this.deps.remoteReady(() => settled || !current()) : true;
+          const ok = ready && !settled && current() && await probe(remote);
+          remoteDone = true;
+          if (ok) finish({ state: 'remote', url: remote }); else failIfExhausted();
+        })();
       };
       const startDiscovery = () => {
         if (discoveryDone) return;

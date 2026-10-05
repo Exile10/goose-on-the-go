@@ -246,3 +246,35 @@ it('gives a route that was never working no second pass', async () => {
   expect(manager.current.state).toBe('disconnected');
   manager.environment(false, false);
 });
+
+/**
+ * A cold start on cellular, before this phone's tailnet node has come up: every probe of the
+ * tailnet address failed at once and the app said "Pond unavailable" for twelve seconds.
+ */
+it('waits for its own tailnet node instead of reporting the Pond unavailable', async () => {
+  const { deps } = fixture();
+  let ready!: (value: boolean) => void;
+  const manager = new ConnectionManager({ ...deps, remoteReady: () => new Promise<boolean>((resolve) => { ready = resolve; }) });
+  await manager.configure(profile, pin);
+  manager.environment(true, true);
+  const recovery = manager.recover();
+  await Promise.resolve();
+  expect(deps.probe).not.toHaveBeenCalled();
+  expect(manager.current.state).toBe('reconnecting');
+  ready(true);
+  expect(await recovery).toBe(profile.remoteUrl);
+  const states = deps.changed.mock.calls.map(([snapshot]: [{ state: string }]) => snapshot.state);
+  expect(states).not.toContain('disconnected');
+  manager.environment(false, false);
+});
+
+it('reports the Pond unavailable when its own node never comes up', async () => {
+  const { deps } = fixture();
+  const manager = new ConnectionManager({ ...deps, remoteReady: async () => false });
+  await manager.configure(profile, pin);
+  manager.environment(true, true);
+  expect(await manager.recover()).toBeNull();
+  expect(deps.probe).not.toHaveBeenCalled();
+  expect(manager.current.state).toBe('disconnected');
+  manager.environment(false, false);
+});

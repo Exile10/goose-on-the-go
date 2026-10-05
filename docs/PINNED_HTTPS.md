@@ -79,6 +79,13 @@ refresh. A network event that reports no connection at all is ignored: Android
 sends one between Wi-Fi and cellular, probing then could only fail, and the
 network that follows raises its own event.
 
+A probe of the tailnet address waits, for up to ten seconds, until this phone's own
+node reports `Running`. On a cold start the node takes seconds to come up and every
+earlier probe failed at once, which reported "Pond unavailable" for twelve seconds
+on the A57 and set off a backoff that delayed the connection further once the node
+was ready. The wait keeps the state `reconnecting` and probes the moment the node is
+up; a node that does not start within the budget is reported as unavailable.
+
 Failures use coalesced, bounded recovery with stale-generation rejection and no
 background probes. NetInfo uses native reachability, never an external internet
 check or SSID collection. While connected remotely on Wi-Fi, six bounded LAN
