@@ -52,12 +52,30 @@ the generated `ios/` directory are required.
 ## Recovery
 
 One connection manager handles endpoint selection for the provider, REST and SSE.
-Wi-Fi prefers local candidates and then tailnet; cellular uses tailnet. Foreground
-resume and network changes restart selection. Failures use coalesced, bounded
-recovery with stale-generation rejection and no background probes. NetInfo uses
-native reachability, never an external internet check or SSID collection.
-While connected remotely on Wi-Fi, six bounded LAN rechecks can return to a local
-endpoint after a temporary outage without requiring another network event.
+Wi-Fi prefers local candidates; cellular uses tailnet. On Wi-Fi every saved local
+address is probed at once, and the tailnet joins after a 250 ms head start, or as
+soon as every local address has failed; mDNS discovery runs alongside the tailnet
+rather than ahead of it. A local answer wins whenever it comes first. Until
+2026-10-05 the order was strictly sequential, so away from home a Wi-Fi network
+held remote access up for each saved address's three-second probe timeout, then
+for discovery.
+
+Foreground resume and network changes restart selection. When the phone already
+has a working route, it stays on screen while it is re-checked; only a failed
+check changes the state. A saved pairing starts as `reconnecting`, never
+`unpaired`, and the last working route outlives the provider: Android recreates
+the activity on a return to the app, and React builds a new manager with it, which
+used to show `unpaired`, then `reconnecting`, on every return. The remembered
+route is used only while the profile still names it, and forgotten when the Pond
+refuses the phone. The banner waits 1.5 s before reporting `reconnecting`, and
+says nothing until the saved pairing has loaded, because it pushes every screen
+down.
+
+Failures use coalesced, bounded recovery with stale-generation rejection and no
+background probes. NetInfo uses native reachability, never an external internet
+check or SSID collection. While connected remotely on Wi-Fi, six bounded LAN
+rechecks can return to a local endpoint after a temporary outage without requiring
+another network event.
 
 Reads retry once after successful recovery. Ambiguous writes and refresh-token
 rotations are not replayed. SSE reconnects using the newly selected endpoint and

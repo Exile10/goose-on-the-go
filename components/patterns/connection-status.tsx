@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
@@ -49,8 +50,15 @@ const NEEDS_ATTENTION: readonly ConnectionState[] = [
   'revoked',
 ];
 
+/**
+ * How long a reconnect may run before the banner says so. The banner pushes every screen down, so
+ * showing it for a reconnect that finishes in a few hundred milliseconds -- a network change, a
+ * return to the app -- made the whole layout jump for nothing anyone could act on.
+ */
+const RECONNECT_GRACE_MS = 1_500;
+
 export function ConnectionStatus() {
-  const { connectionState, recover } = useServer();
+  const { connectionState, recover, hydrated } = useServer();
   const styles = useThemedStyles(makeStyles);
   const { t } = useTranslation();
   const router = useRouter();
@@ -63,7 +71,16 @@ export function ConnectionStatus() {
     if (['unpaired', 'upgrade', 'revoked'].includes(connectionState)) router.push('/(stack)/pond-pairing');
     else void recover();
   };
-  if (!NEEDS_ATTENTION.includes(connectionState)) return null;
+  const [graceOver, setGraceOver] = useState(false);
+  useEffect(() => {
+    setGraceOver(false);
+    if (connectionState !== 'reconnecting') return;
+    const timer = setTimeout(() => setGraceOver(true), RECONNECT_GRACE_MS);
+    return () => clearTimeout(timer);
+  }, [connectionState]);
+  // Before the saved pairing has loaded, the state is a placeholder, not news.
+  if (!hydrated || !NEEDS_ATTENTION.includes(connectionState)) return null;
+  if (connectionState === 'reconnecting' && !graceOver) return null;
   return <Pressable accessibilityRole="button" onPress={act} style={[styles.container, { paddingTop: insets.top + 6 }]}>
     <Text accessibilityLiveRegion="polite" style={styles.text}>{stateLabel(t, connectionState)}</Text>
   </Pressable>;

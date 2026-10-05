@@ -122,6 +122,12 @@ const probe = async (url: string) => {
   if (result.trustFailure) throw new PondTrustError();
   return result.ok;
 };
+/**
+ * Last working route per Pond, for the life of the process. Module scope on purpose: Android
+ * recreates the activity on a return to the app, React remounts this provider and builds a new
+ * ConnectionManager, and this is what lets it carry on with the route it had.
+ */
+const rememberedRoutes = new Map<string, ConnectionSnapshot>();
 
 export function ServerProvider({ children }: PropsWithChildren) {
   const [screenModes, setScreenModes] = useState<ScreenModes>(DEFAULT_SCREEN_MODES);
@@ -138,7 +144,7 @@ export function ServerProvider({ children }: PropsWithChildren) {
   const tokenWrite = useRef<Promise<void>>(Promise.resolve());
   const environment = useRef({ cellular: false, active: AppState.currentState === 'active' });
   const manager = useMemo(() => new ConnectionManager({
-    probe, trust,
+    probe, trust, routes: rememberedRoutes,
     discover: async (host, port) => (await findPondByHost(host, port))?.url ?? null,
     changed: (next) => {
       console.info('[connection]', next.state);

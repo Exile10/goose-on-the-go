@@ -4,7 +4,7 @@ const profile: ConnectionProfile = { version: 2, host: 'pond.local', port: 4443,
   localUrls: ['https://192.168.1.2:4443'], remoteUrl: 'https://100.64.0.2:4443', remoteAccess: { mode: 'embedded', controlUrl: 'https://coord.example' } };
 const pin = `sha256/${'A'.repeat(43)}=`;
 const fixture = () => {
-  const deps = { probe: jest.fn(async () => true), discover: jest.fn(async () => null),
+  const deps = { probe: jest.fn(async (_url: string) => true), discover: jest.fn(async () => null),
     trust: jest.fn(async () => undefined), changed: jest.fn() };
   return { deps, manager: new ConnectionManager(deps) };
 };
@@ -111,5 +111,112 @@ it('pairing again clears the refusal', async () => {
   expect(await manager.recover()).toBe(profile.localUrls[0]);
   expect(manager.current.state).toBe('local');
   expect(deps.probe).toHaveBeenCalled();
+  manager.environment(false, false);
+});
+
+it('never calls a saved pairing unpaired, even before its first probe', async () => {
+  const { deps, manager } = fixture();
+  await manager.configure(profile, pin);
+  const states = deps.changed.mock.calls.map(([snapshot]: [{ state: string }]) => snapshot.state);
+  expect(states).toEqual(['reconnecting']);
+  await manager.configure(null);
+  expect(manager.current.state).toBe('unpaired');
+});
+
+/**
+ * Android recreates the activity on a return to the app, which remounts the provider and builds
+ * a new manager. On the A57 that showed up as "unpaired", "reconnecting", then "remote" on every
+ * return, each one moving the banner, for a route that had not changed.
+ */
+it('carries on with the route a previous manager found, and re-checks it quietly', async () => {
+  const routes = new Map();
+  const first = fixture();
+  const before = new ConnectionManager({ ...first.deps, routes });
+  await before.configure(profile, pin); await before.recover();
+  expect(before.current.state).toBe('local');
+
+  const { deps } = fixture();
+  const after = new ConnectionManager({ ...deps, routes });
+  await after.configure(profile, pin);
+  expect(after.current).toEqual({ state: 'local', url: profile.localUrls[0] });
+  after.environment(false, true); await after.recover();
+  const states = deps.changed.mock.calls.map(([snapshot]: [{ state: string }]) => snapshot.state);
+  expect(states).not.toContain('reconnecting');
+  expect(states).not.toContain('unpaired');
+  expect(deps.probe).toHaveBeenCalledWith(profile.localUrls[0]);
+  after.environment(false, false); before.environment(false, false);
+});
+
+it('ignores a remembered route the profile no longer names', async () => {
+  const routes = new Map();
+  const first = fixture();
+  const before = new ConnectionManager({ ...first.deps, routes });
+  before.environment(true, true);
+  await before.configure(profile, pin); await before.recover();
+  expect(before.current.state).toBe('remote');
+
+  const { deps } = fixture();
+  const after = new ConnectionManager({ ...deps, routes });
+  await after.configure({ ...profile, remoteAccess: { mode: 'local' } }, pin);
+  expect(after.current).toEqual({ state: 'reconnecting', url: null });
+  before.environment(false, false); after.environment(false, false);
+});
+
+it('forgets the remembered route once the Pond refuses this phone', async () => {
+  const routes = new Map();
+  const { deps } = fixture();
+  const manager = new ConnectionManager({ ...deps, routes });
+  await manager.configure(profile, pin); await manager.recover();
+  expect(routes.size).toBe(1);
+  manager.revoke();
+  expect(routes.size).toBe(0);
+});
+
+it('still says so when the quiet re-check of a working route fails', async () => {
+  const { deps, manager } = fixture();
+  await manager.configure(profile, pin); await manager.recover();
+  deps.probe.mockResolvedValue(false);
+  manager.environment(false, true); await manager.recover();
+  expect(manager.current.state).toBe('disconnected');
+  manager.environment(false, false);
+});
+
+/**
+ * Away from home on Wi-Fi the saved home address never answers, and each one held remote access
+ * up for its whole three-second timeout before the tailnet was tried.
+ */
+it('does not let a home address that never answers hold up remote access', async () => {
+  jest.useFakeTimers();
+  const { deps, manager } = fixture();
+  deps.probe.mockImplementation((url: string) => url === profile.remoteUrl ? Promise.resolve(true) : new Promise<boolean>(() => undefined));
+  await manager.configure(profile, pin);
+  const recovery = manager.recover();
+  await jest.advanceTimersByTimeAsync(250);
+  expect(await recovery).toBe(profile.remoteUrl);
+  expect(manager.current.state).toBe('remote');
+  manager.environment(false, false);
+});
+
+it('prefers the home address whenever it answers within its head start', async () => {
+  jest.useFakeTimers();
+  const { deps, manager } = fixture();
+  deps.probe.mockImplementation((url: string) => url === profile.remoteUrl
+    ? Promise.resolve(true)
+    : new Promise<boolean>((resolve) => setTimeout(() => resolve(true), 100)));
+  await manager.configure(profile, pin);
+  const recovery = manager.recover();
+  await jest.advanceTimersByTimeAsync(100);
+  expect(await recovery).toBe(profile.localUrls[0]);
+  expect(deps.probe).not.toHaveBeenCalledWith(profile.remoteUrl);
+  manager.environment(false, false);
+});
+
+it('tries remote alongside discovery instead of waiting for it', async () => {
+  const { deps, manager } = fixture();
+  deps.probe.mockImplementation(async (url: string) => url === profile.remoteUrl);
+  deps.discover.mockImplementation(() => new Promise(() => undefined));
+  await manager.configure(profile, pin);
+  expect(await manager.recover()).toBe(profile.remoteUrl);
+  expect(deps.discover).toHaveBeenCalled();
   manager.environment(false, false);
 });
