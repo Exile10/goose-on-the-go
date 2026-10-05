@@ -34,6 +34,28 @@ export function voiceSupported(): boolean {
   return audio !== null;
 }
 
+/** expo-audio's code for a call on a native object it has already released. */
+const RELEASED = 'ERR_USING_RELEASED_SHARED_OBJECT';
+
+/**
+ * Stop a microphone stream that may already be gone, without throwing.
+ *
+ * Closing voice mode unmounts the hook that owns the stream. expo-audio's own cleanup
+ * releases the stream before the voice hook's cleanup runs, so the stop there lands on a
+ * released object and expo-audio throws. Thrown out of an effect cleanup, that is fatal:
+ * on 2026-10-05 switching from voice mode to the keyboard closed the app on the A57. A
+ * released stream has nothing left to stop. Any other failure is reported, and still not
+ * thrown, because this runs during unmount, where a throw ends the app.
+ */
+export function stopStream(stop: () => void): void {
+  try {
+    stop();
+  } catch (error) {
+    if ((error as { code?: unknown } | null)?.code === RELEASED) return;
+    console.warn('[voice] the microphone did not stop:', error);
+  }
+}
+
 export interface MicBuffer {
   samples: Int16Array;
   sampleRate: number;
@@ -98,7 +120,7 @@ export const useMicStream: (onBuffer: (buffer: MicBuffer) => void) => {
 
       return useRef({
         start: () => streamRef.current.start(),
-        stop: () => streamRef.current.stop(),
+        stop: () => stopStream(() => streamRef.current.stop()),
       }).current;
     }
   : () => ({ start: async () => {}, stop: () => {} });
