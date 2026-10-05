@@ -84,7 +84,9 @@ node reports `Running`. On a cold start the node takes seconds to come up and ev
 earlier probe failed at once, which reported "Pond unavailable" for twelve seconds
 on the A57 and set off a backoff that delayed the connection further once the node
 was ready. The wait keeps the state `reconnecting` and probes the moment the node is
-up; a node that does not start within the budget is reported as unavailable.
+up; a node that does not start within the budget is reported as unavailable. Home's
+Pond card says it is looking for the Pond while a reconnect is in progress,
+rather than "Pond unreachable" beside a banner saying it is reconnecting.
 
 Failures use coalesced, bounded recovery with stale-generation rejection and no
 background probes. NetInfo uses native reachability, never an external internet
