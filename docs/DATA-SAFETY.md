@@ -49,6 +49,22 @@ plaintext bearer token to `@goose/token`. Removing the key from the code would n
 the value from a device that already had one, so `purgeLegacyStorage()`
 (`services/storage.ts:27-43`) deletes it on upgrade.
 
+### Embedded network node — app-private files
+
+Once remote access is turned on, the embedded node keeps a directory per pairing under
+`pond-network/` in the app's private storage: `noBackupFilesDir` on Android, and
+Application Support on iOS, where `PondNetwork.stage`
+(`plugins/pond-tls/ios/PondNetwork.swift`) marks the directory excluded from backup. It
+holds the node's private machine key and node key and, where the coordinator grants it,
+a cached network map: the household's peers, their tailnet addresses and the access
+rules. The map holds no private keys. None of these files leave the device; the
+coordinator learns only the public keys listed below.
+
+When remote access goes off, including when this phone signs out or the Pond forgets the
+pairing, `forgetNetworkMap` in `PondNetwork` (`plugins/pond-tls/PondNetwork.kt`,
+`plugins/pond-tls/ios/PondNetwork.swift`) erases the map through the Pond library's
+`Mobile.disable`. The node's keys are kept.
+
 ---
 
 ## What leaves the device, and to whom
