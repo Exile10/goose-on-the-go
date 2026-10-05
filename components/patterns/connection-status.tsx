@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactElement } from 'react';
 import { Pressable, StyleSheet, Text } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
@@ -57,6 +57,19 @@ const NEEDS_ATTENTION: readonly ConnectionState[] = [
  */
 const RECONNECT_GRACE_MS = 1_500;
 
+/**
+ * Shows `children` once the grace period has passed. It holds no reset of its own: the banner
+ * renders nothing between reconnects, so React mounts a fresh one, with a fresh timer, for each.
+ */
+function AfterGrace({ children }: { children: ReactElement }) {
+  const [shown, setShown] = useState(false);
+  useEffect(() => {
+    const timer = setTimeout(() => setShown(true), RECONNECT_GRACE_MS);
+    return () => clearTimeout(timer);
+  }, []);
+  return shown ? children : null;
+}
+
 export function ConnectionStatus() {
   const { connectionState, recover, hydrated } = useServer();
   const styles = useThemedStyles(makeStyles);
@@ -71,19 +84,12 @@ export function ConnectionStatus() {
     if (['unpaired', 'upgrade', 'revoked'].includes(connectionState)) router.push('/(stack)/pond-pairing');
     else void recover();
   };
-  const [graceOver, setGraceOver] = useState(false);
-  useEffect(() => {
-    setGraceOver(false);
-    if (connectionState !== 'reconnecting') return;
-    const timer = setTimeout(() => setGraceOver(true), RECONNECT_GRACE_MS);
-    return () => clearTimeout(timer);
-  }, [connectionState]);
   // Before the saved pairing has loaded, the state is a placeholder, not news.
   if (!hydrated || !NEEDS_ATTENTION.includes(connectionState)) return null;
-  if (connectionState === 'reconnecting' && !graceOver) return null;
-  return <Pressable accessibilityRole="button" onPress={act} style={[styles.container, { paddingTop: insets.top + 6 }]}>
+  const banner = <Pressable accessibilityRole="button" onPress={act} style={[styles.container, { paddingTop: insets.top + 6 }]}>
     <Text accessibilityLiveRegion="polite" style={styles.text}>{stateLabel(t, connectionState)}</Text>
   </Pressable>;
+  return connectionState === 'reconnecting' ? <AfterGrace>{banner}</AfterGrace> : banner;
 }
 /*
  * Themed, because this strip is drawn behind the notification bar.
