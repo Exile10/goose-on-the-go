@@ -51,3 +51,39 @@ export function takeSetupCode(): string | null {
   pendingSetupCode = null;
   return held;
 }
+
+/**
+ * Where the welcome screen left the wizard to begin: at a Pond it found on the
+ * network, or at the address form. Without it the wizard opened on its own search,
+ * so a household that had just picked its Pond was shown the same list again.
+ *
+ * Held here rather than in route params for the reason above, and one more: a
+ * route param can arrive from any `gooseonthego://` link, which would let a web
+ * page open the wizard with an address and a pin of its choosing already filled.
+ * The pin is only ever a claim the next step has the user check, but it should
+ * not be possible to plant one.
+ */
+export type PairingStart = { kind: 'pond'; url: string; pin?: string } | { kind: 'address' };
+
+let pendingStart: PairingStart | null = null;
+
+/** Hand the wizard where to begin, for the next time it opens. */
+export function offerPairingStart(start: PairingStart): void {
+  pendingStart = start;
+}
+
+/**
+ * Read where to begin without clearing it.
+ *
+ * A state initialiser can run twice under React's strict mode, and a take() there
+ * would hand the second call nothing. The wizard reads with this and clears with
+ * clearPairingStart once it has mounted.
+ */
+export function peekPairingStart(): PairingStart | null {
+  return pendingStart;
+}
+
+/** Forget where to begin, so a later visit to the wizard starts with its search. */
+export function clearPairingStart(): void {
+  pendingStart = null;
+}

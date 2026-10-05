@@ -104,10 +104,16 @@ and the orb in it is `VoiceOrb`.
 ## First run
 
 Welcome (`app/(onboarding)/welcome.tsx`) → Pond Pairing → Home. The welcome
-screen is the network scan itself: the Ponds it finds hand off to pairing with
-that address, and "set up later" goes to the tabs, where the gate below sends an
-unpaired phone to pairing instead. There is no restore path, because there is no
-backup to restore from.
+screen is the network scan itself. A Pond picked there opens the pairing wizard
+at that Pond's fingerprint check, as a Pond picked from the wizard's own search
+does, and "Enter an address" opens it at the address form; the wizard begins with its own search only when it is opened from anywhere
+else. The choice travels through `offerPairingStart` in
+`services/pairing-handoff.ts`, not route params, so a `gooseonthego://` link
+cannot open the wizard with an address and pin already filled.
+
+Until 2026-10-05 the welcome screen put the address in a route param the wizard
+never read, so either choice landed on the same search the welcome screen had
+just shown. There is no restore path, because there is no backup to restore from.
 
 ## Pairing gate (2026-09-21)
 

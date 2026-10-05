@@ -4,7 +4,9 @@
  * The hero is the network scan itself, not a carousel: what distinguishes this
  * app from a hosted assistant is that the thing it talks to is yours and is on
  * this network, and watching it appear says that better than a slide claiming
- * it. Pairing proper lives in the pond-pairing screen, which this hands off to.
+ * it. Pairing proper lives in the pond-pairing screen, which this hands off to:
+ * a Pond picked here opens the wizard at that Pond, and "Enter an address" opens
+ * it at the address form, so neither shows the search a second time.
  */
 
 import React, { useCallback } from 'react';
@@ -19,6 +21,7 @@ import { useThemedStyles } from '@/hooks/use-themed-styles';
 import { useTheme } from '@/providers/theme-provider';
 import { useDiscovery } from '@/view-models/use-discovery';
 import { selectionTick } from '@/services/haptics';
+import { offerPairingStart, type PairingStart } from '@/services/pairing-handoff';
 import type { DiscoveredPond } from '@/services/discovery';
 import type { ThemeColors } from '@/constants/colors';
 import { Spacing } from '@/constants/spacing';
@@ -31,14 +34,18 @@ export default function Welcome() {
   const discovery = useDiscovery();
 
   const openPairing = useCallback(
-    (url?: string) => {
+    (start: PairingStart) => {
       void selectionTick();
-      router.push({ pathname: '/(stack)/pond-pairing', params: url ? { url } : {} });
+      offerPairingStart(start);
+      router.push('/(stack)/pond-pairing');
     },
     [router],
   );
 
-  const onSelect = useCallback((pond: DiscoveredPond) => openPairing(pond.url), [openPairing]);
+  const onSelect = useCallback(
+    (pond: DiscoveredPond) => openPairing({ kind: 'pond', url: pond.url, pin: pond.pin }),
+    [openPairing],
+  );
   const { ponds, phase } = discovery.data;
 
   return (
@@ -67,7 +74,7 @@ export default function Welcome() {
         />
 
         <View style={styles.actions}>
-          <InkButton variant="primary" block icon="plus" onPress={() => openPairing()}>
+          <InkButton variant="primary" block icon="plus" onPress={() => openPairing({ kind: 'address' })}>
             {t('onboarding.manual')}
           </InkButton>
         </View>
