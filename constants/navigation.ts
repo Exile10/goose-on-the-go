@@ -43,8 +43,7 @@ export const PROFILE_NAV: NavGroup[] = [
   {
     groupKey: 'nav.integrations',
     items: [
-      { id: 'appManagement', labelKey: 'screens.appManagement', icon: 'link', route: '/(stack)/app-management' },
-      { id: 'mcpServers', labelKey: 'screens.mcpServers', icon: 'globe', route: '/(stack)/mcp-servers' },
+      { id: 'extensions', labelKey: 'screens.extensions', icon: 'link', route: '/(stack)/extensions' },
     ],
   },
   {

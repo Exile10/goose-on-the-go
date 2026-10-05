@@ -400,8 +400,7 @@
     "memories": "Memories",
     "logs": "Activity",
     "schedule": "Schedule",
-    "appManagement": "Connected apps",
-    "mcpServers": "MCP servers",
+    "extensions": "Extensions",
     "userMedia": "Photos and videos",
     "photoUpload": "Send a photo",
     "addUsers": "People",
@@ -430,8 +429,7 @@
     "sessions": "Sessions",
     "logs": "Activity Logs",
     "schedule": "Schedule",
-    "appManagement": "App Integrations",
-    "mcpServers": "MCP Servers",
+    "extensions": "Extensions",
     "addUsers": "Users",
     "homeManagement": "Home Management",
     "remoteAccess": "Remote Access",
@@ -663,17 +661,24 @@
     "enrolling": "Enrolling",
     "needs": "You will need"
   },
-  "integrations": {
-    "apiKey": "API key",
-    "apiKeyPlaceholder": "Paste your key",
-    "connected": "Connected",
-    "latency": "Response time",
-    "tools": "Tools",
-    "configure": "Configure",
-    "addServer": "Add a server",
-    "online": "Online",
-    "offline": "Offline",
-    "error": "Error"
+  "extensions": {
+    "loading": "Loading extensions…",
+    "installedTitle": "Installed",
+    "marketplaceTitle": "Marketplace",
+    "install": "Install",
+    "installing": "Installing…",
+    "noneTitle": "No extensions yet",
+    "noneBody": "Your Pond could not be reached for its extension list.",
+    "status": {
+      "connected": "Connected",
+      "error": "Error",
+      "loading": "Starting…"
+    },
+    "setupTitle": "Finish setting up {{name}}",
+    "secretPlaceholder": "Paste the value",
+    "secretSaved": "Saved",
+    "saving": "Saving…",
+    "oauthPending": "Requires connecting {{name}} — coming soon"
   },
   "photo": {
     "choose": "Choose a photo",
@@ -717,7 +722,6 @@
     "screens": {
       "chat": "Chat",
       "memory": "Memories",
-      "integrations": "App Integrations & MCP Servers",
       "schedule": "Schedule",
       "logs": "Activity Logs"
     },
@@ -792,23 +796,6 @@
     "firmware": "Firmware: {{version}}",
     "pairDevice": "Pair New Pond Device",
     "deviceCount_one": "{{count}} device"
-  },
-  "appManagement": {
-    "apiKey": "API Key",
-    "apiKeyPlaceholder": "Enter API key…",
-    "hide": "Hide",
-    "show": "Show",
-    "connected": "Connected",
-    "connectedApps": "CONNECTED APPS"
-  },
-  "mcp": {
-    "latency": "Latency",
-    "tools": "Tools",
-    "configure": "Configure",
-    "retry": "Retry",
-    "remove": "Remove",
-    "servers": "MCP SERVERS",
-    "addServer": "Add MCP Server"
   },
   "addUsers": {
     "remove": "Remove",
