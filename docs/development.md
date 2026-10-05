@@ -98,6 +98,11 @@ What changes for a plaintext origin:
   `/system/info` only so the saved pairing has its usual shape; nothing is ever
   verified against it, so the wizard does not ask the user to confirm it.
 - Remote access is unavailable (`remote.unsupported`).
+- Notifications are off. Since SDK 53, Expo Go on Android throws as soon as
+  `expo-notifications` is imported, which took the root layout down;
+  `services/notifications-module.ts` loads it only outside Expo Go.
+- Finding Ponds on the network is off: Expo Go has no zeroconf module, so the
+  welcome screen says to enter the address instead of showing the native error.
 
 What it exposes: everything. Anyone on the network can read every request and
 response, including the session and refresh tokens, which are also valid on the

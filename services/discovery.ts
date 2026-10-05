@@ -12,9 +12,11 @@
  * the name-resolution problem rather than working around it.
  */
 
+import { NativeModules } from 'react-native';
 import Zeroconf, { type Service } from 'react-native-zeroconf';
 
 import { validPin } from '@/models/connection';
+import i18n from './i18n';
 
 /** The service pond-server registers. */
 const SERVICE_TYPE = 'pond';
@@ -171,6 +173,13 @@ export function startDiscovery(
   onFound: (ponds: DiscoveredPond[]) => void,
   onError: (message: string) => void,
 ): DiscoveryHandle {
+  // Expo Go has no zeroconf native module, so there is nothing to search with, and
+  // the scan below would fail with "Cannot read property 'scan' of null" on the
+  // screen. Say what it means instead: typing the address still works.
+  if (!NativeModules.RNZeroconf) {
+    onError(i18n.t('onboarding.discoveryUnavailable'));
+    return { stop: () => {} };
+  }
   const zeroconf = new Zeroconf();
   const found: DiscoveredPond[] = [];
 

@@ -386,6 +386,7 @@
     "scanning": "Looking for Ponds…",
     "noneFound": "No Ponds found yet",
     "noneFoundBody": "Make sure your Pond is running and on this network.",
+    "discoveryUnavailable": "Finding Ponds on the network needs a development or release build of the app. Enter your Pond's address instead.",
     "manual": "Enter an address"
   },
   "settings": {
