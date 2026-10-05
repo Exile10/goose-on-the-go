@@ -26,6 +26,11 @@ import { useVoice } from '@/view-models/use-voice';
 
 const ORB = 132;
 
+/** Shown while there's nothing already said to listen past. */
+const SUGGESTIONS_VISIBLE = new Set<VoiceState>(['idle', 'wait', 'recording']);
+
+const PHRASE_KEYS = ['voice.phraseLights', 'voice.phraseWeather', 'voice.phraseTimer', 'voice.phrasePlaylist'] as const;
+
 const CAPTIONS: Record<VoiceState, TranslationKey> = {
   idle: 'chat.voice.idle',
   wait: 'chat.voice.listening',
@@ -63,6 +68,7 @@ export function VoiceDock({ send, stop, onClose, bottomInset }: VoiceDockProps) 
     weight: theme.weight.semibold,
     color: error ? theme.color.dangerFg : theme.color.textSecondary,
   });
+  const hint = inkText(theme, { size: 'xs', weight: theme.weight.regular, color: theme.color.textSecondary });
 
   return (
     <View style={[styles.dock, { paddingBottom: bottomInset + 8 }]}>
@@ -91,6 +97,21 @@ export function VoiceDock({ send, stop, onClose, bottomInset }: VoiceDockProps) 
         >
           {error ?? t(CAPTIONS[state])}
         </Text>
+      )}
+      {SUGGESTIONS_VISIBLE.has(state) && (
+        <View style={styles.suggestions}>
+          <Text style={[hint.style, styles.suggestionsLabel]}>{t('voice.trySaying')}</Text>
+          <View style={styles.chipRow}>
+            {PHRASE_KEYS.map((key) => (
+              <View
+                key={key}
+                style={[styles.chip, { backgroundColor: theme.color.chrome, borderColor: theme.color.lineStrong }]}
+              >
+                <Text style={[hint.style, styles.chipText]} numberOfLines={1}>{`"${t(key)}"`}</Text>
+              </View>
+            ))}
+          </View>
+        </View>
       )}
       <View style={styles.row}>
         <ChromePuck
@@ -126,5 +147,10 @@ const styles = StyleSheet.create({
   dock: { paddingHorizontal: 16, paddingTop: 4, gap: 6 },
   caption: { textAlign: 'center', minHeight: 18 },
   captionAction: { textDecorationLine: 'underline' },
+  suggestions: { alignItems: 'center', gap: 6 },
+  suggestionsLabel: { textAlign: 'center' },
+  chipRow: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 6 },
+  chip: { borderWidth: StyleSheet.hairlineWidth, borderRadius: 12, paddingHorizontal: 10, paddingVertical: 5 },
+  chipText: {},
   row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
 });

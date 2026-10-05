@@ -12,6 +12,7 @@
  * detector need. `speech.ts` does the arithmetic.
  */
 
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { File, Paths } from 'expo-file-system';
 
 type Audio = typeof import('expo-audio');
@@ -51,53 +52,54 @@ export const useMicStream: (onBuffer: (buffer: MicBuffer) => void) => {
   stop: () => void;
 } = audio
   ? (onBuffer) => {
-      const { stream } = audio.useAudioStream({
-        sampleRate: 16_000,
-        channels: 1,
-        encoding: 'int16',
-        onBuffer: (buffer: StreamBuffer) => {
-          // Mixed down here if the device insisted on stereo: speech is mono.
-          const raw = new Int16Array(buffer.data);
-          if (buffer.channels <= 1) {
-            onBuffer({ samples: raw, sampleRate: buffer.sampleRate });
-            return;
-          }
-          const mono = new Int16Array(Math.floor(raw.length / buffer.channels));
-          for (let i = 0; i < mono.length; i += 1) {
-            let sum = 0;
-            for (let c = 0; c < buffer.channels; c += 1) sum += raw[i * buffer.channels + c];
-            mono[i] = Math.round(sum / buffer.channels);
-          }
-          onBuffer({ samples: mono, sampleRate: buffer.sampleRate });
-        },
-      });
-      return {
-        start: () => stream.start(),
-        // Stopping a stream that is already gone is not an error, and it is the
-        // normal path out of voice mode. Leaving the dock runs `end()`, which
-        // stops the stream, and then unmounts VoiceDock -- at which point
-        // expo-audio's own hook releases the native AudioStream while our
-        // cleanup effect is still queued to stop it. The released object then
-        // rejects the call:
-        //
-        //   Call to function 'AudioStream.stop' has been rejected.
-        //   -> Cannot use shared object that was already released
-        //
-        // which React raises as a fatal JavascriptException from
-        // commitHookEffectListUnmount, taking the app down every time the user
-        // switched from the orb back to the keyboard. Both callers are right to
-        // ask; there is simply nothing left to stop, so say so by returning
-        // rather than by throwing.
-        stop: () => {
-          try {
-            stream.stop();
-          } catch {
-            // Already stopped or already released. Not logged: this is the
-            // expected teardown order, not a failure, and it happens on every
-            // exit from voice mode.
-          }
-        },
-      };
+      // `onBuffer` is read through a ref so the native stream's own options object —
+      // and therefore the stream itself — never has to be recreated when the caller's
+      // callback identity changes. Recreating it mid-session is what used to leave a
+      // stale `stream.stop` pointed at an already-torn-down native object.
+      const onBufferRef = useRef(onBuffer);
+      useEffect(() => {
+        onBufferRef.current = onBuffer;
+      }, [onBuffer]);
+
+      const handleBuffer = useCallback((buffer: StreamBuffer) => {
+        // Mixed down here if the device insisted on stereo: speech is mono.
+        const raw = new Int16Array(buffer.data);
+        if (buffer.channels <= 1) {
+          onBufferRef.current({ samples: raw, sampleRate: buffer.sampleRate });
+          return;
+        }
+        const mono = new Int16Array(Math.floor(raw.length / buffer.channels));
+        for (let i = 0; i < mono.length; i += 1) {
+          let sum = 0;
+          for (let c = 0; c < buffer.channels; c += 1) sum += raw[i * buffer.channels + c];
+          mono[i] = Math.round(sum / buffer.channels);
+        }
+        onBufferRef.current({ samples: mono, sampleRate: buffer.sampleRate });
+      }, []);
+
+      const options = useMemo(
+        () => ({
+          sampleRate: 16_000,
+          channels: 1,
+          encoding: 'int16' as const,
+          onBuffer: handleBuffer,
+        }),
+        [handleBuffer],
+      );
+
+      const { stream } = audio.useAudioStream(options);
+
+      // Read through a ref updated during render (not in an effect), so the wrapper
+      // below — created once and never replaced — can never close over a stream
+      // that's since been swapped or released: there's no render-to-effect gap for
+      // a start()/stop() call to land in and hit a disposed native object.
+      const streamRef = useRef(stream);
+      streamRef.current = stream;
+
+      return useRef({
+        start: () => streamRef.current.start(),
+        stop: () => streamRef.current.stop(),
+      }).current;
     }
   : () => ({ start: async () => {}, stop: () => {} });
 

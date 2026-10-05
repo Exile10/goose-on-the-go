@@ -9,8 +9,6 @@ import { useThemedStyles } from '@/hooks/use-themed-styles';
 import type { ThemeColors } from '@/constants/colors';
 import { useRemoteAccess } from '@/view-models/use-remote-access';
 import type { RemoteProgress } from '@/services/remote-access';
-import type { ThemeColors } from '@/constants/colors';
-import { useThemedStyles } from '@/hooks/use-themed-styles';
 import { useTheme } from '@/providers/theme-provider';
 
 /**
@@ -46,7 +44,6 @@ export default function RemoteAccessScreen() {
   const theme = useInkTheme();
   const router = useRouter();
   const { setupUnavailable, progress, error, busy, enable, recover, reviewId, localOnly, lapse } = useRemoteAccess();
-  const styles = useThemedStyles(makeStyles);
   const alert = ALERT[useTheme().isDark ? 'dark' : 'light'];
   return <View style={styles.page}>
     <Text style={styles.title}>{t('remote.title')}</Text>

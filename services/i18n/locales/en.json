@@ -184,6 +184,8 @@
       "micBlocked": "Microphone access is off. Tap here to turn it on in Settings.",
       "micBlockedHint": "Opens this app's settings, where the microphone can be turned on.",
       "micFailed": "The microphone could not start.",
+      "farewellExit": "Goodbye.",
+      "farewellPause": "Talk to you later.",
       "hearFailed": "Your Pond could not make that out. Tap to try again.",
       "speakFailed": "Your Pond could not say that out loud. The answer is above.",
       "idle": "Tap the orb to talk",

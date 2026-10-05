@@ -55,6 +55,14 @@
         }
       ],
       [
+        "expo-audio",
+        {
+          "microphonePermission": "Goose On The Go uses your microphone so you can talk to Goose.",
+          "enableBackgroundRecording": false,
+          "enableBackgroundPlayback": false
+        }
+      ],
+      [
         "expo-splash-screen",
         {
           "image": "./assets/images/splash-icon.png",
