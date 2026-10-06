@@ -73,6 +73,7 @@ The Pond rate-limits per IP (600 requests a minute for API traffic), and a runaw
 | Activity | 30s | `ACTIVITY_MS` | One read of the last 200 events covers every filter; the screen narrows it on the phone. |
 | Problems | 30s, only while that filter is open | `ACTIVITY_MS` | The operational log is a separate store; nobody looking at Home events needs it read behind them. |
 | Activity in the last day | 60s | `SUMMARY_MS` | A day's counts move slowly. A failed read keeps the last counts. |
+| Latest conversation | 60s | `SUMMARY_MS` | Two requests: the conversation list, to find the newest, then its telemetry summary. Its turns are read only when the sheet opens, and not polled. |
 | Weather | 10 min | `WEATHER_MS` | The Pond caches it for 15 min, so asking more often only re-reads that cache. |
 | Member | 5 min | `MEMBER_MS` | An attribution changes only when a pairing code says so. |
 | Home clock | 60s | `CLOCK_MS` | Moves the greeting and the countdowns with the time. |
