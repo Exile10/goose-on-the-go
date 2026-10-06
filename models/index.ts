@@ -5,8 +5,18 @@ export type { MemoryFragment, MemoryCategory } from './memory';
 export { SAMPLE_MEMORIES } from './memory';
 
 
-export type { LogEntry, LogType, LogLevel } from './log';
-export { SAMPLE_LOGS } from './log';
+export type { ActivityFilter, LogEntry, LogType, LogLevel } from './log';
+export {
+  ACTIVITY_FILTERS,
+  SAMPLE_ACTIVITY,
+  SAMPLE_LOGS,
+  attributeText,
+  categoryIcon,
+  describeEvent,
+  eventKey,
+  filterLabelKey,
+  filterOf,
+} from './log';
 
 export type { MCPApp, MCPServer } from './mcp';
 export { INITIAL_APPS, INITIAL_SERVERS } from './mcp';
