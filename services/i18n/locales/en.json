@@ -518,7 +518,10 @@
     "emptyBody": "What Goose does around the house shows up here.",
     "loading": "Reading your Pond's activity",
     "noProblems": "No problems",
-    "noProblemsBody": "Your Pond has not reported any warnings or errors lately."
+    "noProblemsBody": "Your Pond has not reported any warnings or errors lately.",
+    "today_one": "{{count}} event in the last day",
+    "today_other": "{{count}} events in the last day",
+    "todayCount": "{{label}} {{count}}"
   },
   "pairing": {
     "stepFind": "Find",

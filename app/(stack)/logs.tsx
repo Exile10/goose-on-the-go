@@ -12,6 +12,10 @@
  *
  * Problems is the odd one out: it lists the Pond's own warnings and errors
  * from its operational log, a different store from the activity above.
+ *
+ * Above the activity list, a strip counts the last day by filter. It is left
+ * off Problems, which is not activity, and off a day with nothing in it,
+ * where the list's own empty state already says so.
  */
 
 import React, { useState, useCallback, useMemo } from 'react';
@@ -35,10 +39,11 @@ import {
 
 import { GIcon } from '@/components/ui/g-icon';
 import { selectionTick } from '@/services/haptics';
-import type { ActivityEvent, LogEntry } from '@/services/types';
+import type { ActivityEvent, ActivitySummary, LogEntry } from '@/services/types';
 import {
   ACTIVITY_FILTERS,
   categoryIcon,
+  countsByFilter,
   describeEvent,
   eventKey,
   filterLabelKey,
@@ -47,6 +52,7 @@ import {
   type ActivityFilter,
 } from '@/models/log';
 import { useActivity } from '@/view-models/use-activity';
+import { useActivitySummary } from '@/view-models/use-activity-summary';
 import { useProblems } from '@/view-models/use-problems';
 import { formatRelativeTime } from '@/view-models/use-recent-sessions';
 import { Grey, Semantic } from '@/constants/colors';
@@ -107,6 +113,25 @@ const ProblemRow = React.memo(function ProblemRow({ item }: { item: LogEntry }) 
   );
 });
 
+/** The last day in one line: the total, then each filter's share, largest first. */
+function TodayStrip({ summary }: { summary: ActivitySummary }) {
+  const styles = useThemedStyles(makeStyles);
+  const { t } = useTranslation();
+  const counts = countsByFilter(summary);
+  return (
+    <View style={styles.today} accessibilityRole="summary">
+      <Text style={styles.todayTotal}>{t('activity.today', { count: summary.total })}</Text>
+      <View style={styles.todayCounts}>
+        {counts.map(({ filter, count }) => (
+          <Text key={filter} style={styles.todayCount}>
+            {t('activity.todayCount', { label: t(filterLabelKey(filter)), count })}
+          </Text>
+        ))}
+      </View>
+    </View>
+  );
+}
+
 const problemKey = (item: LogEntry) => String(item.id);
 const renderProblem = ({ item }: { item: LogEntry }) => <ProblemRow item={item} />;
 
@@ -115,6 +140,7 @@ export default function ActivityScreen() {
   const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<ActivityFilter>('all');
   const activity = useActivity();
+  const { summary } = useActivitySummary().data;
   const problems = useProblems(activeTab === 'error');
   const showingProblems = activeTab === 'error';
   const { loading, error, actions } = showingProblems ? problems : activity;
@@ -140,6 +166,7 @@ export default function ActivityScreen() {
 
   const header = (
     <>
+      {!showingProblems && summary && summary.total > 0 ? <TodayStrip summary={summary} /> : null}
       {loading ? <InkSpinner label={t('activity.loading')} /> : null}
       {error ? (
         <View style={styles.notice}>
@@ -293,4 +320,27 @@ const makeStyles = (c: ThemeColors) =>
     color: c.textSecondary,
   },
   notice: { gap: Spacing.sm, marginBottom: Spacing.md },
+
+  /* Today */
+  today: {
+    backgroundColor: c.card,
+    borderRadius: Radii.lg,
+    padding: Spacing.md,
+    borderWidth: 1,
+    borderColor: c.border,
+    marginBottom: Spacing.md,
+    gap: Spacing.xs,
+  },
+  todayTotal: {
+    fontFamily: FontFamily.body,
+    fontSize: FontSize.base,
+    fontWeight: FontWeight.semibold,
+    color: c.text,
+  },
+  todayCounts: { flexDirection: 'row', flexWrap: 'wrap', columnGap: Spacing.md },
+  todayCount: {
+    fontFamily: FontFamily.body,
+    fontSize: FontSize.sm,
+    color: c.textSecondary,
+  },
 });
