@@ -13,6 +13,10 @@
 
 import Constants, { ExecutionEnvironment } from 'expo-constants';
 
+/**
+ * The type of the `expo-notifications` module, for code that receives it from
+ * `notifications` after the null check rather than importing it directly.
+ */
 export type NotificationsModule = typeof import('expo-notifications');
 
 function load(): NotificationsModule | null {

@@ -4,7 +4,8 @@
 
 This milestone targets native Android and iOS builds. Expo Go and browsers do not
 provide the required native trust module. Existing HTTP-only profiles require a
-fresh QR scan on the Pond's LAN. There is no insecure pin discovery fallback.
+fresh QR scan on the Pond's LAN. Outside insecure development mode
+([development.md](development.md)), there is no insecure pin discovery fallback.
 
 For development without a release build, see [development.md](development.md):
 a development build keeps every Pond connection pinned, and Expo Go can use an

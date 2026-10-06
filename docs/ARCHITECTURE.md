@@ -64,6 +64,12 @@ the Pond each time; these cards are kept in plain storage, capped at 100
 conversations, dropped with their conversation, and cleared on sign-out.
 `services/discovery.ts` — finds Ponds over mDNS, so step 0 of the pairing wizard
 can offer a hub rather than ask for its address. See "Finding the Pond" below.
+`services/notifications-module.ts` — `expo-notifications`, or null in Expo Go,
+where importing it throws on Android since SDK 53. The notification services read
+the module from here and stop when it is null.
+`services/dev-mode.ts` — the single `insecureDevMode` flag. Every plaintext
+relaxation reads it and nothing else; see
+[development.md](./development.md).
 
 ## Finding the Pond
 
@@ -96,6 +102,11 @@ optional — it holds a multicast lock on Android for as long as it runs.
 Discovery is the default, not the only way in: multicast is filtered on plenty
 of guest and office networks, so scanning the QR and typing an address both
 remain on the same step.
+
+Expo Go has no zeroconf native module. `startDiscovery` checks
+`NativeModules.RNZeroconf` first and, when it is missing, reports
+`onboarding.discoveryUnavailable` (enter the address instead) through its error
+callback rather than throwing.
 
 `types/react-native-zeroconf.d.ts` declares the library's browsing API, which
 ships no types of its own. Field names there are taken from its Android NSD
@@ -155,6 +166,13 @@ live on `ServerProvider` (`providers/server-provider.tsx`); mock and real code
 paths coexist per screen, so nothing needs to be deleted to test either one.
 It also has a "Pond server URL" field and a Test connection button that probes
 `/health`. The screen isn't linked from the You-tab menu in production builds.
+
+This screen is not insecure development mode (`services/dev-mode.ts`,
+[development.md](./development.md)). That is a build-time switch for Expo Go,
+`EXPO_PUBLIC_POND_INSECURE_DEV=1` in a development bundle, which allows plaintext
+Pond origins on the LAN and shows a permanent banner while it is on. This screen
+only flips each screen between mock and real data, and changes nothing about how
+the Pond is reached.
 
 ## Performance
 

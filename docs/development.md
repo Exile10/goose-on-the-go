@@ -93,8 +93,10 @@ What changes for a plaintext origin:
 - `services/pond-trust.ts` pins nothing for it and lets requests to it through.
 - `services/api-client.ts` and the notification stream send it as ordinary
   requests, without the `X-Pond-Transport` marker (PondTls would refuse it).
-- `pair()` sends no channel binding and so checks no server proof: plaintext has
-  no TLS key for either to name. The pairing keeps the pin the Pond reports in
+- `pair()` sends no channel binding to a plaintext origin (`isInsecureDevOrigin`)
+  and so checks no server proof: plaintext has no TLS key for either to name. It
+  logs a warning when it drops a binding. An HTTPS origin is bound and checked as
+  in release, even in this mode. The pairing keeps the pin the Pond reports in
   `/system/info` only so the saved pairing has its usual shape; nothing is ever
   verified against it, so the wizard does not ask the user to confirm it.
 - Remote access is unavailable (`remote.unsupported`).
@@ -110,6 +112,14 @@ Pond's HTTPS listener; can recover the six-digit pairing code offline from one
 captured pairing; and can impersonate the Pond to the app or the app to the Pond.
 Use it on a network you control, against a Pond that holds nothing you mind
 exposing, and pair again over HTTPS before trusting that Pond or that phone again.
+
+## Troubleshooting
+
+- **Expo Go against a Pond that has not finished onboarding.** The notification
+  stream gets 403 `onboarding_required`. Without `fix/stream-refusal-is-not-auth`
+  the app treats that 403 as a dead token and refreshes and reconnects in a tight
+  loop; with it, the app retries quietly with backoff until onboarding completes.
+  Finish onboarding on the Pond either way.
 
 ## Tests
 

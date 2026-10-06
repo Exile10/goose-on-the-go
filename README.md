@@ -39,21 +39,28 @@ Models (Types)       -> models/
 
 ```bash
 npm install
-npx expo start
+npx expo run:android   # build and install a development build, once
+npx expo start         # then serve the JavaScript to it
 ```
+
+`expo-dev-client` is a dependency, so `npx expo start` serves a development build,
+not Expo Go: install one first with `npx expo run:android`, and rebuild it only when
+native code or a config plugin changes. To work in Expo Go instead, or to reach
+Metro over Wi-Fi rather than USB, see [Development](docs/development.md).
 
 ## Documentation
 
 - [Architecture](docs/ARCHITECTURE.md)
 - [Component Guide](docs/COMPONENT-GUIDE.md)
+- [Development](docs/development.md)
 - [Design System](docs/DESIGN-SYSTEM.md)
 - [Navigation](docs/NAVIGATION.md)
 - [Testing](docs/TESTING.md)
 
 ## Tech Stack
 
-- Expo 54 + Expo Router v6
-- React Native 0.81 with New Architecture
+- Expo SDK 57 + Expo Router
+- React Native 0.86 with New Architecture
 - React 19 + React Compiler
 - react-native-reanimated, react-native-svg
 - TypeScript strict mode

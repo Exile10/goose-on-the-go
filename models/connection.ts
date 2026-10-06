@@ -59,7 +59,7 @@ export function normalizeHttpsUrl(raw: string): string {
  * host name, or a private IPv4 address. It does not consult the flag itself; callers
  * reach it only through {@link normalizePondUrl} and {@link isInsecureDevOrigin}.
  */
-export function normalizeInsecureDevUrl(raw: string): string {
+function normalizeInsecureDevUrl(raw: string): string {
   const url = bareOrigin(raw, 'http:');
   if (!url || !isLanHost(url.hostname.toLowerCase())) throw new Error('Invalid plaintext development Pond origin');
   return url.origin;
