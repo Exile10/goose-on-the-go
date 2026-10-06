@@ -117,6 +117,7 @@
     },
     "plist": {
       "@xmldom/xmldom": "^0.9.12"
-    }
+    },
+    "source-map-js": "^1.2.2"
   }
 }
