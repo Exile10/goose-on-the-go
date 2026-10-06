@@ -10,7 +10,7 @@
 
 import type { IconName } from '@/constants/icons';
 import type { TranslationKey } from '@/services/i18n';
-import type { ActivityEvent, AttributeValue, EventCategory } from '@/services/types';
+import type { ActivityEvent, AttributeValue, EventCategory, LogEntry } from '@/services/types';
 
 /**
  * The filters, named for what a reader is looking for rather than for the
@@ -164,5 +164,50 @@ export const SAMPLE_ACTIVITY: ActivityEvent[] = [
     timestamp: ago(60 * 26),
     privacy_sensitivity: 'sensitive',
     attributes: { name: { text: 'iPhone' } },
+  },
+];
+
+// ── Problems: the Pond's operational log ─────────────────────────────────────
+//
+// `GET /logs` is a different store from activity: the Pond's own tracing
+// output, kept at WARN and above (plus INFO from trace targets). It is what
+// the Problems filter shows, so a household can see what went wrong without
+// it crowding the everyday activity.
+
+/** WARN and ERROR, case-blind: the INFO rows are trace chatter, not problems. */
+export function isProblem(entry: LogEntry): boolean {
+  const level = entry.level.toUpperCase();
+  return level === 'WARN' || level === 'ERROR';
+}
+
+/**
+ * A log row's timestamp as ISO 8601. The Pond writes these with SQLite's
+ * `datetime('now')`, "YYYY-MM-DD HH:MM:SS", which is UTC but says so nowhere;
+ * read as-is, `Date` would take it for local time and be hours out.
+ */
+export function parsePondLogTime(timestamp: string): string {
+  const m = /^(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2}:\d{2}(?:\.\d+)?)$/.exec(timestamp.trim());
+  return m ? `${m[1]}T${m[2]}Z` : timestamp;
+}
+
+const sqliteAgo = (minutes: number) =>
+  new Date(Date.now() - minutes * 60_000).toISOString().slice(0, 19).replace('T', ' ');
+
+export const SAMPLE_PROBLEMS: LogEntry[] = [
+  {
+    id: 2,
+    timestamp: sqliteAgo(12),
+    level: 'WARN',
+    source: 'pond_mcp::client',
+    message: 'Calendar tool took 9.8s to answer; still waiting',
+    metadata: null,
+  },
+  {
+    id: 1,
+    timestamp: sqliteAgo(60 * 20),
+    level: 'ERROR',
+    source: 'pond_matter::controller',
+    message: 'Kitchen plug did not answer three times; marked unreachable',
+    metadata: null,
   },
 ];

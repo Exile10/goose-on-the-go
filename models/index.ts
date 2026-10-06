@@ -9,12 +9,15 @@ export type { ActivityFilter } from './log';
 export {
   ACTIVITY_FILTERS,
   SAMPLE_ACTIVITY,
+  SAMPLE_PROBLEMS,
   attributeText,
   categoryIcon,
   describeEvent,
   eventKey,
   filterLabelKey,
   filterOf,
+  isProblem,
+  parsePondLogTime,
 } from './log';
 
 export type { MCPApp, MCPServer } from './mcp';
