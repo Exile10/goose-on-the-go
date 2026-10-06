@@ -516,7 +516,9 @@
     "error": "Problems",
     "empty": "Nothing here yet",
     "emptyBody": "What Goose does around the house shows up here.",
-    "loading": "Reading your Pond's activity"
+    "loading": "Reading your Pond's activity",
+    "noProblems": "No problems",
+    "noProblemsBody": "Your Pond has not reported any warnings or errors lately."
   },
   "pairing": {
     "stepFind": "Find",

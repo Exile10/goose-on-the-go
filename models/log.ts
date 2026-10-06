@@ -17,12 +17,13 @@ import type { ActivityEvent, AttributeValue, EventCategory, LogEntry } from '@/s
  * nine categories behind them: nobody looks for "inference", they look for
  * what Goose did.
  */
-export type ActivityFilter = 'all' | 'action' | 'mcp' | 'home' | 'system';
+export type ActivityFilter = 'all' | 'action' | 'mcp' | 'home' | 'system' | 'error';
 
-export const ACTIVITY_FILTERS: ActivityFilter[] = ['all', 'action', 'mcp', 'home', 'system'];
+/** `error` is Problems: the Pond's operational log rather than its activity. */
+export const ACTIVITY_FILTERS: ActivityFilter[] = ['all', 'action', 'mcp', 'home', 'system', 'error'];
 
 /** Which filter a category falls under. Exhaustive, so a new category fails here until placed. */
-export function filterOf(category: EventCategory): Exclude<ActivityFilter, 'all'> {
+export function filterOf(category: EventCategory): Exclude<ActivityFilter, 'all' | 'error'> {
   switch (category) {
     case 'agent':
     case 'inference':
@@ -56,6 +57,8 @@ export function filterLabelKey(filter: ActivityFilter): TranslationKey {
       return 'activity.home';
     case 'system':
       return 'activity.system';
+    case 'error':
+      return 'activity.error';
   }
 }
 
