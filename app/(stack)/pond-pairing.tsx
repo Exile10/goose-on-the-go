@@ -845,8 +845,6 @@ const makeStyles = (c: ThemeColors) =>
       color: c.textTertiary,
       lineHeight: FontSize.base * 1.5,
     },
-    // The fingerprint is read aloud against the Pond's own screen, so it is set
-    // in the mono face at a size where each group of four is unambiguous.
     fingerprintChoice: {
       width: '100%',
       alignItems: 'center',
@@ -857,6 +855,8 @@ const makeStyles = (c: ThemeColors) =>
       borderColor: c.border,
       backgroundColor: c.card,
     },
+    // The fingerprint is read aloud against the Pond's own screen, so it is set
+    // in the mono face at a size where each group of four is unambiguous.
     pinPreview: {
       fontFamily: FontFamily.mono,
       fontSize: FontSize.lg,

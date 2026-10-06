@@ -4,7 +4,9 @@
 
 This milestone targets native Android and iOS builds. Expo Go and browsers do not
 provide the required native trust module. Existing HTTP-only profiles require a
-fresh QR scan on the Pond's LAN. There is no insecure pin discovery fallback.
+fresh QR scan on the Pond's LAN. There is no insecure pin discovery fallback: a
+pin advertised on the network is only offered for the user to pick out against the
+Pond's own screen (see "Trust lifecycle").
 
 Both fork and upstream remotes were fetched on 2026-09-19. The branch was
 rebased onto upstream main `aee8e4d`, which contains W1 and the earlier integration
@@ -17,10 +19,15 @@ branches and named stashes until delivery is complete.
 
 `models/pairing.ts` validates v2 HTTPS QR payloads. `ServerProvider` stages the
 public-key pin through `PondTls` before contacting local candidates. Discovery
-can add addresses but cannot provide a pin. Initialization and verification must
-be local; the Pond independently checks the actual TCP source subnet. Manual
-pairing asks for the HTTPS address, six-digit code, and full public-key pin shown
-locally on the Pond.
+can also offer the pin the Pond advertises beside its mDNS service, but that is
+a claim, not trust (2026-09-30). The wizard shows its preview beside two decoys
+that share the first group of four, and only picking the one on the Pond's own
+screen continues. A wrong pick or "None of these match" ends discovery for that
+step, after which only a typed fingerprint or a QR scan can continue. Decoys and
+order come from expo-crypto (`services/secure-random.ts`). Initialization and
+verification must be local; the Pond independently checks the actual TCP source
+subnet. Manual pairing asks for the HTTPS address, six-digit code, and full
+public-key pin shown locally on the Pond.
 
 `paired-profile.ts` writes the new non-secret address record while preserving the
 old one, then atomically commits pin and credentials together in SecureStore.

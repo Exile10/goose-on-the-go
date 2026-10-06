@@ -64,6 +64,8 @@ the Pond each time; these cards are kept in plain storage, capped at 100
 conversations, dropped with their conversation, and cleared on sign-out.
 `services/discovery.ts` — finds Ponds over mDNS, so step 0 of the pairing wizard
 can offer a hub rather than ask for its address. See "Finding the Pond" below.
+`services/secure-random.ts` — platform CSPRNG bytes (`randomBytes`, from
+expo-crypto), for anything an observer must not be able to predict.
 
 ## Finding the Pond
 
@@ -71,7 +73,7 @@ pond-server advertises `_pond._tcp.local.`; `services/discovery.ts` browses for
 it through `react-native-zeroconf`, and `view-models/use-discovery.ts` turns that
 into the `{data, loading, error, actions}` shape the wizard renders.
 
-Three things about this are load-bearing and easy to undo by accident.
+Four things about this are load-bearing and easy to undo by accident.
 
 **Only numeric addresses are kept.** A resolved service carries both a `host`
 (`<name>.local`) and `addresses` (numeric). Android's resolver does no mDNS at
@@ -87,6 +89,11 @@ a restart replaces its own entry.
 **A discovered Pond is probed with `/health` before the wizard advances**, for
 the same reason: an advertisement is not a running server, and a ghost resolves
 perfectly and answers nothing.
+
+**An advertised pin is confirmed by choice, not by a yes.** A pin that arrives
+with a discovered Pond is only a claim. `fingerprintChoices`
+(`models/connection.ts`) offers three previews that differ only after the first
+group, drawn once per pin, so a wrong pick cannot be retried against a fresh set.
 
 The search ends on a clock (8 s), because mDNS has no "that is all" signal, and
 browsing continues past the deadline so a hub switched on later still appears.
