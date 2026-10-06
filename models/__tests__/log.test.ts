@@ -3,8 +3,16 @@
  * falls under, the row text, and a key for events that carry no id.
  */
 
-import { attributeText, describeEvent, eventKey, filterOf, isProblem, parsePondLogTime } from '@/models/log';
-import type { ActivityEvent, EventCategory, LogEntry } from '@/services/types';
+import {
+  attributeText,
+  countsByFilter,
+  describeEvent,
+  eventKey,
+  filterOf,
+  isProblem,
+  parsePondLogTime,
+} from '@/models/log';
+import type { ActivityEvent, ActivitySummary, EventCategory, LogEntry } from '@/services/types';
 
 function event(overrides: Partial<ActivityEvent>): ActivityEvent {
   return {
@@ -95,5 +103,31 @@ describe('the operational log', () => {
 
   it('leaves a timestamp that already carries a zone alone', () => {
     expect(parsePondLogTime('2026-10-05T09:00:00+03:00')).toBe('2026-10-05T09:00:00+03:00');
+  });
+});
+
+describe('countsByFilter', () => {
+  function summary(by_category: ActivitySummary['by_category']): ActivitySummary {
+    return { window: 'day', since: '2026-10-05T09:00:00Z', total: 0, by_category };
+  }
+
+  it('adds categories that share a filter into one count', () => {
+    expect(countsByFilter(summary({ sensor: 2, camera: 1, device: 4 }))).toEqual([{ filter: 'home', count: 7 }]);
+  });
+
+  it('puts the largest first', () => {
+    expect(countsByFilter(summary({ tool: 1, agent: 5, auth: 3 }))).toEqual([
+      { filter: 'action', count: 5 },
+      { filter: 'system', count: 3 },
+      { filter: 'mcp', count: 1 },
+    ]);
+  });
+
+  it('leaves out filters with nothing in them', () => {
+    expect(countsByFilter(summary({ tool: 0, device: 2 }))).toEqual([{ filter: 'home', count: 2 }]);
+  });
+
+  it('is empty for a quiet day', () => {
+    expect(countsByFilter(summary({}))).toEqual([]);
   });
 });
