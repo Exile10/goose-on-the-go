@@ -28,8 +28,10 @@ import {
 import { timeoutSignal } from './http';
 import { readSse, type SseEvent } from './sse';
 import type {
+  ActivityPurge,
   ActivityResponse,
   ActivitySummary,
+  ActivityWindow,
   CommissionDeviceRequest,
   CommissionDeviceResponse,
   CreateDeviceRequest,
@@ -39,6 +41,8 @@ import type {
   EventCategory,
   Extension,
   LogEntry,
+  TelemetrySummary,
+  TurnMetrics,
   MarketplaceExtension,
   ChatFrame,
   ChatStreamRequest,
@@ -950,23 +954,64 @@ export class PondApiClient {
     return collection<LogEntry>(res, 'logs');
   }
 
+  /**
+   * The Pond's activity, newest first. `since` is inclusive and `until`
+   * exclusive, both RFC3339; there is no cursor, so the next page back is the
+   * oldest timestamp seen, passed as `until`. At most 1000 per read.
+   */
   listActivity(params?: {
     limit?: number;
     since?: string;
+    until?: string;
     category?: EventCategory;
     session_id?: string;
   }): Promise<ActivityResponse> {
     const qs = new URLSearchParams();
     if (params?.limit) qs.set('limit', String(params.limit));
     if (params?.since) qs.set('since', params.since);
+    if (params?.until) qs.set('until', params.until);
     if (params?.category) qs.set('category', params.category);
     if (params?.session_id) qs.set('session_id', params.session_id);
     const q = qs.toString();
     return this.get<ActivityResponse>(`/api/v1/activity${q ? `?${q}` : ''}`);
   }
 
-  activitySummary(): Promise<ActivitySummary> {
-    return this.get<ActivitySummary>('/api/v1/activity/summary');
+  activitySummary(window?: ActivityWindow): Promise<ActivitySummary> {
+    const q = window ? `?window=${encodeURIComponent(window)}` : '';
+    return this.get<ActivitySummary>(`/api/v1/activity/summary${q}`);
+  }
+
+  /**
+   * Delete the household's activity history, all of it. The operational log
+   * and telemetry are separate stores and are kept.
+   */
+  clearActivity(): Promise<ActivityPurge> {
+    return this.del<ActivityPurge>('/api/v1/activity');
+  }
+
+  /**
+   * The operational log as CSV, newest 10,000 rows. The Pond applies no
+   * filter to an export, so none is offered here.
+   */
+  async exportLogsCsv(): Promise<string> {
+    const res = await this.open('/api/v1/logs/export', { headers: { Accept: 'text/csv' } });
+    return res.text();
+  }
+
+  // ── Telemetry ───────────────────────────────────────────────
+
+  telemetrySummary(sessionId: string): Promise<TelemetrySummary> {
+    return this.get<TelemetrySummary>(
+      `/api/v1/telemetry/summary?session_id=${encodeURIComponent(sessionId)}`,
+    );
+  }
+
+  /** Every turn of one conversation, first to last. */
+  async telemetryTurns(sessionId: string): Promise<TurnMetrics[]> {
+    const res = await this.get<{ turns?: TurnMetrics[] } | TurnMetrics[]>(
+      `/api/v1/telemetry/turns?session_id=${encodeURIComponent(sessionId)}`,
+    );
+    return collection<TurnMetrics>(res, 'turns');
   }
 
   // ── Extensions and the marketplace ──────────────────────────

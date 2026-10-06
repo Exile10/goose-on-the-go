@@ -376,15 +376,22 @@ export interface ScheduleRun {
 
 // ── Logs and activity ─────────────────────────────────────────
 
+/**
+ * One row of `GET /logs`: the Pond's own operational log, drained from its
+ * tracing output. Kept are WARN and ERROR from anywhere, and INFO only from
+ * trace targets, so this is mostly a list of what went wrong.
+ */
 export interface LogEntry {
   id: number;
+  /** SQLite `datetime('now')`: UTC, but written "YYYY-MM-DD HH:MM:SS", with no zone. */
   timestamp: string;
   /** INFO | WARN | ERROR */
   level: string;
+  /** The tracing target, usually a module path. */
   source: string;
   message: string;
-  /** JSON, as a string. */
-  metadata?: string;
+  /** JSON, as a string, or null. */
+  metadata: string | null;
 }
 
 export type EventCategory =
@@ -426,11 +433,55 @@ export interface ActivityResponse {
   events: ActivityEvent[];
 }
 
+/** What `GET /activity/summary` counts over. */
+export type ActivityWindow = 'hour' | 'day' | 'week';
+
+/**
+ * Events per category over a window. A category with none is left out rather
+ * than given a zero, and the Pond counts at most the newest 1000 events.
+ */
 export interface ActivitySummary {
-  window: string;
+  window: ActivityWindow;
   since: string;
   total: number;
-  by_category: Record<string, number>;
+  by_category: Partial<Record<EventCategory, number>>;
+}
+
+/** `DELETE /activity`: how many events went. */
+export interface ActivityPurge {
+  purged: number;
+}
+
+// ── Telemetry ─────────────────────────────────────────────────
+//
+// Recorded per conversation turn, and only while the Pond's telemetry setting
+// is on; with it off these read back empty rather than failing.
+
+/** `GET /telemetry/summary?session_id=`: averages over one conversation. All zero for an unknown one. */
+export interface TelemetrySummary {
+  /** Mean time to first token, ms. */
+  avg_ttft_ms: number;
+  avg_completion_tokens: number;
+  total_turns: number;
+  /** Mean share of the model's context window used, 0–100. */
+  avg_context_utilization: number;
+}
+
+/** One turn of `GET /telemetry/turns`. Only the fields the app reads, plus the identifying ones. */
+export interface TurnMetrics {
+  session_id: string;
+  /** 1-based, within the conversation. */
+  turn_number: number;
+  prompt_tokens: number;
+  completion_tokens: number;
+  ttft_ms: number;
+  total_latency_ms: number;
+  tool_name: string | null;
+  tool_latency_ms: number | null;
+  context_utilization_pct: number;
+  model_name: string;
+  timestamp: string;
+  decode_tok_per_sec?: number;
 }
 
 // ── Extensions and the marketplace ────────────────────────────
