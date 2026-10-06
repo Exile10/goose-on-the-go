@@ -10,7 +10,13 @@
 
 import type { IconName } from '@/constants/icons';
 import type { TranslationKey } from '@/services/i18n';
-import type { ActivityEvent, AttributeValue, EventCategory, LogEntry } from '@/services/types';
+import type {
+  ActivityEvent,
+  ActivitySummary,
+  AttributeValue,
+  EventCategory,
+  LogEntry,
+} from '@/services/types';
 
 /**
  * The filters, named for what a reader is looking for rather than for the
@@ -214,3 +220,31 @@ export const SAMPLE_PROBLEMS: LogEntry[] = [
     metadata: null,
   },
 ];
+
+// ── Today: the Pond's activity summary ───────────────────────────────────────
+
+/**
+ * A summary's counts regrouped under the screen's own filters, largest first,
+ * with the empty ones left out — the Pond already omits zero categories, and
+ * two categories that share a filter are one number to a reader.
+ */
+export function countsByFilter(
+  summary: ActivitySummary,
+): { filter: Exclude<ActivityFilter, 'all' | 'error'>; count: number }[] {
+  const totals = new Map<Exclude<ActivityFilter, 'all' | 'error'>, number>();
+  for (const [category, count] of Object.entries(summary.by_category) as [EventCategory, number | undefined][]) {
+    if (!count) continue;
+    const filter = filterOf(category);
+    totals.set(filter, (totals.get(filter) ?? 0) + count);
+  }
+  return [...totals.entries()]
+    .map(([filter, count]) => ({ filter, count }))
+    .sort((a, b) => b.count - a.count);
+}
+
+export const SAMPLE_SUMMARY: ActivitySummary = {
+  window: 'day',
+  since: new Date(Date.now() - 86_400_000).toISOString(),
+  total: 14,
+  by_category: { device: 6, sensor: 3, tool: 3, agent: 2 },
+};
