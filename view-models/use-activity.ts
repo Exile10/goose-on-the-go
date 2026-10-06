@@ -26,7 +26,11 @@ export interface UseActivity {
   data: { events: ActivityEvent[] };
   loading: boolean;
   error: string | null;
-  actions: { refresh: () => Promise<void> };
+  actions: {
+    refresh: () => Promise<void>;
+    /** Delete every event on the Pond, then read again; resolves to how many went. Throws if the Pond refuses. */
+    clear: () => Promise<number>;
+  };
 }
 
 export function useActivity(): UseActivity {
@@ -75,7 +79,19 @@ export function useActivity(): UseActivity {
 
   const refresh = useCallback(() => load(true), [load]);
 
+  const clear = useCallback(async () => {
+    // On mock there is no Pond to ask: the samples go, until the toggle brings them back.
+    if (!real) {
+      setEvents([]);
+      return SAMPLE_ACTIVITY.length;
+    }
+    const { purged } = await api.clearActivity();
+    setEvents([]);
+    await load(true);
+    return purged;
+  }, [real, load]);
+
   useLive(() => load(false), ACTIVITY_MS, hydrated && real);
 
-  return { data: { events }, loading, error, actions: { refresh } };
+  return { data: { events }, loading, error, actions: { refresh, clear } };
 }
