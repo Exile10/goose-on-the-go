@@ -20,6 +20,9 @@
  *
  * Below it, a card shows how Goose's latest conversation went, from the Pond's
  * telemetry; tapping it lists that conversation's turns.
+ *
+ * Clearing is at the foot of the activity list, behind a confirmation: it
+ * deletes the Pond's activity history for everyone in the household.
  */
 
 import React, { useState, useCallback, useMemo } from 'react';
@@ -35,6 +38,7 @@ import { useTranslation } from 'react-i18next';
 import {
   InkButton,
   InkChoice,
+  InkDialog,
   InkEmptyState,
   InkNotice,
   InkSpinner,
@@ -43,7 +47,8 @@ import {
 
 import { GIcon } from '@/components/ui/g-icon';
 import { TelemetryCard, TurnsSheet } from '@/components/patterns/conversation-telemetry';
-import { selectionTick } from '@/services/haptics';
+import { caution, confirm, selectionTick } from '@/services/haptics';
+import { describeApiError } from '@/view-models/describe-error';
 import type { ActivityEvent, ActivitySummary, LogEntry } from '@/services/types';
 import {
   ACTIVITY_FILTERS,
@@ -147,10 +152,35 @@ export default function ActivityScreen() {
   const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<ActivityFilter>('all');
   const activity = useActivity();
-  const { summary } = useActivitySummary().data;
+  const activitySummary = useActivitySummary();
+  const { summary } = activitySummary.data;
   const { latest } = useConversationTelemetry().data;
   const turns = useConversationTurns();
   const logExport = useLogExport();
+
+  const [confirmingClear, setConfirmingClear] = useState(false);
+  const [clearing, setClearing] = useState(false);
+  const [clearResult, setClearResult] = useState<{ tone: 'success' | 'danger'; text: string } | null>(null);
+  const askClear = useCallback(() => {
+    void caution();
+    setClearResult(null);
+    setConfirmingClear(true);
+  }, []);
+  const clearActivity = useCallback(async () => {
+    setConfirmingClear(false);
+    setClearing(true);
+    try {
+      const purged = await activity.actions.clear();
+      void confirm();
+      setClearResult({ tone: 'success', text: t('activity.clear.done', { count: purged }) });
+      void activitySummary.actions.refresh();
+    } catch (e) {
+      // Somebody asked for this: a failure is said even when the banner explains why.
+      setClearResult({ tone: 'danger', text: describeApiError(e) ?? t('activity.clear.failed') });
+    } finally {
+      setClearing(false);
+    }
+  }, [activity.actions, activitySummary.actions, t]);
   const [turnsOpen, setTurnsOpen] = useState(false);
   const openTurns = useCallback(() => {
     if (!latest) return;
@@ -197,6 +227,7 @@ export default function ActivityScreen() {
       ) : null}
       {!showingProblems && summary && summary.total > 0 ? <TodayStrip summary={summary} /> : null}
       {!showingProblems && latest ? <TelemetryCard latest={latest} onOpen={openTurns} /> : null}
+      {!showingProblems && clearResult ? <InkNotice tone={clearResult.tone}>{clearResult.text}</InkNotice> : null}
       {loading ? <InkSpinner label={t('activity.loading')} /> : null}
       {error ? (
         <View style={styles.notice}>
@@ -258,6 +289,15 @@ export default function ActivityScreen() {
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
           ListHeaderComponent={header}
+          ListFooterComponent={
+            data.events.length > 0 && !loading ? (
+              <View style={styles.footer}>
+                <InkButton variant="danger" icon="trash" disabled={clearing} onPress={askClear}>
+                  {clearing ? t('activity.clear.clearing') : t('activity.clear.button')}
+                </InkButton>
+              </View>
+            ) : null
+          }
           // A list that failed to load is unknown, not empty.
           ListEmptyComponent={
             !loading && !error ? (
@@ -268,6 +308,23 @@ export default function ActivityScreen() {
           }
         />
       )}
+
+      <InkDialog
+        open={confirmingClear}
+        onClose={() => setConfirmingClear(false)}
+        title={t('activity.clear.title')}
+        description={t('activity.clear.body')}
+        actions={
+          <>
+            <InkButton variant="quiet" onPress={() => setConfirmingClear(false)}>
+              {t('common.cancel')}
+            </InkButton>
+            <InkButton variant="danger" onPress={clearActivity}>
+              {t('activity.clear.confirm')}
+            </InkButton>
+          </>
+        }
+      />
 
       <TurnsSheet
         open={turnsOpen}
@@ -358,6 +415,7 @@ const makeStyles = (c: ThemeColors) =>
     color: c.textSecondary,
   },
   notice: { gap: Spacing.sm, marginBottom: Spacing.md },
+  footer: { marginTop: Spacing.lg, alignItems: 'flex-start' },
 
   /* Today */
   today: {

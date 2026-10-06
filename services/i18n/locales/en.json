@@ -542,6 +542,16 @@
       "noShare": "This phone can't share files from Goose.",
       "noLog": "Your Pond isn't keeping a log, so there's nothing to export.",
       "failed": "Couldn't export the log. Check your Pond is reachable, then try again."
+    },
+    "clear": {
+      "button": "Clear activity",
+      "clearing": "Clearing",
+      "title": "Clear all activity?",
+      "body": "This deletes everything your Pond has recorded here, for everyone in the household. It can't be undone. Problems, the exported log and conversation stats are kept.",
+      "confirm": "Clear activity",
+      "done_one": "Cleared {{count}} event.",
+      "done_other": "Cleared {{count}} events.",
+      "failed": "Couldn't clear activity. Check your Pond is reachable, then try again."
     }
   },
   "pairing": {
