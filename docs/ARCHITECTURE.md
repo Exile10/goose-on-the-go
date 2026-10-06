@@ -50,12 +50,14 @@ Custom hooks in `view-models/` that own all state and side effects. Every ViewMo
 TypeScript interfaces in `models/` defining the domain shapes. These are pure types — no logic. Mock data is co-located with its type file (e.g., `LLM_MODELS` in `models/model.ts`).
 
 ### Services
-`services/api-client.ts` — the HTTP client for pond-server, and the only place in
-the app that calls `fetch`. It attaches the bearer token, refreshes once on 401
-(sharing a single refresh across concurrent 401s), and throws a typed `ApiError`
-carrying the status and any `Retry-After`. Wire types live in
-`services/types.ts`, in the server's own snake_case — deliberately separate from
-the display-shaped types in `models/`.
+`services/api-client.ts` — the HTTP client for pond-server, and the only place
+in the app that calls `fetch`. It attaches the bearer token, refreshes once on
+401 (sharing a single refresh across concurrent 401s), and throws a typed
+`ApiError` carrying the status and any `Retry-After`. Where a call reads the
+Pond's `{error}` identifier (handshake verify), `ApiError` carries it as `code`,
+so a screen can act on why the Pond refused rather than on the status alone.
+Wire types live in `services/types.ts`, in the server's own snake_case —
+deliberately separate from the display-shaped types in `models/`.
 `services/storage.ts` — typed AsyncStorage wrapper, with key families
 (`storageFamily`) for records that grow with use, one key per record.
 `services/card-cache.ts` — the tool cards the phone was shown, by conversation
