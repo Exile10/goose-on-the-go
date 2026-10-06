@@ -14,7 +14,10 @@ import { assertPondTrust } from './pond-trust';
  *
  * React Native's `fetch` cannot stream response bodies, so this parses SSE
  * frames incrementally off `XMLHttpRequest.onprogress` — no added dependency.
- * Reconnects with capped exponential backoff until `stop()` is called.
+ * Reconnects with exponential backoff, from 1 s and capped at 30 s, until
+ * `stop()` is called or the Pond answers 401. A 401 stops the stream and hands
+ * the token back through `onAuthFailure`. A 403 is a refusal to serve the stream
+ * yet, such as before onboarding completes, not a dead token, and is retried.
  */
 
 export interface ServerNotification {
