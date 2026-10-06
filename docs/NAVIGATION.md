@@ -119,10 +119,13 @@ signed out land in the same place.
 
 The guard is keyed on the **stored identity**, not on the connection state, and
 the distinction is load-bearing. `ConnectionManager.configure` publishes
-`unpaired` at the start of every reconfiguration — including the one that enables
-remote access — so a guard watching the connection throws the user onto pairing
-in the middle of setting remote access up. It also waits for `hydrated`, or every
-cold start bounces through pairing before discovering it is already paired.
+`upgrade` or `unpaired` only when it is given no saved profile, which pairing
+itself does while it stages a new one. A saved profile starts as `reconnecting`,
+or as the route a previous manager found in this process (2026-10-05). Either
+way the state is a placeholder until the first probe answers, so a guard
+watching it would misroute in the middle of setup, such as enabling remote
+access, which reconfigures the manager. The guard also waits for `hydrated`, or
+every cold start bounces through pairing before discovering it is already paired.
 
 Pairing leaves for Home the moment it succeeds, replacing rather than pushing, so
 a finished wizard is not left in the stack. There is no success screen. The
