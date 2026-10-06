@@ -102,4 +102,8 @@ The loop is tested with fake timers (`view-models/__tests__/live.test.ts`): no o
 ## Known gaps
 
 - **Names need a profile.** With no household profiles, or a pairing code not bound to one, there is no name to show, and that is correct.
+- **The day's count stops at 1,000.** `GET /activity/summary` counts at most 1,000 events, so a busier day reads as 1,000 on the Activity screen's strip.
+- **The export is the whole log.** `GET /logs/export` takes no filters, so the file never follows the filter on screen, and it holds the Pond's 10,000 most recent rows.
+- **Telemetry is per conversation.** The Pond has no household-wide figures, so the Activity screen shows only the latest conversation's.
+- **Clearing is all or nothing.** `DELETE /activity` takes filters, but the screen offers only clearing everything, which is what the confirmation says. The operational log and telemetry are separate stores and are kept.
 - **`Schedule` in `services/types.ts` does not match the wire.** It declares `name`, `enabled` and `prompt`, and the Pond sends none of them; it sends `label`, `paused` and a `kind`. Only `.length` is read here, so this screen is unaffected. Anything reading those fields would get `undefined`, which matters for #14.
