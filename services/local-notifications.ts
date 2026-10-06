@@ -19,8 +19,9 @@
  */
 
 import * as Notifications from 'expo-notifications';
-import { Platform } from 'react-native';
+import { Linking, Platform } from 'react-native';
 
+import { linkFromData } from './notification-link';
 import type { ServerNotification } from './notification-stream';
 
 /**
@@ -100,7 +101,12 @@ export async function presentLocally(notification: ServerNotification): Promise<
       content: {
         title: notification.title,
         body: notification.body,
-        data: { id: notification.id, category: notification.category },
+        // A ride or directions link rides along, already checked, for the tap to open.
+        data: {
+          id: notification.id,
+          category: notification.category,
+          ...linkData(notification.data),
+        },
       },
       // Android routes by channel, and the channel is carried on the trigger —
       // `NotificationContentInput` has no `channelId`, so a channel set there is
@@ -114,4 +120,32 @@ export async function presentLocally(notification: ServerNotification): Promise<
   } catch (e) {
     console.warn('[notifications] could not present', notification.id, e);
   }
+}
+
+/** The open-link fields to store on a shade notification; empty when it carries no link. */
+function linkData(data: unknown): Record<string, string> {
+  const link = linkFromData(data);
+  return link ? { action: 'open_url', kind: link.kind, url: link.url, label: link.label } : {};
+}
+
+/** Open the link a tapped notification carries, checking it again first. */
+function openTapped(response: Notifications.NotificationResponse | null): void {
+  const link = linkFromData(response?.notification.request.content.data);
+  if (!link) return;
+  Linking.openURL(link.url).catch((e) => {
+    // No app and no browser can take it; the notification itself still says where to.
+    console.warn('[notifications] could not open link', e);
+  });
+}
+
+/**
+ * Open ride and directions links when their notification is tapped, including
+ * the tap that launched the app. Returns the unsubscribe.
+ */
+export function watchLinkTaps(): () => void {
+  const sub = Notifications.addNotificationResponseReceivedListener(openTapped);
+  Notifications.getLastNotificationResponseAsync()
+    .then(openTapped)
+    .catch(() => {});
+  return () => sub.remove();
 }
