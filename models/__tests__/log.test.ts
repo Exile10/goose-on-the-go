@@ -8,8 +8,10 @@ import {
   countsByFilter,
   describeEvent,
   eventKey,
+  exportFileName,
   filterOf,
   isProblem,
+  logsToCsv,
   parsePondLogTime,
 } from '@/models/log';
 import type { ActivityEvent, ActivitySummary, EventCategory, LogEntry } from '@/services/types';
@@ -129,5 +131,25 @@ describe('countsByFilter', () => {
 
   it('is empty for a quiet day', () => {
     expect(countsByFilter(summary({}))).toEqual([]);
+  });
+});
+
+describe('exporting the operational log', () => {
+  it('names the file for the day, in the phone\'s own time', () => {
+    expect(exportFileName(new Date(2026, 0, 5, 23, 30))).toBe('pond-logs-2026-01-05.csv');
+  });
+
+  it('writes a header and one row per entry', () => {
+    const csv = logsToCsv([
+      { id: 7, timestamp: '2026-10-05 09:00:00', level: 'WARN', source: 'tools', message: 'slow', metadata: null },
+    ]);
+    expect(csv).toBe('id,timestamp,level,source,message,metadata\n7,2026-10-05 09:00:00,WARN,tools,slow,\n');
+  });
+
+  it('quotes a field that holds a comma, quote or line break', () => {
+    const csv = logsToCsv([
+      { id: 1, timestamp: 't', level: 'ERROR', source: 's', message: 'said "no", then\nstopped', metadata: '{"a":1}' },
+    ]);
+    expect(csv.split('\n').slice(1).join('\n')).toBe('1,t,ERROR,s,"said ""no"", then\nstopped","{""a"":1}"\n');
   });
 });
