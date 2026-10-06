@@ -306,6 +306,14 @@ with the rebuilt library. Normal iOS Debug simulator and unsigned Release device
 builds pass, as do Android Debug/Release builds and all 13 native TLS/proxy tests
 with zero skips. Both Android APKs contain all four required Go-library ABIs.
 
+### Recovery review shows the machine key (2026-09-30)
+
+While a recovery request waits for approval, the phone shows the request id and
+`mkey:` with the first sixteen hex digits of its new machine key
+(`machineKeyPreview` in `services/remote-access.ts`), grouped in fours as the
+Pond's review shows them. Approve the request only when the Pond shows this
+phone's name and the same key. The measurements above predate this.
+
 
 ## Current embedded validation and platform fixes (2026-09-20)
 
@@ -346,6 +354,10 @@ and requires HTTPS, saved SPKI, valid dates and the expected hostname. Unrelated
 traffic retains platform validation. Native CONNECT tests also verify that proxy
 credentials never reach Pond HTTP. The deployment minimum remains iOS 16.4; its
 older runtime proxy path is not established by iOS 27 simulator results.
+Tailscale's own service address (100.100.100.100, fd7a:115c:a1e0::53) lies inside
+those ranges but is never a Pond: since 2026-09-30 the remote-target check,
+`PondNetwork.remote`, refuses it on both platforms, so it is never configured as a
+proxy target.
 
 Fixtures compile an isolated CA through a temporary Go overlay, keep administration
 credentials in private scratch files, and restore normal libraries in cleanup.

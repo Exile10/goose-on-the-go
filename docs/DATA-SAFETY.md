@@ -73,7 +73,10 @@ coordinator therefore observes:
 - the node's **node key** and **machine key**, established by the embedded node;
 - the **tailnet address** assigned to this device — the app validates it falls in
   `100.64.0.0/10`, and the transport recognises `fd7a:115c:a1e0:` for IPv6
-  (`plugins/pond-tls/PondNetwork.kt:150-152`);
+  (`remote` in `PondNetwork`, `plugins/pond-tls/PondNetwork.kt` and
+  `plugins/pond-tls/ios/PondNetwork.swift`). The same check refuses Tailscale's own
+  service address (`100.100.100.100`, `fd7a:115c:a1e0::53`) as a target: it is the
+  node's resolver and local API, never a Pond;
 - **connection and disconnection times**, inherent to maintaining a control connection.
 
 What it does not observe is the content: traffic between this device and the Pond is
