@@ -5,11 +5,10 @@ export type { MemoryFragment, MemoryCategory } from './memory';
 export { SAMPLE_MEMORIES } from './memory';
 
 
-export type { ActivityFilter, LogEntry, LogType, LogLevel } from './log';
+export type { ActivityFilter } from './log';
 export {
   ACTIVITY_FILTERS,
   SAMPLE_ACTIVITY,
-  SAMPLE_LOGS,
   attributeText,
   categoryIcon,
   describeEvent,

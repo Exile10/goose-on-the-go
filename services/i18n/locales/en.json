@@ -515,7 +515,8 @@
     "system": "System",
     "error": "Problems",
     "empty": "Nothing here yet",
-    "emptyBody": "What Goose does around the house shows up here."
+    "emptyBody": "What Goose does around the house shows up here.",
+    "loading": "Reading your Pond's activity"
   },
   "pairing": {
     "stepFind": "Find",
