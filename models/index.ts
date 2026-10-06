@@ -22,6 +22,15 @@ export {
   parsePondLogTime,
 } from './log';
 
+export {
+  SAMPLE_SESSION,
+  SAMPLE_TELEMETRY,
+  SAMPLE_TURNS,
+  formatDuration,
+  formatPercent,
+  latestSession,
+} from './telemetry';
+
 export type { MCPApp, MCPServer } from './mcp';
 export { INITIAL_APPS, INITIAL_SERVERS } from './mcp';
 
