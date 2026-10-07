@@ -55,6 +55,16 @@
         }
       ],
       [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Goose On The Go uses your location only when you ask for a ride fare, so the driver is sent to where you are. It is sent to your Pond and to the ride company for that ride, and nowhere else.",
+          "locationAlwaysAndWhenInUsePermission": false,
+          "locationAlwaysPermission": false,
+          "isIosBackgroundLocationEnabled": false,
+          "isAndroidBackgroundLocationEnabled": false
+        }
+      ],
+      [
         "expo-audio",
         {
           "microphonePermission": "Goose On The Go uses your microphone so you can talk to Goose.",
