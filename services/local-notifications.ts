@@ -21,7 +21,9 @@
 import * as Notifications from 'expo-notifications';
 import { Linking, Platform } from 'react-native';
 
-import { linkFromData } from './notification-link';
+import { router } from 'expo-router';
+
+import { linkFromData, rideOfferFromData } from './notification-link';
 import type { ServerNotification } from './notification-stream';
 
 /**
@@ -101,7 +103,7 @@ export async function presentLocally(notification: ServerNotification): Promise<
       content: {
         title: notification.title,
         body: notification.body,
-        // A ride or directions link rides along, already checked, for the tap to open.
+        // A link or a ride offer rides along, already checked, for the tap to act on.
         data: {
           id: notification.id,
           category: notification.category,
@@ -123,14 +125,26 @@ export async function presentLocally(notification: ServerNotification): Promise<
 }
 
 /** The open-link fields to store on a shade notification; empty when it carries no link. */
-function linkData(data: unknown): Record<string, string> {
+function linkData(data: unknown): Record<string, unknown> {
   const link = linkFromData(data);
-  return link ? { action: 'open_url', kind: link.kind, url: link.url, label: link.label } : {};
+  if (link) return { action: 'open_url', kind: link.kind, url: link.url, label: link.label };
+  const offer = rideOfferFromData(data);
+  return offer ? { action: 'ride_offer', provider: offer.provider, dropoff: offer.dropoff } : {};
 }
 
-/** Open the link a tapped notification carries, checking it again first. */
+/** Act on a tapped notification, checking what it carries again first. */
 function openTapped(response: Notifications.NotificationResponse | null): void {
-  const link = linkFromData(response?.notification.request.content.data);
+  const data = response?.notification.request.content.data;
+  const offer = rideOfferFromData(data);
+  if (offer) {
+    const { name, latitude, longitude } = offer.dropoff;
+    router.push({
+      pathname: '/ride',
+      params: { name, latitude: String(latitude), longitude: String(longitude), provider: offer.provider },
+    });
+    return;
+  }
+  const link = linkFromData(data);
   if (!link) return;
   Linking.openURL(link.url).catch((e) => {
     // No app and no browser can take it; the notification itself still says where to.
@@ -139,8 +153,9 @@ function openTapped(response: Notifications.NotificationResponse | null): void {
 }
 
 /**
- * Open ride and directions links when their notification is tapped, including
- * the tap that launched the app. Returns the unsubscribe.
+ * Open ride and directions links, and the ride screen for a ride offer, when
+ * their notification is tapped, including the tap that launched the app.
+ * Returns the unsubscribe.
  */
 export function watchLinkTaps(): () => void {
   const sub = Notifications.addNotificationResponseReceivedListener(openTapped);
