@@ -73,6 +73,7 @@ export default function StackLayout() {
       <Stack.Screen name="sessions" options={{ title: t('screens.sessions') }} />
       <Stack.Screen name="logs" options={{ title: t('screens.logs') }} />
       <Stack.Screen name="schedule" options={{ title: t('screens.schedule') }} />
+      <Stack.Screen name="ride" options={{ title: t('screens.ride') }} />
       <Stack.Screen name="app-management" options={{ title: t('screens.appManagement') }} />
       <Stack.Screen name="mcp-servers" options={{ title: t('screens.mcpServers') }} />
       <Stack.Screen name="add-users" options={{ title: t('screens.addUsers') }} />

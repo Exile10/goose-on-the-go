@@ -415,7 +415,8 @@
     "commissionDevice": "Add a device",
     "switchPond": "Switch Pond",
     "sessions": "Conversations",
-    "remoteAccess": "Remote access"
+    "remoteAccess": "Remote access",
+    "ride": "Ride"
   },
   "nav": {
     "goose": "Goose",
@@ -881,5 +882,43 @@
     "tabHabit": "Habit",
     "tabPerson": "Person",
     "tabReminder": "Reminder"
+  },
+  "ride": {
+    "to": "Ride to {{place}}",
+    "offerBody": "Get an Uber fare from where you are now. Your location is used for this ride only. Nothing is booked until you confirm.",
+    "getFare": "Get a fare",
+    "locating": "Finding where you are…",
+    "fare": "Fare: {{fare}}",
+    "pickupIn": "A driver could reach you in about {{minutes}} min.",
+    "confirm": "Book this ride",
+    "decline": "No thanks",
+    "cancel": "Cancel ride",
+    "cancelNote": "Uber may charge a cancellation fee.",
+    "driver": "{{name}} in a {{car}}",
+    "closedDeclined": "No ride was booked.",
+    "closedCancelled": "The ride was cancelled.",
+    "closedFailed": "Uber could not book this ride. Nothing was booked.",
+    "status": {
+      "processing": "Finding a driver…",
+      "accepted": "A driver is on the way.",
+      "arriving": "Your driver is arriving.",
+      "in_progress": "You are on your way.",
+      "completed": "You have arrived.",
+      "no_drivers_available": "No drivers were available.",
+      "driver_canceled": "The driver cancelled the ride.",
+      "rider_canceled": "The ride was cancelled.",
+      "other": "Your ride is under way."
+    },
+    "problem": {
+      "locationDenied": "Location is off for Goose On The Go, so no fare could be asked for. Turn it on in Settings to get a fare.",
+      "notLinked": "This phone is not linked to a member of your household, so it cannot book rides.",
+      "notSetUp": "Your Pond is not set up to book rides yet. Connect Uber on the Pond first.",
+      "expired": "That fare has expired. Get a new one.",
+      "alreadyDecided": "This ride was already booked or turned down.",
+      "notFound": "This ride is no longer on your Pond.",
+      "refused": "Uber turned this down. Nothing was booked.",
+      "failed": "Something went wrong. Nothing was booked."
+    },
+    "done": "Done"
   }
 }
