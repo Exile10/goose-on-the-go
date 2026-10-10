@@ -110,6 +110,7 @@
         }
       ],
       "./plugins/with-pond-tls",
+      "./plugins/with-release-signing",
       "expo-asset"
     ],
     "experiments": {
