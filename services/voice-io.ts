@@ -35,8 +35,12 @@ export function voiceSupported(): boolean {
   return audio !== null;
 }
 
-/** expo-audio's code for a call on a native object it has already released. */
-const RELEASED = 'ERR_USING_RELEASED_SHARED_OBJECT';
+/**
+ * expo-modules-core's codes for a call on a native object it has already released.
+ * Android raises the first. iOS cannot find the object at all and raises the second,
+ * which on 2026-10-11 put a warning in the log every time voice mode closed.
+ */
+const RELEASED = new Set(['ERR_USING_RELEASED_SHARED_OBJECT', 'ERR_NATIVE_SHARED_OBJECT_NOT_FOUND']);
 
 /**
  * Stop a microphone stream that may already be gone, without throwing.
@@ -52,7 +56,8 @@ export function stopStream(stop: () => void): void {
   try {
     stop();
   } catch (error) {
-    if ((error as { code?: unknown } | null)?.code === RELEASED) return;
+    const code = (error as { code?: unknown } | null)?.code;
+    if (typeof code === 'string' && RELEASED.has(code)) return;
     console.warn('[voice] the microphone did not stop:', error);
   }
 }
