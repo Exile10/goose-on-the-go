@@ -37,9 +37,9 @@ import {
   ACTIVITY_FILTERS,
   categoryIcon,
   describeEvent,
-  eventKey,
+  eventFilter,
+  eventKeys,
   filterLabelKey,
-  filterOf,
   type ActivityFilter,
 } from '@/models/log';
 import { useActivity } from '@/view-models/use-activity';
@@ -60,7 +60,9 @@ const EventRow = React.memo(function EventRow({
 }) {
   const styles = useThemedStyles(makeStyles);
   const { t } = useTranslation();
-  const { title, detail } = describeEvent(item);
+  const { title, detail } = describeEvent(item, t);
+  // Presence and session events fall under no filter, so they carry no badge.
+  const filter = eventFilter(item);
   return (
     <View style={styles.logRow}>
       <View style={styles.logIcon}>
@@ -71,9 +73,9 @@ const EventRow = React.memo(function EventRow({
         {detail ? <Text style={styles.logDetail}>{detail}</Text> : null}
         <View style={styles.logMeta}>
           <Text style={styles.logTime}>{formatRelativeTime(item.timestamp)}</Text>
-          {showType ? (
+          {showType && filter ? (
             <View style={styles.typeBadge}>
-              <Text style={styles.typeText}>{t(filterLabelKey(filterOf(item.category)))}</Text>
+              <Text style={styles.typeText}>{t(filterLabelKey(filter))}</Text>
             </View>
           ) : null}
         </View>
@@ -85,26 +87,18 @@ const EventRow = React.memo(function EventRow({
 export default function ActivityScreen() {
   const styles = useThemedStyles(makeStyles);
   const { t } = useTranslation();
-  const { data, loading, error, actions } = useActivity();
   const [activeTab, setActiveTab] = useState<ActivityFilter>('all');
-
-  const filtered = useMemo(
-    () =>
-      activeTab === 'all'
-        ? data.events
-        : data.events.filter((e) => filterOf(e.category) === activeTab),
-    [data.events, activeTab],
-  );
+  const { data, loading, error, failed, actions } = useActivity(activeTab);
 
   const renderItem = useCallback(
     ({ item }: { item: ActivityEvent }) => <EventRow item={item} showType={activeTab === 'all'} />,
     [activeTab],
   );
 
-  const keyExtractor = useCallback(
-    (item: ActivityEvent, index: number) => eventKey(item, index),
-    [],
-  );
+  // Keyed once per read. The index only finds an event's key; the key itself
+  // holds no position, so a row keeps it when a poll adds newer ones above.
+  const keys = useMemo(() => eventKeys(data.events), [data.events]);
+  const keyExtractor = useCallback((_item: ActivityEvent, index: number) => keys[index], [keys]);
 
   return (
     <View style={styles.container}>
@@ -133,17 +127,20 @@ export default function ActivityScreen() {
 
       {/* Activity list */}
       <FlatList
-        data={filtered}
+        data={data.events}
         keyExtractor={keyExtractor}
         renderItem={renderItem}
+        // A poll puts newer events above; this keeps the row being read where it is.
+        maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
         ListHeaderComponent={
           <>
             {loading ? <InkSpinner label={t('activity.loading')} /> : null}
-            {error ? (
+            {/* A failed read with nothing to add still says so: the connection banner gives the cause. */}
+            {error || failed ? (
               <View style={styles.notice}>
-                <InkNotice tone="danger">{error}</InkNotice>
+                <InkNotice tone="danger">{error ?? t('activity.failed')}</InkNotice>
                 <InkButton variant="quiet" icon="refresh" onPress={actions.refresh}>
                   {t('common.retry')}
                 </InkButton>
@@ -153,7 +150,7 @@ export default function ActivityScreen() {
         }
         // A list that failed to load is unknown, not empty.
         ListEmptyComponent={
-          !loading && !error ? (
+          !loading && !error && !failed ? (
             <InkEmptyState icon="logs" title={t('activity.empty')}>
               <InkText>{t('activity.emptyBody')}</InkText>
             </InkEmptyState>

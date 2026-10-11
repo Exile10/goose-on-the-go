@@ -12,7 +12,7 @@ export {
   attributeText,
   categoryIcon,
   describeEvent,
-  eventKey,
+  eventKeys,
   filterLabelKey,
   filterOf,
 } from './log';
