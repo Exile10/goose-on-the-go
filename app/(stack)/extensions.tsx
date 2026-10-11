@@ -9,8 +9,8 @@
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import React, { useCallback, useState } from 'react';
-import { InkButton, InkEmptyState, InkNotice, InkSpinner, InkSwitch, InkText, InkTitle } from '@jarida/ink/native';
-import { View, Text, StyleSheet, ScrollView, TextInput } from 'react-native';
+import { InkButton, InkEmptyState, InkNotice, InkSegmented, InkSpinner, InkSwitch, InkText, InkTitle } from '@jarida/ink/native';
+import { Alert, View, Text, StyleSheet, ScrollView, TextInput } from 'react-native';
 
 import { GIcon } from '@/components/ui/g-icon';
 import { GPressable } from '@/components/ui/g-pressable';
@@ -22,10 +22,8 @@ import { Spacing } from '@/constants/spacing';
 import { Radii } from '@/constants/radii';
 import { useThemedStyles } from '@/hooks/use-themed-styles';
 import type { ThemeColors } from '@/constants/colors';
-import { api } from '@/services/api-client';
-import type { Extension, MarketplaceExtension, SecretRequirement } from '@/services/types';
-import { useExtensions } from '@/view-models/use-extensions';
-import { describeApiError } from '@/view-models/describe-error';
+import type { Extension, MarketplaceExtension } from '@/services/types';
+import { credentialFields, useExtensions } from '@/view-models/use-extensions';
 
 const STATUS_COLORS: Record<string, string> = {
   connected: Semantic.success,
@@ -47,9 +45,15 @@ function statusLabel(status: string, t: TFunction): string | null {
 const InstalledCard = React.memo(function InstalledCard({
   extension,
   onToggle,
+  onCredentials,
+  onRemove,
 }: {
   extension: Extension;
   onToggle: (name: string, enabled: boolean) => void;
+  /** Present when the marketplace entry it came from has credentials to set. */
+  onCredentials?: (name: string) => void;
+  /** Present only for a marketplace extension; the Pond's built-in ones stay. */
+  onRemove?: (name: string) => void;
 }) {
   const styles = useThemedStyles(makeStyles);
   const { t } = useTranslation();
@@ -79,85 +83,115 @@ const InstalledCard = React.memo(function InstalledCard({
       {extension.last_error ? (
         <Text style={styles.errorText}>{extension.last_error}</Text>
       ) : null}
+
+      {onCredentials || onRemove ? (
+        <View style={styles.actionRow}>
+          {onCredentials ? (
+            <InkButton variant="quiet" icon="key" onPress={() => onCredentials(extension.name)}>
+              {t('extensions.credentials')}
+            </InkButton>
+          ) : null}
+          {onRemove ? (
+            <InkButton variant="quiet" icon="trash" onPress={() => onRemove(extension.name)}>
+              {t('common.remove')}
+            </InkButton>
+          ) : null}
+        </View>
+      ) : null}
     </View>
   );
 });
 
-/** One secret field within a post-install setup prompt. Write-only: nothing typed here is ever read back. */
-const SecretField = React.memo(function SecretField({ requirement }: { requirement: SecretRequirement }) {
+type FormMode = 'install' | 'credentials';
+
+/**
+ * Every credential an extension asks for, sent with one submit. Write-only: nothing typed
+ * here is read back, and what is left blank is not sent, so it keeps what the Pond holds.
+ *
+ * Installing, it comes first, since the Pond refuses an install that lacks a required
+ * secret, and it is also the confirmation that the extension will run on the Pond.
+ */
+function CredentialsForm({
+  item,
+  mode,
+  busy,
+  onSubmit,
+  onCancel,
+}: {
+  item: MarketplaceExtension;
+  mode: FormMode;
+  busy: boolean;
+  onSubmit: (secrets: Record<string, string>) => void;
+  onCancel: () => void;
+}) {
   const styles = useThemedStyles(makeStyles);
   const { t } = useTranslation();
-  const [value, setValue] = useState('');
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [values, setValues] = useState<Record<string, string>>({});
+  const fields = credentialFields(item);
 
-  const handleSave = useCallback(async () => {
-    if (!value.trim()) return;
-    setSaving(true);
-    setError(null);
-    try {
-      await api.setSecret(requirement.key, value.trim());
-      setSaved(true);
-      setValue('');
-    } catch (e) {
-      setError(describeApiError(e) ?? t('errors.generic'));
-    } finally {
-      setSaving(false);
-    }
-  }, [requirement.key, t, value]);
-
-  return (
-    <View style={styles.secretField}>
-      <Text style={styles.secretLabel}>{requirement.display_name}</Text>
-      {requirement.description ? <Text style={styles.secretDesc}>{requirement.description}</Text> : null}
-      {saved ? (
-        <View style={styles.secretSavedRow}>
-          <GIcon name="check" size={14} color={Semantic.success} />
-          <Text style={styles.secretSavedText}>{t('extensions.secretSaved')}</Text>
-        </View>
-      ) : (
-        <View style={styles.secretInputRow}>
-          <TextInput
-            style={styles.secretInput}
-            value={value}
-            onChangeText={setValue}
-            secureTextEntry
-            placeholder={t('extensions.secretPlaceholder')}
-            placeholderTextColor={Grey[400]}
-            autoCapitalize="none"
-            autoCorrect={false}
-          />
-          <GPressable onPress={handleSave} disabled={saving || !value.trim()}>
-            <Text style={styles.secretSaveText}>{saving ? t('extensions.saving') : t('common.save')}</Text>
-          </GPressable>
-        </View>
-      )}
-      {error ? <Text style={styles.errorText}>{error}</Text> : null}
-    </View>
-  );
-});
-
-/** Shown right after a successful install, for whatever credentials that extension needs. */
-function SetupPrompt({ item, onDone }: { item: MarketplaceExtension; onDone: () => void }) {
-  const styles = useThemedStyles(makeStyles);
-  const { t } = useTranslation();
-  const credentialed = item.required_secrets.filter((s) => s.kind !== 'oauth_flow');
-  const oauthOnly = item.required_secrets.filter((s) => s.kind === 'oauth_flow');
+  const filled: Record<string, string> = {};
+  for (const [key, value] of Object.entries(values)) {
+    if (value.trim()) filled[key] = value.trim();
+  }
+  // An install needs every required field now; a save needs something to save.
+  const ready = mode === 'install'
+    ? fields.every((f) => !f.required || filled[f.key])
+    : Object.keys(filled).length > 0;
+  const setValue = (key: string, value: string) => setValues((current) => ({ ...current, [key]: value }));
 
   return (
     <View style={styles.setupCard}>
       <Text style={styles.setupTitle}>{t('extensions.setupTitle', { name: item.name })}</Text>
-      {credentialed.map((req) => (
-        <SecretField key={req.key} requirement={req} />
-      ))}
-      {oauthOnly.map((req) => (
-        <View key={req.key} style={styles.oauthNotice}>
-          <GIcon name="external" size={14} color={Grey[400]} />
-          <Text style={styles.oauthNoticeText}>{t('extensions.oauthPending', { name: req.display_name })}</Text>
-        </View>
-      ))}
-      <InkButton variant="quiet" onPress={onDone}>{t('common.done')}</InkButton>
+      <Text style={styles.secretDesc}>
+        {mode === 'install'
+          ? t('extensions.installConfirmBody', { name: item.name })
+          : t('extensions.credentialsBody')}
+      </Text>
+      {fields.map((req) => {
+        const chosen = req.options?.find((o) => o.value === values[req.key]);
+        return (
+          <View key={req.key} style={styles.secretField}>
+            <View style={styles.labelRow}>
+              <Text style={styles.secretLabel}>{req.display_name}</Text>
+              {req.required ? <Text style={styles.secretDesc}>{t('extensions.required')}</Text> : null}
+            </View>
+            {req.description ? <Text style={styles.secretDesc}>{req.description}</Text> : null}
+            {req.kind === 'choice' ? (
+              // A choice is not a secret: its answers are shown, never typed or masked.
+              <InkSegmented
+                label={req.display_name}
+                value={values[req.key] ?? ''}
+                options={(req.options ?? []).map((o) => ({ value: o.value, label: o.label, disabled: busy }))}
+                onChange={(next) => setValue(req.key, next)}
+              />
+            ) : (
+              <View style={styles.secretInputRow}>
+                <TextInput
+                  style={styles.secretInput}
+                  value={values[req.key] ?? ''}
+                  onChangeText={(next) => setValue(req.key, next)}
+                  secureTextEntry
+                  editable={!busy}
+                  accessibilityLabel={req.display_name}
+                  placeholder={t('extensions.secretPlaceholder')}
+                  placeholderTextColor={Grey[400]}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+              </View>
+            )}
+            {chosen?.description ? <Text style={styles.secretDesc}>{chosen.description}</Text> : null}
+          </View>
+        );
+      })}
+      <View style={styles.formActions}>
+        <InkButton variant="quiet" onPress={onCancel} disabled={busy}>{t('common.cancel')}</InkButton>
+        <InkButton variant="primary" onPress={() => onSubmit(filled)} disabled={busy || !ready}>
+          {mode === 'install'
+            ? busy ? t('extensions.installing') : t('extensions.install')
+            : busy ? t('extensions.saving') : t('common.save')}
+        </InkButton>
+      </View>
     </View>
   );
 }
@@ -207,26 +241,90 @@ const MarketplaceCard = React.memo(function MarketplaceCard({
 export default function ExtensionsScreen() {
   const styles = useThemedStyles(makeStyles);
   const { t } = useTranslation();
-  const { data, loading, error, actions } = useExtensions();
+  const { data, loading, error, failed, actions } = useExtensions();
   const [installingId, setInstallingId] = useState<string | null>(null);
-  const [setupFor, setSetupFor] = useState<MarketplaceExtension | null>(null);
+  const [form, setForm] = useState<{ item: MarketplaceExtension; mode: FormMode } | null>(null);
+  const [saving, setSaving] = useState(false);
 
   const handleToggle = useCallback(
     (name: string, enabled: boolean) => void actions.setEnabled(name, enabled),
     [actions],
   );
 
-  const handleInstall = useCallback(
-    async (item: MarketplaceExtension) => {
+  const runInstall = useCallback(
+    async (item: MarketplaceExtension, secrets?: Record<string, string>) => {
       setInstallingId(item.id);
-      const ok = await actions.install(item);
+      const ok = await actions.install(item, secrets);
       setInstallingId(null);
-      if (ok && item.required_secrets.length > 0) setSetupFor(item);
+      return ok;
     },
     [actions],
   );
 
-  const nothing = !loading && !error && data.installed.length === 0 && data.available.length === 0;
+  /**
+   * An extension runs as a program on the Pond's computer -- Filesystem is handed `/` --
+   * so an install is confirmed first. One with credentials is confirmed by its form.
+   */
+  const handleInstall = useCallback(
+    (item: MarketplaceExtension) => {
+      if (credentialFields(item).length > 0) {
+        setForm({ item, mode: 'install' });
+        return;
+      }
+      Alert.alert(
+        t('extensions.installConfirmTitle', { name: item.name }),
+        t('extensions.installConfirmBody', { name: item.name }),
+        [
+          { text: t('common.cancel'), style: 'cancel' },
+          { text: t('extensions.install'), onPress: () => void runInstall(item) },
+        ],
+      );
+    },
+    [runInstall, t],
+  );
+
+  const handleCredentials = useCallback(
+    (name: string) => {
+      const item = data.marketplace.find((m) => m.id === name);
+      if (item) setForm({ item, mode: 'credentials' });
+    },
+    [data.marketplace],
+  );
+
+  const confirmRemove = useCallback(
+    (name: string) => {
+      const label = data.marketplace.find((m) => m.id === name)?.name ?? name;
+      Alert.alert(
+        t('extensions.removeConfirmTitle', { name: label }),
+        t('extensions.removeConfirmBody', { name: label }),
+        [
+          { text: t('common.cancel'), style: 'cancel' },
+          { text: t('common.remove'), style: 'destructive', onPress: () => void actions.remove(name) },
+        ],
+      );
+    },
+    [actions, data.marketplace, t],
+  );
+
+  /** Closes the form only on success, so a refused submit keeps what was typed. */
+  const handleSubmit = useCallback(
+    async (secrets: Record<string, string>) => {
+      if (!form) return;
+      let ok: boolean;
+      if (form.mode === 'install') {
+        ok = await runInstall(form.item, Object.keys(secrets).length > 0 ? secrets : undefined);
+      } else {
+        setSaving(true);
+        ok = await actions.saveSecrets(form.item.id, secrets);
+        setSaving(false);
+      }
+      if (ok) setForm(null);
+    },
+    [actions, form, runInstall],
+  );
+
+  // A first read that failed is not an empty Pond: say so, and offer the read again.
+  const nothing = !loading && !error && !failed && data.installed.length === 0 && data.available.length === 0;
 
   return (
     <GKeyboardView>
@@ -245,6 +343,15 @@ export default function ExtensionsScreen() {
           </View>
         ) : null}
 
+        {failed && !error && !loading ? (
+          <View style={styles.notice}>
+            <InkNotice tone="danger">{t('extensions.loadFailed')}</InkNotice>
+            <GPressable onPress={() => void actions.refresh()} hitSlop={8}>
+              <InkText>{t('common.retry')}</InkText>
+            </GPressable>
+          </View>
+        ) : null}
+
         {nothing ? (
           <InkEmptyState icon="package" title={t('extensions.noneTitle')}>
             <InkText>{t('extensions.noneBody')}</InkText>
@@ -254,26 +361,53 @@ export default function ExtensionsScreen() {
         {data.installed.length > 0 ? (
           <View style={styles.section}>
             <InkTitle level={3}>{t('extensions.installedTitle')}</InkTitle>
-            {data.installed.map((ext) => (
-              <InstalledCard key={ext.name} extension={ext} onToggle={handleToggle} />
-            ))}
+            {data.installed.map((ext) => {
+              // Only a marketplace install is named by a marketplace id. The Pond's built-in
+              // `giap-*` extensions never are, so they get neither credentials nor Remove.
+              const item = data.marketplace.find((m) => m.id === ext.name);
+              return (
+                <React.Fragment key={ext.name}>
+                  <InstalledCard
+                    extension={ext}
+                    onToggle={handleToggle}
+                    onCredentials={item && credentialFields(item).length > 0 ? handleCredentials : undefined}
+                    onRemove={item ? confirmRemove : undefined}
+                  />
+                  {form?.mode === 'credentials' && form.item.id === ext.name ? (
+                    <CredentialsForm
+                      item={form.item}
+                      mode="credentials"
+                      busy={saving}
+                      onSubmit={handleSubmit}
+                      onCancel={() => setForm(null)}
+                    />
+                  ) : null}
+                </React.Fragment>
+              );
+            })}
           </View>
-        ) : null}
-
-        {setupFor ? (
-          <SetupPrompt item={setupFor} onDone={() => setSetupFor(null)} />
         ) : null}
 
         {data.available.length > 0 ? (
           <View style={styles.section}>
             <InkTitle level={3}>{t('extensions.marketplaceTitle')}</InkTitle>
             {data.available.map((item) => (
-              <MarketplaceCard
-                key={item.id}
-                item={item}
-                installing={installingId === item.id}
-                onInstall={handleInstall}
-              />
+              <React.Fragment key={item.id}>
+                <MarketplaceCard
+                  item={item}
+                  installing={installingId === item.id}
+                  onInstall={handleInstall}
+                />
+                {form?.mode === 'install' && form.item.id === item.id ? (
+                  <CredentialsForm
+                    item={item}
+                    mode="install"
+                    busy={installingId === item.id}
+                    onSubmit={handleSubmit}
+                    onCancel={() => setForm(null)}
+                  />
+                ) : null}
+              </React.Fragment>
             ))}
           </View>
         ) : null}
@@ -288,7 +422,7 @@ const makeStyles = (c: ThemeColors) =>
   StyleSheet.create({
   container: { flex: 1, backgroundColor: c.background },
   scroll: { paddingHorizontal: Spacing.lg, paddingTop: Spacing.lg },
-  notice: { marginBottom: Spacing.md },
+  notice: { marginBottom: Spacing.md, gap: Spacing.sm },
   section: { gap: Spacing.sm, marginBottom: Spacing.lg },
 
   /* Card */
@@ -349,6 +483,12 @@ const makeStyles = (c: ThemeColors) =>
     color: Semantic.danger,
     marginTop: Spacing.xs,
   },
+  actionRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.sm,
+    marginTop: Spacing.md,
+  },
 
   /* Category */
   categoryRow: {
@@ -370,7 +510,7 @@ const makeStyles = (c: ThemeColors) =>
     color: c.textSecondary,
   },
 
-  /* Setup prompt */
+  /* Credentials form */
   setupCard: {
     backgroundColor: c.backgroundSecondary,
     borderRadius: Radii.xl,
@@ -411,23 +551,6 @@ const makeStyles = (c: ThemeColors) =>
     fontSize: FontSize.sm,
     color: c.text,
   },
-  secretSaveText: {
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.sm,
-    fontWeight: FontWeight.semibold,
-    color: c.textBrand,
-  },
-  secretSavedRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs },
-  secretSavedText: {
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.sm,
-    color: Semantic.success,
-  },
-  oauthNotice: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs },
-  oauthNoticeText: {
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.xs,
-    color: c.textTertiary,
-    flex: 1,
-  },
+  labelRow: { flexDirection: 'row', alignItems: 'baseline', gap: Spacing.sm },
+  formActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: Spacing.sm },
 });

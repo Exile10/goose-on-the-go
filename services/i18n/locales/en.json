@@ -668,17 +668,24 @@
     "install": "Install",
     "installing": "Installing…",
     "noneTitle": "No extensions yet",
-    "noneBody": "Your Pond could not be reached for its extension list.",
+    "noneBody": "Your Pond has no extensions installed, and none to add.",
+    "loadFailed": "Your Pond could not be reached for its extension list.",
     "status": {
       "connected": "Connected",
       "error": "Error",
       "loading": "Starting…"
     },
-    "setupTitle": "Finish setting up {{name}}",
+    "setupTitle": "Set up {{name}}",
+    "credentials": "Credentials",
+    "credentialsBody": "Anything left blank keeps what your Pond already holds.",
+    "required": "Required",
     "secretPlaceholder": "Paste the value",
-    "secretSaved": "Saved",
     "saving": "Saving…",
-    "oauthPending": "Requires connecting {{name}} — coming soon"
+    "restartFailed": "Saved, but your Pond could not restart the extension with the new values.",
+    "installConfirmTitle": "Install {{name}}?",
+    "installConfirmBody": "{{name}} will run as a program on the computer your Pond runs on, and Goose will be able to use its tools.",
+    "removeConfirmTitle": "Remove {{name}}?",
+    "removeConfirmBody": "{{name}} will stop running on your Pond. Credentials saved for it stay there."
   },
   "photo": {
     "choose": "Choose a photo",
