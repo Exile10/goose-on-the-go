@@ -371,6 +371,12 @@ voice mode. What is worth knowing:
   detects the end of speech from its loudness, and writes the WAV itself
   (`services/speech.ts`). Replies are spoken a sentence at a time through
   `/tts`, the next one synthesised while the last plays.
+- **Stopping the microphone never throws.** When voice mode closes,
+  expo-audio's own cleanup releases the stream before `use-voice.ts` stops it,
+  and stopping a released stream throws `ERR_USING_RELEASED_SHARED_OBJECT`.
+  Thrown during unmount that ends the app: on 2026-10-05, tapping the keyboard
+  icon in voice mode closed it. `stopStream` in `services/voice-io.ts` treats
+  a released stream as stopped and reports any other failure without throwing.
 
 The root stack draws no header for it (`headerShown: false` in
 `app/_layout.tsx`); the screen draws Ink's navbar, which carries its own way
