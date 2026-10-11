@@ -12,8 +12,9 @@
  * detector need. `speech.ts` does the arithmetic.
  */
 
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { File, Paths } from 'expo-file-system';
+import { useReleasingSharedObjectWithLifecycle } from 'expo-modules-core';
 
 type Audio = typeof import('expo-audio');
 type StreamBuffer = import('expo-audio').AudioStreamBuffer;
@@ -40,7 +41,7 @@ const RELEASED = 'ERR_USING_RELEASED_SHARED_OBJECT';
 /**
  * Stop a microphone stream that may already be gone, without throwing.
  *
- * Closing voice mode unmounts the hook that owns the stream. expo-audio's own cleanup
+ * Closing voice mode unmounts the hook that owns the stream. `useMicStream`'s own cleanup
  * releases the stream before the voice hook's cleanup runs, so the stop there lands on a
  * released object and expo-audio throws. Thrown out of an effect cleanup, that is fatal:
  * on 2026-10-05 switching from voice mode to the keyboard closed the app on the A57. A
@@ -99,17 +100,35 @@ export const useMicStream: (onBuffer: (buffer: MicBuffer) => void) => {
         onBufferRef.current({ samples: mono, sampleRate: buffer.sampleRate });
       }, []);
 
-      const options = useMemo(
-        () => ({
-          sampleRate: 16_000,
-          channels: 1,
-          encoding: 'int16' as const,
-          onBuffer: handleBuffer,
-        }),
-        [handleBuffer],
+      // A `start()` still opening the recorder, if there is one.
+      const starting = useRef<Promise<void> | null>(null);
+
+      // Made here rather than through expo-audio's `useAudioStream`, whose cleanup releases
+      // the stream at unmount there and then. If voice mode closes while `start()` is still
+      // opening the recorder, that release finds nothing to stop (Android stops only a stream
+      // already running), the start then finishes on an object nothing can reach, and the
+      // microphone stays on. So the release waits for a start in flight to settle, stops what
+      // it opened, and only then lets the stream go.
+      const stream = useReleasingSharedObjectWithLifecycle(
+        {
+          factory: () =>
+            new audio.AudioModule.AudioStream({ sampleRate: 16_000, channels: 1, encoding: 'int16' }),
+          release: (closing) => {
+            const close = () => {
+              stopStream(() => closing.stop());
+              closing.release();
+            };
+            if (starting.current) void starting.current.then(close, close);
+            else close();
+          },
+        },
+        [],
       );
 
-      const { stream } = audio.useAudioStream(options);
+      useEffect(() => {
+        const subscription = stream.addListener('audioStreamBuffer', handleBuffer);
+        return () => subscription.remove();
+      }, [stream, handleBuffer]);
 
       // Read through a ref updated during render (not in an effect), so the wrapper
       // below — created once and never replaced — can never close over a stream
@@ -119,7 +138,15 @@ export const useMicStream: (onBuffer: (buffer: MicBuffer) => void) => {
       streamRef.current = stream;
 
       return useRef({
-        start: () => streamRef.current.start(),
+        start: () => {
+          const started = streamRef.current.start();
+          starting.current = started;
+          const settled = () => {
+            if (starting.current === started) starting.current = null;
+          };
+          void started.then(settled, settled);
+          return started;
+        },
         stop: () => stopStream(() => streamRef.current.stop()),
       }).current;
     }
