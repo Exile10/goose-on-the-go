@@ -509,10 +509,30 @@
     "all": "All",
     "action": "Actions",
     "mcp": "Tools",
+    "home": "Home",
     "system": "System",
     "error": "Problems",
     "empty": "Nothing here yet",
-    "emptyBody": "What Goose does around the house shows up here."
+    "emptyBody": "What Goose does around the house shows up here.",
+    "loading": "Reading your Pond's activity",
+    "failed": "Could not read your Pond's activity.",
+    "event": {
+      "agentTurn": "Answered in a conversation",
+      "inference": "Ran a model",
+      "toolCall": "Used a tool",
+      "sensorReading": "A sensor reported",
+      "cameraEvent": "A camera saw something",
+      "deviceChanged": "A device changed",
+      "timeTick": "A new hour began",
+      "presence": "Someone arrived or left",
+      "session": "A conversation started or went quiet",
+      "egress": "Reached the internet",
+      "egressDenied": "Kept a request off the internet",
+      "devicePaired": "Paired a device",
+      "pairingFailed": "Refused a pairing attempt",
+      "securityAudit": "Checked who was asking",
+      "other": "Something happened"
+    }
   },
   "pairing": {
     "stepFind": "Find",

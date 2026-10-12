@@ -5,8 +5,17 @@ export type { MemoryFragment, MemoryCategory } from './memory';
 export { SAMPLE_MEMORIES } from './memory';
 
 
-export type { LogEntry, LogType, LogLevel } from './log';
-export { SAMPLE_LOGS } from './log';
+export type { ActivityFilter } from './log';
+export {
+  ACTIVITY_FILTERS,
+  SAMPLE_ACTIVITY,
+  attributeText,
+  categoryIcon,
+  describeEvent,
+  eventKeys,
+  filterLabelKey,
+  filterOf,
+} from './log';
 
 export type { ScheduleEvent, Routine, EventType } from './schedule';
 export { SAMPLE_EVENTS, SAMPLE_ROUTINES } from './schedule';
