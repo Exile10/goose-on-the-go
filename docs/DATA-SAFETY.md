@@ -86,6 +86,14 @@ app sends `{authUrl, nodeKey, machineKey}` to **the Pond**, not to the coordinat
 (`services/remote-access.ts:104`), and the Pond approves the node. Approval is a local
 act, which is the point of the design.
 
+A phone whose remote access lapsed, because the Pond did not see it on the home network
+for 30 days, has its enrollment revoked, and the coordinator will not enrol that machine
+key again. When the Pond reports this (`stale_identity`), the app erases the embedded
+node's private node and machine keys from the device and enrols a node with new ones
+(2026-10-12, see `docs/PINNED_HTTPS.md`). The coordinator then holds the new public keys;
+the old ones stay with it only as the revoked record. A lapsed pairing's keys are never
+reused.
+
 ### 3. Google FCM and Apple APNs
 
 `services/push-token.ts:1-19` is explicit about the shape, and it is the strongest privacy

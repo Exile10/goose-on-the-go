@@ -306,6 +306,41 @@ with the rebuilt library. Normal iOS Debug simulator and unsigned Release device
 builds pass, as do Android Debug/Release builds and all 13 native TLS/proxy tests
 with zero skips. Both Android APKs contain all four required Go-library ABIs.
 
+### A lapsed phone enrols again with fresh keys (2026-10-12)
+
+When a phone is not seen on the home network for 30 days, the Pond revokes its
+tailnet enrollment. The coordinator keeps the revoked machine key as a tombstone,
+so that a late registration under it can still be deleted, and it refuses to enrol
+that key again. A phone that was not re-paired kept presenting the same key, so it
+could never get remote access back (goose-in-a-pond#476).
+
+The Pond now answers that enrollment with `409 {"error":"stale_identity"}` when its
+revoked or failed record holds the phone's current machine key. `requestLocal`
+carries the body's `error` into `ApiError.detail`, and `enableRemoteAccess`
+(`services/remote-access.ts`) matches it there. It then calls the native
+`resetIdentity` (`PondNetwork` in `plugins/pond-tls/PondNetwork.kt` and
+`plugins/pond-tls/ios/PondNetwork.swift`), which stops the node, forgets the
+active profile and erases every node directory under `pond-network/` through the
+Pond library's `Mobile.prune(base, "")`. It starts a node, which makes new
+WireGuard and tailnet keys, and submits the enrollment once more under the new
+machine key, which replaces the revoked record through the Pond's normal path.
+
+The new key is enrolled with the same checks as before: the phone must still be on
+the home network with a valid bearer token. The 409 is a refusal, not an ambiguous
+failure, and the second write carries a different key, so this is not a replay of
+the first. A second `stale_identity` stops and shows `remote.identityStale`; there
+is no third attempt. Every other 409 is reported as before and erases nothing. The
+user sees no new screen, only the existing enrolling state for a little longer.
+Each lapse and return retires the old record against the household's bounded
+retirement budget, which the Pond already charges for a replacement.
+
+This needs the Pond's `stale_identity` answer, and a `pondnet.aar` and
+`Pondnet.xcframework` built from a Pond with `native/pondnet/mobile/prune.go`, or
+`resetIdentity` fails to link. The jest suite covers one reset and one resubmit,
+the refused second attempt, and other 409 reasons. The native method was not run on
+a device here. The device test is to lapse a phone, or have its Pond record revoked
+under the same key, then enable remote access and confirm it comes back.
+
 
 ## Current embedded validation and platform fixes (2026-09-20)
 

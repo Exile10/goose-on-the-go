@@ -62,6 +62,28 @@ export async function disableRemoteAccess(): Promise<void> {
   await cancelPendingRecovery();
   await native().disableRemote();
 }
+/**
+ * Whether the Pond refused an enrollment because the record it holds for this phone is
+ * revoked (or failed) under the very machine key the phone just sent.
+ *
+ * That is a lapse: the Pond revokes a phone not seen on the home network for 30 days,
+ * and the coordinator keeps the revoked machine key as a tombstone it will never enrol
+ * again. Every other 409 from enrollment means something else and is left to the caller.
+ */
+function isStaleIdentity(cause: unknown): boolean {
+  return cause instanceof ApiError && cause.status === 409 && cause.detail === 'stale_identity';
+}
+
+/**
+ * Enrol this phone's embedded node with the paired Pond's coordinator, from the home
+ * network, and commit the tailnet endpoint the Pond reports once the node is running.
+ *
+ * A Pond that answers the enrollment with `stale_identity` revoked this node's identity
+ * when its remote access lapsed. The node's directory is then erased through the native
+ * `resetIdentity`, a node with fresh keys is started, and the enrollment is submitted
+ * once more under the new machine key. A second `stale_identity` is reported, never
+ * retried.
+ */
 export async function enableRemoteAccess(profileId: string, localUrl: string, progress: (value: RemoteProgress) => void,
   commit: (endpoint: string, control: string, current: () => void) => Promise<void>,
   recovery?: { onReview: (id: string) => void },
@@ -87,6 +109,7 @@ export async function enableRemoteAccess(profileId: string, localUrl: string, pr
     let state = status(await native().beginRemote(profileId, control));
     check();
     let submitted = false;
+    let identityReset = false;
     for (let attempt = 0; attempt < 30; attempt++) {
       check();
       if (state.state === 'Running') {
@@ -139,7 +162,25 @@ export async function enableRemoteAccess(profileId: string, localUrl: string, pr
           await api.requestLocal(localUrl, `/api/v1/remote-access/recovery/${request.id}`, { method: 'POST' });
           pendingRecovery = null;
         } else {
-          await api.requestLocal(localUrl, '/api/v1/remote-access/enrollment', { method: 'POST', body });
+          try {
+            await api.requestLocal(localUrl, '/api/v1/remote-access/enrollment', { method: 'POST', body });
+          } catch (cause) {
+            if (!isStaleIdentity(cause)) throw cause;
+            if (identityReset) {
+              console.warn('[remote] Pond refused the fresh node identity as stale too; not enrolling again');
+              throw new Error(i18n.t('remote.identityStale'));
+            }
+            // A refusal, not an ambiguous failure: nothing was enrolled, and the next write
+            // carries a different machine key, so this is not a replay of the one above.
+            console.warn('[remote] Pond holds this node identity as revoked; replacing it with fresh keys');
+            identityReset = true;
+            check(); await native().resetIdentity();
+            check(); state = status(await native().beginRemote(profileId, control));
+            submitted = false;
+            // The fresh node is a new enrollment, so it gets the whole window.
+            attempt = -1;
+            continue;
+          }
         }
         check();
       }

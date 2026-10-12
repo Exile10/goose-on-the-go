@@ -91,7 +91,9 @@ export class ApiError extends Error {
    * The Pond's own `{"error": "..."}` sentence, when it sent one. A 400 from
    * the scheduler says which field was wrong ("invalid cron expression", "a
    * rule needs at least one action"), which a form can show where a status
-   * code could not. English, from the server: not for general display.
+   * code could not. English, from the server: not for general display. Some
+   * refusals carry a code here instead, such as enrollment's `stale_identity`,
+   * which a caller matches rather than shows.
    */
   readonly detail: string | null;
 
@@ -595,7 +597,8 @@ export class PondApiClient {
       signal: init.signal ?? timeoutSignal(REQUEST_TIMEOUT_MS),
     });
     if (!response.ok) {
-      throw new ApiError(`${init.method ?? 'GET'} ${path} → ${response.status}`, response.status, parseRetryAfter(response));
+      throw new ApiError(`${init.method ?? 'GET'} ${path} → ${response.status}`, response.status, parseRetryAfter(response),
+        await errorDetail(response));
     }
     return (await parseBody<T>(response)) as T;
   }
