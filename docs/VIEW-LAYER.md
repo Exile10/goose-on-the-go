@@ -373,7 +373,8 @@ voice mode. What is worth knowing:
   `/tts`, the next one synthesised while the last plays.
 - **Stopping the microphone never throws.** When voice mode closes,
   expo-audio's own cleanup releases the stream before `use-voice.ts` stops it,
-  and stopping a released stream throws `ERR_USING_RELEASED_SHARED_OBJECT`.
+  and stopping a released stream throws: `ERR_USING_RELEASED_SHARED_OBJECT` on
+  Android, `ERR_NATIVE_SHARED_OBJECT_NOT_FOUND` on iOS.
   Thrown during unmount that ends the app: on 2026-10-05, tapping the keyboard
   icon in voice mode closed it. `stopStream` in `services/voice-io.ts` treats
   a released stream as stopped and reports any other failure without throwing.

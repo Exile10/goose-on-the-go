@@ -20,6 +20,16 @@ describe('stopping the microphone', () => {
     expect(warn).not.toHaveBeenCalled();
   });
 
+  // iOS reports the same released stream as an object it cannot find.
+  it('treats the iOS released-stream code as stopped too', () => {
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const released = Object.assign(new Error("Calling the 'stop' function has failed"), {
+      code: 'ERR_NATIVE_SHARED_OBJECT_NOT_FOUND',
+    });
+    expect(() => stopStream(() => { throw released; })).not.toThrow();
+    expect(warn).not.toHaveBeenCalled();
+  });
+
   it('reports any other failure without throwing it', () => {
     const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
     expect(() => stopStream(() => { throw new Error('the hardware said no'); })).not.toThrow();
