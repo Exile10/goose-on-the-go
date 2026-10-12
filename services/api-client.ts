@@ -38,6 +38,7 @@ import type {
   DeviceStatePatch,
   EventCategory,
   Extension,
+  ExtensionSecretsResult,
   LogEntry,
   MarketplaceExtension,
   ChatFrame,
@@ -134,6 +135,14 @@ const REQUEST_TIMEOUT_MS = 15_000;
  * that was still going to succeed.
  */
 const COMMISSION_TIMEOUT_MS = 190_000;
+
+/**
+ * Installing an extension, or restarting one with new credentials. The Pond
+ * spawns it (`npx -y <package>`, which downloads the package the first time)
+ * and answers only once it has started, which can take minutes. At the default
+ * 15s the request was abandoned while the install was still going.
+ */
+const INSTALL_TIMEOUT_MS = 300_000;
 
 /**
  * A chat turn, which is a language model generating on the Pond's own hardware.
@@ -978,8 +987,27 @@ export class PondApiClient {
     return collection<Extension>(res, 'extensions');
   }
 
+  /** The Pond routes this path to PATCH and DELETE only; a PUT is refused. */
   setExtensionEnabled(name: string, enabled: boolean): Promise<void> {
-    return this.put<void>(`/api/v1/extensions/${encodeURIComponent(name)}`, { enabled });
+    return this.patch<void>(`/api/v1/extensions/${encodeURIComponent(name)}`, { enabled });
+  }
+
+  /** `DELETE /extensions/{name}`: stops it and forgets its config. Stored secrets stay. */
+  removeExtension(name: string): Promise<void> {
+    return this.del<void>(`/api/v1/extensions/${encodeURIComponent(name)}`);
+  }
+
+  /**
+   * Store an installed extension's credentials, bulk, as `{ KEY: value }`. Unlike
+   * `setSecret`, the Pond also restarts the extension, since a stdio extension's
+   * environment is fixed when it is spawned.
+   */
+  setExtensionSecrets(name: string, secrets: Record<string, string>): Promise<ExtensionSecretsResult> {
+    return this.request<ExtensionSecretsResult>(`/api/v1/extensions/${encodeURIComponent(name)}/secrets`, {
+      method: 'POST',
+      body: JSON.stringify(secrets),
+      signal: timeoutSignal(INSTALL_TIMEOUT_MS),
+    });
   }
 
   async listMarketplace(): Promise<MarketplaceExtension[]> {
@@ -987,8 +1015,18 @@ export class PondApiClient {
     return res.extensions;
   }
 
-  installMarketplaceExtension(id: string): Promise<void> {
-    return this.post<void>(`/api/v1/marketplace/${encodeURIComponent(id)}/install`, {});
+  /**
+   * The Pond answers 428 when a required secret is neither in `secrets` nor
+   * already stored, so credentials go with the install rather than after it.
+   * Its own signal also keeps `request()` from running connection recovery
+   * when the long wait runs out.
+   */
+  installMarketplaceExtension(id: string, secrets?: Record<string, string>): Promise<void> {
+    return this.request<void>(`/api/v1/marketplace/${encodeURIComponent(id)}/install`, {
+      method: 'POST',
+      body: JSON.stringify(secrets ? { secrets } : {}),
+      signal: timeoutSignal(INSTALL_TIMEOUT_MS),
+    });
   }
 
   // ── Secrets and OAuth ───────────────────────────────────────
@@ -1096,6 +1134,10 @@ export class PondApiClient {
 
   private put<T>(path: string, body: unknown): Promise<T> {
     return this.request<T>(path, { method: 'PUT', body: JSON.stringify(body) });
+  }
+
+  private patch<T>(path: string, body: unknown): Promise<T> {
+    return this.request<T>(path, { method: 'PATCH', body: JSON.stringify(body) });
   }
 
   private del<T>(path: string): Promise<T> {

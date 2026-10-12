@@ -446,12 +446,34 @@ export interface Extension {
   last_error?: string | null;
 }
 
+/** One answer a `choice` requirement takes. */
+export interface SecretOption {
+  /** What is stored and put in the extension's environment. */
+  value: string;
+  label: string;
+  description?: string;
+}
+
 export interface SecretRequirement {
   key: string;
   display_name: string;
   description: string;
   required: boolean;
-  kind: 'api_key' | 'oauth_flow' | 'generic';
+  /** A `choice` is not a secret: it is one of `options`, and its value is shown rather than masked. */
+  kind: 'api_key' | 'oauth_flow' | 'generic' | 'choice';
+  /** Used by the Pond itself and never given to the extension. */
+  host_only?: boolean;
+  /** Bring-your-own credentials and overrides, kept off the ordinary setup path. */
+  advanced?: boolean;
+  /** For a `choice`: the answers it takes, the first applying until one is saved. */
+  options?: SecretOption[];
+}
+
+/** `POST /extensions/{name}/secrets`. The values are stored even when the restart fails. */
+export interface ExtensionSecretsResult {
+  stored: number;
+  restarted: boolean;
+  restart_error: string | null;
 }
 
 export interface MarketplaceExtension {

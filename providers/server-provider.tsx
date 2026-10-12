@@ -63,7 +63,8 @@ interface ServerContextValue {
  * Home tabs to the Pond's real device list unconditionally, as #28 did for
  * models, profiles and recent conversations. A toggle for a screen with no
  * mock branch left would be a switch that does nothing. `voice` went the same
- * way when the unused listening overlay was deleted.
+ * way when the unused listening overlay was deleted, and `integrations` when
+ * the Extensions screen was wired to `/extensions` and `/marketplace` (#92).
  *
  * Nothing enforces this list: each view-model has to call `isScreenReal`
  * itself, so a screen can read "Real" here while its hook still returns mock
@@ -72,7 +73,6 @@ interface ServerContextValue {
 export const MIGRATION_SCREENS = [
   'chat',
   'memory',
-  'integrations',
   'schedule',
   'logs',
 ] as const;
