@@ -1,6 +1,6 @@
 /**
  * MemoriesScreen — what the Pond has learned about the household: read, add,
- * reword and forget, filtered by segment.
+ * reword and forget, filter by segment, and tidy the store on request.
  *
  * The filter chips are the Pond's segments and "Kept" is its permanent tier;
  * `models/memory.ts` says why those, and not fields of the app's own.
@@ -11,10 +11,12 @@ import { Alert, ScrollView, StyleSheet, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { InkButton, InkChip, InkEmptyState, InkNotice, InkSpinner, InkText } from '@jarida/ink/native';
 
+import { ConsolidationCard } from '@/components/patterns/consolidation-card';
 import { MemoryCard } from '@/components/patterns/memory-card';
 import { MemorySheet } from '@/components/patterns/memory-sheet';
 import { segmentLabel, segmentsIn } from '@/models/memory';
 import type { MemoryFragment, MemorySegment } from '@/services/types';
+import { useConsolidation } from '@/view-models/use-consolidation';
 import { useMemories } from '@/view-models/use-memories';
 import { useThemedStyles } from '@/hooks/use-themed-styles';
 import type { ThemeColors } from '@/constants/colors';
@@ -24,6 +26,7 @@ export default function MemoriesScreen() {
   const { t } = useTranslation();
   const styles = useThemedStyles(makeStyles);
   const { data, loading, error, failed, actions } = useMemories();
+  const consolidation = useConsolidation(actions.refresh);
   const [filter, setFilter] = useState<MemorySegment | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [editing, setEditing] = useState<MemoryFragment | null>(null);
@@ -59,6 +62,13 @@ export default function MemoriesScreen() {
       showsVerticalScrollIndicator={false}
       keyboardShouldPersistTaps="handled"
     >
+      <ConsolidationCard
+        progress={consolidation.progress}
+        available={consolidation.available}
+        onStart={consolidation.actions.start}
+        onStop={consolidation.actions.stop}
+      />
+
       <View style={styles.header}>
         <InkButton variant="primary" icon="plus" onPress={() => openSheet(null)}>
           {t('memories.list.add')}
