@@ -17,8 +17,16 @@ export {
   filterOf,
 } from './log';
 
-export type { ScheduleEvent, Routine, EventType } from './schedule';
-export { SAMPLE_EVENTS, SAMPLE_ROUTINES } from './schedule';
+export {
+  SAMPLE_RULES,
+  SAMPLE_SCHEDULES,
+  deviceTimeZone,
+  formatScheduleTime,
+  isRule,
+  isSixFieldCron,
+  oneOffCron,
+  timedSchedules,
+} from './schedule';
 
 
 export type { Message, MessageRole, SessionSummary, ChatState } from './chat';
