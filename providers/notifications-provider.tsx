@@ -35,7 +35,11 @@ import {
   type ServerNotification,
 } from '@/services/notification-stream';
 import { registerPushToken, watchPushTokenRotation } from '@/services/push-token';
-import { configureLocalNotifications, presentLocally } from '@/services/local-notifications';
+import {
+  configureLocalNotifications,
+  presentLocally,
+  watchLinkTaps,
+} from '@/services/local-notifications';
 import { useServer } from '@/providers/server-provider';
 
 /** Newest notifications kept in memory for the UI. */
@@ -147,6 +151,9 @@ export function NotificationsProvider({ children }: PropsWithChildren) {
       streamRef.current = null;
     };
   }, [serverUrl, token, online, recover, deduplicator]);
+
+  // Taps work whether or not a Pond is reachable: the link goes to Uber or a maps app.
+  useEffect(() => watchLinkTaps(), []);
 
   const markAllRead = useCallback(() => setUnreadCount(0), []);
 
