@@ -18,10 +18,11 @@ import { Spacing } from '@/constants/spacing';
 
 export interface MemoryCardProps {
   memory: MemoryFragment;
+  onEdit: (memory: MemoryFragment) => void;
   onDelete: (memory: MemoryFragment) => void;
 }
 
-export const MemoryCard = React.memo(function MemoryCard({ memory, onDelete }: MemoryCardProps) {
+export const MemoryCard = React.memo(function MemoryCard({ memory, onEdit, onDelete }: MemoryCardProps) {
   const { t } = useTranslation();
   const when = relativeWhen(memory.created_at, new Date(), undefined, t('sessions.yesterday'));
 
@@ -35,6 +36,9 @@ export const MemoryCard = React.memo(function MemoryCard({ memory, onDelete }: M
       <View style={styles.footer}>
         <InkText size="sm" tone="tertiary">{when}</InkText>
         <View style={styles.actions}>
+          <InkButton variant="quiet" icon="edit" onPress={() => onEdit(memory)}>
+            {t('memories.card.edit')}
+          </InkButton>
           <InkButton variant="quiet" icon="trash" onPress={() => onDelete(memory)}>
             {t('memories.card.forget')}
           </InkButton>

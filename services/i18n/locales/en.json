@@ -1008,6 +1008,7 @@
       "context": "Right now"
     },
     "list": {
+      "add": "Add memory",
       "all": "All",
       "loading": "Loading memories…",
       "failed": "Could not load memories from your Pond.",
@@ -1016,11 +1017,25 @@
     },
     "card": {
       "kept": "Kept",
+      "edit": "Edit",
       "forget": "Forget"
     },
     "forgetTitle": "Forget this memory?",
     "forgetBody": "Goose will no longer know it. This cannot be undone.",
+    "form": {
+      "newTitle": "New memory",
+      "editTitle": "Edit memory",
+      "content": "What should Goose remember?",
+      "contentPlaceholder": "Prefers tea over coffee in the morning",
+      "segment": "Kind",
+      "segmentHint": "Optional. It sets how much this memory matters and how quickly it fades.",
+      "keep": "Keep forever",
+      "keepHint": "A kept memory never fades with time. A tidy-up can still merge it with a repeat.",
+      "save": "Save"
+    },
     "errors": {
+      "contentRequired": "Write what Goose should remember.",
+      "saveFailed": "Could not save that memory.",
       "deleteFailed": "Could not forget that memory."
     }
   }

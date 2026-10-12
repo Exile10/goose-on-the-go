@@ -12,7 +12,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useServer } from '@/providers/server-provider';
 import { ApiError, api } from '@/services/api-client';
 import i18n from '@/services/i18n';
-import type { MemoryFragment } from '@/services/types';
+import type { MemoryFragment, SaveMemoryRequest } from '@/services/types';
 import { SAMPLE_MEMORIES } from '@/models/memory';
 import { describeApiError } from './describe-error';
 import { useLive } from './use-live';
@@ -28,6 +28,10 @@ export interface UseMemories {
   failed: boolean;
   actions: {
     refresh: () => Promise<void>;
+    /** Resolves to why the Pond refused it, or null once it is saved. */
+    save: (req: SaveMemoryRequest) => Promise<string | null>;
+    /** Resolves to why the Pond refused it, or null once it is reworded. */
+    reword: (memory: MemoryFragment, content: string) => Promise<string | null>;
     remove: (memory: MemoryFragment) => Promise<void>;
   };
 }
@@ -93,6 +97,34 @@ export function useMemories(): UseMemories {
 
   useLive(() => load(false), MEMORIES_MS, hydrated && real);
 
+  const save = useCallback(
+    async (req: SaveMemoryRequest) => {
+      try {
+        const saved = real ? await api.saveMemory(req) : mockMemory(req);
+        changes.current += 1;
+        setMemories((current) => [saved, ...current]);
+        return null;
+      } catch (e) {
+        return describeMemoryError(e) ?? i18n.t('memories.errors.saveFailed');
+      }
+    },
+    [real],
+  );
+
+  const reword = useCallback(
+    async (memory: MemoryFragment, content: string) => {
+      try {
+        if (real) await api.updateMemory(memory.id, content);
+        changes.current += 1;
+        setMemories((current) => current.map((m) => (m.id === memory.id ? { ...m, content } : m)));
+        return null;
+      } catch (e) {
+        return describeMemoryError(e) ?? i18n.t('memories.errors.saveFailed');
+      }
+    },
+    [real],
+  );
+
   const remove = useCallback(
     async (memory: MemoryFragment) => {
       changes.current += 1;
@@ -109,5 +141,23 @@ export function useMemories(): UseMemories {
     [real],
   );
 
-  return { data: { memories }, loading, error, failed, actions: { refresh, remove } };
+  return { data: { memories }, loading, error, failed, actions: { refresh, save, reword, remove } };
+}
+
+/** The fragment the Pond would send back, without the Pond. */
+function mockMemory(req: SaveMemoryRequest): MemoryFragment {
+  return {
+    id: `mock-${Date.now()}`,
+    profile_id: null,
+    session_id: null,
+    content: req.content,
+    source: req.source ?? 'api',
+    tags: req.tags ?? [],
+    created_at: new Date().toISOString(),
+    segment: req.segment,
+    importance: req.importance,
+    tier: req.tier,
+    access_count: 0,
+    lifecycle: 'active',
+  };
 }
