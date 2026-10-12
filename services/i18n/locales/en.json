@@ -997,10 +997,31 @@
     "rejected": "The server rejected the pairing attempt. Double-check the code and try again."
   },
   "memories": {
-    "tabAll": "All",
-    "tabPreference": "Preference",
-    "tabHabit": "Habit",
-    "tabPerson": "Person",
-    "tabReminder": "Reminder"
+    "segment": {
+      "identity": "About you",
+      "preference": "Preference",
+      "correction": "Correction",
+      "relationship": "People",
+      "project": "Project",
+      "routine": "Habit",
+      "knowledge": "Knowledge",
+      "context": "Right now"
+    },
+    "list": {
+      "all": "All",
+      "loading": "Loading memories…",
+      "failed": "Could not load memories from your Pond.",
+      "emptyTitle": "No memories yet",
+      "emptyBody": "Goose learns from your conversations, or you can add something it should know."
+    },
+    "card": {
+      "kept": "Kept",
+      "forget": "Forget"
+    },
+    "forgetTitle": "Forget this memory?",
+    "forgetBody": "Goose will no longer know it. This cannot be undone.",
+    "errors": {
+      "deleteFailed": "Could not forget that memory."
+    }
   }
 }
