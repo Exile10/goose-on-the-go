@@ -255,23 +255,77 @@ export interface UsageSummary {
 }
 
 // ── Memory ────────────────────────────────────────────────────
+//
+// The Pond's `MemoryFragment` (`pond-core/src/user_data/domain/memory.rs`),
+// serialised as-is. The optional fields are skipped on the wire when unset:
+// a fragment saved before segments existed has none of them.
 
+/** What a memory is about. The Pond picks each one's default importance and tier. */
+export type MemorySegment =
+  | 'identity'
+  | 'preference'
+  | 'correction'
+  | 'relationship'
+  | 'project'
+  | 'routine'
+  | 'knowledge'
+  | 'context';
+
+/** How fast a memory decays: `permanent` never does, and cleanup never prunes it. */
 export type MemoryTier = 'short' | 'long' | 'permanent';
 export type MemoryLifecycle = 'active' | 'archived' | 'merged';
 
 export interface MemoryFragment {
   id: string;
+  profile_id: string | null;
+  session_id: string | null;
   content: string;
-  source?: string;
-  tags?: string[];
+  /** "chat", "extraction", "api", "mcp_tool", ... */
+  source: string;
+  tags: string[];
   created_at: string;
+  segment?: MemorySegment;
+  /** 0.0–1.0. */
   importance?: number;
   tier?: MemoryTier;
-  lifecycle?: MemoryLifecycle;
+  decay_rate?: number;
   access_count: number;
   last_accessed_at?: string;
+  lifecycle?: MemoryLifecycle;
   superseded_by?: string;
+  corrects?: string;
 }
+
+/** `POST /memories`. A segment alone sets the importance and tier it implies. */
+export interface SaveMemoryRequest {
+  content: string;
+  tags?: string[];
+  source?: string;
+  segment?: MemorySegment;
+  importance?: number;
+  tier?: MemoryTier;
+}
+
+/** The tally a finished consolidation run reports. */
+export interface ConsolidationRunResult {
+  accepted_count: number;
+  rejected_count: number;
+  duration_ms: number;
+}
+
+/**
+ * One frame of `POST /memory/consolidate`. Each stage carries the full
+ * proposals, challenges and rulings; only their number is read here.
+ */
+export type ConsolidationEvent =
+  | { type: 'started'; memory_count: number }
+  | { type: 'proposer_done'; proposals: unknown[] }
+  | { type: 'adversary_done'; challenges: unknown[] }
+  | { type: 'judge_done'; decisions: { accepted: boolean }[] }
+  | { type: 'applied' }
+  | { type: 'completed'; result: ConsolidationRunResult }
+  | { type: 'error'; message: string }
+  | { type: 'cancelled' };
 
 // ── Models ────────────────────────────────────────────────────
 
@@ -347,31 +401,128 @@ export interface ModelMemoryStatus {
 }
 
 // ── Schedules ─────────────────────────────────────────────────
+//
+// The Pond's own scheduler types (`pond-core/src/user_data/domain/schedule.rs`),
+// serialised as-is. One table holds both kinds of task: cron and one-off
+// schedules, and sensor-triggered rules, which are stored with the cron
+// `@event` and a `sensor_trigger` kind. `GET /schedules` returns both;
+// `GET /rules` returns only the rules, reshaped as `Rule`.
+
+/** Where a rule listens. `device_id` and `signal` narrow it; omitted matches any. */
+export interface TriggerSource {
+  kind: 'sensor' | 'camera' | 'device';
+  device_id?: string;
+  signal?: string;
+}
+
+/**
+ * `op` and `value` go together: the Pond rejects one without the other, since
+ * a half condition would fire on every reading. `after`/`before` are "HH:MM".
+ */
+export interface TriggerCondition {
+  op?: 'gt' | 'gte' | 'lt' | 'lte' | 'eq';
+  value?: number;
+  after?: string;
+  before?: string;
+}
+
+export type TriggerAction =
+  | { type: 'agent_prompt'; prompt: string }
+  | { type: 'device_power'; device_id: string; on: boolean }
+  | { type: 'notify'; title: string; body: string };
+
+export type TaskKind =
+  | { type: 'agent_prompt'; prompt: string }
+  | { type: 'webhook'; webhook_url: string }
+  | {
+      type: 'sensor_trigger';
+      source: TriggerSource;
+      condition?: TriggerCondition;
+      actions: TriggerAction[];
+      cooldown_secs?: number;
+    };
 
 export interface Schedule {
   id: string;
-  name: string;
-  label?: string;
+  label: string;
+  /** Six fields, seconds first; `@once` for a one-shot, `@event` for a rule. */
   cron: string;
   /** Set when this is a one-shot: fires once at this instant, then never again. */
-  fire_at?: string | null;
-  prompt: string;
-  enabled: boolean;
+  fire_at: string | null;
+  timezone: string;
+  kind: TaskKind;
+  paused: boolean;
+  currently_running: boolean;
+  last_run: string | null;
+  next_run: string | null;
+  created_at: string;
+}
+
+/** `POST /schedules`. `name` is the label; `once` removes it after its first run. */
+export interface CreateScheduleRequest {
+  id?: string;
+  name: string;
+  cron: string;
+  prompt?: string;
   timezone?: string;
-  last_run?: string;
-  next_run?: string;
-  created_at?: string;
+  kind?: TaskKind;
+  once?: boolean;
+}
+
+/** `PUT /schedules/{id}`. Absent fields are left as they are. */
+export interface UpdateScheduleRequest {
+  name?: string;
+  cron?: string;
+  timezone?: string;
+  prompt?: string;
+  fire_at?: string;
+  once?: boolean;
 }
 
 export interface ScheduleRun {
   id: string;
   schedule_id: string;
   status: 'running' | 'completed' | 'failed';
-  result?: string;
-  error?: string;
+  result: string | null;
+  error: string | null;
   started_at: string;
-  finished_at?: string;
-  duration_ms?: number;
+  finished_at: string | null;
+  duration_ms: number | null;
+}
+
+/** One frame of `GET /schedules/events`: a run starting or finishing. */
+export interface ScheduleResultEvent {
+  schedule_id: string;
+  schedule_label: string;
+  run_id: string;
+  status: ScheduleRun['status'];
+  result?: string | null;
+  error?: string | null;
+  duration_ms?: number | null;
+}
+
+/** A sensor-triggered rule as `GET /rules` presents it. */
+export interface Rule {
+  id: string;
+  name: string;
+  paused: boolean;
+  currently_running: boolean;
+  created_at: string;
+  last_fired: string | null;
+  cooldown_secs: number;
+  source: TriggerSource;
+  condition?: TriggerCondition;
+  actions: TriggerAction[];
+}
+
+/** `POST /rules` and `PUT /rules/{id}`. A rule needs at least one action. */
+export interface RuleRequest {
+  id?: string;
+  name: string;
+  source: TriggerSource;
+  condition?: TriggerCondition;
+  actions: TriggerAction[];
+  cooldown_secs?: number;
 }
 
 // ── Logs and activity ─────────────────────────────────────────
@@ -497,12 +648,34 @@ export interface Extension {
   last_error?: string | null;
 }
 
+/** One answer a `choice` requirement takes. */
+export interface SecretOption {
+  /** What is stored and put in the extension's environment. */
+  value: string;
+  label: string;
+  description?: string;
+}
+
 export interface SecretRequirement {
   key: string;
   display_name: string;
   description: string;
   required: boolean;
-  kind: 'api_key' | 'oauth_flow' | 'generic';
+  /** A `choice` is not a secret: it is one of `options`, and its value is shown rather than masked. */
+  kind: 'api_key' | 'oauth_flow' | 'generic' | 'choice';
+  /** Used by the Pond itself and never given to the extension. */
+  host_only?: boolean;
+  /** Bring-your-own credentials and overrides, kept off the ordinary setup path. */
+  advanced?: boolean;
+  /** For a `choice`: the answers it takes, the first applying until one is saved. */
+  options?: SecretOption[];
+}
+
+/** `POST /extensions/{name}/secrets`. The values are stored even when the restart fails. */
+export interface ExtensionSecretsResult {
+  stored: number;
+  restarted: boolean;
+  restart_error: string | null;
 }
 
 export interface MarketplaceExtension {
@@ -595,4 +768,6 @@ export interface UpcomingSchedule {
 export interface SystemInfo {
   hostname: string;
   version?: string;
+  /** The Pond's public-key pin, `sha256/<base64>`; null when it has no TLS identity. */
+  tls_spki_sha256?: string | null;
 }

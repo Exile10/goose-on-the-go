@@ -71,12 +71,14 @@ function greetingKey(hour: number) {
  *
  * Three states, not two: until `hydrated` the stored URL has not been read
  * back, so claiming "unreachable" would be reporting a race rather than a
- * fact.
+ * fact. A reconnect in progress is the same kind of not-yet: it said
+ * "unreachable" for the six seconds a cold start on cellular takes to bring the
+ * tailnet up, beside a banner saying it was reconnecting.
  */
 function PondCard() {
   const styles = useThemedStyles(makeStyles);
   const { t } = useTranslation();
-  const { online, serverUrl, checkHealth, hydrated } = useServer();
+  const { online, serverUrl, checkHealth, hydrated, connectionState } = useServer();
   const [checking, setChecking] = useState(false);
   const router = useRouter();
 
@@ -89,11 +91,11 @@ function PondCard() {
     }
   }, [checkHealth]);
 
-  if (!hydrated) {
+  if (!hydrated || connectionState === 'reconnecting') {
     return (
       <InkCard style={styles.pond}>
         <InkTitle level={2}>{t('pond.searching')}</InkTitle>
-        <InkText>{t('pond.searchingBody')}</InkText>
+        <InkText>{hydrated ? t('pond.connectingBody') : t('pond.searchingBody')}</InkText>
       </InkCard>
     );
   }

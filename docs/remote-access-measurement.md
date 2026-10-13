@@ -30,10 +30,11 @@ There are two distinct failures, and the point of the third run is to tell them 
    node's control connection drops, and the coordinator sees it go offline. A foreground
    service is the supported remedy.
 2. **The node survives but the app never re-checks it.** On resume, `AppState` triggers
-   `ConnectionManager.environment()`, which re-probes HTTP endpoints. Nothing queries
-   `PondTls.remoteStatus()` and nothing calls `restoreRemoteAccess` outside mount and sign-out.
-   A node that died is therefore never noticed, and the app retries endpoints that no longer
-   route.
+   `ConnectionManager.environment()`, which re-probes HTTP endpoints. Since 2026-10-05 a
+   recovery that reaches the tailnet probe first polls `PondTls.remoteStatus()` through
+   `remoteNodeRunning`, for up to 10 s, until the node reports `Running`. It only waits: it
+   does not restart a node that died. The restart happens on return to the foreground,
+   where `resumeRemoteAccess` restarts the transport when the node is not running.
 
 If the coordinator shows the node online throughout but the app cannot reach the Pond until
 something forces a re-probe, the defect is the second, and no foreground service fixes it.

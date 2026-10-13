@@ -1,8 +1,7 @@
 /** Models barrel export — Goose On The Go v2 */
 
 
-export type { MemoryFragment, MemoryCategory } from './memory';
-export { SAMPLE_MEMORIES } from './memory';
+export { MEMORY_SEGMENTS, SAMPLE_MEMORIES, isKept, segmentLabel, segmentsIn } from './memory';
 
 
 export type { ActivityFilter } from './log';
@@ -13,18 +12,23 @@ export {
   attributeText,
   categoryIcon,
   describeEvent,
-  eventKey,
+  eventKeys,
   filterLabelKey,
   filterOf,
   isProblem,
   parsePondLogTime,
 } from './log';
 
-export type { MCPApp, MCPServer } from './mcp';
-export { INITIAL_APPS, INITIAL_SERVERS } from './mcp';
-
-export type { ScheduleEvent, Routine, EventType } from './schedule';
-export { SAMPLE_EVENTS, SAMPLE_ROUTINES } from './schedule';
+export {
+  SAMPLE_RULES,
+  SAMPLE_SCHEDULES,
+  deviceTimeZone,
+  formatScheduleTime,
+  isRule,
+  isSixFieldCron,
+  oneOffCron,
+  timedSchedules,
+} from './schedule';
 
 
 export type { Message, MessageRole, SessionSummary, ChatState } from './chat';

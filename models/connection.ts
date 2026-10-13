@@ -1,3 +1,5 @@
+import { insecureDevMode } from '@/services/dev-mode';
+
 /** Non-secret endpoint metadata. The public-key pin is held in SecureStore. */
 export interface ConnectionProfile {
   version: 2;
@@ -36,13 +38,88 @@ export function pinPreview(pin: string): string {
   return `sha256/${body.match(/.{1,4}/g)?.join(' ') ?? ''}`;
 }
 
-export function normalizeHttpsUrl(raw: string): string {
-  const url = new URL(raw);
-  if (url.protocol !== 'https:' || !url.hostname || url.username || url.password ||
-      (url.pathname !== '/' && url.pathname !== '') || url.search || url.hash) {
-    throw new Error('Invalid HTTPS Pond origin');
+const PIN_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+
+/**
+ * The real preview of `pin` and two decoys, in random order, for a pin that came
+ * off the network rather than from a QR or the user.
+ *
+ * A single "does this match?" can be tapped through without looking. Picking one
+ * of three cannot: only the Pond's own screen says which. The decoys share the
+ * real preview's first group, because a key whose pin starts with any chosen four
+ * characters takes minutes to generate, so the user has to read all twelve.
+ *
+ * `randomBytes` must be a cryptographic source; it is a parameter so this stays pure.
+ */
+export function fingerprintChoices(
+  pin: string,
+  randomBytes: (count: number) => Uint8Array,
+): string[] {
+  const real = pinPreview(pin);
+  const prefix = real.slice(0, 'sha256/AAAA'.length);
+  const choices = [real];
+  while (choices.length < 3) {
+    // 256 is a multiple of 64, so every alphabet character is equally likely.
+    const tail = Array.from(randomBytes(8), (byte) => PIN_ALPHABET[byte % 64]).join('');
+    const decoy = `${prefix} ${tail.slice(0, 4)} ${tail.slice(4)}`;
+    if (!choices.includes(decoy)) choices.push(decoy);
   }
+  for (let i = choices.length - 1; i > 0; i--) {
+    const j = uniformBelow(i + 1, randomBytes);
+    [choices[i], choices[j]] = [choices[j], choices[i]];
+  }
+  return choices;
+}
+
+/** A uniform integer in [0, bound), rejecting the bytes that would bias it. */
+function uniformBelow(bound: number, randomBytes: (count: number) => Uint8Array): number {
+  const limit = 256 - (256 % bound);
+  for (;;) {
+    const [byte] = randomBytes(1);
+    if (byte < limit) return byte % bound;
+  }
+}
+
+/** An origin with no credentials, path, query or fragment, under `protocol`. */
+function bareOrigin(raw: string, protocol: 'https:' | 'http:'): URL | null {
+  const url = new URL(raw);
+  if (url.protocol !== protocol || !url.hostname || url.username || url.password ||
+      (url.pathname !== '/' && url.pathname !== '') || url.search || url.hash) return null;
+  return url;
+}
+
+export function normalizeHttpsUrl(raw: string): string {
+  const url = bareOrigin(raw, 'https:');
+  if (!url) throw new Error('Invalid HTTPS Pond origin');
   return url.origin;
+}
+
+/**
+ * A plaintext `http://` Pond origin on a LAN address, for insecure development mode.
+ *
+ * The same address rules as {@link isLocalPairingUrl}: loopback, `.local`, a bare
+ * host name, or a private IPv4 address. It does not consult the flag itself; callers
+ * reach it only through {@link normalizePondUrl} and {@link isInsecureDevOrigin}.
+ */
+function normalizeInsecureDevUrl(raw: string): string {
+  const url = bareOrigin(raw, 'http:');
+  if (!url || !isLanHost(url.hostname.toLowerCase())) throw new Error('Invalid plaintext development Pond origin');
+  return url.origin;
+}
+
+/**
+ * Normalise a Pond origin: HTTPS always, and also plaintext on a LAN address when
+ * `insecureDevMode` is on. Outside that mode it is exactly {@link normalizeHttpsUrl}.
+ */
+export function normalizePondUrl(raw: string): string {
+  if (insecureDevMode && new URL(raw).protocol === 'http:') return normalizeInsecureDevUrl(raw);
+  return normalizeHttpsUrl(raw);
+}
+
+/** Whether `url` is a plaintext LAN origin this build may use: only in `insecureDevMode`. */
+export function isInsecureDevOrigin(url: string): boolean {
+  if (!insecureDevMode) return false;
+  try { normalizeInsecureDevUrl(url); return true; } catch { return false; }
 }
 
 export function parseConnectionProfile(raw: unknown): ConnectionProfile | null {
@@ -55,7 +132,7 @@ export function parseConnectionProfile(raw: unknown): ConnectionProfile | null {
     if (remote && remote.mode !== 'local' && remote.mode !== 'embedded') return null;
     if (remote?.mode === 'embedded' && !p.remoteUrl) return null;
     return { version: 2, host: p.host, port: p.port,
-      localUrls: [...new Set(p.localUrls.map(normalizeHttpsUrl))],
+      localUrls: [...new Set(p.localUrls.map(normalizePondUrl))],
       ...(remote ? { remoteAccess: remote.mode === 'embedded'
         ? { mode: 'embedded' as const, controlUrl: normalizeHttpsUrl(remote.controlUrl) }
         : { mode: 'local' as const } } : {}),
@@ -67,8 +144,13 @@ export function parseConnectionProfile(raw: unknown): ConnectionProfile | null {
 /** The phone rejects known remote addresses; the server checks the actual source subnet. */
 export function isLocalPairingUrl(url: string): boolean {
   let host: string;
-  try { host = new URL(normalizeHttpsUrl(url)).hostname.toLowerCase(); }
+  try { host = new URL(normalizePondUrl(url)).hostname.toLowerCase(); }
   catch { return false; }
+  return isLanHost(host);
+}
+
+/** Loopback, `.local`, a bare host name, or a private IPv4 address. */
+function isLanHost(host: string): boolean {
   if (host === 'localhost' || host === '[::1]' || host.endsWith('.local')) return true;
   const parts = host.split('.').map(Number);
   if (parts.length === 4 && parts.every((n) => Number.isInteger(n) && n >= 0 && n <= 255)) {
