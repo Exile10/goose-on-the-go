@@ -892,6 +892,7 @@
     "reviewCode": "Match this request on the Pond: {{id}}",
     "reviewKey": "Approve it only if the Pond shows this phone's name and a key beginning {{key}}",
     "reviewExpired": "Local approval expired. Request recovery again while on the home network.",
+    "identityStale": "Your Pond would not take this phone back for remote access, even with new keys. Your local pairing is preserved. Sign out and pair again at home if it keeps failing.",
     "busy": "Remote access setup is already running.",
     "unsupported": "Remote access requires the latest native Goose app."
   },

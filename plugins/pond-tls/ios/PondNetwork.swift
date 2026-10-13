@@ -111,6 +111,24 @@ final class PondNetwork {
     do { _ = try checked { MobileDisable(directory.path, $0) } }
     catch { NSLog("PondNetwork: remote access is off but its cached network map was not erased: %@", String(describing: error)) }
   }
+  /// Erase every node identity, so the next `stage` starts a node with fresh keys.
+  ///
+  /// For a pairing whose remote access lapsed: the Pond revoked its enrollment, and the
+  /// coordinator keeps the revoked machine key as a tombstone it will never enrol again, so only
+  /// a new key brings remote access back. The node is stopped first, because the Go side refuses
+  /// a directory whose node lock is held, and the active profile is forgotten, so neither
+  /// `activate` nor `cancel` restarts a node from the identity being erased. The app keeps one
+  /// pairing at a time, so no directory is kept. A failure is logged and rethrown.
+  static func resetIdentity() throws {
+    lock.lock(); defer { lock.unlock() }
+    activeProfile = nil
+    stop()
+    // No Application Support directory means no node was ever started, so nothing to erase.
+    guard let base = try? FileManager.default.url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: false) else { return }
+    let directory = base.appendingPathComponent("pond-network", isDirectory: true)
+    do { _ = try checked { MobilePrune(directory.path, "", $0) } }
+    catch { NSLog("PondNetwork: node identities were not erased: %@", String(describing: error)); throw error }
+  }
   private static func stop() { port = nil; password = nil; runningProfile = nil; MobileStop() }
 
   static func apply(_ config: URLSessionConfiguration, url: URL) throws {

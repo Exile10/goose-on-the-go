@@ -265,6 +265,27 @@ object PondNetwork {
     try { Mobile.disable(directory.absolutePath) }
     catch (error: Exception) { android.util.Log.w("PondNetwork", "remote access is off but its cached network map was not erased: ${error.message}") }
   }
+  /**
+   * Erase every node identity, so the next [stage] starts a node with fresh keys.
+   *
+   * For a pairing whose remote access lapsed: the Pond revoked its enrollment, and the
+   * coordinator keeps the revoked machine key as a tombstone it will never enrol again, so
+   * only a new key brings remote access back. The node is stopped first, because the Go side
+   * refuses a directory whose node lock is held, and the active profile is forgotten, so
+   * neither [activate] nor [cancel] restarts a node from the identity being erased. The app
+   * keeps one pairing at a time, so no directory is kept. A failure is logged and rethrown.
+   */
+  @Synchronized fun resetIdentity() {
+    activeProfile = null
+    stopTransport()
+    PondTls.invalidateConnections()
+    val base = java.io.File(context.noBackupFilesDir, "pond-network")
+    try { Mobile.prune(base.absolutePath, "") }
+    catch (error: Exception) {
+      android.util.Log.w("PondNetwork", "node identities were not erased: ${error.message}")
+      throw error
+    }
+  }
   private fun stopTransport() {
     networkCallback?.let { callback ->
       val manager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
