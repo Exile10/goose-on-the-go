@@ -15,9 +15,11 @@ import {
   eventKeys,
   filterOf,
   inFilter,
+  isProblem,
   newestFirst,
+  parsePondLogTime,
 } from '@/models/log';
-import type { ActivityEvent, EventCategory } from '@/services/types';
+import type { ActivityEvent, EventCategory, LogEntry } from '@/services/types';
 
 const t = i18n.t as unknown as TFunction;
 
@@ -179,5 +181,28 @@ describe('eventKeys', () => {
     const before = eventKeys([older, older]);
     const after = eventKeys([newer, newer, older, older]);
     expect(after.slice(2)).toEqual(before);
+  });
+});
+
+describe('the operational log', () => {
+  function entry(level: string): LogEntry {
+    return { id: 1, timestamp: '2026-10-05 09:00:00', level, source: 's', message: 'm', metadata: null };
+  }
+
+  /** INFO rows are trace chatter; Problems is for what went wrong. */
+  it('counts WARN and ERROR as problems, in any case, and not INFO', () => {
+    expect(isProblem(entry('WARN'))).toBe(true);
+    expect(isProblem(entry('error'))).toBe(true);
+    expect(isProblem(entry('INFO'))).toBe(false);
+  });
+
+  /** SQLite writes UTC without saying so; read as local it would be hours out. */
+  it('reads a SQLite timestamp as UTC', () => {
+    expect(parsePondLogTime('2026-10-05 09:00:00')).toBe('2026-10-05T09:00:00Z');
+    expect(new Date(parsePondLogTime('2026-10-05 09:00:00')).getUTCHours()).toBe(9);
+  });
+
+  it('leaves a timestamp that already carries a zone alone', () => {
+    expect(parsePondLogTime('2026-10-05T09:00:00+03:00')).toBe('2026-10-05T09:00:00+03:00');
   });
 });

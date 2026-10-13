@@ -8,12 +8,15 @@ export type { ActivityFilter } from './log';
 export {
   ACTIVITY_FILTERS,
   SAMPLE_ACTIVITY,
+  SAMPLE_PROBLEMS,
   attributeText,
   categoryIcon,
   describeEvent,
   eventKeys,
   filterLabelKey,
   filterOf,
+  isProblem,
+  parsePondLogTime,
 } from './log';
 
 export {

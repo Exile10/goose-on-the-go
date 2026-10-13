@@ -534,7 +534,9 @@
       "pairingFailed": "Refused a pairing attempt",
       "securityAudit": "Checked who was asking",
       "other": "Something happened"
-    }
+    },
+    "noProblems": "No problems",
+    "noProblemsBody": "Your Pond has not reported any warnings or errors lately."
   },
   "pairing": {
     "stepFind": "Find",
