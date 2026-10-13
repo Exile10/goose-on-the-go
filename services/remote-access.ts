@@ -200,6 +200,38 @@ export async function resumeRemoteAccess(profileId: string, control: string): Pr
   return true;
 }
 
+/** How long a probe of the tailnet address waits for this phone's own node to come up. */
+const NODE_START_BUDGET_MS = 10_000;
+
+/**
+ * Resolves once this phone's tailnet node is running, or with false when it is not within the
+ * budget or `abandoned()` says the answer is no longer wanted.
+ *
+ * On a cold start the node takes seconds to come up, and until it does a request to the tailnet
+ * address fails at once. Probing straight away therefore reported "Pond unavailable" for twelve
+ * seconds on the A57 on 2026-10-05, and the backoff it set off delayed the connection further
+ * after the node was ready. An unreadable status is treated as "not yet", never as running.
+ */
+export async function remoteNodeRunning(abandoned: () => boolean): Promise<boolean> {
+  const bridge = NativeModules.PondTls;
+  // No node to wait for on this platform or build: the probe itself decides.
+  if (!bridge?.remoteStatus) return true;
+  const deadline = Date.now() + NODE_START_BUDGET_MS;
+  while (!abandoned()) {
+    try {
+      if (status(await bridge.remoteStatus()).state === 'Running') return true;
+    } catch {
+      // Not readable yet; keep waiting until the deadline.
+    }
+    if (Date.now() >= deadline) {
+      console.warn('[remote] the tailnet node did not start within', NODE_START_BUDGET_MS, 'ms');
+      return false;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+  return false;
+}
+
 /** Restore transport before trust, credentials, health checks, or notification streams. */
 export async function restoreRemoteAccess(profileId: string, control: string): Promise<void> {
   generation++;

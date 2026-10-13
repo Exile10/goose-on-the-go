@@ -184,7 +184,7 @@ Verified on a device from outside the app. Six rapid screenshots of the bar area
 | Component | Props | Description |
 |-----------|-------|-------------|
 | ServerStatus | online, label | Whether the Pond is reachable, as a dot and a word |
-| ConnectionStatus | — | The connection banner; sends an unpaired or revoked phone to pairing |
+| ConnectionStatus | — | The connection banner; sends an unpaired or revoked phone to pairing. Silent until the saved pairing has loaded (`hydrated`), and shows reconnecting only after 1.5 s (`RECONNECT_GRACE_MS`) |
 | RemoteAccessOffer | — | Home's dismissible offer of remote access to a Pond paired without it |
 | PondList | title, ponds, phase, onSelect | The Ponds on this network, shared by first run and Switch Pond |
 | ConversationWall | cards, loading, selecting, onOpen, … | The Chat tab's wall of conversation cards |

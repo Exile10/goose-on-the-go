@@ -136,6 +136,8 @@ The Pond does not store whether a device is online. It derives `is_online` at re
 | Stops only in a **known background** state | Backgrounding a React Native app suspends its networking, so claiming reachability then would be false. On an Android cold start AppState can still read `'unknown'`, and the app is on screen. |
 | A missed beat is **dropped, not retried**, and logged | The next one is already scheduled, and a retry loop against a rate-limited Pond is the failure the interval avoids. It is logged because a beat that always fails looks exactly like one that never fires. |
 
+With a remembered route (2026-10-05), "reached" can mean a route a previous `ConnectionManager` reached in the same process: `configure` publishes it at once, so the first beat can go there before the quiet re-check that `environment` starts has answered.
+
 The conditions live in `services/heartbeat.ts` (`canBeat`) and are unit tested there; the provider only wires them to its state. The cold-start behaviour was verified on a device, starting from a row that had aged out: the card read online 38 seconds after launch, before the interval could fire.
 
 The desktop app has the same problem and the same fix, on the Pond side (goose-in-a-pond#388).
