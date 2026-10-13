@@ -30,7 +30,6 @@ import type { TranslationKey } from '@/services/i18n';
 const SCREEN_LABELS: Record<MigrationScreen, TranslationKey> = {
   chat: 'dev.screens.chat',
   memory: 'dev.screens.memory',
-  integrations: 'dev.screens.integrations',
   schedule: 'dev.screens.schedule',
   logs: 'dev.screens.logs',
 };
