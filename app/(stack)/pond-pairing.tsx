@@ -25,7 +25,8 @@ import { Grey, JaridaPurple, Brand, Semantic } from '@/constants/colors';
 import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
 import { Spacing } from '@/constants/spacing';
 import { Radii } from '@/constants/radii';
-import { ApiError, PondApiClient } from '@/services/api-client';
+import { ApiError, PondApiClient, PondOutdatedError } from '@/services/api-client';
+import { PondTrustError } from '@/services/pond-trust';
 import { useServer } from '@/providers/server-provider';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
@@ -248,12 +249,12 @@ function DiscoverStep({
  * fingerprint by hand in both cases.
  *
  * A pin learned this way is only a claim. mDNS is unauthenticated, so anything
- * on this network can answer with its own key -- and the handshake cannot catch
- * that: whoever holds the pin terminates TLS, receives the phone's proof, and
- * can recover a six-digit code from it offline in about a second, then forge the
- * Pond's half. So the user confirms the pin against the Pond's own dashboard
- * before it is used (see ServerStep), the out-of-band check that a QR scan or a
- * typed fingerprint already is.
+ * on this network can answer with its own key and terminate the phone's TLS.
+ * CPace pairing leaves it one guess at the code per attempt rather than the code
+ * itself, and the pairing fails visibly, but a wrong pin is still not one to
+ * keep. So the user confirms the pin against the Pond's own dashboard before it
+ * is used (see ServerStep), the out-of-band check that a QR scan or a typed
+ * fingerprint already is.
  */
 async function discoverFingerprint(origin: string): Promise<string | null> {
   const { hostname, port } = new URL(origin);
@@ -264,10 +265,10 @@ async function discoverFingerprint(origin: string): Promise<string | null> {
 /**
  * The pin a plaintext development Pond reports for itself, insecure development mode only.
  *
- * Nothing is ever verified against it: a plaintext connection has no key to pin, and
- * pairing over one is unbound. It is kept only so the saved pairing has the shape every
- * other pairing has. Asking the user to confirm it would suggest a protection that is not
- * there, so the caller does not.
+ * Nothing is ever verified against it: a plaintext connection has no key to pin, and the
+ * pin it puts into the CPace exchange binds nothing. It is kept so the exchange and the
+ * saved pairing have the shape every other pairing has. Asking the user to confirm it
+ * would suggest a protection that is not there, so the caller does not.
  */
 async function reportedFingerprint(origin: string): Promise<string | null> {
   const info = await new PondApiClient(origin).systemInfo();
@@ -586,29 +587,61 @@ function describeTransportFailure(e: unknown, t: TFunction): string {
  * Turn the server's rejection code into something a person can act on.
  *
  * `rejection_reason` is a closed set from pond-core's handshake verifier, and it
- * was rendered raw — someone who mistyped a digit was shown "invalid_mac". The
+ * was rendered raw -- someone who mistyped a digit was shown the identifier. The
  * cases are split because they call for different things: a stale challenge only
- * needs the same code re-sent, while an expired code needs a new one fetched
- * from the Pond.
+ * needs the same code re-sent, while an expired or retired code needs a new one
+ * fetched from the Pond.
  *
  * The 60-second challenge lifetime is worth naming rather than folding into a
  * generic retry message. It is far shorter than the code's ten minutes, so it is
- * the limit a user actually hits.
+ * the limit a user actually hits. `code_retired` is the Pond's per-code budget:
+ * after 10 failed confirmations it stops accepting that code at all, because
+ * online guessing is the only attack left on it.
+ *
+ * The Pond names a refusal of `pake/init` the same way, as an error code rather
+ * than a rejection, so this reads both. Null for an identifier this screen has no
+ * sentence for.
  */
-function explainRejection(reason: string | null, t: TFunction): string {
+function explainRejection(reason: string | null, t: TFunction): string | null {
   switch (reason) {
-    case 'invalid_mac':
-    case 'bad_mac_hex':
+    case 'invalid_confirmation':
       return t('pairingErrors.badCode');
+    case 'code_retired':
+      return t('pairingErrors.codeRetired');
     case 'challenge_expired':
     case 'challenge_used':
     case 'unknown_challenge':
       return t('pairingErrors.expired');
     case 'no_active_pairing_code':
       return t('pairingErrors.noCode');
+    // The pin this phone holds is not the Pond's own.
+    case 'channel_binding_mismatch':
+      return t('connection.trust');
+    // Too many runs waiting on their second half; the Pond asks for a short wait.
+    case 'pairing_busy':
+      return t('pairingErrors.rateLimitedNoHint');
     default:
-      return t('pairingErrors.rejected');
+      return null;
   }
+}
+
+/**
+ * Describe a pairing that threw rather than came back refused.
+ *
+ * Checked in order of how specific the answer is: a Pond too old to speak CPace,
+ * a Pond whose answers did not verify, a refusal the Pond named, and only then
+ * the transport.
+ */
+function describePairingFailure(e: unknown, t: TFunction): string {
+  if (e instanceof PondOutdatedError) return t('pairingErrors.pondOutdated');
+  if (e instanceof PondTrustError) return t('connection.trust');
+  if (e instanceof ApiError) {
+    const named = explainRejection(e.detail, t);
+    if (named) return named;
+    // Any other 403 is the Pond refusing enrolment from off its own network.
+    if (e.status === 403) return t('pairing.lan');
+  }
+  return describeTransportFailure(e, t);
 }
 
 /** Step 3: run the handshake, then say how it went. */
@@ -756,18 +789,14 @@ export default function PondPairingScreen() {
           router.replace('/(tabs)');
         } else {
           setCompletionState('error');
-          setCompletionReason(explainRejection(resp.rejection_reason, t));
+          setCompletionReason(explainRejection(resp.rejection_reason, t) ?? t('pairingErrors.rejected'));
         }
       } catch (e) {
-        // A throw means the request never reached the verifier, so there is no
-        // rejection_reason to explain — only an HTTP or transport failure. A 403
-        // is the Pond refusing enrolment from off its own network.
+        // A throw is anything but a plain refusal: a Pond too old to pair with,
+        // answers that did not verify, a refusal carried as an HTTP error, or no
+        // answer at all.
         setCompletionState('error');
-        setCompletionReason(
-          e instanceof ApiError && e.status === 403
-            ? t(e.detail === 'channel_binding_required' ? 'pairingErrors.bindingRequired' : 'pairing.lan')
-            : describeTransportFailure(e, t),
-        );
+        setCompletionReason(describePairingFailure(e, t));
       }
     },
     [code, pair, router, t],

@@ -35,18 +35,63 @@ verification must be local; the Pond independently checks the actual TCP source
 subnet. Manual pairing asks for the HTTPS address, six-digit code, and full
 public-key pin shown locally on the Pond.
 
-Every pairing binds the pinned SPKI into its MAC (2026-09-30). The MAC is
-HMAC-SHA256 keyed by the six-digit code over `pairTranscript` in
-`services/hmac.ts`: label, challenge, client id and the pin, separated by NUL
-bytes, with `CLIENT_LABEL` for the phone's MAC. When the Pond accepts, the phone
-recomputes the Pond's proof over the same transcript under `SERVER_LABEL`, and
-anything else (a missing or wrong proof) is a `PondTrustError` and no token is
-kept. The Pond refuses an unbound pairing from any peer but its own loopback and,
-on a debug Pond, its plaintext development listener (insecure development mode
-only; see [development.md](development.md)) with 403 `channel_binding_required`;
-`ApiError.detail` carries that identifier,
-and the wizard shows `pairingErrors.bindingRequired` for it rather than the
-generic off-LAN `pairing.lan` message.
+Pairing is CPace (2026-10-13). Every pairing from the phone, whether the pin came from a QR, a typed fingerprint
+or mDNS, runs CPace (draft-irtf-cfrg-cpace-21, suite CPACE-RISTR255-SHA512) with
+the six-digit code as the password (goose-in-a-pond#508). There is no other
+pairing path, no fallback and no negotiation. `PondApiClient.pair()` reads
+`/system/info` first, and a Pond that does not report `protocol: 3` stops the
+wizard with `pairingErrors.pondOutdated` before anything is sent.
+
+The exchange fits the two existing round trips. The Pond is the CPace initiator
+and the phone the responder:
+
+1. `POST /api/v1/handshake/pake/init` with `client_id`, `channel_binding` (the
+   pin) and a 32-byte `client_nonce`. The Pond commits to its newest active code
+   and answers with a 32-byte `challenge` and its share.
+2. The phone derives the generator from the code, the channel identifier
+   (label, the pin, the client id) and sid (`challenge || client_nonce`), and
+   sends its own share and confirmation tag to `POST /api/v1/handshake/pake/verify`.
+3. The Pond checks that tag, consumes the code and answers with tokens and its own
+   confirmation tag in `server_proof`. The phone keeps no token until that tag
+   verifies, in constant time; a missing or wrong tag is a `PondTrustError`.
+   So is a share that does not decode, an identity share, or an unexpected suite
+   in step 1, and then nothing derived from the code is sent at all.
+
+`services/cpace.ts` holds the exchange. Its draft half is held to the draft's
+Appendix A.1 and B.3 vectors, and the whole run, on the wire included, to one fixed
+exchange the Pond generates. Both files in `services/__tests__/vectors/` are
+byte-identical copies of the Pond's `crates/pond-infra/tests/fixtures/`, so a
+change to either side fails the other's tests until the copies are refreshed.
+Shares are base64 and tags lowercase hex. Randomness comes from expo-crypto
+through `services/secure-random.ts`; the noble libraries are pinned exactly.
+
+What it changes: before, whoever terminated the phone's TLS received an HMAC keyed
+by the code and could recover all six digits offline in about a second. Under
+CPace nothing on the wire can be tested against a guessed code offline, so each
+guess costs a live exchange with the Pond, one guess per attempt.
+
+What the pin still does: it authenticates the Pond's TLS key, so tokens and every
+later request still travel only to that key, and it is the channel binding. The
+Pond always puts its own pin in the channel identifier and the phone puts the pin
+it connected under, so a phone pinned to any other key runs a different generator
+and the pairing fails. A wrong pin therefore fails visibly, but it is still not
+safe to keep, which is why the pick-from-three check above stays. The
+`channel_binding` sent in step 1 is only an early diagnostic: the Pond refuses
+with `channel_binding_mismatch` when it is not its own pin, `ApiError.detail`
+carries that code, and the wizard shows the `connection.trust` message for it
+rather than the off-LAN `pairing.lan`.
+
+The failure budget: online guessing is the only attack left, so the Pond retires
+a code after 10 failed confirmations against it, whatever addresses they came
+from, which bounds an attacker at 10 in 10^6 per code. A retired code is reported
+as `code_retired` and the wizard shows `pairingErrors.codeRetired`, which asks for
+a new code from the Pond's dashboard; `pairingErrors.badCode` warns of the limit.
+Each challenge is single use and lives 60 seconds, as before.
+
+In insecure development mode the plaintext listener runs the same exchange. The
+pin there is the one the Pond reported for itself, so it binds nothing, but the
+code is still never sent in a form that can be tested offline, and the Pond's
+confirmation is still required.
 
 `paired-profile.ts` writes the new non-secret address record while preserving the
 old one, then atomically commits pin and credentials together in SecureStore.

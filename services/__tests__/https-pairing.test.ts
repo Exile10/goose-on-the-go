@@ -14,3 +14,8 @@ it('keeps remote endpoints out of initial pairing candidates', () => {
   expect(p.profile.localUrls).not.toContain(p.remoteUrl);
   expect(p.pin).toBe(pin);
 });
+// A CPace Pond adds `pake=1` beside `v=2`. Every pairing is CPace whatever the QR says,
+// so the marker changes nothing here; it must only not stop the scan.
+it('accepts the CPace marker a current Pond adds', () => {
+  expect(parsePairingPayload(qr('&pake=1')).code).toBe('123456');
+});

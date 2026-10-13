@@ -601,7 +601,8 @@
     "rateLimitedWait_other": "Your Pond is rate-limiting pairing attempts. Wait {{count}} seconds and try again.",
     "refused": "Your Pond refused the pairing request (HTTP {{status}}).",
     "unreachable": "Could not reach your Pond. Check that the phone is on the same network and the server is running.",
-    "badCode": "That pairing code did not match. Check the six digits on your Pond and try again — a wrong code costs nothing but this attempt.",
+    "badCode": "That pairing code did not match. Check the six digits on your Pond and try again. After 10 wrong tries the Pond retires the code and you will need a new one.",
+    "codeRetired": "Too many wrong codes were tried, so your Pond has retired this pairing code. Show a new code on your Pond's dashboard and pair again.",
     "expired": "This attempt took too long — the server holds a challenge for only 60 seconds. Enter the same code again; you do not need a new one.",
     "noCode": "Your Pond has no pairing code right now. Codes last 10 minutes — open the dashboard on the host machine to show a fresh one.",
     "noAnswer": "No Pond answered at {{address}}. Check the address, and that the phone is on the same network.",
@@ -1032,11 +1033,12 @@
     "serverError": "Your Pond returned an error while pairing. Check that it is still running, then try again.",
     "refused": "Your Pond refused the pairing request. Check the code on its dashboard and try again.",
     "unreachable": "Could not reach your Pond. Check that the phone is on the same network and the server is running.",
-    "badCode": "That pairing code did not match. Check the six digits on your Pond and try again — a wrong code costs nothing but this attempt.",
+    "badCode": "That pairing code did not match. Check the six digits on your Pond and try again. After 10 wrong tries the Pond retires the code and you will need a new one.",
+    "codeRetired": "Too many wrong codes were tried, so your Pond has retired this pairing code. Show a new code on your Pond's dashboard and pair again.",
     "expired": "This attempt took too long — the server holds a challenge for only 60 seconds. Enter the same code again; you do not need a new one.",
     "noCode": "Your Pond has no pairing code right now. Codes last 10 minutes — open the dashboard on the host machine to show a fresh one.",
     "rejected": "The server rejected the pairing attempt. Double-check the code and try again.",
-    "bindingRequired": "Your Pond refused a pairing that did not confirm its key. Scan the QR code on your Pond's dashboard to pair."
+    "pondOutdated": "This Pond is too old to pair with this version of the app. Update the software on your Pond, then try again."
   },
   "memories": {
     "segment": {

@@ -6,26 +6,20 @@ import { isInsecureDevOrigin, isLocalPairingUrl, normalizePondUrl } from '@/mode
  * PondApiClient — HTTP client for goose-in-a-pond.
  *
  * Implements the GIAP ↔ GOTG handshake protocol:
- *   1. handshakeInit  — POST /api/v1/handshake/init     → challenge
- *   2. pair           — runs init + verify with a 6-digit code
- *   3. handshakeRefresh                                 → fresh tokens
+ *   1. handshakeInit    — POST /api/v1/handshake/pake/init   → challenge + the Pond's CPace share
+ *   2. handshakeVerify  — POST /api/v1/handshake/pake/verify → tokens + the Pond's confirmation
+ *   3. pair             — runs both with the six-digit code (see services/cpace.ts)
+ *   4. handshakeRefresh                                      → fresh tokens
  *
  * The active session token is automatically attached to every request as
  * `Authorization: Bearer <token>`. On 401, the client tries one refresh
  * before bubbling the error up to the caller.
  */
 
-import {
-  CLIENT_LABEL,
-  equalHex,
-  fromBase64,
-  hmacSha256,
-  pairTranscript,
-  SERVER_LABEL,
-  toHex,
-  unboundPairTranscript,
-  utf8,
-} from './hmac';
+import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js';
+
+import { confirmationMatches, NONCE_BYTES, respond } from './cpace';
+import { randomBytes } from './secure-random';
 import { timeoutSignal } from './http';
 import { readSse, type SseEvent } from './sse';
 import type {
@@ -134,17 +128,59 @@ export interface HandshakeResponse {
   capabilities: string[];
   rejection_reason: string | null;
   /**
-   * The server's half of the channel binding: hex HMAC-SHA256 over the same
-   * transcript the client MACed, under `goose-pair-server-v1`. Present exactly
-   * when the accepted request carried a `channel_binding`.
+   * The Pond's CPace confirmation tag, T_server, as lowercase hex. Present on an
+   * accepted pairing, and checked by {@link PondApiClient.pair} before any token
+   * in this response is kept.
    */
   server_proof?: string | null;
 }
 
-interface ChallengeResponse {
+/** The Pond's answer to `pake/init`: the challenge and its CPace share. */
+export interface PakeChallenge {
   challenge_id: string;
-  challenge: string; // base64
+  /** 32 bytes, standard base64: the Pond's half of sid. */
+  challenge: string;
   expires_at: string;
+  /** The only suite there is; anything else is refused. */
+  suite: string;
+  /** Ya, the Pond's 32-byte ristretto255 share, standard base64. */
+  share: string;
+}
+
+/** The suite `pake/init` must answer with. */
+const PAKE_SUITE = 'CPACE-RISTR255-SHA512';
+
+/**
+ * The pairing protocol this app speaks, as `/system/info` reports it.
+ *
+ * There is exactly one: no fallback, and no negotiation. A Pond reporting
+ * anything else is too old to pair with, and the user is told to update it.
+ */
+export const PAIRING_PROTOCOL = 3;
+
+/** The Pond does not speak {@link PAIRING_PROTOCOL}. Shown as "update the Pond". */
+export class PondOutdatedError extends Error {
+  constructor(reported: unknown) {
+    super(`Pond reports pairing protocol ${String(reported)}, this app needs ${PAIRING_PROTOCOL}`);
+    this.name = 'PondOutdatedError';
+  }
+}
+
+/** Standard base64 of `bytes`. */
+function toBase64(bytes: Uint8Array): string {
+  let bin = '';
+  for (const b of bytes) bin += String.fromCharCode(b);
+  return btoa(bin);
+}
+
+/** Bytes of standard base64 `b64`; throws on anything that is not. */
+function fromBase64(b64: string): Uint8Array {
+  return Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+}
+
+/** The Pond's hex confirmation tag as bytes; anything that is not hex is an empty tag, which never matches. */
+function parseTag(hex: string | null | undefined): Uint8Array {
+  try { return hexToBytes(hex ?? ''); } catch { return new Uint8Array(0); }
 }
 
 /** How long to wait for /health before calling the Pond unreachable. */
@@ -353,55 +389,66 @@ export class PondApiClient {
     }
   }
 
-  /** Phase 1: ask the server for a fresh challenge. */
+  /**
+   * Phase 1: open a CPace run. The Pond commits to its newest pairing code,
+   * answers with its share, and holds its secret scalar for 60 seconds.
+   *
+   * The Pond compares `channelBinding` with its own pin only as an early,
+   * readable refusal (`channel_binding_mismatch`). The binding that protects
+   * anything is the pin inside the CPace generator; see services/cpace.ts.
+   */
   async handshakeInit(input: {
     clientId: string;
+    channelBinding: string;
+    /** This phone's half of sid, {@link NONCE_BYTES} from the platform CSPRNG. */
+    clientNonce: Uint8Array;
     clientType?: string;
     clientVersion?: string;
-  }): Promise<ChallengeResponse> {
-    const res = await this.send(`${this.baseUrl}/api/v1/handshake/init`, {
+  }): Promise<PakeChallenge> {
+    const res = await this.send(`${this.baseUrl}/api/v1/handshake/pake/init`, {
       method: 'POST',
       headers: this.headers(),
       body: JSON.stringify({
         client_id: input.clientId,
         client_type: input.clientType ?? 'gotg',
         client_version: input.clientVersion ?? '1.0.0',
+        channel_binding: input.channelBinding,
+        client_nonce: toBase64(input.clientNonce),
       }),
     });
     if (!res.ok) {
       throw new ApiError(
-        `handshake/init failed: ${res.status}`,
+        `handshake/pake/init failed: ${res.status}`,
         res.status,
         parseRetryAfter(res),
+        await errorDetail(res),
       );
     }
-    return (await res.json()) as ChallengeResponse;
+    return (await res.json()) as PakeChallenge;
   }
 
-  /** Phase 2: prove possession of the pairing code. */
+  /** Phase 2: send this phone's CPace share and its confirmation tag. */
   async handshakeVerify(input: {
     challengeId: string;
-    mac: string;
+    /** Yb, sent as standard base64. */
+    share: Uint8Array;
+    /** T_client, sent as lowercase hex. */
+    confirm: Uint8Array;
     deviceName?: string;
-    /** Null only over a plaintext development origin, which has no key to bind; see {@link pair}. */
-    channelBinding: string | null;
   }): Promise<HandshakeResponse> {
-    if (input.channelBinding === null && !isInsecureDevOrigin(this.baseUrl)) {
-      throw new Error('An unbound pairing is only for a plaintext development Pond');
-    }
-    const res = await this.send(`${this.baseUrl}/api/v1/handshake/verify`, {
+    const res = await this.send(`${this.baseUrl}/api/v1/handshake/pake/verify`, {
       method: 'POST',
       headers: this.headers(),
       body: JSON.stringify({
         challenge_id: input.challengeId,
-        mac: input.mac,
         device_name: input.deviceName ?? null,
-        channel_binding: input.channelBinding,
+        share: toBase64(input.share),
+        confirm: bytesToHex(input.confirm),
       }),
     });
     if (!res.ok) {
       throw new ApiError(
-        `handshake/verify failed: ${res.status}`,
+        `handshake/pake/verify failed: ${res.status}`,
         res.status,
         parseRetryAfter(res),
         await errorDetail(res),
@@ -411,57 +458,76 @@ export class PondApiClient {
   }
 
   /**
-   * Run the full two-phase pairing. On success the session+refresh tokens
-   * are stored on this client (use {@link setOnTokensRotated} to persist).
+   * Pair with the six-digit code over CPace. On success the session+refresh
+   * tokens are stored on this client (use {@link setOnTokensRotated} to persist).
+   *
+   * Throws {@link PondOutdatedError} before sending anything when the Pond does
+   * not report {@link PAIRING_PROTOCOL}, and {@link PondTrustError} when the
+   * Pond's answers do not check out: a malformed or invalid share, or an
+   * acceptance without the confirmation tag only the code's holder can make.
    */
   async pair(input: {
     clientId: string;
     pairingCode: string;
     deviceName?: string;
     /**
-     * The Pond public-key pin this connection is pinned to, folded into the
-     * proof so it is this pairing that certifies the key rather than the other
-     * way round. Required: the Pond refuses an unbound pairing from a phone.
-     * See {@link pairTranscript}.
+     * The Pond public-key pin this connection is pinned to. It goes into the
+     * CPace channel identifier, so a phone pinned to any key but the Pond's runs
+     * a different generator and the exchange fails. On a plaintext development
+     * origin it is the pin the Pond reported for itself, which binds nothing.
      */
     channelBinding: string;
   }): Promise<HandshakeResponse> {
     const epoch = this.identityEpoch;
-    // Plaintext (insecure development mode only) has no TLS key for the binding to name,
-    // so that pairing alone is unbound, through unboundPairTranscript, and there is no
-    // server proof to check. Everywhere else it is bound to the caller's pin and the
-    // Pond's proof is required.
-    const unbound = isInsecureDevOrigin(this.baseUrl);
-    if (unbound) console.warn('[pairing] unbound pairing over a plaintext development connection');
-    const init = await this.handshakeInit({ clientId: input.clientId });
-    const challenge = fromBase64(init.challenge);
-    const key = utf8(input.pairingCode);
-    const mac = toHex(
-      hmacSha256(key, unbound
-        ? unboundPairTranscript(challenge, input.clientId)
-        : pairTranscript(CLIENT_LABEL, challenge, input.clientId, input.channelBinding)),
-    );
-    const resp = await this.handshakeVerify({
-      challengeId: init.challenge_id,
-      mac,
-      deviceName: input.deviceName,
-      channelBinding: unbound ? null : input.channelBinding,
+    const info = await this.systemInfo();
+    if (info.protocol !== PAIRING_PROTOCOL) {
+      console.warn('[pairing] Pond reports pairing protocol', info.protocol ?? 'none', 'and needs an update');
+      throw new PondOutdatedError(info.protocol);
+    }
+    if (isInsecureDevOrigin(this.baseUrl)) {
+      console.warn('[pairing] over a plaintext development connection: the pin binds nothing');
+    }
+    const clientNonce = randomBytes(NONCE_BYTES);
+    const init = await this.handshakeInit({
+      clientId: input.clientId,
+      channelBinding: input.channelBinding,
+      clientNonce,
     });
     if (epoch !== this.identityEpoch) throw new Error('Pond profile changed');
-    // The Pond's half. Without it, something that terminated this connection
-    // with its own certificate could invent an acceptance and a token of its
-    // own, and this phone would be paired with the interceptor. Only something
-    // holding the pairing code can produce the proof, so checking it is what
-    // makes a pin that arrived over an untrusted route safe to use.
-    if (resp.accepted && !unbound) {
-      const expected = toHex(
-        hmacSha256(key, pairTranscript(SERVER_LABEL, challenge, input.clientId, input.channelBinding)),
-      );
-      if (!equalHex(resp.server_proof ?? '', expected)) {
-        this.token = null;
-        this.refreshToken = null;
-        throw new PondTrustError();
-      }
+    let exchange: ReturnType<typeof respond>;
+    try {
+      if (init.suite !== PAKE_SUITE) throw new Error(`unexpected suite ${String(init.suite)}`);
+      exchange = respond({
+        code: input.pairingCode,
+        pin: input.channelBinding,
+        clientId: input.clientId,
+        challenge: fromBase64(init.challenge),
+        clientNonce,
+        initiatorShare: fromBase64(init.share),
+        random: randomBytes,
+      });
+    } catch (error) {
+      // A Pond that speaks protocol 3 does not send these. Whatever did is not
+      // to be answered with a share derived from the code.
+      console.warn('[pairing] refused the Pond\'s CPace answer:', error instanceof Error ? error.message : error);
+      throw new PondTrustError();
+    }
+    const resp = await this.handshakeVerify({
+      challengeId: init.challenge_id,
+      share: exchange.share,
+      confirm: exchange.confirm,
+      deviceName: input.deviceName,
+    });
+    if (epoch !== this.identityEpoch) throw new Error('Pond profile changed');
+    // The Pond's confirmation. Without it, something that terminated this
+    // connection with its own certificate could invent an acceptance and a token
+    // of its own, and this phone would be paired with the interceptor. Only the
+    // party that ran CPace with the right code and the same pin can produce it.
+    if (resp.accepted && !confirmationMatches(parseTag(resp.server_proof), exchange.expectedServerConfirm)) {
+      console.warn('[pairing] the Pond\'s confirmation did not verify; no token kept');
+      this.token = null;
+      this.refreshToken = null;
+      throw new PondTrustError();
     }
     if (resp.accepted && resp.session_token) {
       this.token = resp.session_token;

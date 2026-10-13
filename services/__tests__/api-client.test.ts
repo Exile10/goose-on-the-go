@@ -10,7 +10,10 @@ jest.mock('@/services/pond-trust', () => ({
  * client back into an inconsiderate one.
  */
 
-import { ApiError, PondApiClient } from '@/services/api-client';
+import { ApiError, PondApiClient, PondOutdatedError } from '@/services/api-client';
+import { PondTrustError } from '@/services/pond-trust';
+
+import { pakePond } from './support/pake-pond';
 
 /** A `fetch` returning one canned response. */
 function stubFetch(init: { status: number; headers?: Record<string, string>; body?: unknown }) {
@@ -181,88 +184,142 @@ describe('local enrollment requests', () => {
 });
 
 /**
- * The client's half of the channel binding.
+ * Pairing over CPace, against a fake Pond that runs the initiator's half for real.
  *
- * The pin is what this connection is pinned to, so `pair` folding it into the
- * proof is what stops the pin's own provenance mattering: a phone that pinned
- * an interceptor's key fails the pair instead of completing one against the
- * wrong Pond. That refusal is the Pond's; what is tested here is the other
- * direction -- something that terminated this connection and invented an
- * acceptance, which only the returned proof catches.
+ * What the client owns is its own side of the exchange and the check on the
+ * Pond's confirmation. The Pond refuses a wrong code or a relayed pin by failing
+ * the phone's tag; what is tested here beyond that is the other direction --
+ * something that terminated this connection and invented an acceptance, which
+ * only the Pond's confirmation catches.
  */
-describe('pair() channel binding', () => {
+describe('pair() over CPace', () => {
   const PIN = 'sha256/TnkUsN+AaLec3BDTh/KUwSokXTmCq2+4rlfBnmJxPkE=';
-  const CHALLENGE = 'AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=';
-  const CODE = '482915';
+  const OTHER_PIN = `sha256/${'B'.repeat(43)}=`;
+  const CODE = '048291';
   const CLIENT_ID = 'install-abcdef';
-  const PROOF = '73171bac55bb3346045142bb0647057067d94712f5fab82d2260bf91c106ebe0';
 
-  /** init, then verify answering with `verify`. */
-  function pairingFetch(verify: Record<string, unknown>) {
-    return jest.fn(async (url: string, _init?: RequestInit) =>
-      new Response(
-        JSON.stringify(
-          String(url).endsWith('/init')
-            ? { challenge_id: 'c1', challenge: CHALLENGE, expires_at: '' }
-            : verify,
-        ),
-        { status: 200, headers: { 'Content-Type': 'application/json' } },
-      ),
-    );
-  }
+  let warn: jest.SpyInstance;
+  beforeEach(() => { warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined); });
+  afterEach(() => warn.mockRestore());
 
-  const accepted = {
-    accepted: true,
-    session_token: 'session',
-    refresh_token: 'refresh',
-    hostname: 'nano',
-    server_version: 'test',
-    capabilities: [],
-    rejection_reason: null,
-  };
+  const body = (fetch: jest.Mock, path: string) =>
+    JSON.parse(String(fetch.mock.calls.find(([url]) => String(url).endsWith(path))?.[1]?.body));
 
-  it('sends the pin and the bound MAC, and keeps the tokens when the proof checks out', async () => {
-    const fetch = pairingFetch({ ...accepted, server_proof: PROOF }); setFetch(fetch);
+  it('runs the exchange, sends only shares and tags, and keeps the tokens once the Pond confirms', async () => {
+    const fetch = pakePond({ code: CODE, pin: PIN }); setFetch(fetch);
     const client = new PondApiClient('https://192.168.1.7:4443');
-
     const rotated = jest.fn(); client.setOnTokensRotated(rotated);
 
-    const resp = await client.pair({ clientId: CLIENT_ID, pairingCode: CODE, channelBinding: PIN });
+    const resp = await client.pair({ clientId: CLIENT_ID, pairingCode: CODE, channelBinding: PIN, deviceName: 'Phone' });
 
     expect(resp.accepted).toBe(true);
     expect(rotated).toHaveBeenCalledWith('session', 'refresh');
-    const body = JSON.parse(String(fetch.mock.calls[1]?.[1]?.body));
-    expect(body.channel_binding).toBe(PIN);
-    expect(body.mac).toBe('2cc63017ff6979d0f1c4009a4f37c3c95bc2d535897fc2fb19a0a496f6a649aa');
+    expect(fetch.mock.calls.map(([url]) => new URL(String(url)).pathname)).toEqual([
+      '/api/v1/system/info', '/api/v1/handshake/pake/init', '/api/v1/handshake/pake/verify',
+    ]);
+    const init = body(fetch, '/pake/init');
+    expect(init).toMatchObject({ client_id: CLIENT_ID, channel_binding: PIN });
+    expect(Buffer.from(init.client_nonce, 'base64')).toHaveLength(32);
+    const verify = body(fetch, '/pake/verify');
+    expect(Object.keys(verify).sort()).toEqual(['challenge_id', 'confirm', 'device_name', 'share']);
+    expect(Buffer.from(verify.share, 'base64')).toHaveLength(32);
+    expect(verify.confirm).toMatch(/^[0-9a-f]{128}$/);
+    // The code never leaves the phone in any form a request carries.
+    for (const [, req] of fetch.mock.calls) expect(String(req?.body ?? '')).not.toContain(CODE);
+  });
+
+  it('draws a fresh nonce and share every run', async () => {
+    const fetch = pakePond({ code: CODE, pin: PIN }); setFetch(fetch);
+    const client = new PondApiClient('https://192.168.1.7:4443');
+    await client.pair({ clientId: CLIENT_ID, pairingCode: CODE, channelBinding: PIN });
+    await client.pair({ clientId: CLIENT_ID, pairingCode: CODE, channelBinding: PIN });
+    const inits = fetch.mock.calls.filter(([url]) => String(url).endsWith('/pake/init'));
+    const verifies = fetch.mock.calls.filter(([url]) => String(url).endsWith('/pake/verify'));
+    expect(JSON.parse(String(inits[0][1]?.body)).client_nonce).not.toBe(JSON.parse(String(inits[1][1]?.body)).client_nonce);
+    expect(JSON.parse(String(verifies[0][1]?.body)).share).not.toBe(JSON.parse(String(verifies[1][1]?.body)).share);
+  });
+
+  // The Pond fails the phone's tag; the phone keeps nothing and says why.
+  it.each([
+    ['a wrong code', { code: '048290', pin: PIN }],
+    ['a pin that is not the Pond\'s', { code: CODE, pin: OTHER_PIN }],
+  ])('is refused for %s', async (_name, pond) => {
+    setFetch(pakePond(pond));
+    const client = new PondApiClient('https://192.168.1.7:4443');
+    const rotated = jest.fn(); client.setOnTokensRotated(rotated);
+    const resp = await client.pair({ clientId: CLIENT_ID, pairingCode: CODE, channelBinding: PIN });
+    expect(resp).toMatchObject({ accepted: false, rejection_reason: 'invalid_confirmation' });
+    expect(rotated).not.toHaveBeenCalled();
   });
 
   // The interceptor's best remaining move once the Pond has refused its relay:
-  // answer the phone itself. It cannot produce the proof without the code.
-  it('rejects an acceptance whose proof is wrong, and keeps no token from it', async () => {
-    for (const server_proof of [undefined, '00'.repeat(32), `f${PROOF.slice(1)}`]) {
-      setFetch(pairingFetch({ ...accepted, server_proof }));
+  // answer the phone itself. It cannot produce the confirmation without the code.
+  it('rejects an acceptance whose confirmation is wrong, and keeps no token from it', async () => {
+    for (const server_proof of [undefined, null, '', 'zz', '00'.repeat(64), '00'.repeat(32)]) {
+      setFetch(pakePond({ code: CODE, pin: PIN, accept: (answer) => ({ ...answer, server_proof }) }));
       const client = new PondApiClient('https://192.168.1.7:4443');
       const rotated = jest.fn(); client.setOnTokensRotated(rotated);
-      await expect(
-        client.pair({ clientId: CLIENT_ID, pairingCode: CODE, channelBinding: PIN }),
-      ).rejects.toThrow();
-      // Nothing is kept and nothing is persisted: the tokens in that response
-      // came from whoever answered, not from the Pond.
+      await expect(client.pair({ clientId: CLIENT_ID, pairingCode: CODE, channelBinding: PIN }))
+        .rejects.toBeInstanceOf(PondTrustError);
       expect(rotated).not.toHaveBeenCalled();
     }
   });
 
-  // The Pond names why it refused, so the screen can say something truer than "not on the LAN".
-  it('carries the Pond\'s refusal identifier on a failed verify', async () => {
-    const fetch = jest.fn(async (url: string) =>
-      String(url).endsWith('/init')
-        ? new Response(JSON.stringify({ challenge_id: 'c1', challenge: CHALLENGE, expires_at: '' }), { status: 200 })
-        : new Response(JSON.stringify({ error: 'channel_binding_required' }), { status: 403 }),
-    );
-    setFetch(fetch);
+  // The Pond's real confirmation flipped in its last bit, and the phone's own tag sent back to it.
+  it('rejects a near-miss and a reflected tag', async () => {
+    const flip = (hex: string) => `${hex.slice(0, -1)}${(parseInt(hex.slice(-1), 16) ^ 1).toString(16)}`;
+    for (const forge of [
+      (answer: string) => flip(answer),
+      (_answer: string, sent: string) => sent,
+    ]) {
+      let sent = '';
+      const pond = pakePond({ code: CODE, pin: PIN,
+        accept: (answer) => ({ ...answer, server_proof: forge(answer.server_proof ?? '', sent) }) });
+      setFetch(jest.fn(async (url: string, init?: RequestInit) => {
+        if (String(url).endsWith('/pake/verify')) sent = JSON.parse(String(init?.body)).confirm;
+        return pond(url, init);
+      }));
+      const client = new PondApiClient('https://192.168.1.7:4443');
+      await expect(client.pair({ clientId: CLIENT_ID, pairingCode: CODE, channelBinding: PIN }))
+        .rejects.toBeInstanceOf(PondTrustError);
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining('confirmation did not verify'));
+    }
+  });
+
+  it.each([
+    ['an unknown suite', { suite: 'CPACE-X25519-SHA512' }],
+    ['the identity as its share', { share: Buffer.alloc(32).toString('base64') }],
+    ['a non-canonical share', { share: Buffer.from('2b3c6b8c4f3800e7aef6864025b4ed79bd599117e427c41bd47d93d654b4a51c', 'hex').toString('base64') }],
+    ['a short challenge', { challenge: Buffer.alloc(16).toString('base64') }],
+    ['a share that is not base64', { share: '***' }],
+  ])('sends nothing derived from the code when the Pond answers with %s', async (_name, patch) => {
+    const fetch = pakePond({ code: CODE, pin: PIN, init: (answer) => ({ ...answer, ...patch }) }); setFetch(fetch);
     const client = new PondApiClient('https://192.168.1.7:4443');
-    await expect(
-      client.pair({ clientId: CLIENT_ID, pairingCode: CODE, channelBinding: PIN }),
-    ).rejects.toMatchObject({ status: 403, detail: 'channel_binding_required' });
+    await expect(client.pair({ clientId: CLIENT_ID, pairingCode: CODE, channelBinding: PIN }))
+      .rejects.toBeInstanceOf(PondTrustError);
+    expect(fetch.mock.calls.some(([url]) => String(url).endsWith('/pake/verify'))).toBe(false);
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('refused the Pond\'s CPace answer'), expect.anything());
+  });
+
+  it.each([[2], [null], [4]])('stops before the handshake when the Pond reports protocol %s', async (protocol) => {
+    const fetch = pakePond({ code: CODE, pin: PIN, protocol }); setFetch(fetch);
+    const client = new PondApiClient('https://192.168.1.7:4443');
+    await expect(client.pair({ clientId: CLIENT_ID, pairingCode: CODE, channelBinding: PIN }))
+      .rejects.toBeInstanceOf(PondOutdatedError);
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('pairing protocol'), protocol ?? 'none', expect.anything());
+  });
+
+  // The Pond names why it refused, so the screen can say something truer than "not on the LAN".
+  it('carries the Pond\'s refusal identifier on a failed init and verify', async () => {
+    for (const failing of ['/pake/init', '/pake/verify']) {
+      const pond = pakePond({ code: CODE, pin: PIN });
+      setFetch(jest.fn(async (url: string, init?: RequestInit) => String(url).endsWith(failing)
+        ? new Response(JSON.stringify({ error: 'channel_binding_mismatch' }), { status: 403 })
+        : pond(url, init)));
+      const client = new PondApiClient('https://192.168.1.7:4443');
+      await expect(client.pair({ clientId: CLIENT_ID, pairingCode: CODE, channelBinding: PIN }))
+        .rejects.toMatchObject({ status: 403, detail: 'channel_binding_mismatch' });
+    }
   });
 });

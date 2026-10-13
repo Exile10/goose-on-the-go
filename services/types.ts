@@ -770,6 +770,11 @@ export interface SystemInfo {
   version?: string;
   /** The Pond's public-key pin, `sha256/<base64>`; null when it has no TLS identity. */
   tls_spki_sha256?: string | null;
+  /**
+   * The pairing protocol the Pond speaks. 3 is CPace, the only one this app
+   * pairs with; a Pond that reports anything else, or nothing, is too old.
+   */
+  protocol?: number;
 }
 
 // ── Rides (`/api/v1/rides`) ───────────────────────────────────
