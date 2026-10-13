@@ -185,7 +185,7 @@ async function run(): Promise<Result[]> {
       const pond = await configResponse.json() as { url: string; pin: string; code: string; remote?: string; control?: string };
       await configurePondTrust([{ url: origin, pin }, { url: pond.url, pin: pond.pin }]);
       const client = new PondApiClient(pond.url);
-      const paired = await client.pair({ clientId: `${Platform.OS}-scratch-phone`, pairingCode: pond.code, deviceName: `${Platform.OS} transport verification` });
+      const paired = await client.pair({ clientId: `${Platform.OS}-scratch-phone`, pairingCode: pond.code, deviceName: `${Platform.OS} transport verification`, channelBinding: pond.pin });
       assert(paired.accepted && paired.session_token, 'Scratch Pond pairing failed');
       const refreshed = await client.handshakeRefresh();
       assert(refreshed?.accepted && refreshed.session_token, 'Scratch Pond refresh failed');
@@ -352,7 +352,7 @@ async function run(): Promise<Result[]> {
           await client.handshakeRevoke();
           assert((await expoFetch(origin + '/embedded-revocation-ready', { headers })).status === 200, 'Network revocation was not reconciled');
           const fresh = await (await expoFetch(origin + '/pond-config', { headers })).json() as { code: string };
-          const repaired = await client.pair({ clientId: `${Platform.OS}-scratch-phone`, pairingCode: fresh.code, deviceName: 'Local recovery verification' });
+          const repaired = await client.pair({ clientId: `${Platform.OS}-scratch-phone`, pairingCode: fresh.code, deviceName: 'Local recovery verification', channelBinding: pond.pin });
           assert(repaired.accepted && repaired.session_token, 'Fresh local pairing failed');
           api.setToken(repaired.session_token);
           let approval: Promise<void> | undefined;

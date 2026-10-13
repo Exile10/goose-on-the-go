@@ -1,0 +1,48 @@
+# Dependabot version-update PRs. Without this file only security updates run, so an advisory showed
+# up first as a red `Dependencies — npm audit (high+)` gate on main instead of as a PR. Mirrors
+# goose-in-a-pond/.github/dependabot.yml so both halves of the system are maintained the same way.
+version: 2
+
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    # The Expo SDK fixes which React Native, jest-expo and expo-* versions work together (see
+    # docs/TESTING.md). A minor or major bump to any of them is an SDK upgrade, which goes through
+    # `npx expo install --fix` by hand rather than a grouped Dependabot PR. Patches within the SDK
+    # are still proposed.
+    ignore:
+      - dependency-name: "expo"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
+      - dependency-name: "expo-*"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
+      - dependency-name: "@expo/*"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
+      - dependency-name: "jest-expo"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
+      - dependency-name: "react-native"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
+      - dependency-name: "@react-native/*"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
+      - dependency-name: "react"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
+    groups:
+      npm-dev-minor-patch:
+        dependency-type: development
+        update-types: [minor, patch]
+      npm-prod-minor-patch:
+        dependency-type: production
+        update-types: [minor, patch]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      actions-minor-patch:
+        update-types: [minor, patch]

@@ -68,6 +68,7 @@ export function useRemoteAccess() {
   const [progress, setProgress] = useState<RemoteProgress | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [reviewId, setReviewId] = useState<string | null>(null);
+  const [reviewKey, setReviewKey] = useState<string | null>(null);
   const [setupUnavailable, setSetupUnavailable] = useState(false);
   const [lapsesAt, setLapsesAt] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -81,13 +82,13 @@ export function useRemoteAccess() {
   }, []);
   const start = useCallback(async (recovery = false) => {
     if (busy) return;
-    setBusy(true); setError(null); setReviewId(null); setProgress(null); setSetupUnavailable(false);
+    setBusy(true); setError(null); setReviewId(null); setReviewKey(null); setProgress(null); setSetupUnavailable(false);
     try {
       await enableRemoteAccess(profileId, serverUrl, (next) => { if (alive.current) setProgress(next); },
         async (endpoint, control, current) => {
           if (!alive.current) throw new Error(i18n.t('remote.cancelled'));
           await setRemoteEndpoint(endpoint, control, current);
-        }, recovery ? { onReview: (id) => { if (alive.current) setReviewId(id); } } : undefined,
+        }, recovery ? { onReview: (id, key) => { if (alive.current) { setReviewId(id); setReviewKey(key); } } } : undefined,
         (at) => {
           void (at ? Storage.set('remoteLapsesAt', at) : Storage.remove('remoteLapsesAt')).catch(() => undefined);
           if (alive.current) setLapsesAt(at);
@@ -114,5 +115,5 @@ export function useRemoteAccess() {
   // Shown whether or not anything failed: the point is to say it before access
   // lapses, and nothing has gone wrong yet at that stage.
   const lapse = describeLapse(lapseIn(lapsesAt));
-  return { setupUnavailable, reviewId, lapse, recover: () => start(true), progress: remoteEnabled ? 'enabled' as const : progress, error, busy, enable: () => start(false), localOnly };
+  return { setupUnavailable, reviewId, reviewKey, lapse, recover: () => start(true), progress: remoteEnabled ? 'enabled' as const : progress, error, busy, enable: () => start(false), localOnly };
 }

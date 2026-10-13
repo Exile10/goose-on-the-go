@@ -116,10 +116,8 @@ exposing, and pair again over HTTPS before trusting that Pond or that phone agai
 ## Troubleshooting
 
 - **Expo Go against a Pond that has not finished onboarding.** The notification
-  stream gets 403 `onboarding_required`. Without `fix/stream-refusal-is-not-auth`
-  the app treats that 403 as a dead token and refreshes and reconnects in a tight
-  loop; with it, the app retries quietly with backoff until onboarding completes.
-  Finish onboarding on the Pond either way.
+  stream gets 403 `onboarding_required`, and the app retries quietly with backoff
+  until onboarding completes. Finish onboarding on the Pond.
 
 ## Tests
 

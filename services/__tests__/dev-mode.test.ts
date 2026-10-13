@@ -13,9 +13,11 @@ import type * as Connection from '@/models/connection';
 import type * as Trust from '../pond-trust';
 import type * as Api from '../api-client';
 import type * as Remote from '../remote-access';
+import { fromBase64, hmacSha256, toHex, unboundPairTranscript, utf8 } from '../hmac';
 
 const PLAIN = 'http://192.168.1.10:4080';
 const PIN = `sha256/${'A'.repeat(43)}=`;
+const CHALLENGE = 'AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=';
 
 interface Loaded {
   insecureDevMode: boolean;
@@ -72,7 +74,7 @@ afterEach(() => warn.mockRestore());
 function pairingFetch(verify: Record<string, unknown>) {
   return jest.fn(async (url: string, _init?: RequestInit) => new Response(
     JSON.stringify(String(url).endsWith('/init')
-      ? { challenge_id: 'c1', challenge: 'AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=', expires_at: '' }
+      ? { challenge_id: 'c1', challenge: CHALLENGE, expires_at: '' }
       : String(url).endsWith('/verify') ? verify : {}),
     { status: 200, headers: { 'Content-Type': 'application/json' } },
   ));
@@ -170,7 +172,10 @@ describe('in insecure development mode', () => {
     const resp = await client.pair({ clientId: 'phone', pairingCode: '123456', channelBinding: PIN });
     expect(resp.accepted).toBe(true);
     expect(fetch.mock.calls[0]?.[0]).toBe(`${PLAIN}/api/v1/handshake/init`);
-    expect(JSON.parse(String(fetch.mock.calls[1]?.[1]?.body)).channel_binding).toBeNull();
+    const body = JSON.parse(String(fetch.mock.calls[1]?.[1]?.body));
+    expect(body.channel_binding).toBeNull();
+    // The unbound transcript, not the bound one computed without its pin.
+    expect(body.mac).toBe(toHex(hmacSha256(utf8('123456'), unboundPairTranscript(fromBase64(CHALLENGE), 'phone'))));
     for (const [, init] of fetch.mock.calls) expect(new Headers(init?.headers).get('X-Pond-Transport')).toBeNull();
     expect(warn).toHaveBeenCalledWith(expect.stringContaining('unbound pairing'));
   });
