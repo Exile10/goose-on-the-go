@@ -1,8 +1,8 @@
-jest.mock('../api-client', () => ({ api: { requestLocal: jest.fn() } }));
+jest.mock('../api-client', () => ({ ApiError: jest.requireActual('../api-client').ApiError, api: { requestLocal: jest.fn() } }));
 import i18n from '../i18n';
 import { AppState, NativeModules } from 'react-native';
-import { api } from '../api-client';
-import { enableRemoteAccess, cancelRemoteAccess, restoreRemoteAccess, resumeRemoteAccess } from '../remote-access';
+import { ApiError, api } from '../api-client';
+import { enableRemoteAccess, cancelRemoteAccess, machineKeyPreview, remoteNodeRunning, restoreRemoteAccess, resumeRemoteAccess } from '../remote-access';
 const local = 'https://192.168.1.2:4443';
 const control = 'https://coord.example';
 const pending = JSON.stringify({ state: 'NeedsLogin', machineKey: 'mkey:' + 'b'.repeat(64), authUrl: `${control}/register/pending-registration`, addresses: [] });
@@ -10,7 +10,7 @@ const running = JSON.stringify({ state: 'Running', addresses: ['100.64.0.2'] });
 let bridge: Record<string, jest.Mock>;
 beforeEach(() => {
   jest.useFakeTimers(); Object.defineProperty(AppState, 'currentState', { value: 'active', configurable: true });
-  bridge = { beginRemote: jest.fn(async () => pending), remoteStatus: jest.fn(async () => running), cancelRemote: jest.fn(async () => undefined), activateRemote: jest.fn(async () => undefined) };
+  bridge = { beginRemote: jest.fn(async () => pending), remoteStatus: jest.fn(async () => running), cancelRemote: jest.fn(async () => undefined), activateRemote: jest.fn(async () => undefined), resetIdentity: jest.fn(async () => undefined) };
   NativeModules.PondTls = bridge;
   jest.mocked(api.requestLocal).mockReset();
   jest.mocked(api.requestLocal).mockImplementation(async (_endpoint, path) => path.endsWith('/configuration') ? { enabled: true, controlUrl: control } : path.endsWith('/info') ? { tailnet_address: '100.64.0.1', https_port: 4443 } : {});
@@ -99,7 +99,8 @@ it('requires an explicit recovery request, waits for local approval and executes
   const commit = jest.fn(async () => undefined), onReview = jest.fn();
   const result = enableRemoteAccess('new-local-profile', local, jest.fn(), commit, { onReview });
   await jest.advanceTimersByTimeAsync(1000); await result;
-  expect(onReview).toHaveBeenCalledWith(id);
+  // The native node's own key, as the Pond's review will show it.
+  expect(onReview).toHaveBeenCalledWith(id, 'mkey:bbbb bbbb bbbb bbbb');
   expect(commit).toHaveBeenCalledTimes(1);
   expect(jest.mocked(api.requestLocal).mock.calls.filter(([, path, init]) => path.endsWith(id) && init?.method === 'POST')).toHaveLength(1);
   expect(jest.mocked(api.requestLocal).mock.calls.some(([, path]) => path.endsWith('/enrollment'))).toBe(false);
@@ -133,4 +134,81 @@ it('never replays an ambiguous replacement and preserves the saved profile', asy
   await expect(enableRemoteAccess('new-local-profile', local, jest.fn(), commit, { onReview: jest.fn() })).rejects.toThrow('replacement response lost');
   expect(commit).not.toHaveBeenCalled();
   expect(jest.mocked(api.requestLocal).mock.calls.filter(([, path, init]) => path.endsWith(id) && init?.method === 'POST')).toHaveLength(1);
+});
+
+it('waits for the node to start before a tailnet probe, and no longer than its budget', async () => {
+  const starting = JSON.stringify({ state: 'Starting', addresses: [] });
+  bridge.remoteStatus.mockResolvedValueOnce(starting).mockRejectedValueOnce(new Error('not yet')).mockResolvedValueOnce(running);
+  const ready = remoteNodeRunning(() => false);
+  await jest.advanceTimersByTimeAsync(500);
+  await expect(ready).resolves.toBe(true);
+  expect(bridge.remoteStatus).toHaveBeenCalledTimes(3);
+
+  bridge.remoteStatus.mockResolvedValue(starting);
+  const never = remoteNodeRunning(() => false);
+  await jest.advanceTimersByTimeAsync(10_250);
+  await expect(never).resolves.toBe(false);
+});
+
+it('stops waiting for the node once the answer is no longer wanted', async () => {
+  bridge.remoteStatus.mockResolvedValue(JSON.stringify({ state: 'Starting', addresses: [] }));
+  let abandoned = false;
+  const ready = remoteNodeRunning(() => abandoned);
+  await jest.advanceTimersByTimeAsync(250);
+  abandoned = true;
+  await jest.advanceTimersByTimeAsync(250);
+  await expect(ready).resolves.toBe(false);
+});
+
+it('shows the same start of the machine key as the Pond\'s review', () => {
+  expect(machineKeyPreview(`mkey:0123456789abcdef${'0'.repeat(48)}`)).toBe('mkey:0123 4567 89ab cdef');
+  expect(machineKeyPreview('')).toBe('mkey:');
+});
+
+// A lapsed phone's enrollment is revoked and the coordinator keeps its machine key as a
+// tombstone, so only fresh keys bring it back. The Pond says so with `stale_identity`.
+describe('a Pond that holds this node identity as revoked', () => {
+  const freshKey = 'mkey:' + 'c'.repeat(64);
+  const fresh = JSON.stringify({ ...JSON.parse(pending), machineKey: freshKey });
+  const refusal = (detail: string | null) => new ApiError('POST /api/v1/remote-access/enrollment → 409', 409, null, detail);
+  const enrollments = () => jest.mocked(api.requestLocal).mock.calls.filter(([, path]) => path.endsWith('/enrollment'));
+  /** Answers enrollment from `answers` in order, and everything else as the defaults do. */
+  function enrollmentAnswers(...answers: (Error | null)[]) {
+    const defaults = jest.mocked(api.requestLocal).getMockImplementation()!;
+    jest.mocked(api.requestLocal).mockImplementation(async (endpoint, path, init) => {
+      if (path.endsWith('/enrollment')) { const answer = answers.shift(); if (answer) throw answer; return {}; }
+      return defaults(endpoint, path, init);
+    });
+  }
+  beforeEach(() => { bridge.beginRemote.mockResolvedValueOnce(pending).mockResolvedValueOnce(fresh); });
+
+  it('erases the identity once, starts a fresh node and enrols its new key once', async () => {
+    enrollmentAnswers(refusal('stale_identity'));
+    const commit = jest.fn(async () => undefined);
+    const result = enableRemoteAccess('profile', local, jest.fn(), commit);
+    await jest.advanceTimersByTimeAsync(1000); await result;
+    expect(bridge.resetIdentity).toHaveBeenCalledTimes(1);
+    expect(bridge.beginRemote.mock.calls).toEqual([['profile', control], ['profile', control]]);
+    // The node is erased before the fresh one starts, or it would start from the old keys.
+    expect(bridge.resetIdentity.mock.invocationCallOrder[0]).toBeLessThan(bridge.beginRemote.mock.invocationCallOrder[1]);
+    expect(enrollments().map(([, , init]) => JSON.parse(String(init?.body)).machineKey)).toEqual([JSON.parse(pending).machineKey, freshKey]);
+    expect(commit).toHaveBeenCalledTimes(1);
+  });
+  it('reports a second stale identity instead of resetting again', async () => {
+    enrollmentAnswers(refusal('stale_identity'), refusal('stale_identity'));
+    const commit = jest.fn();
+    await expect(enableRemoteAccess('profile', local, jest.fn(), commit)).rejects.toThrow(i18n.t('remote.identityStale'));
+    expect(bridge.resetIdentity).toHaveBeenCalledTimes(1);
+    expect(bridge.beginRemote).toHaveBeenCalledTimes(2);
+    expect(enrollments()).toHaveLength(2);
+    expect(commit).not.toHaveBeenCalled(); expect(bridge.cancelRemote).toHaveBeenCalled();
+  });
+  it.each([['already enrolled', 'no_pending_registration'], ['without a reason', null]])('leaves the identity alone for any other 409 (%s)', async (_name, detail) => {
+    const answer = refusal(detail);
+    enrollmentAnswers(answer);
+    await expect(enableRemoteAccess('profile', local, jest.fn(), jest.fn())).rejects.toBe(answer);
+    expect(bridge.resetIdentity).not.toHaveBeenCalled();
+    expect(bridge.beginRemote).toHaveBeenCalledTimes(1);
+    expect(enrollments()).toHaveLength(1);
+  });
 });

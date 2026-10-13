@@ -33,6 +33,8 @@ final class PondTls: NSObject {
   func cancelRemote(_ resolve: @escaping RCTPromiseResolveBlock, rejecter reject: @escaping RCTPromiseRejectBlock) { remote(resolve, reject) { try PondNetwork.cancel(); return nil } }
   @objc(disableRemote:rejecter:)
   func disableRemote(_ resolve: @escaping RCTPromiseResolveBlock, rejecter reject: @escaping RCTPromiseRejectBlock) { remote(resolve, reject) { PondNetwork.disable(); return nil } }
+  @objc(resetIdentity:rejecter:)
+  func resetIdentity(_ resolve: @escaping RCTPromiseResolveBlock, rejecter reject: @escaping RCTPromiseRejectBlock) { remote(resolve, reject) { try PondNetwork.resetIdentity(); return nil } }
 
   @objc(configure:resolver:rejecter:)
   func configure(

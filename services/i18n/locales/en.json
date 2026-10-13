@@ -37,6 +37,7 @@
     "unreachable": "Pond unreachable",
     "searching": "Looking for your Pond",
     "searchingBody": "Reading your saved connection.",
+    "connectingBody": "Reaching it at home or through remote access.",
     "askGoose": "Ask Goose",
     "pair": "Pair a Pond",
     "checking": "Checking",
@@ -386,6 +387,7 @@
     "scanning": "Looking for Ponds…",
     "noneFound": "No Ponds found yet",
     "noneFoundBody": "Make sure your Pond is running and on this network.",
+    "discoveryUnavailable": "Finding Ponds on the network needs a development or release build of the app. Enter your Pond's address instead.",
     "manual": "Enter an address"
   },
   "settings": {
@@ -400,8 +402,7 @@
     "memories": "Memories",
     "logs": "Activity",
     "schedule": "Schedule",
-    "appManagement": "Connected apps",
-    "mcpServers": "MCP servers",
+    "extensions": "Extensions",
     "userMedia": "Photos and videos",
     "photoUpload": "Send a photo",
     "addUsers": "People",
@@ -430,8 +431,7 @@
     "sessions": "Sessions",
     "logs": "Activity Logs",
     "schedule": "Schedule",
-    "appManagement": "App Integrations",
-    "mcpServers": "MCP Servers",
+    "extensions": "Extensions",
     "addUsers": "Users",
     "homeManagement": "Home Management",
     "remoteAccess": "Remote Access",
@@ -517,6 +517,24 @@
     "empty": "Nothing here yet",
     "emptyBody": "What Goose does around the house shows up here.",
     "loading": "Reading your Pond's activity",
+    "failed": "Could not read your Pond's activity.",
+    "event": {
+      "agentTurn": "Answered in a conversation",
+      "inference": "Ran a model",
+      "toolCall": "Used a tool",
+      "sensorReading": "A sensor reported",
+      "cameraEvent": "A camera saw something",
+      "deviceChanged": "A device changed",
+      "timeTick": "A new hour began",
+      "presence": "Someone arrived or left",
+      "session": "A conversation started or went quiet",
+      "egress": "Reached the internet",
+      "egressDenied": "Kept a request off the internet",
+      "devicePaired": "Paired a device",
+      "pairingFailed": "Refused a pairing attempt",
+      "securityAudit": "Checked who was asking",
+      "other": "Something happened"
+    },
     "noProblems": "No problems",
     "noProblemsBody": "Your Pond has not reported any warnings or errors lately.",
     "today_one": "{{count}} event in the last day",
@@ -596,10 +614,10 @@
     "fingerprintHint": "Your Pond shows this on its dashboard, under Pairing.",
     "fingerprintSearching": "Looking for your Pond...",
     "fingerprintConfirmTitle": "Is this your Pond?",
-    "fingerprintConfirmDesc": "Open Pairing on your Pond’s dashboard. Its fingerprint should begin with:",
-    "fingerprintConfirmWhy": "Anything on this network can answer to your Pond’s name. Only your Pond shows this fingerprint.",
-    "fingerprintMatches": "It matches",
-    "fingerprintDiffers": "It doesn’t match",
+    "fingerprintConfirmDesc": "Open Pairing on your Pond’s dashboard and tap the one its fingerprint begins with. Read all three groups: they differ only after the first.",
+    "fingerprintConfirmWhy": "Anything on this network can answer to your Pond’s name. Only your Pond shows its fingerprint.",
+    "fingerprintChoiceLabel": "Fingerprint beginning {{groups}}",
+    "fingerprintNoneMatch": "None of these match",
     "fingerprintMismatch": "Then something else answered for your Pond. Type the fingerprint your Pond shows instead.",
     "fingerprintMissing": "This Pond did not publish its fingerprint on your network, so it has to be entered by hand this once.",
     "saving": "Could not save this pairing. Your previous Pond is still selected.",
@@ -701,17 +719,31 @@
     "enrolling": "Enrolling",
     "needs": "You will need"
   },
-  "integrations": {
-    "apiKey": "API key",
-    "apiKeyPlaceholder": "Paste your key",
-    "connected": "Connected",
-    "latency": "Response time",
-    "tools": "Tools",
-    "configure": "Configure",
-    "addServer": "Add a server",
-    "online": "Online",
-    "offline": "Offline",
-    "error": "Error"
+  "extensions": {
+    "loading": "Loading extensions…",
+    "installedTitle": "Installed",
+    "marketplaceTitle": "Marketplace",
+    "install": "Install",
+    "installing": "Installing…",
+    "noneTitle": "No extensions yet",
+    "noneBody": "Your Pond has no extensions installed, and none to add.",
+    "loadFailed": "Your Pond could not be reached for its extension list.",
+    "status": {
+      "connected": "Connected",
+      "error": "Error",
+      "loading": "Starting…"
+    },
+    "setupTitle": "Set up {{name}}",
+    "credentials": "Credentials",
+    "credentialsBody": "Anything left blank keeps what your Pond already holds.",
+    "required": "Required",
+    "secretPlaceholder": "Paste the value",
+    "saving": "Saving…",
+    "restartFailed": "Saved, but your Pond could not restart the extension with the new values.",
+    "installConfirmTitle": "Install {{name}}?",
+    "installConfirmBody": "{{name}} will run as a program on the computer your Pond runs on, and Goose will be able to use its tools.",
+    "removeConfirmTitle": "Remove {{name}}?",
+    "removeConfirmBody": "{{name}} will stop running on your Pond. Credentials saved for it stay there."
   },
   "photo": {
     "choose": "Choose a photo",
@@ -755,7 +787,6 @@
     "screens": {
       "chat": "Chat",
       "memory": "Memories",
-      "integrations": "App Integrations & MCP Servers",
       "schedule": "Schedule",
       "logs": "Activity Logs"
     },
@@ -766,8 +797,115 @@
     "pairDevice": "Pair another Pond"
   },
   "schedule": {
-    "event": "Event",
-    "eventBadge": "Event"
+    "tabs": {
+      "label": "Show",
+      "schedules": "Schedules",
+      "automations": "Automations"
+    },
+    "time": {
+      "today": "Today {{time}}",
+      "tomorrow": "Tomorrow {{time}}",
+      "yesterday": "Yesterday {{time}}",
+      "onDate": "{{date}}, {{time}}"
+    },
+    "card": {
+      "next": "Next: {{when}}",
+      "lastRan": "Last ran {{when}}",
+      "neverRun": "Never run",
+      "running": "Running",
+      "paused": "Paused",
+      "runNow": "Run now",
+      "enabled": "On",
+      "kindPrompt": "Prompt",
+      "kindWebhook": "Webhook",
+      "lastFired": "Last fired {{when}}",
+      "neverFired": "Never fired",
+      "cooldown": "Waits {{seconds}}s between firings",
+      "actions_one": "{{count}} action",
+      "actions_other": "{{count}} actions",
+      "when": "When {{subject}}",
+      "whenCompared": "When {{subject}} {{op}} {{value}}",
+      "sourceSensor": "Sensor",
+      "sourceCamera": "Camera",
+      "sourceDevice": "Device"
+    },
+    "list": {
+      "newSchedule": "New schedule",
+      "newAutomation": "New automation",
+      "loading": "Reading your Pond's schedules",
+      "noSchedulesTitle": "No schedules yet",
+      "noSchedulesBody": "A schedule has Goose run a prompt for you on a timer, once or on repeat.",
+      "noRulesTitle": "No automations yet",
+      "noRulesBody": "An automation has Goose act when a sensor or device reports something.",
+      "polling": "Live updates are paused. This list refreshes every 30 seconds.",
+      "rulesNote": "Automations run when a reading matches, so they have no Run now.",
+      "schedulesFailed": "Could not load your schedules.",
+      "rulesFailed": "Could not load your automations."
+    },
+    "runs": {
+      "title": "Recent runs",
+      "none": "This schedule has not run yet.",
+      "failed": "Could not load this schedule's runs.",
+      "statusRunning": "Running",
+      "statusCompleted": "Done",
+      "statusFailed": "Failed",
+      "duration": "{{ms}} ms"
+    },
+    "form": {
+      "scheduleTitle": "New schedule",
+      "automationTitle": "New automation",
+      "name": "Name",
+      "schedulePlaceholder": "Morning briefing",
+      "automationPlaceholder": "Too warm in the living room",
+      "timing": "When",
+      "once": "Once",
+      "repeat": "On repeat",
+      "date": "Date",
+      "datePlaceholder": "Choose a date",
+      "time": "Time",
+      "cron": "Cron expression",
+      "cronHint": "Six fields, seconds first: second minute hour day month weekday. 0 0 9 * * 1-5 is 9:00 on weekdays.",
+      "prompt": "What should Goose do?",
+      "promptPlaceholder": "Summarise my calendar and the weather.",
+      "create": "Create",
+      "source": "Listen to",
+      "device": "Device",
+      "anyDevice": "Any device",
+      "signal": "Signal (optional)",
+      "signalPlaceholder": "temperature",
+      "condition": "Condition",
+      "noCondition": "Any reading",
+      "opGt": "Above",
+      "opGte": "At least",
+      "opLt": "Below",
+      "opLte": "At most",
+      "opEq": "Exactly",
+      "value": "Value",
+      "cooldown": "Wait between firings (seconds)",
+      "action": "Then",
+      "actionPrompt": "Ask Goose",
+      "actionPower": "Switch a device",
+      "actionNotify": "Notify me",
+      "targetDevice": "Device to switch",
+      "power": "On or off",
+      "turnOn": "Turn on",
+      "turnOff": "Turn off",
+      "notifyTitle": "Title",
+      "notifyBody": "Message"
+    },
+    "errors": {
+      "nameRequired": "Give it a name.",
+      "promptRequired": "Say what Goose should do.",
+      "whenRequired": "Choose a date and a time.",
+      "whenPast": "That time has already passed.",
+      "cronFields": "A cron expression here has six fields. The first is seconds and must be a single number, such as 0.",
+      "valueRequired": "A condition needs a number to compare against.",
+      "actionIncomplete": "Finish the action: it is missing something it needs.",
+      "cooldownInvalid": "The wait has to be a whole number of seconds.",
+      "createFailed": "Your Pond could not create it. Try again in a moment.",
+      "gone": "That one is no longer on your Pond.",
+      "noScheduler": "Your Pond is running without its scheduler, so it cannot keep schedules."
+    }
   },
   "remote": {
     "title": "Access your Pond from anywhere",
@@ -789,7 +927,9 @@
     "replacementBlocked": "Your Pond could not re-issue this phone’s remote address. Try again in a moment, or sign out and pair again if it keeps failing.",
     "review": "Approve this recovery request on your Pond dashboard. Keep this phone on the home network.",
     "reviewCode": "Match this request on the Pond: {{id}}",
+    "reviewKey": "Approve it only if the Pond shows this phone's name and a key beginning {{key}}",
     "reviewExpired": "Local approval expired. Request recovery again while on the home network.",
+    "identityStale": "Your Pond would not take this phone back for remote access, even with new keys. Your local pairing is preserved. Sign out and pair again at home if it keeps failing.",
     "busy": "Remote access setup is already running.",
     "unsupported": "Remote access requires the latest native Goose app."
   },
@@ -830,23 +970,6 @@
     "firmware": "Firmware: {{version}}",
     "pairDevice": "Pair New Pond Device",
     "deviceCount_one": "{{count}} device"
-  },
-  "appManagement": {
-    "apiKey": "API Key",
-    "apiKeyPlaceholder": "Enter API key…",
-    "hide": "Hide",
-    "show": "Show",
-    "connected": "Connected",
-    "connectedApps": "CONNECTED APPS"
-  },
-  "mcp": {
-    "latency": "Latency",
-    "tools": "Tools",
-    "configure": "Configure",
-    "retry": "Retry",
-    "remove": "Remove",
-    "servers": "MCP SERVERS",
-    "addServer": "Add MCP Server"
   },
   "addUsers": {
     "remove": "Remove",
@@ -911,13 +1034,74 @@
     "badCode": "That pairing code did not match. Check the six digits on your Pond and try again — a wrong code costs nothing but this attempt.",
     "expired": "This attempt took too long — the server holds a challenge for only 60 seconds. Enter the same code again; you do not need a new one.",
     "noCode": "Your Pond has no pairing code right now. Codes last 10 minutes — open the dashboard on the host machine to show a fresh one.",
-    "rejected": "The server rejected the pairing attempt. Double-check the code and try again."
+    "rejected": "The server rejected the pairing attempt. Double-check the code and try again.",
+    "bindingRequired": "Your Pond refused a pairing that did not confirm its key. Scan the QR code on your Pond's dashboard to pair."
   },
   "memories": {
-    "tabAll": "All",
-    "tabPreference": "Preference",
-    "tabHabit": "Habit",
-    "tabPerson": "Person",
-    "tabReminder": "Reminder"
+    "segment": {
+      "identity": "About you",
+      "preference": "Preference",
+      "correction": "Correction",
+      "relationship": "People",
+      "project": "Project",
+      "routine": "Habit",
+      "knowledge": "Knowledge",
+      "context": "Right now"
+    },
+    "list": {
+      "add": "Add memory",
+      "all": "All",
+      "loading": "Loading memories…",
+      "failed": "Could not load memories from your Pond.",
+      "emptyTitle": "No memories yet",
+      "emptyBody": "Goose learns from your conversations, or you can add something it should know."
+    },
+    "card": {
+      "kept": "Kept",
+      "edit": "Edit",
+      "forget": "Forget"
+    },
+    "forgetTitle": "Forget this memory?",
+    "forgetBody": "Goose will no longer know it. This cannot be undone.",
+    "form": {
+      "newTitle": "New memory",
+      "editTitle": "Edit memory",
+      "content": "What should Goose remember?",
+      "contentPlaceholder": "Prefers tea over coffee in the morning",
+      "segment": "Kind",
+      "segmentHint": "Optional. It sets how much this memory matters and how quickly it fades.",
+      "keep": "Keep forever",
+      "keepHint": "A kept memory never fades with time. A tidy-up can still merge it with a repeat.",
+      "save": "Save"
+    },
+    "consolidate": {
+      "title": "Tidy up memories",
+      "body": "Goose reviews what it knows, merges repeats and drops what is out of date. Each change is challenged before it is made.",
+      "start": "Tidy up now",
+      "stop": "Stop",
+      "progressLabel": "Tidy-up progress",
+      "starting": "Starting…",
+      "proposing_one": "Reviewing {{count}} memory…",
+      "proposing_other": "Reviewing {{count}} memories…",
+      "challenging_one": "Double-checking {{count}} suggested change…",
+      "challenging_other": "Double-checking {{count}} suggested changes…",
+      "judging": "Deciding which changes to make…",
+      "applying": "Making changes: {{applied}} of {{count}}",
+      "done": "Done. Changes made: {{accepted}}. Turned down: {{rejected}}.",
+      "stopped": "Tidy-up stopped.",
+      "failed": "The tidy-up did not finish.",
+      "notEnabled": "Tidying up is switched off on your Pond. Turn on memory consolidation in its settings.",
+      "mock": "Switch Memories to the real Pond on the Developer screen to tidy up."
+    },
+    "errors": {
+      "contentRequired": "Write what Goose should remember.",
+      "saveFailed": "Could not save that memory.",
+      "deleteFailed": "Could not forget that memory."
+    }
+  },
+  "devMode": {
+    "insecureBanner": "Insecure development connection",
+    "insecureBannerDetail": "Pond traffic may be plaintext and unpinned. Anyone on this network can read it.",
+    "addressHint": "Development mode: a plain http:// address on this network is accepted and is not encrypted."
   }
 }

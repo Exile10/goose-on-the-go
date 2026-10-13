@@ -170,6 +170,9 @@ object PondNetwork {
     // "100.64.0.1.attacker.example" pass as a tailnet address.
     val parts = host.split('.')
     val bytes = parts.mapNotNull { p -> if (p.length in 1..3 && p.all { it in '0'..'9' }) p.toInt() else null }
+    // Tailscale's own service address (MagicDNS and the local API) is never a Pond, and
+    // proxying to it would hand the page a way to query this node's resolver.
+    if (bytes == listOf(100, 100, 100, 100) || host.lowercase() in setOf("fd7a:115c:a1e0::53", "fd7a:115c:a1e0:0:0:0:0:53")) return false
     return (parts.size == 4 && bytes.size == 4 && bytes.all { it in 0..255 } && bytes[0] == 100 && bytes[1] in 64..127) || host.lowercase().startsWith("fd7a:115c:a1e0:")
   }
   @Synchronized fun configure(urls: Collection<HttpUrl>) {
@@ -216,20 +219,73 @@ object PondNetwork {
     return raw
   }
   @Synchronized fun activate(profile: String, control: String) {
+    val previous = activeProfile?.first ?: runningProfile?.first
     activeProfile = if (control.isEmpty()) null else Pair(profile, control)
-    if (activeProfile == null) { stopTransport() }
+    if (activeProfile == null) { stopTransport(); previous?.let(::forgetNetworkMap) }
     else if (runningProfile != activeProfile || proxyAddress == null) {
       try { stage(profile, control) }
       catch (error: Exception) { stopTransport(); throw error }
     }
+    pruneSupersededIdentities(profile)
     PondTls.invalidateConnections()
+  }
+  /**
+   * The app keeps one pairing at a time, so once [keep] is the active profile every other
+   * node directory belongs to a pairing it replaced or forgot, and each still holds that
+   * node's private key. A forgotten pairing passes an empty profile and keeps none.
+   * Called only after the profile's node started, or was stopped for want of a coordinator,
+   * so a failed start never costs the identity it was meant to use. The Go side refuses a
+   * directory whose node lock is held, and reports what it erased and what it could not.
+   */
+  private fun pruneSupersededIdentities(keep: String) {
+    val base = java.io.File(context.noBackupFilesDir, "pond-network")
+    try { Mobile.prune(base.absolutePath, keep) }
+    catch (error: Exception) { android.util.Log.w("PondNetwork", "superseded node identities were not all erased: ${error.message}") }
   }
   @Synchronized fun cancel() {
     val active = activeProfile
     if (active == null) stopTransport() else if (runningProfile != active) stage(active.first, active.second)
     PondTls.invalidateConnections()
   }
-  @Synchronized fun disable() { activeProfile = null; stopTransport(); PondTls.invalidateConnections() }
+  @Synchronized fun disable() {
+    val previous = activeProfile?.first ?: runningProfile?.first
+    activeProfile = null
+    stopTransport()
+    previous?.let(::forgetNetworkMap)
+    PondTls.invalidateConnections()
+  }
+  /**
+   * Remote access is off for this profile, by choice or because the Pond forgot the phone,
+   * so the network map the node cached -- its peers, their addresses, the access rules --
+   * has no reason to stay on the phone. Leaving local-only ("keep local only") and a
+   * forgotten pairing both arrive here through activate with no coordinator.
+   */
+  private fun forgetNetworkMap(profile: String) {
+    val directory = java.io.File(java.io.File(context.noBackupFilesDir, "pond-network"), profile)
+    try { Mobile.disable(directory.absolutePath) }
+    catch (error: Exception) { android.util.Log.w("PondNetwork", "remote access is off but its cached network map was not erased: ${error.message}") }
+  }
+  /**
+   * Erase every node identity, so the next [stage] starts a node with fresh keys.
+   *
+   * For a pairing whose remote access lapsed: the Pond revoked its enrollment, and the
+   * coordinator keeps the revoked machine key as a tombstone it will never enrol again, so
+   * only a new key brings remote access back. The node is stopped first, because the Go side
+   * refuses a directory whose node lock is held, and the active profile is forgotten, so
+   * neither [activate] nor [cancel] restarts a node from the identity being erased. The app
+   * keeps one pairing at a time, so no directory is kept. A failure is logged and rethrown.
+   */
+  @Synchronized fun resetIdentity() {
+    activeProfile = null
+    stopTransport()
+    PondTls.invalidateConnections()
+    val base = java.io.File(context.noBackupFilesDir, "pond-network")
+    try { Mobile.prune(base.absolutePath, "") }
+    catch (error: Exception) {
+      android.util.Log.w("PondNetwork", "node identities were not erased: ${error.message}")
+      throw error
+    }
+  }
   private fun stopTransport() {
     networkCallback?.let { callback ->
       val manager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager

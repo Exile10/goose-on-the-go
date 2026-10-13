@@ -8,4 +8,5 @@ RCT_EXTERN_METHOD(remoteStatus:(RCTPromiseResolveBlock)resolve rejecter:(RCTProm
 RCT_EXTERN_METHOD(activateRemote:(NSString *)profile control:(NSString *)control resolver:(RCTPromiseResolveBlock)resolve rejecter:(RCTPromiseRejectBlock)reject)
 RCT_EXTERN_METHOD(cancelRemote:(RCTPromiseResolveBlock)resolve rejecter:(RCTPromiseRejectBlock)reject)
 RCT_EXTERN_METHOD(disableRemote:(RCTPromiseResolveBlock)resolve rejecter:(RCTPromiseRejectBlock)reject)
+RCT_EXTERN_METHOD(resetIdentity:(RCTPromiseResolveBlock)resolve rejecter:(RCTPromiseRejectBlock)reject)
 @end
