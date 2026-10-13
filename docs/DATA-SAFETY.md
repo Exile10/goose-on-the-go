@@ -49,6 +49,29 @@ plaintext bearer token to `@goose/token`. Removing the key from the code would n
 the value from a device that already had one, so `purgeLegacyStorage()`
 (`services/storage.ts:27-43`) deletes it on upgrade.
 
+### Embedded network node — app-private files
+
+Once remote access is turned on, the embedded node keeps a directory per pairing under
+`pond-network/` in the app's private storage: `noBackupFilesDir` on Android, and
+Application Support on iOS, where `PondNetwork.stage`
+(`plugins/pond-tls/ios/PondNetwork.swift`) marks the directory excluded from backup. It
+holds the node's private machine key and node key and, where the coordinator grants it,
+a cached network map: the household's peers, their tailnet addresses and the access
+rules. The map holds no private keys. None of these files leave the device; the
+coordinator learns only the public keys listed below.
+
+When remote access goes off, including when this phone signs out or the Pond forgets the
+pairing, `forgetNetworkMap` in `PondNetwork` (`plugins/pond-tls/PondNetwork.kt`,
+`plugins/pond-tls/ios/PondNetwork.swift`) erases the map through the Pond library's
+`Mobile.disable`. The node's keys stay while the pairing does.
+
+The app keeps one pairing's node directory at a time. Activating a profile erases every
+other directory under `pond-network/` through the Pond library's `Mobile.prune`, called
+from `pruneSupersededIdentities` in `PondNetwork` (`plugins/pond-tls/PondNetwork.kt`,
+`plugins/pond-tls/ios/PondNetwork.swift`), so keys from replaced or forgotten pairings do
+not accumulate. A forgotten pairing activates with no profile and keeps none. The library
+refuses a directory whose node is still running, and a failure is logged.
+
 ---
 
 ## What leaves the device, and to whom
@@ -73,7 +96,10 @@ coordinator therefore observes:
 - the node's **node key** and **machine key**, established by the embedded node;
 - the **tailnet address** assigned to this device — the app validates it falls in
   `100.64.0.0/10`, and the transport recognises `fd7a:115c:a1e0:` for IPv6
-  (`plugins/pond-tls/PondNetwork.kt:150-152`);
+  (`remote` in `PondNetwork`, `plugins/pond-tls/PondNetwork.kt` and
+  `plugins/pond-tls/ios/PondNetwork.swift`). The same check refuses Tailscale's own
+  service address (`100.100.100.100`, `fd7a:115c:a1e0::53`) as a target: it is the
+  node's resolver and local API, never a Pond;
 - **connection and disconnection times**, inherent to maintaining a control connection.
 
 What it does not observe is the content: traffic between this device and the Pond is
@@ -159,7 +185,9 @@ recording a guess here would be worse than recording the gap.
 
 1. **Coordinator retention.** How long are node keys, machine keys, tailnet addresses and
    connection logs kept, and what is the deletion path when a user signs out? The client
-   can say what it sends; only the operator can say what is kept.
+   can say what it sends; only the operator can say what is kept. The phone erases its
+   own superseded node keys (2026-10-05, see above); whether the coordinator deletes the
+   corresponding nodes is still open.
 2. **Relay operation.** Which relays can carry this traffic, who runs them, and what do
    their logs retain?
 3. **Jurisdiction and controller.** Which legal entity is the data controller for the

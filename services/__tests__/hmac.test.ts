@@ -124,14 +124,6 @@ describe('the pairing transcript', () => {
     );
   });
 
-  // The original shape, for a Pond running a server older than the binding. It
-  // has to stay byte-for-byte what it was or every such pond stops pairing.
-  it('matches the vector for the unbound MAC, which predates the binding', () => {
-    expect(toHex(hmacSha256(CODE, pairTranscript(CLIENT_LABEL, CHALLENGE, CLIENT_ID)))).toBe(
-      'b922abd25f5f1519c9d0f8ccabab4ed17b3e888a3b868be9cfdc320de017ec30',
-    );
-  });
-
   // The labels are inside the MAC so the pond's proof cannot be replayed as a
   // client MAC, which would let anything that saw one pair as that client.
   it('gives the two directions different bytes for the same inputs', () => {

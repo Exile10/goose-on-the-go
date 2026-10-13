@@ -49,7 +49,9 @@ import type {
   ChatStreamRequest,
   ChatTurn,
   MatterStatus,
+  ConsolidationEvent,
   MemoryFragment,
+  SaveMemoryRequest,
   ModelActiveRoles,
   ModelCapabilities,
   ModelEntry,
@@ -375,7 +377,7 @@ export class PondApiClient {
     challengeId: string;
     mac: string;
     deviceName?: string;
-    channelBinding?: string;
+    channelBinding: string;
   }): Promise<HandshakeResponse> {
     const res = await this.send(`${this.baseUrl}/api/v1/handshake/verify`, {
       method: 'POST',
@@ -384,7 +386,7 @@ export class PondApiClient {
         challenge_id: input.challengeId,
         mac: input.mac,
         device_name: input.deviceName ?? null,
-        channel_binding: input.channelBinding ?? null,
+        channel_binding: input.channelBinding,
       }),
     });
     if (!res.ok) {
@@ -392,6 +394,7 @@ export class PondApiClient {
         `handshake/verify failed: ${res.status}`,
         res.status,
         parseRetryAfter(res),
+        await errorDetail(res),
       );
     }
     return (await res.json()) as HandshakeResponse;
@@ -408,9 +411,10 @@ export class PondApiClient {
     /**
      * The Pond public-key pin this connection is pinned to, folded into the
      * proof so it is this pairing that certifies the key rather than the other
-     * way round. See {@link pairTranscript}.
+     * way round. Required: the Pond refuses an unbound pairing from a phone.
+     * See {@link pairTranscript}.
      */
-    channelBinding?: string;
+    channelBinding: string;
   }): Promise<HandshakeResponse> {
     const epoch = this.identityEpoch;
     const init = await this.handshakeInit({ clientId: input.clientId });
@@ -431,7 +435,7 @@ export class PondApiClient {
     // own, and this phone would be paired with the interceptor. Only something
     // holding the pairing code can produce the proof, so checking it is what
     // makes a pin that arrived over an untrusted route safe to use.
-    if (input.channelBinding && resp.accepted) {
+    if (resp.accepted) {
       const expected = toHex(
         hmacSha256(key, pairTranscript(SERVER_LABEL, challenge, input.clientId, input.channelBinding)),
       );
@@ -567,6 +571,7 @@ export class PondApiClient {
         `${init.method ?? 'GET'} ${path} → ${res.status}`,
         res.status,
         parseRetryAfter(res),
+        await errorDetail(res),
       );
     }
     return res;
@@ -885,20 +890,55 @@ export class PondApiClient {
 
   // ── Memory ──────────────────────────────────────────────────
 
-  async listMemories(limit?: number): Promise<MemoryFragment[]> {
-    const q = limit ? `?limit=${limit}` : '';
-    const res = await this.request<{ memories?: MemoryFragment[] } | MemoryFragment[]>(
-      `/api/v1/memories${q}`,
-    );
+  /** The household's 50 most recent. The Pond takes no limit or filter. */
+  async listMemories(): Promise<MemoryFragment[]> {
+    const res = await this.request<{ memories?: MemoryFragment[] } | MemoryFragment[]>('/api/v1/memories');
     return collection<MemoryFragment>(res, 'memories');
   }
 
-  addMemory(content: string, tags?: string[]): Promise<MemoryFragment> {
-    return this.post<MemoryFragment>('/api/v1/memories', { content, tags });
+  saveMemory(req: SaveMemoryRequest): Promise<MemoryFragment> {
+    return this.post<MemoryFragment>('/api/v1/memories', req);
+  }
+
+  /** Rewords in place; the Pond keeps the id, age, usage, segment and tier. */
+  updateMemory(id: string, content: string): Promise<void> {
+    return this.put<void>(`/api/v1/memories/${encodeURIComponent(id)}`, { content });
   }
 
   deleteMemory(id: string): Promise<void> {
     return this.del<void>(`/api/v1/memories/${encodeURIComponent(id)}`);
+  }
+
+  /**
+   * Run consolidation now, reporting each stage. Resolves once the run ends,
+   * whichever way. A 501 means it is off in the Pond's settings or missing
+   * from its build; `ApiError.detail` says which.
+   *
+   * Only the phone that started a run hears its progress: the Pond has no
+   * route that reports a run already going.
+   */
+  async streamConsolidation(onEvent: (event: ConsolidationEvent) => void, signal?: AbortSignal): Promise<void> {
+    const res = await this.open('/api/v1/memory/consolidate', {
+      method: 'POST',
+      headers: { Accept: 'text/event-stream' },
+      signal,
+    });
+    await readSse(
+      res,
+      (event) => {
+        try {
+          onEvent(JSON.parse(event.data) as ConsolidationEvent);
+        } catch {
+          // A frame that is not JSON carries nothing to act on.
+        }
+      },
+      { idleMs: STREAM_IDLE_MS },
+    );
+  }
+
+  /** Cancels between stages; a stage already asking a model finishes first. */
+  stopConsolidation(): Promise<void> {
+    return this.post<void>('/api/v1/memory/consolidate/stop', {});
   }
 
   // ── Models ──────────────────────────────────────────────────

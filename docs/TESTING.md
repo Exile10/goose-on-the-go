@@ -23,7 +23,14 @@ rate-limit budget in seconds. Every request from the phone then returned 429,
 including `handshake/init`, so pairing failed too: the app had denied itself
 the recovery path.
 
-Nothing about that was visible in a type error or a lint rule. When adding
+It happened again on 2026-10-05, from the other direction. The notification
+stream treated the Pond's 403 `onboarding_required` as a dead token, so the
+provider refreshed a token that was fine, reconnected loudly, and restarted the
+stream into the same 403: about ten rounds a second, each spending a refresh
+token. `services/__tests__/https-notification-stream.test.ts` now pins the
+behaviour: a 403 is retried with backoff and a 401 stops the stream.
+
+Nothing about either was visible in a type error or a lint rule. When adding
 network-adjacent code, prefer a test that asserts *how many* calls happen over
 one that only asserts the happy path.
 

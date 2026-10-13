@@ -12,7 +12,7 @@ import { configurePondTrust, PondTrustError } from '@/services/pond-trust';
 import { findPondAt, findPondByHost } from '@/services/discovery';
 import { parseConnectionProfile, validPin, isLocalPairingUrl, type ConnectionProfile } from '@/models/connection';
 import i18n from '@/services/i18n';
-import { cancelRemoteAccess, restoreRemoteAccess, resumeRemoteAccess } from '@/services/remote-access';
+import { cancelRemoteAccess, remoteNodeRunning, restoreRemoteAccess, resumeRemoteAccess } from '@/services/remote-access';
 import { getInstallId } from '@/services/install-id';
 import { canBeat, HEARTBEAT_MS } from '@/services/heartbeat';
 
@@ -122,6 +122,12 @@ const probe = async (url: string) => {
   if (result.trustFailure) throw new PondTrustError();
   return result.ok;
 };
+/**
+ * Last working route per Pond, for the life of the process. Module scope on purpose: Android
+ * recreates the activity on a return to the app, React remounts this provider and builds a new
+ * ConnectionManager, and this is what lets it carry on with the route it had.
+ */
+const rememberedRoutes = new Map<string, ConnectionSnapshot>();
 
 export function ServerProvider({ children }: PropsWithChildren) {
   const [screenModes, setScreenModes] = useState<ScreenModes>(DEFAULT_SCREEN_MODES);
@@ -138,7 +144,7 @@ export function ServerProvider({ children }: PropsWithChildren) {
   const tokenWrite = useRef<Promise<void>>(Promise.resolve());
   const environment = useRef({ cellular: false, active: AppState.currentState === 'active' });
   const manager = useMemo(() => new ConnectionManager({
-    probe, trust,
+    probe, trust, routes: rememberedRoutes, remoteReady: remoteNodeRunning,
     discover: async (host, port) => (await findPondByHost(host, port))?.url ?? null,
     changed: (next) => {
       console.info('[connection]', next.state);
@@ -223,6 +229,10 @@ export function ServerProvider({ children }: PropsWithChildren) {
       const key = `${state.type}:${state.isConnected}:${address}`;
       if (key === networkKey) return;
       networkKey = key;
+      // Android reports no network for a moment between Wi-Fi and cellular. Probing then can
+      // only fail, and announced "disconnected" for a second on every switch; the network that
+      // follows raises its own event. A network that stays gone is reported by the next request.
+      if (state.isConnected === false) return;
       environment.current.cellular = state.type === 'cellular';
       if (!staged.current) manager.environment(environment.current.cellular, environment.current.active);
     });

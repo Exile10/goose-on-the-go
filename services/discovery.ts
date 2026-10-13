@@ -40,10 +40,13 @@ export interface DiscoveredPond {
    * Offered so nobody has to copy fifty-one characters of base64 off a
    * dashboard. It is **not** trusted on the strength of having arrived over
    * mDNS -- multicast is unauthenticated and anything on this network can claim
-   * it. What makes accepting it safe is that the pairing handshake binds the
-   * served certificate into its proof: pin the wrong key and the pair fails
-   * outright rather than succeeding against the wrong Pond. Absent when the
-   * Pond runs a server older than that TXT record.
+   * it. The pairing handshake binds the served certificate into its proof, which
+   * stops an interceptor relaying the pairing, but it does not make a wrong pin
+   * safe: whoever answered with their own key can recover the six-digit code from
+   * the phone's proof offline and then pair with the real Pond in its place
+   * (goose-in-a-pond#483). So this pin is trusted only once the user has confirmed
+   * it against the Pond's own screen. Absent when the Pond runs a server older
+   * than that TXT record.
    */
   pin?: string;
   /**
