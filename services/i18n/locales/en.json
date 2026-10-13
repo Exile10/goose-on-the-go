@@ -1033,6 +1033,25 @@
       "keepHint": "A kept memory never fades with time. A tidy-up can still merge it with a repeat.",
       "save": "Save"
     },
+    "consolidate": {
+      "title": "Tidy up memories",
+      "body": "Goose reviews what it knows, merges repeats and drops what is out of date. Each change is challenged before it is made.",
+      "start": "Tidy up now",
+      "stop": "Stop",
+      "progressLabel": "Tidy-up progress",
+      "starting": "Starting…",
+      "proposing_one": "Reviewing {{count}} memory…",
+      "proposing_other": "Reviewing {{count}} memories…",
+      "challenging_one": "Double-checking {{count}} suggested change…",
+      "challenging_other": "Double-checking {{count}} suggested changes…",
+      "judging": "Deciding which changes to make…",
+      "applying": "Making changes: {{applied}} of {{count}}",
+      "done": "Done. Changes made: {{accepted}}. Turned down: {{rejected}}.",
+      "stopped": "Tidy-up stopped.",
+      "failed": "The tidy-up did not finish.",
+      "notEnabled": "Tidying up is switched off on your Pond. Turn on memory consolidation in its settings.",
+      "mock": "Switch Memories to the real Pond on the Developer screen to tidy up."
+    },
     "errors": {
       "contentRequired": "Write what Goose should remember.",
       "saveFailed": "Could not save that memory.",

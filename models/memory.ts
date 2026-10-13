@@ -18,7 +18,7 @@
  */
 
 import i18n from '@/services/i18n';
-import type { MemoryFragment, MemorySegment } from '@/services/types';
+import type { ConsolidationEvent, MemoryFragment, MemorySegment } from '@/services/types';
 
 /** Every segment, in the order the chips show them: most personal first. */
 export const MEMORY_SEGMENTS: readonly MemorySegment[] = [
@@ -57,6 +57,54 @@ export function segmentLabel(segment: MemorySegment): string {
     case 'routine': return i18n.t('memories.segment.routine');
     case 'knowledge': return i18n.t('memories.segment.knowledge');
     case 'context': return i18n.t('memories.segment.context');
+  }
+}
+
+/**
+ * Where a consolidation run has got to. The Pond's run is a trial: a proposer
+ * suggests merges, prunes and splits, an adversary challenges each, a judge
+ * rules, and the accepted ones are applied.
+ */
+export type ConsolidationProgress =
+  | { status: 'idle' }
+  | {
+      status: 'running';
+      stage: 'proposing' | 'challenging' | 'judging' | 'applying';
+      memoryCount: number;
+      proposals: number;
+      accepted: number;
+      applied: number;
+    }
+  | { status: 'done'; accepted: number; rejected: number }
+  | { status: 'stopped' }
+  | { status: 'failed'; message: string | null };
+
+/** Stages in order, so a meter can say how far along a run is. */
+export const CONSOLIDATION_STAGES = ['proposing', 'challenging', 'judging', 'applying'] as const;
+
+const RUNNING_START = {
+  status: 'running',
+  stage: 'proposing',
+  memoryCount: 0,
+  proposals: 0,
+  accepted: 0,
+  applied: 0,
+} as const;
+
+/** The progress after one frame of `POST /memory/consolidate`. */
+export function consolidationStep(progress: ConsolidationProgress, event: ConsolidationEvent): ConsolidationProgress {
+  const running = progress.status === 'running' ? progress : RUNNING_START;
+  switch (event.type) {
+    case 'started': return { ...RUNNING_START, memoryCount: event.memory_count };
+    case 'proposer_done': return { ...running, stage: 'challenging', proposals: event.proposals.length };
+    case 'adversary_done': return { ...running, stage: 'judging' };
+    case 'judge_done':
+      return { ...running, stage: 'applying', accepted: event.decisions.filter((d) => d.accepted).length };
+    case 'applied': return { ...running, applied: running.applied + 1 };
+    case 'completed':
+      return { status: 'done', accepted: event.result.accepted_count, rejected: event.result.rejected_count };
+    case 'error': return { status: 'failed', message: event.message };
+    case 'cancelled': return { status: 'stopped' };
   }
 }
 
