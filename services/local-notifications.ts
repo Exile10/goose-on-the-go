@@ -18,7 +18,8 @@
  * twice.
  */
 
-import * as Notifications from 'expo-notifications';
+import type { NotificationResponse } from 'expo-notifications';
+import { notifications, type NotificationsModule } from './notifications-module';
 import { Linking, Platform } from 'react-native';
 
 import { linkFromData } from './notification-link';
@@ -44,7 +45,7 @@ let configured: Promise<void> | null = null;
  * while the app is in the foreground — which is precisely when the SSE stream
  * is delivering, so nothing would ever reach the shade.
  */
-function installHandler(): void {
+function installHandler(Notifications: NotificationsModule): void {
   Notifications.setNotificationHandler({
     handleNotification: async () => ({
       shouldShowBanner: true, // Heads-up, the same as when the app is closed.
@@ -55,7 +56,7 @@ function installHandler(): void {
   });
 }
 
-async function createChannels(): Promise<void> {
+async function createChannels(Notifications: NotificationsModule): Promise<void> {
   if (Platform.OS !== 'android') return;
 
   await Notifications.setNotificationChannelAsync(ALERT_CHANNEL, {
@@ -74,9 +75,11 @@ async function createChannels(): Promise<void> {
  * work happens once and every later caller awaits the same promise.
  */
 export function configureLocalNotifications(): Promise<void> {
+  const Notifications = notifications;
+  if (!Notifications) return Promise.resolve(); // Expo Go: see notifications-module.ts
   if (!configured) {
-    installHandler();
-    configured = createChannels().catch((e) => {
+    installHandler(Notifications);
+    configured = createChannels(Notifications).catch((e) => {
       // A channel that cannot be created costs the shade entry, not the app.
       console.warn('[notifications] could not create channels', e);
     });
@@ -94,6 +97,8 @@ export function configureLocalNotifications(): Promise<void> {
 export async function presentLocally(notification: ServerNotification): Promise<void> {
   try {
     await configureLocalNotifications();
+    const Notifications = notifications;
+    if (!Notifications) return; // Expo Go: see notifications-module.ts
     await Notifications.scheduleNotificationAsync({
       // The server's own id, so the same notification arriving over both the
       // stream and a remote push replaces itself instead of duplicating.
@@ -132,7 +137,7 @@ function linkData(data: unknown): Record<string, string> {
 const handledTaps = new Set<string>();
 
 /** Open the link a tapped notification carries, checking it again first. */
-function openTapped(response: Notifications.NotificationResponse | null): void {
+function openTapped(Notifications: NotificationsModule, response: NotificationResponse | null): void {
   if (!response) return;
   // The listener and the read of the last response can both deliver one tap; it opens once.
   const id = response.notification.request.identifier;
@@ -158,9 +163,11 @@ function openTapped(response: Notifications.NotificationResponse | null): void {
  * the tap that launched the app. Returns the unsubscribe.
  */
 export function watchLinkTaps(): () => void {
-  const sub = Notifications.addNotificationResponseReceivedListener(openTapped);
+  const Notifications = notifications;
+  if (!Notifications) return () => {}; // Expo Go: see notifications-module.ts
+  const sub = Notifications.addNotificationResponseReceivedListener((response) => openTapped(Notifications, response));
   Notifications.getLastNotificationResponseAsync()
-    .then(openTapped)
+    .then((response) => openTapped(Notifications, response))
     .catch(() => {});
   return () => sub.remove();
 }

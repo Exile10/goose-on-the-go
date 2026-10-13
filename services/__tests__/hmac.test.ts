@@ -20,6 +20,7 @@ import {
   pairTranscript,
   SERVER_LABEL,
   toHex,
+  unboundPairTranscript,
   utf8,
 } from '@/services/hmac';
 
@@ -121,6 +122,14 @@ describe('the pairing transcript', () => {
   it('matches the vector for the server proof', () => {
     expect(toHex(hmacSha256(CODE, pairTranscript(SERVER_LABEL, CHALLENGE, CLIENT_ID, SPKI)))).toBe(
       '73171bac55bb3346045142bb0647057067d94712f5fab82d2260bf91c106ebe0',
+    );
+  });
+
+  // The original shape, used only over a plaintext development origin. It has to
+  // stay byte-for-byte what it was or the Pond's debug plaintext listener refuses it.
+  it('matches the vector for the unbound MAC, which predates the binding', () => {
+    expect(toHex(hmacSha256(CODE, unboundPairTranscript(CHALLENGE, CLIENT_ID)))).toBe(
+      'b922abd25f5f1519c9d0f8ccabab4ed17b3e888a3b868be9cfdc320de017ec30',
     );
   });
 

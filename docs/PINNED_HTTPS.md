@@ -4,9 +4,15 @@
 
 This milestone targets native Android and iOS builds. Expo Go and browsers do not
 provide the required native trust module. Existing HTTP-only profiles require a
-fresh QR scan on the Pond's LAN. There is no insecure pin discovery fallback: a
+fresh QR scan on the Pond's LAN. Outside insecure development mode
+([development.md](development.md)), there is no insecure pin discovery fallback: a
 pin advertised on the network is only offered for the user to pick out against the
 Pond's own screen (see "Trust lifecycle").
+
+For development without a release build, see [development.md](development.md):
+a development build keeps every Pond connection pinned, and Expo Go can use an
+explicitly insecure, development-only plaintext mode (2026-10-05) that release
+bundles cannot enable.
 
 Both fork and upstream remotes were fetched on 2026-09-19. The branch was
 rebased onto upstream main `aee8e4d`, which contains W1 and the earlier integration
@@ -35,8 +41,10 @@ HMAC-SHA256 keyed by the six-digit code over `pairTranscript` in
 bytes, with `CLIENT_LABEL` for the phone's MAC. When the Pond accepts, the phone
 recomputes the Pond's proof over the same transcript under `SERVER_LABEL`, and
 anything else (a missing or wrong proof) is a `PondTrustError` and no token is
-kept. The Pond refuses an unbound pairing from any peer but its own loopback
-with 403 `channel_binding_required`; `ApiError.detail` carries that identifier,
+kept. The Pond refuses an unbound pairing from any peer but its own loopback and,
+on a debug Pond, its plaintext development listener (insecure development mode
+only; see [development.md](development.md)) with 403 `channel_binding_required`;
+`ApiError.detail` carries that identifier,
 and the wizard shows `pairingErrors.bindingRequired` for it rather than the
 generic off-LAN `pairing.lan` message.
 

@@ -1,4 +1,5 @@
 import { assertPondTrust } from './pond-trust';
+import { isInsecureDevOrigin } from '@/models/connection';
 /**
  * NotificationStream — consumes GIAP's `GET /api/v1/notifications/stream`
  * (SSE) so the phone receives server notifications in the foreground:
@@ -134,7 +135,8 @@ export class NotificationStream {
 
     xhr.open('GET', url);
     xhr.setRequestHeader('Accept', 'text/event-stream');
-    xhr.setRequestHeader('X-Pond-Transport', '1');
+    // Only a pinned origin carries the marker; see PondApiClient.send.
+    if (!isInsecureDevOrigin(baseUrl)) xhr.setRequestHeader('X-Pond-Transport', '1');
     xhr.setRequestHeader('Authorization', `Bearer ${token}`);
 
     xhr.onprogress = () => {

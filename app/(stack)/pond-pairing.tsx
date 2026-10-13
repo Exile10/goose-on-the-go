@@ -25,12 +25,13 @@ import { Grey, JaridaPurple, Brand, Semantic } from '@/constants/colors';
 import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
 import { Spacing } from '@/constants/spacing';
 import { Radii } from '@/constants/radii';
-import { ApiError } from '@/services/api-client';
+import { ApiError, PondApiClient } from '@/services/api-client';
 import { useServer } from '@/providers/server-provider';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 
-import { fingerprintChoices, normalizeHttpsUrl, pinPreview, validPin } from '@/models/connection';
+import { fingerprintChoices, isInsecureDevOrigin, normalizePondUrl, pinPreview, validPin } from '@/models/connection';
+import { insecureDevMode } from '@/services/dev-mode';
 import { randomBytes } from '@/services/secure-random';
 import { getInstallId } from '@/services/install-id';
 import { clearPairingStart, peekPairingStart, takePairingPayload } from '@/services/pairing-handoff';
@@ -115,13 +116,17 @@ function ScanLink({ onPress }: { onPress: () => void }) {
  * Normalise a hand-typed server address, or return null if it cannot be one.
  *
  * The host machine's dashboard shows a bare `host:port`, so a missing scheme is
- * the common case rather than a mistake; it defaults to https, the only scheme
- * `normalizeHttpsUrl` accepts for a pinned Pond origin.
+ * the common case rather than a mistake; it defaults to https, the scheme of a
+ * pinned Pond origin. An explicit `http://` LAN address is accepted only in
+ * insecure development mode (see `normalizePondUrl`).
  */
 export function normalizeServerUrl(raw: string): string | null {
-  try { return normalizeHttpsUrl(raw.trim().includes('://') ? raw.trim() : `https://${raw.trim()}`); }
+  try { return normalizePondUrl(raw.trim().includes('://') ? raw.trim() : `https://${raw.trim()}`); }
   catch { return null; }
 }
+
+/** What the address field suggests: the plaintext listener's shape only where it is accepted. */
+const ADDRESS_PLACEHOLDER = insecureDevMode ? 'http://192.168.1.10:4080' : 'https://pond.local:4443';
 
 /**
  * The body of one wizard step.
@@ -256,6 +261,19 @@ async function discoverFingerprint(origin: string): Promise<string | null> {
   return found?.pin ?? null;
 }
 
+/**
+ * The pin a plaintext development Pond reports for itself, insecure development mode only.
+ *
+ * Nothing is ever verified against it: a plaintext connection has no key to pin, and
+ * pairing over one is unbound. It is kept only so the saved pairing has the shape every
+ * other pairing has. Asking the user to confirm it would suggest a protection that is not
+ * there, so the caller does not.
+ */
+async function reportedFingerprint(origin: string): Promise<string | null> {
+  const info = await new PondApiClient(origin).systemInfo();
+  return info.tls_spki_sha256 ?? null;
+}
+
 /** Step 0, the fallback: type the address in, and establish whose key it serves. */
 function ServerStep({
   initial,
@@ -322,6 +340,15 @@ function ServerStep({
     }
     setChecking(true); setError(null);
     try {
+      if (isInsecureDevOrigin(normalized)) {
+        const reported = await reportedFingerprint(normalized);
+        if (!reported || !validPin(reported)) {
+          setError(t('pairing.fingerprintMissing'));
+          return;
+        }
+        await onNext(normalized, reported);
+        return;
+      }
       // No fingerprint in hand is a request to look one up, not a mistake: the
       // Pond publishes its own pin beside the service phones already discover
       // it by, so the only things anybody should have to read off a screen are
@@ -420,12 +447,13 @@ function ServerStep({
             setUrl(next);
             setError(null);
           }}
-          placeholder="https://pond.local:4443"
+          placeholder={ADDRESS_PLACEHOLDER}
           placeholderTextColor={Grey[400]}
           autoCapitalize="none"
           autoCorrect={false}
           editable={!checking}
         />
+        {insecureDevMode ? <Text style={styles.inputHint}>{t('devMode.addressHint')}</Text> : null}
       </View>
       {askForPin ? (
         <View style={styles.inputGroup}>
@@ -675,7 +703,9 @@ export default function PondPairingScreen() {
   // Step 0 searches the network by default; typing an address is the fallback
   // for a network that filters multicast, which plenty of guest wifi does. Opened
   // from the welcome screen, which has already searched, it starts past the search.
-  const [manualEntry, setManualEntry] = useState(start !== null);
+  // In insecure development mode it is the start: the plaintext listener is never
+  // advertised, and Expo Go, which that mode exists for, has no mDNS module.
+  const [manualEntry, setManualEntry] = useState(insecureDevMode || start !== null);
   const openScanner = useCallback(() => router.push('/(stack)/connect-desktop'), [router]);
 
   /**

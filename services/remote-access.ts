@@ -3,6 +3,7 @@ import { AppState, NativeModules } from 'react-native';
 import { ApiError, api } from './api-client';
 import { isLocalPairingUrl, normalizeHttpsUrl } from '@/models/connection';
 import i18n from './i18n';
+import { insecureDevMode } from './dev-mode';
 
 /** Setup cannot proceed until the operator configures remote infrastructure. */
 /**
@@ -99,6 +100,9 @@ export async function enableRemoteAccess(profileId: string, localUrl: string, pr
   recovery?: { onReview: (id: string, keyPreview: string) => void },
   /** When this device's remote access lapses if it does not come home. */
   onLapse?: (lapsesAt: string | null) => void): Promise<void> {
+  // Remote access enrolls over the Pond's HTTPS listener and runs on pinned TLS; a
+  // plaintext development bundle has neither, so it is unavailable rather than half-working.
+  if (insecureDevMode) throw new Error(i18n.t('remote.unsupported'));
   if (busy) throw new Error(i18n.t('remote.busy'));
   if (!isLocalPairingUrl(localUrl)) throw new Error(i18n.t('pairing.lan'));
   const current = ++generation;
