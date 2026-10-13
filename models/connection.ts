@@ -36,6 +36,48 @@ export function pinPreview(pin: string): string {
   return `sha256/${body.match(/.{1,4}/g)?.join(' ') ?? ''}`;
 }
 
+const PIN_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+
+/**
+ * The real preview of `pin` and two decoys, in random order, for a pin that came
+ * off the network rather than from a QR or the user.
+ *
+ * A single "does this match?" can be tapped through without looking. Picking one
+ * of three cannot: only the Pond's own screen says which. The decoys share the
+ * real preview's first group, because a key whose pin starts with any chosen four
+ * characters takes minutes to generate, so the user has to read all twelve.
+ *
+ * `randomBytes` must be a cryptographic source; it is a parameter so this stays pure.
+ */
+export function fingerprintChoices(
+  pin: string,
+  randomBytes: (count: number) => Uint8Array,
+): string[] {
+  const real = pinPreview(pin);
+  const prefix = real.slice(0, 'sha256/AAAA'.length);
+  const choices = [real];
+  while (choices.length < 3) {
+    // 256 is a multiple of 64, so every alphabet character is equally likely.
+    const tail = Array.from(randomBytes(8), (byte) => PIN_ALPHABET[byte % 64]).join('');
+    const decoy = `${prefix} ${tail.slice(0, 4)} ${tail.slice(4)}`;
+    if (!choices.includes(decoy)) choices.push(decoy);
+  }
+  for (let i = choices.length - 1; i > 0; i--) {
+    const j = uniformBelow(i + 1, randomBytes);
+    [choices[i], choices[j]] = [choices[j], choices[i]];
+  }
+  return choices;
+}
+
+/** A uniform integer in [0, bound), rejecting the bytes that would bias it. */
+function uniformBelow(bound: number, randomBytes: (count: number) => Uint8Array): number {
+  const limit = 256 - (256 % bound);
+  for (;;) {
+    const [byte] = randomBytes(1);
+    if (byte < limit) return byte % bound;
+  }
+}
+
 export function normalizeHttpsUrl(raw: string): string {
   const url = new URL(raw);
   if (url.protocol !== 'https:' || !url.hostname || url.username || url.password ||

@@ -62,9 +62,19 @@ export async function disableRemoteAccess(): Promise<void> {
   await cancelPendingRecovery();
   await native().disableRemote();
 }
+/**
+ * `mkey:` and the first sixteen hex digits of a machine key, grouped in fours: what the
+ * Pond's review shows beside a recovery request, so the two screens can be compared.
+ */
+export function machineKeyPreview(machineKey: string): string {
+  const hex = machineKey.replace(/^mkey:/, '').slice(0, 16);
+  return `mkey:${hex.match(/.{1,4}/g)?.join(' ') ?? ''}`;
+}
+
 export async function enableRemoteAccess(profileId: string, localUrl: string, progress: (value: RemoteProgress) => void,
   commit: (endpoint: string, control: string, current: () => void) => Promise<void>,
-  recovery?: { onReview: (id: string) => void },
+  /** `keyPreview` is what the Pond's review should show for this request. */
+  recovery?: { onReview: (id: string, keyPreview: string) => void },
   /** When this device's remote access lapses if it does not come home. */
   onLapse?: (lapsesAt: string | null) => void): Promise<void> {
   if (busy) throw new Error(i18n.t('remote.busy'));
@@ -124,7 +134,7 @@ export async function enableRemoteAccess(profileId: string, localUrl: string, pr
             });
           if (!/^[a-f0-9-]{36}$/.test(request.id)) throw new Error(i18n.t('remote.failed'));
           pendingRecovery = { endpoint: localUrl, id: request.id };
-          check(); recovery.onReview(request.id); progress('review');
+          check(); recovery.onReview(request.id, machineKeyPreview(state.machineKey ?? '')); progress('review');
           let approved = false;
           for (let reviewAttempt = 0; reviewAttempt < 24; reviewAttempt++) {
             check();

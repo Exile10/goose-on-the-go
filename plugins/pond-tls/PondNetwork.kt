@@ -170,6 +170,9 @@ object PondNetwork {
     // "100.64.0.1.attacker.example" pass as a tailnet address.
     val parts = host.split('.')
     val bytes = parts.mapNotNull { p -> if (p.length in 1..3 && p.all { it in '0'..'9' }) p.toInt() else null }
+    // Tailscale's own service address (MagicDNS and the local API) is never a Pond, and
+    // proxying to it would hand the page a way to query this node's resolver.
+    if (bytes == listOf(100, 100, 100, 100) || host.lowercase() in setOf("fd7a:115c:a1e0::53", "fd7a:115c:a1e0:0:0:0:0:53")) return false
     return (parts.size == 4 && bytes.size == 4 && bytes.all { it in 0..255 } && bytes[0] == 100 && bytes[1] in 64..127) || host.lowercase().startsWith("fd7a:115c:a1e0:")
   }
   @Synchronized fun configure(urls: Collection<HttpUrl>) {
