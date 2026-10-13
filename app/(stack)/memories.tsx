@@ -1,6 +1,6 @@
 /**
- * MemoriesScreen — what the Pond has learned about the household: read and
- * forget, filtered by segment.
+ * MemoriesScreen — what the Pond has learned about the household: read, add,
+ * reword and forget, filtered by segment.
  *
  * The filter chips are the Pond's segments and "Kept" is its permanent tier;
  * `models/memory.ts` says why those, and not fields of the app's own.
@@ -12,6 +12,7 @@ import { useTranslation } from 'react-i18next';
 import { InkButton, InkChip, InkEmptyState, InkNotice, InkSpinner, InkText } from '@jarida/ink/native';
 
 import { MemoryCard } from '@/components/patterns/memory-card';
+import { MemorySheet } from '@/components/patterns/memory-sheet';
 import { segmentLabel, segmentsIn } from '@/models/memory';
 import type { MemoryFragment, MemorySegment } from '@/services/types';
 import { useMemories } from '@/view-models/use-memories';
@@ -24,10 +25,21 @@ export default function MemoriesScreen() {
   const styles = useThemedStyles(makeStyles);
   const { data, loading, error, failed, actions } = useMemories();
   const [filter, setFilter] = useState<MemorySegment | null>(null);
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [editing, setEditing] = useState<MemoryFragment | null>(null);
+  // A new key per opening gives the sheet a fresh form each time.
+  const [sheetKey, setSheetKey] = useState(0);
+
   const segments = segmentsIn(data.memories);
   // A filter whose last memory went is dropped rather than left showing nothing.
   const active = filter && segments.includes(filter) ? filter : null;
   const shown = active ? data.memories.filter((m) => m.segment === active) : data.memories;
+
+  const openSheet = useCallback((memory: MemoryFragment | null) => {
+    setEditing(memory);
+    setSheetKey((k) => k + 1);
+    setSheetOpen(true);
+  }, []);
 
   const { remove } = actions;
   const confirmDelete = useCallback(
@@ -47,6 +59,12 @@ export default function MemoriesScreen() {
       showsVerticalScrollIndicator={false}
       keyboardShouldPersistTaps="handled"
     >
+      <View style={styles.header}>
+        <InkButton variant="primary" icon="plus" onPress={() => openSheet(null)}>
+          {t('memories.list.add')}
+        </InkButton>
+      </View>
+
       {segments.length > 0 ? (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
           <InkChip selected={active === null} onPress={() => setFilter(null)}>
@@ -79,9 +97,17 @@ export default function MemoriesScreen() {
       ) : null}
 
       {shown.map((memory) => (
-        <MemoryCard key={memory.id} memory={memory} onDelete={confirmDelete} />
+        <MemoryCard key={memory.id} memory={memory} onEdit={openSheet} onDelete={confirmDelete} />
       ))}
 
+      <MemorySheet
+        key={sheetKey}
+        open={sheetOpen}
+        editing={editing}
+        onClose={() => setSheetOpen(false)}
+        onSave={actions.save}
+        onReword={actions.reword}
+      />
     </ScrollView>
   );
 }
@@ -90,6 +116,7 @@ const makeStyles = (c: ThemeColors) =>
   StyleSheet.create({
     container: { flex: 1, backgroundColor: c.background },
     scroll: { padding: Spacing.lg, gap: Spacing.md, paddingBottom: Spacing['4xl'] },
+    header: { flexDirection: 'row', justifyContent: 'flex-end' },
     chips: { gap: Spacing.sm },
     notice: { gap: Spacing.sm },
   });
