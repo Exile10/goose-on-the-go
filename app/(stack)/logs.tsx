@@ -16,6 +16,9 @@
  * Above the activity list, a strip counts the last day by filter. It is left
  * off Problems, which is not activity, and off a day with nothing in it,
  * where the list's own empty state already says so.
+ *
+ * Below it, a card shows how Goose's latest conversation went, from the Pond's
+ * telemetry; tapping it lists that conversation's turns.
  */
 
 import React, { useState, useCallback, useMemo } from 'react';
@@ -38,6 +41,7 @@ import {
 } from '@jarida/ink/native';
 
 import { GIcon } from '@/components/ui/g-icon';
+import { TelemetryCard, TurnsSheet } from '@/components/patterns/conversation-telemetry';
 import { selectionTick } from '@/services/haptics';
 import type { ActivityEvent, ActivitySummary, LogEntry } from '@/services/types';
 import {
@@ -53,6 +57,7 @@ import {
 } from '@/models/log';
 import { useActivity } from '@/view-models/use-activity';
 import { useActivitySummary } from '@/view-models/use-activity-summary';
+import { useConversationTelemetry, useConversationTurns } from '@/view-models/use-conversation-telemetry';
 import { useProblems } from '@/view-models/use-problems';
 import { formatRelativeTime } from '@/view-models/use-recent-sessions';
 import { Grey, Semantic } from '@/constants/colors';
@@ -142,6 +147,14 @@ export default function ActivityScreen() {
   const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<ActivityFilter>('all');
   const { summary } = useActivitySummary().data;
+  const { latest } = useConversationTelemetry().data;
+  const turns = useConversationTurns();
+  const [turnsOpen, setTurnsOpen] = useState(false);
+  const openTurns = useCallback(() => {
+    if (!latest) return;
+    setTurnsOpen(true);
+    void turns.actions.load(latest.session.id);
+  }, [latest, turns.actions]);
   const showingProblems = activeTab === 'error';
   // Problems spans no activity category, so on that filter this asks the Pond nothing.
   const activity = useActivity(activeTab);
@@ -163,6 +176,7 @@ export default function ActivityScreen() {
   const header = (
     <>
       {!showingProblems && summary && summary.total > 0 ? <TodayStrip summary={summary} /> : null}
+      {!showingProblems && latest ? <TelemetryCard latest={latest} onOpen={openTurns} /> : null}
       {loading ? <InkSpinner label={t('activity.loading')} /> : null}
       {/* A failed read with nothing to add still says so: the connection banner gives the cause. */}
       {error || failed ? (
@@ -237,6 +251,14 @@ export default function ActivityScreen() {
           }
         />
       )}
+
+      <TurnsSheet
+        open={turnsOpen}
+        title={latest?.session.title || t('activity.telemetry.untitled')}
+        turns={turns}
+        onClose={() => setTurnsOpen(false)}
+        onRetry={openTurns}
+      />
     </View>
   );
 }

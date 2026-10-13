@@ -22,6 +22,15 @@ export {
 } from './log';
 
 export {
+  SAMPLE_SESSION,
+  SAMPLE_TELEMETRY,
+  SAMPLE_TURNS,
+  formatDuration,
+  formatPercent,
+  latestSession,
+} from './telemetry';
+
+export {
   SAMPLE_RULES,
   SAMPLE_SCHEDULES,
   deviceTimeZone,

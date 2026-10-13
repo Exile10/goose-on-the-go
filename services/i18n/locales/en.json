@@ -539,7 +539,21 @@
     "noProblemsBody": "Your Pond has not reported any warnings or errors lately.",
     "today_one": "{{count}} event in the last day",
     "today_other": "{{count}} events in the last day",
-    "todayCount": "{{label}} {{count}}"
+    "todayCount": "{{label}} {{count}}",
+    "telemetry": {
+      "eyebrow": "Latest conversation",
+      "untitled": "Untitled conversation",
+      "turns": "Turns",
+      "firstWord": "Starts answering",
+      "replyLength": "Reply length",
+      "context": "Memory used",
+      "tokens_one": "{{count}} token",
+      "tokens_other": "{{count}} tokens",
+      "turnTitle": "Turn {{number}} · {{model}}",
+      "turnDetail": "Started in {{firstWord}} · done in {{total}} · {{tokens}} tokens",
+      "tool": "{{tool}} ({{time}})",
+      "loading": "Reading this conversation's turns"
+    }
   },
   "pairing": {
     "stepFind": "Find",
