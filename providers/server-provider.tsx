@@ -10,9 +10,9 @@ import { ApiError, api, PondApiClient, type HandshakeResponse } from '@/services
 import { ConnectionManager, type ConnectionSnapshot } from '@/services/connection-manager';
 import { configurePondTrust, PondTrustError } from '@/services/pond-trust';
 import { findPondAt, findPondByHost } from '@/services/discovery';
-import { parseConnectionProfile, validPin, isLocalPairingUrl, type ConnectionProfile } from '@/models/connection';
+import { parseConnectionProfile, validPin, isInsecureDevOrigin, isLocalPairingUrl, type ConnectionProfile } from '@/models/connection';
 import i18n from '@/services/i18n';
-import { cancelRemoteAccess, restoreRemoteAccess, resumeRemoteAccess } from '@/services/remote-access';
+import { cancelRemoteAccess, remoteNodeRunning, restoreRemoteAccess, resumeRemoteAccess } from '@/services/remote-access';
 import { getInstallId } from '@/services/install-id';
 import { canBeat, HEARTBEAT_MS } from '@/services/heartbeat';
 
@@ -63,7 +63,8 @@ interface ServerContextValue {
  * Home tabs to the Pond's real device list unconditionally, as #28 did for
  * models, profiles and recent conversations. A toggle for a screen with no
  * mock branch left would be a switch that does nothing. `voice` went the same
- * way when the unused listening overlay was deleted.
+ * way when the unused listening overlay was deleted, and `integrations` when
+ * the Extensions screen was wired to `/extensions` and `/marketplace` (#92).
  *
  * Nothing enforces this list: each view-model has to call `isScreenReal`
  * itself, so a screen can read "Real" here while its hook still returns mock
@@ -72,7 +73,6 @@ interface ServerContextValue {
 export const MIGRATION_SCREENS = [
   'chat',
   'memory',
-  'integrations',
   'schedule',
   'logs',
 ] as const;
@@ -122,6 +122,12 @@ const probe = async (url: string) => {
   if (result.trustFailure) throw new PondTrustError();
   return result.ok;
 };
+/**
+ * Last working route per Pond, for the life of the process. Module scope on purpose: Android
+ * recreates the activity on a return to the app, React remounts this provider and builds a new
+ * ConnectionManager, and this is what lets it carry on with the route it had.
+ */
+const rememberedRoutes = new Map<string, ConnectionSnapshot>();
 
 export function ServerProvider({ children }: PropsWithChildren) {
   const [screenModes, setScreenModes] = useState<ScreenModes>(DEFAULT_SCREEN_MODES);
@@ -138,7 +144,7 @@ export function ServerProvider({ children }: PropsWithChildren) {
   const tokenWrite = useRef<Promise<void>>(Promise.resolve());
   const environment = useRef({ cellular: false, active: AppState.currentState === 'active' });
   const manager = useMemo(() => new ConnectionManager({
-    probe, trust,
+    probe, trust, routes: rememberedRoutes, remoteReady: remoteNodeRunning,
     discover: async (host, port) => (await findPondByHost(host, port))?.url ?? null,
     changed: (next) => {
       console.info('[connection]', next.state);
@@ -223,6 +229,10 @@ export function ServerProvider({ children }: PropsWithChildren) {
       const key = `${state.type}:${state.isConnected}:${address}`;
       if (key === networkKey) return;
       networkKey = key;
+      // Android reports no network for a moment between Wi-Fi and cellular. Probing then can
+      // only fail, and announced "disconnected" for a second on every switch; the network that
+      // follows raises its own event. A network that stays gone is reported by the next request.
+      if (state.isConnected === false) return;
       environment.current.cellular = state.type === 'cellular';
       if (!staged.current) manager.environment(environment.current.cellular, environment.current.active);
     });
@@ -360,9 +370,13 @@ export function ServerProvider({ children }: PropsWithChildren) {
       // could never find it again. Ask the network which Pond answers at that address
       // and keep its advertised name instead.
       const numericHost = NUMERIC_HOST.test(profile.host);
-      const found = numericHost
-        ? await findPondAt(profile.host, profile.port, 3_000)
-        : await findPondByHost(profile.host, profile.port);
+      // A plaintext development Pond is not advertised (mDNS names only HTTPS), and the
+      // Expo Go it exists for has no mDNS module, so there is nothing to look up.
+      const found = profile.localUrls.every(isInsecureDevOrigin)
+        ? null
+        : numericHost
+          ? await findPondAt(profile.host, profile.port, 3_000)
+          : await findPondByHost(profile.host, profile.port);
       if (op !== operation.current) throw new Error(i18n.t('pairing.failed'));
       const host = numericHost && found?.hostname ? found.hostname : profile.host;
       if (found && isLocalPairingUrl(found.url) && !candidates.includes(found.url)) candidates.push(found.url);
