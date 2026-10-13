@@ -19,7 +19,7 @@
  */
 
 import * as Device from 'expo-device';
-import * as Notifications from 'expo-notifications';
+import { notifications, type NotificationsModule } from '@/services/notifications-module';
 import { Platform } from 'react-native';
 
 import { ApiError, api } from '@/services/api-client';
@@ -57,7 +57,7 @@ function pushPlatform(): PushPlatform | null {
   return null; // web etc. — foreground SSE only
 }
 
-async function ensurePermission(): Promise<boolean> {
+async function ensurePermission(Notifications: NotificationsModule): Promise<boolean> {
   const current = await Notifications.getPermissionsAsync();
   if (current.granted) return true;
   if (!current.canAskAgain) return false;
@@ -126,11 +126,13 @@ async function uploadToken(token: string, platform: PushPlatform): Promise<boole
 export async function registerPushToken(): Promise<string | null> {
   const platform = pushPlatform();
   if (!platform) return null;
+  const Notifications = notifications;
+  if (!Notifications) return null; // Expo Go: see notifications-module.ts
   if (!Device.isDevice) {
     console.log('[push] simulator/emulator has no push token; skipping');
     return null;
   }
-  if (!(await ensurePermission())) {
+  if (!(await ensurePermission(Notifications))) {
     console.log('[push] notification permission not granted; skipping');
     return null;
   }
@@ -175,6 +177,8 @@ export async function registerPushToken(): Promise<string | null> {
  * pairing — the recovery path — until the server's window rolled over.
  */
 export function watchPushTokenRotation(): () => void {
+  const Notifications = notifications;
+  if (!Notifications) return () => {}; // Expo Go: see notifications-module.ts
   const sub = Notifications.addPushTokenListener((event) => {
     const platform = pushPlatform();
     if (!platform) return;

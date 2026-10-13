@@ -104,10 +104,18 @@ and the orb in it is `VoiceOrb`.
 ## First run
 
 Welcome (`app/(onboarding)/welcome.tsx`) → Pond Pairing → Home. The welcome
-screen is the network scan itself: the Ponds it finds hand off to pairing with
-that address, and "set up later" goes to the tabs, where the gate below sends an
-unpaired phone to pairing instead. There is no restore path, because there is no
-backup to restore from.
+screen is the network scan itself. A Pond picked there opens the pairing wizard
+at that Pond's fingerprint check, as a Pond picked from the wizard's own search
+does, and "Enter an address" opens it at the address form; the wizard begins
+with its own search only when it is opened from anywhere else. The choice
+travels through `offerPairingStart` in `services/pairing-handoff.ts`, not route
+params, so a `gooseonthego://` link cannot open the wizard with an address and
+pin already filled. There is no restore path, because there is no backup to
+restore from.
+
+Until 2026-10-05 the welcome screen put the address in a route param the wizard
+never read, so either choice landed on the same search the welcome screen had
+just shown.
 
 ## Pairing gate (2026-09-21)
 
@@ -119,10 +127,13 @@ signed out land in the same place.
 
 The guard is keyed on the **stored identity**, not on the connection state, and
 the distinction is load-bearing. `ConnectionManager.configure` publishes
-`unpaired` at the start of every reconfiguration — including the one that enables
-remote access — so a guard watching the connection throws the user onto pairing
-in the middle of setting remote access up. It also waits for `hydrated`, or every
-cold start bounces through pairing before discovering it is already paired.
+`upgrade` or `unpaired` only when it is given no saved profile, which pairing
+itself does while it stages a new one. A saved profile starts as `reconnecting`,
+or as the route a previous manager found in this process (2026-10-05). Either
+way the state is a placeholder until the first probe answers, so a guard
+watching it would misroute in the middle of setup, such as enabling remote
+access, which reconfigures the manager. The guard also waits for `hydrated`, or
+every cold start bounces through pairing before discovering it is already paired.
 
 Pairing leaves for Home the moment it succeeds, replacing rather than pushing, so
 a finished wizard is not left in the stack. There is no success screen. The

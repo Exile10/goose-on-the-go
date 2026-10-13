@@ -63,3 +63,40 @@ it('does not reconnect after the owner stops it', async () => {
     jest.useRealTimers();
   }
 });
+
+// Only a 401 is a dead token. A 403 is the Pond declining to serve the stream yet --
+// before onboarding, for one -- and treating it as a dead token refreshed and
+// reconnected loudly about ten times a second.
+it('treats 401 as a dead token and 403 as a refusal to retry with backoff', async () => {
+  jest.useFakeTimers();
+  const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+  try {
+    const authFailure = jest.fn(); const disconnected = jest.fn();
+    const make = () => new NotificationStream({ baseUrl: 'https://pond.local:4443', token: 'secret', deviceId: 'phone', onNotification: jest.fn(), onDisconnect: disconnected, onAuthFailure: authFailure });
+
+    const refused = make(); refused.start(); await Promise.resolve();
+    const first = FakeXHR.instances[FakeXHR.instances.length - 1];
+    first.status = 403; first.responseText = '{"error":"onboarding_required"}'; first.onload();
+    expect(authFailure).not.toHaveBeenCalled();
+    expect(disconnected).toHaveBeenCalledTimes(1);
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('refused the stream (403)'), expect.stringContaining('onboarding_required'));
+    // Back off: nothing before a second, then one attempt, then two seconds before the next.
+    const before = FakeXHR.instances.length;
+    jest.advanceTimersByTime(999); await Promise.resolve();
+    expect(FakeXHR.instances.length).toBe(before);
+    jest.advanceTimersByTime(1); await Promise.resolve(); await Promise.resolve();
+    expect(FakeXHR.instances.length).toBe(before + 1);
+    refused.stop();
+
+    const dead = make(); dead.start(); await Promise.resolve();
+    const last = FakeXHR.instances[FakeXHR.instances.length - 1];
+    last.status = 401; last.onload();
+    expect(authFailure).toHaveBeenCalledTimes(1);
+    const after = FakeXHR.instances.length;
+    jest.advanceTimersByTime(60_000); await Promise.resolve();
+    expect(FakeXHR.instances.length).toBe(after);
+  } finally {
+    warn.mockRestore();
+    jest.useRealTimers();
+  }
+});

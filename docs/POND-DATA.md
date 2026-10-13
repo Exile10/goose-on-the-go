@@ -68,8 +68,15 @@ The Pond rate-limits per IP (600 requests a minute for API traffic), and a runaw
 | Devices | 15s | `DEVICES_MS` | Each read also fetches every switchable device's power state. |
 | Recent conversations | 30s | `RECENT_SESSIONS_MS` | |
 | Next routine | 60s | `ROUTINE_MS` | |
+| Schedules | 60s with the event stream up, 30s without it, 5s while one is running | `SCHEDULES_STREAMING_MS`, `SCHEDULES_IDLE_MS`, `SCHEDULES_ACTIVE_MS` | `GET /schedules/events` says when a run starts and ends; the poll picks up the next run the scheduler works out afterwards. A finished run is also followed by one read, at most one per `MIN_POLL_MS`, never while another read is out or the app is not in front, and only for a timed schedule, since rule fires share the stream. The Pond takes no stream permit for it, so a stream that ends is opened again, after 5s doubling to 60s (`SCHEDULES_STREAM_RETRY_MS`, `SCHEDULES_STREAM_RETRY_MAX_MS`). |
+| Rules | 30s | `RULES_MS` | The Pond has no event stream for rules. |
+| Memories | 60s | `MEMORIES_MS` | The Pond writes them in the background, after a conversation or a tidy-up, and has no event stream for them. A tidy-up started from the screen reloads the list when it ends. |
 | Household counts | 60s | `HOUSEHOLD_MS` | |
 | Profiles, models | 60s | `PROFILES_MS`, `MODELS_MS` | |
+| Activity | 30s | `ACTIVITY_MS` | One read of the last 200 events covers every filter; the screen narrows it on the phone. |
+| Problems | 30s, only while that filter is open | `ACTIVITY_MS` | The operational log is a separate store; nobody looking at Home events needs it read behind them. |
+| Activity in the last day | 60s | `SUMMARY_MS` | A day's counts move slowly. A failed read keeps the last counts. |
+| Latest conversation | 60s | `SUMMARY_MS` | Two requests: the conversation list, to find the newest, then its telemetry summary. Its turns are read only when the sheet opens, and not polled. |
 | Weather | 10 min | `WEATHER_MS` | The Pond caches it for 15 min, so asking more often only re-reads that cache. |
 | Member | 5 min | `MEMBER_MS` | An attribution changes only when a pairing code says so. |
 | Home clock | 60s | `CLOCK_MS` | Moves the greeting and the countdowns with the time. |
@@ -80,6 +87,15 @@ With Home in front that comes to about 15 requests a minute.
 
 **A poll never undoes what you just did.** A poll is slower than a tap. One that read a lamp as off just before you switched it on would land afterwards and switch it back off on screen. `mergePower()` keeps any device changed at or after the poll began. The mark is set on the tap and again when the tap's own read-back lands, since a poll in flight began before that too. A deleted device could come back the same way, so `listPollStillCurrent()` ignores a device list if the list changed after the poll began, and that stamp moves again once the server answers.
 
+## Exporting the log
+
+The Activity screen's **Problems** filter has an **Export log (CSV)** button. It reads `GET /logs/export`, writes the CSV to a dated file in the app's cache (`pond-logs-YYYY-MM-DD.csv`), and opens the phone's share sheet with it, so it can be saved to Files, sent, or opened in a spreadsheet.
+
+- **It is the whole log.** The Pond's export takes no filters and returns up to its 10,000 most recent rows, whichever filter is showing.
+- **A Pond without a log answers 501.** The screen says the Pond isn't keeping a log rather than showing a generic failure.
+- **It needs a native rebuild.** `expo-sharing` is a native module. Expo Go already includes it, but a development build made before it was added does not, so run `npx expo run:ios` or `npx expo run:android` again.
+- **On mock**, the sample problems go through the same file and share sheet, in the same columns as the Pond's export.
+
 ## How this is tested
 
 The reads live in plain async functions that take the client as an argument, `readHousehold(client)`, rather than inside the hooks. That lets the whole behaviour be tested with a fake client and no renderer: partial failure, an older Pond's 405, and a Pond that tried and failed. It is what defeated a provider-level test earlier. The hooks set state only in the promise's callback, which is also what `react-hooks/set-state-in-effect` asks for.
@@ -89,4 +105,8 @@ The loop is tested with fake timers (`view-models/__tests__/live.test.ts`): no o
 ## Known gaps
 
 - **Names need a profile.** With no household profiles, or a pairing code not bound to one, there is no name to show, and that is correct.
-- **`Schedule` in `services/types.ts` does not match the wire.** It declares `name`, `enabled` and `prompt`, and the Pond sends none of them; it sends `label`, `paused` and a `kind`. Only `.length` is read here, so this screen is unaffected. Anything reading those fields would get `undefined`, which matters for #14.
+- **The day's count stops at 1,000.** `GET /activity/summary` counts at most 1,000 events, so a busier day reads as 1,000 on the Activity screen's strip.
+- **The export is the whole log.** `GET /logs/export` takes no filters, so the file never follows the filter on screen, and it holds the Pond's 10,000 most recent rows.
+- **Telemetry is per conversation.** The Pond has no household-wide figures, so the Activity screen shows only the latest conversation's.
+- **Clearing is all or nothing.** `DELETE /activity` takes filters, but the screen offers only clearing everything, which is what the confirmation says. The operational log and telemetry are separate stores and are kept.
+- **A repeating schedule runs in UTC.** The Pond registers every repeat with `Job::new_async`, which fires in UTC whatever zone the schedule names; the zone moves only the `next_run` it reports. So `deviceTimeZone()` goes with a one-off only, whose firing instant the Pond does work out in that zone, and a repeat is sent without one, so its `next_run` is when it really fires. A repeat's cron is therefore UTC: 07:00 in Nairobi is hour 4. The fix is the Pond's, `Job::new_async_tz`. A schedule made on the desktop keeps whatever zone it was given there.

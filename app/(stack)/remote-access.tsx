@@ -33,12 +33,13 @@ export default function RemoteAccessScreen() {
   const styles = useThemedStyles(makeStyles);
   const theme = useInkTheme();
   const router = useRouter();
-  const { setupUnavailable, progress, error, busy, enable, recover, reviewId, localOnly, lapse } = useRemoteAccess();
+  const { setupUnavailable, progress, error, busy, enable, recover, reviewId, reviewKey, localOnly, lapse } = useRemoteAccess();
   return <View style={styles.page}>
     <Text style={styles.title}>{t('remote.title')}</Text>
     <Text style={styles.body}>{t('remote.description')}</Text>
     {progress && !error && <Text accessibilityLiveRegion="polite" style={styles.body}>{progressLabel(t, progress)}</Text>}
     {reviewId && busy && <Text selectable style={styles.body}>{t('remote.reviewCode', { id: reviewId })}</Text>}
+    {reviewKey && busy && <Text selectable style={styles.body}>{t('remote.reviewKey', { key: reviewKey })}</Text>}
     {lapse && <Text accessibilityRole="alert" style={[styles.tone, { color: theme.color.warningFg }]}>{lapse}</Text>}
     {error && <Text accessibilityRole="alert" style={[styles.tone, { color: theme.color.dangerFg }]}>{error}</Text>}
     {busy && <ActivityIndicator />}

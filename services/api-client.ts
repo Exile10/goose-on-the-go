@@ -1,7 +1,7 @@
 import { File } from 'expo-file-system';
 
 import { assertPondTrust, PondTrustError, pondTrustFailed } from './pond-trust';
-import { isLocalPairingUrl, normalizeHttpsUrl } from '@/models/connection';
+import { isInsecureDevOrigin, isLocalPairingUrl, normalizePondUrl } from '@/models/connection';
 /**
  * PondApiClient — HTTP client for goose-in-a-pond.
  *
@@ -23,15 +23,18 @@ import {
   pairTranscript,
   SERVER_LABEL,
   toHex,
+  unboundPairTranscript,
   utf8,
 } from './hmac';
 import { timeoutSignal } from './http';
 import { readSse, type SseEvent } from './sse';
 import type {
+  ActivityPurge,
   RidePoint,
   RideQuote,
   ActivityResponse,
   ActivitySummary,
+  ActivityWindow,
   CommissionDeviceRequest,
   CommissionDeviceResponse,
   CreateDeviceRequest,
@@ -40,13 +43,18 @@ import type {
   DeviceStatePatch,
   EventCategory,
   Extension,
+  ExtensionSecretsResult,
   LogEntry,
+  TelemetrySummary,
+  TurnMetrics,
   MarketplaceExtension,
   ChatFrame,
   ChatStreamRequest,
   ChatTurn,
   MatterStatus,
+  ConsolidationEvent,
   MemoryFragment,
+  SaveMemoryRequest,
   ModelActiveRoles,
   ModelCapabilities,
   ModelEntry,
@@ -55,8 +63,13 @@ import type {
   NowPlayingResponse,
   OAuthProvider,
   Profile,
+  CreateScheduleRequest,
+  Rule,
+  RuleRequest,
   Schedule,
+  ScheduleResultEvent,
   ScheduleRun,
+  UpdateScheduleRequest,
   SessionMessage,
   SessionSummary,
   SuggestionList,
@@ -79,12 +92,22 @@ import { MODEL_CATEGORIES } from './types';
 export class ApiError extends Error {
   readonly status: number;
   readonly retryAfterSecs: number | null;
+  /**
+   * The Pond's own `{"error": "..."}` sentence, when it sent one. A 400 from
+   * the scheduler says which field was wrong ("invalid cron expression", "a
+   * rule needs at least one action"), which a form can show where a status
+   * code could not. English, from the server: not for general display. Some
+   * refusals carry a code here instead, such as enrollment's `stale_identity`,
+   * which a caller matches rather than shows.
+   */
+  readonly detail: string | null;
 
-  constructor(message: string, status: number, retryAfterSecs: number | null) {
+  constructor(message: string, status: number, retryAfterSecs: number | null, detail: string | null = null) {
     super(message);
     this.name = 'ApiError';
     this.status = status;
     this.retryAfterSecs = retryAfterSecs;
+    this.detail = detail;
   }
 
   /** True when retrying later could plausibly succeed. */
@@ -136,6 +159,14 @@ const REQUEST_TIMEOUT_MS = 15_000;
  * that was still going to succeed.
  */
 const COMMISSION_TIMEOUT_MS = 190_000;
+
+/**
+ * Installing an extension, or restarting one with new credentials. The Pond
+ * spawns it (`npx -y <package>`, which downloads the package the first time)
+ * and answers only once it has started, which can take minutes. At the default
+ * 15s the request was abandoned while the install was still going.
+ */
+const INSTALL_TIMEOUT_MS = 300_000;
 
 /**
  * A chat turn, which is a language model generating on the Pond's own hardware.
@@ -195,6 +226,16 @@ async function parseBody<T>(res: Response): Promise<T | undefined> {
   return JSON.parse(text) as T;
 }
 
+/** The `error` string of a refusal's JSON body, or null for any other body. */
+async function errorDetail(res: Response): Promise<string | null> {
+  try {
+    const body = (await parseBody<{ error?: unknown }>(res)) ?? {};
+    return typeof body.error === 'string' && body.error.trim() ? body.error : null;
+  } catch {
+    return null;
+  }
+}
+
 
 /**
  * Unwrap a collection that may arrive bare or inside an envelope.
@@ -246,11 +287,11 @@ export class PondApiClient {
   invalidateIdentity() { this.identityEpoch++; this.token = null; this.refreshToken = null; }
 
   constructor(baseUrl = 'https://127.0.0.1:4443') {
-    this.baseUrl = normalizeHttpsUrl(baseUrl);
+    this.baseUrl = normalizePondUrl(baseUrl);
   }
 
   setBaseUrl(url: string) {
-    this.baseUrl = normalizeHttpsUrl(url);
+    this.baseUrl = normalizePondUrl(url);
   }
 
   setToken(token: string | null) {
@@ -273,10 +314,13 @@ export class PondApiClient {
    */
   private async send(url: string, init: RequestInit, timeoutMs: number | null = REQUEST_TIMEOUT_MS): Promise<Response> {
     const epoch = this.identityEpoch;
-    await assertPondTrust(new URL(url).origin);
+    const origin = new URL(url).origin;
+    await assertPondTrust(origin);
     if (epoch !== this.identityEpoch) throw new Error('Pond profile changed');
     const headers = new Headers(init.headers);
-    headers.set('X-Pond-Transport', '1');
+    // The marker asks PondTls to pin this request, and PondTls refuses it over plain HTTP.
+    // A plaintext development origin has no pin, so it goes out as an ordinary fetch.
+    if (!isInsecureDevOrigin(origin)) headers.set('X-Pond-Transport', '1');
     const response = await fetch(url, { ...init, headers, redirect: 'error',
       signal: init.signal ?? (timeoutMs === null ? undefined : timeoutSignal(timeoutMs)) });
     if (epoch !== this.identityEpoch) throw new Error('Pond profile changed');
@@ -339,8 +383,12 @@ export class PondApiClient {
     challengeId: string;
     mac: string;
     deviceName?: string;
-    channelBinding?: string;
+    /** Null only over a plaintext development origin, which has no key to bind; see {@link pair}. */
+    channelBinding: string | null;
   }): Promise<HandshakeResponse> {
+    if (input.channelBinding === null && !isInsecureDevOrigin(this.baseUrl)) {
+      throw new Error('An unbound pairing is only for a plaintext development Pond');
+    }
     const res = await this.send(`${this.baseUrl}/api/v1/handshake/verify`, {
       method: 'POST',
       headers: this.headers(),
@@ -348,7 +396,7 @@ export class PondApiClient {
         challenge_id: input.challengeId,
         mac: input.mac,
         device_name: input.deviceName ?? null,
-        channel_binding: input.channelBinding ?? null,
+        channel_binding: input.channelBinding,
       }),
     });
     if (!res.ok) {
@@ -356,6 +404,7 @@ export class PondApiClient {
         `handshake/verify failed: ${res.status}`,
         res.status,
         parseRetryAfter(res),
+        await errorDetail(res),
       );
     }
     return (await res.json()) as HandshakeResponse;
@@ -372,22 +421,31 @@ export class PondApiClient {
     /**
      * The Pond public-key pin this connection is pinned to, folded into the
      * proof so it is this pairing that certifies the key rather than the other
-     * way round. See {@link pairTranscript}.
+     * way round. Required: the Pond refuses an unbound pairing from a phone.
+     * See {@link pairTranscript}.
      */
-    channelBinding?: string;
+    channelBinding: string;
   }): Promise<HandshakeResponse> {
     const epoch = this.identityEpoch;
+    // Plaintext (insecure development mode only) has no TLS key for the binding to name,
+    // so that pairing alone is unbound, through unboundPairTranscript, and there is no
+    // server proof to check. Everywhere else it is bound to the caller's pin and the
+    // Pond's proof is required.
+    const unbound = isInsecureDevOrigin(this.baseUrl);
+    if (unbound) console.warn('[pairing] unbound pairing over a plaintext development connection');
     const init = await this.handshakeInit({ clientId: input.clientId });
     const challenge = fromBase64(init.challenge);
     const key = utf8(input.pairingCode);
     const mac = toHex(
-      hmacSha256(key, pairTranscript(CLIENT_LABEL, challenge, input.clientId, input.channelBinding)),
+      hmacSha256(key, unbound
+        ? unboundPairTranscript(challenge, input.clientId)
+        : pairTranscript(CLIENT_LABEL, challenge, input.clientId, input.channelBinding)),
     );
     const resp = await this.handshakeVerify({
       challengeId: init.challenge_id,
       mac,
       deviceName: input.deviceName,
-      channelBinding: input.channelBinding,
+      channelBinding: unbound ? null : input.channelBinding,
     });
     if (epoch !== this.identityEpoch) throw new Error('Pond profile changed');
     // The Pond's half. Without it, something that terminated this connection
@@ -395,7 +453,7 @@ export class PondApiClient {
     // own, and this phone would be paired with the interceptor. Only something
     // holding the pairing code can produce the proof, so checking it is what
     // makes a pin that arrived over an untrusted route safe to use.
-    if (input.channelBinding && resp.accepted) {
+    if (resp.accepted && !unbound) {
       const expected = toHex(
         hmacSha256(key, pairTranscript(SERVER_LABEL, challenge, input.clientId, input.channelBinding)),
       );
@@ -502,6 +560,7 @@ export class PondApiClient {
         `${init.method ?? 'GET'} ${path} → ${res.status}`,
         res.status,
         parseRetryAfter(res),
+        await errorDetail(res),
       );
     }
     return (await parseBody<T>(res)) as T;
@@ -530,6 +589,7 @@ export class PondApiClient {
         `${init.method ?? 'GET'} ${path} → ${res.status}`,
         res.status,
         parseRetryAfter(res),
+        await errorDetail(res),
       );
     }
     return res;
@@ -554,13 +614,14 @@ export class PondApiClient {
   async requestLocal<T>(endpoint: string, path: string, init: RequestInit = {}): Promise<T> {
     if (!isLocalPairingUrl(endpoint)) throw new Error('Local Pond endpoint required');
     if (!path.startsWith('/api/') || path.startsWith('//')) throw new Error('Invalid Pond API path');
-    const response = await this.send(`${normalizeHttpsUrl(endpoint)}${path}`, {
+    const response = await this.send(`${normalizePondUrl(endpoint)}${path}`, {
       ...init,
       headers: { ...this.headers(), ...(init.headers ?? {}) },
       signal: init.signal ?? timeoutSignal(REQUEST_TIMEOUT_MS),
     });
     if (!response.ok) {
-      throw new ApiError(`${init.method ?? 'GET'} ${path} → ${response.status}`, response.status, parseRetryAfter(response));
+      throw new ApiError(`${init.method ?? 'GET'} ${path} → ${response.status}`, response.status, parseRetryAfter(response),
+        await errorDetail(response));
     }
     return (await parseBody<T>(response)) as T;
   }
@@ -847,20 +908,55 @@ export class PondApiClient {
 
   // ── Memory ──────────────────────────────────────────────────
 
-  async listMemories(limit?: number): Promise<MemoryFragment[]> {
-    const q = limit ? `?limit=${limit}` : '';
-    const res = await this.request<{ memories?: MemoryFragment[] } | MemoryFragment[]>(
-      `/api/v1/memories${q}`,
-    );
+  /** The household's 50 most recent. The Pond takes no limit or filter. */
+  async listMemories(): Promise<MemoryFragment[]> {
+    const res = await this.request<{ memories?: MemoryFragment[] } | MemoryFragment[]>('/api/v1/memories');
     return collection<MemoryFragment>(res, 'memories');
   }
 
-  addMemory(content: string, tags?: string[]): Promise<MemoryFragment> {
-    return this.post<MemoryFragment>('/api/v1/memories', { content, tags });
+  saveMemory(req: SaveMemoryRequest): Promise<MemoryFragment> {
+    return this.post<MemoryFragment>('/api/v1/memories', req);
+  }
+
+  /** Rewords in place; the Pond keeps the id, age, usage, segment and tier. */
+  updateMemory(id: string, content: string): Promise<void> {
+    return this.put<void>(`/api/v1/memories/${encodeURIComponent(id)}`, { content });
   }
 
   deleteMemory(id: string): Promise<void> {
     return this.del<void>(`/api/v1/memories/${encodeURIComponent(id)}`);
+  }
+
+  /**
+   * Run consolidation now, reporting each stage. Resolves once the run ends,
+   * whichever way. A 501 means it is off in the Pond's settings or missing
+   * from its build; `ApiError.detail` says which.
+   *
+   * Only the phone that started a run hears its progress: the Pond has no
+   * route that reports a run already going.
+   */
+  async streamConsolidation(onEvent: (event: ConsolidationEvent) => void, signal?: AbortSignal): Promise<void> {
+    const res = await this.open('/api/v1/memory/consolidate', {
+      method: 'POST',
+      headers: { Accept: 'text/event-stream' },
+      signal,
+    });
+    await readSse(
+      res,
+      (event) => {
+        try {
+          onEvent(JSON.parse(event.data) as ConsolidationEvent);
+        } catch {
+          // A frame that is not JSON carries nothing to act on.
+        }
+      },
+      { idleMs: STREAM_IDLE_MS },
+    );
+  }
+
+  /** Cancels between stages; a stage already asking a model finishes first. */
+  stopConsolidation(): Promise<void> {
+    return this.post<void>('/api/v1/memory/consolidate/stop', {});
   }
 
   // ── Models ──────────────────────────────────────────────────
@@ -912,8 +1008,12 @@ export class PondApiClient {
     return collection<Schedule>(res, 'schedules');
   }
 
-  createSchedule(req: Omit<Schedule, 'id'>): Promise<Schedule> {
+  createSchedule(req: CreateScheduleRequest): Promise<Schedule> {
     return this.post<Schedule>('/api/v1/schedules', req);
+  }
+
+  updateSchedule(id: string, req: UpdateScheduleRequest): Promise<Schedule> {
+    return this.put<Schedule>(`/api/v1/schedules/${encodeURIComponent(id)}`, req);
   }
 
   deleteSchedule(id: string): Promise<void> {
@@ -939,6 +1039,69 @@ export class PondApiClient {
     return collection<ScheduleRun>(res, 'runs');
   }
 
+  /**
+   * Runs starting and finishing, as the scheduler reports them. Resolves when
+   * the stream ends, whichever way; the caller decides whether to reopen it.
+   * `onOpen` is called once the Pond has accepted it, which is how a caller
+   * that reopens it knows it is back.
+   *
+   * The Pond takes no stream permit for this one, so holding it open costs no
+   * chat stream. A screen that leaves still aborts `signal`: an abandoned
+   * stream stays open and keeps delivering to a screen that is gone.
+   */
+  async streamScheduleEvents(
+    onEvent: (event: ScheduleResultEvent) => void,
+    signal?: AbortSignal,
+    onOpen?: () => void,
+  ): Promise<void> {
+    const res = await this.open('/api/v1/schedules/events', {
+      headers: { Accept: 'text/event-stream' },
+      signal,
+    });
+    onOpen?.();
+    await readSse(
+      res,
+      (event) => {
+        try {
+          onEvent(JSON.parse(event.data) as ScheduleResultEvent);
+        } catch {
+          // A frame that is not JSON carries nothing to act on.
+        }
+      },
+      { idleMs: STREAM_IDLE_MS },
+    );
+  }
+
+  // ── Rules ───────────────────────────────────────────────────
+  //
+  // Sensor-triggered automations. They live in the scheduler's table but have
+  // their own routes, and no run-now: a rule fires when a reading matches.
+
+  async listRules(): Promise<Rule[]> {
+    const res = await this.request<{ rules?: Rule[] } | Rule[]>('/api/v1/rules');
+    return collection<Rule>(res, 'rules');
+  }
+
+  createRule(req: RuleRequest): Promise<Rule> {
+    return this.post<Rule>('/api/v1/rules', req);
+  }
+
+  updateRule(id: string, req: RuleRequest): Promise<Rule> {
+    return this.put<Rule>(`/api/v1/rules/${encodeURIComponent(id)}`, req);
+  }
+
+  deleteRule(id: string): Promise<void> {
+    return this.del<void>(`/api/v1/rules/${encodeURIComponent(id)}`);
+  }
+
+  pauseRule(id: string): Promise<void> {
+    return this.post<void>(`/api/v1/rules/${encodeURIComponent(id)}/pause`, {});
+  }
+
+  resumeRule(id: string): Promise<void> {
+    return this.post<void>(`/api/v1/rules/${encodeURIComponent(id)}/resume`, {});
+  }
+
   // ── Logs and activity ───────────────────────────────────────
 
   async listLogs(params?: { limit?: number; level?: string }): Promise<LogEntry[]> {
@@ -952,23 +1115,64 @@ export class PondApiClient {
     return collection<LogEntry>(res, 'logs');
   }
 
+  /**
+   * The Pond's activity, newest first. `since` is inclusive and `until`
+   * exclusive, both RFC3339; there is no cursor, so the next page back is the
+   * oldest timestamp seen, passed as `until`. At most 1000 per read.
+   */
   listActivity(params?: {
     limit?: number;
     since?: string;
+    until?: string;
     category?: EventCategory;
     session_id?: string;
   }): Promise<ActivityResponse> {
     const qs = new URLSearchParams();
     if (params?.limit) qs.set('limit', String(params.limit));
     if (params?.since) qs.set('since', params.since);
+    if (params?.until) qs.set('until', params.until);
     if (params?.category) qs.set('category', params.category);
     if (params?.session_id) qs.set('session_id', params.session_id);
     const q = qs.toString();
     return this.get<ActivityResponse>(`/api/v1/activity${q ? `?${q}` : ''}`);
   }
 
-  activitySummary(): Promise<ActivitySummary> {
-    return this.get<ActivitySummary>('/api/v1/activity/summary');
+  activitySummary(window?: ActivityWindow): Promise<ActivitySummary> {
+    const q = window ? `?window=${encodeURIComponent(window)}` : '';
+    return this.get<ActivitySummary>(`/api/v1/activity/summary${q}`);
+  }
+
+  /**
+   * Delete the household's activity history, all of it. The operational log
+   * and telemetry are separate stores and are kept.
+   */
+  clearActivity(): Promise<ActivityPurge> {
+    return this.del<ActivityPurge>('/api/v1/activity');
+  }
+
+  /**
+   * The operational log as CSV, newest 10,000 rows. The Pond applies no
+   * filter to an export, so none is offered here.
+   */
+  async exportLogsCsv(): Promise<string> {
+    const res = await this.open('/api/v1/logs/export', { headers: { Accept: 'text/csv' } });
+    return res.text();
+  }
+
+  // ── Telemetry ───────────────────────────────────────────────
+
+  telemetrySummary(sessionId: string): Promise<TelemetrySummary> {
+    return this.get<TelemetrySummary>(
+      `/api/v1/telemetry/summary?session_id=${encodeURIComponent(sessionId)}`,
+    );
+  }
+
+  /** Every turn of one conversation, first to last. */
+  async telemetryTurns(sessionId: string): Promise<TurnMetrics[]> {
+    const res = await this.get<{ turns?: TurnMetrics[] } | TurnMetrics[]>(
+      `/api/v1/telemetry/turns?session_id=${encodeURIComponent(sessionId)}`,
+    );
+    return collection<TurnMetrics>(res, 'turns');
   }
 
   // ── Extensions and the marketplace ──────────────────────────
@@ -980,8 +1184,27 @@ export class PondApiClient {
     return collection<Extension>(res, 'extensions');
   }
 
+  /** The Pond routes this path to PATCH and DELETE only; a PUT is refused. */
   setExtensionEnabled(name: string, enabled: boolean): Promise<void> {
-    return this.put<void>(`/api/v1/extensions/${encodeURIComponent(name)}`, { enabled });
+    return this.patch<void>(`/api/v1/extensions/${encodeURIComponent(name)}`, { enabled });
+  }
+
+  /** `DELETE /extensions/{name}`: stops it and forgets its config. Stored secrets stay. */
+  removeExtension(name: string): Promise<void> {
+    return this.del<void>(`/api/v1/extensions/${encodeURIComponent(name)}`);
+  }
+
+  /**
+   * Store an installed extension's credentials, bulk, as `{ KEY: value }`. Unlike
+   * `setSecret`, the Pond also restarts the extension, since a stdio extension's
+   * environment is fixed when it is spawned.
+   */
+  setExtensionSecrets(name: string, secrets: Record<string, string>): Promise<ExtensionSecretsResult> {
+    return this.request<ExtensionSecretsResult>(`/api/v1/extensions/${encodeURIComponent(name)}/secrets`, {
+      method: 'POST',
+      body: JSON.stringify(secrets),
+      signal: timeoutSignal(INSTALL_TIMEOUT_MS),
+    });
   }
 
   async listMarketplace(): Promise<MarketplaceExtension[]> {
@@ -989,8 +1212,18 @@ export class PondApiClient {
     return res.extensions;
   }
 
-  installMarketplaceExtension(id: string): Promise<void> {
-    return this.post<void>(`/api/v1/marketplace/${encodeURIComponent(id)}/install`, {});
+  /**
+   * The Pond answers 428 when a required secret is neither in `secrets` nor
+   * already stored, so credentials go with the install rather than after it.
+   * Its own signal also keeps `request()` from running connection recovery
+   * when the long wait runs out.
+   */
+  installMarketplaceExtension(id: string, secrets?: Record<string, string>): Promise<void> {
+    return this.request<void>(`/api/v1/marketplace/${encodeURIComponent(id)}/install`, {
+      method: 'POST',
+      body: JSON.stringify(secrets ? { secrets } : {}),
+      signal: timeoutSignal(INSTALL_TIMEOUT_MS),
+    });
   }
 
   // ── Secrets and OAuth ───────────────────────────────────────
@@ -1124,6 +1357,10 @@ export class PondApiClient {
 
   private put<T>(path: string, body: unknown): Promise<T> {
     return this.request<T>(path, { method: 'PUT', body: JSON.stringify(body) });
+  }
+
+  private patch<T>(path: string, body: unknown): Promise<T> {
+    return this.request<T>(path, { method: 'PATCH', body: JSON.stringify(body) });
   }
 
   private del<T>(path: string): Promise<T> {

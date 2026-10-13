@@ -9,6 +9,7 @@
     "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": true,
+      "buildNumber": "1",
       "bundleIdentifier": "io.jarida.gooseonthego",
       "infoPlist": {
         "NSLocalNetworkUsageDescription": "Goose On The Go looks for your Goose In A Pond server on this network so you do not have to type its address.",
@@ -24,6 +25,7 @@
       }
     },
     "android": {
+      "versionCode": 1,
       "permissions": [
         "android.permission.ACCESS_WIFI_STATE",
         "android.permission.CHANGE_WIFI_MULTICAST_STATE",
@@ -120,6 +122,7 @@
         }
       ],
       "./plugins/with-pond-tls",
+      "./plugins/with-release-signing",
       "expo-asset"
     ],
     "experiments": {
