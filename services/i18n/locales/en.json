@@ -994,7 +994,8 @@
     "badCode": "That pairing code did not match. Check the six digits on your Pond and try again — a wrong code costs nothing but this attempt.",
     "expired": "This attempt took too long — the server holds a challenge for only 60 seconds. Enter the same code again; you do not need a new one.",
     "noCode": "Your Pond has no pairing code right now. Codes last 10 minutes — open the dashboard on the host machine to show a fresh one.",
-    "rejected": "The server rejected the pairing attempt. Double-check the code and try again."
+    "rejected": "The server rejected the pairing attempt. Double-check the code and try again.",
+    "bindingRequired": "Your Pond refused a pairing that did not confirm its key. Scan the QR code on your Pond's dashboard to pair."
   },
   "memories": {
     "segment": {

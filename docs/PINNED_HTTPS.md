@@ -22,6 +22,17 @@ be local; the Pond independently checks the actual TCP source subnet. Manual
 pairing asks for the HTTPS address, six-digit code, and full public-key pin shown
 locally on the Pond.
 
+Every pairing binds the pinned SPKI into its MAC (2026-09-30). The MAC is
+HMAC-SHA256 keyed by the six-digit code over `pairTranscript` in
+`services/hmac.ts`: label, challenge, client id and the pin, separated by NUL
+bytes, with `CLIENT_LABEL` for the phone's MAC. When the Pond accepts, the phone
+recomputes the Pond's proof over the same transcript under `SERVER_LABEL`, and
+anything else (a missing or wrong proof) is a `PondTrustError` and no token is
+kept. The Pond refuses an unbound pairing from any peer but its own loopback
+with 403 `channel_binding_required`; `ApiError.detail` carries that identifier,
+and the wizard shows `pairingErrors.bindingRequired` for it rather than the
+generic off-LAN `pairing.lan` message.
+
 `paired-profile.ts` writes the new non-secret address record while preserving the
 old one, then atomically commits pin and credentials together in SecureStore.
 Failed secure commits leave the old profile loadable. A saved profile's ID ties

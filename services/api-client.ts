@@ -375,7 +375,7 @@ export class PondApiClient {
     challengeId: string;
     mac: string;
     deviceName?: string;
-    channelBinding?: string;
+    channelBinding: string;
   }): Promise<HandshakeResponse> {
     const res = await this.send(`${this.baseUrl}/api/v1/handshake/verify`, {
       method: 'POST',
@@ -384,7 +384,7 @@ export class PondApiClient {
         challenge_id: input.challengeId,
         mac: input.mac,
         device_name: input.deviceName ?? null,
-        channel_binding: input.channelBinding ?? null,
+        channel_binding: input.channelBinding,
       }),
     });
     if (!res.ok) {
@@ -392,6 +392,7 @@ export class PondApiClient {
         `handshake/verify failed: ${res.status}`,
         res.status,
         parseRetryAfter(res),
+        await errorDetail(res),
       );
     }
     return (await res.json()) as HandshakeResponse;
@@ -408,9 +409,10 @@ export class PondApiClient {
     /**
      * The Pond public-key pin this connection is pinned to, folded into the
      * proof so it is this pairing that certifies the key rather than the other
-     * way round. See {@link pairTranscript}.
+     * way round. Required: the Pond refuses an unbound pairing from a phone.
+     * See {@link pairTranscript}.
      */
-    channelBinding?: string;
+    channelBinding: string;
   }): Promise<HandshakeResponse> {
     const epoch = this.identityEpoch;
     const init = await this.handshakeInit({ clientId: input.clientId });
@@ -431,7 +433,7 @@ export class PondApiClient {
     // own, and this phone would be paired with the interceptor. Only something
     // holding the pairing code can produce the proof, so checking it is what
     // makes a pin that arrived over an untrusted route safe to use.
-    if (input.channelBinding && resp.accepted) {
+    if (resp.accepted) {
       const expected = toHex(
         hmacSha256(key, pairTranscript(SERVER_LABEL, challenge, input.clientId, input.channelBinding)),
       );
