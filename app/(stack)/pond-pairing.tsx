@@ -33,7 +33,7 @@ import type { TFunction } from 'i18next';
 import { fingerprintChoices, normalizeHttpsUrl, pinPreview, validPin } from '@/models/connection';
 import { randomBytes } from '@/services/secure-random';
 import { getInstallId } from '@/services/install-id';
-import { takePairingPayload } from '@/services/pairing-handoff';
+import { clearPairingStart, peekPairingStart, takePairingPayload } from '@/services/pairing-handoff';
 import { findPondAt, type DiscoveredPond } from '@/services/discovery';
 import { useDiscovery } from '@/view-models/use-discovery';
 import { describeApiError } from '@/view-models/describe-error';
@@ -260,12 +260,19 @@ async function discoverFingerprint(origin: string): Promise<string | null> {
 function ServerStep({
   initial,
   initialPin,
+  picked,
   onNext,
   onScan,
 }: {
   initial: string;
   /** The pin discovery already learned for `initial`, when it had one. */
   initialPin: string;
+  /**
+   * `initial` is a Pond the user picked off a discovery list, not an address they typed.
+   * With its pin in hand there is nothing to type, so the step opens on checking that pin
+   * against the Pond's screen instead of on an address form waiting for Continue.
+   */
+  picked: boolean;
   onNext: (url: string, pin: string) => Promise<void>;
   onScan: () => void;
 }) {
@@ -277,7 +284,15 @@ function ServerStep({
   const [pinFromNetwork, setPinFromNetwork] = useState(!!initialPin);
   // The three previews are drawn once per pin: offering a fresh set after a wrong
   // pick would let the user guess until one works.
-  const [confirming, setConfirming] = useState<{ url: string; pin: string; choices: string[] } | null>(null);
+  const [confirming, setConfirming] = useState<{ url: string; pin: string; choices: string[] } | null>(() => {
+    // Only what Continue would have reached anyway: a usable address and a well-formed pin.
+    // Anything less opens on the form, where the user can see and fix it.
+    if (!picked || !validPin(initialPin)) return null;
+    const normalized = normalizeServerUrl(initial);
+    return normalized
+      ? { url: normalized, pin: initialPin, choices: fingerprintChoices(initialPin, randomBytes) }
+      : null;
+  });
   // After a wrong pick or "none match", nothing more is taken from the network in
   // this step: only a typed fingerprint or a QR scan can continue.
   const [networkPinRefused, setNetworkPinRefused] = useState(false);
@@ -635,8 +650,14 @@ export default function PondPairingScreen() {
    * the screen was being torn down was not.
    */
   const [reachedWithHistory] = useState(() => Boolean(profileId));
-  const [manualUrl, setManualUrl] = useState(serverUrl);
-  const [manualPin, setManualPin] = useState('');
+  // Where the welcome screen left off, if it was the way in. Read once and cleared
+  // after mount; see peekPairingStart.
+  const [start] = useState(peekPairingStart);
+  useEffect(() => { clearPairingStart(); }, []);
+  const [manualUrl, setManualUrl] = useState(start?.kind === 'pond' ? start.url : serverUrl);
+  const [manualPin, setManualPin] = useState(start?.kind === 'pond' ? (start.pin ?? '') : '');
+  // Whether the address came off a discovery list, here or on the welcome screen.
+  const [picked, setPicked] = useState(start?.kind === 'pond');
   const [pairingError, setPairingError] = useState<string | null>(null);
   useEffect(() => () => { void cancelPairing(); }, [cancelPairing]);
   // Stable per-install client_id, hydrated from SecureStorage on mount. The
@@ -652,8 +673,9 @@ export default function PondPairingScreen() {
   const [step, setStep] = useState<Step>(0);
   const [code, setCode] = useState('');
   // Step 0 searches the network by default; typing an address is the fallback
-  // for a network that filters multicast, which plenty of guest wifi does.
-  const [manualEntry, setManualEntry] = useState(false);
+  // for a network that filters multicast, which plenty of guest wifi does. Opened
+  // from the welcome screen, which has already searched, it starts past the search.
+  const [manualEntry, setManualEntry] = useState(start !== null);
   const openScanner = useCallback(() => router.push('/(stack)/connect-desktop'), [router]);
 
   /**
@@ -757,13 +779,14 @@ export default function PondPairingScreen() {
           <ServerStep
             initial={manualUrl}
             initialPin={manualPin}
+            picked={picked}
             onNext={onServerNext}
             onScan={openScanner}
           />
         ) : (
           <DiscoverStep
-            onNext={(url, pin) => { setManualUrl(url); setManualPin(pin ?? ''); setManualEntry(true); }}
-            onManual={() => setManualEntry(true)}
+            onNext={(url, pin) => { setManualUrl(url); setManualPin(pin ?? ''); setPicked(true); setManualEntry(true); }}
+            onManual={() => { setPicked(false); setManualEntry(true); }}
             onScan={openScanner}
           />
         ))}
