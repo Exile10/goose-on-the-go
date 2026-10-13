@@ -73,6 +73,9 @@ The Pond rate-limits per IP (600 requests a minute for API traffic), and a runaw
 | Memories | 60s | `MEMORIES_MS` | The Pond writes them in the background, after a conversation or a tidy-up, and has no event stream for them. A tidy-up started from the screen reloads the list when it ends. |
 | Household counts | 60s | `HOUSEHOLD_MS` | |
 | Profiles, models | 60s | `PROFILES_MS`, `MODELS_MS` | |
+| Activity | 30s | `ACTIVITY_MS` | One read of the last 200 events covers every filter; the screen narrows it on the phone. |
+| Problems | 30s, only while that filter is open | `ACTIVITY_MS` | The operational log is a separate store; nobody looking at Home events needs it read behind them. |
+| Activity in the last day | 60s | `SUMMARY_MS` | A day's counts move slowly. A failed read keeps the last counts. |
 | Weather | 10 min | `WEATHER_MS` | The Pond caches it for 15 min, so asking more often only re-reads that cache. |
 | Member | 5 min | `MEMBER_MS` | An attribution changes only when a pairing code says so. |
 | Home clock | 60s | `CLOCK_MS` | Moves the greeting and the countdowns with the time. |
