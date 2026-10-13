@@ -4,7 +4,9 @@
 
 This milestone targets native Android and iOS builds. Expo Go and browsers do not
 provide the required native trust module. Existing HTTP-only profiles require a
-fresh QR scan on the Pond's LAN. There is no insecure pin discovery fallback.
+fresh QR scan on the Pond's LAN. There is no insecure pin discovery fallback: a
+pin advertised on the network is only offered for the user to pick out against the
+Pond's own screen (see "Trust lifecycle").
 
 Both fork and upstream remotes were fetched on 2026-09-19. The branch was
 rebased onto upstream main `aee8e4d`, which contains W1 and the earlier integration
@@ -17,10 +19,26 @@ branches and named stashes until delivery is complete.
 
 `models/pairing.ts` validates v2 HTTPS QR payloads. `ServerProvider` stages the
 public-key pin through `PondTls` before contacting local candidates. Discovery
-can add addresses but cannot provide a pin. Initialization and verification must
-be local; the Pond independently checks the actual TCP source subnet. Manual
-pairing asks for the HTTPS address, six-digit code, and full public-key pin shown
-locally on the Pond.
+can also offer the pin the Pond advertises beside its mDNS service, but that is
+a claim, not trust (2026-09-30). The wizard shows its preview beside two decoys
+that share the first group of four, and only picking the one on the Pond's own
+screen continues. A wrong pick or "None of these match" ends discovery for that
+step, after which only a typed fingerprint or a QR scan can continue. Decoys and
+order come from expo-crypto (`services/secure-random.ts`). Initialization and
+verification must be local; the Pond independently checks the actual TCP source
+subnet. Manual pairing asks for the HTTPS address, six-digit code, and full
+public-key pin shown locally on the Pond.
+
+Every pairing binds the pinned SPKI into its MAC (2026-09-30). The MAC is
+HMAC-SHA256 keyed by the six-digit code over `pairTranscript` in
+`services/hmac.ts`: label, challenge, client id and the pin, separated by NUL
+bytes, with `CLIENT_LABEL` for the phone's MAC. When the Pond accepts, the phone
+recomputes the Pond's proof over the same transcript under `SERVER_LABEL`, and
+anything else (a missing or wrong proof) is a `PondTrustError` and no token is
+kept. The Pond refuses an unbound pairing from any peer but its own loopback
+with 403 `channel_binding_required`; `ApiError.detail` carries that identifier,
+and the wizard shows `pairingErrors.bindingRequired` for it rather than the
+generic off-LAN `pairing.lan` message.
 
 `paired-profile.ts` writes the new non-secret address record while preserving the
 old one, then atomically commits pin and credentials together in SecureStore.
@@ -52,12 +70,47 @@ the generated `ios/` directory are required.
 ## Recovery
 
 One connection manager handles endpoint selection for the provider, REST and SSE.
-Wi-Fi prefers local candidates and then tailnet; cellular uses tailnet. Foreground
-resume and network changes restart selection. Failures use coalesced, bounded
-recovery with stale-generation rejection and no background probes. NetInfo uses
-native reachability, never an external internet check or SSID collection.
-While connected remotely on Wi-Fi, six bounded LAN rechecks can return to a local
-endpoint after a temporary outage without requiring another network event.
+Wi-Fi prefers local candidates; cellular uses tailnet. On Wi-Fi every saved local
+address is probed at once, and the tailnet joins after a 250 ms head start, or as
+soon as every local address has failed; mDNS discovery runs alongside the tailnet
+rather than ahead of it. A local answer wins whenever it comes first. Until
+2026-10-05 the order was strictly sequential, so away from home a Wi-Fi network
+held remote access up for each saved address's three-second probe timeout, then
+for discovery.
+
+Foreground resume and network changes restart selection. When the phone already
+has a working route, it stays on screen while it is re-checked; only a failed
+check changes the state. A saved pairing starts as `reconnecting`, never
+`unpaired`, and the last working route outlives the provider: Android recreates
+the activity on a return to the app, and React builds a new manager with it, which
+used to show `unpaired`, then `reconnecting`, on every return. The remembered
+route is used only while the profile still names it, and forgotten when the Pond
+refuses the phone. The banner waits 1.5 s before reporting `reconnecting`, and
+says nothing until the saved pairing has loaded, because it pushes every screen
+down.
+
+A route that was working and then fails gets one more pass a second later, inside
+the same recovery, before the failure is announced; the read that asked for it is
+retried against whatever that pass finds. On cellular the tailnet path drops for
+about a second now and then, and each drop used to show `disconnected` and fail a
+refresh. A network event that reports no connection at all is ignored: Android
+sends one between Wi-Fi and cellular, probing then could only fail, and the
+network that follows raises its own event.
+
+A probe of the tailnet address waits, for up to ten seconds, until this phone's own
+node reports `Running`. On a cold start the node takes seconds to come up and every
+earlier probe failed at once, which reported "Pond unavailable" for twelve seconds
+on the A57 and set off a backoff that delayed the connection further once the node
+was ready. The wait keeps the state `reconnecting` and probes the moment the node is
+up; a node that does not start within the budget is reported as unavailable. Home's
+Pond card says it is looking for the Pond while a reconnect is in progress,
+rather than "Pond unreachable" beside a banner saying it is reconnecting.
+
+Failures use coalesced, bounded recovery with stale-generation rejection and no
+background probes. NetInfo uses native reachability, never an external internet
+check or SSID collection. While connected remotely on Wi-Fi, six bounded LAN
+rechecks can return to a local endpoint after a temporary outage without requiring
+another network event.
 
 Reads retry once after successful recovery. Ambiguous writes and refresh-token
 rotations are not replayed. SSE reconnects using the newly selected endpoint and
@@ -234,6 +287,18 @@ physical iPhone acceptance remains deferred. The paired Pond's deployment and
 verification ledgers are `deploy/remote-access/README.md` and
 `docs/embedded-remote-access-verification.md` in the Pond repository.
 
+### The cached network map is erased when remote access goes off (2026-10-05)
+
+When remote access goes off for a profile -- "keep local only", or a pairing the Pond
+forgot -- the native layer erases the network map the node cached for it. The
+coordinator lets phones cache their map so a cold start can reach the Pond before the
+control login finishes; the map lists the household's peers, their addresses and the
+access rules, and holds no private keys. Both paths reach `PondNetwork.activate` with no
+coordinator, which stops the node and calls `forgetNetworkMap`; that hands the profile's
+directory to the Pond library's `Mobile.disable`, which erases the map and keeps the
+node's keys. A map that cannot be erased is logged. The measurements above predate this
+change and do not cover it. See the Pond's `docs/remote-access.md`.
+
 
 ### Embedded transport continuation (2026-09-20)
 
@@ -306,6 +371,14 @@ with the rebuilt library. Normal iOS Debug simulator and unsigned Release device
 builds pass, as do Android Debug/Release builds and all 13 native TLS/proxy tests
 with zero skips. Both Android APKs contain all four required Go-library ABIs.
 
+### Recovery review shows the machine key (2026-09-30)
+
+While a recovery request waits for approval, the phone shows the request id and
+`mkey:` with the first sixteen hex digits of its new machine key
+(`machineKeyPreview` in `services/remote-access.ts`), grouped in fours as the
+Pond's review shows them. Approve the request only when the Pond shows this
+phone's name and the same key. The measurements above predate this.
+
 ### Superseded node identities are erased (2026-10-05)
 
 Each pairing's node runs in its own directory under `pond-network/`
@@ -363,6 +436,10 @@ and requires HTTPS, saved SPKI, valid dates and the expected hostname. Unrelated
 traffic retains platform validation. Native CONNECT tests also verify that proxy
 credentials never reach Pond HTTP. The deployment minimum remains iOS 16.4; its
 older runtime proxy path is not established by iOS 27 simulator results.
+Tailscale's own service address (100.100.100.100, fd7a:115c:a1e0::53) lies inside
+those ranges but is never a Pond: since 2026-09-30 the remote-target check,
+`PondNetwork.remote`, refuses it on both platforms, so it is never configured as a
+proxy target.
 
 Fixtures compile an isolated CA through a temporary Go overlay, keep administration
 credentials in private scratch files, and restore normal libraries in cleanup.

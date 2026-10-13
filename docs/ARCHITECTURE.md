@@ -50,12 +50,20 @@ Custom hooks in `view-models/` that own all state and side effects. Every ViewMo
 TypeScript interfaces in `models/` defining the domain shapes. These are pure types — no logic. Mock data is co-located with its type file (e.g., `LLM_MODELS` in `models/model.ts`).
 
 ### Services
-`services/api-client.ts` — the HTTP client for pond-server, and the only place in
-the app that calls `fetch`. It attaches the bearer token, refreshes once on 401
-(sharing a single refresh across concurrent 401s), and throws a typed `ApiError`
-carrying the status and any `Retry-After`. Wire types live in
-`services/types.ts`, in the server's own snake_case — deliberately separate from
-the display-shaped types in `models/`.
+`services/api-client.ts` — the HTTP client for pond-server, and the only place
+in the app that calls `fetch`. It attaches the bearer token, refreshes once on
+401 (sharing a single refresh across concurrent 401s), and throws a typed
+`ApiError` carrying the status and any `Retry-After`. Where the Pond names its
+refusal in `{error}` (handshake verify's `channel_binding_required`), `ApiError`
+carries it as `detail`, so a screen can act on why the Pond refused rather than
+on the status alone.
+Wire types live in `services/types.ts`, in the server's own snake_case —
+deliberately separate from the display-shaped types in `models/`.
+`services/notification-stream.ts` — the foreground SSE stream. Only a 401 means
+its token is dead: it stops and the owner refreshes. A 403 is the Pond declining
+to serve the stream yet (before onboarding, for one), so the stream retries with
+its usual backoff, up to 30 s, and logs the reason. Treating a 403 as a dead token
+looped refresh and a loud reconnect about ten times a second (2026-10-05).
 `services/storage.ts` — typed AsyncStorage wrapper, with key families
 (`storageFamily`) for records that grow with use, one key per record.
 `services/card-cache.ts` — the tool cards the phone was shown, by conversation
@@ -64,6 +72,8 @@ the Pond each time; these cards are kept in plain storage, capped at 100
 conversations, dropped with their conversation, and cleared on sign-out.
 `services/discovery.ts` — finds Ponds over mDNS, so step 0 of the pairing wizard
 can offer a hub rather than ask for its address. See "Finding the Pond" below.
+`services/secure-random.ts` — platform CSPRNG bytes (`randomBytes`, from
+expo-crypto), for anything an observer must not be able to predict.
 
 ## Finding the Pond
 
@@ -71,7 +81,7 @@ pond-server advertises `_pond._tcp.local.`; `services/discovery.ts` browses for
 it through `react-native-zeroconf`, and `view-models/use-discovery.ts` turns that
 into the `{data, loading, error, actions}` shape the wizard renders.
 
-Three things about this are load-bearing and easy to undo by accident.
+Four things about this are load-bearing and easy to undo by accident.
 
 **Only numeric addresses are kept.** A resolved service carries both a `host`
 (`<name>.local`) and `addresses` (numeric). Android's resolver does no mDNS at
@@ -87,6 +97,11 @@ a restart replaces its own entry.
 **A discovered Pond is probed with `/health` before the wizard advances**, for
 the same reason: an advertisement is not a running server, and a ghost resolves
 perfectly and answers nothing.
+
+**An advertised pin is confirmed by choice, not by a yes.** A pin that arrives
+with a discovered Pond is only a claim. `fingerprintChoices`
+(`models/connection.ts`) offers three previews that differ only after the first
+group, drawn once per pin, so a wrong pick cannot be retried against a fresh set.
 
 The search ends on a clock (8 s), because mDNS has no "that is all" signal, and
 browsing continues past the deadline so a hub switched on later still appears.
@@ -120,6 +135,8 @@ The Pond does not store whether a device is online. It derives `is_online` at re
 | First beat once the **connection manager has reached the Pond** | The paired identity loads before the base URL resolves. A beat sent then goes to the client's default address and is lost, which on a cold start left the card offline until the interval came round. |
 | Stops only in a **known background** state | Backgrounding a React Native app suspends its networking, so claiming reachability then would be false. On an Android cold start AppState can still read `'unknown'`, and the app is on screen. |
 | A missed beat is **dropped, not retried**, and logged | The next one is already scheduled, and a retry loop against a rate-limited Pond is the failure the interval avoids. It is logged because a beat that always fails looks exactly like one that never fires. |
+
+With a remembered route (2026-10-05), "reached" can mean a route a previous `ConnectionManager` reached in the same process: `configure` publishes it at once, so the first beat can go there before the quiet re-check that `environment` starts has answered.
 
 The conditions live in `services/heartbeat.ts` (`canBeat`) and are unit tested there; the provider only wires them to its state. The cold-start behaviour was verified on a device, starting from a row that had aged out: the card read online 38 seconds after launch, before the interval could fire.
 

@@ -26,6 +26,9 @@ final class PondNetwork {
       guard (1...3).contains(part.count), part.allSatisfy({ ("0"..."9").contains($0) }) else { return nil }
       return Int(part)
     }
+    // Tailscale's own service address (MagicDNS and the local API) is never a Pond, and
+    // proxying to it would hand the page a way to query this node's resolver.
+    if bytes == [100, 100, 100, 100] || ["fd7a:115c:a1e0::53", "fd7a:115c:a1e0:0:0:0:0:53"].contains(host.lowercased()) { return false }
     return (parts.count == 4 && bytes.count == 4 && bytes.allSatisfy { (0...255).contains($0) } && bytes[0] == 100 && (64...127).contains(bytes[1])) || host.lowercased().hasPrefix("fd7a:115c:a1e0:")
   }
   static func configure(_ origins: [String]) throws {
@@ -67,8 +70,9 @@ final class PondNetwork {
   static func status() throws -> String { lock.lock(); defer { lock.unlock() }; return try checked { MobileStatus($0) } }
   static func activate(_ profile: String, _ control: String) throws {
     lock.lock(); defer { lock.unlock() }
+    let previous = activeProfile?.first ?? runningProfile?.first
     activeProfile = control.isEmpty ? nil : [profile, control]
-    guard let active = activeProfile else { stop(); pruneSupersededIdentities(profile); return }
+    guard let active = activeProfile else { stop(); forgetNetworkMap(previous); pruneSupersededIdentities(profile); return }
     if runningProfile != active || port == nil {
       do { _ = try stage(active[0], active[1]) } catch { stop(); throw error }
     }
@@ -92,7 +96,21 @@ final class PondNetwork {
     guard let active = activeProfile else { stop(); return }
     if runningProfile != active { _ = try stage(active[0], active[1]) }
   }
-  static func disable() { lock.lock(); defer { lock.unlock() }; activeProfile = nil; stop() }
+  static func disable() {
+    lock.lock(); defer { lock.unlock() }
+    let previous = activeProfile?.first ?? runningProfile?.first
+    activeProfile = nil; stop(); forgetNetworkMap(previous)
+  }
+  /// Remote access is off for this profile, by choice or because the Pond forgot the phone, so
+  /// the network map the node cached -- its peers, their addresses, the access rules -- has no
+  /// reason to stay on the phone. Leaving local-only and a forgotten pairing both arrive here
+  /// through activate with no coordinator.
+  private static func forgetNetworkMap(_ profile: String?) {
+    guard let profile, let base = try? FileManager.default.url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: false) else { return }
+    let directory = base.appendingPathComponent("pond-network", isDirectory: true).appendingPathComponent(profile, isDirectory: true)
+    do { _ = try checked { MobileDisable(directory.path, $0) } }
+    catch { NSLog("PondNetwork: remote access is off but its cached network map was not erased: %@", String(describing: error)) }
+  }
   private static func stop() { port = nil; password = nil; runningProfile = nil; MobileStop() }
 
   static func apply(_ config: URLSessionConfiguration, url: URL) throws {
