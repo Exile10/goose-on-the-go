@@ -29,7 +29,7 @@ bytes, with `CLIENT_LABEL` for the phone's MAC. When the Pond accepts, the phone
 recomputes the Pond's proof over the same transcript under `SERVER_LABEL`, and
 anything else (a missing or wrong proof) is a `PondTrustError` and no token is
 kept. The Pond refuses an unbound pairing from any peer but its own loopback
-with 403 `channel_binding_required`; `ApiError.code` carries that identifier,
+with 403 `channel_binding_required`; `ApiError.detail` carries that identifier,
 and the wizard shows `pairingErrors.bindingRequired` for it rather than the
 generic off-LAN `pairing.lan` message.
 

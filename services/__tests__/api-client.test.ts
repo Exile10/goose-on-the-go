@@ -263,6 +263,6 @@ describe('pair() channel binding', () => {
     const client = new PondApiClient('https://192.168.1.7:4443');
     await expect(
       client.pair({ clientId: CLIENT_ID, pairingCode: CODE, channelBinding: PIN }),
-    ).rejects.toMatchObject({ status: 403, code: 'channel_binding_required' });
+    ).rejects.toMatchObject({ status: 403, detail: 'channel_binding_required' });
   });
 });
