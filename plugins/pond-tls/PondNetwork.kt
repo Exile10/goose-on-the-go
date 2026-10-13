@@ -226,7 +226,21 @@ object PondNetwork {
       try { stage(profile, control) }
       catch (error: Exception) { stopTransport(); throw error }
     }
+    pruneSupersededIdentities(profile)
     PondTls.invalidateConnections()
+  }
+  /**
+   * The app keeps one pairing at a time, so once [keep] is the active profile every other
+   * node directory belongs to a pairing it replaced or forgot, and each still holds that
+   * node's private key. A forgotten pairing passes an empty profile and keeps none.
+   * Called only after the profile's node started, or was stopped for want of a coordinator,
+   * so a failed start never costs the identity it was meant to use. The Go side refuses a
+   * directory whose node lock is held, and reports what it erased and what it could not.
+   */
+  private fun pruneSupersededIdentities(keep: String) {
+    val base = java.io.File(context.noBackupFilesDir, "pond-network")
+    try { Mobile.prune(base.absolutePath, keep) }
+    catch (error: Exception) { android.util.Log.w("PondNetwork", "superseded node identities were not all erased: ${error.message}") }
   }
   @Synchronized fun cancel() {
     val active = activeProfile

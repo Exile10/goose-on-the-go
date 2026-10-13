@@ -63,7 +63,14 @@ coordinator learns only the public keys listed below.
 When remote access goes off, including when this phone signs out or the Pond forgets the
 pairing, `forgetNetworkMap` in `PondNetwork` (`plugins/pond-tls/PondNetwork.kt`,
 `plugins/pond-tls/ios/PondNetwork.swift`) erases the map through the Pond library's
-`Mobile.disable`. The node's keys are kept.
+`Mobile.disable`. The node's keys stay while the pairing does.
+
+The app keeps one pairing's node directory at a time. Activating a profile erases every
+other directory under `pond-network/` through the Pond library's `Mobile.prune`, called
+from `pruneSupersededIdentities` in `PondNetwork` (`plugins/pond-tls/PondNetwork.kt`,
+`plugins/pond-tls/ios/PondNetwork.swift`), so keys from replaced or forgotten pairings do
+not accumulate. A forgotten pairing activates with no profile and keeps none. The library
+refuses a directory whose node is still running, and a failure is logged.
 
 ---
 
@@ -170,7 +177,9 @@ recording a guess here would be worse than recording the gap.
 
 1. **Coordinator retention.** How long are node keys, machine keys, tailnet addresses and
    connection logs kept, and what is the deletion path when a user signs out? The client
-   can say what it sends; only the operator can say what is kept.
+   can say what it sends; only the operator can say what is kept. The phone erases its
+   own superseded node keys (2026-10-05, see above); whether the coordinator deletes the
+   corresponding nodes is still open.
 2. **Relay operation.** Which relays can carry this traffic, who runs them, and what do
    their logs retain?
 3. **Jurisdiction and controller.** Which legal entity is the data controller for the
