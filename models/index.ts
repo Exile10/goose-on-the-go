@@ -15,9 +15,11 @@ export {
   countsByFilter,
   describeEvent,
   eventKeys,
+  exportFileName,
   filterLabelKey,
   filterOf,
   isProblem,
+  logsToCsv,
   parsePondLogTime,
 } from './log';
 

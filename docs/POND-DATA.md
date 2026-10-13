@@ -87,6 +87,15 @@ With Home in front that comes to about 15 requests a minute.
 
 **A poll never undoes what you just did.** A poll is slower than a tap. One that read a lamp as off just before you switched it on would land afterwards and switch it back off on screen. `mergePower()` keeps any device changed at or after the poll began. The mark is set on the tap and again when the tap's own read-back lands, since a poll in flight began before that too. A deleted device could come back the same way, so `listPollStillCurrent()` ignores a device list if the list changed after the poll began, and that stamp moves again once the server answers.
 
+## Exporting the log
+
+The Activity screen's **Problems** filter has an **Export log (CSV)** button. It reads `GET /logs/export`, writes the CSV to a dated file in the app's cache (`pond-logs-YYYY-MM-DD.csv`), and opens the phone's share sheet with it, so it can be saved to Files, sent, or opened in a spreadsheet.
+
+- **It is the whole log.** The Pond's export takes no filters and returns up to its 10,000 most recent rows, whichever filter is showing.
+- **A Pond without a log answers 501.** The screen says the Pond isn't keeping a log rather than showing a generic failure.
+- **It needs a native rebuild.** `expo-sharing` is a native module. Expo Go already includes it, but a development build made before it was added does not, so run `npx expo run:ios` or `npx expo run:android` again.
+- **On mock**, the sample problems go through the same file and share sheet, in the same columns as the Pond's export.
+
 ## How this is tested
 
 The reads live in plain async functions that take the client as an argument, `readHousehold(client)`, rather than inside the hooks. That lets the whole behaviour be tested with a fake client and no renderer: partial failure, an older Pond's 405, and a Pond that tried and failed. It is what defeated a provider-level test earlier. The hooks set state only in the promise's callback, which is also what `react-hooks/set-state-in-effect` asks for.

@@ -553,6 +553,13 @@
       "turnDetail": "Started in {{firstWord}} · done in {{total}} · {{tokens}} tokens",
       "tool": "{{tool}} ({{time}})",
       "loading": "Reading this conversation's turns"
+    },
+    "export": {
+      "button": "Export log (CSV)",
+      "exporting": "Preparing the log",
+      "noShare": "This phone can't share files from Goose.",
+      "noLog": "Your Pond isn't keeping a log, so there's nothing to export.",
+      "failed": "Couldn't export the log. Check your Pond is reachable, then try again."
     }
   },
   "pairing": {

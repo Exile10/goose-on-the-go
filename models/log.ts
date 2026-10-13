@@ -414,3 +414,26 @@ export const SAMPLE_SUMMARY: ActivitySummary = {
   total: 14,
   by_category: { device: 6, sensor: 3, tool: 3, agent: 2 },
 };
+
+// ── Export: the operational log as a file ────────────────────────────────────
+
+/** `pond-logs-2026-10-06.csv`, dated in the phone's own time, so a day's exports sort together. */
+export function exportFileName(date: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `pond-logs-${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}.csv`;
+}
+
+/** One CSV field: quoted, with quotes doubled, whenever a comma, quote or line break would break the row. */
+function csvField(value: string | number | null): string {
+  const text = value === null ? '' : String(value);
+  return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+}
+
+/** Log rows as CSV, in the columns the Pond's own export uses. The mock path exports through this. */
+export function logsToCsv(entries: LogEntry[]): string {
+  const header = 'id,timestamp,level,source,message,metadata';
+  const rows = entries.map((e) =>
+    [e.id, e.timestamp, e.level, e.source, e.message, e.metadata].map(csvField).join(','),
+  );
+  return [header, ...rows].join('\n') + '\n';
+}

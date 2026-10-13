@@ -11,7 +11,8 @@
  * action, a badge on each one reading "Actions" is the filter repeated.
  *
  * Problems is the odd one out: it lists the Pond's own warnings and errors
- * from its operational log, a different store from the activity above.
+ * from its operational log, a different store from the activity above. The
+ * export lives there too, since the file it shares is that same log.
  *
  * Above the activity list, a strip counts the last day by filter. It is left
  * off Problems, which is not activity, and off a day with nothing in it,
@@ -58,6 +59,7 @@ import {
 import { useActivity } from '@/view-models/use-activity';
 import { useActivitySummary } from '@/view-models/use-activity-summary';
 import { useConversationTelemetry, useConversationTurns } from '@/view-models/use-conversation-telemetry';
+import { useLogExport } from '@/view-models/use-log-export';
 import { useProblems } from '@/view-models/use-problems';
 import { formatRelativeTime } from '@/view-models/use-recent-sessions';
 import { Grey, Semantic } from '@/constants/colors';
@@ -149,6 +151,7 @@ export default function ActivityScreen() {
   const { summary } = useActivitySummary().data;
   const { latest } = useConversationTelemetry().data;
   const turns = useConversationTurns();
+  const logExport = useLogExport();
   const [turnsOpen, setTurnsOpen] = useState(false);
   const openTurns = useCallback(() => {
     if (!latest) return;
@@ -175,6 +178,19 @@ export default function ActivityScreen() {
 
   const header = (
     <>
+      {showingProblems ? (
+        <View style={styles.notice}>
+          <InkButton
+            variant="quiet"
+            icon="download"
+            disabled={logExport.exporting}
+            onPress={logExport.actions.exportLogs}
+          >
+            {logExport.exporting ? t('activity.export.exporting') : t('activity.export.button')}
+          </InkButton>
+          {logExport.error ? <InkNotice tone="danger">{logExport.error}</InkNotice> : null}
+        </View>
+      ) : null}
       {!showingProblems && summary && summary.total > 0 ? <TodayStrip summary={summary} /> : null}
       {!showingProblems && latest ? <TelemetryCard latest={latest} onOpen={openTurns} /> : null}
       {loading ? <InkSpinner label={t('activity.loading')} /> : null}
