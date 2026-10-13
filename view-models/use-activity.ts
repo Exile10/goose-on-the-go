@@ -30,7 +30,11 @@ export interface UseActivity {
   error: string | null;
   /** A read failed before any landed for this filter: the list is unknown, not empty. */
   failed: boolean;
-  actions: { refresh: () => Promise<void> };
+  actions: {
+    refresh: () => Promise<void>;
+    /** Delete every event on the Pond, then read again; resolves to how many went. Throws if the Pond refuses. */
+    clear: () => Promise<number>;
+  };
 }
 
 /** The newest events under `filter`: everything in one request, or one per category it spans. */
@@ -105,6 +109,19 @@ export function useActivity(filter: ActivityFilter): UseActivity {
 
   const refresh = useCallback(() => load(true), [load]);
 
+  const clear = useCallback(async () => {
+    // On mock there is no Pond to ask: the samples go, until the toggle or another filter
+    // brings them back.
+    if (!real) {
+      setEvents([]);
+      return SAMPLE_ACTIVITY.length;
+    }
+    const { purged } = await api.clearActivity();
+    setEvents([]);
+    await load(true);
+    return purged;
+  }, [real, load]);
+
   // A new filter is a new question, asked at once rather than at the poll's next tick. The poll
   // asks it from then on, since it always calls the latest `load`.
   const askedFor = useRef(filter);
@@ -119,5 +136,5 @@ export function useActivity(filter: ActivityFilter): UseActivity {
 
   useLive(() => load(false), ACTIVITY_MS, hydrated && real);
 
-  return { data: { events }, loading, error, failed, actions: { refresh } };
+  return { data: { events }, loading, error, failed, actions: { refresh, clear } };
 }

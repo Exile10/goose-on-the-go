@@ -23,6 +23,8 @@ export const SUMMARY_MS = 60_000;
 export interface UseActivitySummary {
   /** `null` until the first read lands, or when it failed. */
   data: { summary: ActivitySummary | null };
+  /** Read again now, after a change that moves the counts. */
+  actions: { refresh: () => Promise<void> };
 }
 
 export function useActivitySummary(): UseActivitySummary {
@@ -49,5 +51,5 @@ export function useActivitySummary(): UseActivitySummary {
 
   useLive(load, SUMMARY_MS, hydrated && real);
 
-  return { data: { summary } };
+  return { data: { summary }, actions: { refresh: load } };
 }
