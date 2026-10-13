@@ -30,6 +30,8 @@ import { timeoutSignal } from './http';
 import { readSse, type SseEvent } from './sse';
 import type {
   ActivityPurge,
+  RidePoint,
+  RideQuote,
   ActivityResponse,
   ActivitySummary,
   ActivityWindow,
@@ -1299,6 +1301,32 @@ export class PondApiClient {
       `/api/v1/schedules/upcoming?limit=${encodeURIComponent(String(limit))}`,
     );
     return Array.isArray(res) ? res : res.schedules;
+  }
+
+  // ── Rides ───────────────────────────────────────────────────
+  // The Pond knows whose ride it is from this phone's pairing; no request names a member.
+
+  /** An upfront fare from where the phone is. Books nothing. */
+  quoteRide(pickup: Omit<RidePoint, 'name'> & { name?: string }, dropoff: RidePoint): Promise<RideQuote> {
+    return this.post<RideQuote>('/api/v1/rides/quote', { pickup, dropoff });
+  }
+
+  getRide(id: string): Promise<RideQuote> {
+    return this.get<RideQuote>(`/api/v1/rides/${encodeURIComponent(id)}`);
+  }
+
+  /** Book the ride at the quoted fare. A fare is confirmed at most once. */
+  confirmRide(id: string): Promise<RideQuote> {
+    return this.post<RideQuote>(`/api/v1/rides/${encodeURIComponent(id)}/confirm`, {});
+  }
+
+  declineRide(id: string): Promise<void> {
+    return this.post<void>(`/api/v1/rides/${encodeURIComponent(id)}/decline`, {});
+  }
+
+  /** Cancel a booked ride. The ride company may charge a cancellation fee. */
+  cancelRide(id: string): Promise<void> {
+    return this.post<void>(`/api/v1/rides/${encodeURIComponent(id)}/cancel`, {});
   }
 
   // ── Verb helpers ────────────────────────────────────────────

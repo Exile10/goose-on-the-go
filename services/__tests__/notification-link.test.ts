@@ -3,7 +3,7 @@
  * other scheme or host, or a Google URL outside its maps path, is refused.
  */
 
-import { allowedUrl, linkFromData } from '@/services/notification-link';
+import { allowedUrl, linkFromData, rideOfferFromData } from '@/services/notification-link';
 
 const UBER =
   'https://m.uber.com/ul/?action=setPickup&pickup=my_location' +
@@ -63,5 +63,30 @@ describe('allowedUrl', () => {
   // Checked as m.uber.com, but iOS opens the raw string on evil.example.
   it('returns the URL it checked, not the string it was given', () => {
     expect(allowedUrl('https://m.uber.com\\@evil.example/')).toBe('https://m.uber.com/@evil.example/');
+  });
+});
+
+describe('rideOfferFromData', () => {
+  const offer = {
+    action: 'ride_offer',
+    provider: 'uber',
+    dropoff: { name: 'JKIA', latitude: -1.319167, longitude: 36.9275 },
+    label: 'Get a fare',
+  };
+
+  it('reads a ride offer', () => {
+    expect(rideOfferFromData(offer)).toEqual({
+      provider: 'uber',
+      dropoff: { name: 'JKIA', latitude: -1.319167, longitude: 36.9275 },
+    });
+  });
+
+  it('ignores other actions and malformed drop-offs', () => {
+    expect(rideOfferFromData({ ...offer, action: 'open_url' })).toBeNull();
+    expect(rideOfferFromData({ ...offer, dropoff: { name: '', latitude: 1, longitude: 1 } })).toBeNull();
+    expect(rideOfferFromData({ ...offer, dropoff: { name: 'X', latitude: 91, longitude: 0 } })).toBeNull();
+    expect(rideOfferFromData({ ...offer, dropoff: { name: 'X', latitude: 0, longitude: 0 } })).toBeNull();
+    expect(rideOfferFromData({ ...offer, dropoff: { name: 'X', latitude: '1', longitude: 2 } })).toBeNull();
+    expect(rideOfferFromData(undefined)).toBeNull();
   });
 });

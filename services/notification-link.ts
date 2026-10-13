@@ -59,3 +59,30 @@ export function linkFromData(data: unknown): NotificationLink | null {
         : 'Open directions';
   return { kind, url, label };
 }
+
+/**
+ * A ride the Pond offers after a member asked for one: where to, and with which company.
+ * Sent as `{ action: "ride_offer", provider, dropoff: { name, latitude, longitude }, label }`.
+ * Nothing is booked by it; the ride screen asks for a fare from the phone's own location.
+ */
+export interface RideOffer {
+  provider: string;
+  dropoff: { name: string; latitude: number; longitude: number };
+}
+
+function onEarth(lat: unknown, lng: unknown): lat is number {
+  return (
+    typeof lat === 'number' && typeof lng === 'number' &&
+    Number.isFinite(lat) && Number.isFinite(lng) &&
+    Math.abs(lat) <= 90 && Math.abs(lng) <= 180 && !(lat === 0 && lng === 0)
+  );
+}
+
+/** The ride offer in a notification's `data`, or null when it carries none or a malformed one. */
+export function rideOfferFromData(data: unknown): RideOffer | null {
+  if (!isRecord(data) || data.action !== 'ride_offer' || !isRecord(data.dropoff)) return null;
+  const { name, latitude, longitude } = data.dropoff;
+  if (typeof name !== 'string' || !name.trim() || !onEarth(latitude, longitude)) return null;
+  const provider = typeof data.provider === 'string' && data.provider ? data.provider : 'uber';
+  return { provider, dropoff: { name: name.trim(), latitude, longitude: longitude as number } };
+}

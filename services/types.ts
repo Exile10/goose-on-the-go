@@ -771,3 +771,48 @@ export interface SystemInfo {
   /** The Pond's public-key pin, `sha256/<base64>`; null when it has no TLS identity. */
   tls_spki_sha256?: string | null;
 }
+
+// ── Rides (`/api/v1/rides`) ───────────────────────────────────
+
+export interface RidePoint {
+  name: string;
+  latitude: number;
+  longitude: number;
+}
+
+export type RideStatus =
+  | 'processing'
+  | 'no_drivers_available'
+  | 'accepted'
+  | 'arriving'
+  | 'in_progress'
+  | 'driver_canceled'
+  | 'rider_canceled'
+  | 'completed'
+  | { other: string };
+
+export interface BookedRide {
+  request_id: string;
+  status: RideStatus;
+  driver: { name: string; phone_number: string | null; rating: number | null } | null;
+  vehicle: { make: string; model: string; license_plate: string } | null;
+  pickup_eta_mins: number | null;
+}
+
+/** Where a quoted ride stands on the Pond. Only `awaiting_confirmation` can be confirmed. */
+export type RideBookingState =
+  | { state: 'awaiting_confirmation' }
+  | { state: 'requesting' }
+  | { state: 'requested'; ride: BookedRide }
+  | { state: 'declined' }
+  | { state: 'failed'; reason: string };
+
+export interface RideQuote {
+  id: string;
+  provider: string;
+  pickup: RidePoint;
+  dropoff: RidePoint;
+  fare: { display: string; currency_code: string; expires_at: string };
+  pickup_eta_mins: number | null;
+  state: RideBookingState;
+}
