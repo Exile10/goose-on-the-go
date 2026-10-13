@@ -56,6 +56,11 @@ the app that calls `fetch`. It attaches the bearer token, refreshes once on 401
 carrying the status and any `Retry-After`. Wire types live in
 `services/types.ts`, in the server's own snake_case — deliberately separate from
 the display-shaped types in `models/`.
+`services/notification-stream.ts` — the foreground SSE stream. Only a 401 means
+its token is dead: it stops and the owner refreshes. A 403 is the Pond declining
+to serve the stream yet (before onboarding, for one), so the stream retries with
+its usual backoff, up to 30 s, and logs the reason. Treating a 403 as a dead token
+looped refresh and a loud reconnect about ten times a second (2026-10-05).
 `services/storage.ts` — typed AsyncStorage wrapper, with key families
 (`storageFamily`) for records that grow with use, one key per record.
 `services/card-cache.ts` — the tool cards the phone was shown, by conversation
