@@ -25,14 +25,16 @@ import { Grey, JaridaPurple, Brand, Semantic } from '@/constants/colors';
 import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
 import { Spacing } from '@/constants/spacing';
 import { Radii } from '@/constants/radii';
-import { ApiError } from '@/services/api-client';
+import { ApiError, PondApiClient } from '@/services/api-client';
 import { useServer } from '@/providers/server-provider';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 
-import { normalizeHttpsUrl, pinPreview, validPin } from '@/models/connection';
+import { fingerprintChoices, isInsecureDevOrigin, normalizePondUrl, pinPreview, validPin } from '@/models/connection';
+import { insecureDevMode } from '@/services/dev-mode';
+import { randomBytes } from '@/services/secure-random';
 import { getInstallId } from '@/services/install-id';
-import { takePairingPayload } from '@/services/pairing-handoff';
+import { clearPairingStart, peekPairingStart, takePairingPayload } from '@/services/pairing-handoff';
 import { findPondAt, type DiscoveredPond } from '@/services/discovery';
 import { useDiscovery } from '@/view-models/use-discovery';
 import { describeApiError } from '@/view-models/describe-error';
@@ -114,13 +116,17 @@ function ScanLink({ onPress }: { onPress: () => void }) {
  * Normalise a hand-typed server address, or return null if it cannot be one.
  *
  * The host machine's dashboard shows a bare `host:port`, so a missing scheme is
- * the common case rather than a mistake; it defaults to https, the only scheme
- * `normalizeHttpsUrl` accepts for a pinned Pond origin.
+ * the common case rather than a mistake; it defaults to https, the scheme of a
+ * pinned Pond origin. An explicit `http://` LAN address is accepted only in
+ * insecure development mode (see `normalizePondUrl`).
  */
 export function normalizeServerUrl(raw: string): string | null {
-  try { return normalizeHttpsUrl(raw.trim().includes('://') ? raw.trim() : `https://${raw.trim()}`); }
+  try { return normalizePondUrl(raw.trim().includes('://') ? raw.trim() : `https://${raw.trim()}`); }
   catch { return null; }
 }
+
+/** What the address field suggests: the plaintext listener's shape only where it is accepted. */
+const ADDRESS_PLACEHOLDER = insecureDevMode ? 'http://192.168.1.10:4080' : 'https://pond.local:4443';
 
 /**
  * The body of one wizard step.
@@ -255,16 +261,36 @@ async function discoverFingerprint(origin: string): Promise<string | null> {
   return found?.pin ?? null;
 }
 
+/**
+ * The pin a plaintext development Pond reports for itself, insecure development mode only.
+ *
+ * Nothing is ever verified against it: a plaintext connection has no key to pin, and
+ * pairing over one is unbound. It is kept only so the saved pairing has the shape every
+ * other pairing has. Asking the user to confirm it would suggest a protection that is not
+ * there, so the caller does not.
+ */
+async function reportedFingerprint(origin: string): Promise<string | null> {
+  const info = await new PondApiClient(origin).systemInfo();
+  return info.tls_spki_sha256 ?? null;
+}
+
 /** Step 0, the fallback: type the address in, and establish whose key it serves. */
 function ServerStep({
   initial,
   initialPin,
+  picked,
   onNext,
   onScan,
 }: {
   initial: string;
   /** The pin discovery already learned for `initial`, when it had one. */
   initialPin: string;
+  /**
+   * `initial` is a Pond the user picked off a discovery list, not an address they typed.
+   * With its pin in hand there is nothing to type, so the step opens on checking that pin
+   * against the Pond's screen instead of on an address form waiting for Continue.
+   */
+  picked: boolean;
   onNext: (url: string, pin: string) => Promise<void>;
   onScan: () => void;
 }) {
@@ -274,7 +300,20 @@ function ServerStep({
   // A pin that came off the network rather than from the user must be confirmed
   // against the Pond's screen before it is trusted. See discoverFingerprint.
   const [pinFromNetwork, setPinFromNetwork] = useState(!!initialPin);
-  const [confirming, setConfirming] = useState<{ url: string; pin: string } | null>(null);
+  // The three previews are drawn once per pin: offering a fresh set after a wrong
+  // pick would let the user guess until one works.
+  const [confirming, setConfirming] = useState<{ url: string; pin: string; choices: string[] } | null>(() => {
+    // Only what Continue would have reached anyway: a usable address and a well-formed pin.
+    // Anything less opens on the form, where the user can see and fix it.
+    if (!picked || !validPin(initialPin)) return null;
+    const normalized = normalizeServerUrl(initial);
+    return normalized
+      ? { url: normalized, pin: initialPin, choices: fingerprintChoices(initialPin, randomBytes) }
+      : null;
+  });
+  // After a wrong pick or "none match", nothing more is taken from the network in
+  // this step: only a typed fingerprint or a QR scan can continue.
+  const [networkPinRefused, setNetworkPinRefused] = useState(false);
   const [url, setUrl] = useState(initial);
   const [checking, setChecking] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -301,11 +340,25 @@ function ServerStep({
     }
     setChecking(true); setError(null);
     try {
+      if (isInsecureDevOrigin(normalized)) {
+        const reported = await reportedFingerprint(normalized);
+        if (!reported || !validPin(reported)) {
+          setError(t('pairing.fingerprintMissing'));
+          return;
+        }
+        await onNext(normalized, reported);
+        return;
+      }
       // No fingerprint in hand is a request to look one up, not a mistake: the
       // Pond publishes its own pin beside the service phones already discover
       // it by, so the only things anybody should have to read off a screen are
       // the address and the six-digit code.
       let fingerprint = pin.trim();
+      if (!fingerprint && networkPinRefused) {
+        setAskForPin(true);
+        setError(t('pairing.fingerprintMismatch'));
+        return;
+      }
       if (!fingerprint) {
         const discovered = await discoverFingerprint(normalized);
         if (!discovered) {
@@ -325,30 +378,33 @@ function ServerStep({
         return;
       }
       if (pinFromNetwork || fingerprint !== pin.trim()) {
-        setConfirming({ url: normalized, pin: fingerprint });
+        setConfirming({ url: normalized, pin: fingerprint, choices: fingerprintChoices(fingerprint, randomBytes) });
         return;
       }
       await onNext(normalized, fingerprint);
     }
     catch (error) { setError(error instanceof Error ? error.message : t('pairing.failed')); }
     finally { setChecking(false); }
-  }, [url, pin, pinFromNetwork, onNext, t]);
-
-  const confirmMatch = useCallback(async () => {
-    if (!confirming) return;
-    setChecking(true); setError(null);
-    try { await onNext(confirming.url, confirming.pin); }
-    catch (error) { setError(error instanceof Error ? error.message : t('pairing.failed')); }
-    finally { setChecking(false); setConfirming(null); }
-  }, [confirming, onNext, t]);
+  }, [url, pin, pinFromNetwork, networkPinRefused, onNext, t]);
 
   const rejectMatch = useCallback(() => {
     setConfirming(null);
     setPin('');
     setPinFromNetwork(false);
+    setNetworkPinRefused(true);
     setAskForPin(true);
     setError(t('pairing.fingerprintMismatch'));
   }, [t]);
+
+  // Only the preview of the pin in hand proceeds; a decoy is the same as "none match".
+  const pick = useCallback(async (choice: string) => {
+    if (!confirming) return;
+    if (choice !== pinPreview(confirming.pin)) { rejectMatch(); return; }
+    setChecking(true); setError(null);
+    try { await onNext(confirming.url, confirming.pin); }
+    catch (error) { setError(error instanceof Error ? error.message : t('pairing.failed')); }
+    finally { setChecking(false); setConfirming(null); }
+  }, [confirming, onNext, rejectMatch, t]);
 
   if (confirming) {
     return (
@@ -356,14 +412,23 @@ function ServerStep({
         <GIcon name="shield" size={28} color={JaridaPurple[500]} />
         <Text style={styles.stepTitle}>{t('pairing.fingerprintConfirmTitle')}</Text>
         <Text style={styles.stepDesc}>{t('pairing.fingerprintConfirmDesc')}</Text>
-        <Text style={styles.pinPreview} selectable>{pinPreview(confirming.pin)}</Text>
+        {confirming.choices.map((choice) => (
+          <GPressable
+            key={choice}
+            style={styles.fingerprintChoice}
+            disabled={checking}
+            onPress={() => void pick(choice)}
+            accessibilityRole="button"
+            accessibilityLabel={t('pairing.fingerprintChoiceLabel', { groups: choice.replace('sha256/', '').split(' ').join(', ') })}
+          >
+            <Text style={styles.pinPreview}>{choice}</Text>
+          </GPressable>
+        ))}
         <Text style={styles.stepDesc}>{t('pairing.fingerprintConfirmWhy')}</Text>
         {error ? <Text style={styles.stepError}>{error}</Text> : null}
-        <InkButton variant="primary" disabled={checking} onPress={confirmMatch}>
-          {checking ? t('pairing.fingerprintSearching') : t('pairing.fingerprintMatches')}
-        </InkButton>
+        {checking ? <Text style={styles.stepDesc}>{t('pairing.fingerprintSearching')}</Text> : null}
         <InkButton variant="quiet" disabled={checking} onPress={rejectMatch}>
-          {t('pairing.fingerprintDiffers')}
+          {t('pairing.fingerprintNoneMatch')}
         </InkButton>
       </StepBody>
     );
@@ -382,12 +447,13 @@ function ServerStep({
             setUrl(next);
             setError(null);
           }}
-          placeholder="https://pond.local:4443"
+          placeholder={ADDRESS_PLACEHOLDER}
           placeholderTextColor={Grey[400]}
           autoCapitalize="none"
           autoCorrect={false}
           editable={!checking}
         />
+        {insecureDevMode ? <Text style={styles.inputHint}>{t('devMode.addressHint')}</Text> : null}
       </View>
       {askForPin ? (
         <View style={styles.inputGroup}>
@@ -612,8 +678,14 @@ export default function PondPairingScreen() {
    * the screen was being torn down was not.
    */
   const [reachedWithHistory] = useState(() => Boolean(profileId));
-  const [manualUrl, setManualUrl] = useState(serverUrl);
-  const [manualPin, setManualPin] = useState('');
+  // Where the welcome screen left off, if it was the way in. Read once and cleared
+  // after mount; see peekPairingStart.
+  const [start] = useState(peekPairingStart);
+  useEffect(() => { clearPairingStart(); }, []);
+  const [manualUrl, setManualUrl] = useState(start?.kind === 'pond' ? start.url : serverUrl);
+  const [manualPin, setManualPin] = useState(start?.kind === 'pond' ? (start.pin ?? '') : '');
+  // Whether the address came off a discovery list, here or on the welcome screen.
+  const [picked, setPicked] = useState(start?.kind === 'pond');
   const [pairingError, setPairingError] = useState<string | null>(null);
   useEffect(() => () => { void cancelPairing(); }, [cancelPairing]);
   // Stable per-install client_id, hydrated from SecureStorage on mount. The
@@ -629,8 +701,11 @@ export default function PondPairingScreen() {
   const [step, setStep] = useState<Step>(0);
   const [code, setCode] = useState('');
   // Step 0 searches the network by default; typing an address is the fallback
-  // for a network that filters multicast, which plenty of guest wifi does.
-  const [manualEntry, setManualEntry] = useState(false);
+  // for a network that filters multicast, which plenty of guest wifi does. Opened
+  // from the welcome screen, which has already searched, it starts past the search.
+  // In insecure development mode it is the start: the plaintext listener is never
+  // advertised, and Expo Go, which that mode exists for, has no mDNS module.
+  const [manualEntry, setManualEntry] = useState(insecureDevMode || start !== null);
   const openScanner = useCallback(() => router.push('/(stack)/connect-desktop'), [router]);
 
   /**
@@ -690,7 +765,7 @@ export default function PondPairingScreen() {
         setCompletionState('error');
         setCompletionReason(
           e instanceof ApiError && e.status === 403
-            ? t('pairing.lan')
+            ? t(e.detail === 'channel_binding_required' ? 'pairingErrors.bindingRequired' : 'pairing.lan')
             : describeTransportFailure(e, t),
         );
       }
@@ -734,13 +809,14 @@ export default function PondPairingScreen() {
           <ServerStep
             initial={manualUrl}
             initialPin={manualPin}
+            picked={picked}
             onNext={onServerNext}
             onScan={openScanner}
           />
         ) : (
           <DiscoverStep
-            onNext={(url, pin) => { setManualUrl(url); setManualPin(pin ?? ''); setManualEntry(true); }}
-            onManual={() => setManualEntry(true)}
+            onNext={(url, pin) => { setManualUrl(url); setManualPin(pin ?? ''); setPicked(true); setManualEntry(true); }}
+            onManual={() => { setPicked(false); setManualEntry(true); }}
             onScan={openScanner}
           />
         ))}
@@ -821,6 +897,16 @@ const makeStyles = (c: ThemeColors) =>
       fontSize: FontSize.base,
       color: c.textTertiary,
       lineHeight: FontSize.base * 1.5,
+    },
+    fingerprintChoice: {
+      width: '100%',
+      alignItems: 'center',
+      paddingVertical: Spacing.md,
+      paddingHorizontal: Spacing.lg,
+      borderRadius: Radii.md,
+      borderWidth: 1,
+      borderColor: c.border,
+      backgroundColor: c.card,
     },
     // The fingerprint is read aloud against the Pond's own screen, so it is set
     // in the mono face at a size where each group of four is unambiguous.

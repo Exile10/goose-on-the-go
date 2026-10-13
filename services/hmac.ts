@@ -130,14 +130,13 @@ export const SERVER_LABEL = 'goose-pair-server-v1';
 /**
  * The bytes a pairing MAC is computed over, keyed by the pairing code.
  *
- * Two shapes, selected by whether this connection had a certificate to bind to:
+ *   label | 0x00 | challenge | 0x00 | clientId | 0x00 | spki
  *
- *   bound     label | 0x00 | challenge | 0x00 | clientId | 0x00 | spki
- *   unbound   challenge | clientId
- *
- * The unbound shape is the original and is kept byte-for-byte, for a Pond
- * running a server older than the binding. `0x00` separates the bound fields
- * unambiguously: `clientId` and the pin are text and cannot contain a NUL, and
+ * Always bound to the pin this connection is pinned to. The Pond also accepts the
+ * older unbound shape ({@link unboundPairTranscript}), but only from its own loopback
+ * (its desktop dashboard) and, on a debug Pond, its plaintext development listener;
+ * from anywhere else it refuses it as `channel_binding_required`. `0x00` separates the
+ * fields unambiguously: `clientId` and the pin are text and cannot contain a NUL, and
  * the challenge is a fixed 32 bytes. The label is inside the MAC rather than
  * beside it so the two directions cannot be replayed against each other -- a
  * server proof is not a client MAC.
@@ -150,14 +149,24 @@ export function pairTranscript(
   label: string,
   challenge: Uint8Array,
   clientId: string,
-  spki?: string,
+  spki: string,
 ): Uint8Array {
-  if (!spki) return concat(challenge, utf8(clientId));
   const nul = new Uint8Array([0]);
   return concat(
     concat(concat(utf8(label), nul), concat(challenge, nul)),
     concat(concat(utf8(clientId), nul), utf8(spki)),
   );
+}
+
+/**
+ * The original, unbound transcript: `challenge | clientId`, with no label and no pin.
+ *
+ * Only for a plaintext development origin (`isInsecureDevOrigin`, insecure development
+ * mode only), which has no TLS key for a binding to name; every other pairing uses
+ * {@link pairTranscript}. Kept byte-for-byte as the Pond computes it.
+ */
+export function unboundPairTranscript(challenge: Uint8Array, clientId: string): Uint8Array {
+  return concat(challenge, utf8(clientId));
 }
 
 /**

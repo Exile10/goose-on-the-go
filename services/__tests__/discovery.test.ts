@@ -68,8 +68,16 @@ function resolved(overrides: Partial<Service> = {}): Service {
   };
 }
 
+// A development or release build has the native module; Expo Go does not.
+const { NativeModules } = jest.requireActual<typeof import('react-native')>('react-native');
+
 beforeEach(() => {
   instances.length = 0;
+  NativeModules.RNZeroconf = {};
+});
+
+afterEach(() => {
+  delete NativeModules.RNZeroconf;
 });
 
 describe('toPond', () => {
@@ -137,6 +145,17 @@ describe('dedupe', () => {
 });
 
 describe('startDiscovery', () => {
+  // Expo Go: the scan used to fail with "Cannot read property 'scan' of null",
+  // and that is what the welcome screen showed.
+  it('says searching needs a real build when there is no native module', () => {
+    delete NativeModules.RNZeroconf;
+    const onError = jest.fn();
+    const handle = startDiscovery(jest.fn(), onError);
+    expect(onError).toHaveBeenCalledWith(expect.stringContaining('development or release build'));
+    expect(instances).toHaveLength(0);
+    expect(() => handle.stop()).not.toThrow();
+  });
+
   it('browses the service type pond-server registers', () => {
     startDiscovery(jest.fn(), jest.fn());
     expect(instances[0].scanArgs).toEqual(['pond', 'tcp', 'local.']);
