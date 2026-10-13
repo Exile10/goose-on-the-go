@@ -1,3 +1,4 @@
+import { useEffect, useState, type ReactElement } from 'react';
 import { Pressable, StyleSheet, Text } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
@@ -8,6 +9,8 @@ import { useThemedStyles } from '@/hooks/use-themed-styles';
 import type { ThemeColors } from '@/constants/colors';
 import '@/services/i18n';
 import type { ConnectionState } from '@/models/connection';
+// The insecure development banner above this one takes the top inset when it is shown.
+import { insecureDevMode } from '@/services/dev-mode';
 
 /** Persistent feedback with local pairing or recovery as the relevant action. */
 /**
@@ -49,8 +52,28 @@ const NEEDS_ATTENTION: readonly ConnectionState[] = [
   'revoked',
 ];
 
+/**
+ * How long a reconnect may run before the banner says so. The banner pushes every screen down, so
+ * showing it for a reconnect that finishes in a few hundred milliseconds -- a network change, a
+ * return to the app -- made the whole layout jump for nothing anyone could act on.
+ */
+const RECONNECT_GRACE_MS = 1_500;
+
+/**
+ * Shows `children` once the grace period has passed. It holds no reset of its own: the banner
+ * renders nothing between reconnects, so React mounts a fresh one, with a fresh timer, for each.
+ */
+function AfterGrace({ children }: { children: ReactElement }) {
+  const [shown, setShown] = useState(false);
+  useEffect(() => {
+    const timer = setTimeout(() => setShown(true), RECONNECT_GRACE_MS);
+    return () => clearTimeout(timer);
+  }, []);
+  return shown ? children : null;
+}
+
 export function ConnectionStatus() {
-  const { connectionState, recover } = useServer();
+  const { connectionState, recover, hydrated } = useServer();
   const styles = useThemedStyles(makeStyles);
   const { t } = useTranslation();
   const router = useRouter();
@@ -63,10 +86,12 @@ export function ConnectionStatus() {
     if (['unpaired', 'upgrade', 'revoked'].includes(connectionState)) router.push('/(stack)/pond-pairing');
     else void recover();
   };
-  if (!NEEDS_ATTENTION.includes(connectionState)) return null;
-  return <Pressable accessibilityRole="button" onPress={act} style={[styles.container, { paddingTop: insets.top + 6 }]}>
+  // Before the saved pairing has loaded, the state is a placeholder, not news.
+  if (!hydrated || !NEEDS_ATTENTION.includes(connectionState)) return null;
+  const banner = <Pressable accessibilityRole="button" onPress={act} style={[styles.container, { paddingTop: (insecureDevMode ? 0 : insets.top) + 6 }]}>
     <Text accessibilityLiveRegion="polite" style={styles.text}>{stateLabel(t, connectionState)}</Text>
   </Pressable>;
+  return connectionState === 'reconnecting' ? <AfterGrace>{banner}</AfterGrace> : banner;
 }
 /*
  * Themed, because this strip is drawn behind the notification bar.

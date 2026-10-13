@@ -49,9 +49,9 @@ import {
   categoryIcon,
   countsByFilter,
   describeEvent,
-  eventKey,
+  eventFilter,
+  eventKeys,
   filterLabelKey,
-  filterOf,
   parsePondLogTime,
   type ActivityFilter,
 } from '@/models/log';
@@ -76,7 +76,9 @@ const EventRow = React.memo(function EventRow({
 }) {
   const styles = useThemedStyles(makeStyles);
   const { t } = useTranslation();
-  const { title, detail } = describeEvent(item);
+  const { title, detail } = describeEvent(item, t);
+  // Presence and session events fall under no filter, so they carry no badge.
+  const filter = eventFilter(item);
   return (
     <View style={styles.logRow}>
       <View style={styles.logIcon}>
@@ -87,9 +89,9 @@ const EventRow = React.memo(function EventRow({
         {detail ? <Text style={styles.logDetail}>{detail}</Text> : null}
         <View style={styles.logMeta}>
           <Text style={styles.logTime}>{formatRelativeTime(item.timestamp)}</Text>
-          {showType ? (
+          {showType && filter ? (
             <View style={styles.typeBadge}>
-              <Text style={styles.typeText}>{t(filterLabelKey(filterOf(item.category)))}</Text>
+              <Text style={styles.typeText}>{t(filterLabelKey(filter))}</Text>
             </View>
           ) : null}
         </View>
@@ -144,7 +146,6 @@ export default function ActivityScreen() {
   const styles = useThemedStyles(makeStyles);
   const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<ActivityFilter>('all');
-  const activity = useActivity();
   const { summary } = useActivitySummary().data;
   const { latest } = useConversationTelemetry().data;
   const turns = useConversationTurns();
@@ -154,37 +155,33 @@ export default function ActivityScreen() {
     setTurnsOpen(true);
     void turns.actions.load(latest.session.id);
   }, [latest, turns.actions]);
-  const problems = useProblems(activeTab === 'error');
   const showingProblems = activeTab === 'error';
+  // Problems spans no activity category, so on that filter this asks the Pond nothing.
+  const activity = useActivity(activeTab);
+  const problems = useProblems(showingProblems);
   const { loading, error, actions } = showingProblems ? problems : activity;
+  const failed = !showingProblems && activity.failed;
   const data = activity.data;
-
-  const filtered = useMemo(
-    () =>
-      activeTab === 'all'
-        ? data.events
-        : data.events.filter((e) => filterOf(e.category) === activeTab),
-    [data.events, activeTab],
-  );
 
   const renderItem = useCallback(
     ({ item }: { item: ActivityEvent }) => <EventRow item={item} showType={activeTab === 'all'} />,
     [activeTab],
   );
 
-  const keyExtractor = useCallback(
-    (item: ActivityEvent, index: number) => eventKey(item, index),
-    [],
-  );
+  // Keyed once per read. The index only finds an event's key; the key itself
+  // holds no position, so a row keeps it when a poll adds newer ones above.
+  const keys = useMemo(() => eventKeys(data.events), [data.events]);
+  const keyExtractor = useCallback((_item: ActivityEvent, index: number) => keys[index], [keys]);
 
   const header = (
     <>
       {!showingProblems && summary && summary.total > 0 ? <TodayStrip summary={summary} /> : null}
       {!showingProblems && latest ? <TelemetryCard latest={latest} onOpen={openTurns} /> : null}
       {loading ? <InkSpinner label={t('activity.loading')} /> : null}
-      {error ? (
+      {/* A failed read with nothing to add still says so: the connection banner gives the cause. */}
+      {error || failed ? (
         <View style={styles.notice}>
-          <InkNotice tone="danger">{error}</InkNotice>
+          <InkNotice tone="danger">{error ?? t('activity.failed')}</InkNotice>
           <InkButton variant="quiet" icon="refresh" onPress={actions.refresh}>
             {t('common.retry')}
           </InkButton>
@@ -236,15 +233,17 @@ export default function ActivityScreen() {
         />
       ) : (
         <FlatList
-          data={filtered}
+          data={data.events}
           keyExtractor={keyExtractor}
           renderItem={renderItem}
+          // A poll puts newer events above; this keeps the row being read where it is.
+          maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
           ListHeaderComponent={header}
           // A list that failed to load is unknown, not empty.
           ListEmptyComponent={
-            !loading && !error ? (
+            !loading && !error && !failed ? (
               <InkEmptyState icon="logs" title={t('activity.empty')}>
                 <InkText>{t('activity.emptyBody')}</InkText>
               </InkEmptyState>

@@ -160,6 +160,7 @@ class PondTlsModule(context: ReactApplicationContext) : ReactContextBaseJavaModu
   @ReactMethod fun activateRemote(profile: String, control: String, promise: Promise) = remote(promise) { PondNetwork.activate(profile, control); null }
   @ReactMethod fun cancelRemote(promise: Promise) = remote(promise) { PondNetwork.cancel(); null }
   @ReactMethod fun disableRemote(promise: Promise) = remote(promise) { PondNetwork.disable(); null }
+  @ReactMethod fun resetIdentity(promise: Promise) = remote(promise) { PondNetwork.resetIdentity(); null }
   @ReactMethod fun trustFailed(url: String, promise: Promise) {
     try { promise.resolve(PondTls.trustFailed(url)) } catch (_: Exception) { promise.resolve(true) }
   }

@@ -1,4 +1,5 @@
 import { assertPondTrust } from './pond-trust';
+import { isInsecureDevOrigin } from '@/models/connection';
 /**
  * NotificationStream — consumes GIAP's `GET /api/v1/notifications/stream`
  * (SSE) so the phone receives server notifications in the foreground:
@@ -14,7 +15,10 @@ import { assertPondTrust } from './pond-trust';
  *
  * React Native's `fetch` cannot stream response bodies, so this parses SSE
  * frames incrementally off `XMLHttpRequest.onprogress` — no added dependency.
- * Reconnects with capped exponential backoff until `stop()` is called.
+ * Reconnects with exponential backoff, from 1 s and capped at 30 s, until
+ * `stop()` is called or the Pond answers 401. A 401 stops the stream and hands
+ * the token back through `onAuthFailure`. A 403 is a refusal to serve the stream
+ * yet, such as before onboarding completes, not a dead token, and is retried.
  */
 
 export interface ServerNotification {
@@ -38,7 +42,7 @@ interface StreamOptions {
   /** Called when the stream drops and a reconnect is scheduled. */
   onDisconnect?: () => void;
   /**
-   * Called when the server rejected the token itself (401/403). The stream has
+   * Called when the server rejected the token itself (401). The stream has
    * stopped and will not retry: only a fresh token can recover it.
    */
   onAuthFailure?: () => void;
@@ -131,7 +135,8 @@ export class NotificationStream {
 
     xhr.open('GET', url);
     xhr.setRequestHeader('Accept', 'text/event-stream');
-    xhr.setRequestHeader('X-Pond-Transport', '1');
+    // Only a pinned origin carries the marker; see PondApiClient.send.
+    if (!isInsecureDevOrigin(baseUrl)) xhr.setRequestHeader('X-Pond-Transport', '1');
     xhr.setRequestHeader('Authorization', `Bearer ${token}`);
 
     xhr.onprogress = () => {
@@ -149,13 +154,23 @@ export class NotificationStream {
     xhr.onerror = scheduleReconnect;
     xhr.onload = () => {
       // The token is captured once at construction and never refreshed here, so
-      // a 401/403 means every reconnect would replay the same dead credential
+      // a 401 means every reconnect would replay the same dead credential
       // forever behind capped backoff, with nothing surfacing that notifications
       // had stopped. Stop, and tell the caller — it owns the token.
-      if (xhr.status === 401 || xhr.status === 403) {
+      if (xhr.status === 401) {
         this.stop();
         this.opts.onAuthFailure?.();
         return;
+      }
+      // A 403 is not about the token: the Pond answers 401 for a token it does not
+      // accept, and 403 for a request it understood and will not serve yet, such as
+      // before onboarding completes. Treated as a dead token, it sent the owner to
+      // refresh -- which succeeded, since the token was fine -- and then to reconnect
+      // loudly, which restarted this stream into the same 403: about ten rounds a
+      // second, each spending a refresh token, on a Pond that was not yet onboarded
+      // (2026-10-05). Retried with the usual backoff instead, which reaches 30 s.
+      if (xhr.status === 403) {
+        console.warn('[notifications] the Pond refused the stream (403); retrying with backoff:', xhr.responseText.slice(0, 200));
       }
       scheduleReconnect(); // server closed the stream → reconnect
     };

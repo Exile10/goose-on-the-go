@@ -28,11 +28,15 @@ jest.mock('@/services/install-id', () => ({
 
 jest.mock('expo-device', () => ({ isDevice: true }));
 
-jest.mock('expo-notifications', () => ({
-  getDevicePushTokenAsync: (...args: unknown[]) => mockGetDevicePushToken(...args),
-  addPushTokenListener: (...args: unknown[]) => mockAddPushTokenListener(...args),
-  getPermissionsAsync: (...args: unknown[]) => mockGetPermissions(...args),
-  requestPermissionsAsync: (...args: unknown[]) => mockRequestPermissions(...args),
+// The module comes through notifications-module.ts, which decides whether it can be
+// loaded at all; this file tests what push-token does with it once it is.
+jest.mock('@/services/notifications-module', () => ({
+  notifications: {
+    getDevicePushTokenAsync: (...args: unknown[]) => mockGetDevicePushToken(...args),
+    addPushTokenListener: (...args: unknown[]) => mockAddPushTokenListener(...args),
+    getPermissionsAsync: (...args: unknown[]) => mockGetPermissions(...args),
+    requestPermissionsAsync: (...args: unknown[]) => mockRequestPermissions(...args),
+  },
 }));
 
 jest.mock('react-native', () => ({ Platform: { OS: 'android' } }));
