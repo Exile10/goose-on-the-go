@@ -889,6 +889,7 @@
     "replacementBlocked": "Your Pond could not re-issue this phone’s remote address. Try again in a moment, or sign out and pair again if it keeps failing.",
     "review": "Approve this recovery request on your Pond dashboard. Keep this phone on the home network.",
     "reviewCode": "Match this request on the Pond: {{id}}",
+    "reviewKey": "Approve it only if the Pond shows this phone's name and a key beginning {{key}}",
     "reviewExpired": "Local approval expired. Request recovery again while on the home network.",
     "busy": "Remote access setup is already running.",
     "unsupported": "Remote access requires the latest native Goose app."
