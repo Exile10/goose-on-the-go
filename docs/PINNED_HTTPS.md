@@ -287,6 +287,18 @@ physical iPhone acceptance remains deferred. The paired Pond's deployment and
 verification ledgers are `deploy/remote-access/README.md` and
 `docs/embedded-remote-access-verification.md` in the Pond repository.
 
+### The cached network map is erased when remote access goes off (2026-10-05)
+
+When remote access goes off for a profile -- "keep local only", or a pairing the Pond
+forgot -- the native layer erases the network map the node cached for it. The
+coordinator lets phones cache their map so a cold start can reach the Pond before the
+control login finishes; the map lists the household's peers, their addresses and the
+access rules, and holds no private keys. Both paths reach `PondNetwork.activate` with no
+coordinator, which stops the node and calls `forgetNetworkMap`; that hands the profile's
+directory to the Pond library's `Mobile.disable`, which erases the map and keeps the
+node's keys. A map that cannot be erased is logged. The measurements above predate this
+change and do not cover it. See the Pond's `docs/remote-access.md`.
+
 
 ### Embedded transport continuation (2026-09-20)
 

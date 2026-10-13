@@ -219,8 +219,9 @@ object PondNetwork {
     return raw
   }
   @Synchronized fun activate(profile: String, control: String) {
+    val previous = activeProfile?.first ?: runningProfile?.first
     activeProfile = if (control.isEmpty()) null else Pair(profile, control)
-    if (activeProfile == null) { stopTransport() }
+    if (activeProfile == null) { stopTransport(); previous?.let(::forgetNetworkMap) }
     else if (runningProfile != activeProfile || proxyAddress == null) {
       try { stage(profile, control) }
       catch (error: Exception) { stopTransport(); throw error }
@@ -232,7 +233,24 @@ object PondNetwork {
     if (active == null) stopTransport() else if (runningProfile != active) stage(active.first, active.second)
     PondTls.invalidateConnections()
   }
-  @Synchronized fun disable() { activeProfile = null; stopTransport(); PondTls.invalidateConnections() }
+  @Synchronized fun disable() {
+    val previous = activeProfile?.first ?: runningProfile?.first
+    activeProfile = null
+    stopTransport()
+    previous?.let(::forgetNetworkMap)
+    PondTls.invalidateConnections()
+  }
+  /**
+   * Remote access is off for this profile, by choice or because the Pond forgot the phone,
+   * so the network map the node cached -- its peers, their addresses, the access rules --
+   * has no reason to stay on the phone. Leaving local-only ("keep local only") and a
+   * forgotten pairing both arrive here through activate with no coordinator.
+   */
+  private fun forgetNetworkMap(profile: String) {
+    val directory = java.io.File(java.io.File(context.noBackupFilesDir, "pond-network"), profile)
+    try { Mobile.disable(directory.absolutePath) }
+    catch (error: Exception) { android.util.Log.w("PondNetwork", "remote access is off but its cached network map was not erased: ${error.message}") }
+  }
   private fun stopTransport() {
     networkCallback?.let { callback ->
       val manager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
