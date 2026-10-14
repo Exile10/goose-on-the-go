@@ -1097,7 +1097,8 @@
     "errors": {
       "contentRequired": "Write what Goose should remember.",
       "saveFailed": "Could not save that memory.",
-      "deleteFailed": "Could not forget that memory."
+      "deleteFailed": "Could not forget that memory.",
+      "keepNeedsUpdate": "Your Pond needs an update before it can change whether a memory is kept."
     }
   },
   "devMode": {

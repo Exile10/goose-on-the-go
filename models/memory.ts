@@ -18,7 +18,7 @@
  */
 
 import i18n from '@/services/i18n';
-import type { ConsolidationEvent, MemoryFragment, MemorySegment } from '@/services/types';
+import type { ConsolidationEvent, MemoryFragment, MemorySegment, MemoryTier } from '@/services/types';
 
 /** Every segment, in the order the chips show them: most personal first. */
 export const MEMORY_SEGMENTS: readonly MemorySegment[] = [
@@ -35,6 +35,15 @@ export const MEMORY_SEGMENTS: readonly MemorySegment[] = [
 /** Kept forever: decay cleanup never archives or prunes a permanent memory. */
 export function isKept(memory: MemoryFragment): boolean {
   return memory.tier === 'permanent';
+}
+
+/**
+ * The tier a memory falls back to when it stops being kept: its segment's
+ * default, as the Pond assigns it (`MemorySegment::default_tier`), except that
+ * "About you" defaults to permanent, so it falls back to long.
+ */
+export function unkeptTier(segment: MemorySegment | undefined): MemoryTier {
+  return segment === 'context' ? 'short' : 'long';
 }
 
 /** The segments the list holds, in chip order. A filter with nothing in it is not offered. */

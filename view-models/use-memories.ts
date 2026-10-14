@@ -13,7 +13,7 @@ import { useServer } from '@/providers/server-provider';
 import { ApiError, api } from '@/services/api-client';
 import i18n from '@/services/i18n';
 import type { MemoryFragment, SaveMemoryRequest } from '@/services/types';
-import { SAMPLE_MEMORIES } from '@/models/memory';
+import { SAMPLE_MEMORIES, unkeptTier } from '@/models/memory';
 import { describeApiError } from './describe-error';
 import { useLive } from './use-live';
 
@@ -32,6 +32,8 @@ export interface UseMemories {
     save: (req: SaveMemoryRequest) => Promise<string | null>;
     /** Resolves to why the Pond refused it, or null once it is reworded. */
     reword: (memory: MemoryFragment, content: string) => Promise<string | null>;
+    /** Resolves to why the Pond refused it, or null once the keep has changed. */
+    setKept: (memory: MemoryFragment, keep: boolean) => Promise<string | null>;
     remove: (memory: MemoryFragment) => Promise<void>;
   };
 }
@@ -40,6 +42,15 @@ export interface UseMemories {
 export function describeMemoryError(e: unknown): string | null {
   if (e instanceof ApiError && e.status === 400 && e.detail) return e.detail;
   return describeApiError(e);
+}
+
+/**
+ * A Pond from before `PUT /memories/{id}` took a tier refuses a tier alone
+ * with a 422, so that says the Pond needs updating rather than that it broke.
+ */
+export function describeKeepError(e: unknown): string {
+  if (e instanceof ApiError && e.status === 422) return i18n.t('memories.errors.keepNeedsUpdate');
+  return describeMemoryError(e) ?? i18n.t('memories.errors.saveFailed');
 }
 
 export function useMemories(): UseMemories {
@@ -125,6 +136,23 @@ export function useMemories(): UseMemories {
     [real],
   );
 
+  // Sent on its own, never beside new words, so an older Pond refuses it
+  // instead of ignoring it (see `UpdateMemoryRequest`).
+  const setKept = useCallback(
+    async (memory: MemoryFragment, keep: boolean) => {
+      const tier = keep ? 'permanent' : unkeptTier(memory.segment);
+      try {
+        if (real) await api.updateMemory(memory.id, { tier });
+        changes.current += 1;
+        setMemories((current) => current.map((m) => (m.id === memory.id ? { ...m, tier } : m)));
+        return null;
+      } catch (e) {
+        return describeKeepError(e);
+      }
+    },
+    [real],
+  );
+
   const remove = useCallback(
     async (memory: MemoryFragment) => {
       changes.current += 1;
@@ -141,7 +169,7 @@ export function useMemories(): UseMemories {
     [real],
   );
 
-  return { data: { memories }, loading, error, failed, actions: { refresh, save, reword, remove } };
+  return { data: { memories }, loading, error, failed, actions: { refresh, save, reword, setKept, remove } };
 }
 
 /** The fragment the Pond would send back, without the Pond. */

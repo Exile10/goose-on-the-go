@@ -4,10 +4,10 @@
  * progress.
  */
 
-import { consolidationStep, isKept, segmentsIn, type ConsolidationProgress } from '@/models/memory';
+import { consolidationStep, isKept, segmentsIn, unkeptTier, type ConsolidationProgress } from '@/models/memory';
 import type { ConsolidationEvent, MemoryFragment } from '@/services/types';
 import { describeConsolidationError } from '@/view-models/use-consolidation';
-import { describeMemoryError } from '@/view-models/use-memories';
+import { describeKeepError, describeMemoryError } from '@/view-models/use-memories';
 import { describeApiError } from '@/view-models/describe-error';
 import { ApiError } from '@/services/api-client';
 import i18n from '@/services/i18n';
@@ -31,6 +31,15 @@ describe('isKept', () => {
     expect(isKept(memory({ tier: 'permanent' }))).toBe(true);
     expect(isKept(memory({ tier: 'long', importance: 1 }))).toBe(false);
     expect(isKept(memory({ tags: ['pinned'] }))).toBe(false);
+  });
+});
+
+describe('unkeptTier', () => {
+  it("falls back to the segment's tier, and never to permanent", () => {
+    expect(unkeptTier('context')).toBe('short');
+    expect(unkeptTier('routine')).toBe('long');
+    expect(unkeptTier('identity')).toBe('long');
+    expect(unkeptTier(undefined)).toBe('long');
   });
 });
 
@@ -87,5 +96,15 @@ describe('errors', () => {
     expect(describeMemoryError(blank)).toBe('a memory cannot be blank -- delete it instead');
     const bare = new ApiError('x', 500, null);
     expect(describeMemoryError(bare)).toBe(describeApiError(bare));
+  });
+});
+
+describe('describeKeepError', () => {
+  it("reads an older Pond's 422 as needing an update, and the rest as any memory error", () => {
+    expect(describeKeepError(new ApiError('x', 422, null, 'missing field `content`'))).toBe(
+      i18n.t('memories.errors.keepNeedsUpdate'),
+    );
+    const blank = new ApiError('x', 400, null, 'nothing to change');
+    expect(describeKeepError(blank)).toBe('nothing to change');
   });
 });
