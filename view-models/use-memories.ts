@@ -114,7 +114,7 @@ export function useMemories(): UseMemories {
   const reword = useCallback(
     async (memory: MemoryFragment, content: string) => {
       try {
-        if (real) await api.updateMemory(memory.id, content);
+        if (real) await api.updateMemory(memory.id, { content });
         changes.current += 1;
         setMemories((current) => current.map((m) => (m.id === memory.id ? { ...m, content } : m)));
         return null;

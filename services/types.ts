@@ -306,6 +306,16 @@ export interface SaveMemoryRequest {
   tier?: MemoryTier;
 }
 
+/**
+ * `PUT /memories/{id}`. A field left out stays as it is. A Pond from before
+ * the tier could change ignores `tier` beside `content` and refuses it alone
+ * (422), so send a tier change on its own to learn whether it took.
+ */
+export interface UpdateMemoryRequest {
+  content?: string;
+  tier?: MemoryTier;
+}
+
 /** The tally a finished consolidation run reports. */
 export interface ConsolidationRunResult {
   accepted_count: number;
