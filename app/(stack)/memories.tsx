@@ -1,6 +1,6 @@
 /**
  * MemoriesScreen — what the Pond has learned about the household: read, add,
- * reword and forget, filter by segment, and tidy the store on request.
+ * reword, keep and forget, filter by segment, and tidy the store on request.
  *
  * The filter chips are the Pond's segments and "Kept" is its permanent tier;
  * `models/memory.ts` says why those, and not fields of the app's own.
@@ -117,6 +117,7 @@ export default function MemoriesScreen() {
         onClose={() => setSheetOpen(false)}
         onSave={actions.save}
         onReword={actions.reword}
+        onSetKept={actions.setKept}
       />
     </ScrollView>
   );

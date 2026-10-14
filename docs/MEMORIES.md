@@ -3,8 +3,7 @@
 The Memories screen reads and writes the Pond's own `MemoryFragment`
 (`pond-core/src/user_data/domain/memory.rs` in goose-in-a-pond). It used to show a mock
 with `category`, `pinned`, `icon` and `time`, none of which exist on the Pond. This page
-records how those ideas map onto real fields, and what the Pond would need for the one
-that does not map yet.
+records how those ideas map onto real fields.
 
 ## Routes
 
@@ -12,7 +11,7 @@ that does not map yet.
 |---|---|---|
 | GET | `/api/v1/memories` | The list: the household's 50 most recent. No limit or filter is taken. |
 | POST | `/api/v1/memories` | Add: `content`, and optionally `segment` and `tier`. |
-| PUT | `/api/v1/memories/{id}` | Reword: `content` only. |
+| PUT | `/api/v1/memories/{id}` | Reword (`content`), keep or let fade (`tier`). Each is sent on its own. |
 | DELETE | `/api/v1/memories/{id}` | Forget. |
 | POST | `/api/v1/memory/consolidate` | Tidy up now. Streams each stage as server-sent events. |
 | POST | `/api/v1/memory/consolidate/stop` | Stop a tidy-up between stages. |
@@ -22,7 +21,7 @@ that does not map yet.
 | On screen | Pond field | Why |
 |---|---|---|
 | Filter chips | `segment` | The Pond classifies every extracted memory into one of eight segments, and the segment sets its default importance and tier. Only segments that appear in the list are offered. |
-| "Kept" badge | `tier == "permanent"` | Decay cleanup skips the permanent tier: it is never archived or pruned for age. That is most of what "pinned" was meant to promise; see below for the rest. |
+| "Kept" badge and Keep switch | `tier == "permanent"` | Decay cleanup skips the permanent tier: it is never archived or pruned for age. Consolidation never prunes it, and anything merged or split from it stays kept. |
 | Date | `created_at` | |
 
 **Not a reserved tag, not an importance threshold.** Decay cleanup reads `tier`,
@@ -37,22 +36,22 @@ down over time regardless.
 **The old icon is gone.** It was decoration chosen per mock entry; the segment badge
 carries the same information.
 
-## What needs the Pond
+## Keeping a memory
 
-A memory can be kept forever when it is **added** (`POST` takes `tier`). It cannot be kept,
-or un-kept, **afterwards**: `PUT /memories/{id}` reads only `content`. So "Kept" is shown but
-cannot be toggled on an existing memory.
+The Keep switch is on the add sheet and the edit sheet. Keeping sends `tier: "permanent"`.
+Letting a memory fade sends its segment's default tier (`unkeptTier`): short for "Right
+now", long for everything else, including "About you", whose default is permanent and so
+would not fade at all.
 
-Requested from goose-in-a-pond: let `PUT /api/v1/memories/{id}` also take optional `tier`
-(and, for the same reason, `segment` and `importance`), recomputing `decay_rate` from the
-tier as `save_memory` does, and leaving any field that is absent as it is. Once that
-lands, the card can carry a Keep switch.
+The tier is always sent alone, never beside new words. A Pond from before
+jarida-io/goose-in-a-pond#553 ignores `tier` next to `content` and still answers 204, which
+would show a keep that did not happen. Sent alone it is refused with a 422, and the sheet
+says the Pond needs an update. When both change, the keep goes first, so a refused keep
+leaves the words alone too.
 
-Consolidation does not check the tier. It guards corrections (never pruned, and a merge
-involving one stays a correction) and nothing else, so a kept memory is safe from fading
-but a tidy-up can still prune it or merge it into one that is not kept. Requested
-alongside: the same guards for the permanent tier. Until then the Keep hint says a tidy-up
-can still merge a kept memory.
+Consolidation guards kept memories from jarida-io/goose-in-a-pond#551: a prune of one is
+refused, a merge with one stays kept, and a split of one keeps every piece. An older Pond
+can still merge a kept memory into one that is not kept.
 
 ## Consolidation progress
 

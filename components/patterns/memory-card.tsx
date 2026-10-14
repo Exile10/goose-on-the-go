@@ -2,8 +2,8 @@
  * MemoryCard — one memory: what it says, its segment, whether it is kept
  * forever, and when it was learned.
  *
- * "Kept" is read-only. It is the Pond's `permanent` tier, and the Pond has no
- * route that changes a saved memory's tier (see `models/memory.ts`).
+ * "Kept" is the Pond's `permanent` tier (see `models/memory.ts`). It is changed
+ * from the edit sheet, not here.
  */
 
 import React from 'react';

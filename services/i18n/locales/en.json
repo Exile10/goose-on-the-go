@@ -1072,7 +1072,7 @@
       "segment": "Kind",
       "segmentHint": "Optional. It sets how much this memory matters and how quickly it fades.",
       "keep": "Keep forever",
-      "keepHint": "A kept memory never fades with time. A tidy-up can still merge it with a repeat.",
+      "keepHint": "A kept memory never fades with time, and a tidy-up will not drop it.",
       "save": "Save"
     },
     "consolidate": {
