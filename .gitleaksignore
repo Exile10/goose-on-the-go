@@ -1,0 +1,6 @@
+# Findings gitleaks is right to flag and wrong to fail on, one per line as `commit:file:rule:line`.
+# Pinned to the commit because the full-history scan reads each blob as it was then.
+
+# An invented Brave-shaped key in the test that the web search view-model never keeps a key;
+# no real key exists in this repository.
+41aa963a3636ebff3f8dae0a4fa144bc8801d7f2:view-models/__tests__/web-search.test.tsx:generic-api-key:213
