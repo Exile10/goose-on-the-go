@@ -57,6 +57,7 @@ Its labels are `TranslationKey`s under `screens.*` and `nav.*`, never text.
 | Schedule | `/(stack)/schedule` | Goose |
 | Connected apps | `/(stack)/app-management` | Integrations |
 | MCP servers | `/(stack)/mcp-servers` | Integrations |
+| Web search | `/(stack)/web-search` | Integrations |
 | People | `/(stack)/add-users` | Household |
 | Your home | `/(stack)/home-management` | Household |
 | Remote access | `/(stack)/remote-access` | Data and privacy; also the Home offer |
@@ -66,6 +67,16 @@ Its labels are `TranslationKey`s under `screens.*` and `nav.*`, never text.
 Conversations is the rename-and-delete list of what the Pond holds. The Chat
 tab's wall is the way into a conversation; this is the way to tidy them, and it
 opens a row in `app/conversation.tsx` like the wall does.
+
+Web search sets, checks and removes the Pond's Brave Search key, over
+`/api/v1/web-search` (goose-in-a-pond's `docs/architecture/small-model-tools.md`,
+sections 8.4 and 8.5; pond-desktop shows the same content). The key field is
+masked and write-only: the Pond never returns the key, so the only copy this app
+holds is what has been typed, and it is emptied once the Pond has it. A key
+Brave refuses is a 422 and stays in the field to be corrected. The privacy line
+is always on screen. The screen is behind the Developer toggle (`webSearch`,
+real by default): on mock, typing `invalid`, `quota` or `offline` as the key
+reaches the refused, spent and unchecked states without a Pond.
 
 Four more stack screens aren't in the hub:
 
