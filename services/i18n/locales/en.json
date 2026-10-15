@@ -668,7 +668,7 @@
     "storageTitle": "How it is stored",
     "storageBody": "API keys you give your Pond are encrypted on disk. Its other data — conversations, memories, profiles and face templates — is not encrypted by the Pond, so protect the computer it runs on as you would any device holding personal information.",
     "networkTitle": "What reaches the internet",
-    "networkBody": "Some features need the internet: weather comes from Open-Meteo, and music from Spotify once you connect it. Your Pond keeps a record of every outbound call it makes, and can be set to refuse sensitive destinations or to stay offline entirely.",
+    "networkBody": "Some features need the internet: weather comes from Open-Meteo, encyclopedia lookups from Wikipedia, and music from Spotify once you connect it. Keys you add turn on more: Wolfram|Alpha for calculations, and Brave for web search, which sends your question to Brave and reads the top result pages from their own sites. Your Pond keeps a record of every outbound call it makes, and can be set to refuse sensitive destinations or to stay offline entirely.",
     "voiceTitle": "Voice",
     "voiceBody": "Speech is transcribed on your Pond by default, and the recording is not kept afterwards. What you said is kept as text, as part of the conversation. The wake word is detected on your Pond, not on this phone.",
     "facesTitle": "Faces",
