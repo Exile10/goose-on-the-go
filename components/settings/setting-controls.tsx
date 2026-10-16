@@ -10,9 +10,7 @@ import type { TFunction } from 'i18next';
 import { InkMenu, InkSheet, InkSwitch } from '@jarida/ink/native';
 
 import { GIcon } from '@/components/ui/g-icon';
-import { Radii } from '@/constants/radii';
 import { Spacing } from '@/constants/spacing';
-import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
 import {
   formatClock,
   paceWord,
@@ -26,7 +24,13 @@ import { selectionTick, toggle } from '@/services/haptics';
 import type { TranslationKey } from '@/services/i18n';
 import { SettingsRow } from './settings-list';
 import { SettingsSlider } from './settings-slider';
-import { useSettingsColors, useSettingsStyles, type SettingsColors } from './settings-theme';
+import {
+  useSettingsColors,
+  useSettingsStyles,
+  type SettingsColors,
+  type SettingsMetrics,
+  type SettingsType,
+} from './settings-theme';
 
 interface Common {
   label: string;
@@ -52,24 +56,10 @@ export function SwitchRow({ value, onChange, ...row }: Common & { value: boolean
   );
 }
 
+/** Ink's radio: an edge-coloured ring on the surface, the accent dot inside when chosen. */
 function Radio({ selected }: { selected: boolean }) {
-  const colors = useSettingsColors();
-  return (
-    <View
-      style={{
-        width: 22,
-        height: 22,
-        borderRadius: 11,
-        borderWidth: 2,
-        borderColor: selected ? colors.accent : colors.textTertiary,
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginTop: 4,
-      }}
-    >
-      {selected ? <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: colors.accent }} /> : null}
-    </View>
-  );
+  const styles = useSettingsStyles(makeStyles);
+  return <View style={styles.radio}>{selected ? <View style={styles.radioDot} /> : null}</View>;
 }
 
 /** Every option on its own row with a radio and what it means. Returns rows, one per option. */
@@ -489,7 +479,7 @@ export function TimeRow({ value, onCommit, ...row }: Common & { value: string; o
                 }}
                 style={({ pressed }) => [styles.sheetItem, pressed && { backgroundColor: colors.pressed }]}
               >
-                <Text style={[styles.sheetText, selected && { color: colors.accent, fontWeight: FontWeight.semibold }]}>{time}</Text>
+                <Text style={[styles.sheetText, selected && styles.sheetChosen]}>{time}</Text>
                 {selected ? <GIcon name="check" size={18} color={colors.accent} /> : null}
               </Pressable>
             );
@@ -549,75 +539,68 @@ function ListItemRow({ item, removeLabel, onRemove }: { item: string; removeLabe
   );
 }
 
-const makeStyles = (c: SettingsColors) => ({
+const makeStyles = (c: SettingsColors, type: SettingsType, m: SettingsMetrics) => ({
   dim: { opacity: 0.45 },
+  radio: {
+    width: 20,
+    height: 20,
+    marginTop: 2,
+    borderRadius: m.radius.pill,
+    borderWidth: m.border,
+    borderColor: c.edge,
+    backgroundColor: c.group,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+  },
+  radioDot: { width: 8, height: 8, borderRadius: m.radius.pill, backgroundColor: c.accent },
   radioRow: {
     flexDirection: 'row' as const,
     alignItems: 'flex-start' as const,
-    gap: Spacing.md,
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.md,
-    minHeight: 52,
+    gap: m.gap,
+    paddingHorizontal: m.rowH,
+    paddingVertical: m.rowV,
+    minHeight: m.tapMin,
   },
-  radioText: { flex: 1, gap: 2, paddingTop: 2 },
-  radioLabel: { fontFamily: FontFamily.body, fontSize: FontSize.md, fontWeight: FontWeight.medium, color: c.text },
-  radioHint: { fontFamily: FontFamily.body, fontSize: FontSize.sm, color: c.textSecondary, lineHeight: FontSize.sm * 1.4 },
+  radioText: { flex: 1, gap: 2 },
+  radioLabel: type.label,
+  radioHint: type.description,
   inlineWrap: { flexShrink: 1, minWidth: 120, maxWidth: '60%' as const },
-  textInline: {
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.md,
-    color: c.textSecondary,
-    textAlign: 'right' as const,
-    paddingVertical: 0,
-  },
+  textInline: { ...type.value, textAlign: 'right' as const, paddingVertical: 0 },
   textArea: {
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.md,
-    color: c.text,
+    ...type.body,
     minHeight: 88,
     textAlignVertical: 'top' as const,
-    borderRadius: Radii.md,
-    borderWidth: 1,
-    borderColor: c.line,
-    paddingHorizontal: Spacing.md,
+    borderRadius: m.radius.md,
+    borderWidth: m.hairline,
+    borderColor: c.edge,
+    backgroundColor: c.group,
+    paddingHorizontal: m.gap,
     paddingVertical: Spacing.sm,
   },
   numberWrap: { flexDirection: 'row' as const, alignItems: 'center' as const, gap: Spacing.xs },
-  numberInput: {
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.md,
-    color: c.textSecondary,
-    textAlign: 'right' as const,
-    minWidth: 56,
-    paddingVertical: 0,
-  },
-  unit: { fontFamily: FontFamily.body, fontSize: FontSize.md, color: c.textTertiary },
+  numberInput: { ...type.value, textAlign: 'right' as const, minWidth: 56, paddingVertical: 0 },
+  unit: type.note,
   stepper: { flexDirection: 'row' as const, alignItems: 'center' as const, gap: Spacing.sm },
   stepButton: {
     width: 32,
     height: 32,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: c.line,
+    borderRadius: m.radius.pill,
+    borderWidth: m.hairline,
+    borderColor: c.edge,
+    backgroundColor: c.group,
     alignItems: 'center' as const,
     justifyContent: 'center' as const,
   },
-  stepValue: {
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.md,
-    fontWeight: FontWeight.semibold,
-    color: c.text,
-    minWidth: 28,
-    textAlign: 'center' as const,
-  },
+  stepValue: { ...type.label, minWidth: 28, textAlign: 'center' as const },
   sheetList: { maxHeight: 360 },
   sheetItem: {
     flexDirection: 'row' as const,
     alignItems: 'center' as const,
     justifyContent: 'space-between' as const,
     minHeight: 48,
-    paddingHorizontal: Spacing.md,
-    borderRadius: Radii.sm,
+    paddingHorizontal: m.gap,
+    borderRadius: m.radius.sm,
   },
-  sheetText: { fontFamily: FontFamily.body, fontSize: FontSize.md, color: c.text },
+  sheetText: type.body,
+  sheetChosen: { ...type.label, color: c.accent },
 });

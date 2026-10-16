@@ -1,22 +1,29 @@
 /**
- * The pieces of an iPhone-style settings list: groups of rows on a recessed page, each row a
- * coloured icon, a label, what it is set to, and a chevron when it leads somewhere.
+ * The pieces of a settings list, drawn in Ink: groups of rows on hairline surfaces, each row a
+ * coloured icon, a label, what it is set to, and a chevron when it leads somewhere. Groups take no
+ * plate, because Ink spends the raised edge on what is chosen, about twice a screen.
  */
 
 import React, { Children, isValidElement, type ReactNode } from 'react';
 import { Pressable, Text, View, type StyleProp, type ViewStyle } from 'react-native';
+import { InkEdge, InkTitle } from '@jarida/ink/native';
 
 import { GIcon } from '@/components/ui/g-icon';
 import { Brand, TileColors, type TileColor } from '@/constants/colors';
 import type { IconName } from '@/constants/icons';
-import { Radii } from '@/constants/radii';
 import { Spacing } from '@/constants/spacing';
-import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
-import { useSettingsColors, useSettingsStyles, type SettingsColors } from './settings-theme';
+import {
+  useSettingsColors,
+  useSettingsMetrics,
+  useSettingsStyles,
+  type SettingsColors,
+  type SettingsMetrics,
+  type SettingsType,
+} from './settings-theme';
 
 const TILE = 30;
 const ROW_PADDING = Spacing.lg;
-/** Where a hairline starts in a group whose rows carry tiles: under the label, as on iOS. */
+/** Where a hairline starts in a group whose rows carry tiles: under the label. */
 export const TILE_INSET = ROW_PADDING + TILE + Spacing.md;
 
 export function IconTile({ icon, tile, size = TILE }: { icon: IconName; tile: TileColor; size?: number }) {
@@ -25,7 +32,7 @@ export function IconTile({ icon, tile, size = TILE }: { icon: IconName; tile: Ti
       style={{
         width: size,
         height: size,
-        borderRadius: Math.round(size * 0.27),
+        borderRadius: Math.round(size * 0.3),
         backgroundColor: TileColors[tile],
         alignItems: 'center',
         justifyContent: 'center',
@@ -37,13 +44,13 @@ export function IconTile({ icon, tile, size = TILE }: { icon: IconName; tile: Ti
 }
 
 /**
- * A group of rows. Hairlines go between rows, not around the group, and start at `inset` so a
- * divider never cuts under an icon.
+ * A group of rows on one hairline surface, its name in Ink's eyebrow at the top as pond-desktop's
+ * cards carry it. Hairlines go between rows and start at `inset`, so one never cuts under an icon.
  */
 export function SettingsGroup({
   title,
   footer,
-  inset = ROW_PADDING,
+  inset = 0,
   children,
   style,
 }: {
@@ -54,25 +61,26 @@ export function SettingsGroup({
   style?: StyleProp<ViewStyle>;
 }) {
   const styles = useSettingsStyles(makeStyles);
+  const m = useSettingsMetrics();
   const rows = Children.toArray(children).filter((child) => isValidElement(child) || typeof child === 'string');
   if (rows.length === 0 && !footer) return null;
 
   return (
     <View style={[styles.groupWrap, style]}>
-      {title ? (
-        <Text style={styles.groupTitle} accessibilityRole="header">
-          {title}
-        </Text>
-      ) : null}
       {rows.length > 0 ? (
-        <View style={styles.group}>
+        <InkEdge raised={false} radius={m.radius.lg} contentStyle={styles.group}>
+          {title ? (
+            <Text style={styles.groupTitle} accessibilityRole="header">
+              {title}
+            </Text>
+          ) : null}
           {rows.map((row, i) => (
             <View key={isValidElement(row) && row.key != null ? row.key : i}>
               {i > 0 ? <View style={[styles.separator, { marginLeft: inset }]} /> : null}
               {row}
             </View>
           ))}
-        </View>
+        </InkEdge>
       ) : null}
       {footer ? (typeof footer === 'string' ? <Text style={styles.footer}>{footer}</Text> : footer) : null}
     </View>
@@ -80,7 +88,7 @@ export function SettingsGroup({
 }
 
 /** A hairline inside a row that draws two rows of its own, matching the group's own dividers. */
-export function RowSeparator({ inset = ROW_PADDING }: { inset?: number }) {
+export function RowSeparator({ inset = 0 }: { inset?: number }) {
   const styles = useSettingsStyles(makeStyles);
   return <View style={[styles.separator, { marginLeft: inset }]} />;
 }
@@ -147,8 +155,8 @@ export function SettingsRow({
             </Text>
           ) : null}
           {trailing}
-          {accessory === 'next' ? <GIcon name="chevron-right" size={18} color={colors.textTertiary} /> : null}
-          {accessory === 'menu' ? <GIcon name="updown" size={16} color={colors.textTertiary} /> : null}
+          {accessory === 'next' ? <GIcon name="chevron-right" size={18} color={colors.textTertiary} strokeWidth={2.5} /> : null}
+          {accessory === 'menu' ? <GIcon name="updown" size={16} color={colors.textTertiary} strokeWidth={2.5} /> : null}
         </View>
         {children}
         {note ? <Text style={styles.note}>{note}</Text> : null}
@@ -178,7 +186,7 @@ export function SettingsRow({
   );
 }
 
-/** The top of a detail page: the setting's icon, its name, and a line on what it covers. */
+/** The top of a detail page, as pond-desktop opens one: its title, and a line on what it covers. */
 export function SettingsHeader({
   icon,
   tile,
@@ -192,11 +200,9 @@ export function SettingsHeader({
 }) {
   const styles = useSettingsStyles(makeStyles);
   return (
-    <View style={[styles.group, styles.header]}>
-      <IconTile icon={icon} tile={tile} size={52} />
-      <Text style={styles.headerTitle} accessibilityRole="header">
-        {title}
-      </Text>
+    <View style={styles.header}>
+      <IconTile icon={icon} tile={tile} size={44} />
+      <InkTitle level={2}>{title}</InkTitle>
       <Text style={styles.headerBody}>{description}</Text>
     </View>
   );
@@ -213,91 +219,46 @@ export function SettingsMessage({ children, tone = 'neutral' }: { children: Reac
   );
 }
 
-const makeStyles = (c: SettingsColors) => ({
-  groupWrap: { marginBottom: Spacing['2xl'] },
+const makeStyles = (c: SettingsColors, type: SettingsType, m: SettingsMetrics) => ({
+  groupWrap: { marginBottom: Spacing.xl },
+  group: { overflow: 'hidden' as const, paddingBottom: 2 },
   groupTitle: {
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.sm,
-    fontWeight: FontWeight.semibold,
-    color: c.textSecondary,
-    marginLeft: ROW_PADDING,
-    marginBottom: Spacing.sm,
+    ...type.eyebrow,
+    paddingHorizontal: m.rowH,
+    paddingTop: m.rowV,
+    paddingBottom: 2,
   },
-  group: {
-    backgroundColor: c.group,
-    borderRadius: Radii.xl,
-    overflow: 'hidden' as const,
-  },
-  separator: { height: 1, backgroundColor: c.line },
+  separator: { height: m.hairline, backgroundColor: c.line },
   footer: {
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.sm,
-    color: c.textSecondary,
-    lineHeight: FontSize.sm * 1.45,
+    ...type.prose,
     marginTop: Spacing.sm,
-    marginHorizontal: ROW_PADDING,
+    marginHorizontal: m.rowH,
   },
   row: {
     flexDirection: 'row' as const,
     alignItems: 'flex-start' as const,
     gap: Spacing.md,
-    minHeight: 52,
-    paddingHorizontal: ROW_PADDING,
-    paddingVertical: Spacing.md,
+    minHeight: m.tapMin,
+    paddingHorizontal: m.rowH,
+    paddingVertical: m.rowV,
   },
   disabled: { opacity: 0.45 },
   main: { flex: 1, gap: Spacing.sm, justifyContent: 'center' as const, minHeight: TILE },
   line: { flexDirection: 'row' as const, alignItems: 'center' as const, gap: Spacing.sm, minHeight: TILE },
   labels: { flex: 1, gap: 2 },
-  label: {
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.md,
-    fontWeight: FontWeight.medium,
-    color: c.text,
-  },
-  description: {
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.sm,
-    color: c.textSecondary,
-    lineHeight: FontSize.sm * 1.4,
-  },
-  value: {
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.md,
-    color: c.textSecondary,
-    maxWidth: '55%' as const,
-    textAlign: 'right' as const,
-  },
-  note: {
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.sm,
-    color: c.textTertiary,
-    lineHeight: FontSize.sm * 1.4,
-  },
+  label: type.label,
+  description: type.description,
+  value: { ...type.value, maxWidth: '55%' as const, textAlign: 'right' as const },
+  note: type.note,
   header: {
     alignItems: 'flex-start' as const,
     gap: Spacing.sm,
-    padding: Spacing.lg,
-    marginBottom: Spacing['2xl'],
+    paddingHorizontal: Spacing.xs,
+    marginBottom: Spacing.xl,
   },
-  headerTitle: {
-    fontFamily: FontFamily.heading,
-    fontSize: FontSize['2xl'],
-    fontWeight: FontWeight.bold,
-    letterSpacing: -0.3,
-    color: c.text,
-    marginTop: Spacing.xs,
-  },
-  headerBody: {
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.md,
-    color: c.textSecondary,
-    lineHeight: FontSize.md * 1.45,
-  },
+  headerBody: { ...type.prose, fontSize: type.body.fontSize, lineHeight: type.body.lineHeight },
   message: {
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.md,
-    color: c.textSecondary,
+    ...type.prose,
     textAlign: 'center' as const,
     marginVertical: Spacing.lg,
     marginHorizontal: Spacing.xl,

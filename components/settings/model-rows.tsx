@@ -7,9 +7,7 @@ import React from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
-import { Radii } from '@/constants/radii';
 import { Spacing } from '@/constants/spacing';
-import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
 import {
   formatBytes,
   formatMegabytes,
@@ -22,7 +20,7 @@ import { tap } from '@/services/haptics';
 import type { DownloadAction, ModelEntry } from '@/services/types';
 import { roleLabelKey } from '@/view-models/use-model-library';
 import { SettingsRow } from './settings-list';
-import { useSettingsColors, useSettingsStyles, type SettingsColors } from './settings-theme';
+import { useSettingsColors, useSettingsStyles, type SettingsColors, type SettingsMetrics, type SettingsType } from './settings-theme';
 
 export function ProgressBar({ fraction }: { fraction: number | null }) {
   const styles = useSettingsStyles(makeStyles);
@@ -102,14 +100,21 @@ export function ModelRow({ model, onPress }: { model: ModelEntry; onPress: () =>
   );
 }
 
-const makeStyles = (c: SettingsColors) => ({
-  track: { height: 6, borderRadius: Radii.pill, backgroundColor: c.line, overflow: 'hidden' as const },
-  fill: { height: 6, borderRadius: Radii.pill, backgroundColor: c.accent },
-  download: { paddingHorizontal: Spacing.lg, paddingVertical: Spacing.md, gap: Spacing.sm },
-  title: { fontFamily: FontFamily.body, fontSize: FontSize.md, fontWeight: FontWeight.medium, color: c.text },
+const makeStyles = (c: SettingsColors, type: SettingsType, m: SettingsMetrics) => ({
+  track: {
+    height: 6,
+    borderRadius: m.radius.pill,
+    backgroundColor: c.line,
+    borderWidth: m.hairline,
+    borderColor: c.edge,
+    overflow: 'hidden' as const,
+  },
+  fill: { height: '100%' as const, backgroundColor: c.accent },
+  download: { paddingHorizontal: m.rowH, paddingVertical: m.rowV, gap: Spacing.sm },
+  title: type.label,
   downloadFoot: { flexDirection: 'row' as const, alignItems: 'center' as const, justifyContent: 'space-between' as const, gap: Spacing.sm },
-  status: { flex: 1, fontFamily: FontFamily.body, fontSize: FontSize.sm, color: c.textSecondary },
+  status: { ...type.mono, flex: 1 },
   controls: { flexDirection: 'row' as const, gap: Spacing.xs },
-  control: { paddingHorizontal: Spacing.sm, paddingVertical: Spacing.xs, borderRadius: Radii.sm },
-  controlText: { fontFamily: FontFamily.body, fontSize: FontSize.sm, fontWeight: FontWeight.semibold, color: c.accent },
+  control: { paddingHorizontal: Spacing.sm, paddingVertical: Spacing.xs, borderRadius: m.radius.sm },
+  controlText: { ...type.value, color: c.accent },
 });

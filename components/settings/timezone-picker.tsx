@@ -11,15 +11,13 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { InkSpinner } from '@jarida/ink/native';
 
 import { GIcon } from '@/components/ui/g-icon';
-import { Radii } from '@/constants/radii';
 import { Spacing } from '@/constants/spacing';
-import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
 import { selectionTick } from '@/services/haptics';
 import type { ZoneChoice } from '@/services/types';
 import { usePondSettings } from '@/view-models/use-pond-settings';
 import { searchZones, useTimeZones } from '@/view-models/use-settings-extras';
 import { SettingsGroup, SettingsMessage, SettingsRow } from './settings-list';
-import { useSettingsColors, useSettingsStyles, type SettingsColors } from './settings-theme';
+import { useSettingsColors, useSettingsStyles, type SettingsColors, type SettingsMetrics, type SettingsType } from './settings-theme';
 
 export function TimezonePickerScreen() {
   const { t } = useTranslation();
@@ -106,31 +104,36 @@ export function TimezonePickerScreen() {
   );
 }
 
-const makeStyles = (c: SettingsColors) => ({
+const makeStyles = (c: SettingsColors, type: SettingsType, m: SettingsMetrics) => ({
   search: {
     flexDirection: 'row' as const,
     alignItems: 'center' as const,
     gap: Spacing.sm,
     backgroundColor: c.group,
-    borderRadius: Radii.lg,
+    borderRadius: m.radius.md,
+    borderWidth: m.hairline,
+    borderColor: c.edge,
     paddingHorizontal: Spacing.md,
     minHeight: 44,
     marginBottom: Spacing.lg,
   },
-  searchInput: { flex: 1, fontFamily: FontFamily.body, fontSize: FontSize.md, color: c.text, paddingVertical: Spacing.sm },
+  searchInput: { ...type.body, flex: 1, paddingVertical: Spacing.sm },
   zone: {
     flexDirection: 'row' as const,
     alignItems: 'center' as const,
     gap: Spacing.md,
     backgroundColor: c.group,
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.md,
+    paddingHorizontal: m.rowH,
+    paddingVertical: m.rowV,
     minHeight: 56,
+    borderLeftWidth: m.hairline,
+    borderRightWidth: m.hairline,
+    borderColor: c.line,
   },
-  first: { borderTopLeftRadius: Radii.xl, borderTopRightRadius: Radii.xl },
-  last: { borderBottomLeftRadius: Radii.xl, borderBottomRightRadius: Radii.xl },
-  divided: { borderTopWidth: 1, borderTopColor: c.line },
+  first: { borderTopWidth: m.hairline, borderTopLeftRadius: m.radius.lg, borderTopRightRadius: m.radius.lg },
+  last: { borderBottomWidth: m.hairline, borderBottomLeftRadius: m.radius.lg, borderBottomRightRadius: m.radius.lg },
+  divided: { borderTopWidth: m.hairline, borderTopColor: c.line },
   zoneText: { flex: 1, gap: 2 },
-  place: { fontFamily: FontFamily.body, fontSize: FontSize.md, fontWeight: FontWeight.medium, color: c.text },
-  detail: { fontFamily: FontFamily.body, fontSize: FontSize.sm, color: c.textSecondary },
+  place: type.label,
+  detail: type.description,
 });

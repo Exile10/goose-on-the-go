@@ -9,7 +9,6 @@ import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 
 import { Spacing } from '@/constants/spacing';
-import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
 import {
   describeVoice,
   formatRetentionOverrides,
@@ -34,7 +33,7 @@ import {
 import type { UsePondSettings } from '@/view-models/use-pond-settings';
 import { MenuRow, TextRow } from './setting-controls';
 import { RowSeparator, SettingsRow } from './settings-list';
-import { useSettingsColors, useSettingsStyles, type SettingsColors } from './settings-theme';
+import { useSettingsColors, useSettingsStyles, type SettingsColors, type SettingsMetrics, type SettingsType } from './settings-theme';
 
 export interface SpecialProps {
   settings: PondSettings;
@@ -338,17 +337,10 @@ export function PostureRow({ settings }: SpecialProps) {
   );
 }
 
-const makeStyles = (c: SettingsColors) => ({
-  action: { paddingHorizontal: Spacing.lg, paddingVertical: Spacing.md, minHeight: 52, justifyContent: 'center' as const, gap: Spacing.xs },
-  actionLabel: { fontFamily: FontFamily.body, fontSize: FontSize.md, fontWeight: FontWeight.semibold, color: c.accent },
-  actionNote: { fontFamily: FontFamily.body, fontSize: FontSize.sm, color: c.textSecondary, lineHeight: FontSize.sm * 1.4 },
-  inlineAction: { fontFamily: FontFamily.body, fontSize: FontSize.md, fontWeight: FontWeight.semibold },
-  posture: {
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.md,
-    lineHeight: FontSize.md * 1.5,
-    color: c.text,
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.md,
-  },
+const makeStyles = (c: SettingsColors, type: SettingsType, m: SettingsMetrics) => ({
+  action: { paddingHorizontal: m.rowH, paddingVertical: m.rowV, minHeight: m.tapMin, justifyContent: 'center' as const, gap: Spacing.xs },
+  actionLabel: { ...type.label, color: c.accent },
+  actionNote: type.description,
+  inlineAction: type.label,
+  posture: { ...type.body, paddingHorizontal: m.rowH, paddingVertical: m.rowV },
 });

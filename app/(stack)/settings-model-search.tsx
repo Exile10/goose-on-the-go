@@ -9,12 +9,16 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { InkNotice, InkSpinner } from '@jarida/ink/native';
 
 import { SettingsGroup, SettingsHeader, SettingsMessage, SettingsRow } from '@/components/settings/settings-list';
-import { useSettingsColors, useSettingsStyles, type SettingsColors } from '@/components/settings/settings-theme';
+import {
+  useSettingsColors,
+  useSettingsStyles,
+  type SettingsColors,
+  type SettingsMetrics,
+  type SettingsType,
+} from '@/components/settings/settings-theme';
 import { GIcon } from '@/components/ui/g-icon';
 import { GKeyboardView } from '@/components/ui/g-keyboard-view';
-import { Radii } from '@/constants/radii';
 import { Spacing } from '@/constants/spacing';
-import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
 import { formatBytes, formatMegabytes } from '@/models/model-library';
 import { confirm, selectionTick, tap } from '@/services/haptics';
 import type { HfModelFile } from '@/services/types';
@@ -125,17 +129,19 @@ export default function ModelSearchScreen() {
   );
 }
 
-const makeStyles = (c: SettingsColors) => ({
+const makeStyles = (c: SettingsColors, type: SettingsType, m: SettingsMetrics) => ({
   search: {
     flexDirection: 'row' as const,
     alignItems: 'center' as const,
     gap: Spacing.sm,
     backgroundColor: c.group,
-    borderRadius: Radii.lg,
+    borderRadius: m.radius.md,
+    borderWidth: m.hairline,
+    borderColor: c.edge,
     paddingHorizontal: Spacing.md,
     minHeight: 48,
     marginBottom: Spacing.lg,
   },
-  input: { flex: 1, fontFamily: FontFamily.body, fontSize: FontSize.md, color: c.text, paddingVertical: Spacing.sm },
-  searchButton: { fontFamily: FontFamily.body, fontSize: FontSize.md, fontWeight: FontWeight.semibold, color: c.accent },
+  input: { ...type.body, flex: 1, paddingVertical: Spacing.sm },
+  searchButton: { ...type.label, color: c.accent },
 });

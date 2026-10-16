@@ -8,18 +8,17 @@ import { Alert, Pressable, ScrollView, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { InkButton } from '@jarida/ink/native';
+import { InkButton, InkEdge, InkTitle } from '@jarida/ink/native';
 
 import { IssueRows } from '@/components/settings/issue-page';
 import { SwitchRow } from '@/components/settings/setting-controls';
 import { SettingsGroup, SettingsRow, TILE_INSET } from '@/components/settings/settings-list';
-import { useSettingsColors, useSettingsStyles, type SettingsColors } from '@/components/settings/settings-theme';
+import { useSettingsColors, useSettingsStyles, type SettingsColors, type SettingsType } from '@/components/settings/settings-theme';
 import { GIcon } from '@/components/ui/g-icon';
 import { APP_VERSION } from '@/constants/app';
 import { Brand, JaridaPurple } from '@/constants/colors';
 import { ACCOUNT_ROUTE, PROFILE_NAV } from '@/constants/navigation';
 import { Spacing } from '@/constants/spacing';
-import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
 import type { SummaryId } from '@/models/pond-settings';
 import { useBottomBarInset, useChromeScroll } from '@/providers/chrome-provider';
 import { useServer } from '@/providers/server-provider';
@@ -41,6 +40,7 @@ function AccountRow({ onPress }: { onPress: () => void }) {
   const { data: household } = useHousehold();
   const { serverUrl } = useServer();
   const { member, pondName, counts } = household;
+  const [pressed, setPressed] = useState(false);
   const initial = member ? initialOf(member.displayName) : null;
   const subtitle = member && pondName ? t('profile.pairedTo', { pond: pondName }) : serverUrl ? hostOf(serverUrl) : null;
   const tally = [
@@ -49,14 +49,18 @@ function AccountRow({ onPress }: { onPress: () => void }) {
     counts.users === null ? null : t('settings.account.people', { count: counts.users }),
   ].filter(Boolean).join(' · ');
 
+  // The one raised card on the screen: a press drives its face down onto the plate.
   return (
     <Pressable
       onPress={onPress}
+      onPressIn={() => setPressed(true)}
+      onPressOut={() => setPressed(false)}
       accessibilityRole="button"
       accessibilityLabel={member?.displayName ?? pondName ?? t('profile.yourPond')}
       accessibilityHint={t('settings.account.hint')}
-      style={({ pressed }) => [styles.account, pressed && { backgroundColor: colors.pressed }]}
+      style={styles.accountWrap}
     >
+      <InkEdge state={pressed ? 'pressed' : 'rest'} contentStyle={styles.account}>
       <View style={styles.avatar}>
         {initial ? <Text style={styles.avatarText}>{initial}</Text> : <GIcon name="home" size={26} color={Brand.white} />}
       </View>
@@ -67,7 +71,8 @@ function AccountRow({ onPress }: { onPress: () => void }) {
         {subtitle ? <Text style={styles.accountSub} numberOfLines={1}>{subtitle}</Text> : null}
         {tally ? <Text style={styles.accountSub} numberOfLines={1}>{tally}</Text> : null}
       </View>
-      <GIcon name="chevron-right" size={18} color={colors.textTertiary} />
+      <GIcon name="chevron-right" size={18} color={colors.textTertiary} strokeWidth={2.5} />
+      </InkEdge>
     </Pressable>
   );
 }
@@ -124,15 +129,11 @@ export default function ProfileHub() {
         contentContainerStyle={[styles.content, { paddingBottom: bottomInset + Spacing.lg }]}
         showsVerticalScrollIndicator={false}
       >
-        <Text style={styles.title} accessibilityRole="header">
-          {t('screens.settings')}
-        </Text>
+        <InkTitle style={styles.title}>{t('screens.settings')}</InkTitle>
 
         <IssueRows issues={issues} />
 
-        <SettingsGroup>
-          <AccountRow onPress={() => go(ACCOUNT_ROUTE)} />
-        </SettingsGroup>
+        <AccountRow onPress={() => go(ACCOUNT_ROUTE)} />
 
         {PROFILE_NAV.map((group) => (
           <View key={group.groupKey} accessibilityLabel={t(group.groupKey)}>
@@ -174,19 +175,11 @@ export default function ProfileHub() {
   );
 }
 
-const makeStyles = (c: SettingsColors) => ({
+const makeStyles = (c: SettingsColors, type: SettingsType) => ({
   safe: { flex: 1 },
   content: { paddingHorizontal: Spacing.lg },
-  title: {
-    fontFamily: FontFamily.heading,
-    fontSize: FontSize['3xl'],
-    fontWeight: FontWeight.bold,
-    letterSpacing: -0.5,
-    color: c.text,
-    marginTop: Spacing.md,
-    marginBottom: Spacing.lg,
-    marginLeft: Spacing.xs,
-  },
+  title: { marginTop: Spacing.md, marginBottom: Spacing.lg, marginLeft: Spacing.xs },
+  accountWrap: { marginBottom: Spacing.xl },
   account: {
     flexDirection: 'row' as const,
     alignItems: 'center' as const,
@@ -201,10 +194,10 @@ const makeStyles = (c: SettingsColors) => ({
     alignItems: 'center' as const,
     justifyContent: 'center' as const,
   },
-  avatarText: { fontFamily: FontFamily.heading, fontSize: FontSize['2xl'], fontWeight: FontWeight.bold, color: Brand.white },
+  avatarText: { ...type.heading, fontSize: 24, lineHeight: 30, color: Brand.white },
   accountText: { flex: 1, gap: 2 },
-  accountName: { fontFamily: FontFamily.heading, fontSize: FontSize.xl, fontWeight: FontWeight.bold, color: c.text },
-  accountSub: { fontFamily: FontFamily.body, fontSize: FontSize.sm, color: c.textSecondary },
+  accountName: { ...type.heading, fontSize: 20, lineHeight: 25 },
+  accountSub: type.description,
   unpair: { alignSelf: 'flex-start' as const, marginTop: Spacing.sm },
-  version: { fontFamily: FontFamily.body, fontSize: FontSize.xs, color: c.textTertiary, marginTop: Spacing.lg },
+  version: { ...type.mono, marginTop: Spacing.lg },
 });

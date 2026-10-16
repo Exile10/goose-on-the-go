@@ -1,18 +1,24 @@
 /**
- * Tracks the finger 1:1 from touch-down and keeps the gesture from the page's scroll; reports the
- * settled value apart from the ones it passed, so a caller saves once per drag, not per frame.
+ * Tracks the finger 1:1 once a drag is plainly sideways, and keeps it from the page's scroll from
+ * then on; until then a vertical swipe across it scrolls the page and changes nothing. A tap sets
+ * the value where it lands. Reports the settled value apart from the ones it passed, so a caller
+ * saves once per drag, not per frame.
+ * Drawn as pond-desktop's pace slider; `InkSlider` reads `locationX`, which jumps once the finger
+ * is over the thumb, and lets the page's scroll take the drag.
  */
 
 import React, { useCallback, useLayoutEffect, useRef, useState } from 'react';
 import { View, type AccessibilityActionEvent, type GestureResponderEvent, type LayoutChangeEvent } from 'react-native';
 
-import { Brand } from '@/constants/colors';
-import { Radii } from '@/constants/radii';
 import { selectionTick } from '@/services/haptics';
-import { useSettingsColors } from './settings-theme';
+import { useSettingsColors, useSettingsMetrics } from './settings-theme';
 
-const THUMB = 26;
+const THUMB = 22;
 const TRACK = 6;
+/** The thumb's plate, offset as Ink's compact edge is: small enough not to read as toppling. */
+const PLATE = 2;
+/** How far a finger moves, mostly sideways, before it is a drag rather than the start of a scroll. */
+const SLOP = 8;
 
 function snap(raw: number, min: number, max: number, step: number): number {
   const stepped = Math.round((raw - min) / step) * step + min;
@@ -43,9 +49,11 @@ export function SettingsSlider({
   disabled?: boolean;
 }) {
   const colors = useSettingsColors();
+  const m = useSettingsMetrics();
   const [width, setWidth] = useState(0);
   const pageX = useRef(0);
   const trackRef = useRef<View>(null);
+  const start = useRef({ x: 0, y: 0, dragging: false });
 
   const latest = useRef({ value, min, max, step, width, onChange, onCommit, disabled });
   useLayoutEffect(() => {
@@ -71,20 +79,29 @@ export function SettingsSlider({
     onMoveShouldSetResponder: () => !latest.current.disabled,
     // Measured on every grant: the page may have scrolled since layout.
     onResponderGrant: (event: GestureResponderEvent) => {
-      const x = event.nativeEvent.pageX;
+      start.current = { x: event.nativeEvent.pageX, y: event.nativeEvent.pageY, dragging: false };
       trackRef.current?.measureInWindow((left) => {
         pageX.current = left;
-        move(x);
       });
     },
     onResponderMove: (event: GestureResponderEvent) => {
-      move(event.nativeEvent.pageX);
+      const { pageX: x, pageY: y } = event.nativeEvent;
+      const st = start.current;
+      if (!st.dragging) {
+        const dx = Math.abs(x - st.x);
+        if (dx < SLOP || dx < Math.abs(y - st.y)) return;
+        st.dragging = true;
+      }
+      move(x);
     },
     onResponderRelease: (event: GestureResponderEvent) => {
       latest.current.onCommit(move(event.nativeEvent.pageX));
     },
-    onResponderTerminationRequest: () => false,
-    onResponderTerminate: () => latest.current.onCommit(latest.current.value),
+    // The scroll may have it until the drag is sideways, and never after.
+    onResponderTerminationRequest: () => !start.current.dragging,
+    onResponderTerminate: () => {
+      if (start.current.dragging) latest.current.onCommit(latest.current.value);
+    },
   };
 
   const onLayout = useCallback((e: LayoutChangeEvent) => {
@@ -122,15 +139,28 @@ export function SettingsSlider({
       style={{ height: 36, justifyContent: 'center', opacity: disabled ? 0.45 : 1 }}
       {...touch}
     >
-      <View style={{ height: TRACK, borderRadius: Radii.pill, backgroundColor: colors.line }} />
       <View
         style={{
-          position: 'absolute',
-          left: 0,
-          width: left + THUMB / 2,
           height: TRACK,
-          borderRadius: Radii.pill,
-          backgroundColor: colors.accent,
+          borderRadius: m.radius.pill,
+          backgroundColor: colors.line,
+          borderWidth: m.hairline,
+          borderColor: colors.edge,
+          overflow: 'hidden',
+        }}
+      >
+        <View style={{ width: left + THUMB / 2, height: '100%', backgroundColor: colors.accent }} />
+      </View>
+      <View
+        pointerEvents="none"
+        style={{
+          position: 'absolute',
+          left: left + PLATE,
+          width: THUMB,
+          height: THUMB,
+          marginTop: PLATE,
+          borderRadius: THUMB / 2,
+          backgroundColor: colors.ink,
         }}
       />
       <View
@@ -141,12 +171,9 @@ export function SettingsSlider({
           width: THUMB,
           height: THUMB,
           borderRadius: THUMB / 2,
-          backgroundColor: Brand.white,
-          shadowColor: Brand.charcoal,
-          shadowOpacity: 0.22,
-          shadowRadius: 3,
-          shadowOffset: { width: 0, height: 1 },
-          elevation: 3,
+          backgroundColor: colors.group,
+          borderWidth: m.border,
+          borderColor: colors.edge,
         }}
       />
     </View>

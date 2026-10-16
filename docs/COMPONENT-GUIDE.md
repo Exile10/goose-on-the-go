@@ -182,17 +182,22 @@ Verified on a device from outside the app. Six rapid screenshots of the bar area
 
 ### Settings (components/settings/)
 
-Every Settings screen is drawn from these, on Ink's palette (`settings-theme.ts`):
-a recessed page with raised groups on it.
+Every Settings screen is drawn from these, in Ink (`settings-theme.ts` gives each style
+factory Ink's palette, its `inkText` styles and its metrics). Groups are hairline
+surfaces with their name in Ink's eyebrow inside, as pond-desktop's cards carry it;
+the raised edge is spent on what is chosen and on the main action, about twice a
+screen, which is Ink's own budget. Text goes through `inkText` because it names the
+weight's font file: a `fontWeight` on a custom family draws the regular face on
+Android.
 
 | Component | Props | Description |
 |-----------|-------|-------------|
-| SettingsGroup | title?, footer?, inset? | A group of rows, hairlines between them starting at `inset` |
+| SettingsGroup | title?, footer?, inset? | A group of rows on one hairline `InkEdge`, hairlines between them starting at `inset` |
 | SettingsRow | label, icon?, tile?, description?, value?, trailing?, accessory?, note?, error?, onPress? | One row: tile, label, what it is set to, chevron or menu marker |
-| SettingsHeader | icon, tile, title, description | The top of a detail page |
+| SettingsHeader | icon, tile, title, description | The top of a detail page: tile, `InkTitle`, a line on what it covers |
 | SwitchRow, MenuRow, TextRow, NumberRow, SliderRow, TimeRow | value and its setter | One control each, applying on change; text and numbers save when typing ends, sliders on release |
 | radioRows, RadioRow | options, value, onChange | A choice with what each option means, one row each |
-| SettingsSlider | value, min, max, step, onCommit | Tracks the finger 1:1 and holds the gesture from the page's scroll |
+| SettingsSlider | value, min, max, step, onCommit | Becomes a drag after 8 px of sideways movement and then tracks 1:1, holding the gesture from the page's scroll; a vertical swipe across it scrolls, a tap sets the value. Drawn as the desktop's pace slider; `InkSlider` reads `locationX` and loses drags to the scroll |
 | SettingsPageScreen | page | Draws one page of `SETTINGS_PAGES` |
 | DownloadRow, ModelRow | download / model | A model's download with its controls, and a model with its size and job |
 | IssuePage, IssueRows, IssueDot | issue, ctx / issues / tone | One entry of `SETTINGS_ISSUES` as a page; the rows for the top of Settings; the dot the row and the You tab carry |
