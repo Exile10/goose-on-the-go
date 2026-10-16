@@ -79,9 +79,11 @@ reads only at start says that a change waits for a restart.
 
 Two kinds of page are not catalogue pages: Time zone (`settings-timezone`,
 searchable) is a picker, and the Models pages below have their own screens. The
-Voice page carries pond-desktop's voice picker inline, as the desktop's own Voice
-page does: choosing a voice saves it, has the engine switch to it, and then plays
-the next of seven lines in it, the same line for every voice in turn.
+speaking voice has a catalogue page of its own, Speaking voice
+(`settings-speaking`), reached from Voice: pond-desktop's voice picker and the
+sound quality, which would otherwise be most of the Voice page. Choosing a voice
+saves it, has the engine switch to it, and then plays the next of seven lines in
+it, the same line for every voice in turn.
 
 ### What needs attention
 

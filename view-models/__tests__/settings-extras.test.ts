@@ -24,6 +24,8 @@ describe('menu values', () => {
     expect(summarize('remoteAccess', SAMPLE_SETTINGS, extras, t)).toBe('Off');
     expect(summarize('internet', SAMPLE_SETTINGS, extras, t)).toBe('Open');
     expect(summarize('voice', SAMPLE_SETTINGS, extras, t)).toBe('“goose”');
+    expect(summarize('speaking', SAMPLE_SETTINGS, extras, t)).toBe('Heart');
+    expect(summarize('speaking', { ...SAMPLE_SETTINGS, voice_tts_voice: '' }, extras, t)).toBe('Heart');
     expect(summarize('tools', SAMPLE_SETTINGS, extras, t)).toBe('7 of 10 on');
     expect(summarize('people', SAMPLE_SETTINGS, extras, t)).toBe('3 people');
     expect(summarize('privacy', { ...SAMPLE_SETTINGS, mic_enabled: false }, extras, t)).toBe('Microphone off');

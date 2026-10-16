@@ -97,6 +97,7 @@ export type SliderFormat = 'pace' | 'creativity' | 'fraction';
 /** A row value shown on a menu, worked out from the settings and what else the phone knows. */
 export type SummaryId =
   | 'remoteAccess'
+  | 'speaking'
   | 'internet'
   | 'webSearch'
   | 'assistant'
@@ -125,6 +126,7 @@ export interface SettingsSection {
 export type SettingsPageId =
   | 'assistant'
   | 'voice'
+  | 'speaking'
   | 'listening'
   | 'thinking'
   | 'memory'

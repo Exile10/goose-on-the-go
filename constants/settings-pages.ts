@@ -60,25 +60,10 @@ const voice: SettingsPage = {
   titleKey: 'screens.settingsVoice',
   descriptionKey: 'settings.page.voice',
   sections: [
-    // The picker carries the voice and its pace, as pond-desktop's does.
-    { titleKey: 'settings.section.gooseVoice', items: [{ kind: 'special', id: 'voicePicker' }] },
+    // The speaking voice is a page of its own: its picker would otherwise be most of this one.
     {
-      titleKey: 'settings.section.soundQuality',
-      footerKey: 'settings.footer.soundQuality',
       items: [
-        {
-          kind: 'choice',
-          key: 'voice_tts_quality',
-          display: 'radio',
-          labelKey: 'settings.field.voice_tts_quality.label',
-          options: [
-            { value: 'q8', labelKey: 'settings.option.voice_tts_quality.q8.label', hintKey: 'settings.option.voice_tts_quality.q8.hint' },
-            { value: 'q8f16', labelKey: 'settings.option.voice_tts_quality.q8f16.label', hintKey: 'settings.option.voice_tts_quality.q8f16.hint' },
-            { value: 'q4f16', labelKey: 'settings.option.voice_tts_quality.q4f16.label', hintKey: 'settings.option.voice_tts_quality.q4f16.hint' },
-            { value: 'fp16', labelKey: 'settings.option.voice_tts_quality.fp16.label', hintKey: 'settings.option.voice_tts_quality.fp16.hint' },
-            { value: 'fp32', labelKey: 'settings.option.voice_tts_quality.fp32.label', hintKey: 'settings.option.voice_tts_quality.fp32.hint' },
-          ],
-        },
+        { kind: 'link', route: '/(stack)/settings-speaking', icon: 'speaker', tile: 'pink', labelKey: 'screens.settingsSpeaking', summary: 'speaking' },
       ],
     },
     {
@@ -99,6 +84,37 @@ const voice: SettingsPage = {
     {
       items: [
         { kind: 'link', route: '/(stack)/settings-listening', icon: 'ear', tile: 'pink', labelKey: 'screens.settingsListening' },
+      ],
+    },
+  ],
+};
+
+const speaking: SettingsPage = {
+  id: 'speaking',
+  icon: 'speaker',
+  tile: 'pink',
+  titleKey: 'screens.settingsSpeaking',
+  descriptionKey: 'settings.page.speaking',
+  sections: [
+    // The picker carries the voice and its pace, as pond-desktop's does.
+    { titleKey: 'settings.section.gooseVoice', items: [{ kind: 'special', id: 'voicePicker' }] },
+    {
+      titleKey: 'settings.section.soundQuality',
+      footerKey: 'settings.footer.soundQuality',
+      items: [
+        {
+          kind: 'choice',
+          key: 'voice_tts_quality',
+          display: 'radio',
+          labelKey: 'settings.field.voice_tts_quality.label',
+          options: [
+            { value: 'q8', labelKey: 'settings.option.voice_tts_quality.q8.label', hintKey: 'settings.option.voice_tts_quality.q8.hint' },
+            { value: 'q8f16', labelKey: 'settings.option.voice_tts_quality.q8f16.label', hintKey: 'settings.option.voice_tts_quality.q8f16.hint' },
+            { value: 'q4f16', labelKey: 'settings.option.voice_tts_quality.q4f16.label', hintKey: 'settings.option.voice_tts_quality.q4f16.hint' },
+            { value: 'fp16', labelKey: 'settings.option.voice_tts_quality.fp16.label', hintKey: 'settings.option.voice_tts_quality.fp16.hint' },
+            { value: 'fp32', labelKey: 'settings.option.voice_tts_quality.fp32.label', hintKey: 'settings.option.voice_tts_quality.fp32.hint' },
+          ],
+        },
       ],
     },
   ],
@@ -658,6 +674,7 @@ const advanced: SettingsPage = {
 export const SETTINGS_PAGES: Record<SettingsPageId, SettingsPage> = {
   assistant,
   voice,
+  speaking,
   listening,
   thinking,
   memory,

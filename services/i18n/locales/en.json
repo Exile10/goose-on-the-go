@@ -398,7 +398,7 @@
     "haptics": "Haptic feedback",
     "page": {
       "assistant": "What Goose calls itself, and how it talks to you.",
-      "voice": "The voice Goose speaks in, and the word that wakes it.",
+      "voice": "How Goose sounds, and the word that wakes it.",
       "listening": "How Goose listens for its name, and where speech becomes text.",
       "thinking": "Whether Goose thinks before it answers, and who checks its work.",
       "memory": "What Goose keeps about your household, and what it lets go of.",
@@ -412,7 +412,8 @@
       "privacy": "What your Pond may sense, and what it keeps about itself.",
       "retention": "How long your Pond keeps things before it deletes them.",
       "appearance": "How this app looks on this phone. Your Pond never sees it.",
-      "advanced": "Tuning for how Goose thinks and runs. Safe to leave alone."
+      "advanced": "Tuning for how Goose thinks and runs. Safe to leave alone.",
+      "speaking": "How Goose sounds when it answers out loud: the voice, its pace and how clear it is."
     },
     "section": {
       "nameAndManner": "Name and manner",
@@ -1308,7 +1309,8 @@
     "settingsModel": "Model",
     "settingsModelCatalog": "Available to download",
     "settingsModelSearch": "Search Hugging Face",
-    "settingsIssue": "Needs attention"
+    "settingsIssue": "Needs attention",
+    "settingsSpeaking": "Speaking voice"
   },
   "nav": {
     "goose": "Goose",

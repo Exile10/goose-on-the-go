@@ -11,7 +11,16 @@ import { useTheme } from '@/providers/theme-provider';
 import { ApiError, api } from '@/services/api-client';
 import i18n from '@/services/i18n';
 import type { ModelEntry, PondSettings, Profile, WebSearchStatus, ZoneChoice } from '@/services/types';
-import { providerOf, SAMPLE_SETTINGS, toolsOn, TOOL_SWITCHES, zoneCity, type SummaryId } from '@/models/pond-settings';
+import {
+  describeVoice,
+  providerOf,
+  SAMPLE_SETTINGS,
+  toolsOn,
+  TOOL_SWITCHES,
+  voiceInUse,
+  zoneCity,
+  type SummaryId,
+} from '@/models/pond-settings';
 import { describeApiError } from './describe-error';
 import { useLive } from './use-live';
 
@@ -114,6 +123,8 @@ export function summarize(id: SummaryId, s: PondSettings | null, x: Extras, t: T
       return t(networkKey(s.network_mode));
     case 'assistant':
       return s.assistant_name || null;
+    case 'speaking':
+      return describeVoice(voiceInUse(s.voice_tts_voice)).name;
     case 'voice':
       return s.voice_wake_word ? t('settings.summary.wakeWord', { word: s.voice_wake_word }) : null;
     case 'thinking':
