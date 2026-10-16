@@ -2,6 +2,7 @@ import { File } from 'expo-file-system';
 
 import { assertPondTrust, PondTrustError, pondTrustFailed } from './pond-trust';
 import { isInsecureDevOrigin, isLocalPairingUrl, normalizePondUrl } from '@/models/connection';
+import { readWebSearch } from '@/models/web-search';
 /**
  * PondApiClient — HTTP client for goose-in-a-pond.
  *
@@ -75,6 +76,8 @@ import type {
   UpdateDeviceRequest,
   UsageSummary,
   WeatherResponse,
+  WebSearchKeyResult,
+  WebSearchState,
 } from './types';
 import { MODEL_CATEGORIES } from './types';
 
@@ -1322,6 +1325,40 @@ export class PondApiClient {
     return this.get<{ connected: boolean }>(
       `/api/v1/oauth/status/${encodeURIComponent(providerId)}`,
     );
+  }
+
+  // ── Web search ──────────────────────────────────────────────
+  // The household's own Brave Search key, held by the Pond. Every route needs the paired token,
+  // and none of them returns the key: the phone can set it, check it and remove it, never read it.
+
+  /**
+   * Whether the Pond has a key and what Brave last made of it.
+   *
+   * A body that is not `{configured, status}` throws rather than passing for an answer: the cast in
+   * `request` would otherwise hand the screen an `undefined` to index. A Pond without the route
+   * answers 404, which the caller reads as "this Pond cannot search the web yet".
+   */
+  async webSearchState(): Promise<WebSearchState> {
+    const state = readWebSearch(await this.get<unknown>('/api/v1/web-search'));
+    if (!state) throw new Error('The Pond answered the web search status with something unexpected');
+    return state;
+  }
+
+  /**
+   * Store a Brave key. The Pond checks it with one request to Brave before keeping it, so this
+   * takes as long as Brave does, and a key Brave refuses is a 422 with nothing stored.
+   *
+   * A 200 means the key is stored, so a body that cannot say how it fared is read as `unverified`
+   * rather than as a failure that would have somebody paste the same key again.
+   */
+  async setWebSearchKey(key: string): Promise<WebSearchKeyResult> {
+    const state = readWebSearch(await this.put<unknown>('/api/v1/web-search/key', { key }));
+    return { configured: true, status: state?.configured ? state.status : 'unverified' };
+  }
+
+  /** `DELETE /web-search/key`, a 204. Goose stops being offered the tool on the next turn. */
+  removeWebSearchKey(): Promise<void> {
+    return this.del<void>('/api/v1/web-search/key');
   }
 
   // ── Profiles ────────────────────────────────────────────────

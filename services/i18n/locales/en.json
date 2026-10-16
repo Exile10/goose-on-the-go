@@ -403,6 +403,7 @@
     "logs": "Activity",
     "schedule": "Schedule",
     "extensions": "Extensions",
+    "webSearch": "Web search",
     "userMedia": "Photos and videos",
     "photoUpload": "Send a photo",
     "addUsers": "People",
@@ -668,7 +669,7 @@
     "storageTitle": "How it is stored",
     "storageBody": "API keys you give your Pond are encrypted on disk. Its other data — conversations, memories, profiles and face templates — is not encrypted by the Pond, so protect the computer it runs on as you would any device holding personal information.",
     "networkTitle": "What reaches the internet",
-    "networkBody": "Some features need the internet: weather comes from Open-Meteo, and music from Spotify once you connect it. Your Pond keeps a record of every outbound call it makes, and can be set to refuse sensitive destinations or to stay offline entirely.",
+    "networkBody": "Some features need the internet: weather comes from Open-Meteo, encyclopedia lookups from Wikipedia, and music from Spotify once you connect it. Keys you add turn on more: Wolfram|Alpha for calculations, and Brave for web search, which sends your question to Brave and reads the top result pages from their own sites. Your Pond keeps a record of every outbound call it makes, and can be set to refuse sensitive destinations or to stay offline entirely.",
     "voiceTitle": "Voice",
     "voiceBody": "Speech is transcribed on your Pond by default, and the recording is not kept afterwards. What you said is kept as text, as part of the conversation. The wake word is detected on your Pond, not on this phone.",
     "facesTitle": "Faces",
@@ -747,6 +748,31 @@
     "removeConfirmTitle": "Remove {{name}}?",
     "removeConfirmBody": "{{name}} will stop running on your Pond. Credentials saved for it stay there."
   },
+  "webSearch": {
+    "loading": "Checking web search…",
+    "status": {
+      "ok": "On, searching with Brave",
+      "notConfigured": "Off",
+      "rejected": "Brave did not accept the key",
+      "quota": "This month's free searches are used up",
+      "unverified": "Saved, not yet checked"
+    },
+    "loadFailed": "Your Pond could not be reached for its web search status.",
+    "unsupported": "This Pond does not offer web search yet. Update it to turn web search on.",
+    "getKey": "Get a free key at {{site}}",
+    "getKeyHint": "Opens Brave's dashboard in a browser",
+    "help": "The free monthly credit covers about 1,000 searches. Brave asks for a card to confirm who you are.",
+    "keyLabel": "Brave Search key",
+    "keyPlaceholder": "Paste your key",
+    "keyPlaceholderReplace": "Paste a new key to replace it",
+    "keyRejected": "Brave did not accept this key.",
+    "save": "Save key",
+    "checking": "Checking…",
+    "removing": "Removing…",
+    "removeConfirmTitle": "Remove the Brave key?",
+    "removeConfirmBody": "Goose will stop searching the web until a key is added again.",
+    "privacy": "When the Pond searches the web, your question is sent to Brave, and the top pages are read from their sites."
+  },
   "photo": {
     "choose": "Choose a photo",
     "formats": "JPG, PNG or HEIC, up to 25 MB",
@@ -790,7 +816,8 @@
       "chat": "Chat",
       "memory": "Memories",
       "schedule": "Schedule",
-      "logs": "Activity Logs"
+      "logs": "Activity Logs",
+      "webSearch": "Web search"
     },
     "devOnly": "This screen is dev-only. It is not linked from the You tab in production builds."
   },

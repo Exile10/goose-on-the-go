@@ -34,6 +34,15 @@ describe('resolveScreenReal', () => {
     expect(resolveScreenReal('chat', release)).toBe(true);
   });
 
+  /**
+   * Web search's mock answers "saved" to any key. In a release build that would show a key as
+   * stored when nothing had reached the Pond, so it starts on the Pond like chat does.
+   */
+  it('sends web search to the Pond in a release build', () => {
+    const release = { isDev: false, screenModes: DEFAULT_SCREEN_MODES, defaults: DEFAULT_SCREEN_MODES };
+    expect(resolveScreenReal('webSearch', release)).toBe(true);
+  });
+
   // Alternating real and mock, with every toggle set the other way, so an
   // answer that reads the wrong record, or neither, cannot pass.
   const defaults = modes((_, i) => i % 2 === 0);

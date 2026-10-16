@@ -66,6 +66,10 @@ interface ServerContextValue {
  * way when the unused listening overlay was deleted, and `integrations` when
  * the Extensions screen was wired to `/extensions` and `/marketplace` (#92).
  *
+ * `webSearch` is on it for the opposite reason: it was written against a
+ * contract, ahead of any Pond that serves `/api/v1/web-search`, so the mock is
+ * what lets the screen be built and looked at before there is one to ask.
+ *
  * Nothing enforces this list: each view-model has to call `isScreenReal`
  * itself, so a screen can read "Real" here while its hook still returns mock
  * data because it never asked.
@@ -75,6 +79,7 @@ export const MIGRATION_SCREENS = [
   'memory',
   'schedule',
   'logs',
+  'webSearch',
 ] as const;
 
 export type MigrationScreen = (typeof MIGRATION_SCREENS)[number];
@@ -88,8 +93,14 @@ export type ScreenModes = Record<MigrationScreen, boolean>;
  * A screen belongs here once its wiring has been run against a Pond rather
  * than against a test. `chat` earned it: `POST /api/v1/chat` is implemented,
  * and the only reason it ever needed a toggle was that it was not.
+ *
+ * `webSearch` is here without having earned it that way: it has not yet been run
+ * against a Pond that serves the routes. It starts real anyway, because its mock
+ * answers "saved" to any key, and a release build showing a key as stored when
+ * nothing reached the Pond is worse than a screen that says the Pond cannot do
+ * this. Flip it to mock in the Developer screen to work without a Pond.
  */
-const REAL_BY_DEFAULT: readonly MigrationScreen[] = ['chat'];
+const REAL_BY_DEFAULT: readonly MigrationScreen[] = ['chat', 'webSearch'];
 
 export const DEFAULT_SCREEN_MODES: ScreenModes = MIGRATION_SCREENS.reduce(
   (acc, screen) => ({ ...acc, [screen]: REAL_BY_DEFAULT.includes(screen) }),

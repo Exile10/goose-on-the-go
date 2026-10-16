@@ -50,6 +50,18 @@ it('sends every profile menu row to a screen that exists', () => {
   expect(dangling).toEqual([]);
 });
 
+/**
+ * The way in to a screen is a menu row, and a row that is dropped in a merge fails nothing above:
+ * the file still exists, so the guard passes, and the screen is simply unreachable.
+ */
+it('offers Web search under Integrations', () => {
+  const integrations = PROFILE_NAV.find((group) => group.groupKey === 'nav.integrations');
+
+  expect(integrations?.items).toContainEqual(
+    expect.objectContaining({ id: 'webSearch', labelKey: 'screens.webSearch', icon: 'search', route: '/(stack)/web-search' }),
+  );
+});
+
 it('registers only stack screens whose files exist', () => {
   const files = new Set(stackScreenFiles());
   const registered = registeredStackScreens();

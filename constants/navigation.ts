@@ -44,6 +44,7 @@ export const PROFILE_NAV: NavGroup[] = [
     groupKey: 'nav.integrations',
     items: [
       { id: 'extensions', labelKey: 'screens.extensions', icon: 'link', route: '/(stack)/extensions' },
+      { id: 'webSearch', labelKey: 'screens.webSearch', icon: 'search', route: '/(stack)/web-search' },
     ],
   },
   {

@@ -708,6 +708,33 @@ export interface OAuthProvider {
   scopes: string[];
 }
 
+// ── Web search ────────────────────────────────────────────────
+
+/**
+ * What the Pond knows about its Brave Search key, never the key itself.
+ *
+ * `rejected` and `quota` are learned at call time, when Brave refuses a search the Pond made on
+ * the household's behalf, so they can appear on a key that was fine when it was saved.
+ * `unverified` is a key stored while Brave could not be reached, and is checked on first use.
+ */
+export type WebSearchStatus = 'ok' | 'not_configured' | 'rejected' | 'quota' | 'unverified';
+
+/** `GET /api/v1/web-search`. */
+export interface WebSearchState {
+  provider: 'brave';
+  configured: boolean;
+  status: WebSearchStatus;
+}
+
+/**
+ * `PUT /api/v1/web-search/key`, on a 200. `status` is `ok`, `quota` (a valid key that is spent) or
+ * `unverified` (stored, Brave unreachable). A key Brave refuses is a 422 and nothing is stored.
+ */
+export interface WebSearchKeyResult {
+  configured: boolean;
+  status: WebSearchStatus;
+}
+
 // ── Voice ─────────────────────────────────────────────────────
 
 export interface TranscribeResponse {
