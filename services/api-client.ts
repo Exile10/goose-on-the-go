@@ -49,6 +49,7 @@ import type {
   ConsolidationEvent,
   MemoryFragment,
   SaveMemoryRequest,
+  UpdateMemoryRequest,
   ModelActiveRoles,
   ModelCapabilities,
   ModelEntry,
@@ -984,9 +985,9 @@ export class PondApiClient {
     return this.post<MemoryFragment>('/api/v1/memories', req);
   }
 
-  /** Rewords in place; the Pond keeps the id, age, usage, segment and tier. */
-  updateMemory(id: string, content: string): Promise<void> {
-    return this.put<void>(`/api/v1/memories/${encodeURIComponent(id)}`, { content });
+  /** Rewords and/or re-tiers in place; the Pond keeps the id, age, usage and segment. */
+  updateMemory(id: string, change: UpdateMemoryRequest): Promise<void> {
+    return this.put<void>(`/api/v1/memories/${encodeURIComponent(id)}`, change);
   }
 
   deleteMemory(id: string): Promise<void> {

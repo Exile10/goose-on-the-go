@@ -77,13 +77,32 @@ describe('memories', () => {
     const seen: Seen[] = [];
     recordInto(seen, '');
 
-    await api().updateMemory('a/b', 'Likes green tea');
+    await api().updateMemory('a/b', { content: 'Likes green tea' });
 
     expect(seen[0]).toEqual({
       url: 'https://pond.test:4000/api/v1/memories/a%2Fb',
       method: 'PUT',
       body: { content: 'Likes green tea' },
     });
+  });
+
+  it('changes the tier with PUT and sends nothing but the tier', async () => {
+    const seen: Seen[] = [];
+    recordInto(seen, '');
+
+    await api().updateMemory('m1', { tier: 'permanent' });
+
+    expect(seen[0]).toEqual({
+      url: 'https://pond.test:4000/api/v1/memories/m1',
+      method: 'PUT',
+      body: { tier: 'permanent' },
+    });
+  });
+
+  it('surfaces the 422 a Pond that cannot change tiers sends', async () => {
+    recordInto([], '{"error":"missing field `content`"}', 422);
+
+    await expect(api().updateMemory('m1', { tier: 'permanent' })).rejects.toMatchObject({ status: 422 });
   });
 
   it('deletes by id', async () => {
