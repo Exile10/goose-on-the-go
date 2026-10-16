@@ -12,7 +12,7 @@ import { ApiError, api } from '@/services/api-client';
 import i18n from '@/services/i18n';
 import { cacheFile, discardFile, playFile } from '@/services/voice-io';
 import type { ModelEntry, PondSettings, Profile, WebSearchStatus, ZoneChoice } from '@/services/types';
-import { providerOf, SAMPLE_SETTINGS, toolsOn, TOOL_SWITCHES, type SummaryId } from '@/models/pond-settings';
+import { providerOf, SAMPLE_SETTINGS, toolsOn, TOOL_SWITCHES, zoneCity, type SummaryId } from '@/models/pond-settings';
 import { describeApiError } from './describe-error';
 import { useLive } from './use-live';
 
@@ -124,7 +124,7 @@ export function summarize(id: SummaryId, s: PondSettings | null, x: Extras, t: T
     case 'tools':
       return t('settings.summary.tools', { on: toolsOn(s), total: TOOL_SWITCHES.length });
     case 'home':
-      return s.weather_location_name || s.timezone || null;
+      return s.weather_location_name || (s.timezone ? zoneCity(s.timezone) : null);
     case 'household':
       return s.user_name || null;
     case 'cameras':
@@ -140,7 +140,7 @@ export function summarize(id: SummaryId, s: PondSettings | null, x: Extras, t: T
         ? t('settings.summary.forever')
         : t('settings.summary.days', { count: s.retention_event_log_days });
     case 'timezone':
-      return s.timezone || null;
+      return s.timezone ? zoneCity(s.timezone) : null;
     default:
       return null;
   }

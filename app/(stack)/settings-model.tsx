@@ -113,6 +113,7 @@ export default function ModelScreen() {
         {downloaded ? (
           <SettingsRow
             label={model.active ? t('models.library.using', { job }) : t('models.library.use', { job })}
+            action={!model.active}
             disabled={model.active || busy || !runnable}
             note={!runnable ? t('models.library.unavailable') : tooBig(model, lib.memory?.budget_mb) ? t('models.library.tooBig') : null}
             onPress={() => {
@@ -123,6 +124,7 @@ export default function ModelScreen() {
         ) : (
           <SettingsRow
             label={size ? `${t('models.library.download')} · ${size}` : t('models.library.download')}
+            action
             disabled={busy || !!download || !runnable}
             note={!runnable ? t('models.library.unavailable') : tooBig(model, lib.memory?.budget_mb) ? t('models.library.tooBig') : null}
             onPress={askDownload}
@@ -135,6 +137,7 @@ export default function ModelScreen() {
                 : pictures.state === 'downloading' || pictures.state === 'verifying' ? t('models.library.picturesDownloading')
                   : formatBytes(pictures.size_bytes) ? t('models.library.picturesSize', { size: formatBytes(pictures.size_bytes) }) : t('models.library.pictures')
             }
+            action={pictures.state === 'available'}
             disabled={pictures.state !== 'available' || busy}
             onPress={() => {
               void tap();

@@ -17,7 +17,7 @@ import { Spacing } from '@/constants/spacing';
 import { candidatesFor, formatMegabytes, MODEL_ROLES, titleOf } from '@/models/model-library';
 import { selectionTick } from '@/services/haptics';
 import type { ModelRole } from '@/services/types';
-import { roleLabelKey, useModelLibrary } from '@/view-models/use-model-library';
+import { roleAboutKey, roleLabelKey, useModelLibrary } from '@/view-models/use-model-library';
 
 export default function ModelRoleScreen() {
   const { t } = useTranslation();
@@ -34,7 +34,7 @@ export default function ModelRoleScreen() {
       style={{ flex: 1, backgroundColor: colors.page }}
       contentContainerStyle={{ paddingHorizontal: Spacing.lg, paddingTop: Spacing.lg, paddingBottom: insets.bottom + Spacing['4xl'] }}
     >
-      <SettingsHeader icon="models" tile="purple" title={t(roleLabelKey(role))} description={t('models.library.footer.jobs')} />
+      <SettingsHeader icon="models" tile="purple" title={t(roleLabelKey(role))} description={t(roleAboutKey(role))} />
       {lib.notice ? <InkNotice tone={lib.notice.tone === 'danger' ? 'danger' : 'neutral'}>{lib.notice.text}</InkNotice> : null}
       <SettingsGroup>
         {candidates.length === 0 ? <SettingsRow label={t('models.library.noCandidates')} /> : null}

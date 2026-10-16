@@ -101,6 +101,8 @@ export interface SettingsRowProps {
   note?: string | null;
   error?: string | null;
   destructive?: boolean;
+  /** A row that does something rather than shows something, in the accent like a button. */
+  action?: boolean;
   disabled?: boolean;
   onPress?: () => void;
   /** The row's control, read with it by a screen reader: `switch`, `button`, `radio`. */
@@ -121,6 +123,7 @@ export function SettingsRow({
   note,
   error,
   destructive,
+  action,
   disabled,
   onPress,
   accessibilityRole,
@@ -135,7 +138,7 @@ export function SettingsRow({
       <View style={styles.main}>
         <View style={styles.line}>
           <View style={styles.labels}>
-            <Text style={[styles.label, destructive && { color: colors.danger }]}>{label}</Text>
+            <Text style={[styles.label, action && { color: colors.accent }, destructive && { color: colors.danger }]}>{label}</Text>
             {description ? <Text style={styles.description}>{description}</Text> : null}
           </View>
           {value ? (

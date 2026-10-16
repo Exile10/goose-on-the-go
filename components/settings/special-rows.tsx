@@ -16,6 +16,8 @@ import {
   parseRetentionOverrides,
   postureOf,
   splitCategories,
+  voiceInUse,
+  zoneCity,
 } from '@/models/pond-settings';
 import { caution, selectionTick, tap } from '@/services/haptics';
 import type { PondSettings } from '@/services/types';
@@ -41,8 +43,7 @@ export interface SpecialProps {
 
 /** The voice Goose speaks in, as a household names it: "Heart · American English". */
 export function voiceName(id: string, t: TFunction): string {
-  if (!id) return t('settings.notSet');
-  const info = describeVoice(id);
+  const info = describeVoice(voiceInUse(id));
   return info.language ? `${info.name} · ${t(voiceLanguageKey(info.language))}` : info.name;
 }
 
@@ -136,7 +137,7 @@ export function TimezoneRow({ settings }: SpecialProps) {
     <SettingsRow
       label={t('settings.timezone.label')}
       description={t('settings.timezone.hint')}
-      value={settings.timezone || t('settings.notSet')}
+      value={settings.timezone ? zoneCity(settings.timezone) : t('settings.notSet')}
       accessory="next"
       onPress={() => {
         void selectionTick();

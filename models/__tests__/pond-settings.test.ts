@@ -21,6 +21,8 @@ import {
   splitCategories,
   tidyNumber,
   toolsOn,
+  voiceInUse,
+  zoneCity,
 } from '@/models/pond-settings';
 
 const lookup = i18n.t as unknown as (key: string) => string;
@@ -138,6 +140,14 @@ describe('clock times', () => {
   });
 });
 
+describe('time zones', () => {
+  it('names a zone by its city', () => {
+    expect(zoneCity('Africa/Nairobi')).toBe('Nairobi');
+    expect(zoneCity('America/Argentina/Buenos_Aires')).toBe('Buenos Aires');
+    expect(zoneCity('UTC')).toBe('UTC');
+  });
+});
+
 describe('lists the Pond keeps as text', () => {
   it('splits speech categories, dropping blanks and repeats', () => {
     expect(splitCategories('Alert, security,, alert ')).toEqual(['alert', 'security']);
@@ -160,6 +170,11 @@ describe('voices', () => {
   it('names a Kokoro voice from its id', () => {
     expect(describeVoice('af_heart')).toEqual({ id: 'af_heart', name: 'Heart', language: 'a', gender: 'f', grade: 'A' });
     expect(describeVoice('bm_george').language).toBe('b');
+  });
+
+  it('names the voice Kokoro speaks in when none has been chosen', () => {
+    expect(voiceInUse('')).toBe('af_heart');
+    expect(voiceInUse(' bm_george ')).toBe('bm_george');
   });
 
   it('keeps a voice of another shape choosable', () => {

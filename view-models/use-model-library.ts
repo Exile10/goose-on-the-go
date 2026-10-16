@@ -293,3 +293,17 @@ export function roleLabelKey(role: ModelRole) {
       return 'models.library.role.embedding' as const;
   }
 }
+
+/** What each job is for, in a sentence, for the top of its page. */
+export function roleAboutKey(role: ModelRole) {
+  switch (role) {
+    case 'chat':
+      return 'models.library.roleAbout.chat' as const;
+    case 'asr':
+      return 'models.library.roleAbout.asr' as const;
+    case 'tts':
+      return 'models.library.roleAbout.tts' as const;
+    case 'embedding':
+      return 'models.library.roleAbout.embedding' as const;
+  }
+}

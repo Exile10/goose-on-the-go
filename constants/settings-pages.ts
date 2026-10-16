@@ -16,7 +16,7 @@ const assistant: SettingsPage = {
       titleKey: 'settings.section.nameAndManner',
       items: [
         { kind: 'text', key: 'assistant_name', labelKey: 'settings.field.assistant_name.label', hintKey: 'settings.field.assistant_name.hint', placeholderKey: 'settings.field.assistant_name.placeholder' },
-        { kind: 'text', key: 'assistant_personality', labelKey: 'settings.field.assistant_personality.label', hintKey: 'settings.field.assistant_personality.hint', placeholderKey: 'settings.field.assistant_personality.placeholder' },
+        { kind: 'text', key: 'assistant_personality', multiline: true, labelKey: 'settings.field.assistant_personality.label', hintKey: 'settings.field.assistant_personality.hint', placeholderKey: 'settings.field.assistant_personality.placeholder' },
       ],
     },
     {

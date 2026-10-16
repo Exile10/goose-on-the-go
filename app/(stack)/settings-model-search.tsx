@@ -29,6 +29,12 @@ export default function ModelSearchScreen() {
   const search = useModelSearch();
   const [started, setStarted] = React.useState<string | null>(null);
 
+  const picturesNote = (file: HfModelFile) => {
+    if (!file.pictures) return null;
+    const size = formatBytes(file.pictures.size_bytes);
+    return size ? t('models.library.filePicturesSize', { size }) : t('models.library.filePictures');
+  };
+
   const askFile = (file: HfModelFile) => {
     void tap();
     const size = formatMegabytes(file.size_mb);
@@ -92,7 +98,7 @@ export default function ModelSearchScreen() {
               <SettingsRow
                 key={file.filename}
                 label={file.filename}
-                description={[formatMegabytes(file.size_mb), file.pictures ? t('models.library.filePictures') : null, file.pictures ? formatBytes(file.pictures.size_bytes) : null].filter(Boolean).join(' · ') || null}
+                description={[formatMegabytes(file.size_mb), picturesNote(file)].filter(Boolean).join(' · ') || null}
                 trailing={<GIcon name="download" size={18} color={colors.accent} />}
                 onPress={() => askFile(file)}
               />

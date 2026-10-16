@@ -10,7 +10,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { InkSpinner } from '@jarida/ink/native';
 
 import { Spacing } from '@/constants/spacing';
-import { describeVoice, sortVoices, VOICE_LANGUAGES, type VoiceLanguage } from '@/models/pond-settings';
+import { describeVoice, sortVoices, voiceInUse, VOICE_LANGUAGES, type VoiceLanguage } from '@/models/pond-settings';
 import { selectionTick, tap } from '@/services/haptics';
 import { usePondSettings } from '@/view-models/use-pond-settings';
 import { useModelChoices, useVoicePreview, voiceChoices, voiceLanguageKey } from '@/view-models/use-settings-extras';
@@ -27,7 +27,7 @@ export function VoicePickerScreen() {
   const vm = usePondSettings();
   const models = useModelChoices();
   const preview = useVoicePreview();
-  const current = vm.settings?.voice_tts_voice ?? '';
+  const current = voiceInUse(vm.settings?.voice_tts_voice ?? '');
 
   const voices = useMemo(() => voiceChoices(models.items), [models.items]);
   const installed = useMemo(() => new Map(voices.map((v) => [v.id, v.installed])), [voices]);
@@ -107,7 +107,7 @@ export function VoicePickerScreen() {
       <ScrollView
         contentContainerStyle={{ paddingHorizontal: Spacing.lg, paddingTop: Spacing.lg, paddingBottom: insets.bottom + Spacing['4xl'] }}
       >
-        <SettingsHeader icon="voice" tile="pink" title={t('screens.settingsVoices')} description={t('settings.page.voice')} />
+        <SettingsHeader icon="voice" tile="pink" title={t('screens.settingsVoices')} description={t('settings.voice.about')} />
         {body}
       </ScrollView>
     </View>

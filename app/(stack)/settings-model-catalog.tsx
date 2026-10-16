@@ -39,7 +39,7 @@ export default function ModelCatalogScreen() {
               <SettingsRow
                 key={m.id}
                 label={titleOf(m)}
-                description={[formatMegabytes(m.size_mb), m.available === false ? t('models.library.unavailable') : tooBig(m, lib.memory?.budget_mb) ? t('models.library.tooBig') : null]
+                description={[formatMegabytes(m.size_mb), m.engine?.label, m.available === false ? t('models.library.unavailable') : tooBig(m, lib.memory?.budget_mb) ? t('models.library.tooBig') : null]
                   .filter(Boolean)
                   .join(' · ') || null}
                 accessory="next"

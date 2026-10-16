@@ -999,7 +999,7 @@
         },
         "allowlist": {
           "label": "Approved sites only",
-          "hint": "Only this machine and the approved list"
+          "hint": "Only the services your Pond needs, from a list built into it"
         },
         "offline": {
           "label": "Offline",
@@ -1050,6 +1050,7 @@
     },
     "percent": "{{value}}%",
     "voice": {
+      "about": "Choose how Goose sounds. Each voice has a grade for how natural it sounds; A is the most natural.",
       "accent": "Accent",
       "voice": "Voice",
       "lang": {
@@ -1101,7 +1102,7 @@
       "label": "Location",
       "hint": "The place used when Goose talks about the weather.",
       "placeholder": "Nairobi",
-      "find": "Find",
+      "find": "Find my location",
       "finding": "Finding…",
       "found": "Found {{name}}.",
       "guessed": "Guessed {{name}} from your time zone.",
@@ -1202,7 +1203,12 @@
     "loading": "Reading your Pond's settings",
     "account": {
       "hint": "Your name, and who this Pond belongs to",
-      "counts": "{{devices}} devices · {{rooms}} rooms · {{people}} people"
+      "devices_one": "{{count}} device",
+      "devices_other": "{{count}} devices",
+      "rooms_one": "{{count}} room",
+      "rooms_other": "{{count}} rooms",
+      "people_one": "{{count}} person",
+      "people_other": "{{count}} people"
     }
   },
   "screens": {
@@ -1335,8 +1341,8 @@
     "tryAgain": "Try again",
     "library": {
       "page": "What your Pond runs on, and what it costs.",
-      "storage": "{{size}} of models on your Pond",
-      "budget": "Room for one model of {{size}}",
+      "storage": "Models take {{size}} on your Pond.",
+      "budget": "It has memory for a model of up to {{size}}.",
       "noBudget": "Your Pond does not report how much memory a model may use",
       "section": {
         "jobs": "Jobs",
@@ -1363,6 +1369,12 @@
         "asr": "Turns speech into words",
         "tts": "Turns words into speech",
         "embedding": "Finds what it knows"
+      },
+      "roleAbout": {
+        "chat": "The model Goose thinks and answers with. A bigger one answers better and needs more memory.",
+        "asr": "The model that turns what you say into words Goose can read.",
+        "tts": "The voice Goose answers out loud in.",
+        "embedding": "The model that lets Goose find what it remembers by meaning, not just by matching words."
       },
       "nothing": "Nothing chosen yet",
       "noCandidates": "No model for this job is on your Pond yet.",
@@ -1408,6 +1420,7 @@
       "stats": "{{downloads}} downloads · {{likes}} likes",
       "fileSize": "{{size}}",
       "filePictures": "Picture support available",
+      "filePicturesSize": "Picture support adds {{size}}",
       "started": "Downloading. It shows on the Models page as it goes.",
       "empty": "No models on your Pond yet.",
       "facts": {

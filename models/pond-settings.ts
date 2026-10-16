@@ -382,6 +382,20 @@ function titleCase(segment: string): string {
     .join(' ');
 }
 
+/** A zone the way a clock app names it: its city, not the region that files it. */
+export function zoneCity(zone: string): string {
+  const city = zone.split('/').pop() ?? zone;
+  return city.replace(/_/g, ' ');
+}
+
+/** The Pond stores no voice until one is chosen, and Kokoro then speaks in this one. */
+export const DEFAULT_VOICE = 'af_heart';
+
+/** The voice that is actually speaking, so an unchosen voice reads as one, not as missing. */
+export function voiceInUse(id: string): string {
+  return id.trim() || DEFAULT_VOICE;
+}
+
 export function describeVoice(id: string): VoiceInfo {
   const m = /^([a-z])([fm])_(.+)$/.exec(id);
   const language = m && (VOICE_LANGUAGES as readonly string[]).includes(m[1]) ? (m[1] as VoiceLanguage) : null;

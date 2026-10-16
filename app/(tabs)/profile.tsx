@@ -41,7 +41,11 @@ function AccountRow({ onPress }: { onPress: () => void }) {
   const { member, pondName, counts } = household;
   const initial = member ? initialOf(member.displayName) : null;
   const subtitle = member && pondName ? t('profile.pairedTo', { pond: pondName }) : serverUrl ? hostOf(serverUrl) : null;
-  const dash = (n: number | null) => (n === null ? '—' : String(n));
+  const tally = [
+    counts.devices === null ? null : t('settings.account.devices', { count: counts.devices }),
+    counts.rooms === null ? null : t('settings.account.rooms', { count: counts.rooms }),
+    counts.users === null ? null : t('settings.account.people', { count: counts.users }),
+  ].filter(Boolean).join(' · ');
 
   return (
     <Pressable
@@ -59,9 +63,7 @@ function AccountRow({ onPress }: { onPress: () => void }) {
           {member?.displayName ?? pondName ?? t('profile.yourPond')}
         </Text>
         {subtitle ? <Text style={styles.accountSub} numberOfLines={1}>{subtitle}</Text> : null}
-        <Text style={styles.accountSub} numberOfLines={1}>
-          {t('settings.account.counts', { devices: dash(counts.devices), rooms: dash(counts.rooms), people: dash(counts.users) })}
-        </Text>
+        {tally ? <Text style={styles.accountSub} numberOfLines={1}>{tally}</Text> : null}
       </View>
       <GIcon name="chevron-right" size={18} color={colors.textTertiary} />
     </Pressable>
