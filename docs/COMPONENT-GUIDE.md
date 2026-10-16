@@ -180,6 +180,22 @@ Verified on a device from outside the app. Six rapid screenshots of the bar area
 
 `VoiceOrb` is the other continuous animation, and it keeps the same rules by a different route: React Native's `Animated` on the native driver, one value per loop, with a still pose under reduced motion.
 
+### Settings (components/settings/)
+
+Every Settings screen is drawn from these, on Ink's palette (`settings-theme.ts`):
+a recessed page with raised groups on it.
+
+| Component | Props | Description |
+|-----------|-------|-------------|
+| SettingsGroup | title?, footer?, inset? | A group of rows, hairlines between them starting at `inset` |
+| SettingsRow | label, icon?, tile?, description?, value?, trailing?, accessory?, note?, error?, onPress? | One row: tile, label, what it is set to, chevron or menu marker |
+| SettingsHeader | icon, tile, title, description | The top of a detail page |
+| SwitchRow, MenuRow, TextRow, NumberRow, SliderRow, TimeRow | value and its setter | One control each, applying on change; text and numbers save when typing ends, sliders on release |
+| radioRows, RadioRow | options, value, onChange | A choice with what each option means, one row each |
+| SettingsSlider | value, min, max, step, onCommit | Tracks the finger 1:1 and holds the gesture from the page's scroll |
+| SettingsPageScreen | page | Draws one page of `SETTINGS_PAGES` |
+| DownloadRow, ModelRow | download / model | A model's download with its controls, and a model with its size and job |
+
 ### Patterns (components/patterns/)
 | Component | Props | Description |
 |-----------|-------|-------------|
