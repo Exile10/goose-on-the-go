@@ -79,7 +79,18 @@ reads only at start says that a change waits for a restart.
 
 Four pages are not catalogue pages: Voices (`settings-voices`, by accent, with a
 preview) and Time zone (`settings-timezone`, searchable) are pickers, and the
-Models pages below have their own screens. Settings is behind the Developer
+Models pages below have their own screens.
+
+### What needs attention
+
+Anything a household should know about is an issue in
+`constants/settings-issues.ts`: a tone, an icon, a row line, a page of facts and
+sections, an optional action, and an `active(ctx)` test. `useSettingsIssues()`
+lists the ones that apply, most serious first; Settings shows them above the
+account card, the You tab carries a dot while there is one, and each opens
+`settings-issue?id=…`, which renders it through `IssuePage`. A new issue is a
+catalogue entry and, if it needs more than the phone already holds, a field on
+`IssueContext`; it is never a new screen. Settings is behind the Developer
 toggle (`settings`, real by default); on mock it works on the Pond's own defaults.
 
 ### Models

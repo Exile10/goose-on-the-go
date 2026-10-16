@@ -196,7 +196,7 @@ It also has a "Pond server URL" field and a Test connection button that probes
 This screen is not insecure development mode (`services/dev-mode.ts`,
 [development.md](./development.md)). That is a build-time switch for Expo Go,
 `EXPO_PUBLIC_POND_INSECURE_DEV=1` in a development bundle, which allows plaintext
-Pond origins on the LAN and shows a permanent banner while it is on. This screen
+Pond origins on the LAN and raises a Settings issue, with a dot on the You tab, while it is on. This screen
 only flips each screen between mock and real data, and changes nothing about how
 the Pond is reached.
 

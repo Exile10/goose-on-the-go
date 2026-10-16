@@ -10,6 +10,7 @@ import { useTranslation } from 'react-i18next';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { InkButton } from '@jarida/ink/native';
 
+import { IssueRows } from '@/components/settings/issue-page';
 import { SwitchRow } from '@/components/settings/setting-controls';
 import { SettingsGroup, SettingsRow, TILE_INSET } from '@/components/settings/settings-list';
 import { useSettingsColors, useSettingsStyles, type SettingsColors } from '@/components/settings/settings-theme';
@@ -27,6 +28,7 @@ import { caution, hapticsEnabled, saveHapticsPreference, selectionTick } from '@
 import { initialOf, useHousehold } from '@/view-models/use-household';
 import { usePondSettings } from '@/view-models/use-pond-settings';
 import { summarize, useSummaryExtras } from '@/view-models/use-settings-extras';
+import { useSettingsIssues } from '@/view-models/use-settings-issues';
 
 const SUMMARY_IDS: SummaryId[] = PROFILE_NAV.flatMap((group) =>
   group.items.flatMap((item) => (item.summary ? [item.summary] : [])),
@@ -81,6 +83,7 @@ export default function ProfileHub() {
   const chrome = useChromeScroll();
   const bottomInset = useBottomBarInset();
   const { settings } = usePondSettings();
+  const issues = useSettingsIssues();
   const extras = useSummaryExtras(SUMMARY_IDS);
 
   const go = useCallback(
@@ -124,6 +127,8 @@ export default function ProfileHub() {
         <Text style={styles.title} accessibilityRole="header">
           {t('screens.settings')}
         </Text>
+
+        <IssueRows issues={issues} />
 
         <SettingsGroup>
           <AccountRow onPress={() => go(ACCOUNT_ROUTE)} />

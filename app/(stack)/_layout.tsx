@@ -79,6 +79,7 @@ export default function StackLayout() {
       <Stack.Screen name="settings-internet" options={{ title: t('screens.settingsInternet') }} />
       <Stack.Screen name="settings-home" options={{ title: t('screens.settingsHome') }} />
       <Stack.Screen name="settings-timezone" options={{ title: t('screens.settingsTimezone') }} />
+      <Stack.Screen name="settings-issue" options={{ title: t('screens.settingsIssue') }} />
       <Stack.Screen name="settings-household" options={{ title: t('screens.settingsHousehold') }} />
       <Stack.Screen name="settings-cameras" options={{ title: t('screens.settingsCameras') }} />
       <Stack.Screen name="settings-announcements" options={{ title: t('screens.settingsAnnouncements') }} />

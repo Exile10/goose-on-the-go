@@ -1209,6 +1209,27 @@
       "rooms_other": "{{count}} rooms",
       "people_one": "{{count}} person",
       "people_other": "{{count}} people"
+    },
+    "issue": {
+      "insecureConnection": {
+        "title": "Insecure development connection",
+        "row": "Anyone on this network can read your Pond's traffic",
+        "summary": "This build talks to your Pond without encryption, so it is only for working on the app.",
+        "connection": "This connection",
+        "address": "Pond address",
+        "encryption": "Encryption",
+        "identity": "Pond identity check",
+        "none": "None",
+        "exposure": "Anyone on this network can",
+        "read": "Read everything sent to and from your Pond, including what you say to Goose",
+        "replay": "Copy this phone's sign-in and use your Pond as you",
+        "pretend": "Pretend to be your Pond",
+        "exposureFooter": "Use it only on a network you control, with a Pond that holds nothing you mind exposing.",
+        "why": "Why it is on",
+        "whyBody": "This is a development build started in insecure development mode, so it can reach a Pond's plaintext development listener while you work on the app.",
+        "off": "Turning it off",
+        "offBody": "Start the app without EXPO_PUBLIC_POND_INSECURE_DEV, then pair again over your Pond's encrypted address. A release build never has this mode."
+      }
     }
   },
   "screens": {
@@ -1255,7 +1276,8 @@
     "settingsModelRole": "Choose a model",
     "settingsModel": "Model",
     "settingsModelCatalog": "Available to download",
-    "settingsModelSearch": "Search Hugging Face"
+    "settingsModelSearch": "Search Hugging Face",
+    "settingsIssue": "Needs attention"
   },
   "nav": {
     "goose": "Goose",
@@ -2064,8 +2086,6 @@
     }
   },
   "devMode": {
-    "insecureBanner": "Insecure development connection",
-    "insecureBannerDetail": "Pond traffic may be plaintext and unpinned. Anyone on this network can read it.",
     "addressHint": "Development mode: a plain http:// address on this network is accepted and is not encrypted."
   },
   "ride": {
