@@ -80,6 +80,7 @@ export const MIGRATION_SCREENS = [
   'schedule',
   'logs',
   'webSearch',
+  'settings',
 ] as const;
 
 export type MigrationScreen = (typeof MIGRATION_SCREENS)[number];
@@ -100,7 +101,9 @@ export type ScreenModes = Record<MigrationScreen, boolean>;
  * nothing reached the Pond is worse than a screen that says the Pond cannot do
  * this. Flip it to mock in the Developer screen to work without a Pond.
  */
-const REAL_BY_DEFAULT: readonly MigrationScreen[] = ['chat', 'webSearch'];
+// `settings` starts real for the same reason: a release build must never show a change as saved when
+// nothing reached the Pond. The mock exists to build and look at the menus without one.
+const REAL_BY_DEFAULT: readonly MigrationScreen[] = ['chat', 'webSearch', 'settings'];
 
 export const DEFAULT_SCREEN_MODES: ScreenModes = MIGRATION_SCREENS.reduce(
   (acc, screen) => ({ ...acc, [screen]: REAL_BY_DEFAULT.includes(screen) }),

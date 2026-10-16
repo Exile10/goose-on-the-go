@@ -78,6 +78,11 @@ import type {
   WeatherResponse,
   WebSearchKeyResult,
   WebSearchState,
+  DetectedPlace,
+  PondSettings,
+  RetitleResult,
+  TtsApplyResult,
+  ZoneChoice,
 } from './types';
 import { MODEL_CATEGORIES } from './types';
 
@@ -1359,6 +1364,47 @@ export class PondApiClient {
   /** `DELETE /web-search/key`, a 204. Goose stops being offered the tool on the next turn. */
   removeWebSearchKey(): Promise<void> {
     return this.del<void>('/api/v1/web-search/key');
+  }
+
+  // ── Pond settings ───────────────────────────────────────────
+
+  /** The Pond's whole settings record. */
+  getSettings(): Promise<PondSettings> {
+    return this.get<PondSettings>('/api/v1/settings');
+  }
+
+  /**
+   * Send only what changed: every key sent is marked as the household's choice for good. Keep the
+   * answer, not the patch, since the Pond canonicalises, geocodes and widens what it is sent.
+   */
+  updateSettings(patch: Partial<PondSettings>): Promise<PondSettings> {
+    return this.put<PondSettings>('/api/v1/settings', patch);
+  }
+
+  /** Every IANA zone the Pond knows, with its offset now. */
+  async listTimeZones(): Promise<ZoneChoice[]> {
+    const res = await this.get<{ zones?: ZoneChoice[] }>('/api/v1/time/zones');
+    return Array.isArray(res?.zones) ? res.zones : [];
+  }
+
+  /** Where the Pond thinks this home is, from a zone or a typed place. Saves nothing. */
+  detectLocation(req: { system_zone?: string; typed_name?: string }): Promise<DetectedPlace> {
+    return this.post<DetectedPlace>('/api/v1/location/detect', req);
+  }
+
+  /** Storing a voice setting waits for the engine to reload; this downloads and switches now. */
+  applyTts(change: { voice?: string; speed?: number; quality?: string }): Promise<TtsApplyResult> {
+    return this.post<TtsApplyResult>('/api/v1/voice/tts/apply', change);
+  }
+
+  /** Forget the wake word's learned pronunciations. */
+  resetWakeWordCalibration(): Promise<void> {
+    return this.del<void>('/api/v1/voice/calibrate');
+  }
+
+  /** Wake the job that names conversations. It names them as it goes. */
+  retitleSessions(): Promise<RetitleResult> {
+    return this.post<RetitleResult>('/api/v1/sessions/retitle', {});
   }
 
   // ── Profiles ────────────────────────────────────────────────

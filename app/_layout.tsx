@@ -34,6 +34,7 @@ import '@/components/ui/ink-icons';
 // Initialises i18next before the first screen renders.
 import '@/services/i18n';
 import { ServerProvider } from '@/providers/server-provider';
+import { loadHapticsPreference } from '@/services/haptics';
 
 /**
  * Keep the splash up until the app can draw itself.
@@ -97,6 +98,7 @@ export default function RootLayout() {
     loadFontsAsync(DEFERRED_FONTS).catch((e) =>
       console.warn('[fonts] deferred fonts failed to load', e),
     );
+    void loadHapticsPreference();
   }, []);
 
   if (!fontsLoaded && !fontError) {

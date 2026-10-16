@@ -858,3 +858,189 @@ export interface RideQuote {
   pickup_eta_mins: number | null;
   state: RideBookingState;
 }
+
+// ── Pond settings (`GET` / `PUT /api/v1/settings`) ─────────────
+
+/**
+ * The Pond's settings record, the fields this app shows. The Pond holds more; a field missing
+ * here is one nothing on the phone reads, or one the Pond itself does not act on.
+ *
+ * `PUT /settings` takes a partial patch and answers the whole merged record. Every key a patch
+ * carries is marked set by the household for good, so the phone sends only the key it changed.
+ */
+export interface PondSettings {
+  // Household
+  user_name: string;
+  assistant_name: string;
+  assistant_personality: string;
+  primary_profile_id: string | null;
+  home_name: string;
+  timezone: string;
+  weather_enabled: boolean;
+  weather_location_name: string;
+  weather_latitude: number;
+  weather_longitude: number;
+
+  // Personality
+  prompt_style: string;
+  prompt_addendum: string;
+  custom_system_prompt: string | null;
+
+  // Voice
+  voice_wake_word: string;
+  voice_wake_word_transcriptions: string[];
+  voice_kws_energy_threshold: number;
+  voice_kws_post_trigger_silence_ms: number;
+  voice_kws_cooldown_ms: number;
+  voice_recording_duration_secs: number;
+  voice_whisper_url: string;
+  voice_tts_voice: string;
+  voice_tts_speed: number;
+  voice_tts_quality: string;
+  voice_thinking_tone_enabled: boolean;
+  voice_max_turns: number;
+
+  // Models and generation
+  chat_provider: string;
+  llm_provider: string;
+  tool_model: string | null;
+  llm_max_tokens: number;
+  llm_temperature: number;
+  context_window_override: number;
+  embedding_provider: string;
+
+  // Memory
+  agent_memory_inject: boolean;
+  agent_memory_limit: number;
+  memory_extraction_enabled: boolean;
+  memory_extraction_max_facts: number;
+  memory_extraction_interval_secs: number;
+  suggestion_generation_enabled: boolean;
+  memory_cleanup_enabled: boolean;
+  memory_cleanup_interval_hours: number;
+  memory_prune_threshold: number;
+  memory_archive_threshold: number;
+  memory_decay_base_half_life_days: number;
+  memory_decay_beta: number;
+  memory_consolidation_enabled: boolean;
+  memory_consolidation_mode: string;
+  memory_consolidation_interval_hours: number;
+  memory_consolidation_batch_size: number;
+
+  // Privacy and reach
+  mic_enabled: boolean;
+  network_mode: string;
+  mesh_enabled: boolean;
+  security_policy_mode: string;
+  telemetry_enabled: boolean;
+  context_ingest_enabled: boolean;
+
+  // Tools
+  ext_memory_enabled: boolean;
+  ext_schedule_enabled: boolean;
+  ext_weather_enabled: boolean;
+  ext_knowledge_enabled: boolean;
+  ext_system_enabled: boolean;
+  ext_device_enabled: boolean;
+  ext_sensor_enabled: boolean;
+  ext_travel_enabled: boolean;
+  ext_orchestrator_enabled: boolean;
+  ext_context_enabled: boolean;
+  tool_selection_mode: string;
+  searxng_url: string | null;
+
+  // Automations
+  schedule_max_concurrent: number;
+  schedule_max_runs_per_task: number;
+  unprompted_speech_enabled: boolean;
+  unprompted_speech_categories: string;
+  quiet_hours_start: string;
+  quiet_hours_end: string;
+  proactive_review_enabled: boolean;
+  suggestions_muted: string[];
+  session_titling_enabled: boolean;
+
+  // Reasoning
+  thinking_mode: string;
+  reasoning_effort: string;
+  show_thinking: boolean;
+  persist_thinking: boolean;
+  review_mode: string;
+  review_max_rounds: number;
+  review_pass_threshold: number;
+  goal_check_enabled: boolean;
+
+  // Performance and context
+  agent_max_turns: number;
+  agent_timeout_secs: number;
+  prefix_cache_prompt: boolean;
+  hybrid_compaction_enabled: boolean;
+  summary_idle_secs: number;
+  compaction_verbatim_days: number;
+  context_monitor_enabled: boolean;
+  show_turn_stats: boolean;
+
+  // Cameras and Matter
+  vision_enabled: boolean;
+  vision_camera_url: string;
+  vision_camera_id: string;
+  vision_fps: number;
+  vision_motion_threshold: number;
+  vision_classifier_model: string;
+  matter_ws_url: string;
+  matter_ble_enabled: boolean;
+
+  // Retention and cost
+  retention_event_log_days: number;
+  retention_sensor_days: number;
+  retention_session_messages_keep: number;
+  retention_events_days: number;
+  retention_events_by_category: Record<string, number>;
+  retention_sensitive_days: number;
+  cloud_input_price_per_million: number;
+  cloud_output_price_per_million: number;
+}
+
+export type PondSettingKey = keyof PondSettings;
+
+/** One field the Pond refused, from the `fields` of a 422. */
+export interface SettingsFieldError {
+  field: string;
+  message: string;
+}
+
+/** `GET /api/v1/time/zones`: one IANA zone with its current offset and a place it covers. */
+export interface ZoneChoice {
+  zone: string;
+  offset: string;
+  place: string;
+}
+
+/** `POST /api/v1/location/detect`. Nothing is saved; the caller stores what it accepts. */
+export interface DetectedPlace {
+  name: string;
+  latitude: number;
+  longitude: number;
+  timezone: string;
+  source: 'timezone' | 'geocoded' | 'device' | 'network';
+  certain: boolean;
+  has_coordinates: boolean;
+  note: string | null;
+}
+
+/** `POST /api/v1/voice/tts/apply`: the speaking engine as it now stands. */
+export interface TtsApplyResult {
+  voice: string;
+  speed: number;
+  quality: string;
+  downloaded_voice: boolean;
+  downloaded_weights: boolean;
+  engine_reloaded: boolean;
+  installed_voices: string[];
+}
+
+/** `POST /api/v1/sessions/retitle`: whether the titling job was woken. */
+export interface RetitleResult {
+  started: boolean;
+  reason?: string;
+}

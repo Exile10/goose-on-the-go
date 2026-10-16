@@ -12,7 +12,8 @@
 import * as fs from 'fs';
 import * as path from 'path';
 
-import { PROFILE_NAV } from '@/constants/navigation';
+import { ACCOUNT_ROUTE, PROFILE_NAV } from '@/constants/navigation';
+import { SETTINGS_PAGES } from '@/constants/settings-pages';
 
 const APP = path.resolve(__dirname, '../../app');
 const STACK = path.join(APP, '(stack)');
@@ -54,12 +55,23 @@ it('sends every profile menu row to a screen that exists', () => {
  * The way in to a screen is a menu row, and a row that is dropped in a merge fails nothing above:
  * the file still exists, so the guard passes, and the screen is simply unreachable.
  */
-it('offers Web search under Integrations', () => {
-  const integrations = PROFILE_NAV.find((group) => group.groupKey === 'nav.integrations');
+it('offers Web search beside the other ways the Pond reaches out', () => {
+  const connection = PROFILE_NAV.find((group) => group.groupKey === 'settings.menu.connection');
 
-  expect(integrations?.items).toContainEqual(
+  expect(connection?.items).toContainEqual(
     expect.objectContaining({ id: 'webSearch', labelKey: 'screens.webSearch', icon: 'search', route: '/(stack)/web-search' }),
   );
+});
+
+it('offers every settings page from a menu row or a page that is', () => {
+  const routes = new Set([ACCOUNT_ROUTE, ...PROFILE_NAV.flatMap((group) => group.items.map((item) => item.route))]);
+  for (const page of Object.values(SETTINGS_PAGES)) {
+    for (const section of page.sections) {
+      for (const item of section.items) if (item.kind === 'link') routes.add(item.route);
+    }
+  }
+  const pages = stackScreenFiles().filter((name) => name.startsWith('settings-') && !['settings-voices', 'settings-timezone'].includes(name));
+  expect(pages.filter((name) => !routes.has(`/(stack)/${name}`))).toEqual([]);
 });
 
 it('registers only stack screens whose files exist', () => {

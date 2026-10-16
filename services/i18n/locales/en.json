@@ -395,7 +395,815 @@
     "themeSystem": "Match system",
     "themeLight": "Light",
     "themeDark": "Dark",
-    "haptics": "Haptic feedback"
+    "haptics": "Haptic feedback",
+    "page": {
+      "assistant": "What Goose calls itself, and how it talks to you.",
+      "voice": "The voice Goose speaks in, and the word that wakes it.",
+      "listening": "How Goose listens for its name, and where speech becomes text.",
+      "thinking": "Whether Goose thinks before it answers, and who checks its work.",
+      "memory": "What Goose keeps about your household, and what it lets go of.",
+      "memoryTuning": "How quickly memories fade, and how they are found again. Safe to leave alone.",
+      "tools": "What Goose can reach for when it answers you.",
+      "internet": "How much of the internet your Pond may reach.",
+      "home": "Where your home is, so the time and the weather are right.",
+      "household": "Who this Pond belongs to, and what it calls you.",
+      "cameras": "The camera your Pond watches, and the controller for your smart devices.",
+      "announcements": "When Goose may speak without being asked, and when it stays quiet.",
+      "privacy": "What your Pond may sense, and what it keeps about itself.",
+      "retention": "How long your Pond keeps things before it deletes them.",
+      "appearance": "How this app looks on this phone. Your Pond never sees it.",
+      "advanced": "Tuning for how Goose thinks and runs. Safe to leave alone."
+    },
+    "section": {
+      "nameAndManner": "Name and manner",
+      "writingStyle": "Writing style",
+      "standingInstructions": "Standing instructions",
+      "advanced": "Advanced",
+      "gooseVoice": "Goose's voice",
+      "soundQuality": "Sound quality",
+      "wakeWord": "Wake word",
+      "whileItAnswers": "While it answers",
+      "hearingItsName": "Hearing its name",
+      "transcription": "Turning speech into text",
+      "beforeAnswering": "Before answering",
+      "howLong": "How long it may think",
+      "checkingAnswers": "Checking answers",
+      "remembering": "Remembering",
+      "forgetting": "Forgetting",
+      "tidyingUp": "Tidying up",
+      "reading": "Reading conversations",
+      "fading": "Fading",
+      "search": "Finding memories again",
+      "whatItCanUse": "What Goose can use",
+      "howToolsAreOffered": "How tools are offered",
+      "helpers": "Helpers",
+      "reach": "Reach",
+      "otherPonds": "Your other Ponds",
+      "weather": "Weather",
+      "exactPosition": "Exact position",
+      "you": "You",
+      "camera": "Camera",
+      "smartHome": "Smart home",
+      "speakingUp": "Speaking up",
+      "quietHours": "Quiet hours",
+      "onItsOwn": "On its own",
+      "homeSuggestions": "Home suggestions",
+      "schedules": "Schedules",
+      "sensors": "Sensors",
+      "permissionChecks": "Permission checks",
+      "records": "Records",
+      "howLongThingsAreKept": "How long things are kept",
+      "byKind": "By kind of activity",
+      "replies": "Replies",
+      "stepsAndTime": "Steps and time",
+      "longConversations": "Long conversations",
+      "engine": "Engine",
+      "costComparison": "Cost comparison"
+    },
+    "footer": {
+      "standingInstructions": "Added to everything Goose already knows, in every conversation.",
+      "customPrompt": "Replaces Goose's built-in instructions entirely. Leave it empty to keep them.",
+      "soundQuality": "Switching downloads the new quality on your Pond now. The next thing Goose says waits while it loads.",
+      "wakeWord": "A new wake word is heard from the next time your Pond starts listening.",
+      "restartVoice": "These take effect the next time your Pond starts listening.",
+      "restartReview": "A change here takes effect when your Pond restarts.",
+      "embeddings": "Changing this means memories you already have stop matching until your Pond reads them again. Takes effect when your Pond restarts.",
+      "restartTools": "A change here takes effect when your Pond restarts.",
+      "mesh": "Turning this off takes effect when your Pond restarts.",
+      "location": "Save a place name and your Pond looks up where it is.",
+      "exactPosition": "Typing a position yourself keeps the one you typed. Takes effect when your Pond restarts.",
+      "restartCamera": "A change here takes effect when your Pond restarts.",
+      "quietHours": "Goose stays quiet between these times, even when it has news.",
+      "retention": "Zero keeps things for good.",
+      "haptics": "Small taps you feel when you flip a switch or finish something.",
+      "engine": "Where Goose runs. Leave these alone unless you run models somewhere other than your Pond.",
+      "cost": "What a cloud service would charge, so your Pond can show what it saved you."
+    },
+    "link": {
+      "whatItRemembers": "What Goose remembers"
+    },
+    "unit": {
+      "ms": "ms",
+      "seconds": "seconds",
+      "hours": "hours",
+      "days": "days",
+      "fps": "per second",
+      "degrees": "°",
+      "messages": "messages",
+      "tokens": "tokens",
+      "perMillion": "per million"
+    },
+    "field": {
+      "assistant_name": {
+        "label": "Name",
+        "hint": "What Goose calls itself.",
+        "placeholder": "Goose"
+      },
+      "assistant_personality": {
+        "label": "Personality",
+        "hint": "A short note on the manner it answers in.",
+        "placeholder": "friendly and concise"
+      },
+      "prompt_style": {
+        "label": "Writing style"
+      },
+      "prompt_addendum": {
+        "label": "Extra instructions",
+        "placeholder": "Always answer in Swahili."
+      },
+      "custom_system_prompt": {
+        "label": "Replace the instructions",
+        "placeholder": "Uses the writing style above"
+      },
+      "voice_tts_speed": {
+        "label": "Speaking pace"
+      },
+      "voice_tts_quality": {
+        "label": "Sound quality"
+      },
+      "voice_wake_word": {
+        "label": "Wake word",
+        "placeholder": "goose"
+      },
+      "voice_thinking_tone_enabled": {
+        "label": "Sound while it thinks",
+        "hint": "A soft tone while Goose works, so the silence does not seem broken."
+      },
+      "voice_max_turns": {
+        "label": "Steps before answering aloud",
+        "hint": "How much work Goose may do before it answers out loud. Zero means no limit."
+      },
+      "voice_kws_energy_threshold": {
+        "label": "Ignore sounds quieter than",
+        "hint": "How loud a sound must be before your Pond listens for its name."
+      },
+      "voice_kws_post_trigger_silence_ms": {
+        "label": "Stop after a pause of",
+        "hint": "How long a pause means you have finished speaking."
+      },
+      "voice_kws_cooldown_ms": {
+        "label": "Wait before listening again",
+        "hint": "How long to wait after answering before listening for its name again."
+      },
+      "voice_recording_duration_secs": {
+        "label": "Recording length",
+        "hint": "How long it records after you speak to it."
+      },
+      "voice_whisper_url": {
+        "label": "Transcription service",
+        "hint": "Address of the service that turns speech into text.",
+        "placeholder": "http://127.0.0.1:9000"
+      },
+      "thinking_mode": {
+        "label": "Thinking"
+      },
+      "reasoning_effort": {
+        "label": "How long it may think"
+      },
+      "show_thinking": {
+        "label": "Show thinking as it happens",
+        "hint": "Watch Goose think while it works."
+      },
+      "persist_thinking": {
+        "label": "Keep thinking after the reply",
+        "hint": "Keep its reasoning so you can open it again later."
+      },
+      "goal_check_enabled": {
+        "label": "Check the question was answered",
+        "hint": "Goose asks itself whether it really answered you, and keeps going if not."
+      },
+      "review_mode": {
+        "label": "Review answers"
+      },
+      "review_max_rounds": {
+        "label": "Revision rounds",
+        "hint": "How many times an answer may be sent back for another try."
+      },
+      "review_pass_threshold": {
+        "label": "Pass mark",
+        "hint": "How good an answer must be, out of 5, to pass the check."
+      },
+      "memory_extraction_enabled": {
+        "label": "Learn from conversations",
+        "hint": "Goose reads your conversations back in quiet moments and remembers what lasts. It takes a while to show up."
+      },
+      "memory_extraction_max_facts": {
+        "label": "Most things kept at once",
+        "hint": "How many things it may remember from one stretch of conversation. Fewer is better."
+      },
+      "agent_memory_inject": {
+        "label": "Use memories in replies",
+        "hint": "Let Goose recall what it knows about you when it answers."
+      },
+      "agent_memory_limit": {
+        "label": "Memories per reply",
+        "hint": "How many remembered things it may bring to one answer."
+      },
+      "suggestion_generation_enabled": {
+        "label": "Suggest things to ask",
+        "hint": "Turn what Goose remembers into questions on Home."
+      },
+      "memory_cleanup_enabled": {
+        "label": "Let memories fade",
+        "hint": "Old memories fade and are tidied away on their own."
+      },
+      "memory_cleanup_interval_hours": {
+        "label": "Check for faded memories every"
+      },
+      "memory_consolidation_enabled": {
+        "label": "Merge repeated memories",
+        "hint": "Merge memories that repeat or contradict each other."
+      },
+      "memory_consolidation_mode": {
+        "label": "How carefully"
+      },
+      "memory_consolidation_interval_hours": {
+        "label": "Merge every"
+      },
+      "memory_consolidation_batch_size": {
+        "label": "Memories per pass"
+      },
+      "memory_extraction_interval_secs": {
+        "label": "Wait between readings",
+        "hint": "The shortest gap between two readings. It only makes them rarer."
+      },
+      "memory_decay_base_half_life_days": {
+        "label": "Half-life",
+        "hint": "How long an ordinary memory takes to fade by half. Important ones last longer."
+      },
+      "memory_decay_beta": {
+        "label": "Fade curve",
+        "hint": "How sharply memories fade. Lower is gentler."
+      },
+      "memory_archive_threshold": {
+        "label": "Hide below",
+        "hint": "How faded a memory must be before it is hidden but kept."
+      },
+      "memory_prune_threshold": {
+        "label": "Delete below",
+        "hint": "How faded a memory must be before it is deleted."
+      },
+      "embedding_provider": {
+        "label": "Search engine for memories"
+      },
+      "ext_memory_enabled": {
+        "label": "Memories",
+        "hint": "Remember, recall and forget things when you ask."
+      },
+      "ext_schedule_enabled": {
+        "label": "Schedules",
+        "hint": "Create, pause and run things on a schedule."
+      },
+      "ext_weather_enabled": {
+        "label": "Weather",
+        "hint": "Look up the weather."
+      },
+      "ext_knowledge_enabled": {
+        "label": "Knowledge",
+        "hint": "Look things up in an encyclopedia."
+      },
+      "ext_device_enabled": {
+        "label": "Devices",
+        "hint": "See and change the devices in your home."
+      },
+      "ext_sensor_enabled": {
+        "label": "Sensors",
+        "hint": "Read what the sensors in your home have recorded."
+      },
+      "ext_travel_enabled": {
+        "label": "Travel",
+        "hint": "Make map directions and ride links you open on your phone."
+      },
+      "ext_system_enabled": {
+        "label": "System",
+        "hint": "Read files and check on the machine your Pond runs on."
+      },
+      "ext_orchestrator_enabled": {
+        "label": "Delegation",
+        "hint": "Hand part of a job to a helper working on its own."
+      },
+      "ext_context_enabled": {
+        "label": "Personal context",
+        "hint": "Read the notes and documents your home has given it."
+      },
+      "tool_selection_mode": {
+        "label": "Tools sent each time"
+      },
+      "searxng_url": {
+        "label": "Search server",
+        "hint": "Address of your own search server, if you run one.",
+        "placeholder": "http://127.0.0.1:8888"
+      },
+      "network_mode": {
+        "label": "Internet"
+      },
+      "mesh_enabled": {
+        "label": "Talk to your other Ponds",
+        "hint": "Let this Pond work with your other Ponds."
+      },
+      "home_name": {
+        "label": "Home name",
+        "hint": "What to call this home. Shown in this app.",
+        "placeholder": "Not set"
+      },
+      "weather_enabled": {
+        "label": "Use local weather",
+        "hint": "Let your Pond know the weather where you are."
+      },
+      "weather_latitude": {
+        "label": "Latitude"
+      },
+      "weather_longitude": {
+        "label": "Longitude"
+      },
+      "user_name": {
+        "label": "Your name",
+        "hint": "What Goose calls you.",
+        "placeholder": "Friend"
+      },
+      "vision_enabled": {
+        "label": "Watch the camera",
+        "hint": "Watch the camera for movement. Needs a camera attached to your Pond."
+      },
+      "vision_camera_url": {
+        "label": "Camera address",
+        "hint": "A network address, or a camera plugged into your Pond.",
+        "placeholder": "rtsp://… or /dev/video0"
+      },
+      "vision_camera_id": {
+        "label": "Camera name",
+        "hint": "Used in the activity feed and in automations.",
+        "placeholder": "camera-1"
+      },
+      "vision_fps": {
+        "label": "Pictures per second",
+        "hint": "Low on purpose, to leave room for thinking."
+      },
+      "vision_motion_threshold": {
+        "label": "Motion sensitivity",
+        "hint": "How much of the picture must change to count as movement."
+      },
+      "vision_classifier_model": {
+        "label": "Detector",
+        "hint": "What names what the camera saw. Leave empty for the built-in one.",
+        "placeholder": "Built-in"
+      },
+      "matter_ws_url": {
+        "label": "Controller address",
+        "hint": "Address of your smart-home controller.",
+        "placeholder": "ws://127.0.0.1:5580/giap"
+      },
+      "matter_ble_enabled": {
+        "label": "Pair over Bluetooth",
+        "hint": "Needed for a brand-new device, which announces itself over Bluetooth first."
+      },
+      "unprompted_speech_enabled": {
+        "label": "Speak without being asked",
+        "hint": "Let Goose speak first when it has news."
+      },
+      "quiet_hours_start": {
+        "label": "Quiet from"
+      },
+      "quiet_hours_end": {
+        "label": "Quiet until"
+      },
+      "proactive_review_enabled": {
+        "label": "Think over the day",
+        "hint": "Let Goose review the day on its own. Needs Delegation in Tools."
+      },
+      "session_titling_enabled": {
+        "label": "Name conversations",
+        "hint": "Goose names your conversations while it is idle. It never changes a name you typed."
+      },
+      "suggestions_muted": {
+        "label": "Hidden suggestions",
+        "hint": "Kinds of suggestion Home will not offer. Remove one to see it again.",
+        "empty": "Nothing hidden"
+      },
+      "schedule_max_concurrent": {
+        "label": "Tasks at once",
+        "hint": "How many scheduled jobs may run at the same time."
+      },
+      "schedule_max_runs_per_task": {
+        "label": "History per task",
+        "hint": "How many past runs to keep for each scheduled job."
+      },
+      "mic_enabled": {
+        "label": "Microphone",
+        "hint": "Off means your Pond cannot hear anything."
+      },
+      "context_ingest_enabled": {
+        "label": "Learn from sensors",
+        "hint": "Let what the sensors and cameras notice become part of what Goose knows."
+      },
+      "security_policy_mode": {
+        "label": "Permission checks"
+      },
+      "telemetry_enabled": {
+        "label": "Record how it performs",
+        "hint": "Keep a record of how fast Goose answers, on your Pond."
+      },
+      "retention_event_log_days": {
+        "label": "Activity log",
+        "hint": "Days of activity to keep."
+      },
+      "retention_events_days": {
+        "label": "Events",
+        "hint": "Days of events to keep, unless a kind below says otherwise."
+      },
+      "retention_sensor_days": {
+        "label": "Sensor readings"
+      },
+      "retention_sensitive_days": {
+        "label": "Anything sensitive",
+        "hint": "The longest anything sensitive is kept, whatever the other rules say."
+      },
+      "retention_session_messages_keep": {
+        "label": "Messages per conversation"
+      },
+      "llm_temperature": {
+        "label": "Creativity",
+        "hint": "Lower is steadier, higher is more inventive."
+      },
+      "llm_max_tokens": {
+        "label": "Longest reply",
+        "hint": "How long one answer may get."
+      },
+      "context_window_override": {
+        "label": "Memory window",
+        "hint": "Limit how much Goose holds in mind at once. Zero uses the model’s own limit."
+      },
+      "agent_max_turns": {
+        "label": "Steps per request",
+        "hint": "How many steps Goose may take on one request before it must answer."
+      },
+      "agent_timeout_secs": {
+        "label": "Give up after silence",
+        "hint": "How long to wait in silence before giving up on a reply. Zero waits for ever."
+      },
+      "prefix_cache_prompt": {
+        "label": "Start replies sooner",
+        "hint": "Reuse the unchanging part of its instructions between replies."
+      },
+      "hybrid_compaction_enabled": {
+        "label": "Trim history as you go",
+        "hint": "Shorten long conversations as they grow, so they keep fitting."
+      },
+      "summary_idle_secs": {
+        "label": "Summarise after idle",
+        "hint": "How long you must be idle before it summarises the conversation so far."
+      },
+      "compaction_verbatim_days": {
+        "label": "Keep in full for",
+        "hint": "Days of conversation kept word for word before shortening."
+      },
+      "context_monitor_enabled": {
+        "label": "Warn before it fills",
+        "hint": "Warn you before a conversation gets too long to hold."
+      },
+      "show_turn_stats": {
+        "label": "Show speed under replies",
+        "hint": "Show how fast each reply was, under the message."
+      },
+      "cloud_input_price_per_million": {
+        "label": "Reading price"
+      },
+      "cloud_output_price_per_million": {
+        "label": "Writing price"
+      }
+    },
+    "option": {
+      "prompt_style": {
+        "balanced": {
+          "label": "Balanced",
+          "hint": "Warm, and gets to the point"
+        },
+        "concise": {
+          "label": "Concise",
+          "hint": "As few words as the answer allows"
+        },
+        "technical": {
+          "label": "Technical",
+          "hint": "Precise, and assumes you know the terms"
+        },
+        "warm": {
+          "label": "Warm",
+          "hint": "Conversational and unhurried"
+        }
+      },
+      "voice_tts_quality": {
+        "q8": {
+          "label": "Balanced",
+          "hint": "92 MB. The default, and fits beside the language model."
+        },
+        "q8f16": {
+          "label": "Compact",
+          "hint": "86 MB. The smallest, for a busy Pond."
+        },
+        "q4f16": {
+          "label": "Small",
+          "hint": "155 MB. Mid-size."
+        },
+        "fp16": {
+          "label": "High",
+          "hint": "163 MB. Closer to the reference sound."
+        },
+        "fp32": {
+          "label": "Reference",
+          "hint": "326 MB. The best sound, slowest, and heavy on memory."
+        }
+      },
+      "thinking_mode": {
+        "auto": {
+          "label": "When the model can",
+          "hint": "Goose thinks first on models that support it"
+        },
+        "on": {
+          "label": "Always try",
+          "hint": "Even on models that usually skip it"
+        },
+        "off": {
+          "label": "Never",
+          "hint": "Answers straight away"
+        }
+      },
+      "reasoning_effort": {
+        "brief": {
+          "label": "Brief",
+          "hint": "Fastest. On a small Pond every moment of thinking is silence before the answer"
+        },
+        "balanced": {
+          "label": "Balanced"
+        },
+        "thorough": {
+          "label": "Thorough",
+          "hint": "Best on a powerful machine, slow on a small Pond"
+        }
+      },
+      "review_mode": {
+        "off": {
+          "label": "Never",
+          "hint": "Answers come straight to you"
+        },
+        "auto": {
+          "label": "Factual questions",
+          "hint": "Only where a wrong answer would matter"
+        },
+        "on": {
+          "label": "Every answer",
+          "hint": "Slower: every answer is checked first"
+        }
+      },
+      "memory_consolidation_mode": {
+        "single": {
+          "label": "One pass",
+          "hint": "Quickest, and lightest on your Pond"
+        },
+        "adversarial": {
+          "label": "Three passes",
+          "hint": "Slower, and catches more mistakes"
+        }
+      },
+      "embedding_provider": {
+        "gguf": {
+          "label": "On your Pond",
+          "hint": "Runs with the same engine as chat. The one that starts on a Jetson"
+        },
+        "fastembed": {
+          "label": "FastEmbed",
+          "hint": "A separate engine. Does not start on a Jetson"
+        },
+        "none": {
+          "label": "Off",
+          "hint": "Memories are found by matching words only"
+        }
+      },
+      "tool_selection_mode": {
+        "all": {
+          "label": "All of them",
+          "hint": "Every tool, every time. Uses about 40% of the room for instructions"
+        },
+        "relevant": {
+          "label": "The relevant ones",
+          "hint": "A small core plus what this conversation seems to need"
+        },
+        "minimal": {
+          "label": "Only when asked",
+          "hint": "Almost nothing until Goose asks for a group of tools"
+        }
+      },
+      "network_mode": {
+        "open": {
+          "label": "Open",
+          "hint": "Goose may reach any site. Every request is recorded"
+        },
+        "allowlist": {
+          "label": "Approved sites only",
+          "hint": "Only this machine and the approved list"
+        },
+        "offline": {
+          "label": "Offline",
+          "hint": "Nothing leaves your home"
+        }
+      },
+      "security_policy_mode": {
+        "audit": {
+          "label": "Watch",
+          "hint": "Records every decision and blocks nothing. The usual setting"
+        },
+        "enforce": {
+          "label": "Enforce",
+          "hint": "Refuses what the rules do not allow. Read the activity log first"
+        },
+        "off": {
+          "label": "Off",
+          "hint": "No checks and no record. For troubleshooting only"
+        }
+      }
+    },
+    "restartNote": "Takes effect when your Pond restarts.",
+    "saveFailed": "Could not save that change.",
+    "loadFailed": "Could not read your Pond's settings.",
+    "offline": "Connect to your Pond to change its settings.",
+    "notSet": "Not set",
+    "number": {
+      "notNumber": "Enter a number.",
+      "whole": "Enter a whole number.",
+      "tooSmall": "Must be {{min}} or more.",
+      "tooBig": "Must be {{max}} or less.",
+      "decrease": "Decrease {{label}}",
+      "increase": "Increase {{label}}"
+    },
+    "pace": {
+      "muchSlower": "Much slower",
+      "slower": "Slower",
+      "natural": "Natural",
+      "faster": "Faster",
+      "muchFaster": "Much faster",
+      "value": "{{word}} · {{speed}}×"
+    },
+    "creativity": {
+      "steady": "Steady",
+      "balanced": "Balanced",
+      "inventive": "Inventive",
+      "value": "{{word}} · {{value}}"
+    },
+    "percent": "{{value}}%",
+    "voice": {
+      "accent": "Accent",
+      "voice": "Voice",
+      "lang": {
+        "a": "American English",
+        "b": "British English",
+        "e": "Spanish",
+        "f": "French",
+        "h": "Hindi",
+        "i": "Italian",
+        "j": "Japanese",
+        "p": "Portuguese",
+        "z": "Mandarin",
+        "other": "Other"
+      },
+      "gender": {
+        "f": "Female",
+        "m": "Male"
+      },
+      "detail": "{{gender}} · grade {{grade}}",
+      "detailUngraded": "{{gender}}",
+      "notInstalled": "Downloads when you choose it",
+      "preview": "Hear this voice",
+      "previewing": "Playing…",
+      "previewFailed": "Could not play the voice. Is your Pond reachable?",
+      "applying": "Getting the voice ready on your Pond…",
+      "applyFailed": "Saved, but your Pond could not switch the voice yet. It will on its next restart.",
+      "noVoices": "Your Pond has no voices yet.",
+      "choose": "Choose a voice",
+      "previewLine": "Your four o'clock moved to Thursday. I've left the morning open."
+    },
+    "wake": {
+      "learned_one": "{{count}} learned pronunciation",
+      "learned_other": "{{count}} learned pronunciations",
+      "none": "No learned pronunciations",
+      "clear": "Clear",
+      "clearTitle": "Clear learned pronunciations?",
+      "clearBody": "Goose forgets the ways it learned to hear its name. Train it again from your Pond’s screen.",
+      "clearFailed": "Could not clear them. Is your Pond reachable?"
+    },
+    "timezone": {
+      "label": "Time zone",
+      "hint": "So schedules land at the right hour.",
+      "search": "Search time zones",
+      "useDevice": "Use this phone's time zone",
+      "loadFailed": "Could not load the time zones.",
+      "none": "No time zone matches."
+    },
+    "location": {
+      "label": "Location",
+      "hint": "The place used when Goose talks about the weather.",
+      "placeholder": "Nairobi",
+      "find": "Find",
+      "finding": "Finding…",
+      "found": "Found {{name}}.",
+      "guessed": "Guessed {{name}} from your time zone.",
+      "failed": "Could not find that place."
+    },
+    "retitle": {
+      "button": "Name conversations now",
+      "working": "Asking…",
+      "started": "Naming them now. Names appear as it goes.",
+      "idle": "Nothing to name right now.",
+      "failed": "Could not ask your Pond."
+    },
+    "retentionOverrides": {
+      "label": "Exceptions",
+      "hint": "Keep some kinds of activity longer or shorter, as name and days.",
+      "placeholder": "network 14, sensor 7",
+      "invalid": "Write pairs like: network 14, sensor 7"
+    },
+    "speechCategories": {
+      "label": "Speak about",
+      "hint": "Which kinds of news Goose may say out loud, separated by commas.",
+      "placeholder": "alert",
+      "invalid": "Name at least one kind, such as alert."
+    },
+    "toolModel": {
+      "label": "Tool helper",
+      "hint": "A small model that tidies up requests the main one gets wrong.",
+      "none": "None"
+    },
+    "provider": {
+      "chatLabel": "Where conversation runs",
+      "chatHint": "Leave it as it is to use the model chosen in Models.",
+      "llmLabel": "Where thinking starts",
+      "llmHint": "Where your Pond runs its thinking when it starts.",
+      "same": "Same as Models",
+      "local": "On your Pond",
+      "ollama": "Ollama",
+      "llamafile": "Llamafile",
+      "mesh": "Your other Ponds",
+      "other": "{{name}}"
+    },
+    "primaryProfile": {
+      "label": "Household profile",
+      "hint": "The main person this Pond belongs to.",
+      "none": "Nobody chosen"
+    },
+    "theme": {
+      "system": "Match this phone",
+      "systemHint": "Light or dark, as your phone is set",
+      "light": "Light",
+      "dark": "Dark"
+    },
+    "hapticsLabel": "Haptic feedback",
+    "posture": {
+      "hears": "listens",
+      "hearsNothing": "hears nothing",
+      "watches": "watches the camera",
+      "watchesNothing": "watches nothing",
+      "remembers": "remembers what you tell it",
+      "forgets": "forgets what you tell it",
+      "speaksFirst": "speaks up on its own",
+      "speaksWhenSpoken": "speaks only when spoken to",
+      "sentence": "Your Pond {{hear}}, {{watch}}, {{memory}}, and {{speak}}.",
+      "open": "It can reach any site on the internet.",
+      "allowlist": "It reaches only the sites you allow.",
+      "offline": "Nothing leaves your home."
+    },
+    "list": {
+      "remove": "Remove {{item}}"
+    },
+    "summary": {
+      "on": "On",
+      "off": "Off",
+      "tools": "{{on}} of {{total}} on",
+      "people_one": "{{count}} person",
+      "people_other": "{{count}} people",
+      "extensions_one": "{{count}} installed",
+      "extensions_other": "{{count}} installed",
+      "quiet": "Quiet {{start}}–{{end}}",
+      "micOn": "Microphone on",
+      "micOff": "Microphone off",
+      "learning": "Learning",
+      "days": "{{count}} days",
+      "forever": "Forever",
+      "wakeWord": "“{{word}}”",
+      "noModel": "None chosen",
+      "needsKey": "Needs a key"
+    },
+    "menu": {
+      "connection": "Connection",
+      "goose": "Goose",
+      "home": "Home",
+      "notices": "Notices and privacy",
+      "records": "Records",
+      "phone": "This phone",
+      "advanced": "Advanced"
+    },
+    "loading": "Reading your Pond's settings",
+    "account": {
+      "hint": "Your name, and who this Pond belongs to",
+      "counts": "{{devices}} devices · {{rooms}} rooms · {{people}} people"
+    }
   },
   "screens": {
     "models": "Models",
@@ -418,7 +1226,26 @@
     "switchPond": "Switch Pond",
     "sessions": "Conversations",
     "remoteAccess": "Remote access",
-    "ride": "Ride"
+    "ride": "Ride",
+    "settings": "Settings",
+    "settingsAssistant": "Assistant",
+    "settingsVoice": "Voice",
+    "settingsListening": "Listening",
+    "settingsThinking": "Thinking",
+    "settingsMemory": "Memory",
+    "settingsMemoryTuning": "Memory fine-tuning",
+    "settingsTools": "Tools",
+    "settingsInternet": "Internet",
+    "settingsHome": "Your home",
+    "settingsHousehold": "You and your household",
+    "settingsCameras": "Cameras and smart home",
+    "settingsAnnouncements": "Announcements",
+    "settingsPrivacy": "Privacy",
+    "settingsRetention": "Keeping records",
+    "settingsAppearance": "Appearance",
+    "settingsAdvanced": "Advanced",
+    "settingsTimezone": "Time zone",
+    "settingsVoices": "Voices"
   },
   "nav": {
     "goose": "Goose",
@@ -446,7 +1273,8 @@
     "shortcutHome": "Home",
     "shortcutNight": "Night",
     "shortcutMusic": "Music",
-    "shortcutPackages": "Packages"
+    "shortcutPackages": "Packages",
+    "roomsAndPonds": "Rooms and Ponds"
   },
   "profile": {
     "noProfile": "No profile yet",
@@ -817,7 +1645,8 @@
       "memory": "Memories",
       "schedule": "Schedule",
       "logs": "Activity Logs",
-      "webSearch": "Web search"
+      "webSearch": "Web search",
+      "settings": "Settings"
     },
     "devOnly": "This screen is dev-only. It is not linked from the You tab in production builds."
   },

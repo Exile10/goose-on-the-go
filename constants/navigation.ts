@@ -1,17 +1,12 @@
 /**
- * The Profile hub's shape: which screens exist, and how they group.
- *
- * Labels are catalogue keys rather than text. A module constant is evaluated
- * once at import, before i18next has a language, so a literal here would freeze
- * the app in whatever the build shipped with.
- *
- * Every row has to reach a screen file: `constants/__tests__/navigation.test.ts`
- * fails on one that does not, because expo-router resolves routes at runtime and
- * nothing else would notice until someone tapped it.
+ * The You tab's menu, grouped as iPhone Settings groups. Labels are catalogue keys because a module
+ * constant is evaluated before i18next has a language; `navigation.test.ts` checks every route.
  */
 
 import type { TranslationKey } from '@/services/i18n';
+import type { SummaryId } from '@/models/pond-settings';
 
+import type { TileColor } from './colors';
 import type { IconName } from './icons';
 
 export interface NavItem {
@@ -19,46 +14,78 @@ export interface NavItem {
   /** Key into the string catalogue — resolve with `t()` at render. */
   labelKey: TranslationKey;
   icon: IconName;
+  tile: TileColor;
   /** Route path for expo-router */
   route: string;
+  /** What the row shows on its right: how the thing it leads to is set. */
+  summary?: SummaryId;
 }
 
 export interface NavGroup {
-  /** Key into the string catalogue — resolve with `t()` at render. */
+  /** Names the group for a screen reader; the groups themselves carry no visible heading. */
   groupKey: TranslationKey;
   items: NavItem[];
 }
 
+/** Where the card at the top of the menu leads: the household, and what Goose calls you. */
+export const ACCOUNT_ROUTE = '/(stack)/settings-household';
+
 export const PROFILE_NAV: NavGroup[] = [
   {
-    groupKey: 'nav.goose',
+    groupKey: 'settings.menu.connection',
     items: [
-      { id: 'models', labelKey: 'screens.models', icon: 'models', route: '/(stack)/models' },
-      { id: 'memories', labelKey: 'screens.memories', icon: 'memory', route: '/(stack)/memories' },
-      { id: 'sessions', labelKey: 'screens.sessions', icon: 'chat', route: '/(stack)/sessions' },
-      { id: 'logs', labelKey: 'screens.logs', icon: 'logs', route: '/(stack)/logs' },
-      { id: 'schedule', labelKey: 'screens.schedule', icon: 'schedule', route: '/(stack)/schedule' },
+      { id: 'remoteAccess', labelKey: 'screens.remoteAccess', icon: 'lock', tile: 'blue', route: '/(stack)/remote-access', summary: 'remoteAccess' },
+      { id: 'internet', labelKey: 'screens.settingsInternet', icon: 'globe', tile: 'blue', route: '/(stack)/settings-internet', summary: 'internet' },
+      { id: 'webSearch', labelKey: 'screens.webSearch', icon: 'search', tile: 'blue', route: '/(stack)/web-search', summary: 'webSearch' },
     ],
   },
   {
-    groupKey: 'nav.integrations',
+    groupKey: 'settings.menu.goose',
     items: [
-      { id: 'extensions', labelKey: 'screens.extensions', icon: 'link', route: '/(stack)/extensions' },
-      { id: 'webSearch', labelKey: 'screens.webSearch', icon: 'search', route: '/(stack)/web-search' },
+      { id: 'assistant', labelKey: 'screens.settingsAssistant', icon: 'agent', tile: 'purple', route: '/(stack)/settings-assistant', summary: 'assistant' },
+      { id: 'voice', labelKey: 'screens.settingsVoice', icon: 'voice', tile: 'pink', route: '/(stack)/settings-voice', summary: 'voice' },
+      { id: 'thinking', labelKey: 'screens.settingsThinking', icon: 'sparkle', tile: 'indigo', route: '/(stack)/settings-thinking', summary: 'thinking' },
+      { id: 'models', labelKey: 'screens.models', icon: 'models', tile: 'purple', route: '/(stack)/models', summary: 'models' },
+      { id: 'memory', labelKey: 'screens.settingsMemory', icon: 'memory', tile: 'teal', route: '/(stack)/settings-memory', summary: 'memory' },
+      { id: 'tools', labelKey: 'screens.settingsTools', icon: 'skills', tile: 'orange', route: '/(stack)/settings-tools', summary: 'tools' },
+      { id: 'extensions', labelKey: 'screens.extensions', icon: 'link', tile: 'orange', route: '/(stack)/extensions', summary: 'extensions' },
     ],
   },
   {
-    groupKey: 'nav.household',
+    groupKey: 'settings.menu.home',
     items: [
-      { id: 'addUsers', labelKey: 'screens.addUsers', icon: 'users', route: '/(stack)/add-users' },
-      { id: 'homeManagement', labelKey: 'screens.homeManagement', icon: 'home', route: '/(stack)/home-management' },
+      { id: 'home', labelKey: 'screens.settingsHome', icon: 'home', tile: 'green', route: '/(stack)/settings-home', summary: 'home' },
+      { id: 'addUsers', labelKey: 'screens.addUsers', icon: 'users', tile: 'green', route: '/(stack)/add-users', summary: 'people' },
+      { id: 'cameras', labelKey: 'screens.settingsCameras', icon: 'camera', tile: 'slate', route: '/(stack)/settings-cameras', summary: 'cameras' },
+      { id: 'homeManagement', labelKey: 'nav.roomsAndPonds', icon: 'bridge', tile: 'slate', route: '/(stack)/home-management' },
     ],
   },
   {
-    groupKey: 'nav.privacy',
+    groupKey: 'settings.menu.notices',
     items: [
-      { id: 'remoteAccess', labelKey: 'screens.remoteAccess', icon: 'lock', route: '/(stack)/remote-access' },
-      { id: 'privacy', labelKey: 'screens.privacy', icon: 'shield', route: '/(stack)/privacy' },
+      { id: 'announcements', labelKey: 'screens.settingsAnnouncements', icon: 'bell', tile: 'red', route: '/(stack)/settings-announcements', summary: 'announcements' },
+      { id: 'privacy', labelKey: 'screens.settingsPrivacy', icon: 'shield', tile: 'blue', route: '/(stack)/settings-privacy', summary: 'privacy' },
+    ],
+  },
+  {
+    groupKey: 'settings.menu.records',
+    items: [
+      { id: 'memories', labelKey: 'screens.memories', icon: 'memory', tile: 'teal', route: '/(stack)/memories' },
+      { id: 'sessions', labelKey: 'screens.sessions', icon: 'chat', tile: 'green', route: '/(stack)/sessions' },
+      { id: 'logs', labelKey: 'screens.logs', icon: 'logs', tile: 'slate', route: '/(stack)/logs' },
+      { id: 'schedule', labelKey: 'screens.schedule', icon: 'schedule', tile: 'amber', route: '/(stack)/schedule' },
+    ],
+  },
+  {
+    groupKey: 'settings.menu.phone',
+    items: [
+      { id: 'appearance', labelKey: 'screens.settingsAppearance', icon: 'palette', tile: 'slate', route: '/(stack)/settings-appearance', summary: 'appearance' },
+    ],
+  },
+  {
+    groupKey: 'settings.menu.advanced',
+    items: [
+      { id: 'advanced', labelKey: 'screens.settingsAdvanced', icon: 'sliders', tile: 'slate', route: '/(stack)/settings-advanced' },
     ],
   },
   // Dev-only: the per-screen mock/real backend toggle (#21). Discoverable in a
@@ -68,7 +95,7 @@ export const PROFILE_NAV: NavGroup[] = [
         {
           groupKey: 'nav.developer',
           items: [
-            { id: 'developer', labelKey: 'nav.developerMode', icon: 'cpu', route: '/(stack)/developer' },
+            { id: 'developer', labelKey: 'nav.developerMode', icon: 'cpu', tile: 'slate', route: '/(stack)/developer' },
           ],
         },
       ] satisfies NavGroup[])

@@ -13,6 +13,8 @@
 import * as Haptics from 'expo-haptics';
 import { Platform } from 'react-native';
 
+import { Storage } from './storage';
+
 const supported = Platform.OS === 'ios' || Platform.OS === 'android';
 
 let enabled = true;
@@ -20,6 +22,18 @@ let enabled = true;
 /** Turn all feedback off, for a user setting or a test. */
 export function setHapticsEnabled(next: boolean): void {
   enabled = next;
+}
+
+/** The Settings switch: applies at once and is remembered on this phone. */
+export async function saveHapticsPreference(next: boolean): Promise<void> {
+  enabled = next;
+  await Storage.set('hapticsEnabled', next ? '1' : '0').catch(() => undefined);
+}
+
+/** Read the remembered choice at launch. Nothing stored means on. */
+export async function loadHapticsPreference(): Promise<void> {
+  const stored = await Storage.get('hapticsEnabled').catch(() => null);
+  if (stored !== null) enabled = stored !== '0';
 }
 
 export function hapticsEnabled(): boolean {
