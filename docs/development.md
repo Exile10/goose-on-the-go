@@ -93,12 +93,12 @@ What changes for a plaintext origin:
 - `services/pond-trust.ts` pins nothing for it and lets requests to it through.
 - `services/api-client.ts` and the notification stream send it as ordinary
   requests, without the `X-Pond-Transport` marker (PondTls would refuse it).
-- `pair()` sends no channel binding to a plaintext origin (`isInsecureDevOrigin`)
-  and so checks no server proof: plaintext has no TLS key for either to name. It
-  logs a warning when it drops a binding. An HTTPS origin is bound and checked as
-  in release, even in this mode. The pairing keeps the pin the Pond reports in
-  `/system/info` only so the saved pairing has its usual shape; nothing is ever
-  verified against it, so the wizard does not ask the user to confirm it.
+- `pair()` runs the same CPace exchange as everywhere else (2026-10-13), with the
+  pin the Pond reports in `/system/info` in the channel identifier. Plaintext has
+  no TLS key, so that pin binds nothing, and `pair()` logs a warning saying so;
+  the Pond's confirmation tag is still required. An HTTPS origin is bound and
+  checked as in release, even in this mode. Nothing is ever verified against the
+  reported pin, so the wizard does not ask the user to confirm it.
 - Remote access is unavailable (`remote.unsupported`).
 - Notifications are off. Since SDK 53, Expo Go on Android throws as soon as
   `expo-notifications` is imported, which took the root layout down;

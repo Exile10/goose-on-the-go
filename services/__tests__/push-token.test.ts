@@ -22,6 +22,10 @@ jest.mock('@/services/api-client', () => {
   return { ...actual, api: { request: (...args: unknown[]) => mockRequest(...args) } };
 });
 
+// The api client draws pairing randomness from expo-crypto, which needs the real
+// react-native this suite stubs out below. Nothing here pairs.
+jest.mock('@/services/secure-random', () => ({ randomBytes: jest.fn() }));
+
 jest.mock('@/services/install-id', () => ({
   getInstallId: jest.fn(async () => 'install-1'),
 }));

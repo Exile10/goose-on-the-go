@@ -13,11 +13,10 @@ import type * as Connection from '@/models/connection';
 import type * as Trust from '../pond-trust';
 import type * as Api from '../api-client';
 import type * as Remote from '../remote-access';
-import { fromBase64, hmacSha256, toHex, unboundPairTranscript, utf8 } from '../hmac';
+import { pakePond } from './support/pake-pond';
 
 const PLAIN = 'http://192.168.1.10:4080';
 const PIN = `sha256/${'A'.repeat(43)}=`;
-const CHALLENGE = 'AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=';
 
 interface Loaded {
   insecureDevMode: boolean;
@@ -70,19 +69,8 @@ let warn: jest.SpyInstance;
 beforeEach(() => { warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined); });
 afterEach(() => warn.mockRestore());
 
-/** init, then verify answering `verify`; every other route answers `{}`. */
-function pairingFetch(verify: Record<string, unknown>) {
-  return jest.fn(async (url: string, _init?: RequestInit) => new Response(
-    JSON.stringify(String(url).endsWith('/init')
-      ? { challenge_id: 'c1', challenge: CHALLENGE, expires_at: '' }
-      : String(url).endsWith('/verify') ? verify : {}),
-    { status: 200, headers: { 'Content-Type': 'application/json' } },
-  ));
-}
-const accepted = {
-  accepted: true, session_token: 'session', refresh_token: 'refresh', hostname: 'nano',
-  server_version: 'test', capabilities: [], rejection_reason: null,
-};
+/** A Pond whose acceptance carries no confirmation, which a phone must refuse. */
+const unconfirmed = () => pakePond({ code: '123456', pin: PIN, accept: (answer) => ({ ...answer, server_proof: null }) });
 
 describe('the switch', () => {
   it('needs both a development bundle and the variable set to exactly 1', () => {
@@ -117,14 +105,15 @@ describe.each([
     await expect(Promise.resolve().then(() => trust.configurePondTrust([{ url: PLAIN, pin: PIN }]))).rejects.toThrow();
   });
 
-  it('still binds pairing to the pin and demands the proof', async () => {
+  it('still binds pairing to the pin and demands the confirmation', async () => {
     const { api, trust } = load(dev, flag);
     jest.spyOn(trust, 'assertPondTrust').mockResolvedValue(undefined);
-    const fetch = pairingFetch(accepted); setFetch(fetch);
+    const fetch = unconfirmed(); setFetch(fetch);
     const client = new api.PondApiClient('https://192.168.1.10:4443');
-    await expect(client.pair({ clientId: 'phone', pairingCode: '123456', channelBinding: PIN })).rejects.toThrow();
+    await expect(client.pair({ clientId: 'phone', pairingCode: '123456', channelBinding: PIN }))
+      .rejects.toMatchObject({ name: 'PondTrustError' });
     expect(JSON.parse(String(fetch.mock.calls[1]?.[1]?.body)).channel_binding).toBe(PIN);
-    expect(new Headers(fetch.mock.calls[0]?.[1]?.headers).get('X-Pond-Transport')).toBe('1');
+    for (const [, init] of fetch.mock.calls) expect(new Headers(init?.headers).get('X-Pond-Transport')).toBe('1');
   });
 });
 
@@ -165,27 +154,37 @@ describe('in insecure development mode', () => {
     await expect(trust.assertPondTrust('https://pond.local:4443')).rejects.toThrow();
   });
 
-  it('pairs unbound over plaintext, without the transport marker or a proof', async () => {
+  // CPace over plaintext too. The pin is the one the Pond reported for itself, so it binds
+  // nothing, but the code still never crosses the wire in a form that can be tested offline,
+  // and the Pond's confirmation is still demanded.
+  it('pairs over plaintext with CPace, without the transport marker', async () => {
     const { api } = load(true, '1');
-    const fetch = pairingFetch(accepted); setFetch(fetch);
+    const fetch = pakePond({ code: '123456', pin: PIN }); setFetch(fetch);
     const client = new api.PondApiClient(PLAIN);
     const resp = await client.pair({ clientId: 'phone', pairingCode: '123456', channelBinding: PIN });
     expect(resp.accepted).toBe(true);
-    expect(fetch.mock.calls[0]?.[0]).toBe(`${PLAIN}/api/v1/handshake/init`);
-    const body = JSON.parse(String(fetch.mock.calls[1]?.[1]?.body));
-    expect(body.channel_binding).toBeNull();
-    // The unbound transcript, not the bound one computed without its pin.
-    expect(body.mac).toBe(toHex(hmacSha256(utf8('123456'), unboundPairTranscript(fromBase64(CHALLENGE), 'phone'))));
+    expect(fetch.mock.calls.map(([url]) => url)).toEqual([
+      `${PLAIN}/api/v1/system/info`, `${PLAIN}/api/v1/handshake/pake/init`, `${PLAIN}/api/v1/handshake/pake/verify`,
+    ]);
     for (const [, init] of fetch.mock.calls) expect(new Headers(init?.headers).get('X-Pond-Transport')).toBeNull();
-    expect(warn).toHaveBeenCalledWith(expect.stringContaining('unbound pairing'));
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('plaintext development connection'));
   });
 
-  it('still binds and demands the proof from an HTTPS Pond', async () => {
+  it('still demands the confirmation over plaintext', async () => {
+    const { api } = load(true, '1');
+    setFetch(unconfirmed());
+    const client = new api.PondApiClient(PLAIN);
+    await expect(client.pair({ clientId: 'phone', pairingCode: '123456', channelBinding: PIN }))
+      .rejects.toMatchObject({ name: 'PondTrustError' });
+  });
+
+  it('still binds and demands the confirmation from an HTTPS Pond', async () => {
     const { api, trust } = load(true, '1');
     jest.spyOn(trust, 'assertPondTrust').mockResolvedValue(undefined);
-    const fetch = pairingFetch(accepted); setFetch(fetch);
+    const fetch = unconfirmed(); setFetch(fetch);
     const client = new api.PondApiClient('https://192.168.1.10:4443');
-    await expect(client.pair({ clientId: 'phone', pairingCode: '123456', channelBinding: PIN })).rejects.toThrow();
+    await expect(client.pair({ clientId: 'phone', pairingCode: '123456', channelBinding: PIN }))
+      .rejects.toMatchObject({ name: 'PondTrustError' });
     expect(JSON.parse(String(fetch.mock.calls[1]?.[1]?.body)).channel_binding).toBe(PIN);
   });
 

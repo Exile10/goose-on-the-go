@@ -79,7 +79,8 @@ refuses a directory whose node is still running, and a failure is logged.
 ### 1. The Pond — the household server
 
 Everything the app does functionally goes here, over pinned HTTPS, authenticated. Pairing
-is an HMAC handshake on the local network (`services/hmac.ts`). This includes the push
+is a CPace password-authenticated key exchange on the local network
+(`services/cpace.ts`, 2026-10-13); the six-digit code itself is never sent. This includes the push
 token registration below and the remote-access enrollment below.
 
 For the forms, this is the important framing and it is worth stating precisely: the Pond

@@ -54,9 +54,18 @@ TypeScript interfaces in `models/` defining the domain shapes. These are pure ty
 in the app that calls `fetch`. It attaches the bearer token, refreshes once on
 401 (sharing a single refresh across concurrent 401s), and throws a typed
 `ApiError` carrying the status and any `Retry-After`. Where the Pond names its
-refusal in `{error}` (handshake verify's `channel_binding_required`), `ApiError`
-carries it as `detail`, so a screen can act on why the Pond refused rather than
-on the status alone.
+refusal in `{error}` (pairing's `channel_binding_mismatch`, enrollment's
+`stale_identity`), `ApiError` carries it as `detail`, so a screen can act on why the
+Pond refused rather than on the status alone. `pair()` runs CPace (2026-10-13): it
+reads `/system/info` first and throws `PondOutdatedError` unless the Pond reports
+`protocol: 3`, then `handshake/pake/init` and `handshake/pake/verify`, and keeps
+no token until the Pond's confirmation tag verifies (`PondTrustError` otherwise).
+`services/cpace.ts` — CPace (draft-irtf-cfrg-cpace-21, CPACE-RISTR255-SHA512) over
+`@noble/curves` and `@noble/hashes`, both pinned exactly, and the pairing's channel
+identifier, session id and confirmation tags. The draft half is held to the draft's
+own vectors (`services/__tests__/vectors/`). Its randomness is a parameter, which
+`api-client.ts` fills from `secure-random.ts`; noble's own `randomBytes` is never
+used. See [PINNED_HTTPS.md](./PINNED_HTTPS.md) "Trust lifecycle".
 Wire types live in `services/types.ts`, in the server's own snake_case —
 deliberately separate from the display-shaped types in `models/`.
 `services/notification-stream.ts` — the foreground SSE stream. Only a 401 means

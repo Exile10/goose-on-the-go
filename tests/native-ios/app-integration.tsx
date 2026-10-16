@@ -11,6 +11,7 @@ import { commitPairedProfile, loadPairedProfile, type SavedPond } from '@/servic
 import { SecureStorage } from '@/services/secure-storage';
 import { api, PondApiClient } from '@/services/api-client';
 import { enableRemoteAccess } from '@/services/remote-access';
+import { randomBytes } from '@/services/secure-random';
 
 const origin = process.env.EXPO_PUBLIC_POND_TEST_ORIGIN ?? '';
 const pin = process.env.EXPO_PUBLIC_POND_TEST_PIN ?? '';
@@ -243,10 +244,12 @@ async function run(): Promise<Result[]> {
           });
         });
         await check('embedded bridge refuses remote pairing and forged local identity', async () => {
-          const challenge = await client.handshakeInit({ clientId: 'pending-local-challenge' });
+          const challenge = await client.handshakeInit({ clientId: 'pending-local-challenge', channelBinding: pond.pin, clientNonce: randomBytes(32) });
+          // Well-formed bodies, so the refusal seen is the LAN guard's and not a parse error.
+          const zeros = `${'A'.repeat(43)}=`;
           for (const [path, body] of [
-            ['/api/v1/handshake/init', { client_id: 'remote-attempt', client_type: 'gotg', client_version: 'test' }],
-            ['/api/v1/handshake/verify', { challenge_id: challenge.challenge_id, mac: '00'.repeat(32) }],
+            ['/api/v1/handshake/pake/init', { client_id: 'remote-attempt', client_type: 'gotg', client_version: 'test', channel_binding: pond.pin, client_nonce: zeros }],
+            ['/api/v1/handshake/pake/verify', { challenge_id: challenge.challenge_id, share: zeros, confirm: '00'.repeat(64) }],
           ] as const) {
             const response = await expoFetch(remote + path, { method: 'POST', headers: {
               ...remoteHeaders, 'Content-Type': 'application/json', 'X-Forwarded-For': '127.0.0.1', 'X-Pond-Embedded-Peer': '127.0.0.1:1234',
