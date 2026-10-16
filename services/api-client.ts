@@ -83,6 +83,12 @@ import type {
   RetitleResult,
   TtsApplyResult,
   ZoneChoice,
+  DiskUsage,
+  DownloadAction,
+  DownloadEntry,
+  HfModel,
+  HfModelFile,
+  ModelRole,
 } from './types';
 import { MODEL_CATEGORIES } from './types';
 
@@ -1051,6 +1057,8 @@ export class PondApiClient {
       // throwing: the screen maps over what comes back.
       (Array.isArray(res?.[category]) ? res[category] : []).map((m) => ({
         ...m,
+        // The row's own category names the route; the bucket only groups it.
+        pond_category: typeof m.category === 'string' && m.category ? m.category : category,
         category,
         id: `${category}:${m.name}`,
       })),
@@ -1069,11 +1077,73 @@ export class PondApiClient {
     return this.get<ModelMemoryStatus>('/api/v1/models/memory-status');
   }
 
-  activateModel(category: string, name: string): Promise<void> {
+  /** Give a model a job. The Pond refuses a request that names no role. */
+  activateModel(category: string, name: string, role: ModelRole): Promise<void> {
     return this.post<void>(
       `/api/v1/models/${encodeURIComponent(category)}/${encodeURIComponent(name)}/activate`,
+      { role },
+    );
+  }
+
+  diskUsage(): Promise<DiskUsage> {
+    return this.get<DiskUsage>('/api/v1/models/disk-usage');
+  }
+
+  async downloadProgress(): Promise<DownloadEntry[]> {
+    const res = await this.get<{ downloads?: DownloadEntry[] }>('/api/v1/models/download/progress');
+    return Array.isArray(res?.downloads) ? res.downloads : [];
+  }
+
+  /** Start fetching a catalogue model. Picture support comes with it unless `pictures` is false. */
+  downloadModel(category: string, name: string, pictures: boolean): Promise<unknown> {
+    return this.post<unknown>(
+      `/api/v1/models/${encodeURIComponent(category)}/${encodeURIComponent(name)}/download`,
+      { pictures },
+    );
+  }
+
+  addPictureSupport(category: string, name: string): Promise<unknown> {
+    return this.post<unknown>(
+      `/api/v1/models/${encodeURIComponent(category)}/${encodeURIComponent(name)}/companions/pictures`,
       {},
     );
+  }
+
+  /** Pause, resume or stop every file of a model's download. */
+  controlDownload(modelId: string, action: DownloadAction): Promise<unknown> {
+    return this.post<unknown>('/api/v1/models/download/control', { model_id: modelId, action });
+  }
+
+  /** Remove a model's file from the Pond. A 409 means it is in use. */
+  deleteModel(category: string, name: string): Promise<void> {
+    return this.del<void>(`/api/v1/models/${encodeURIComponent(category)}/${encodeURIComponent(name)}`);
+  }
+
+  /** The Pond answers a refused search as a 200 with `error`; raise it rather than show no results. */
+  async searchModels(query: string): Promise<HfModel[]> {
+    const res = await this.get<{ models?: HfModel[]; error?: string }>(
+      `/api/v1/models/search/gguf?q=${encodeURIComponent(query)}`,
+    );
+    if (res?.error) throw new Error(res.error);
+    return Array.isArray(res?.models) ? res.models : [];
+  }
+
+  async modelFiles(repo: string): Promise<HfModelFile[]> {
+    // The Pond passes the repo through unencoded: Hugging Face refuses `owner%2Fname`.
+    const res = await this.get<{ files?: HfModelFile[]; error?: string }>(
+      `/api/v1/models/search/gguf/files?repo=${repo.split('/').map(encodeURIComponent).join('/')}`,
+    );
+    if (res?.error) throw new Error(res.error);
+    return Array.isArray(res?.files) ? res.files : [];
+  }
+
+  downloadModelFile(file: HfModelFile, pictures: boolean): Promise<unknown> {
+    return this.post<unknown>('/api/v1/models/download/url', {
+      url: file.url,
+      category: 'gguf',
+      filename: file.filename,
+      pictures,
+    });
   }
 
   // ── Schedules ───────────────────────────────────────────────

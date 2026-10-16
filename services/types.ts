@@ -376,11 +376,38 @@ export interface ModelEntry {
   asr_size?: string;
   tts_engine?: string;
   config_filename?: string;
+  /**
+   * The Pond's own category for the row (`tts_kokoro` where the bucket says `tts`), which is what
+   * activation and deletion name. Missing on a Pond older than the field.
+   */
+  pond_category?: string;
+  /** What a household reads as the model's name. */
+  title?: string;
+  quantization?: string;
+  engine?: { id: string; label: string };
+  /** False when this Pond lacks the engine the model needs, so choosing it would only fail. */
+  available?: boolean;
+  /** Set only for the Pond's own suggestions. */
+  recommended?: { rank: string; reason: string };
+  /** Separate downloads that extend the model, such as picture support. */
+  companions?: ModelCompanion[];
 }
+
+export interface ModelCompanion {
+  kind: string;
+  label: string;
+  size_bytes: number;
+  /** `installed` | `available` | `downloading` | `verifying` | `not_on_this_device`. */
+  state: string;
+}
+
+/** The jobs a model can hold. A Pond fills each with one model at a time. */
+export type ModelRole = 'chat' | 'asr' | 'tts' | 'embedding';
 
 /** The category buckets `GET /api/v1/models` answers with. */
 export const MODEL_CATEGORIES = [
   'gguf',
+  'litert',
   'ollama',
   'llamafile',
   'whisper',
@@ -408,6 +435,51 @@ export interface ModelMemoryStatus {
   total_mb: number;
   available_for_llm_mb: number;
   loaded_model: string | null;
+  /** The most one model may weigh here; absent when the Pond does not check fit. */
+  budget_mb?: number;
+  reclaimable_mb?: number;
+}
+
+/** `GET /api/v1/models/disk-usage`. */
+export interface DiskUsage {
+  total_bytes: number;
+  by_category: Record<string, number>;
+  hf_cache_bytes: number;
+  incomplete_bytes: number;
+}
+
+/** One file the Pond is fetching, from `GET /api/v1/models/download/progress`. */
+export interface DownloadEntry {
+  filename: string;
+  category: string;
+  downloaded_bytes: number;
+  total_bytes: number | null;
+  status: 'downloading' | 'paused' | 'done' | 'error' | 'cancelled';
+  /** `{category}/{name}`, the row this file belongs to. */
+  model_id?: string;
+  /** `model` or `pictures`. */
+  part?: string;
+  error?: string;
+  resumable?: boolean;
+}
+
+export type DownloadAction = 'pause' | 'resume' | 'cancel';
+
+/** `GET /api/v1/models/search/gguf`: one Hugging Face repository. */
+export interface HfModel {
+  id: string;
+  downloads: number;
+  likes: number;
+  tags: string[];
+  url: string;
+}
+
+/** `GET /api/v1/models/search/gguf/files`: one file in a repository. */
+export interface HfModelFile {
+  filename: string;
+  size_mb?: number;
+  url: string;
+  pictures?: { size_bytes: number; label: string } | null;
 }
 
 // ── Schedules ─────────────────────────────────────────────────

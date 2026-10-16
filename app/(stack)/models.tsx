@@ -1,203 +1,179 @@
 /**
- * ModelsScreen — the models this Pond has, and which of them are serving.
- *
- * Grouped by the category the server files each model under, because that is
- * also what a role is scoped to: a Pond serves a language model, a voice and an
- * embedder at the same time, so "active" is a list rather than one row.
- *
- * Every fact on a card comes from the catalogue row. The cards once showed
- * invented Speed/Quality/Privacy ratings and a cloud-versus-local badge; the
- * API produces neither, and every category it returns runs on the Pond anyway.
+ * Models: which model does each job on the Pond, what is downloading, what is on the Pond, and
+ * where to get more. Laid out like iPhone Storage: what it costs first, then what holds the space.
  */
 
-import React, { useCallback } from 'react';
-import { View, StyleSheet, ScrollView } from 'react-native';
-
-import { GPressable } from '@/components/ui/g-pressable';
+import React, { useMemo } from 'react';
+import { RefreshControl, ScrollView, View } from 'react-native';
+import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import {
-  InkBadge,
-  InkCard,
-  InkGroup,
-  InkRow,
-  InkEmptyState,
-  InkNotice,
-  InkSpinner,
-  InkText,
-  InkTitle,
-} from '@jarida/ink/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { InkButton, InkNotice, InkSpinner } from '@jarida/ink/native';
 
-import { formatContextWindow, formatSize, useModels } from '@/view-models/use-models';
-import { selectionTick, confirm } from '@/services/haptics';
-import type { ModelCategory, ModelEntry } from '@/services/types';
-import type { TranslationKey } from '@/services/i18n';
+import { DownloadRow, ModelRow } from '@/components/settings/model-rows';
+import { SettingsGroup, SettingsHeader, SettingsMessage, SettingsRow, TILE_INSET } from '@/components/settings/settings-list';
+import { useSettingsColors } from '@/components/settings/settings-theme';
+import { voiceName } from '@/components/settings/special-rows';
 import { Spacing } from '@/constants/spacing';
-import { useThemedStyles } from '@/hooks/use-themed-styles';
-import type { ThemeColors } from '@/constants/colors';
+import {
+  downloadsByModel,
+  formatBytes,
+  formatMegabytes,
+  holderOf,
+  isDownloaded,
+  MODEL_ROLES,
+  recommendations,
+  titleOf,
+} from '@/models/model-library';
+import { selectionTick } from '@/services/haptics';
+import type { ModelRole } from '@/services/types';
+import { roleLabelKey, useModelLibrary } from '@/view-models/use-model-library';
+import { usePondSettings } from '@/view-models/use-pond-settings';
 
-/** One literal key per category, so the key-completeness test can see every one. */
-function categoryKey(category: ModelCategory): TranslationKey {
-  switch (category) {
-    case 'gguf': return 'models.category.gguf';
-    case 'ollama': return 'models.category.ollama';
-    case 'llamafile': return 'models.category.llamafile';
-    case 'whisper': return 'models.category.whisper';
-    case 'tts': return 'models.category.tts';
-    case 'embedding': return 'models.category.embedding';
+function roleHintKey(role: ModelRole) {
+  switch (role) {
+    case 'chat':
+      return 'models.library.roleHint.chat' as const;
+    case 'asr':
+      return 'models.library.roleHint.asr' as const;
+    case 'tts':
+      return 'models.library.roleHint.tts' as const;
+    case 'embedding':
+      return 'models.library.roleHint.embedding' as const;
   }
 }
 
-/** One reported fact about a model. Rendered only when the server sent it. */
-function Fact({ label, value }: { label: string; value: string | null }) {
-  const styles = useThemedStyles(makeStyles);
-  if (!value) return null;
-  return (
-    <View style={styles.factRow}>
-      <InkText>{label}</InkText>
-      <InkText>{value}</InkText>
-    </View>
-  );
-}
-
-const ModelCard = React.memo(function ModelCard({
-  model,
-  onSelect,
-}: {
-  model: ModelEntry;
-  onSelect: (model: ModelEntry) => void;
-}) {
-  const styles = useThemedStyles(makeStyles);
-  const { t } = useTranslation();
-  const missing = model.downloaded === false;
-
-  const handlePress = useCallback(() => {
-    if (missing) return;
-    void confirm();
-    onSelect(model);
-  }, [missing, model, onSelect]);
-
-  return (
-    <GPressable
-      onPress={handlePress}
-      accessibilityRole="button"
-      accessibilityState={{ selected: model.active, disabled: missing }}
-      // A model that is not on disk cannot be activated from here; downloading
-      // one is the Pond's own job, not the phone's.
-      disabled={missing}
-      style={missing ? styles.cardMuted : undefined}
-    >
-      <InkCard style={styles.card}>
-        <View style={styles.cardHead}>
-          <InkTitle level={3}>{model.name}</InkTitle>
-          {model.active ? <InkBadge tone="success">{t('models.active')}</InkBadge> : null}
-        </View>
-
-        {model.description ? <InkText>{model.description}</InkText> : null}
-
-        <View style={styles.facts}>
-          <Fact label={t('models.context')} value={formatContextWindow(model.context_length)} />
-          <Fact label={t('models.size')} value={formatSize(model.size_mb)} />
-          <Fact
-            label={t('models.memory')}
-            value={
-              model.ram_estimate_mb
-                ? t('models.memoryValue', { size: formatSize(model.ram_estimate_mb) })
-                : null
-            }
-          />
-          <Fact label={t('models.role')} value={model.recommended_role ?? null} />
-        </View>
-
-        {missing ? <InkText>{t('models.notDownloaded')}</InkText> : null}
-      </InkCard>
-    </GPressable>
-  );
-});
+const ROLE_ICON = { chat: 'chat', asr: 'ear', tts: 'voice', embedding: 'memory' } as const;
+const ROLE_TILE = { chat: 'purple', asr: 'pink', tts: 'pink', embedding: 'teal' } as const;
 
 export default function ModelsScreen() {
-  const styles = useThemedStyles(makeStyles);
   const { t } = useTranslation();
-  const { data, loading, error, actions } = useModels();
+  const router = useRouter();
+  const colors = useSettingsColors();
+  const insets = useSafeAreaInsets();
+  const lib = useModelLibrary();
+  const { settings } = usePondSettings();
 
-  const handleRetry = useCallback(() => {
+  const downloads = useMemo(() => downloadsByModel(lib.downloads).filter((d) => d.status !== 'done' && d.status !== 'cancelled'), [lib.downloads]);
+  const onPond = useMemo(() => lib.models.filter(isDownloaded), [lib.models]);
+  const suggested = useMemo(() => recommendations(lib.models).slice(0, 4), [lib.models]);
+  const offPond = lib.models.filter((m) => !isDownloaded(m)).length;
+  const titleFor = (modelId: string) => {
+    const model = lib.models.find((m) => `${m.pond_category || m.category}/${m.name}` === modelId);
+    return model ? titleOf(model) : modelId.split('/').pop() ?? modelId;
+  };
+
+  const go = (pathname: string, params?: Record<string, string>) => {
     void selectionTick();
-    void actions.refresh();
-  }, [actions]);
+    router.push((params ? { pathname, params } : pathname) as never);
+  };
+
+  const holderText = (role: ModelRole) => {
+    if (role === 'tts' && settings) return voiceName(settings.voice_tts_voice, t);
+    const holder = holderOf(lib.models, role);
+    return holder ? titleOf(holder) : t('models.library.nothing');
+  };
+
+  const disk = formatBytes(lib.disk?.total_bytes);
+  const budget = formatMegabytes(lib.memory?.budget_mb);
 
   return (
     <ScrollView
-      style={styles.container}
-      contentContainerStyle={styles.scroll}
-      showsVerticalScrollIndicator={false}
+      style={{ flex: 1, backgroundColor: colors.page }}
+      contentContainerStyle={{ paddingHorizontal: Spacing.lg, paddingTop: Spacing.lg, paddingBottom: insets.bottom + Spacing['4xl'] }}
+      refreshControl={<RefreshControl refreshing={lib.loading && lib.loaded} onRefresh={() => void lib.actions.refresh()} />}
     >
-      {/* What is serving right now, before the catalogue of what could.
-          Named by the role each one fills, since a Pond runs several at once. */}
-      {data.active.length > 0 ? (
-        <InkGroup title={t('models.serving')} style={styles.serving}>
-          {data.active.map((m, i) => (
-            <InkRow key={m.id} divided={i > 0} label={t(categoryKey(m.category))}>
-              <InkText>{m.name}</InkText>
-            </InkRow>
-          ))}
-        </InkGroup>
+      <SettingsHeader
+        icon="models"
+        tile="purple"
+        title={t('screens.models')}
+        description={[t('models.library.page'), disk ? t('models.library.storage', { size: disk }) : null, budget ? t('models.library.budget', { size: budget }) : null]
+          .filter(Boolean)
+          .join(' ')}
+      />
+
+      {lib.notice ? (
+        <View style={{ marginBottom: Spacing.lg }}>
+          <InkNotice tone={lib.notice.tone === 'danger' ? 'danger' : 'neutral'}>{lib.notice.text}</InkNotice>
+        </View>
+      ) : null}
+
+      {!lib.loaded ? (
+        lib.error ? (
+          <View style={{ alignItems: 'center', gap: Spacing.md }}>
+            <SettingsMessage tone="danger">{lib.error}</SettingsMessage>
+            <InkButton variant="quiet" icon="refresh" onPress={() => void lib.actions.refresh()}>
+              {t('common.retry')}
+            </InkButton>
+          </View>
+        ) : (
+          <InkSpinner label={t('settings.loading')} />
+        )
       ) : (
-        <View style={styles.serving}>
-          <InkTitle level={3}>{t('models.serving')}</InkTitle>
-          <InkText>{t('models.noneActive')}</InkText>
-        </View>
+        <>
+          <SettingsGroup title={t('models.library.section.jobs')} footer={t('models.library.footer.jobs')} inset={TILE_INSET}>
+            {MODEL_ROLES.map((role) => (
+              <SettingsRow
+                key={role}
+                label={t(roleLabelKey(role))}
+                description={t(roleHintKey(role))}
+                icon={ROLE_ICON[role]}
+                tile={ROLE_TILE[role]}
+                value={holderText(role)}
+                accessory="next"
+                onPress={() => (role === 'tts' ? go('/(stack)/settings-voices') : go('/(stack)/settings-model-role', { role }))}
+              />
+            ))}
+          </SettingsGroup>
+
+          {downloads.length > 0 ? (
+            <SettingsGroup title={t('models.library.section.downloading')}>
+              {downloads.map((d) => (
+                <DownloadRow key={d.modelId} download={d} title={titleFor(d.modelId)} onControl={(action) => void lib.actions.control(d.modelId, action)} />
+              ))}
+            </SettingsGroup>
+          ) : null}
+
+          {suggested.length > 0 ? (
+            <SettingsGroup title={t('models.library.section.recommended')} footer={t('models.library.footer.recommended')}>
+              {suggested.map((m) => (
+                <SettingsRow
+                  key={m.id}
+                  label={titleOf(m)}
+                  description={[m.recommended?.reason, formatMegabytes(m.size_mb)].filter(Boolean).join(' · ')}
+                  accessory="next"
+                  onPress={() => go('/(stack)/settings-model', { id: m.id })}
+                />
+              ))}
+            </SettingsGroup>
+          ) : null}
+
+          <SettingsGroup title={t('models.library.section.onPond')}>
+            {onPond.length === 0 ? <SettingsRow label={t('models.library.empty')} /> : null}
+            {onPond.map((m) => (
+              <ModelRow key={m.id} model={m} onPress={() => go('/(stack)/settings-model', { id: m.id })} />
+            ))}
+          </SettingsGroup>
+
+          <SettingsGroup title={t('models.library.section.getMore')} footer={t('models.library.footer.search')} inset={TILE_INSET}>
+            <SettingsRow
+              label={t('models.library.catalog')}
+              icon="download"
+              tile="blue"
+              value={offPond > 0 ? String(offPond) : null}
+              accessory="next"
+              onPress={() => go('/(stack)/settings-model-catalog')}
+            />
+            <SettingsRow
+              label={t('models.library.search')}
+              icon="search"
+              tile="blue"
+              accessory="next"
+              onPress={() => go('/(stack)/settings-model-search')}
+            />
+          </SettingsGroup>
+        </>
       )}
-
-      {loading ? <InkSpinner label={t('pond.checking')} /> : null}
-
-      {error ? (
-        <View style={styles.stateBlock}>
-          <InkNotice tone="danger">{error}</InkNotice>
-          <GPressable onPress={handleRetry} hitSlop={8}>
-            <InkText>{t('common.retry')}</InkText>
-          </GPressable>
-        </View>
-      ) : null}
-
-      {!loading && !error && data.models.length === 0 ? (
-        <InkEmptyState icon="models" title={t('models.empty')}>
-          <InkText>{t('models.emptyBody')}</InkText>
-        </InkEmptyState>
-      ) : null}
-
-      {data.groups.map((group) => (
-        <View key={group.category} style={styles.group}>
-          <InkTitle level={3}>{t(categoryKey(group.category))}</InkTitle>
-          {group.models.map((m) => (
-            <ModelCard key={m.id} model={m} onSelect={actions.activate} />
-          ))}
-        </View>
-      ))}
-
-      <View style={{ height: 32 }} />
     </ScrollView>
   );
 }
-
-const makeStyles = (c: ThemeColors) =>
-  StyleSheet.create({
-    container: { flex: 1, backgroundColor: c.background },
-    scroll: { paddingHorizontal: Spacing.lg, paddingTop: Spacing.lg },
-
-    serving: { marginBottom: Spacing.xl, gap: Spacing.sm },
-
-    group: { marginBottom: Spacing.xl, gap: Spacing.md },
-
-    card: { gap: Spacing.sm },
-    cardMuted: { opacity: 0.55 },
-    cardHead: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      gap: Spacing.sm,
-    },
-
-    facts: { gap: 2 },
-    factRow: { flexDirection: 'row', justifyContent: 'space-between' },
-
-    stateBlock: { gap: Spacing.sm, marginBottom: Spacing.lg },
-  });

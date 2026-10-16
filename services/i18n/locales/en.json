@@ -1245,7 +1245,11 @@
     "settingsAppearance": "Appearance",
     "settingsAdvanced": "Advanced",
     "settingsTimezone": "Time zone",
-    "settingsVoices": "Voices"
+    "settingsVoices": "Voices",
+    "settingsModelRole": "Choose a model",
+    "settingsModel": "Model",
+    "settingsModelCatalog": "Available to download",
+    "settingsModelSearch": "Search Hugging Face"
   },
   "nav": {
     "goose": "Goose",
@@ -1318,7 +1322,8 @@
       "llamafile": "Llamafile",
       "whisper": "Speech to text",
       "tts": "Text to speech",
-      "embedding": "Embeddings"
+      "embedding": "Embeddings",
+      "litert": "LiteRT"
     },
     "onPond": "On your Pond",
     "cloud": "Cloud",
@@ -1327,7 +1332,93 @@
     "contextWindow": "Context Window",
     "notReported": "Not reported",
     "available": "AVAILABLE MODELS",
-    "tryAgain": "Try again"
+    "tryAgain": "Try again",
+    "library": {
+      "page": "What your Pond runs on, and what it costs.",
+      "storage": "{{size}} of models on your Pond",
+      "budget": "Room for one model of {{size}}",
+      "noBudget": "Your Pond does not report how much memory a model may use",
+      "section": {
+        "jobs": "Jobs",
+        "downloading": "Downloading",
+        "recommended": "Recommended for your Pond",
+        "onPond": "On your Pond",
+        "getMore": "Get more",
+        "facts": "About this model",
+        "actions": "Use it"
+      },
+      "footer": {
+        "jobs": "Each job is done by one model at a time. Speaking is the voice Goose speaks in.",
+        "recommended": "Nothing is downloaded or switched on until you choose it.",
+        "search": "Downloads land on your Pond and nowhere else."
+      },
+      "role": {
+        "chat": "Conversation",
+        "asr": "Listening",
+        "tts": "Speaking",
+        "embedding": "Memory"
+      },
+      "roleHint": {
+        "chat": "Answers you",
+        "asr": "Turns speech into words",
+        "tts": "Turns words into speech",
+        "embedding": "Finds what it knows"
+      },
+      "nothing": "Nothing chosen yet",
+      "noCandidates": "No model for this job is on your Pond yet.",
+      "catalog": "Available to download",
+      "search": "Search Hugging Face",
+      "progress": "{{done}} of {{total}}",
+      "progressUnknown": "{{done}} so far",
+      "paused": "Paused",
+      "failedWith": "Stopped: {{reason}}",
+      "failedPlain": "Stopped",
+      "pause": "Pause",
+      "resume": "Resume",
+      "cancel": "Stop",
+      "retry": "Try again",
+      "use": "Use for {{job}}",
+      "using": "In use for {{job}}",
+      "useFailed": "Your Pond could not switch to that model.",
+      "pictures": "Add picture support",
+      "picturesSize": "Add picture support ({{size}})",
+      "picturesInstalled": "Picture support is on your Pond",
+      "picturesDownloading": "Picture support is downloading",
+      "delete": "Delete from your Pond",
+      "deleteTitle": "Delete {{name}}?",
+      "deleteBody": "This removes {{size}} from your Pond. You can download it again later.",
+      "deleteBodyNoSize": "This removes it from your Pond. You can download it again later.",
+      "deleteFailed": "Your Pond could not delete it.",
+      "inUse": "This model is in use. Choose another for its job first.",
+      "download": "Download",
+      "downloadTitle": "Download {{name}}?",
+      "downloadBody": "It takes {{size}} on your Pond.",
+      "downloadBodyNoSize": "It downloads to your Pond.",
+      "withPictures": "With picture support",
+      "textOnly": "Text only",
+      "downloadFailed": "Your Pond could not start the download.",
+      "controlFailed": "Your Pond did not take that.",
+      "tooBig": "Bigger than one model may be on this Pond",
+      "unavailable": "Your Pond cannot run this model",
+      "searchPlaceholder": "gemma, qwen, whisper…",
+      "searchButton": "Search",
+      "searchFailed": "Could not search Hugging Face.",
+      "noResults": "Nothing found.",
+      "noFiles": "No GGUF files in this repository.",
+      "stats": "{{downloads}} downloads · {{likes}} likes",
+      "fileSize": "{{size}}",
+      "filePictures": "Picture support available",
+      "started": "Downloading. It shows on the Models page as it goes.",
+      "empty": "No models on your Pond yet.",
+      "facts": {
+        "size": "Size",
+        "memory": "Memory needed",
+        "context": "Memory window",
+        "engine": "Runs on",
+        "quantization": "Precision",
+        "job": "Job"
+      }
+    }
   },
   "sections": {
     "backupSettings": "How backups run",

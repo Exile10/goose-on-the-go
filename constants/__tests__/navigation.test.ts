@@ -70,7 +70,7 @@ it('offers every settings page from a menu row or a page that is', () => {
       for (const item of section.items) if (item.kind === 'link') routes.add(item.route);
     }
   }
-  const pages = stackScreenFiles().filter((name) => name.startsWith('settings-') && !['settings-voices', 'settings-timezone'].includes(name));
+  const pages = stackScreenFiles().filter((name) => name.startsWith('settings-') && !['settings-voices', 'settings-timezone', 'settings-model', 'settings-model-role', 'settings-model-catalog', 'settings-model-search'].includes(name));
   expect(pages.filter((name) => !routes.has(`/(stack)/${name}`))).toEqual([]);
 });
 
