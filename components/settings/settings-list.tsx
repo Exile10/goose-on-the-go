@@ -250,12 +250,8 @@ const makeStyles = (c: SettingsColors, type: SettingsType, m: SettingsMetrics) =
   description: type.description,
   value: { ...type.value, maxWidth: '55%' as const, textAlign: 'right' as const },
   note: type.note,
-  header: {
-    alignItems: 'flex-start' as const,
-    gap: Spacing.sm,
-    paddingHorizontal: Spacing.xs,
-    marginBottom: Spacing.xl,
-  },
+  // On the page's gutter, where the cards below begin.
+  header: { alignItems: 'flex-start' as const, gap: Spacing.sm, marginBottom: Spacing.xl },
   headerBody: { ...type.prose, fontSize: type.body.fontSize, lineHeight: type.body.lineHeight },
   message: {
     ...type.prose,

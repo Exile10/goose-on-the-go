@@ -1,10 +1,12 @@
-jest.mock('@/services/pond-trust', () => ({ assertPondTrust: jest.fn().mockResolvedValue(undefined) }));
 /**
  * Checked against `pond-api/src/routes.rs`. Activation is pinned because the phone sent no role,
  * which the Pond refuses with a 400, so "Use" on the Models screen did nothing on a real Pond.
  */
 
 import { ApiError, PondApiClient } from '@/services/api-client';
+
+// Hoisted above the import by Jest; written after it so the imports stay first.
+jest.mock('@/services/pond-trust', () => ({ assertPondTrust: jest.fn().mockResolvedValue(undefined) }));
 
 const originalFetch = Object.getOwnPropertyDescriptor(globalThis, 'fetch');
 

@@ -11,6 +11,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { InkButton, InkEdge, InkTitle } from '@jarida/ink/native';
 
 import { IssueRows } from '@/components/settings/issue-page';
+import { PAGE_GUTTER } from '@/components/settings/settings-scroll';
 import { SwitchRow } from '@/components/settings/setting-controls';
 import { SettingsGroup, SettingsRow, TILE_INSET } from '@/components/settings/settings-list';
 import { useSettingsColors, useSettingsStyles, type SettingsColors, type SettingsType } from '@/components/settings/settings-theme';
@@ -177,8 +178,8 @@ export default function ProfileHub() {
 
 const makeStyles = (c: SettingsColors, type: SettingsType) => ({
   safe: { flex: 1 },
-  content: { paddingHorizontal: Spacing.lg },
-  title: { marginTop: Spacing.md, marginBottom: Spacing.lg, marginLeft: Spacing.xs },
+  content: { paddingHorizontal: PAGE_GUTTER },
+  title: { marginTop: Spacing.md, marginBottom: Spacing.lg },
   accountWrap: { marginBottom: Spacing.xl },
   account: {
     flexDirection: 'row' as const,

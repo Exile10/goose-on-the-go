@@ -4,16 +4,12 @@
  */
 
 import React from 'react';
-import { ScrollView } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { InkNotice } from '@jarida/ink/native';
 
 import { RadioRow } from '@/components/settings/setting-controls';
 import { SettingsGroup, SettingsHeader, SettingsRow, TILE_INSET } from '@/components/settings/settings-list';
-import { useSettingsColors } from '@/components/settings/settings-theme';
-import { Spacing } from '@/constants/spacing';
+import { SettingsNotice, SettingsScroll } from '@/components/settings/settings-scroll';
 import { candidatesFor, formatMegabytes, MODEL_ROLES, titleOf } from '@/models/model-library';
 import { selectionTick } from '@/services/haptics';
 import type { ModelRole } from '@/services/types';
@@ -22,20 +18,15 @@ import { roleAboutKey, roleLabelKey, useModelLibrary } from '@/view-models/use-m
 export default function ModelRoleScreen() {
   const { t } = useTranslation();
   const router = useRouter();
-  const colors = useSettingsColors();
-  const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{ role?: string }>();
   const role: ModelRole = MODEL_ROLES.includes(params.role as ModelRole) ? (params.role as ModelRole) : 'chat';
   const lib = useModelLibrary();
   const candidates = candidatesFor(lib.models, role);
 
   return (
-    <ScrollView
-      style={{ flex: 1, backgroundColor: colors.page }}
-      contentContainerStyle={{ paddingHorizontal: Spacing.lg, paddingTop: Spacing.lg, paddingBottom: insets.bottom + Spacing['4xl'] }}
-    >
+    <SettingsScroll>
       <SettingsHeader icon="models" tile="purple" title={t(roleLabelKey(role))} description={t(roleAboutKey(role))} />
-      {lib.notice ? <InkNotice tone={lib.notice.tone === 'danger' ? 'danger' : 'neutral'}>{lib.notice.text}</InkNotice> : null}
+      {lib.notice ? <SettingsNotice tone={lib.notice.tone === 'danger' ? 'danger' : 'neutral'}>{lib.notice.text}</SettingsNotice> : null}
       <SettingsGroup>
         {candidates.length === 0 ? <SettingsRow label={t('models.library.noCandidates')} /> : null}
         {candidates.map((m) => (
@@ -65,6 +56,6 @@ export default function ModelRoleScreen() {
           }}
         />
       </SettingsGroup>
-    </ScrollView>
+    </SettingsScroll>
   );
 }

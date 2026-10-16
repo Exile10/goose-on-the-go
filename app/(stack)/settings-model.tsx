@@ -4,16 +4,13 @@
  */
 
 import React from 'react';
-import { Alert, ScrollView } from 'react-native';
+import { Alert } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { InkNotice } from '@jarida/ink/native';
 
 import { DownloadRow } from '@/components/settings/model-rows';
 import { SettingsGroup, SettingsHeader, SettingsMessage, SettingsRow } from '@/components/settings/settings-list';
-import { useSettingsColors } from '@/components/settings/settings-theme';
-import { Spacing } from '@/constants/spacing';
+import { SettingsNotice, SettingsScroll } from '@/components/settings/settings-scroll';
 import {
   downloadsByModel,
   formatBytes,
@@ -32,17 +29,15 @@ import { roleLabelKey, useModelLibrary } from '@/view-models/use-model-library';
 export default function ModelScreen() {
   const { t } = useTranslation();
   const router = useRouter();
-  const colors = useSettingsColors();
-  const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id?: string }>();
   const lib = useModelLibrary();
   const model = lib.models.find((m) => m.id === id);
 
   if (!model) {
     return (
-      <ScrollView style={{ flex: 1, backgroundColor: colors.page }} contentContainerStyle={{ padding: Spacing.lg }}>
+      <SettingsScroll>
         <SettingsMessage>{lib.loaded ? t('models.library.empty') : t('settings.loading')}</SettingsMessage>
-      </ScrollView>
+      </SettingsScroll>
     );
   }
 
@@ -96,12 +91,9 @@ export default function ModelScreen() {
   ].filter((f) => !!f.value);
 
   return (
-    <ScrollView
-      style={{ flex: 1, backgroundColor: colors.page }}
-      contentContainerStyle={{ paddingHorizontal: Spacing.lg, paddingTop: Spacing.lg, paddingBottom: insets.bottom + Spacing['4xl'] }}
-    >
+    <SettingsScroll>
       <SettingsHeader icon="models" tile="purple" title={titleOf(model)} description={model.recommended?.reason || model.description || job} />
-      {lib.notice ? <InkNotice tone={lib.notice.tone === 'danger' ? 'danger' : 'neutral'}>{lib.notice.text}</InkNotice> : null}
+      {lib.notice ? <SettingsNotice tone={lib.notice.tone === 'danger' ? 'danger' : 'neutral'}>{lib.notice.text}</SettingsNotice> : null}
 
       {download ? (
         <SettingsGroup title={t('models.library.section.downloading')}>
@@ -153,6 +145,6 @@ export default function ModelScreen() {
           <SettingsRow key={f.label} label={f.label} value={f.value} />
         ))}
       </SettingsGroup>
-    </ScrollView>
+    </SettingsScroll>
   );
 }

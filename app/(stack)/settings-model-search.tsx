@@ -3,12 +3,12 @@
  */
 
 import React from 'react';
-import { Alert, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { Alert, Pressable, Text, TextInput, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { InkNotice, InkSpinner } from '@jarida/ink/native';
+import { InkSpinner } from '@jarida/ink/native';
 
 import { SettingsGroup, SettingsHeader, SettingsMessage, SettingsRow } from '@/components/settings/settings-list';
+import { SettingsNotice, SettingsScroll } from '@/components/settings/settings-scroll';
 import {
   useSettingsColors,
   useSettingsStyles,
@@ -17,7 +17,6 @@ import {
   type SettingsType,
 } from '@/components/settings/settings-theme';
 import { GIcon } from '@/components/ui/g-icon';
-import { GKeyboardView } from '@/components/ui/g-keyboard-view';
 import { Spacing } from '@/constants/spacing';
 import { formatBytes, formatMegabytes } from '@/models/model-library';
 import { confirm, selectionTick, tap } from '@/services/haptics';
@@ -26,9 +25,8 @@ import { useModelLibrary, useModelSearch } from '@/view-models/use-model-library
 
 export default function ModelSearchScreen() {
   const { t } = useTranslation();
-  const colors = useSettingsColors();
   const styles = useSettingsStyles(makeStyles);
-  const insets = useSafeAreaInsets();
+  const colors = useSettingsColors();
   const lib = useModelLibrary();
   const search = useModelSearch();
   const [started, setStarted] = React.useState<string | null>(null);
@@ -62,70 +60,65 @@ export default function ModelSearchScreen() {
   };
 
   return (
-    <GKeyboardView style={{ flex: 1, backgroundColor: colors.page }}>
-      <ScrollView
-        keyboardShouldPersistTaps="handled"
-        contentContainerStyle={{ paddingHorizontal: Spacing.lg, paddingTop: Spacing.lg, paddingBottom: insets.bottom + Spacing['4xl'] }}
-      >
-        <SettingsHeader icon="search" tile="blue" title={t('models.library.search')} description={t('models.library.footer.search')} />
-        <View style={styles.search}>
-          <GIcon name="search" size={18} color={colors.textTertiary} />
-          <TextInput
-            value={search.query}
-            onChangeText={search.actions.setQuery}
-            onSubmitEditing={() => void search.actions.search()}
-            placeholder={t('models.library.searchPlaceholder')}
-            placeholderTextColor={colors.textTertiary}
-            autoCapitalize="none"
-            autoCorrect={false}
-            returnKeyType="search"
-            accessibilityLabel={t('models.library.search')}
-            style={styles.input}
-          />
-          <Pressable onPress={() => void search.actions.search()} accessibilityRole="button" hitSlop={8}>
-            <Text style={styles.searchButton}>{t('models.library.searchButton')}</Text>
-          </Pressable>
-        </View>
+    <SettingsScroll typing>
+      <SettingsHeader icon="search" tile="blue" title={t('models.library.search')} description={t('models.library.footer.search')} />
+      <View style={styles.search}>
+        <GIcon name="search" size={18} color={colors.textTertiary} />
+        <TextInput
+          value={search.query}
+          onChangeText={search.actions.setQuery}
+          onSubmitEditing={() => void search.actions.search()}
+          placeholder={t('models.library.searchPlaceholder')}
+          placeholderTextColor={colors.textTertiary}
+          autoCapitalize="none"
+          autoCorrect={false}
+          returnKeyType="search"
+          accessibilityLabel={t('models.library.search')}
+          style={styles.input}
+        />
+        <Pressable onPress={() => void search.actions.search()} accessibilityRole="button" hitSlop={8}>
+          <Text style={styles.searchButton}>{t('models.library.searchButton')}</Text>
+        </Pressable>
+      </View>
 
-        {started ? <InkNotice tone="success">{t('models.library.started')}</InkNotice> : null}
-        {lib.notice ? <InkNotice tone="danger">{lib.notice.text}</InkNotice> : null}
-        {search.searching ? <InkSpinner label={t('models.library.searchButton')} /> : null}
-        {search.error ? <SettingsMessage tone="danger">{search.error}</SettingsMessage> : null}
+      {started ? <SettingsNotice tone="success">{t('models.library.started')}</SettingsNotice> : null}
+      {lib.notice ? <SettingsNotice tone="danger">{lib.notice.text}</SettingsNotice> : null}
+      {search.searching ? <InkSpinner label={t('models.library.searchButton')} /> : null}
+      {search.error ? <SettingsMessage tone="danger">{search.error}</SettingsMessage> : null}
 
-        {search.files ? (
-          <SettingsGroup title={search.files.repo}>
-            <SettingsRow label={t('common.back')} icon="chevron-left" tile="slate" onPress={() => { void selectionTick(); search.actions.closeRepo(); }} />
-            {search.files.loading ? <SettingsRow label={t('settings.loading')} /> : null}
-            {search.files.error ? <SettingsRow label={search.files.error} /> : null}
-            {!search.files.loading && !search.files.error && search.files.items.length === 0 ? <SettingsRow label={t('models.library.noFiles')} /> : null}
-            {search.files.items.map((file) => (
-              <SettingsRow
-                key={file.filename}
-                label={file.filename}
-                description={[formatMegabytes(file.size_mb), picturesNote(file)].filter(Boolean).join(' · ') || null}
-                trailing={<GIcon name="download" size={18} color={colors.accent} />}
-                onPress={() => askFile(file)}
-              />
-            ))}
-          </SettingsGroup>
-        ) : search.results.length > 0 ? (
-          <SettingsGroup>
-            {search.results.map((repo) => (
-              <SettingsRow
-                key={repo.id}
-                label={repo.id}
-                description={t('models.library.stats', { downloads: repo.downloads.toLocaleString(), likes: repo.likes.toLocaleString() })}
-                accessory="next"
-                onPress={() => {
-                  void selectionTick();
-                  void search.actions.openRepo(repo.id);
-                }}
-              />
-            ))}
-          </SettingsGroup>
-        ) : !search.searching && search.query && !search.error ? null : null}
-      </ScrollView>
-    </GKeyboardView>
+      {search.files ? (
+        <SettingsGroup title={search.files.repo}>
+          <SettingsRow label={t('common.back')} icon="chevron-left" tile="slate" onPress={() => { void selectionTick(); search.actions.closeRepo(); }} />
+          {search.files.loading ? <SettingsRow label={t('settings.loading')} /> : null}
+          {search.files.error ? <SettingsRow label={search.files.error} /> : null}
+          {!search.files.loading && !search.files.error && search.files.items.length === 0 ? <SettingsRow label={t('models.library.noFiles')} /> : null}
+          {search.files.items.map((file) => (
+            <SettingsRow
+              key={file.filename}
+              label={file.filename}
+              description={[formatMegabytes(file.size_mb), picturesNote(file)].filter(Boolean).join(' · ') || null}
+              trailing={<GIcon name="download" size={18} color={colors.accent} />}
+              onPress={() => askFile(file)}
+            />
+          ))}
+        </SettingsGroup>
+      ) : search.results.length > 0 ? (
+        <SettingsGroup>
+          {search.results.map((repo) => (
+            <SettingsRow
+              key={repo.id}
+              label={repo.id}
+              description={t('models.library.stats', { downloads: repo.downloads.toLocaleString(), likes: repo.likes.toLocaleString() })}
+              accessory="next"
+              onPress={() => {
+                void selectionTick();
+                void search.actions.openRepo(repo.id);
+              }}
+            />
+          ))}
+        </SettingsGroup>
+      ) : !search.searching && search.query && !search.error ? null : null}
+    </SettingsScroll>
   );
 }
 

@@ -7,7 +7,6 @@ import React, { useMemo, useState } from 'react';
 import { FlatList, Pressable, Text, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { InkSpinner } from '@jarida/ink/native';
 
 import { GIcon } from '@/components/ui/g-icon';
@@ -17,12 +16,13 @@ import type { ZoneChoice } from '@/services/types';
 import { usePondSettings } from '@/view-models/use-pond-settings';
 import { searchZones, useTimeZones } from '@/view-models/use-settings-extras';
 import { SettingsGroup, SettingsMessage, SettingsRow } from './settings-list';
+import { useSettingsPagePadding } from './settings-scroll';
 import { useSettingsColors, useSettingsStyles, type SettingsColors, type SettingsMetrics, type SettingsType } from './settings-theme';
 
 export function TimezonePickerScreen() {
   const { t } = useTranslation();
   const router = useRouter();
-  const insets = useSafeAreaInsets();
+  const padding = useSettingsPagePadding();
   const colors = useSettingsColors();
   const styles = useSettingsStyles(makeStyles);
   const vm = usePondSettings();
@@ -72,7 +72,7 @@ export function TimezonePickerScreen() {
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
         initialNumToRender={24}
-        contentContainerStyle={{ paddingHorizontal: Spacing.lg, paddingTop: Spacing.lg, paddingBottom: insets.bottom + Spacing['4xl'] }}
+        contentContainerStyle={padding}
         ListHeaderComponent={
           <>
             <View style={styles.search}>

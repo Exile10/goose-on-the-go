@@ -3,14 +3,11 @@
  */
 
 import React, { useMemo } from 'react';
-import { ScrollView } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { SettingsGroup, SettingsHeader, SettingsMessage, SettingsRow } from '@/components/settings/settings-list';
-import { useSettingsColors } from '@/components/settings/settings-theme';
-import { Spacing } from '@/constants/spacing';
+import { SettingsScroll } from '@/components/settings/settings-scroll';
 import { formatMegabytes, isDownloaded, MODEL_ROLES, roleOf, titleOf, tooBig } from '@/models/model-library';
 import { selectionTick } from '@/services/haptics';
 import { roleLabelKey, useModelLibrary } from '@/view-models/use-model-library';
@@ -18,16 +15,11 @@ import { roleLabelKey, useModelLibrary } from '@/view-models/use-model-library';
 export default function ModelCatalogScreen() {
   const { t } = useTranslation();
   const router = useRouter();
-  const colors = useSettingsColors();
-  const insets = useSafeAreaInsets();
   const lib = useModelLibrary();
   const offPond = useMemo(() => lib.models.filter((m) => !isDownloaded(m)), [lib.models]);
 
   return (
-    <ScrollView
-      style={{ flex: 1, backgroundColor: colors.page }}
-      contentContainerStyle={{ paddingHorizontal: Spacing.lg, paddingTop: Spacing.lg, paddingBottom: insets.bottom + Spacing['4xl'] }}
-    >
+    <SettingsScroll>
       <SettingsHeader icon="download" tile="blue" title={t('models.library.catalog')} description={t('models.library.footer.recommended')} />
       {offPond.length === 0 ? <SettingsMessage>{lib.loaded ? t('models.library.noResults') : t('settings.loading')}</SettingsMessage> : null}
       {MODEL_ROLES.map((role) => {
@@ -52,6 +44,6 @@ export default function ModelCatalogScreen() {
           </SettingsGroup>
         );
       })}
-    </ScrollView>
+    </SettingsScroll>
   );
 }

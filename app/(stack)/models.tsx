@@ -4,15 +4,14 @@
  */
 
 import React, { useMemo } from 'react';
-import { RefreshControl, ScrollView, View } from 'react-native';
+import { RefreshControl, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { InkButton, InkNotice, InkSpinner } from '@jarida/ink/native';
+import { InkButton, InkSpinner } from '@jarida/ink/native';
 
 import { DownloadRow, ModelRow } from '@/components/settings/model-rows';
 import { SettingsGroup, SettingsHeader, SettingsMessage, SettingsRow, TILE_INSET } from '@/components/settings/settings-list';
-import { useSettingsColors } from '@/components/settings/settings-theme';
+import { SettingsNotice, SettingsScroll } from '@/components/settings/settings-scroll';
 import { voiceName } from '@/components/settings/special-rows';
 import { Spacing } from '@/constants/spacing';
 import {
@@ -49,8 +48,6 @@ const ROLE_TILE = { chat: 'purple', asr: 'pink', tts: 'pink', embedding: 'teal' 
 export default function ModelsScreen() {
   const { t } = useTranslation();
   const router = useRouter();
-  const colors = useSettingsColors();
-  const insets = useSafeAreaInsets();
   const lib = useModelLibrary();
   const { settings } = usePondSettings();
 
@@ -78,11 +75,7 @@ export default function ModelsScreen() {
   const budget = formatMegabytes(lib.memory?.budget_mb);
 
   return (
-    <ScrollView
-      style={{ flex: 1, backgroundColor: colors.page }}
-      contentContainerStyle={{ paddingHorizontal: Spacing.lg, paddingTop: Spacing.lg, paddingBottom: insets.bottom + Spacing['4xl'] }}
-      refreshControl={<RefreshControl refreshing={lib.loading && lib.loaded} onRefresh={() => void lib.actions.refresh()} />}
-    >
+    <SettingsScroll refreshControl={<RefreshControl refreshing={lib.loading && lib.loaded} onRefresh={() => void lib.actions.refresh()} />}>
       <SettingsHeader
         icon="models"
         tile="purple"
@@ -93,9 +86,7 @@ export default function ModelsScreen() {
       />
 
       {lib.notice ? (
-        <View style={{ marginBottom: Spacing.lg }}>
-          <InkNotice tone={lib.notice.tone === 'danger' ? 'danger' : 'neutral'}>{lib.notice.text}</InkNotice>
-        </View>
+        <SettingsNotice tone={lib.notice.tone === 'danger' ? 'danger' : 'neutral'}>{lib.notice.text}</SettingsNotice>
       ) : null}
 
       {!lib.loaded ? (
@@ -174,6 +165,6 @@ export default function ModelsScreen() {
           </SettingsGroup>
         </>
       )}
-    </ScrollView>
+    </SettingsScroll>
   );
 }

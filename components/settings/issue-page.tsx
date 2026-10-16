@@ -4,22 +4,20 @@
  */
 
 import React from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { InkButton } from '@jarida/ink/native';
 
 import { Spacing } from '@/constants/spacing';
 import { factValue, ISSUE_TILES, type IssueContext, type SettingsIssue } from '@/models/settings-issues';
 import { selectionTick } from '@/services/haptics';
 import { SettingsGroup, SettingsHeader, SettingsRow, TILE_INSET } from './settings-list';
+import { SettingsScroll } from './settings-scroll';
 import { useSettingsColors } from './settings-theme';
 
 export function IssuePage({ issue, ctx }: { issue: SettingsIssue; ctx: IssueContext }) {
   const { t } = useTranslation();
-  const colors = useSettingsColors();
-  const insets = useSafeAreaInsets();
   const router = useRouter();
   const facts = issue.facts?.rows.flatMap((fact) => {
     const value = factValue(fact, ctx, t);
@@ -27,10 +25,7 @@ export function IssuePage({ issue, ctx }: { issue: SettingsIssue; ctx: IssueCont
   });
 
   return (
-    <ScrollView
-      style={{ flex: 1, backgroundColor: colors.page }}
-      contentContainerStyle={{ paddingHorizontal: Spacing.lg, paddingTop: Spacing.lg, paddingBottom: insets.bottom + Spacing['4xl'] }}
-    >
+    <SettingsScroll>
       <SettingsHeader icon={issue.icon} tile={ISSUE_TILES[issue.tone]} title={t(issue.titleKey)} description={t(issue.summaryKey)} />
 
       {issue.facts && facts && facts.length > 0 ? (
@@ -65,7 +60,7 @@ export function IssuePage({ issue, ctx }: { issue: SettingsIssue; ctx: IssueCont
           </InkButton>
         </View>
       ) : null}
-    </ScrollView>
+    </SettingsScroll>
   );
 }
 

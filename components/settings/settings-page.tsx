@@ -3,14 +3,12 @@
  */
 
 import React, { useMemo, useState, type ReactElement } from 'react';
-import { ScrollView, View } from 'react-native';
+import { View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { InkButton, InkSpinner } from '@jarida/ink/native';
 
-import { GKeyboardView } from '@/components/ui/g-keyboard-view';
 import { SETTINGS_PAGES } from '@/constants/settings-pages';
 import { Spacing } from '@/constants/spacing';
 import type { TranslationKey } from '@/services/i18n';
@@ -48,8 +46,8 @@ import {
   ToolModelRow,
   WakeWordResetRow,
 } from './special-rows';
+import { SettingsScroll } from './settings-scroll';
 import { VoicePicker } from './voice-picker';
-import { useSettingsColors } from './settings-theme';
 
 /** Footers that already say a change waits for a restart, so their rows need not say it again. */
 const RESTART_FOOTERS = new Set<TranslationKey>([
@@ -231,8 +229,6 @@ export function SettingsPageScreen({ page: id }: { page: SettingsPageId }) {
   const page = SETTINGS_PAGES[id];
   const { t } = useTranslation();
   const router = useRouter();
-  const colors = useSettingsColors();
-  const insets = useSafeAreaInsets();
   const theme = useTheme();
   const vm = usePondSettings();
   const summaryIds = useMemo(() => linkSummaries(id), [id]);
@@ -291,19 +287,9 @@ export function SettingsPageScreen({ page: id }: { page: SettingsPageId }) {
   }
 
   return (
-    <GKeyboardView style={{ flex: 1, backgroundColor: colors.page }}>
-      <ScrollView
-        contentContainerStyle={{
-          paddingHorizontal: Spacing.lg,
-          paddingTop: Spacing.lg,
-          paddingBottom: insets.bottom + Spacing['4xl'],
-        }}
-        keyboardShouldPersistTaps="handled"
-        keyboardDismissMode="interactive"
-      >
-        <SettingsHeader icon={page.icon} tile={page.tile} title={t(page.titleKey)} description={t(page.descriptionKey)} />
-        {body}
-      </ScrollView>
-    </GKeyboardView>
+    <SettingsScroll typing>
+      <SettingsHeader icon={page.icon} tile={page.tile} title={t(page.titleKey)} description={t(page.descriptionKey)} />
+      {body}
+    </SettingsScroll>
   );
 }
