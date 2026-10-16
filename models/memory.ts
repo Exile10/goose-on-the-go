@@ -9,12 +9,11 @@
  *   old "Reminder" chip is gone: reminders are their own table and route
  *   (`/reminders`), not a kind of memory.
  * - **"Pinned" is `tier: 'permanent'`, shown as "Kept".** That tier is the one
- *   thing decay cleanup reads that means "never fade, never prune" (consolidation
- *   does not check it yet: it can still merge a kept memory). A reserved
- *   tag or an importance threshold would be a flag the Pond ignores: the memory
- *   would look pinned here and still be archived. A memory can be kept when it
- *   is saved; changing it afterwards needs the Pond's `PUT /memories/{id}` to
- *   take a tier, which today rewords only (docs/MEMORIES.md).
+ *   thing decay cleanup and consolidation read that means "never fade, never
+ *   prune". A reserved tag or an importance threshold would be a flag the Pond
+ *   ignores: the memory would look pinned here and still be archived. A memory
+ *   can be kept when it is saved, or afterwards through `PUT /memories/{id}`
+ *   on a Pond new enough to take a tier (docs/MEMORIES.md).
  */
 
 import i18n from '@/services/i18n';
@@ -44,6 +43,28 @@ export function isKept(memory: MemoryFragment): boolean {
  */
 export function unkeptTier(segment: MemorySegment | undefined): MemoryTier {
   return segment === 'context' ? 'short' : 'long';
+}
+
+/** What the edit sheet can send; each resolves to why the Pond refused, or null. */
+export interface MemoryEditActions {
+  setKept: (memory: MemoryFragment, keep: boolean) => Promise<string | null>;
+  reword: (memory: MemoryFragment, content: string) => Promise<string | null>;
+}
+
+/**
+ * Send only what the sheet changed, the keep first: a refused keep then leaves
+ * the words as they were too. Resolves to the first refusal, or null.
+ */
+export async function saveEdit(
+  memory: MemoryFragment,
+  edit: { content: string; keep: boolean },
+  actions: MemoryEditActions,
+): Promise<string | null> {
+  if (edit.keep !== isKept(memory)) {
+    const refused = await actions.setKept(memory, edit.keep);
+    if (refused) return refused;
+  }
+  return edit.content === memory.content ? null : actions.reword(memory, edit.content);
 }
 
 /** The segments the list holds, in chip order. A filter with nothing in it is not offered. */

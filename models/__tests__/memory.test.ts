@@ -4,7 +4,14 @@
  * progress.
  */
 
-import { consolidationStep, isKept, segmentsIn, unkeptTier, type ConsolidationProgress } from '@/models/memory';
+import {
+  consolidationStep,
+  isKept,
+  saveEdit,
+  segmentsIn,
+  unkeptTier,
+  type ConsolidationProgress,
+} from '@/models/memory';
 import type { ConsolidationEvent, MemoryFragment } from '@/services/types';
 import { describeConsolidationError } from '@/view-models/use-consolidation';
 import { describeKeepError, describeMemoryError } from '@/view-models/use-memories';
@@ -40,6 +47,43 @@ describe('unkeptTier', () => {
     expect(unkeptTier('routine')).toBe('long');
     expect(unkeptTier('identity')).toBe('long');
     expect(unkeptTier(undefined)).toBe('long');
+  });
+});
+
+describe('saveEdit', () => {
+  const actions = () => ({
+    setKept: jest.fn().mockResolvedValue(null as string | null),
+    reword: jest.fn().mockResolvedValue(null as string | null),
+  });
+
+  it('sends nothing when nothing changed', async () => {
+    const a = actions();
+    const m = memory({ tier: 'long' });
+    expect(await saveEdit(m, { content: 'Likes tea', keep: false }, a)).toBeNull();
+    expect(a.setKept).not.toHaveBeenCalled();
+    expect(a.reword).not.toHaveBeenCalled();
+  });
+
+  it('sends the keep and the words separately, the keep first', async () => {
+    const a = actions();
+    const order: string[] = [];
+    a.setKept.mockImplementation(async () => (order.push('keep'), null));
+    a.reword.mockImplementation(async () => (order.push('words'), null));
+    const m = memory({ tier: 'long' });
+
+    expect(await saveEdit(m, { content: 'Likes green tea', keep: true }, a)).toBeNull();
+    expect(a.setKept).toHaveBeenCalledWith(m, true);
+    expect(a.reword).toHaveBeenCalledWith(m, 'Likes green tea');
+    expect(order).toEqual(['keep', 'words']);
+  });
+
+  it('leaves the words alone when the keep is refused', async () => {
+    const a = actions();
+    a.setKept.mockResolvedValue('Your Pond needs an update');
+    const m = memory({ tier: 'permanent' });
+
+    expect(await saveEdit(m, { content: 'Likes green tea', keep: false }, a)).toBe('Your Pond needs an update');
+    expect(a.reword).not.toHaveBeenCalled();
   });
 });
 

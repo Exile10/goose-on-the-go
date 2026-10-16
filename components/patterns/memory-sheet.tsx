@@ -2,7 +2,7 @@
  * MemorySheet — a new memory, or new words for one the Pond already holds.
  *
  * A new memory takes a segment and whether to keep it forever; the Pond sets
- * importance and decay from those. Editing offers the words only, because
+ * importance and decay from those. Editing offers the words and the keep:
  * `PUT /memories/{id}` changes nothing else (see `models/memory.ts`).
  */
 
@@ -12,7 +12,7 @@ import { useTranslation } from 'react-i18next';
 import { InkButton, InkChip, InkFormField, InkNotice, InkSheet, InkSwitch, InkText, InkTextArea } from '@jarida/ink/native';
 
 import { GKeyboardView } from '@/components/ui/g-keyboard-view';
-import { MEMORY_SEGMENTS, segmentLabel } from '@/models/memory';
+import { MEMORY_SEGMENTS, isKept, saveEdit, segmentLabel } from '@/models/memory';
 import { confirm, reject } from '@/services/haptics';
 import type { MemoryFragment, MemorySegment, SaveMemoryRequest } from '@/services/types';
 import { Spacing } from '@/constants/spacing';
@@ -25,16 +25,17 @@ export interface MemorySheetProps {
   /** Each resolves to why the Pond refused it, or null once it is saved. */
   onSave: (req: SaveMemoryRequest) => Promise<string | null>;
   onReword: (memory: MemoryFragment, content: string) => Promise<string | null>;
+  onSetKept: (memory: MemoryFragment, keep: boolean) => Promise<string | null>;
 }
 
-export function MemorySheet({ open, editing, onClose, onSave, onReword }: MemorySheetProps) {
+export function MemorySheet({ open, editing, onClose, onSave, onReword, onSetKept }: MemorySheetProps) {
   const { t } = useTranslation();
   const { height } = useWindowDimensions();
   // Mounted afresh for each opening (the screen keys it), so this starts from
   // the memory being edited, or blank.
   const [content, setContent] = useState(editing?.content ?? '');
   const [segment, setSegment] = useState<MemorySegment | null>(null);
-  const [keep, setKeep] = useState(false);
+  const [keep, setKeep] = useState(editing ? isKept(editing) : false);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -48,7 +49,7 @@ export function MemorySheet({ open, editing, onClose, onSave, onReword }: Memory
     setError(null);
     setSubmitting(true);
     const refused = editing
-      ? await onReword(editing, words)
+      ? await saveEdit(editing, { content: words, keep }, { setKept: onSetKept, reword: onReword })
       : await onSave({ content: words, segment: segment ?? undefined, tier: keep ? 'permanent' : undefined });
     setSubmitting(false);
     if (refused) {
@@ -87,11 +88,11 @@ export function MemorySheet({ open, editing, onClose, onSave, onReword }: Memory
                 </View>
               </InkFormField>
               <InkText size="sm" tone="tertiary">{t('memories.form.segmentHint')}</InkText>
-
-              <InkSwitch label={t('memories.form.keep')} checked={keep} onChange={setKeep} />
-              <InkText size="sm" tone="tertiary">{t('memories.form.keepHint')}</InkText>
             </>
           )}
+
+          <InkSwitch label={t('memories.form.keep')} checked={keep} onChange={setKeep} />
+          <InkText size="sm" tone="tertiary">{t('memories.form.keepHint')}</InkText>
 
           {error ? <InkNotice tone="danger">{error}</InkNotice> : null}
 
