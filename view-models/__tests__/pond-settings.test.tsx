@@ -182,6 +182,26 @@ it('makes the speaking engine use a new voice now, not on its next restart', asy
   await m.unmount();
 });
 
+it('settles a voice change only once the engine has it, so a preview hears the new voice', async () => {
+  const m = await mount();
+  pond.updateSettings.mockResolvedValueOnce(record({ voice_tts_voice: 'bf_emma' }));
+  let applied: () => void = () => {};
+  pond.applyTts.mockReturnValueOnce(new Promise((resolve) => (applied = () => resolve({} as never))) as never);
+  let settled = false;
+  await act(async () => {
+    void m.vm.actions.update('voice_tts_voice', 'bf_emma').then(() => (settled = true));
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+  expect(settled).toBe(false);
+  await act(async () => {
+    applied();
+    await Promise.resolve();
+  });
+  expect(settled).toBe(true);
+  await m.unmount();
+});
+
 it('does not touch the engine for a setting that is not about the voice', async () => {
   const m = await mount();
   pond.updateSettings.mockResolvedValueOnce(record({ show_thinking: true }));

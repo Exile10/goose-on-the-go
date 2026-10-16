@@ -18,7 +18,7 @@ import {
   Key, Keyboard, Lightbulb, Link, ListFilter, Lock, MessageCircle, MessageSquareText, Mic, Minus,
   MonitorSmartphone, Moon, Music, Package, Pause, Pencil, Play, Plug, Plus,
   Power, RefreshCw, RotateCcw, ScanFace, ScrollText, Search, Send, Server,
-  Router, Settings, Shield, Siren, Sparkles, Speaker, SquarePen, Sun, Thermometer, Trash2,
+  Router, Settings, Shield, Siren, Sparkles, Speaker, Square, SquarePen, Sun, Thermometer, Trash2,
   TriangleAlert,
   Upload, User, Users, Video, Volume2, VolumeX, Waves, Wifi, Wind, Wrench, X, Zap,
 } from 'lucide-react-native';
@@ -98,6 +98,7 @@ export const ICONS = {
   skills: Wrench,
   sliders: SlidersHorizontal,
   sparkle: Sparkles,
+  stop: Square,
   speaker: Speaker,
   sun: Sun,
   thermo: Thermometer,

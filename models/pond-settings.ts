@@ -420,10 +420,10 @@ export function sortVoices(voices: VoiceInfo[]): VoiceInfo[] {
 
 /** The pace a household reads, from the engine's multiplier. */
 export function paceWord(speed: number): 'muchSlower' | 'slower' | 'natural' | 'faster' | 'muchFaster' {
-  if (speed < 0.75) return 'muchSlower';
-  if (speed < 0.95) return 'slower';
-  if (speed <= 1.05) return 'natural';
-  if (speed <= 1.4) return 'faster';
+  if (speed < 0.7) return 'muchSlower';
+  if (speed < 0.9) return 'slower';
+  if (speed <= 1.1) return 'natural';
+  if (speed <= 1.35) return 'faster';
   return 'muchFaster';
 }
 

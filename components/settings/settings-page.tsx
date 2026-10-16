@@ -46,9 +46,9 @@ import {
   SpeechCategoriesRow,
   TimezoneRow,
   ToolModelRow,
-  VoiceRow,
   WakeWordResetRow,
 } from './special-rows';
+import { VoicePicker } from './voice-picker';
 import { useSettingsColors } from './settings-theme';
 
 /** Footers that already say a change waits for a restart, so their rows need not say it again. */
@@ -179,7 +179,7 @@ function specialRows(id: SpecialId, ctx: Context): ReactElement[] {
   const { t } = ctx;
   switch (id) {
     case 'voicePicker':
-      return [<VoiceRow key={id} {...props} />];
+      return [<VoicePicker key={id} vm={ctx.vm} />];
     case 'wakeWordReset':
       return [<WakeWordResetRow key={id} {...props} />];
     case 'timezone':

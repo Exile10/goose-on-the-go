@@ -46,9 +46,9 @@ own `NavbarBehaviour`.
 ## Sub-Screens (stack navigation from the Profile hub)
 
 The hub is `PROFILE_NAV` in `constants/navigation.ts`, rendered by the You tab
-as iPhone Settings lays its root out: groups without headings, each row an icon
-on a coloured tile, its label, how it stands (`summary`, worked out by
-`summarize` in `view-models/use-settings-extras.ts`) and a chevron. The card
+as iPhone Settings lays its root out, drawn in Ink: groups without headings, each
+row an icon on a coloured tile, its label, how it stands (`summary`, worked out by
+`summarize` in `view-models/use-settings-extras.ts`) and a chevron. The raised card
 at the top leads to `ACCOUNT_ROUTE`, You and your household. Labels are
 `TranslationKey`s, never text.
 
@@ -77,9 +77,11 @@ household's choice for good. Its answer replaces the record, and a refusal puts
 the old value back with the Pond's reason under the row. A setting the Pond
 reads only at start says that a change waits for a restart.
 
-Four pages are not catalogue pages: Voices (`settings-voices`, by accent, with a
-preview) and Time zone (`settings-timezone`, searchable) are pickers, and the
-Models pages below have their own screens.
+Two kinds of page are not catalogue pages: Time zone (`settings-timezone`,
+searchable) is a picker, and the Models pages below have their own screens. The
+Voice page carries pond-desktop's voice picker inline, as the desktop's own Voice
+page does: choosing a voice saves it, has the engine switch to it, and then plays
+the next of seven lines in it, the same line for every voice in turn.
 
 ### What needs attention
 

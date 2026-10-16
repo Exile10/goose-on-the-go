@@ -1050,7 +1050,6 @@
     },
     "percent": "{{value}}%",
     "voice": {
-      "about": "Choose how Goose sounds. Each voice has a grade for how natural it sounds; A is the most natural.",
       "accent": "Accent",
       "voice": "Voice",
       "lang": {
@@ -1069,17 +1068,50 @@
         "f": "Female",
         "m": "Male"
       },
-      "detail": "{{gender}} · grade {{grade}}",
-      "detailUngraded": "{{gender}}",
-      "notInstalled": "Downloads when you choose it",
       "preview": "Hear this voice",
-      "previewing": "Playing…",
       "previewFailed": "Could not play the voice. Is your Pond reachable?",
       "applying": "Getting the voice ready on your Pond…",
       "applyFailed": "Saved, but your Pond could not switch the voice yet. It will on its next restart.",
       "noVoices": "Your Pond has no voices yet.",
       "choose": "Choose a voice",
-      "previewLine": "Your four o'clock moved to Thursday. I've left the morning open."
+      "accentShort": {
+        "a": "American",
+        "b": "British",
+        "e": "Spanish",
+        "f": "French",
+        "h": "Hindi",
+        "i": "Italian",
+        "j": "Japanese",
+        "p": "Portuguese",
+        "z": "Mandarin",
+        "other": "Other"
+      },
+      "pace": "Pace",
+      "ungraded": "—",
+      "note": {
+        "af_heart": "Reference voice",
+        "af_bella": "Most training data",
+        "af_nicole": "Close-mic"
+      },
+      "lines": {
+        "0": "Your four o'clock moved to Thursday. I've left the morning open.",
+        "1": "It's sixty-eight inside, and clear until about four.",
+        "2": "The front door locked itself at eleven, same as it always does.",
+        "3": "I've turned the patio lights down to forty percent.",
+        "4": "You asked me to mention the water filter. It's been three months.",
+        "5": "Nothing needs you right now.",
+        "6": "I live here on your shelf, I think on my own, and nothing you say to me leaves this room."
+      },
+      "pressPlay": "Press play to hear this voice.",
+      "gettingReady": "Getting that voice ready…",
+      "play": "Hear this voice",
+      "preparing": "Preparing",
+      "stop": "Stop",
+      "downloads": "Downloads when you choose it",
+      "grade": "Grade {{grade}}",
+      "gradeNote": "Grade {{grade}} · {{note}}",
+      "showAll": "Show all {{count}}",
+      "showFewer": "Show fewer"
     },
     "wake": {
       "learned_one": "{{count}} learned pronunciation",
@@ -1272,7 +1304,6 @@
     "settingsAppearance": "Appearance",
     "settingsAdvanced": "Advanced",
     "settingsTimezone": "Time zone",
-    "settingsVoices": "Voices",
     "settingsModelRole": "Choose a model",
     "settingsModel": "Model",
     "settingsModelCatalog": "Available to download",

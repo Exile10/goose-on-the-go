@@ -3,14 +3,13 @@
  * lists some controls choose from. Each read is made only by a page that shows it.
  */
 
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import type { TFunction } from 'i18next';
 
 import { useServer } from '@/providers/server-provider';
 import { useTheme } from '@/providers/theme-provider';
 import { ApiError, api } from '@/services/api-client';
 import i18n from '@/services/i18n';
-import { cacheFile, discardFile, playFile } from '@/services/voice-io';
 import type { ModelEntry, PondSettings, Profile, WebSearchStatus, ZoneChoice } from '@/services/types';
 import { providerOf, SAMPLE_SETTINGS, toolsOn, TOOL_SWITCHES, zoneCity, type SummaryId } from '@/models/pond-settings';
 import { describeApiError } from './describe-error';
@@ -374,28 +373,4 @@ export function useResetWakeWord(): ActionState & { run: () => Promise<boolean> 
     }
   }, [isScreenReal]);
   return { ...state, run };
-}
-
-/** Play a line in the voice the Pond speaks in now, through the phone's speaker. */
-export function useVoicePreview(): ActionState & { play: () => Promise<void>; stop: () => void } {
-  const { isScreenReal } = useServer();
-  const [state, setState] = useState<ActionState>(IDLE);
-  const stopRef = useRef<() => void>(() => {});
-  const play = useCallback(async () => {
-    if (!isScreenReal('settings')) return;
-    setState({ busy: true, message: null, tone: 'neutral' });
-    try {
-      const wav = new Uint8Array(await api.speak(i18n.t('settings.voice.previewLine')));
-      const uri = cacheFile('preview', wav);
-      const playing = playFile(uri, () => {});
-      stopRef.current = playing.stop;
-      await playing.done;
-      discardFile(uri);
-      setState(IDLE);
-    } catch (e) {
-      setState({ busy: false, message: describeApiError(e) ?? i18n.t('settings.voice.previewFailed'), tone: 'danger' });
-    }
-  }, [isScreenReal]);
-  const stop = useCallback(() => stopRef.current(), []);
-  return { ...state, play, stop };
 }

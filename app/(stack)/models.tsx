@@ -121,7 +121,7 @@ export default function ModelsScreen() {
                 tile={ROLE_TILE[role]}
                 value={holderText(role)}
                 accessory="next"
-                onPress={() => (role === 'tts' ? go('/(stack)/settings-voices') : go('/(stack)/settings-model-role', { role }))}
+                onPress={() => (role === 'tts' ? go('/(stack)/settings-voice') : go('/(stack)/settings-model-role', { role }))}
               />
             ))}
           </SettingsGroup>

@@ -102,7 +102,7 @@ function saveMessage(e: unknown): string {
 const VOICE_KEYS: readonly PondSettingKey[] = ['voice_tts_voice', 'voice_tts_speed', 'voice_tts_quality'];
 
 /** Storing a voice setting waits for the engine to reload; asking it to apply switches it now. */
-async function applyVoice(key: PondSettingKey, s: PondSettings): Promise<void> {
+async function applyVoice(key: PondSettingKey, s: PondSettings): Promise<boolean> {
   const mine = ++voiceApplies;
   setStore({ voice: { applying: true, error: null } });
   const change =
@@ -112,13 +112,18 @@ async function applyVoice(key: PondSettingKey, s: PondSettings): Promise<void> {
   try {
     await api.applyTts(change);
     if (mine === voiceApplies) setStore({ voice: { applying: false, error: null } });
+    return true;
   } catch (e) {
     console.warn('[settings] the voice was saved but not applied', e instanceof ApiError ? e.status : 'network');
     if (mine === voiceApplies) setStore({ voice: { applying: false, error: i18n.t('settings.voice.applyFailed') } });
+    return false;
   }
 }
 
-/** Change one setting. Resolves to whether the Pond kept it; a refusal puts the old value back. */
+/**
+ * Change one setting. Resolves to whether the Pond kept it; a refusal puts the old value back. A
+ * voice setting resolves once the engine has it too, so a preview after it hears the new voice.
+ */
 async function update<K extends PondSettingKey>(key: K, value: PondSettings[K]): Promise<boolean> {
   const current = store.settings;
   if (!current) return false;
@@ -138,7 +143,7 @@ async function update<K extends PondSettingKey>(key: K, value: PondSettings[K]):
     const answer = readSettings(await api.updateSettings({ [key]: value } as Partial<PondSettings>));
     if (writes.get(key) !== seq) return true;
     setStore({ settings: adopt(answer, key), saving: without(store.saving, key) });
-    if (VOICE_KEYS.includes(key)) void applyVoice(key, answer);
+    if (VOICE_KEYS.includes(key)) await applyVoice(key, answer);
     return true;
   } catch (e) {
     if (writes.get(key) !== seq || !store.settings) return false;

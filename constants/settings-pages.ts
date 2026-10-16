@@ -60,12 +60,8 @@ const voice: SettingsPage = {
   titleKey: 'screens.settingsVoice',
   descriptionKey: 'settings.page.voice',
   sections: [
+    // The picker carries the voice and its pace, as pond-desktop's does.
     { titleKey: 'settings.section.gooseVoice', items: [{ kind: 'special', id: 'voicePicker' }] },
-    {
-      items: [
-        { kind: 'slider', key: 'voice_tts_speed', min: 0.5, max: 2, step: 0.05, format: 'pace', labelKey: 'settings.field.voice_tts_speed.label' },
-      ],
-    },
     {
       titleKey: 'settings.section.soundQuality',
       footerKey: 'settings.footer.soundQuality',

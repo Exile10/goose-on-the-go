@@ -46,24 +46,6 @@ export function voiceName(id: string, t: TFunction): string {
   return info.language ? `${info.name} · ${t(voiceLanguageKey(info.language))}` : info.name;
 }
 
-export function VoiceRow({ settings, vm }: SpecialProps) {
-  const { t } = useTranslation();
-  const router = useRouter();
-  return (
-    <SettingsRow
-      label={t('settings.voice.voice')}
-      value={voiceName(settings.voice_tts_voice, t)}
-      accessory="next"
-      note={vm.voice.applying ? t('settings.voice.applying') : null}
-      error={vm.voice.error ?? vm.fieldErrors.voice_tts_voice}
-      onPress={() => {
-        void selectionTick();
-        router.push('/(stack)/settings-voices');
-      }}
-    />
-  );
-}
-
 /** An action that reads like a link: accent text, no chevron, for a button inside a group. */
 function ActionRow({ label, busyLabel, busy, message, tone, onPress }: {
   label: string;
