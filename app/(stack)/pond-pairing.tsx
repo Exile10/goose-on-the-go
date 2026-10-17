@@ -59,6 +59,7 @@ import {
   refusalWait,
 } from '@/view-models/pairing-errors';
 import { useSpokenCode, type UseSpokenCode } from '@/view-models/use-spoken-code';
+import { setupNeededNow } from '@/view-models/use-setup-gate';
 import { useCountdown } from '@/hooks/use-countdown';
 import { useThemedStyles } from '@/hooks/use-themed-styles';
 import type { ThemeColors } from '@/constants/colors';
@@ -940,10 +941,9 @@ export default function PondPairingScreen() {
         clientIdRef.current = clientId;
         const resp = await pair({ clientId, pairingCode: code, credential, deviceName: name });
         if (resp.accepted) {
-          // Leave on success rather than waiting to be dismissed. The wizard
-          // has nothing left to say, and the remote access offer it used to
-          // push you onto is a dismissible card on Home now.
-          router.replace('/(tabs)');
+          // Leave on success rather than waiting to be dismissed: for Home, or for owner setup on a
+          // Pond nobody has set up yet, as a freshly claimed one is.
+          router.replace((await setupNeededNow()) ? '/(onboarding)/owner-setup' : '/(tabs)');
         } else {
           setCompletionState('error');
           setCompletionReason(explainRefusedPairing(resp.rejection_reason, t, credential));

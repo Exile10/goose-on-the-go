@@ -40,6 +40,7 @@ import {
 } from '@/providers/chrome-provider';
 import { useServer } from '@/providers/server-provider';
 import { useOnboarding } from '@/view-models/use-onboarding';
+import { useSetupGate } from '@/view-models/use-setup-gate';
 import { useSettingsIssues } from '@/view-models/use-settings-issues';
 import { selectionTick } from '@/services/haptics';
 import { Semantic } from '@/constants/colors';
@@ -221,6 +222,7 @@ function AppTabBar({ state, navigation }: TabBarProps) {
 export default function TabLayout() {
   const { hydrated, paired } = useServer();
   const onboarding = useOnboarding();
+  const setup = useSetupGate();
   const { t } = useTranslation();
 
   // `hydrated` is what says the stored identity has been read back. Without
@@ -250,6 +252,10 @@ export default function TabLayout() {
       <Redirect href={onboarding.data.show ? '/(onboarding)/welcome' : '/(stack)/pond-pairing'} />
     );
   }
+
+  // A Pond nobody has set up refuses nearly everything with `onboarding_required`. Until the Pond
+  // has answered, Home shows: an unreachable Pond must not hold the app on a blank screen.
+  if (setup === 'needed') return <Redirect href="/(onboarding)/owner-setup" />;
 
   return (
     <ChromeProvider>
