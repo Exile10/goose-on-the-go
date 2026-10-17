@@ -10,7 +10,7 @@ import type { PakeCredential } from '@/services/cpace';
 import type { ConnectionProfile } from '@/models/connection';
 import type { NearbyPond } from '@/models/nearby-pond';
 import type { HeldSetup } from '@/services/setup-session';
-import { BleUnreachableError } from '@/services/ble';
+import { BleUnreachableError, WrongPondError } from '@/services/ble';
 import { SetupChannel, type SetupLink } from '@/services/setup-channel/session';
 
 export interface ClaimInput {
@@ -22,6 +22,8 @@ export interface ClaimInput {
 
 export interface ClaimDriver {
   readonly transport: 'ble' | 'network';
+  /** Over Bluetooth, whether the Pond is already someone's: one that lost its network still advertises. */
+  greet(): Promise<{ claimed: boolean } | null>;
   /** Whether this Pond can say a pairing code aloud. */
   canSpeak(): Promise<boolean>;
   speak(): Promise<void>;
@@ -47,13 +49,22 @@ export function bleClaim(
       throw new BleUnreachableError(e);
     }
     const next = new SetupChannel(link, random);
-    await next.greet();
+    const hello = await next.greet();
+    // The name was only a claim made over the air; hello is the Pond's own answer, after connecting.
+    if (hello.pondId && hello.pondId !== pond.id) {
+      await next.close();
+      throw new WrongPondError(pond.id, hello.pondId);
+    }
     channel = next;
     return next;
   };
 
   return {
     transport: 'ble',
+    async greet() {
+      const hello = (await open()).hello;
+      return { claimed: hello?.claimed ?? false };
+    },
     async canSpeak() {
       return (await open()).hello?.capabilities.includes('spoken_code') ?? false;
     },
@@ -96,6 +107,9 @@ export function networkClaim(
   };
   return {
     transport: 'network',
+    async greet() {
+      return null;
+    },
     async canSpeak() {
       return true;
     },

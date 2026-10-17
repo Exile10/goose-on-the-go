@@ -1,13 +1,12 @@
 /**
- * New Ponds near the phone, and the claim for the one picked, opened under its own row: the code,
- * what went wrong, and the other ways to give a code. Nothing here moves to another screen until
- * the claim has worked.
+ * Ponds near the phone that need this phone: new ones, and someone's that lost their network. The
+ * claim for the one picked opens under its own row, and nothing moves to another screen until it works.
  */
 
 import React, { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { InkBadge, InkButton, InkGroup, InkNotice, InkRow, InkSpinner, InkText } from '@jarida/ink/native';
+import { InkBadge, InkButton, InkGroup, InkNotice, InkRow, InkSpinner, InkText, InkTitle } from '@jarida/ink/native';
 
 import { GIcon } from '@/components/ui/g-icon';
 import { GPressable } from '@/components/ui/g-pressable';
@@ -20,7 +19,8 @@ import { DigitsField } from './claim-fields';
 
 function ClaimPanel({ pond, find, onScanCard }: { pond: NearbyPond; find: UseFindPond; onScanCard: () => void }) {
   const { t } = useTranslation();
-  const { phase, coolingSecs, spoken } = find.data;
+  const { phase, coolingSecs, spoken, claimedIds } = find.data;
+  const claimed = claimedIds.includes(pond.id);
   const credential = phase.kind === 'entering' || phase.kind === 'failed' ? phase.credential : 'setup';
   const [typed, setTyped] = useState('');
   const [typedFor, setTypedFor] = useState(credential);
@@ -30,10 +30,29 @@ function ClaimPanel({ pond, find, onScanCard }: { pond: NearbyPond; find: UseFin
     setTyped('');
   }
 
-  if (phase.kind === 'claiming') {
+  if (phase.kind === 'claiming' || phase.kind === 'connecting') {
     return (
       <View style={styles.panel} accessibilityLiveRegion="polite">
-        <InkSpinner label={t('bleSetup.find.claiming', { id: pond.id })} />
+        <InkSpinner label={phase.kind === 'connecting' ? t('bleSetup.find.connecting', { id: pond.id }) : t('bleSetup.find.claiming', { id: pond.id })} />
+      </View>
+    );
+  }
+
+  // Someone's Pond that lost its network: its card no longer works, so it says a code instead.
+  if (claimed && phase.kind === 'entering' && !phase.spoken) {
+    return (
+      <View style={styles.panel}>
+        <InkTitle level={3}>{t('bleSetup.find.claimedTitle')}</InkTitle>
+        <InkText tone="secondary">{t('bleSetup.find.claimedBody', { id: pond.id })}</InkText>
+        {spoken.error ? <InkNotice tone="warning">{spoken.error}</InkNotice> : null}
+        <InkButton variant="primary" block icon="volume" disabled={spoken.asking} onPress={find.actions.askSpoken}>
+          {spoken.asking ? t('bleSetup.find.askingSpoken') : t('bleSetup.find.askSpoken')}
+        </InkButton>
+        <View style={styles.alternatives}>
+          <InkButton variant="quiet" onPress={find.actions.cancel}>
+            {t('bleSetup.find.cancel')}
+          </InkButton>
+        </View>
       </View>
     );
   }
@@ -97,9 +116,11 @@ function ClaimPanel({ pond, find, onScanCard }: { pond: NearbyPond; find: UseFin
             <InkButton variant="quiet" icon="volume" disabled={spoken.asking} onPress={find.actions.askSpoken}>
               {spoken.asking ? t('bleSetup.find.askingSpoken') : t('bleSetup.find.askAgain')}
             </InkButton>
-            <InkButton variant="quiet" icon="key" onPress={find.actions.useCard}>
-              {t('bleSetup.find.useCard')}
-            </InkButton>
+            {claimed ? null : (
+              <InkButton variant="quiet" icon="key" onPress={find.actions.useCard}>
+                {t('bleSetup.find.useCard')}
+              </InkButton>
+            )}
           </>
         )}
         <InkButton variant="quiet" onPress={find.actions.cancel}>
@@ -111,19 +132,22 @@ function ClaimPanel({ pond, find, onScanCard }: { pond: NearbyPond; find: UseFin
 }
 
 function pickedId(phase: FindPhase): string | null {
-  return phase.kind === 'entering' || phase.kind === 'claiming' || phase.kind === 'failed' ? phase.pondId : null;
+  return phase.kind === 'entering' || phase.kind === 'claiming' || phase.kind === 'failed' || phase.kind === 'connecting' ? phase.pondId : null;
 }
 
 export function NearbyPonds({ ponds, find, onScanCard }: { ponds: NearbyPond[]; find: UseFindPond; onScanCard: () => void }) {
   const { t } = useTranslation();
   const picked = pickedId(find.data.phase);
-  const busy = find.data.phase.kind === 'claiming';
+  const busy = find.data.phase.kind === 'claiming' || find.data.phase.kind === 'connecting';
   if (ponds.length === 0) return null;
   return (
     <InkGroup title={t('bleSetup.find.newTitle')}>
       {ponds.map((pond, i) => {
         const open = pond.id === picked;
-        const where = pond.url
+        const claimed = find.data.claimedIds.includes(pond.id);
+        const where = claimed
+          ? t('bleSetup.find.needsWifi')
+          : pond.url
           ? pond.hostname
             ? t('bleSetup.find.onNetworkAt', { host: pond.hostname })
             : t('bleSetup.find.onNetwork')
@@ -151,7 +175,8 @@ export function NearbyPonds({ ponds, find, onScanCard }: { ponds: NearbyPond[]; 
               >
                 {open ? null : (
                   <View style={styles.trail}>
-                    <InkBadge tone="brand">{t('onboarding.notSetUp')}</InkBadge>
+                    {/* Only the network says a Pond is unclaimed before connecting; Bluetooth's name does not. */}
+                    {pond.url && !claimed ? <InkBadge tone="brand">{t('onboarding.notSetUp')}</InkBadge> : null}
                     <GIcon name="chevron-right" size={18} />
                   </View>
                 )}

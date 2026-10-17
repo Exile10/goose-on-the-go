@@ -8,7 +8,7 @@ import { BackHandler, ScrollView, StyleSheet, View } from 'react-native';
 import { Stack, useFocusEffect } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { InkButton, InkEmptyState, InkEyebrow, InkSpinner, InkText, InkTitle } from '@jarida/ink/native';
+import { InkButton, InkEmptyState, InkEyebrow, InkNotice, InkSpinner, InkText, InkTitle } from '@jarida/ink/native';
 
 import { WifiList } from '@/components/setup/wifi-list';
 import { GKeyboardView } from '@/components/ui/g-keyboard-view';
@@ -21,7 +21,7 @@ export default function PondWifiScreen() {
   const styles = useThemedStyles(makeStyles);
   const { t } = useTranslation();
   const wifi = usePondWifi();
-  const { phase, networks, cardId } = wifi.data;
+  const { phase, networks, cardId, scanFailure } = wifi.data;
 
   // Back would abandon a Pond that is already claimed; the only ways on are forward or "Find it again".
   useFocusEffect(
@@ -78,7 +78,8 @@ export default function PondWifiScreen() {
               <InkSpinner label={t('bleSetup.wifi.scanning')} />
             ) : (
               <>
-                {phase.kind === 'choosing' && !phase.scanning && networks.length === 0 ? (
+                {scanFailure ? <InkNotice tone="warning">{scanFailure}</InkNotice> : null}
+                {phase.kind === 'choosing' && !phase.scanning && networks.length === 0 && !scanFailure ? (
                   <InkText tone="secondary">{t('bleSetup.wifi.none')}</InkText>
                 ) : null}
                 <WifiList wifi={wifi} />

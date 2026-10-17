@@ -10,10 +10,11 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 
 import { useCountdown } from '@/hooks/use-countdown';
-import { defaultPhoneName } from '@/models/ble-setup';
+import { channelErrorKey, defaultPhoneName } from '@/models/ble-setup';
 import type { NearbyPond } from '@/models/nearby-pond';
 import { useServer } from '@/providers/server-provider';
-import { BleUnreachableError, connectPond } from '@/services/ble';
+import { ApiError } from '@/services/api-client';
+import { BleUnreachableError, connectPond, WrongPondError } from '@/services/ble';
 import type { PakeCredential } from '@/services/cpace';
 import { confirm, reject } from '@/services/haptics';
 import { getInstallId } from '@/services/install-id';
@@ -34,6 +35,8 @@ export type FindPhase =
   | { kind: 'browsing' }
   /** A card was scanned and its Pond has not been heard yet. */
   | { kind: 'looking'; cardId: string; late: boolean }
+  /** Connecting over Bluetooth to learn whether the picked Pond is new or someone's. */
+  | { kind: 'connecting'; pondId: string }
   /** A Pond is picked and the code is being typed. */
   | { kind: 'entering'; pondId: string; credential: PakeCredential; spoken: boolean }
   | { kind: 'claiming'; pondId: string }
@@ -42,6 +45,8 @@ export type FindPhase =
 export interface UseFindPond {
   data: {
     phase: FindPhase;
+    /** Ponds whose hello said they are already someone's: these need a spoken code, then Wi-Fi. */
+    claimedIds: string[];
     phoneName: string;
     /** Seconds until the Pond takes another setup code, after wrong ones. */
     coolingSecs: number;
@@ -70,6 +75,7 @@ export function useFindPond(fresh: NearbyPond[]): UseFindPond {
   const [phase, setPhase] = useState<FindPhase>({ kind: 'browsing' });
   const [phoneName, setPhoneName] = useState(() => defaultPhoneName(Device.deviceName, Device.modelName));
   const [spoken, setSpoken] = useState<{ asking: boolean; error: string | null }>({ asking: false, error: null });
+  const [claimedIds, setClaimedIds] = useState<string[]>([]);
   const { left: coolingSecs, start: startCooling, stop: stopCooling } = useCountdown();
   const { left: spokenWaitSecs, start: startSpokenWait } = useCountdown();
   const card = useRef<{ id: string; code: string } | null>(null);
@@ -97,6 +103,9 @@ export function useFindPond(fresh: NearbyPond[]): UseFindPond {
   const describe = useCallback(
     (e: unknown, credential: PakeCredential) => {
       if (e instanceof BleUnreachableError) return t('bleSetup.find.unreachable');
+      if (e instanceof WrongPondError) return t('bleSetup.find.wrongPond');
+      const channel = e instanceof ApiError ? channelErrorKey(e.detail) : null;
+      if (channel) return t(channel);
       return describePairingFailure(e, t, credential);
     },
     [t],
@@ -114,6 +123,7 @@ export function useFindPond(fresh: NearbyPond[]): UseFindPond {
           void reject();
           // Another phone claimed it between the card and now: only a spoken code joins it.
           const claimedNow = resp.rejection_reason === 'setup_code_unavailable';
+          if (claimedNow) setClaimedIds((ids) => (ids.includes(pond.id) ? ids : [...ids, pond.id]));
           setPhase({ kind: 'failed', pondId: pond.id, credential: claimedNow ? 'pairing' : credential, message: explainRefusedPairing(resp.rejection_reason, t, credential) });
           return;
         }
@@ -129,6 +139,7 @@ export function useFindPond(fresh: NearbyPond[]): UseFindPond {
         void reject();
         const wait = refusalWait(e, 'setup_code_cooling');
         if (wait) startCooling(wait);
+        if (isClaimedRefusal(e)) setClaimedIds((ids) => (ids.includes(pond.id) ? ids : [...ids, pond.id]));
         setPhase({ kind: 'failed', pondId: pond.id, credential: isClaimedRefusal(e) ? 'pairing' : credential, message: describe(e, credential) });
       }
     },
@@ -166,13 +177,30 @@ export function useFindPond(fresh: NearbyPond[]): UseFindPond {
         void claim(pond, 'setup', card.current.code);
         return;
       }
-      setPhase({ kind: 'entering', pondId: pond.id, credential: 'setup', spoken: false });
+      const run = driverFor(pond);
+      if (run.transport === 'network') {
+        setPhase({ kind: 'entering', pondId: pond.id, credential: 'setup', spoken: false });
+        return;
+      }
+      // Over Bluetooth a Pond that lost its network advertises too; only hello says whose it is.
+      setPhase({ kind: 'connecting', pondId: pond.id });
+      void (async () => {
+        try {
+          const greeted = await run.greet();
+          const claimed = greeted?.claimed ?? false;
+          if (claimed) setClaimedIds((ids) => (ids.includes(pond.id) ? ids : [...ids, pond.id]));
+          setPhase({ kind: 'entering', pondId: pond.id, credential: claimed ? 'pairing' : 'setup', spoken: false });
+        } catch (e) {
+          void reject();
+          setPhase({ kind: 'failed', pondId: pond.id, credential: 'setup', message: describe(e, 'setup') });
+        }
+      })();
     },
-    [claim],
+    [claim, describe, driverFor],
   );
 
   const picked = (): NearbyPond | null => {
-    const id = phase.kind === 'entering' || phase.kind === 'failed' || phase.kind === 'claiming' ? phase.pondId : null;
+    const id = phase.kind === 'entering' || phase.kind === 'failed' || phase.kind === 'claiming' || phase.kind === 'connecting' ? phase.pondId : null;
     return ponds.current.find((p) => p.id === id) ?? null;
   };
 
@@ -219,7 +247,7 @@ export function useFindPond(fresh: NearbyPond[]): UseFindPond {
   }, [stopCooling]);
 
   return {
-    data: { phase, phoneName, coolingSecs, spoken },
+    data: { phase, claimedIds, phoneName, coolingSecs, spoken },
     actions: { pick, submit, askSpoken, useCard, setPhoneName, cancel },
   };
 }

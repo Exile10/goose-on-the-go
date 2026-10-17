@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto';
 
-import { BleUnreachableError } from '@/services/ble';
+import { BleUnreachableError, WrongPondError } from '@/services/ble';
 import type { HeldSetup } from '@/services/setup-session';
 import { fakePond, POND_PIN, SETUP_CODE } from '@/services/__tests__/support/setup-channel-pond';
 import type { NearbyPond } from '@/models/nearby-pond';
@@ -48,6 +48,31 @@ describe('claiming over Bluetooth', () => {
     expect(pond.requests.map((r) => r.type)).toEqual(['hello', 'spoken_code', 'pake_init', 'pake_verify', 'status']);
   });
 
+  it('says whether a Pond is already someone’s, from hello, before any code is asked for', async () => {
+    const fresh = bleClaim(nearby(), { connect: jest.fn().mockResolvedValue(fakePond().link), hold: jest.fn() }, random);
+    await expect(fresh.greet()).resolves.toEqual({ claimed: false });
+    const owned = bleClaim(nearby(), { connect: jest.fn().mockResolvedValue(fakePond({ claimed: true }).link), hold: jest.fn() }, random);
+    await expect(owned.greet()).resolves.toEqual({ claimed: true });
+  });
+
+  it('re-provisions someone’s Pond with a spoken code, holding its channel for Wi-Fi', async () => {
+    const pond = fakePond({ claimed: true, pairingCode: '482913' });
+    const hold = jest.fn<void, [HeldSetup]>();
+    const claim = bleClaim(nearby(), { connect: jest.fn().mockResolvedValue(pond.link), hold }, random);
+    await claim.greet();
+    await claim.speak();
+    expect((await claim.claim({ ...input, credential: 'pairing', code: '482913' })).accepted).toBe(true);
+    expect(hold).toHaveBeenCalledTimes(1);
+  });
+
+  it('stops when hello’s pond_id is not the card id the name advertised', async () => {
+    const pond = fakePond({ pondId: 'beef' });
+    const claim = bleClaim(nearby(), { connect: jest.fn().mockResolvedValue(pond.link), hold: jest.fn() }, random);
+    await expect(claim.claim(input)).rejects.toBeInstanceOf(WrongPondError);
+    expect(pond.requests.map((r) => r.type)).toEqual(['hello']);
+    expect(pond.closed()).toBe(true);
+  });
+
   it('names a Pond it cannot reach as out of Bluetooth range', async () => {
     const claim = bleClaim(nearby(), { connect: jest.fn().mockRejectedValue(new Error('timeout')), hold: jest.fn() }, random);
     await expect(claim.claim(input)).rejects.toBeInstanceOf(BleUnreachableError);
@@ -81,6 +106,10 @@ describe('claiming over the network', () => {
     await claim.speak();
     claim.close();
     expect(d.cancel).toHaveBeenCalledTimes(1);
+  });
+
+  it('has nothing to greet over the network, where setup=1 already said', async () => {
+    await expect(networkClaim(onNetwork, deps()).greet()).resolves.toBeNull();
   });
 
   it('prefers the network for a Pond heard both ways', () => {

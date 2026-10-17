@@ -1,6 +1,7 @@
 import i18n from '@/services/i18n';
 import type { ChannelStatus } from '@/services/setup-channel/session';
 import {
+  channelErrorKey,
   defaultPhoneName,
   handoverProfile,
   joinedAt,
@@ -62,6 +63,13 @@ describe('setting up over the setup channel', () => {
     for (const key of [...keys, wifiErrorKey(null), securityKey('enterprise'), securityKey('wpa3')]) {
       expect(i18n.exists(key)).toBe(true);
     }
+  });
+
+  it('says something of its own for the channel’s codes, and leaves the rest to the wizard', () => {
+    expect(channelErrorKey('too_many_attempts')).toBe('bleSetup.find.tooManyAttempts');
+    expect(channelErrorKey('wrong_phase')).toBe(channelErrorKey('unknown_type'));
+    expect(channelErrorKey('internal_error')).toBe('bleSetup.find.pondError');
+    expect(channelErrorKey('invalid_confirmation')).toBeNull();
   });
 
   it('names the phone after itself, else its model', () => {

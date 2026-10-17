@@ -24,6 +24,14 @@ export class BleUnreachableError extends Error {
   }
 }
 
+/** The Pond answered with another card id than its advertised name carried: not the Pond that was picked. */
+export class WrongPondError extends Error {
+  constructor(advertised: string, answered: string) {
+    super(`advertised as ${advertised}, answered as ${answered}`);
+    this.name = 'WrongPondError';
+  }
+}
+
 export type BleState = 'on' | 'off' | 'unauthorized' | 'unsupported' | 'unknown';
 
 export interface BleSighting {

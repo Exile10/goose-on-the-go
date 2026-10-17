@@ -86,6 +86,22 @@ export function wifiErrorKey(code: string | null | undefined): TranslationKey {
   }
 }
 
+/** Setup-channel refusals with no HTTPS counterpart; null leaves a code to the wizard's own sentences. */
+export function channelErrorKey(code: string | null | undefined): TranslationKey | null {
+  switch (code) {
+    case 'too_many_attempts':
+      return 'bleSetup.find.tooManyAttempts';
+    case 'wrong_phase':
+    case 'unknown_type':
+    case 'invalid_request':
+      return 'bleSetup.find.notUnderstood';
+    case 'internal_error':
+      return 'bleSetup.find.pondError';
+    default:
+      return null;
+  }
+}
+
 export function securityKey(security: WifiNetwork['security']): TranslationKey {
   switch (security) {
     case 'open':

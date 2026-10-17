@@ -34,6 +34,8 @@ export interface UsePondWifi {
     networks: WifiNetwork[];
     /** Why the last join failed, in the Pond's own terms, for the network it was for. */
     failure: { ssid: string; message: string } | null;
+    /** Why the Pond could not list networks, so an empty list is not mistaken for none in range. */
+    scanFailure: string | null;
     cardId: string;
   };
   actions: {
@@ -56,6 +58,7 @@ export function usePondWifi(): UsePondWifi {
   const [phase, setPhase] = useState<WifiPhase>(held ? { kind: 'checking' } : { kind: 'lost' });
   const [networks, setNetworks] = useState<WifiNetwork[]>([]);
   const [failure, setFailure] = useState<UsePondWifi['data']['failure']>(null);
+  const [scanFailure, setScanFailure] = useState<string | null>(null);
   const adopted = useRef(false);
   const reaching = useRef(false);
 
@@ -112,13 +115,17 @@ export function usePondWifi(): UsePondWifi {
   const scan = useCallback(async () => {
     if (!held) return;
     setPhase({ kind: 'choosing', scanning: true });
+    setScanFailure(null);
     try {
       setNetworks(wifiChoices(await held.channel.wifiScan()));
       setPhase({ kind: 'choosing', scanning: false });
     } catch (e) {
-      if (!lose(e)) setPhase({ kind: 'choosing', scanning: false });
+      if (lose(e)) return;
+      const code = e instanceof ApiError ? e.detail : null;
+      setScanFailure(code === 'unsupported' ? t(wifiErrorKey(code), { ssid: '' }) : t('bleSetup.wifi.scanFailed'));
+      setPhase({ kind: 'choosing', scanning: false });
     }
-  }, [held, lose]);
+  }, [held, lose, t]);
 
   useEffect(() => {
     if (!held) return;
@@ -189,7 +196,7 @@ export function usePondWifi(): UsePondWifi {
   }, [router]);
 
   return {
-    data: { phase, networks, failure, cardId: held?.cardId ?? '' },
+    data: { phase, networks, failure, scanFailure, cardId: held?.cardId ?? '' },
     actions: {
       rescan: () => void scan(),
       join,
