@@ -194,6 +194,26 @@ code from request to pairing (including from the pick view of a Pond with no
 screen), a dashboard code after an unpicked pin going back to the pick, and a
 claimed Pond's message.
 
+### Over Bluetooth, then HTTPS (2026-10-17)
+
+A Pond with no network is claimed over its BLE setup channel (goose-in-a-pond
+`docs/architecture/pond-setup-channel.md`; ARCHITECTURE.md, "The setup channel").
+
+- **The pin.** There is no TLS on that link, so the pin the phone binds is the one `hello`
+  reports. The exchange that follows is the same CPace run with that pin in the channel
+  identifier, so a relay that substitutes its own pin fails confirmation. A completed exchange
+  therefore proves the pin exactly as a completed HTTPS setup exchange does.
+- **The tokens** arrive sealed under a key drawn from that exchange. The phone opens them only
+  after the Pond's `server_proof` verifies.
+- **The handover.** After `wifi_join` answers with an address, the pairing is committed at
+  `https://<address>:<port>` under that proven pin, before anything is reached
+  (`adoptPairing`). From then on the Pond is pinned HTTPS like any other. The address came over
+  the sealed channel, and a substituted address would fail the pin.
+
+Owed on a device: the scan finding "Pond <id>" (macOS's helper puts the name in the scan
+response), the claim, a Wi-Fi join with a wrong and then a right password, the handover with
+the phone on the same network, and the "connect this phone" state from cellular.
+
 ## Recovery
 
 One connection manager handles endpoint selection for the provider, REST and SSE.

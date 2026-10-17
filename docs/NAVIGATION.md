@@ -122,7 +122,7 @@ is always on screen. The screen is behind the Developer toggle (`webSearch`,
 real by default): on mock, typing `invalid`, `quota` or `offline` as the key
 reaches the refused, spent and unchecked states without a Pond.
 
-Four more stack screens aren't in the hub:
+Five more stack screens aren't in the hub:
 
 - **Pond Pairing** (`/(stack)/pond-pairing`) — from the pairing gate below, first
   run, Switch Pond, Your home and the connection banner.
@@ -131,6 +131,7 @@ Four more stack screens aren't in the hub:
   `offerPairingStart`, as the welcome screen does; until 2026-10-17 it went in a
   route param the wizard never read, and the wizard opened on its own search.
 - **Add a device** (`/(stack)/commission-device`) — from the Devices tab and Home.
+- **Wake word** (`/(stack)/wake-word`) — from Home's "Finish setting up" card after owner setup: the phrase and its calibration, saved through the shared settings store.
 - **Connect Desktop** (`/(stack)/connect-desktop`) — the QR scanner opened from
   Pond Pairing. It reads the pairing QR and a Pond's printed setup card
   (`pond://setup`), and hands either back through `services/pairing-handoff.ts`.
@@ -162,80 +163,66 @@ and the orb in it is `VoiceOrb`.
 
 ## First run
 
-Welcome (`app/(onboarding)/welcome.tsx`) → Pond Pairing → Owner setup, for a Pond
-nobody has set up → Home. The welcome screen is the network scan itself, split
-into its two ways in: "Set up a new Pond", which scans the setup card (the wizard
-opens under the scanner to take it) or lists the Ponds advertising `setup=1`, and
-"Join a Pond that's already set up", the rest of the list and the address form.
-`PondList` badges an unclaimed Pond "Not set up" and prints its card id beside
-its address, so a household with two new Ponds can tell which card is whose. A Pond picked there opens the pairing wizard
-at that Pond's fingerprint check, as a Pond picked from the wizard's own search
-does, and "Enter an address" opens it at the address form; the wizard begins
-with its own search only when it is opened from anywhere else. The choice
-travels through `offerPairingStart` in `services/pairing-handoff.ts`, not route
-params, so a `gooseonthego://` link cannot open the wizard with an address and
-pin already filled. There is no restore path, because there is no backup to
-restore from.
+Find your Pond (`app/(onboarding)/welcome.tsx`), then Wi-Fi for a Pond found over Bluetooth, then owner setup for a Pond nobody has set up, then Home. For a new Pond on Bluetooth with a chat model already on it, that is three screens before Home, plus the scanner. On 2026-10-17 the same path took thirteen. Each removed screen, and where its information went, is in the table under "Owner setup" below.
 
-Until 2026-10-05 the welcome screen put the address in a route param the wizard
-never read, so either choice landed on the same search the welcome screen had
-just shown.
+**Find your Pond** is the welcome screen.
 
-A Pond that advertises itself unclaimed (`setup=1`) skips the fingerprint check:
-the wizard stages it and opens at the code step on its setup card's entry, which
-also offers "Have the Pond say a code" and a six-digit pairing code instead. A
-scanned setup card goes further, since it carries the code: the wizard finds the
-Pond with the card's id and opens at naming the phone (2026-10-17). The
-fingerprint check itself offers "My Pond has no screen: have it say a code", which
-skips the check and opens the code step while the Pond speaks; a code typed from a
-screen after any skipped check returns to the check first. Why the check can be
-skipped is in ARCHITECTURE.md, "Finding the Pond".
+- **New Ponds nearby.** It lists new Ponds heard over Bluetooth (`view-models/use-nearby-ponds.ts`) and those seen on this network advertising `setup=1`, one row per card id (`models/nearby-pond.ts`).
+- **Scan the setup card** is the main button. A scanned card picks the Pond whose advertised name carries its id, and claims it the moment that Pond is heard. There is nothing more to tap.
+- **A Pond picked without a card** opens its claim under its own row (`components/setup/nearby-ponds.tsx`): the card's eleven digits with their Luhn check, "Scan the setup card", and "Have it say a code". Claiming, a wrong code, the cooling wait and "already claimed" are all said on that row.
+- **The phone's name** is its own (expo-device's name, else its model), shown as "This phone joins as …" with Change. Nothing asks for it.
+- **Claiming** goes over the network when the Pond is on it, as the HTTPS setup exchange (no Wi-Fi step then), and otherwise over Bluetooth (`view-models/pond-claim.ts`).
+- **"Join a Pond that's already set up"** stays below. It lists the claimed Ponds and Enter an address, and opens the pairing wizard as before. The wizard has no Name step any more: its code step shows the phone's name with Change, and pairing starts once the code is in.
+
+A choice reaches the wizard through `offerPairingStart` in `services/pairing-handoff.ts`, not route params, so a `gooseonthego://` link cannot open the wizard with an address and pin already filled. There is no restore path, because there is no backup to restore from.
+
+**Wi-Fi** (`app/(onboarding)/pond-wifi.tsx`, `view-models/use-pond-wifi.ts`) follows a claim over Bluetooth.
+
+- **Its list** is the Pond's own `wifi_scan`: known networks first, then strongest. The phone's own network is never read.
+- **A network** opens under its row, with a masked password field that never offers the phone's password store, then Join. Progress and every `wifi_join` refusal show there.
+- **Keeping the session open.** A `status` request every 45 s keeps the Bluetooth session inside the Pond's 120 s idle limit while someone types.
+- **Already online.** A Pond already on a network (Ethernet, or a network it knew) passes through without a choice.
+- **The handover.** Once the Pond has an address, the pairing is kept at once (`adoptPairing`), then the Pond is reached over HTTPS. A phone not on that network sees one state, "Connect this phone to <ssid>", which checks again on every network change and on Check again.
+- **Lost.** A Bluetooth session lost before then says so and goes back to Find your Pond. The Pond is claimed by then, so the way back in is a spoken code.
+
+A Pond that advertises itself unclaimed (`setup=1`), a scanned card, and a spoken code all skip the fingerprint pick, because each exchange proves the pin (ARCHITECTURE.md, "Finding the Pond"). Over Bluetooth the pick never appears: the pin comes from `hello`, and the exchange binds it.
 
 ## Owner setup (2026-10-17)
 
-`app/(onboarding)/owner-setup.tsx` is pond-desktop's onboarding wizard for a Pond
-with no screen: Welcome, About you, Language and location, How Goose talks, Wake
-word, All set. `models/owner-setup.ts` holds the steps, the backend step each one
-records, and the keys each one writes, copied from the desktop's
-`onboarding.constants.ts` and `useOnboardingPersist.ts`; the screen renders
-`view-models/use-owner-setup.ts`, and the steps are in `components/setup/`.
+`app/(onboarding)/owner-setup.tsx` is pond-desktop's onboarding wizard for a Pond with no screen, trimmed for a phone:
 
-- **How it is reached.** Pairing that succeeds asks `/onboard/status` and opens
-  setup instead of Home when the Pond is not done. On launch,
-  `view-models/use-setup-gate.ts` asks once per pairing and the tab layout
-  redirects while the answer is `needed`; until the Pond answers, Home shows, so
-  an unreachable Pond never holds the app on a blank screen. Any request the Pond
-  refuses with 403 `onboarding_required` sets the gate too, which replaced the
-  quiet retry that used to be the only thing that happened.
-- **Each step is saved as it is left**, then recorded with
-  `POST /onboard/step/{name}`; a Pond that will not record it has still saved the
-  step. Setup reopens on the screen after the furthest one recorded.
-- **What the Pond will not answer until setup is done** shapes the rest. The
-  record is read with `GET /settings`, which a paired token may use before setup
-  from goose-in-a-pond#579 (P4) on; an older Pond refuses it with a 403, and then
-  an empty `PUT`, which writes nothing, answers the same record. `GET /profiles` is refused and `PATCH /profiles/{id}` replaces
-  the whole preference map, so the draft is kept on the phone
-  (`storageFamily('setupDrafts')`, by pairing) and every PATCH sends the whole
-  map. `GET /models` is refused, so the voices offered are the installed ones
-  `/voice/tts/apply` reports and Kokoro's graded catalogue, and none can be heard
-  first: `/tts` answers loopback only. The picker is Settings' own
-  (`VoicePickerView`) with no preview.
-- **Calibration is recorded on the phone.** `/voice/calibrate` takes an uploaded
-  WAV and the sentence read; the Pond does not listen itself. The wake step
-  records the five sentences pond-voice's `calibration_prompts` builds, one take
-  each, and starts each run by clearing the old one.
-- **Finishing** is `POST /onboard/complete`. A 400 names `missing_fields`: setup
-  goes back to the earliest step that sets one, and says which. `chat_model` has
-  no default on the Pond and no step can set it, because a phone cannot list
-  models until setup is done; setup says so and stays.
-- **After finishing**, `components/setup/setup-ready.tsx` waits for the chat
-  model to be on disk and warmed (`/warmup`, `/models/download/progress`). A
-  model is never fetched without asking first (`askToDownload`, shared with the
-  Models page). Going on before then marks the Pond getting ready, and Home shows
-  `PondGettingReady` until it can answer.
-- **The phone's owner is shown as the Pond reports it** (`/devices/self`). A
-  claim binds the phone to nobody, since a new Pond has no members yet, and
-  nothing attributes it afterwards.
+- **About you**: name, preferred name, birthday and speech. Under "Where you are", the language and time zone are prefilled from the phone and editable, and a place, detected or typed, sets the weather.
+- **How Goose talks**: style, personality, name and voice, all preselected. Its Finish completes setup. A voice can be heard on the Pond's own speaker through P4's `POST /voice/sample` (goose-in-a-pond#579).
+- **Goose's model**, only when the Pond refuses to finish without a chat model.
+
+`models/owner-setup.ts` holds the steps, the backend steps each records (About you records Basics and Location), and the keys each writes, copied from the desktop's `onboarding.constants.ts` and `useOnboardingPersist.ts`. The screen renders `view-models/use-owner-setup.ts`, and the steps are in `components/setup/`.
+
+What the removed screens held, and where it is now:
+
+| Removed | Now |
+|---|---|
+| Wizard: Find, Code, Name, Pairing (new Pond) | Find your Pond: inline search, code, claim and errors; the phone's own name |
+| Setup: Welcome | The Pond's name on Find your Pond and Home's Pond card; the progress meter; Switch Pond on Home |
+| Setup: Language and location | Prefilled from the phone on About you; also in Settings (Your home, Time zone) |
+| Setup: Wake word | Home's "Finish setting up" card, which opens `/(stack)/wake-word` (phrase and calibration); also Settings > Listening |
+| Setup: All set | Memory stays on (sent with Finish) and is in Settings > Memory; "Look over your choices" on Home opens Settings |
+| Setup: Ready | Home's getting-ready card, shown after every setup until Goose can answer |
+
+- **How it is reached.** Pairing that succeeds asks `/onboard/status` and opens setup instead of Home when the Pond is not done. On launch, `view-models/use-setup-gate.ts` asks once per pairing, and the tab layout redirects while the answer is `needed`. Until the Pond answers, Home shows, so an unreachable Pond never holds the app on a blank screen. Any request the Pond refuses with 403 `onboarding_required` sets the gate too, which replaced the quiet retry that used to be the only thing that happened.
+- **Each step is saved as it is left**, then recorded with `POST /onboard/step/{name}`. A Pond that will not record a step has still saved it. Setup reopens on the screen after the furthest one recorded. A Pond with Basics recorded but not Location was left halfway by an older build, so it reopens on About you.
+- **What the Pond will not answer until setup is done** shapes the rest.
+  - The record is read with `GET /settings`, which a paired token may use before setup from goose-in-a-pond#579 (P4) on. An older Pond refuses it with a 403, and then an empty `PUT`, which writes nothing, answers the same record.
+  - `GET /profiles` is refused and `PATCH /profiles/{id}` replaces the whole preference map, so the draft is kept on the phone (`storageFamily('setupDrafts')`, by pairing) and every PATCH sends the whole map.
+  - Before P4 the voices offered are the installed ones `/voice/tts/apply` reports plus Kokoro's graded catalogue. The picker is Settings' own (`VoicePickerView`). Its play button asks the Pond to speak, and on a Pond without the route the picker says that samples come after setup.
+- **Calibration is recorded on the phone.** `/voice/calibrate` takes an uploaded WAV and the sentence read; the Pond does not listen itself. The wake word screen records the five sentences pond-voice's `calibration_prompts` builds, one take each, and starts each run by clearing the old one.
+- **Finishing.** Finish sends `agent_memory_inject` and `POST /onboard/complete`. A 400 names `missing_fields`: setup goes back to the earliest step that sets one, and says which. `chat_model` alone opens the model step, quietly.
+- **The model step** (`components/setup/model-step.tsx`, `view-models/use-setup-model.ts`) reads the Pond's models, which P4 opens to a paired token before setup.
+  - It offers the chat model already chosen or on the Pond, else the Pond's own suggestion, with its size.
+  - It asks before downloading (`askToDownload`, shared with Models) and shows the progress.
+  - It gives the model the chat job (`POST /models/{category}/{name}/activate {"role":"chat"}`) and finishes by itself.
+  - A Pond that refuses `/models` gets the old notice.
+- **After finishing**, setup leaves for Home. Home's `PondGettingReady` shows whether the chat model is downloading, warming or ready, and the "Finish setting up" card (`components/patterns/finish-setup.tsx`, kept per pairing in `storageFamily('setupChecklist')`) holds the wake word and a look over the defaults. Only the phone that set the Pond up sees that card.
+- **The phone's owner is shown as the Pond reports it** (`/devices/self`). A claim binds the phone to nobody, since a new Pond has no members yet, and nothing attributes it afterwards.
 
 ## Pairing gate (2026-09-21)
 

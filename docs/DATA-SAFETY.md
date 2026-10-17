@@ -141,8 +141,10 @@ crash reporter, no advertising or attribution SDK, and no tracking library of an
 `package.json`. There is no location permission, no contacts access, and no advertising
 identifier.
 
-`expo-device` is present but is used only to establish whether the code is running on
-physical hardware before attempting push registration; it transmits nothing.
+`expo-device` establishes whether the code is running on physical hardware before attempting push
+registration, and since 2026-10-17 gives the default name this phone pairs under (its device name,
+else its model). That name is shown with Change before pairing, and goes only to the user's own
+Pond, as pairing's `device_name` always has.
 
 ---
 
@@ -154,6 +156,21 @@ for. Two uses, both QR codes: the Pond's pairing code, and a Matter device's set
 Decoding happens on device. No image is stored, and no image is transmitted. For Apple's
 label this is camera access without data collection, which is a category the form supports
 and which should be selected deliberately rather than by defaulting to "collected".
+
+---
+
+## Bluetooth
+
+A local module (`plugins/pond-ble`) scans for a new Pond's setup service and connects to the one
+the user picks, to claim it and give it Wi-Fi. Declared: iOS `NSBluetoothAlwaysUsageDescription`;
+Android `BLUETOOTH_SCAN` with `usesPermissionFlags="neverForLocation"`, `BLUETOOTH_CONNECT`, and
+`BLUETOOTH`/`BLUETOOTH_ADMIN` capped at API 30. Nothing is bonded.
+
+The Wi-Fi networks listed are the Pond's own scan; the phone's Wi-Fi is never read. The
+password travels to the Pond under ChaCha20-Poly1305 with a key from that connection's CPace
+exchange, is never written to storage on the phone, and is not offered to the system's password
+store. For both stores this is Bluetooth use without data collection: nothing goes anywhere but
+the user's own Pond.
 
 ---
 
