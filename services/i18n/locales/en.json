@@ -2417,7 +2417,6 @@
       "tooManyAttempts": "Your Pond stopped taking codes on this connection. Pick it again to start a new one.",
       "notUnderstood": "Your Pond didn't understand this phone. Updating the app and your Pond should fix it.",
       "pondError": "Something went wrong on your Pond. Try again in a moment.",
-      "claimedTitle": "Set up already, and needs Wi-Fi",
       "claimedBody": "Pond {{id}} belongs to a household but has lost its network. Have it say a code, and you can give it Wi-Fi from here.",
       "connecting": "Connecting to Pond {{id}}",
       "wrongPond": "That isn't the Pond it said it was, so this phone stopped. Move closer to your Pond and try again.",

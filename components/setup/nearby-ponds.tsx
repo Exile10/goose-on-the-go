@@ -6,7 +6,7 @@
 import React, { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { InkBadge, InkButton, InkGroup, InkNotice, InkRow, InkSpinner, InkText, InkTitle } from '@jarida/ink/native';
+import { InkBadge, InkButton, InkGroup, InkNotice, InkRow, InkSpinner, InkText } from '@jarida/ink/native';
 
 import { GIcon } from '@/components/ui/g-icon';
 import { GPressable } from '@/components/ui/g-pressable';
@@ -42,7 +42,7 @@ function ClaimPanel({ pond, find, onScanCard }: { pond: NearbyPond; find: UseFin
   if (claimed && phase.kind === 'entering' && !phase.spoken) {
     return (
       <View style={styles.panel}>
-        <InkTitle level={3}>{t('bleSetup.find.claimedTitle')}</InkTitle>
+        {/* The row above already says it needs Wi-Fi; this says what to do about it. */}
         <InkText tone="secondary">{t('bleSetup.find.claimedBody', { id: pond.id })}</InkText>
         {spoken.error ? <InkNotice tone="warning">{spoken.error}</InkNotice> : null}
         <InkButton variant="primary" block icon="volume" disabled={spoken.asking} onPress={find.actions.askSpoken}>

@@ -77,9 +77,9 @@ export function PondList({
               }
               description={
                 <Text style={styles.addr}>
-                  {/* The card's id is printed on it, so it says which of several new Ponds a card belongs to. */}
+                  {/* The card's id, in the card's own lowercase, says which of several new Ponds a card belongs to. */}
                   {pond.unclaimed && pond.setupId
-                    ? `${pond.address}:${pond.port} · ${t('onboarding.cardId', { id: pond.setupId.toUpperCase() })}`
+                    ? `${pond.address}:${pond.port} · ${t('onboarding.cardId', { id: pond.setupId })}`
                     : `${pond.address}:${pond.port}`}
                 </Text>
               }

@@ -170,7 +170,7 @@ const makeStyles = (c: ThemeColors) =>
   StyleSheet.create({
     safe: { flex: 1, backgroundColor: c.background },
     scroll: { paddingHorizontal: Spacing.lg, paddingBottom: Spacing.xl },
-    mark: { width: 56, height: 56, marginTop: Spacing.lg, marginBottom: Spacing.md },
+    mark: { width: 56, height: 56, marginTop: Spacing.sm, marginBottom: Spacing.md },
     lede: { marginTop: Spacing.xs, maxWidth: 420 },
     path: { marginTop: Spacing.xl, gap: Spacing.md },
     looking: { gap: Spacing.sm },

@@ -8,7 +8,7 @@ import { BackHandler, ScrollView, StyleSheet, View } from 'react-native';
 import { Stack, useFocusEffect } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { InkButton, InkEmptyState, InkEyebrow, InkNotice, InkSpinner, InkText, InkTitle } from '@jarida/ink/native';
+import { InkButton, InkEmptyState, InkNotice, InkSpinner, InkText, InkTitle } from '@jarida/ink/native';
 
 import { WifiList } from '@/components/setup/wifi-list';
 import { GKeyboardView } from '@/components/ui/g-keyboard-view';
@@ -105,7 +105,8 @@ export default function PondWifiScreen() {
       <Stack.Screen options={{ gestureEnabled: false }} />
       <GKeyboardView>
         <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-          {cardId ? <InkEyebrow>{t('bleSetup.find.rowName', { id: cardId })}</InkEyebrow> : null}
+          {/* Not an eyebrow: its capitals would print the id unlike the card and the advertised name. */}
+          {cardId ? <InkText size="sm" tone="secondary">{t('bleSetup.find.rowName', { id: cardId })}</InkText> : null}
           <InkTitle level={1}>{t('bleSetup.wifi.title')}</InkTitle>
           {body}
         </ScrollView>
@@ -117,6 +118,6 @@ export default function PondWifiScreen() {
 const makeStyles = (c: ThemeColors) =>
   StyleSheet.create({
     safe: { flex: 1, backgroundColor: c.background },
-    scroll: { paddingHorizontal: Spacing.lg, paddingTop: Spacing.xl, paddingBottom: Spacing.xl, gap: Spacing.lg },
+    scroll: { paddingHorizontal: Spacing.lg, paddingTop: Spacing.md, paddingBottom: Spacing.xl, gap: Spacing.lg },
     start: { alignItems: 'flex-start' },
   });
