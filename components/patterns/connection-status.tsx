@@ -2,13 +2,13 @@ import { useEffect, useState, type ReactElement } from 'react';
 import { Pressable, StyleSheet, Text } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
-import { useRouter } from 'expo-router';
+import { useRouter, useSegments } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useServer } from '@/providers/server-provider';
 import { useThemedStyles } from '@/hooks/use-themed-styles';
 import type { ThemeColors } from '@/constants/colors';
 import '@/services/i18n';
-import type { ConnectionState } from '@/models/connection';
+import { bannerHiddenOn, type ConnectionState } from '@/models/connection';
 // The insecure development banner above this one takes the top inset when it is shown.
 
 /** Persistent feedback with local pairing or recovery as the relevant action. */
@@ -76,6 +76,7 @@ export function ConnectionStatus() {
   const styles = useThemedStyles(makeStyles);
   const { t } = useTranslation();
   const router = useRouter();
+  const segments = useSegments();
   const insets = useSafeAreaInsets();
   // `revoked` joins the states that send you to pairing rather than retrying:
   // the Pond is reachable and has stopped recognising this phone, so `recover`
@@ -86,7 +87,7 @@ export function ConnectionStatus() {
     else void recover();
   };
   // Before the saved pairing has loaded, the state is a placeholder, not news.
-  if (!hydrated || !NEEDS_ATTENTION.includes(connectionState)) return null;
+  if (!hydrated || !NEEDS_ATTENTION.includes(connectionState) || bannerHiddenOn(segments)) return null;
   const banner = <Pressable accessibilityRole="button" onPress={act} style={[styles.container, { paddingTop: insets.top + 6 }]}>
     <Text accessibilityLiveRegion="polite" style={styles.text}>{stateLabel(t, connectionState)}</Text>
   </Pressable>;
