@@ -15,6 +15,7 @@ import { PondApiClient } from '@/services/api-client';
 import {
   calculateGenerator,
   channelIdentifier,
+  channelLabel,
   CI_LABEL,
   CLIENT_CONFIRM_LABEL,
   confirmationKey,
@@ -22,10 +23,12 @@ import {
   DSI,
   generatorString,
   intermediateSessionKey,
+  lvCat,
   respond,
   scalarMult,
   scalarMultVfy,
   SERVER_CONFIRM_LABEL,
+  SETUP_CI_LABEL,
 } from '@/services/cpace';
 import { PondTrustError } from '@/services/pond-trust';
 import { randomBytes } from '@/services/secure-random';
@@ -100,6 +103,24 @@ describe('the exchange, value by value', () => {
     expect(hex(macKey)).toBe(outputs.K_mac);
     expect(hex(confirmationTag(CLIENT_CONFIRM_LABEL, macKey, ya, yb))).toBe(outputs.T_client);
     expect(hex(confirmationTag(SERVER_CONFIRM_LABEL, macKey, ya, yb))).toBe(outputs.T_server);
+  });
+
+  // The Pond has no setup vector yet; the contract is the pairing construction under another label.
+  it('opens a setup run\'s CI with the setup label, and so draws a different generator', () => {
+    expect(SETUP_CI_LABEL).toBe('goose-setup-cpace-v1');
+    expect(channelLabel('setup')).toBe(SETUP_CI_LABEL);
+    expect(channelLabel('pairing')).toBe(CI_LABEL);
+    expect(hex(channelIdentifier(inputs.spki_pin, inputs.client_id, CI_LABEL))).toBe(outputs.CI);
+    const setupCi = channelIdentifier(inputs.spki_pin, inputs.client_id, SETUP_CI_LABEL);
+    expect(hex(setupCi)).toBe(hex(lvCat(utf8ToBytes(SETUP_CI_LABEL), utf8ToBytes(inputs.spki_pin), utf8ToBytes(inputs.client_id))));
+    const run = (credential?: 'pairing' | 'setup') => respond({
+      code: inputs.code, pin: inputs.spki_pin, clientId: inputs.client_id, credential,
+      challenge: bytes(inputs.challenge), clientNonce: bytes(inputs.client_nonce),
+      initiatorShare: bytes(outputs.Ya), random: fixed(inputs.yb),
+    });
+    expect(hex(run('pairing').share)).toBe(outputs.Yb);
+    expect(hex(run('setup').share)).toBe(hex(scalarMult(bytesToNumberLE(bytes(inputs.yb)), calculateGenerator(bytes(inputs.PRS), setupCi, sid))));
+    expect(hex(run('setup').share)).not.toBe(outputs.Yb);
   });
 
   it('respond() produces the phone\'s message and expects the Pond\'s tag', () => {

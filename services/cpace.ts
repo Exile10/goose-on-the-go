@@ -2,10 +2,11 @@
  * CPace (draft-irtf-cfrg-cpace-21), suite CPACE-RISTR255-SHA512, and the
  * pairing exchange the Pond runs on top of it.
  *
- * The six-digit pairing code is the password. Nothing either side sends can be
- * tested against a guessed code offline: each guess costs one live exchange with
- * whoever holds the code, so a party that terminates the phone's TLS learns one
- * yes-or-no per pairing attempt instead of the code.
+ * The six-digit pairing code, or a setup card's eleven digits, is the password.
+ * Nothing either side sends can be tested against a guessed code offline: each
+ * guess costs one live exchange with whoever holds the code, so a party that
+ * terminates the phone's TLS learns one yes-or-no per pairing attempt instead of
+ * the code.
  *
  * Roles: the Pond is the initiator (A) and the phone the responder (B). That is
  * what fits the two existing round trips with the phone confirming first, so the
@@ -145,6 +146,8 @@ export function intermediateSessionKey(
 
 /** The label that opens the channel identifier. A breaking change to the exchange is a new label. */
 export const CI_LABEL = 'goose-pair-cpace-v1';
+/** The setup code's own label, so a setup code and a pairing code never share a generator. */
+export const SETUP_CI_LABEL = 'goose-setup-cpace-v1';
 /** The label inside the phone's confirmation tag. */
 export const CLIENT_CONFIRM_LABEL = 'goose-pair-cpace-client-v1';
 /** The label inside the Pond's confirmation tag. Different from the phone's, so neither reflects. */
@@ -164,8 +167,16 @@ const NO_AD = new Uint8Array(0);
  * of its own therefore runs a different generator from the Pond's, and relaying
  * between the two fails without any check after the run.
  */
-export function channelIdentifier(pin: string, clientId: string): Uint8Array {
-  return lvCat(utf8ToBytes(CI_LABEL), utf8ToBytes(pin), utf8ToBytes(clientId));
+export function channelIdentifier(pin: string, clientId: string, label: string = CI_LABEL): Uint8Array {
+  return lvCat(utf8ToBytes(label), utf8ToBytes(pin), utf8ToBytes(clientId));
+}
+
+/** Which secret the phone holds, as `pake/init` names it: a printed setup card's or a pairing code. */
+export type PakeCredential = 'pairing' | 'setup';
+
+/** The label each secret's channel identifier opens with. */
+export function channelLabel(credential: PakeCredential): string {
+  return credential === 'setup' ? SETUP_CI_LABEL : CI_LABEL;
 }
 
 /** Draft 10.4: `mac_key = SHA-512("CPaceMac" || sid || ISK)`. */
@@ -192,7 +203,8 @@ export interface CpaceResponse {
  * Run the phone's side of one exchange, from the Pond's `init` answer to the
  * `verify` request.
  *
- * `code` is the six digits as typed, leading zeros kept, as ASCII. Throws
+ * `code` is the six digits as typed, or a setup card's eleven without dashes,
+ * leading zeros kept, as ASCII. Throws
  * {@link CpaceAbort} when the Pond's share does not decode or the shared secret
  * is the identity; either way nothing is sent.
  */
@@ -200,6 +212,8 @@ export function respond(input: {
   code: string;
   pin: string;
   clientId: string;
+  /** Absent is a pairing code, as it is on the wire. */
+  credential?: PakeCredential;
   challenge: Uint8Array;
   clientNonce: Uint8Array;
   initiatorShare: Uint8Array;
@@ -209,7 +223,8 @@ export function respond(input: {
     throw new CpaceAbort('sid halves must be 32 bytes each');
   }
   const sid = concatBytes(input.challenge, input.clientNonce);
-  const g = calculateGenerator(utf8ToBytes(input.code), channelIdentifier(input.pin, input.clientId), sid);
+  const ci = channelIdentifier(input.pin, input.clientId, channelLabel(input.credential ?? 'pairing'));
+  const g = calculateGenerator(utf8ToBytes(input.code), ci, sid);
   const yb = sampleScalar(input.random);
   const share = scalarMult(yb, g);
   const k = scalarMultVfy(yb, input.initiatorShare);
