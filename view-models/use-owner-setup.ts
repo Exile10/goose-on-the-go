@@ -1,9 +1,11 @@
 /**
- * Owner setup: pond-desktop's onboarding wizard on the phone, for a Pond with no screen. Each step
- * is saved as it is left and recorded with the Pond, so a setup quit part way resumes where it was.
+ * Owner setup: pond-desktop's onboarding wizard on the phone, for a Pond with no screen, trimmed to
+ * two screens and a model screen only when the Pond has none. Each step is saved as it is left and
+ * recorded with the Pond, so a setup quit part way resumes where it was.
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { getLocales } from 'expo-localization';
 
 import { useServer } from '@/providers/server-provider';
 import { ApiError, api } from '@/services/api-client';
@@ -13,21 +15,24 @@ import { storageFamily } from '@/services/storage';
 import type { OnboardStatus, PondSettings, SystemInfo } from '@/services/types';
 import {
   SETUP_STEPS,
-  STEP_TO_BACKEND,
   canContinue,
   defaultDraft,
   deviceZone,
   draftFromPond,
+  finishPatch,
   firstStepFor,
   profilePrefs,
   resumeIndex,
   settingsPatch,
+  setupLanguageFor,
+  stepRecords,
   writesProfile,
   type SetupDraft,
   type SetupStep,
 } from '@/models/owner-setup';
 import { describeApiError } from './describe-error';
-import { markSetupDone } from './use-setup-gate';
+import { openSetupChecklist } from './use-setup-checklist';
+import { markGettingReady, markSetupDone } from './use-setup-gate';
 
 export type SetupPhase = 'loading' | 'failed' | 'wizard' | 'finished' | 'alreadyDone' | 'unpaired';
 
@@ -37,6 +42,17 @@ interface Saved {
 }
 
 const drafts = storageFamily('setupDrafts');
+
+/** The draft's starting point: this phone's zone and, when the desktop offers it, its language. */
+function phoneDraft(): SetupDraft {
+  let tags: string[] = [];
+  try {
+    tags = getLocales().map((l) => l.languageTag);
+  } catch {
+    // No locale module (a test, or the web): English, as the desktop starts.
+  }
+  return defaultDraft(deviceZone(), setupLanguageFor(tags));
+}
 
 function missingKey(field: string): TranslationKey {
   switch (field) {
@@ -49,6 +65,11 @@ function missingKey(field: string): TranslationKey {
     default:
       return 'setup.missing.other';
   }
+}
+
+/** The model step says it itself; every other missing field is named over the step it sends back to. */
+function namedMissing(fields: readonly string[]): string {
+  return fields.filter((f) => f !== 'chat_model').map((f) => i18n.t(missingKey(f))).join(' ');
 }
 
 // P4 answers GET /settings to a paired token before setup; an older Pond refuses it with a 403,
@@ -71,14 +92,9 @@ function saveMessage(e: unknown): string {
 /** What the step a skip leaves behind is set to: the defaults, so nothing it requires is left empty. */
 function skipped(step: SetupStep, draft: SetupDraft): SetupDraft {
   const base = defaultDraft(draft.timezone);
-  switch (step) {
-    case 'personality':
-      return { ...draft, promptStyle: base.promptStyle, personality: base.personality, assistantName: base.assistantName };
-    case 'wake-word':
-      return { ...draft, wakeWord: base.wakeWord, wakeWordCustom: '' };
-    default:
-      return draft;
-  }
+  return step === 'personality'
+    ? { ...draft, promptStyle: base.promptStyle, personality: base.personality, assistantName: base.assistantName }
+    : draft;
 }
 
 export interface UseOwnerSetup {
@@ -90,14 +106,13 @@ export interface UseOwnerSetup {
   error: string | null;
   /** Why the step on screen was returned to, after the Pond refused to finish. */
   notice: string | null;
-  /** The Pond refused to finish because it has no chat model, which nothing on a phone can choose yet. */
+  /** The Pond refused to finish because it has no chat model; the model step chooses one. */
   noChatModel: boolean;
   system: SystemInfo | null;
   canContinue: boolean;
   place: { busy: boolean; note: string | null; tone: 'neutral' | 'danger' };
   actions: {
     patch: (change: Partial<SetupDraft>) => void;
-    start: () => Promise<void>;
     next: () => Promise<void>;
     skip: () => Promise<void>;
     back: () => void;
@@ -112,7 +127,7 @@ export function useOwnerSetup(): UseOwnerSetup {
   const { hydrated, paired, profileId } = useServer();
   const [phase, setPhase] = useState<SetupPhase>('loading');
   const [index, setIndex] = useState(0);
-  const [draft, setDraft] = useState<SetupDraft>(() => defaultDraft(deviceZone()));
+  const [draft, setDraft] = useState<SetupDraft>(phoneDraft);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -121,7 +136,7 @@ export function useOwnerSetup(): UseOwnerSetup {
   const [attempt, setAttempt] = useState(0);
   const [place, setPlace] = useState<UseOwnerSetup['place']>({ busy: false, note: null, tone: 'neutral' });
   // Read in the actions without making them change identity on every keystroke.
-  const owner = useRef<{ id: string | null; prefsKnown: boolean }>({ id: null, prefsKnown: false });
+  const owner = useRef<{ id: string | null }>({ id: null });
   const draftRef = useRef(draft);
   useEffect(() => {
     draftRef.current = draft;
@@ -152,10 +167,9 @@ export function useOwnerSetup(): UseOwnerSetup {
         api.systemInfo().catch((): SystemInfo | null => null),
       ]);
       if (cancelled) return;
-      const base = saved?.draft ? { ...defaultDraft(deviceZone()), ...saved.draft } : defaultDraft(deviceZone());
+      const base = saved?.draft ? { ...phoneDraft(), ...saved.draft } : phoneDraft();
       setDraft(draftFromPond(base, settings, resumeAt));
-      // Preferences cannot be read back, and a PATCH replaces them all: past About you, only a kept draft knows them.
-      owner.current = { id: settings?.primary_profile_id ?? saved?.ownerId ?? null, prefsKnown: !!saved || resumeAt <= 1 };
+      owner.current = { id: settings?.primary_profile_id ?? saved?.ownerId ?? null };
       setSystem(info);
       setIndex(resumeAt);
       setPhase('wizard');
@@ -186,15 +200,16 @@ export function useOwnerSetup(): UseOwnerSetup {
     async (step: SetupStep, d: SetupDraft) => {
       const patch = settingsPatch(step, d);
       if (patch) await api.updateSettings(patch);
-      if (writesProfile(step) && (step === 'about-you' || owner.current.prefsKnown)) {
+      if (writesProfile(step)) {
         const id = await ensureOwner(d.userName.trim());
         await api.setProfilePrefs(id, profilePrefs(d));
-        owner.current = { ...owner.current, prefsKnown: true };
       }
       // Progress is only a bookmark; a Pond that will not record it has still saved the step.
-      await api.recordOnboardStep(STEP_TO_BACKEND[step]).catch((e) => {
-        console.warn('[setup] the step was saved but not recorded', e instanceof ApiError ? e.status : 'network');
-      });
+      for (const record of stepRecords(step)) {
+        await api.recordOnboardStep(record).catch((e) => {
+          console.warn('[setup] the step was saved but not recorded', e instanceof ApiError ? e.status : 'network');
+        });
+      }
       keep(d);
     },
     [ensureOwner, keep],
@@ -222,53 +237,51 @@ export function useOwnerSetup(): UseOwnerSetup {
 
   const next = useCallback(() => advanceFrom(draftRef.current), [advanceFrom]);
 
-  const skip = useCallback(async () => {
-    const d = skipped(SETUP_STEPS[index], draftRef.current);
-    setDraft(d);
-    await advanceFrom(d);
-  }, [advanceFrom, index]);
-
-  const start = useCallback(async () => {
-    if (saving) return;
-    setSaving(true);
-    await api.recordOnboardStep(STEP_TO_BACKEND.welcome).catch(() => undefined);
-    setSaving(false);
-    setIndex(1);
-  }, [saving]);
-
   const finish = useCallback(async () => {
     if (saving) return;
     const d = draftRef.current;
+    const step = SETUP_STEPS[index];
+    if (!canContinue(step, d)) return;
     setSaving(true);
     setError(null);
-    setNoChatModel(false);
     try {
-      await persist('complete', d);
+      await persist(step, d);
+      await api.updateSettings(finishPatch(d));
       const result = await api.completeOnboarding();
       if (result.completed) {
         void confirm();
         if (profileId) {
           markSetupDone(profileId);
+          // Home says whether Goose can answer yet, and what is left to do, in place of two screens.
+          markGettingReady(profileId, true);
+          void openSetupChecklist(profileId);
           void drafts.remove([profileId]).catch(() => {});
         }
         setPhase('finished');
         return;
       }
-      void reject();
       const back = firstStepFor(result.missing);
-      if (back) {
-        const fields = result.missing.filter((f) => f !== 'chat_model');
-        setNotice(fields.map((f) => i18n.t(missingKey(f))).join(' '));
-        setIndex(SETUP_STEPS.indexOf(back));
-      }
+      const onlyModel = result.missing.every((f) => f === 'chat_model');
       setNoChatModel(result.missing.includes('chat_model'));
+      if (!onlyModel) void reject();
+      setNotice(onlyModel ? null : namedMissing(result.missing));
+      if (back) setIndex(SETUP_STEPS.indexOf(back));
     } catch (e) {
       void reject();
       setError(saveMessage(e));
     } finally {
       setSaving(false);
     }
-  }, [persist, profileId, saving]);
+  }, [index, persist, profileId, saving]);
+
+  // Skipping How Goose talks keeps its defaults and finishes, since it is the last thing asked.
+  const skip = useCallback(async () => {
+    const step = SETUP_STEPS[index];
+    const d = skipped(step, draftRef.current);
+    setDraft(d);
+    draftRef.current = d;
+    await (step === 'personality' ? finish() : advanceFrom(d));
+  }, [advanceFrom, finish, index]);
 
   const patch = useCallback((change: Partial<SetupDraft>) => setDraft((d) => ({ ...d, ...change })), []);
   const back = useCallback(() => {
@@ -311,6 +324,6 @@ export function useOwnerSetup(): UseOwnerSetup {
     system,
     canContinue: canContinue(step, draft),
     place,
-    actions: { patch, start, next, skip, back, finish, reload, detectPlace },
+    actions: { patch, next, skip, back, finish, reload, detectPlace },
   };
 }

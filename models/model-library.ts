@@ -135,3 +135,31 @@ export function recommendations(models: ModelEntry[]): ModelEntry[] {
   const rank = (m: ModelEntry) => (m.recommended?.rank === 'primary' ? 0 : 1);
   return models.filter((m) => m.recommended && !m.active).sort((a, b) => rank(a) - rank(b));
 }
+
+export type SetupModelChoice =
+  /** A chat model is on the Pond and doing the job: setup can finish. */
+  | { kind: 'held'; model: ModelEntry }
+  /** One is on the Pond but nothing holds the job: it only needs giving the job. */
+  | { kind: 'ready'; model: ModelEntry }
+  | { kind: 'downloading'; model: ModelEntry; download: ModelDownload }
+  /** The Pond's best suggestion, to ask about before fetching. */
+  | { kind: 'download'; model: ModelEntry }
+  | { kind: 'none' };
+
+/** What owner setup's model step offers, for a Pond that refused to finish without a chat model. */
+export function setupModelChoice(models: ModelEntry[], downloads: DownloadEntry[]): SetupModelChoice {
+  const held = holderOf(models, 'chat');
+  if (held && isDownloaded(held)) return { kind: 'held', model: held };
+  const live = downloadsByModel(downloads).filter((d) => d.status === 'downloading' || d.status === 'paused');
+  const chats = models.filter((m) => roleOf(m) === 'chat');
+  for (const model of chats) {
+    const download = live.find((d) => d.modelId === pondModelId(model));
+    if (download) return { kind: 'downloading', model, download };
+  }
+  // Named for the job but not on disk yet: fetching it keeps the choice already made.
+  if (held) return { kind: 'download', model: held };
+  const onPond = candidatesFor(models, 'chat')[0];
+  if (onPond) return { kind: 'ready', model: onPond };
+  const suggested = recommendations(models).find((m) => roleOf(m) === 'chat' && m.available !== false);
+  return suggested ? { kind: 'download', model: suggested } : { kind: 'none' };
+}

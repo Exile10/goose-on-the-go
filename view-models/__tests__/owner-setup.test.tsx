@@ -11,6 +11,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ApiError, api } from '@/services/api-client';
 import type { OnboardStatus, PondSettings } from '@/services/types';
 import { useOwnerSetup, type UseOwnerSetup } from '@/view-models/use-owner-setup';
+import { resetSetupChecklist } from '@/view-models/use-setup-checklist';
 import { resetSetupGate } from '@/view-models/use-setup-gate';
 
 jest.mock('@/services/pond-trust', () => ({ assertPondTrust: jest.fn().mockResolvedValue(undefined) }));
@@ -34,6 +35,7 @@ jest.mock('@/services/api-client', () => {
 jest.mock('@/providers/server-provider', () => ({
   useServer: () => ({ hydrated: true, paired: true, profileId: 'pairing-1' }),
 }));
+jest.mock('expo-localization', () => ({ getLocales: () => [{ languageTag: 'sw-KE' }] }));
 
 const pond = jest.mocked(api);
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -63,6 +65,7 @@ async function mount() {
 beforeEach(async () => {
   jest.clearAllMocks();
   resetSetupGate();
+  resetSetupChecklist();
   await AsyncStorage.clear();
   pond.updateSettings.mockResolvedValue(record());
   pond.getSettings.mockResolvedValue(record());
@@ -77,7 +80,7 @@ it('reads the record with GET, and writes nothing to read it', async () => {
   pond.getSettings.mockResolvedValue(record());
   const m = await mount();
   expect(m.vm.phase).toBe('wizard');
-  expect(m.vm.step).toBe('welcome');
+  expect(m.vm.step).toBe('about-you');
   expect(pond.getSettings).toHaveBeenCalledTimes(1);
   expect(pond.updateSettings).not.toHaveBeenCalled();
   m.unmount();
@@ -102,32 +105,37 @@ it('does not write to read when the Pond simply cannot be reached', async () => 
   m.unmount();
 });
 
+it('starts from the phone’s language and zone', async () => {
+  pond.onboardStatus.mockResolvedValue(status('not_started'));
+  const m = await mount();
+  expect(m.vm.draft.language).toBe('sw');
+  expect(m.vm.draft.timezone).toBe(Intl.DateTimeFormat().resolvedOptions().timeZone);
+  m.unmount();
+});
+
 it('reopens on the step after the one the Pond last recorded', async () => {
-  pond.onboardStatus.mockResolvedValue(status('Basics'));
+  pond.onboardStatus.mockResolvedValue(status('Location'));
   pond.getSettings.mockResolvedValue(record({ user_name: 'Amina' }));
   const m = await mount();
-  expect(m.vm.step).toBe('locale');
+  expect(m.vm.step).toBe('personality');
   expect(m.vm.draft.userName).toBe('Amina');
   m.unmount();
 });
 
-it('makes the owner once, and sends their whole preference map from each step that writes it', async () => {
-  pond.onboardStatus.mockResolvedValue(status('Welcome'));
+it('saves About you with where you are, makes the owner once, and records both of the desktop’s steps', async () => {
+  pond.onboardStatus.mockResolvedValue(status('not_started'));
   const m = await mount();
   expect(m.vm.step).toBe('about-you');
 
-  await act(async () => m.vm.actions.patch({ userName: 'Amina', slowSpeech: true }));
-  await act(async () => m.vm.actions.next());
-  expect(m.vm.step).toBe('locale');
-
-  await act(async () => m.vm.actions.patch({ language: 'sw' }));
+  await act(async () => m.vm.actions.patch({ userName: 'Amina', slowSpeech: true, timezone: 'Africa/Nairobi' }));
   await act(async () => m.vm.actions.next());
   expect(m.vm.step).toBe('personality');
 
   expect(pond.createProfile).toHaveBeenCalledTimes(1);
   expect(pond.createProfile).toHaveBeenCalledWith('Amina');
   expect(pond.updateSettings).toHaveBeenCalledWith({ primary_profile_id: 'owner-1' });
-  expect(pond.setProfilePrefs).toHaveBeenCalledTimes(2);
+  expect(pond.updateSettings).toHaveBeenCalledWith({ user_name: 'Amina', timezone: 'Africa/Nairobi', weather_location_name: '', weather_enabled: false });
+  expect(pond.setProfilePrefs).toHaveBeenCalledTimes(1);
   expect(pond.setProfilePrefs).toHaveBeenLastCalledWith('owner-1', {
     language: 'sw',
     accessibility_atypical_speech: 'false',
@@ -138,7 +146,7 @@ it('makes the owner once, and sends their whole preference map from each step th
 });
 
 it('uses the owner the Pond already has rather than making a second', async () => {
-  pond.onboardStatus.mockResolvedValue(status('Welcome'));
+  pond.onboardStatus.mockResolvedValue(status('not_started'));
   pond.getSettings.mockResolvedValue(record({ primary_profile_id: 'owner-0' }));
   const m = await mount();
   await act(async () => m.vm.actions.patch({ userName: 'Amina' }));
@@ -148,46 +156,51 @@ it('uses the owner the Pond already has rather than making a second', async () =
   m.unmount();
 });
 
-it('does not overwrite preferences it cannot see, resuming past About you with nothing kept', async () => {
-  pond.onboardStatus.mockResolvedValue(status('Basics'));
-  const m = await mount();
-  expect(m.vm.step).toBe('locale');
-  await act(async () => m.vm.actions.next());
-  expect(pond.setProfilePrefs).not.toHaveBeenCalled();
-  m.unmount();
-});
-
 it('takes the household back to the step that sets a field the Pond is missing', async () => {
-  pond.onboardStatus.mockResolvedValue(status('WakeWord'));
+  pond.onboardStatus.mockResolvedValue(status('GooseIdentity'));
   pond.completeOnboarding.mockResolvedValue({ completed: false, missing: ['timezone', 'chat_model'] });
   const m = await mount();
-  expect(m.vm.step).toBe('complete');
+  expect(m.vm.step).toBe('personality');
   await act(async () => m.vm.actions.finish());
-  expect(m.vm.step).toBe('locale');
+  expect(m.vm.step).toBe('about-you');
   expect(m.vm.notice).toBeTruthy();
   expect(m.vm.noChatModel).toBe(true);
   m.unmount();
 });
 
-it('stays to say so when only the chat model is missing, since no step sets it', async () => {
-  pond.onboardStatus.mockResolvedValue(status('WakeWord'));
+it('opens the model step, quietly, when only the chat model is missing', async () => {
+  pond.onboardStatus.mockResolvedValue(status('GooseIdentity'));
   pond.completeOnboarding.mockResolvedValue({ completed: false, missing: ['chat_model'] });
   const m = await mount();
   await act(async () => m.vm.actions.finish());
-  expect(m.vm.step).toBe('complete');
+  expect(m.vm.step).toBe('model');
   expect(m.vm.noChatModel).toBe(true);
+  expect(m.vm.notice).toBeNull();
   expect(m.vm.phase).toBe('wizard');
   m.unmount();
 });
 
-it('finishes, and says so to the gate', async () => {
-  pond.onboardStatus.mockResolvedValue(status('WakeWord'));
+it('finishes from How Goose talks, saving it first, and leaves the rest for Home', async () => {
+  pond.onboardStatus.mockResolvedValue(status('Location'));
   pond.completeOnboarding.mockResolvedValue({ completed: true });
   const m = await mount();
   await act(async () => m.vm.actions.finish());
   expect(m.vm.phase).toBe('finished');
+  expect(pond.updateSettings).toHaveBeenCalledWith(expect.objectContaining({ assistant_name: 'Goose', voice_tts_voice: 'af_heart' }));
   expect(pond.updateSettings).toHaveBeenCalledWith({ agent_memory_inject: true });
-  expect(pond.recordOnboardStep).toHaveBeenLastCalledWith('Extensions');
+  expect(pond.recordOnboardStep).toHaveBeenLastCalledWith('GooseIdentity');
+  expect(JSON.parse((await AsyncStorage.getItem('@goose/setup-checklist/pairing-1')) ?? '{}')).toEqual({ open: ['wake', 'review'] });
+  m.unmount();
+});
+
+it('keeps the defaults and finishes when How Goose talks is skipped', async () => {
+  pond.onboardStatus.mockResolvedValue(status('Location'));
+  pond.completeOnboarding.mockResolvedValue({ completed: true });
+  const m = await mount();
+  await act(async () => m.vm.actions.patch({ assistantName: '' }));
+  await act(async () => m.vm.actions.skip());
+  expect(m.vm.phase).toBe('finished');
+  expect(pond.updateSettings).toHaveBeenCalledWith(expect.objectContaining({ assistant_name: 'Goose' }));
   m.unmount();
 });
 

@@ -389,11 +389,6 @@
     "noneFoundBody": "Make sure your Pond is running and on this network.",
     "discoveryUnavailable": "Finding Ponds on the network needs a development or release build of the app. Enter your Pond's address instead.",
     "manual": "Enter an address",
-    "newTitle": "Set up a new Pond",
-    "newBody": "Scan the setup card that came with it, or pick it below and have it say a code.",
-    "scanCard": "Scan its setup card",
-    "newFound": "New Ponds on this network",
-    "newNone": "A new Pond appears here once it's switched on and on this network.",
     "joinTitle": "Join a Pond that's already set up",
     "joinBody": "Use the six-digit pairing code from a screen its owner can see.",
     "joinFound": "Ponds on this network",
@@ -1321,7 +1316,8 @@
     "settingsModelSearch": "Search Hugging Face",
     "settingsIssue": "Needs attention",
     "settingsSpeaking": "Speaking voice",
-    "ownerSetup": "Set up your Pond"
+    "ownerSetup": "Set up your Pond",
+    "wakeWord": "Wake word"
   },
   "nav": {
     "goose": "Goose",
@@ -2213,19 +2209,9 @@
     "loadFailedBody": "Check that it's switched on and on the same network as this phone.",
     "saveFailed": "Your Pond didn't save that. Try again.",
     "steps": {
-      "welcome": "Welcome",
       "aboutYou": "About you",
-      "locale": "Language and location",
       "personality": "How Goose talks",
-      "wakeWord": "Wake word",
-      "complete": "All set"
-    },
-    "stepNotes": {
-      "aboutYou": "Your name, and how you speak",
-      "locale": "Language, time zone and weather",
-      "personality": "Style, name and voice",
-      "wakeWord": "What to say to get Goose's attention",
-      "complete": "Check it over and finish"
+      "model": "Goose's model"
     },
     "warmup": {
       "warming": "Goose is warming up on your Pond.",
@@ -2238,16 +2224,6 @@
       "assistantName": "Your Pond needs a name for your assistant before it can finish.",
       "timezone": "Your Pond needs a time zone before it can finish.",
       "other": "Your Pond needs a few more details before it can finish."
-    },
-    "welcome": {
-      "title": "Set up your Pond",
-      "body": "Your Pond has no screen of its own, so you set it up from here. It takes about two minutes, and what you enter stays on your Pond.",
-      "pond": "Your Pond",
-      "pondName": "Name",
-      "pondVersion": "Version",
-      "overview": "What you'll set up",
-      "start": "Get started",
-      "other": "Use a different Pond"
     },
     "about": {
       "title": "About you",
@@ -2271,8 +2247,7 @@
       "birthdayInvalid": "That isn't a date. Check the day and the year."
     },
     "locale": {
-      "title": "Language and location",
-      "lead": "Used for spoken answers, the weather, and anything that depends on the time.",
+      "title": "Where you are",
       "language": "Language",
       "zone": "Time zone",
       "zoneChange": "Change time zone",
@@ -2289,7 +2264,8 @@
       "detectFailed": "Couldn't work that out. Type the nearest town instead.",
       "weather": "Live weather",
       "weatherBody": "Forecasts from Open-Meteo for the place above. No GPS needed.",
-      "zoneClear": "Clear"
+      "zoneClear": "Clear",
+      "fromPhone": "Filled in from this phone. Change anything that's wrong."
     },
     "personality": {
       "title": "How Goose talks",
@@ -2310,7 +2286,13 @@
       "name": "Assistant name",
       "voice": "Voice",
       "voiceLoading": "Asking your Pond about its voices",
-      "noPreview": "You can hear each voice once setup is finished. Until then your Pond only plays samples to itself."
+      "noPreview": "You can hear each voice once setup is finished. Until then your Pond only plays samples to itself.",
+      "sampleHint": "Press play to hear this voice on your Pond's speaker.",
+      "samplePlaying": "Listen to your Pond.",
+      "sampleWait": "Your Pond needs a moment. Try again in {{count}} s.",
+      "sampleUnknown": "Your Pond doesn't have this voice, so it can't play a sample of it.",
+      "sampleUnavailable": "Your Pond's voice isn't ready yet. Try again in a moment.",
+      "sampleFailed": "Your Pond couldn't play a sample."
     },
     "wake": {
       "title": "Wake word",
@@ -2351,26 +2333,15 @@
         "nothingHeard": "Your Pond didn't hear that. Say the sentence again, a little closer to the phone.",
         "failed": "Your Pond couldn't check that sentence. Try again.",
         "noTranscriber": "Your Pond can't listen to recordings yet: its speech-to-text isn't running. Skip this for now."
-      }
+      },
+      "save": "Save wake word",
+      "saved": "Saved. Goose now answers to “{{phrase}}”.",
+      "current": "Goose answers to “{{phrase}}” now."
     },
     "complete": {
-      "title": "All set",
-      "lead": "Here's what your Pond knows. You can change any of it later in Settings.",
-      "memory": "Memory",
-      "memoryBody": "Goose remembers facts across conversations, kept on your Pond. Nothing leaves it.",
-      "summary": "Your setup",
-      "you": "You",
-      "language": "Language",
-      "zone": "Time zone",
-      "style": "Style",
-      "assistant": "Assistant",
-      "wake": "Wake word",
-      "noModelTitle": "Your Pond has no model to think with",
       "noModelBody": "It can't finish setting up without one, and choosing a model from a phone needs a Pond update. Everything else is saved: once your Pond has a model, finish here."
     },
     "ready": {
-      "title": "Getting your Pond ready",
-      "titleReady": "Goose is ready",
       "checking": "Checking on your Pond",
       "downloading": "Your Pond is downloading {{name}}, the model Goose thinks with.",
       "notDownloaded": "{{name}} is chosen, but it isn't on your Pond yet.",
@@ -2378,18 +2349,34 @@
       "suggestion": "Your Pond suggests {{name}}.",
       "chooseModel": "Choose a model",
       "warming": "Your Pond has its model and is warming up.",
-      "ready": "Your Pond can answer now.",
-      "phone": "This phone",
-      "phoneOwner": "Linked to {{name}} on your Pond.",
-      "phoneNobody": "Not linked to anyone on your Pond yet, so Goose doesn't use your details when you talk from here. That needs a Pond update.",
-      "goHome": "Go to Home",
-      "goOn": "Continue while it gets ready"
+      "ready": "Your Pond can answer now."
     },
     "gettingReady": {
-      "title": "Your Pond is still getting ready",
+      "title": "Goose is set up and getting ready",
       "readyTitle": "Goose is ready",
       "readyBody": "Your Pond has its model and can answer now.",
       "dismiss": "Dismiss"
+    },
+    "model": {
+      "title": "Choose what Goose thinks with",
+      "lead": "Your Pond has no model to think with yet, and Goose can't answer without one. Your Pond suggests one that fits it.",
+      "checking": "Asking your Pond what fits it",
+      "suggested": "Your Pond's suggestion for the way Goose thinks and talks.",
+      "downloadSized": "Download ({{size}})",
+      "downloading": "Your Pond is downloading {{name}}.",
+      "keepOpen": "Setup finishes by itself once it's on your Pond. You can leave this screen open, or come back to it.",
+      "using": "Giving {{name}} the job",
+      "none": "Your Pond has no model to suggest. Choose one from its models.",
+      "others": "See other models"
+    },
+    "checklist": {
+      "title": "Finish setting up",
+      "lead": "Everything else has a sensible default. These are worth a minute when you have one.",
+      "wake": "Choose a wake word",
+      "wakeBody": "Goose answers to its default until you pick a phrase and teach it your voice.",
+      "review": "Look over your choices",
+      "reviewBody": "Your name, Goose's voice and where you live are all in Settings.",
+      "dismiss": "Put away"
     }
   },
   "bleSetup": {

@@ -4,60 +4,60 @@
 import type { TranslationKey } from '@/services/i18n';
 import type { PondSettings } from '@/services/types';
 
-export const SETUP_STEPS = ['welcome', 'about-you', 'locale', 'personality', 'wake-word', 'complete'] as const;
+/**
+ * The desktop's six screens, trimmed to what a phone has to ask: who you are and where (the place
+ * and language prefilled from the phone), how Goose talks, and a model only when the Pond has none.
+ * The wake word moved to Home's "Finish setting up" card, and the summary to Settings.
+ */
+export const SETUP_STEPS = ['about-you', 'personality', 'model'] as const;
 export type SetupStep = (typeof SETUP_STEPS)[number];
 
 export function stepLabelKey(step: SetupStep): TranslationKey {
   switch (step) {
-    case 'welcome':
-      return 'setup.steps.welcome';
     case 'about-you':
       return 'setup.steps.aboutYou';
-    case 'locale':
-      return 'setup.steps.locale';
     case 'personality':
       return 'setup.steps.personality';
-    case 'wake-word':
-      return 'setup.steps.wakeWord';
-    case 'complete':
-      return 'setup.steps.complete';
+    case 'model':
+      return 'setup.steps.model';
   }
 }
 
 /** A required step has no Skip: the Pond refuses to finish without what it sets. */
 export function isRequired(step: SetupStep): boolean {
-  return step === 'about-you' || step === 'locale';
+  return step === 'about-you' || step === 'model';
 }
 
-/** The backend `OnboardingStep` each step records once it is saved, as the desktop sends them. */
-export const STEP_TO_BACKEND: Record<SetupStep, string> = {
-  welcome: 'Welcome',
-  'about-you': 'Basics',
-  locale: 'Location',
-  personality: 'GooseIdentity',
-  'wake-word': 'WakeWord',
-  complete: 'Extensions',
-};
+/** The backend `OnboardingStep`s each step records once it is saved, in the order the desktop sends them. */
+export function stepRecords(step: SetupStep): string[] {
+  switch (step) {
+    case 'about-you':
+      return ['Basics', 'Location'];
+    case 'personality':
+      return ['GooseIdentity'];
+    case 'model':
+      return ['Model'];
+  }
+}
 
-// Ten backend steps fold into six screens; Accessibility and Personality were merged on the desktop.
+// About you is saved only once Location is recorded too; a Pond with Basics alone was left half way
+// by an older build, and its zone is not known to be saved. Finishing lives on How Goose talks, so
+// anything past it reopens there.
 const BACKEND_TO_INDEX: Record<string, number> = {
-  Welcome: 0,
-  Basics: 1,
-  Accessibility: 1,
-  Location: 2,
-  Personality: 3,
-  GooseIdentity: 3,
-  WakeWord: 4,
-  Model: 5,
-  Extensions: 5,
-  Completed: 5,
+  Location: 0,
+  Personality: 1,
+  GooseIdentity: 1,
+  WakeWord: 1,
+  Model: 1,
+  Extensions: 1,
+  Completed: 1,
 };
 
 /** The screen after the furthest one the Pond recorded: a recorded step was saved, so it is not asked again. */
 export function resumeIndex(backendStep: string | null | undefined): number {
   const done = backendStep ? BACKEND_TO_INDEX[backendStep] : undefined;
   if (done === undefined) return 0;
-  return Math.min(done + 1, SETUP_STEPS.length - 1);
+  return Math.min(done + 1, SETUP_STEPS.indexOf('personality'));
 }
 
 export const PROMPT_STYLES = ['balanced', 'concise', 'technical', 'warm'] as const;
@@ -77,6 +77,15 @@ export const SETUP_LANGUAGES = [
   { key: 'ja', name: '日本語' },
   { key: 'zh', name: '中文' },
 ] as const;
+
+/** The phone's language when it is one the desktop offers, else English. */
+export function setupLanguageFor(tags: readonly (string | null | undefined)[]): string {
+  for (const tag of tags) {
+    const key = tag?.toLowerCase().split(/[-_]/)[0];
+    if (key && SETUP_LANGUAGES.some((l) => l.key === key)) return key;
+  }
+  return 'en';
+}
 
 /** This phone's zone, which is nearly always the home's. */
 export function deviceZone(): string {
@@ -115,14 +124,14 @@ export interface SetupDraft {
   enableMemory: boolean;
 }
 
-export function defaultDraft(deviceZone: string): SetupDraft {
+export function defaultDraft(deviceZone: string, language = 'en'): SetupDraft {
   return {
     userName: '',
     preferredName: '',
     birthday: '',
     atypicalSpeech: false,
     slowSpeech: false,
-    language: 'en',
+    language,
     timezone: deviceZone || 'UTC',
     locationName: '',
     latitude: 0,
@@ -154,7 +163,7 @@ export function draftFromPond(base: SetupDraft, settings: Partial<PondSettings> 
   const saved = (step: SetupStep) => SETUP_STEPS.indexOf(step) < resumeAt;
   const next = { ...base };
   if (saved('about-you') && s.user_name) next.userName = s.user_name;
-  if (saved('locale')) {
+  if (saved('about-you')) {
     if (s.timezone) next.timezone = s.timezone;
     next.locationName = s.weather_location_name ?? next.locationName;
     next.enableWeather = s.weather_enabled ?? next.enableWeather;
@@ -166,12 +175,14 @@ export function draftFromPond(base: SetupDraft, settings: Partial<PondSettings> 
     next.ttsVoice = s.voice_tts_voice || next.ttsVoice;
     next.ttsSpeed = s.voice_tts_speed || next.ttsSpeed;
   }
-  if (saved('wake-word') && s.voice_wake_word) {
-    const preset = (WAKE_PRESETS as readonly string[]).includes(s.voice_wake_word);
-    next.wakeWord = preset ? s.voice_wake_word : 'custom';
-    next.wakeWordCustom = preset ? next.wakeWordCustom : s.voice_wake_word;
-  }
   return next;
+}
+
+/** The wake phrase the Pond holds, as the wake step's preset or custom choice. */
+export function wakeDraftFrom(phrase: string | null | undefined): Pick<SetupDraft, 'wakeWord' | 'wakeWordCustom'> {
+  const p = phrase?.trim() ?? '';
+  if (!p) return { wakeWord: 'goose', wakeWordCustom: '' };
+  return (WAKE_PRESETS as readonly string[]).includes(p) ? { wakeWord: p, wakeWordCustom: '' } : { wakeWord: 'custom', wakeWordCustom: p };
 }
 
 /** The phrase the Pond will listen for. */
@@ -179,13 +190,12 @@ export function wakePhrase(draft: Pick<SetupDraft, 'wakeWord' | 'wakeWordCustom'
   return draft.wakeWord === 'custom' ? draft.wakeWordCustom.trim() : draft.wakeWord;
 }
 
-/** `PUT /settings` per step, key for key with the desktop. */
+/** `PUT /settings` per step, key for key with the desktop; About you carries the desktop's Location step too. */
 export function settingsPatch(step: SetupStep, draft: SetupDraft): Partial<PondSettings> | null {
   switch (step) {
     case 'about-you':
-      return { user_name: draft.userName.trim() };
-    case 'locale':
       return {
+        user_name: draft.userName.trim(),
         timezone: draft.timezone,
         weather_location_name: draft.locationName,
         weather_enabled: draft.enableWeather,
@@ -202,18 +212,19 @@ export function settingsPatch(step: SetupStep, draft: SetupDraft): Partial<PondS
         voice_tts_voice: draft.ttsVoice,
         voice_tts_speed: draft.ttsSpeed,
       };
-    case 'wake-word':
-      return { voice_wake_word: wakePhrase(draft) };
-    case 'complete':
-      return { agent_memory_inject: draft.enableMemory };
-    default:
+    case 'model':
       return null;
   }
 }
 
-/** The steps that write the owner's profile preferences: About you, and Language for its language. */
+/** What All set used to save with Finish: memory on, which Settings > Memory shows and changes. */
+export function finishPatch(draft: SetupDraft): Partial<PondSettings> {
+  return { agent_memory_inject: draft.enableMemory };
+}
+
+/** The step that writes the owner's profile preferences, language among them. */
 export function writesProfile(step: SetupStep): boolean {
-  return step === 'about-you' || step === 'locale';
+  return step === 'about-you';
 }
 
 /** The whole preference map, since a PATCH replaces it: strings, flags as `"true"`, empties dropped. */
@@ -288,27 +299,29 @@ export function shortPhraseSuggestion(phrase: string): string | null {
 export function canContinue(step: SetupStep, draft: SetupDraft): boolean {
   switch (step) {
     case 'about-you':
-      return draft.userName.trim().length > 0;
-    case 'locale':
-      return draft.timezone.trim().length > 0;
+      return draft.userName.trim().length > 0 && draft.timezone.trim().length > 0;
     case 'personality':
       return draft.assistantName.trim().length > 0;
-    case 'wake-word':
-      return draft.wakeWord !== 'custom' || wakePhraseProblem(draft.wakeWordCustom) === null;
-    default:
+    case 'model':
       return true;
   }
 }
 
-/** The fields `POST /onboard/complete` checks, and the step that sets each; `chat_model` has none. */
+/** Whether a wake phrase choice can be stored. */
+export function wakeChoiceValid(draft: Pick<SetupDraft, 'wakeWord' | 'wakeWordCustom'>): boolean {
+  return draft.wakeWord !== 'custom' || wakePhraseProblem(draft.wakeWordCustom) === null;
+}
+
+/** The fields `POST /onboard/complete` checks, and the step that sets each. */
 export function stepForMissingField(field: string): SetupStep | null {
   switch (field) {
     case 'user_name':
+    case 'timezone':
       return 'about-you';
     case 'assistant_name':
       return 'personality';
-    case 'timezone':
-      return 'locale';
+    case 'chat_model':
+      return 'model';
     default:
       return null;
   }
