@@ -189,7 +189,10 @@ can be tested lives in TypeScript.
 **The exchange.** `SetupChannel` (`services/setup-channel/session.ts`) runs over any ordered byte
 link. Messages are length-prefixed JSON cut to `ATT_MTU - 3` (`framing.ts`).
 
-- **hello** gives the pin.
+- **hello** gives the pin, and `pond_id`, which must match the card id the advertised name
+  carried, or the phone stops. It also says whether the Pond is `claimed`. A claimed Pond with no
+  network still advertises, because the Pond advertises while unclaimed OR without a network. Such
+  a Pond is given Wi-Fi again after a spoken code, from the same row.
 - **The claim** is `pake_init` and `pake_verify`, the exchange `pair()` runs over HTTPS, with the
   same `respond()` and the pin from `hello` in the channel identifier. A substituted pin can only
   fail it.
@@ -199,8 +202,12 @@ link. Messages are length-prefixed JSON cut to `ATT_MTU - 3` (`framing.ts`).
   (`keepIsk`), and the channel zeroes it once the keys are drawn.
 - **Anything unreadable ends the session**: a frame that does not parse, a tag or counter that does
   not check, an answer to no question. A counter out of step cannot be put back.
-- **Refusals** arrive as `ApiError` carrying the HTTPS API's codes, so the pairing wizard's
-  sentences apply unchanged.
+- **Refusals.** Every refusal is `ok: false`. A refused `pake_verify` is returned as HTTPS returns
+  it, `accepted: false` with its `rejection_reason`. Every other refusal arrives as `ApiError`
+  carrying the code, so the pairing wizard's sentences apply unchanged. The channel's own codes
+  (`too_many_attempts`, after a fourth `pake_init`, which also ends the session; `wrong_phase`;
+  `unknown_type`; `invalid_request`; `internal_error`) have sentences of their own
+  (`channelErrorKey`).
 
 **The handover.** `wifi_join` answers with the Pond's address and HTTPS port. `adoptPairing` in
 `ServerProvider` keeps the pairing there at once: the pin proven by the exchange, the tokens from
@@ -209,9 +216,11 @@ be on that network yet, and tokens held only in memory would leave a claimed Pon
 holds. Then the Pond is reached over pinned HTTPS, and owner setup runs there.
 
 **Tests.** `services/__tests__/support/setup-channel-pond.ts` plays the Pond's end, built from the
-same primitives. HKDF and the AEAD are checked against Node's OpenSSL. The Pond's own
-`setup-channel-vectors.json` will pin both byte for byte once P5a lands. Everything native is
-owed a device test.
+same primitives and following the agreed contract. HKDF and the AEAD are checked against Node's
+OpenSSL. `setup-channel-vectors.test.ts` checks the keys, four sealed messages in session order,
+and framing at ATT_MTU 23 against `vectors/setup-channel-vectors.json`. That file is a
+byte-identical copy of goose-in-a-pond's `crates/pond-connect/tests/fixtures/setup-channel-vectors.json`,
+and its ISK and sid chain to `cpace-vectors.json`. Everything native is owed a device test.
 
 ## Providers
 

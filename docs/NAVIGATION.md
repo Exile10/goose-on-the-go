@@ -167,10 +167,10 @@ Find your Pond (`app/(onboarding)/welcome.tsx`), then Wi-Fi for a Pond found ove
 
 **Find your Pond** is the welcome screen.
 
-- **New Ponds nearby.** It lists new Ponds heard over Bluetooth (`view-models/use-nearby-ponds.ts`) and those seen on this network advertising `setup=1`, one row per card id (`models/nearby-pond.ts`).
+- **Ponds nearby.** It lists Ponds heard over Bluetooth (`view-models/use-nearby-ponds.ts`) and those seen on this network advertising `setup=1`, one row per card id (`models/nearby-pond.ts`). Picking one heard over Bluetooth connects first, because only `hello` says whose it is. A new Pond takes its card's code. Someone's Pond that has lost its network (it moved house, or the router changed) offers only "Have it say a code", then the Wi-Fi screen. That is how a Pond is given Wi-Fi again, with no screen of its own.
 - **Scan the setup card** is the main button. A scanned card picks the Pond whose advertised name carries its id, and claims it the moment that Pond is heard. There is nothing more to tap.
 - **A Pond picked without a card** opens its claim under its own row (`components/setup/nearby-ponds.tsx`): the card's eleven digits with their Luhn check, "Scan the setup card", and "Have it say a code". Claiming, a wrong code, the cooling wait and "already claimed" are all said on that row.
-- **The phone's name** is its own (expo-device's name, else its model), shown as "This phone joins as …" with Change. Nothing asks for it.
+- **The phone's name** is its own (expo-device's name, else its model), shown as "This phone joins as …" with Change. Nothing asks for it. iOS 16 and later report plain "iPhone", so once setup knows the owner, a phone still under such a generic name is renamed, e.g. "Amina's iPhone" (`PUT /devices/{id}`, sending its host name and room back as they were).
 - **Claiming** goes over the network when the Pond is on it, as the HTTPS setup exchange (no Wi-Fi step then), and otherwise over Bluetooth (`view-models/pond-claim.ts`).
 - **"Join a Pond that's already set up"** stays below. It lists the claimed Ponds and Enter an address, and opens the pairing wizard as before. The wizard has no Name step any more: its code step shows the phone's name with Change, and pairing starts once the code is in.
 
@@ -219,7 +219,7 @@ What the removed screens held, and where it is now:
 - **The model step** (`components/setup/model-step.tsx`, `view-models/use-setup-model.ts`) reads the Pond's models, which P4 opens to a paired token before setup.
   - It offers the chat model already chosen or on the Pond, else the Pond's own suggestion, with its size.
   - It asks before downloading (`askToDownload`, shared with Models) and shows the progress.
-  - It gives the model the chat job (`POST /models/{category}/{name}/activate {"role":"chat"}`) and finishes by itself.
+  - It gives the model the chat job (`POST /models/{category}/{name}/activate {"role":"chat"}`) and finishes by itself, once per model. The Pond ignores a failed write of `chat_model`, so a finish that still refuses shows Try again rather than spinning or asking again on every read.
   - A Pond that refuses `/models` gets the old notice.
 - **After finishing**, setup leaves for Home. Home's `PondGettingReady` shows whether the chat model is downloading, warming or ready, and the "Finish setting up" card (`components/patterns/finish-setup.tsx`, kept per pairing in `storageFamily('setupChecklist')`) holds the wake word and a look over the defaults. Only the phone that set the Pond up sees that card.
 - **The phone's owner is shown as the Pond reports it** (`/devices/self`). A claim binds the phone to nobody, since a new Pond has no members yet, and nothing attributes it afterwards.
