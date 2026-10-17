@@ -121,13 +121,14 @@ with a discovered Pond is only a claim. `fingerprintChoices`
 (`models/connection.ts`) offers three previews that differ only after the first
 group, drawn once per pin, so a wrong pick cannot be retried against a fresh set.
 
-The one exception is a pin that a setup exchange is about to prove (2026-10-17). A
-Pond with no screen has nothing to pick a fingerprint against, so the pick is
-skipped when the next exchange runs on a setup card's code: after a scanned card,
-and for a Pond whose advertisement says `setup=1`. That exchange puts the pin into
-its channel identifier exactly as pairing does, so a spoofed pin can only fail it.
-`setup=1` is itself only a claim; a spoofed one skips the pick for a claimed Pond,
-and the exchange that follows still fails under the wrong pin.
+The one exception is a pin that the exchange itself is about to prove (2026-10-17).
+A Pond with no screen has nothing to pick a fingerprint against, so the pick is
+skipped when the next exchange runs on a setup card's code (after a scanned card,
+and for a Pond whose advertisement says `setup=1`) or on a code the Pond says
+aloud. Both exchanges put the pin into the channel identifier, so a spoofed pin
+can only fail them. `setup=1` is itself only a claim; a spoofed one skips the pick
+for a claimed Pond, and the exchange that follows still fails under the wrong pin.
+A six-digit code read off a screen keeps the pick (`pickBeforeExchange`).
 
 **A setup card names its Pond by `id`.** The TXT record carries `id`, the four hex
 digits printed on the Pond's setup card, and `setup=1` while nobody has claimed it.

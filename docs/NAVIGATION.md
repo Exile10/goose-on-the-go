@@ -136,8 +136,11 @@ A Pond that advertises itself unclaimed (`setup=1`) skips the fingerprint check:
 the wizard stages it and opens at the code step on its setup card's entry, which
 also offers "Have the Pond say a code" and a six-digit pairing code instead. A
 scanned setup card goes further, since it carries the code: the wizard finds the
-Pond with the card's id and opens at naming the phone (2026-10-17). Why the
-fingerprint check can be skipped there is in ARCHITECTURE.md, "Finding the Pond".
+Pond with the card's id and opens at naming the phone (2026-10-17). The
+fingerprint check itself offers "My Pond has no screen: have it say a code", which
+skips the check and opens the code step while the Pond speaks; a code typed from a
+screen after any skipped check returns to the check first. Why the check can be
+skipped is in ARCHITECTURE.md, "Finding the Pond".
 
 ## Pairing gate (2026-09-21)
 

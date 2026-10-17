@@ -145,3 +145,17 @@ it('stops counting when it is unmounted', async () => {
   interval.mockRestore();
   clear.mockRestore();
 });
+
+it('forgets a code said by one Pond once another is staged', async () => {
+  mockRequestSpokenCode.mockResolvedValueOnce(SAID).mockRejectedValueOnce(limited(30));
+  const m = await mount();
+  await act(async () => { await m.vm.actions.ask(); });
+  await act(async () => { await m.vm.actions.ask(); });
+  expect(m.vm.data).toEqual({ phase: 'spoken', waitSecs: 30 });
+
+  await act(async () => { m.vm.actions.reset(); });
+
+  expect(m.vm.data).toEqual({ phase: 'idle', waitSecs: 0 });
+  expect(m.vm.error).toBeNull();
+  m.unmount();
+});

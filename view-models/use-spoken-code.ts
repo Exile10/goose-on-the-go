@@ -20,6 +20,8 @@ export interface UseSpokenCode {
   actions: {
     /** Resolves true once the Pond has started saying a code. */
     ask: () => Promise<boolean>;
+    /** Forget what was said, for another Pond: its code is not this one's. */
+    reset: () => void;
   };
 }
 
@@ -55,6 +57,12 @@ export function useSpokenCode(): UseSpokenCode {
     }
   }, [requestSpokenCode, start, stop]);
 
+  const reset = useCallback(() => {
+    stop();
+    setSaid(false);
+    setFailure(null);
+  }, [stop]);
+
   // A wait that has run out has nothing left to say: asking again is the next step.
   const error = failure && !(failure.waited && left === 0)
     ? describeSpokenCodeFailure(failure.error, t, left)
@@ -65,6 +73,6 @@ export function useSpokenCode(): UseSpokenCode {
     data: { phase, waitSecs: left },
     loading: asking,
     error,
-    actions: { ask },
+    actions: { ask, reset },
   };
 }

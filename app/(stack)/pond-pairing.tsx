@@ -31,7 +31,15 @@ import { useServer } from '@/providers/server-provider';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 
-import { fingerprintChoices, isInsecureDevOrigin, normalizePondUrl, pinPreview, validPin } from '@/models/connection';
+import {
+  fingerprintChoices,
+  isInsecureDevOrigin,
+  normalizePondUrl,
+  pickBeforeExchange,
+  pinPreview,
+  validPin,
+  type PinSource,
+} from '@/models/connection';
 import { isValidSetupCode, readSetupCode, type SetupCard } from '@/models/setup-card';
 import { insecureDevMode } from '@/services/dev-mode';
 import { randomBytes } from '@/services/secure-random';
@@ -296,6 +304,7 @@ function ServerStep({
   initialUnclaimed,
   setupExchange,
   onNext,
+  onSpokenInstead,
   onScan,
 }: {
   initial: string;
@@ -311,7 +320,10 @@ function ServerStep({
   initialUnclaimed: boolean;
   /** A setup card is in hand, so the exchange that follows is a setup one whatever the Pond advertises. */
   setupExchange: boolean;
-  onNext: (url: string, pin: string, unclaimed: boolean) => Promise<void>;
+  /** `pickSkipped`: the pin is still only what the Pond advertised. */
+  onNext: (url: string, pin: string, unclaimed: boolean, pickSkipped: boolean) => Promise<void>;
+  /** Stage the advertised pin unpicked and have the Pond say a code, for a Pond with no screen to pick against. */
+  onSpokenInstead: (url: string, pin: string) => Promise<void>;
   onScan: () => void;
 }) {
   const styles = useThemedStyles(makeStyles);
@@ -367,7 +379,7 @@ function ServerStep({
           setError(t('pairing.fingerprintMissing'));
           return;
         }
-        await onNext(normalized, reported, false);
+        await onNext(normalized, reported, false, false);
         return;
       }
       // No fingerprint in hand is a request to look one up, not a mistake: the
@@ -405,13 +417,13 @@ function ServerStep({
         // No pick-from-three before a setup exchange: it is bound to the Pond's real pin through the
         // channel identifier, so a spoofed pin can only fail, never succeed.
         if (setupExchange || unclaimed) {
-          await onNext(normalized, fingerprint, unclaimed);
+          await onNext(normalized, fingerprint, unclaimed, true);
           return;
         }
         setConfirming({ url: normalized, pin: fingerprint, choices: fingerprintChoices(fingerprint, randomBytes) });
         return;
       }
-      await onNext(normalized, fingerprint, false);
+      await onNext(normalized, fingerprint, false, false);
     }
     catch (error) { setError(error instanceof Error ? error.message : t('pairing.failed')); }
     finally { setChecking(false); }
@@ -432,10 +444,20 @@ function ServerStep({
     if (!confirming) return;
     if (choice !== pinPreview(confirming.pin)) { rejectMatch(); return; }
     setChecking(true); setError(null);
-    try { await onNext(confirming.url, confirming.pin, false); }
+    try { await onNext(confirming.url, confirming.pin, false, false); }
     catch (error) { setError(error instanceof Error ? error.message : t('pairing.failed')); }
     finally { setChecking(false); setConfirming(null); }
   }, [confirming, onNext, rejectMatch, t]);
+
+  // No pick-from-three before a spoken code: the pairing exchange binds the pin in the channel
+  // identifier just as a setup one does, so a spoofed pin can only fail, never succeed.
+  const speakInstead = useCallback(async () => {
+    if (!confirming) return;
+    setChecking(true); setError(null);
+    try { await onSpokenInstead(confirming.url, confirming.pin); }
+    catch (error) { setError(error instanceof Error ? error.message : t('pairing.failed')); }
+    finally { setChecking(false); }
+  }, [confirming, onSpokenInstead, t]);
 
   if (confirming) {
     return (
@@ -460,6 +482,9 @@ function ServerStep({
         {checking ? <Text style={styles.stepDesc}>{t('pairing.fingerprintSearching')}</Text> : null}
         <InkButton variant="quiet" disabled={checking} onPress={rejectMatch}>
           {t('pairing.fingerprintNoneMatch')}
+        </InkButton>
+        <InkButton variant="quiet" icon="volume" disabled={checking} onPress={() => void speakInstead()}>
+          {t('pairing.fingerprintNoScreen')}
         </InkButton>
       </StepBody>
     );
@@ -553,12 +578,14 @@ function SpokenCodeAction({ spoken, onSpoken }: { spoken: UseSpokenCode; onSpoke
 function PairingCodeStep({
   credential,
   initial,
+  spoken,
   onCredential,
   onNext,
   onScan,
 }: {
   credential: PakeCredential;
   initial: string;
+  spoken: UseSpokenCode;
   onCredential: (credential: PakeCredential) => void;
   onNext: (code: string) => void;
   onScan: () => void;
@@ -567,8 +594,6 @@ function PairingCodeStep({
   const { t } = useTranslation();
   const [code, setCode] = useState(credential === 'pairing' ? initial : '');
   const [setupDigits, setSetupDigits] = useState(credential === 'setup' ? initial : '');
-  // One request state for both entries, so a code the Pond is saying survives the switch to six digits.
-  const spoken = useSpokenCode();
   const setup = readSetupCode(setupDigits);
   const valid = /^\d{6}$/.test(code);
 
@@ -771,6 +796,12 @@ export default function PondPairingScreen() {
   const [credential, setCredential] = useState<PakeCredential>(startedUnclaimed ? 'setup' : 'pairing');
   const [deviceName, setDeviceName] = useState('');
   const [cardSearch, setCardSearch] = useState<SetupCard | null>(null);
+  // Held here, not in the code step, so the wizard knows a code was said when it decides on the pick.
+  const spoken = useSpokenCode();
+  const { ask: askSpoken, reset: resetSpoken } = spoken.actions;
+  const [staged, setStaged] = useState<{ url: string; pin: string; source: PinSource } | null>(null);
+  // A six-digit code typed while the pin was unpicked waits here for the pick, then goes on to naming.
+  const [codeAwaitingPick, setCodeAwaitingPick] = useState(false);
   const [reaching, setReaching] = useState<{ url: string; pin: string } | null>(() =>
     start?.kind === 'pond' && start.unclaimed && start.pin ? { url: start.url, pin: start.pin } : null);
   // Step 0 searches the network by default; typing an address is the fallback
@@ -781,11 +812,15 @@ export default function PondPairingScreen() {
   const [manualEntry, setManualEntry] = useState(insecureDevMode || start !== null);
   const openScanner = useCallback(() => router.push('/(stack)/connect-desktop'), [router]);
 
-  const stage = useCallback(async (url: string, pin: string) => {
+  const stage = useCallback(async (url: string, pin: string, source: PinSource) => {
     const parsed = new URL(url);
     await stagePairing({ version: 2, host: parsed.hostname, port: Number(parsed.port) || 443, localUrls: [url] }, pin);
     setManualUrl(url);
-  }, [stagePairing]);
+    setStaged({ url, pin, source });
+    setCodeAwaitingPick(false);
+    setNotice(null);
+    resetSpoken();
+  }, [stagePairing, resetSpoken]);
 
   /**
    * Pick up a scanned payload when the scanner navigates back.
@@ -818,12 +853,15 @@ export default function PondPairingScreen() {
       let cancelled = false;
       setPairingError(null);
       void stagePairing(scanned.profile, scanned.pin).then(() => {
-        if (!cancelled) { setCredential('pairing'); setCode(scanned.code); setStep(2); }
+        if (cancelled) return;
+        setStaged({ url: scanned.serverUrl, pin: scanned.pin, source: 'checked' });
+        resetSpoken();
+        setCredential('pairing'); setCode(scanned.code); setStep(2);
       }).catch((error) => {
         if (!cancelled) setPairingError(error instanceof Error ? error.message : t('pairing.failed'));
       });
       return () => { cancelled = true; };
-    }, [stagePairing, t]),
+    }, [stagePairing, resetSpoken, t]),
   );
 
   // A card names its Pond by id. Found, the card already holds the code, so only a name is left to ask.
@@ -845,7 +883,7 @@ export default function PondPairingScreen() {
         setManualUrl(pond.url);
         // No pick-from-three: a completed setup exchange is bound to the Pond's real pin through
         // the channel identifier, so a spoofed pin can only fail, never succeed.
-        await stage(pond.url, pond.pin);
+        await stage(pond.url, pond.pin, 'advertised');
         if (!cancelled) setStep(2);
       } catch (error) {
         if (cancelled) return;
@@ -865,7 +903,7 @@ export default function PondPairingScreen() {
     let cancelled = false;
     void (async () => {
       try {
-        await stage(reaching.url, reaching.pin);
+        await stage(reaching.url, reaching.pin, 'advertised');
         if (!cancelled) { setCredential('setup'); setStep(1); }
       } catch (error) {
         if (cancelled) return;
@@ -925,17 +963,33 @@ export default function PondPairingScreen() {
     [code, credential, pair, router, startCooling, stopCooling, t],
   );
 
-  const onServerNext = useCallback(async (url: string, pin: string, unclaimed: boolean) => {
-    await stage(url, pin);
+  const onServerNext = useCallback(async (url: string, pin: string, unclaimed: boolean, pickSkipped: boolean) => {
+    await stage(url, pin, pickSkipped ? 'advertised' : 'checked');
     if (unclaimed) setCredential('setup');
-    // A scanned card already gave the code, so all that is left to ask for is a name.
-    setStep(credential === 'setup' && isValidSetupCode(code) ? 2 : 1);
-  }, [stage, credential, code]);
+    const waiting = codeAwaitingPick && credential === 'pairing' && /^\d{6}$/.test(code);
+    // A scanned card, or a code typed before the pick, already gave the code: only a name is left.
+    setStep(waiting || (credential === 'setup' && isValidSetupCode(code)) ? 2 : 1);
+  }, [stage, credential, code, codeAwaitingPick]);
+
+  const onSpokenInstead = useCallback(async (url: string, pin: string) => {
+    await stage(url, pin, 'advertised');
+    setCredential('pairing');
+    setCode('');
+    setStep(1);
+    void askSpoken();
+  }, [stage, askSpoken]);
 
   const onCodeNext = useCallback((nextCode: string) => {
     setCode(nextCode);
+    if (staged && pickBeforeExchange({ pin: staged.source, credential, codeSpoken: spoken.data.phase === 'spoken' })) {
+      // A code read off a dashboard or a terminal means this household has a screen to pick against.
+      setManualUrl(staged.url); setManualPin(staged.pin); setPicked(true); setPickedUnclaimed(false);
+      setManualEntry(true); setCodeAwaitingPick(true); setNotice(t('pairing.fingerprintBeforeCode'));
+      setStep(0);
+      return;
+    }
     setStep(2);
-  }, []);
+  }, [staged, credential, spoken.data.phase, t]);
 
   return (
     <GKeyboardView style={styles.container}>
@@ -971,6 +1025,7 @@ export default function PondPairingScreen() {
             initialUnclaimed={pickedUnclaimed}
             setupExchange={credential === 'setup'}
             onNext={onServerNext}
+            onSpokenInstead={onSpokenInstead}
             onScan={openScanner}
           />
         ) : (
@@ -991,6 +1046,7 @@ export default function PondPairingScreen() {
         <PairingCodeStep
           credential={credential}
           initial={code}
+          spoken={spoken}
           onCredential={setCredential}
           onNext={onCodeNext}
           onScan={openScanner}

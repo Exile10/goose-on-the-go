@@ -151,9 +151,20 @@ bound to the Pond's real pin through the channel identifier, so a spoofed pin ca
 only fail it, never succeed; and a Pond with no screen has no fingerprint to pick
 against. The same skip applies to a Pond that advertises `setup=1`, which is
 unauthenticated: a spoofed `setup=1` on a claimed Pond skips the pick, and the
-exchange that follows still fails under the wrong pin. If the user then has the
-Pond say a code instead, the ordinary pairing exchange runs under that same pin
-without a pick. CPace binds the pin there too, so a wrong one still only fails.
+exchange that follows still fails under the wrong pin.
+
+A spoken code skips the pick too, whatever `setup=1` says. Every pairing exchange is
+CPace with the pin in the channel identifier, so a completed spoken-code pairing
+proves the pin exactly as a setup exchange does, and a second household member
+adding a phone to a claimed Pond with no screen has nothing to pick against. The
+pick view offers "My Pond has no screen: have it say a code", which stages the
+advertised pin unpicked and asks the Pond to speak. A six-digit code read off a
+dashboard or a terminal keeps the pick: that household has a screen. So when a
+pin was staged unpicked (a card, `setup=1`, or the spoken path) and a six-digit
+code is entered without the Pond having said one, the wizard sends the user back
+to the pick first, keeps the code, and goes on to naming once the right
+fingerprint is chosen. `pickBeforeExchange` in `models/connection.ts` is that rule,
+and is unit tested.
 
 The refusals a setup run adds:
 
@@ -179,7 +190,9 @@ is in flight sends nothing, because each request is a code said aloud in the hou
 
 None of this has run on a device or against a real Pond yet. A device run has to
 check: scanning a printed card, the typo message, the cooling countdown, the spoken
-code from request to pairing, and a claimed Pond's message.
+code from request to pairing (including from the pick view of a Pond with no
+screen), a dashboard code after an unpicked pin going back to the pick, and a
+claimed Pond's message.
 
 ## Recovery
 

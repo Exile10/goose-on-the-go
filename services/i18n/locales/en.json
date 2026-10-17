@@ -636,6 +636,8 @@
     "fingerprintConfirmWhy": "Anything on this network can answer to your Pond’s name. Only your Pond shows its fingerprint.",
     "fingerprintChoiceLabel": "Fingerprint beginning {{groups}}",
     "fingerprintNoneMatch": "None of these match",
+    "fingerprintNoScreen": "My Pond has no screen: have it say a code",
+    "fingerprintBeforeCode": "Before using a code from your Pond's screen, check that this is your Pond: pick the fingerprint its screen shows.",
     "fingerprintMismatch": "Then something else answered for your Pond. Type the fingerprint your Pond shows instead.",
     "fingerprintMissing": "This Pond did not publish its fingerprint on your network, so it has to be entered by hand this once.",
     "saving": "Could not save this pairing. Your previous Pond is still selected.",
