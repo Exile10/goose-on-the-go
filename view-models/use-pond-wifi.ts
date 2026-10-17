@@ -14,9 +14,13 @@ import { useTranslation } from 'react-i18next';
 import { handoverProfile, joinedAt, onlineAt, wifiChoices, wifiErrorKey, type PondAddress } from '@/models/ble-setup';
 import { useServer } from '@/providers/server-provider';
 import { ApiError } from '@/services/api-client';
+import { connectPond, findPondById } from '@/services/ble';
+import { devicePassword } from '@/services/cpace';
 import { confirm, reject } from '@/services/haptics';
+import { getInstallId } from '@/services/install-id';
 import { SetupChannelClosed, type WifiNetwork } from '@/services/setup-channel/session';
-import { heldSetup, releaseSetup } from '@/services/setup-session';
+import { heldSetup, holdSetup, releaseSetup, type HeldSetup } from '@/services/setup-session';
+import { bleClaim } from './pond-claim';
 import { setupNeededNow } from './use-setup-gate';
 
 export type WifiPhase =
@@ -25,8 +29,10 @@ export type WifiPhase =
   | { kind: 'joining'; ssid: string }
   | { kind: 'handover'; ssid: string | null }
   | { kind: 'unreachable'; ssid: string | null; checking: boolean }
-  /** The Bluetooth session ended before the Pond had an address. */
-  | { kind: 'lost' };
+  /** Finding the Pond again and resuming on the claim's own refresh token, with no code. */
+  | { kind: 'reconnecting' }
+  /** The Bluetooth session ended before the Pond had an address; `note` says a resume did not work. */
+  | { kind: 'lost'; note?: string };
 
 export interface UsePondWifi {
   data: {
@@ -37,9 +43,13 @@ export interface UsePondWifi {
     /** Why the Pond could not list networks, so an empty list is not mistaken for none in range. */
     scanFailure: string | null;
     cardId: string;
+    /** This phone still holds the claim's tokens, so a dropped session can resume without a code. */
+    canResume: boolean;
   };
   actions: {
     rescan: () => void;
+    /** Find the Pond again over Bluetooth and resume as the paired device. */
+    reconnect: () => void;
     join: (ssid: string, passphrase: string, hidden?: boolean) => void;
     checkAgain: () => void;
     findAgain: () => void;
@@ -54,7 +64,9 @@ export function usePondWifi(): UsePondWifi {
   const { t } = useTranslation();
   const router = useRouter();
   const { adoptPairing, checkHealth } = useServer();
-  const [held] = useState(heldSetup);
+  const [held, setHeld] = useState(heldSetup);
+  // A resume replaces the held session; callbacks read the current one rather than the first.
+  const heldRef = useRef(held);
   const [phase, setPhase] = useState<WifiPhase>(held ? { kind: 'checking' } : { kind: 'lost' });
   const [networks, setNetworks] = useState<WifiNetwork[]>([]);
   const [failure, setFailure] = useState<UsePondWifi['data']['failure']>(null);
@@ -94,11 +106,12 @@ export function usePondWifi(): UsePondWifi {
 
   const handover = useCallback(
     async (at: PondAddress, ssid: string | null) => {
-      if (!held) return;
+      const current = heldRef.current;
+      if (!current) return;
       setPhase({ kind: 'handover', ssid });
       if (!adopted.current) {
         try {
-          await adoptPairing(handoverProfile(at), held.pin, held.tokens);
+          await adoptPairing(handoverProfile(at), current.pin, current.tokens);
           adopted.current = true;
         } catch {
           void reject();
@@ -109,15 +122,16 @@ export function usePondWifi(): UsePondWifi {
       }
       await reach(ssid);
     },
-    [adoptPairing, held, reach, t],
+    [adoptPairing, reach, t],
   );
 
   const scan = useCallback(async () => {
-    if (!held) return;
+    const current = heldRef.current;
+    if (!current) return;
     setPhase({ kind: 'choosing', scanning: true });
     setScanFailure(null);
     try {
-      setNetworks(wifiChoices(await held.channel.wifiScan()));
+      setNetworks(wifiChoices(await current.channel.wifiScan()));
       setPhase({ kind: 'choosing', scanning: false });
     } catch (e) {
       if (lose(e)) return;
@@ -125,15 +139,13 @@ export function usePondWifi(): UsePondWifi {
       setScanFailure(code === 'unsupported' ? t(wifiErrorKey(code), { ssid: '' }) : t('bleSetup.wifi.scanFailed'));
       setPhase({ kind: 'choosing', scanning: false });
     }
-  }, [held, lose, t]);
+  }, [lose, t]);
 
-  useEffect(() => {
-    if (!held) return;
-    let cancelled = false;
-    void (async () => {
+  /** What arriving does: a Pond already online goes straight to the handover, any other lists its networks. */
+  const begin = useCallback(
+    async (setup: HeldSetup) => {
       try {
-        const status = held.status ?? (await held.channel.status());
-        if (cancelled) return;
+        const status = setup.status ?? (await setup.channel.status());
         const at = onlineAt(status);
         if (at) {
           await handover(at, status.network.ssid);
@@ -141,12 +153,15 @@ export function usePondWifi(): UsePondWifi {
         }
         await scan();
       } catch (e) {
-        if (!cancelled && !lose(e)) await scan();
+        if (!lose(e)) await scan();
       }
-    })();
-    return () => {
-      cancelled = true;
-    };
+    },
+    [handover, lose, scan],
+  );
+
+  useEffect(() => {
+    // On a microtask, as useLive starts its reads, so arriving never sets state inside the effect itself.
+    if (held) void Promise.resolve().then(() => begin(held));
     // Once, on arrival: everything after is the household's choice.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -171,13 +186,14 @@ export function usePondWifi(): UsePondWifi {
 
   const join = useCallback(
     (ssid: string, passphrase: string, hidden?: boolean) => {
-      if (!held || phase.kind !== 'choosing') return;
+      const current = heldRef.current;
+      if (!current || phase.kind !== 'choosing') return;
       setFailure(null);
       setPhase({ kind: 'joining', ssid });
       void (async () => {
         try {
-          const joined = await held.channel.wifiJoin({ ssid, passphrase: passphrase || undefined, hidden });
-          await handover(joinedAt(joined, held.status), ssid);
+          const joined = await current.channel.wifiJoin({ ssid, passphrase: passphrase || undefined, hidden });
+          await handover(joinedAt(joined, current.status), ssid);
         } catch (e) {
           if (lose(e)) return;
           void reject();
@@ -187,7 +203,7 @@ export function usePondWifi(): UsePondWifi {
         }
       })();
     },
-    [handover, held, lose, phase.kind, t],
+    [handover, lose, phase.kind, t],
   );
 
   const findAgain = useCallback(() => {
@@ -195,10 +211,46 @@ export function usePondWifi(): UsePondWifi {
     router.replace('/(onboarding)/welcome');
   }, [router]);
 
+  // The claim's tokens are still held, so the Pond can be found again and resumed without a code
+  // (pond-setup-channel.md, "Resuming as a paired device"). Anything that fails sends the household
+  // back to Find your Pond for a spoken code.
+  const reconnect = useCallback(() => {
+    const was = heldRef.current;
+    const refresh = was?.tokens.refresh_token;
+    if (!was || !refresh) {
+      findAgain();
+      return;
+    }
+    setPhase({ kind: 'reconnecting' });
+    void (async () => {
+      try {
+        const peripheral = await findPondById(was.cardId);
+        if (!peripheral) throw new Error('not heard');
+        const pond = { id: was.cardId, peripheral, rssi: null, url: null, pin: null, hostname: null, seenAt: Date.now() };
+        const resp = await bleClaim(pond, { connect: connectPond, hold: holdSetup }).claim({
+          credential: 'device',
+          code: devicePassword(refresh),
+          clientId: await getInstallId(),
+          deviceName: '',
+        });
+        const next = heldSetup();
+        if (!resp.accepted || !next || next === was || next.pin !== was.pin) throw new Error('not resumed');
+        heldRef.current = next;
+        setHeld(next);
+        void confirm();
+        await begin(next);
+      } catch {
+        void reject();
+        setPhase({ kind: 'lost', note: t('bleSetup.wifi.reconnectFailed') });
+      }
+    })();
+  }, [begin, findAgain, t]);
+
   return {
-    data: { phase, networks, failure, scanFailure, cardId: held?.cardId ?? '' },
+    data: { phase, networks, failure, scanFailure, cardId: held?.cardId ?? '', canResume: !!held?.tokens.refresh_token },
     actions: {
       rescan: () => void scan(),
+      reconnect,
       join,
       checkAgain: () => void reach(unreachableSsid ?? null),
       findAgain,

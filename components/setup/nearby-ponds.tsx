@@ -33,7 +33,15 @@ function ClaimPanel({ pond, find, onScanCard }: { pond: NearbyPond; find: UseFin
   if (phase.kind === 'claiming' || phase.kind === 'connecting') {
     return (
       <View style={styles.panel} accessibilityLiveRegion="polite">
-        <InkSpinner label={phase.kind === 'connecting' ? t('bleSetup.find.connecting', { id: pond.id }) : t('bleSetup.find.claiming', { id: pond.id })} />
+        <InkSpinner
+          label={
+            phase.kind === 'connecting'
+              ? t('bleSetup.find.connecting', { id: pond.id })
+              : phase.resuming
+                ? t('bleSetup.find.resuming', { id: pond.id })
+                : t('bleSetup.find.claiming', { id: pond.id })
+          }
+        />
       </View>
     );
   }

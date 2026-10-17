@@ -22,8 +22,8 @@ export interface ClaimInput {
 
 export interface ClaimDriver {
   readonly transport: 'ble' | 'network';
-  /** Over Bluetooth, whether the Pond is already someone's: one that lost its network still advertises. */
-  greet(): Promise<{ claimed: boolean } | null>;
+  /** Over Bluetooth, whether the Pond is already someone's (one that lost its network still advertises), and its pin. */
+  greet(): Promise<{ claimed: boolean; pin: string } | null>;
   /** Whether this Pond can say a pairing code aloud. */
   canSpeak(): Promise<boolean>;
   speak(): Promise<void>;
@@ -63,7 +63,7 @@ export function bleClaim(
     transport: 'ble',
     async greet() {
       const hello = (await open()).hello;
-      return { claimed: hello?.claimed ?? false };
+      return { claimed: hello?.claimed ?? false, pin: hello?.pin ?? '' };
     },
     async canSpeak() {
       return (await open()).hello?.capabilities.includes('spoken_code') ?? false;

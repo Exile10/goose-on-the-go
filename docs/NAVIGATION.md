@@ -167,7 +167,7 @@ Find your Pond (`app/(onboarding)/welcome.tsx`), then Wi-Fi for a Pond found ove
 
 **Find your Pond** is the welcome screen.
 
-- **Ponds nearby.** It lists Ponds heard over Bluetooth (`view-models/use-nearby-ponds.ts`) and those seen on this network advertising `setup=1`, one row per card id (`models/nearby-pond.ts`). Picking one heard over Bluetooth connects first, because only `hello` says whose it is. A new Pond takes its card's code. Someone's Pond that has lost its network (it moved house, or the router changed) offers only "Have it say a code", then the Wi-Fi screen. That is how a Pond is given Wi-Fi again, with no screen of its own.
+- **Ponds nearby.** It lists Ponds heard over Bluetooth (`view-models/use-nearby-ponds.ts`) and those seen on this network advertising `setup=1`, one row per card id (`models/nearby-pond.ts`). Picking one heard over Bluetooth connects first, because only `hello` says whose it is. A new Pond takes its card's code. Someone's Pond that has lost its network (it moved house, or the router changed) offers only "Have it say a code", then the Wi-Fi screen. If its pin is the one this phone is paired with, the phone first resumes on its own refresh token, with no code. That is how a Pond is given Wi-Fi again, with no screen of its own.
 - **Scan the setup card** is the main button. A scanned card picks the Pond whose advertised name carries its id, and claims it the moment that Pond is heard. There is nothing more to tap.
 - **A Pond picked without a card** opens its claim under its own row (`components/setup/nearby-ponds.tsx`): the card's eleven digits with their Luhn check, "Scan the setup card", and "Have it say a code". Claiming, a wrong code, the cooling wait and "already claimed" are all said on that row.
 - **The phone's name** is its own (expo-device's name, else its model), shown as "This phone joins as …" with Change. Nothing asks for it. iOS 16 and later report plain "iPhone", so once setup knows the owner, a phone still under such a generic name is renamed, e.g. "Amina's iPhone" (`PUT /devices/{id}`, sending its host name and room back as they were).
@@ -183,7 +183,7 @@ A choice reaches the wizard through `offerPairingStart` in `services/pairing-han
 - **Keeping the session open.** A `status` request every 45 s keeps the Bluetooth session inside the Pond's 120 s idle limit while someone types.
 - **Already online.** A Pond already on a network (Ethernet, or a network it knew) passes through without a choice.
 - **The handover.** Once the Pond has an address, the pairing is kept at once (`adoptPairing`), then the Pond is reached over HTTPS. A phone not on that network sees one state, "Connect this phone to <ssid>", which checks again on every network change and on Check again.
-- **Lost.** A Bluetooth session lost before then says so and goes back to Find your Pond. The Pond is claimed by then, so the way back in is a spoken code.
+- **Lost.** A Bluetooth session lost before then (a dropped link, a refused write, the Pond's 10-minute cap) offers Reconnect. The phone finds the Pond by its card id and resumes as the paired device on the claim's own refresh token, with no code. If that fails, Find your Pond and a spoken code are the way back in.
 
 A Pond that advertises itself unclaimed (`setup=1`), a scanned card, and a spoken code all skip the fingerprint pick, because each exchange proves the pin (ARCHITECTURE.md, "Finding the Pond"). Over Bluetooth the pick never appears: the pin comes from `hello`, and the exchange binds it.
 

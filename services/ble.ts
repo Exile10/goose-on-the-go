@@ -9,6 +9,7 @@
 
 import { NativeEventEmitter, NativeModules, PermissionsAndroid, Platform } from 'react-native';
 
+import { cardIdFromName } from '@/models/nearby-pond';
 import type { SetupLink } from './setup-channel/session';
 import { fromBase64, toBase64 } from './setup-channel/sealing';
 
@@ -168,4 +169,35 @@ export async function connectPond(peripheral: string): Promise<SetupLink> {
       await native.disconnect(peripheral).catch(() => undefined);
     },
   };
+}
+
+/**
+ * Scan until the advertiser named `Pond <cardId>` is heard, then stop: how a phone finds again a
+ * Pond it was talking to. Null when it is not heard within `timeoutMs`, or Bluetooth is not on.
+ */
+export async function findPondById(cardId: string, timeoutMs = 20_000): Promise<string | null> {
+  if ((await bleState()) !== 'on') return null;
+  return new Promise((resolve) => {
+    let done = false;
+    let stop: (() => void) | null = null;
+    const finish = (peripheral: string | null) => {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      stop?.();
+      resolve(peripheral);
+    };
+    const timer = setTimeout(() => finish(null), timeoutMs);
+    scanForPonds(
+      (s) => {
+        if (cardIdFromName(s.name) === cardId) finish(s.peripheral);
+      },
+      () => finish(null),
+    )
+      .then((next) => {
+        stop = next;
+        if (done) next();
+      })
+      .catch(() => finish(null));
+  });
 }

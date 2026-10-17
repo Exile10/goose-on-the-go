@@ -15,7 +15,7 @@ import type { NearbyPond } from '@/models/nearby-pond';
 import { useServer } from '@/providers/server-provider';
 import { ApiError } from '@/services/api-client';
 import { BleUnreachableError, connectPond, WrongPondError } from '@/services/ble';
-import type { PakeCredential } from '@/services/cpace';
+import { devicePassword, type PakeCredential } from '@/services/cpace';
 import { confirm, reject } from '@/services/haptics';
 import { getInstallId } from '@/services/install-id';
 import { takeSetupCard } from '@/services/pairing-handoff';
@@ -40,7 +40,7 @@ export type FindPhase =
   | { kind: 'connecting'; pondId: string }
   /** A Pond is picked and the code is being typed. */
   | { kind: 'entering'; pondId: string; credential: PakeCredential; spoken: boolean }
-  | { kind: 'claiming'; pondId: string }
+  | { kind: 'claiming'; pondId: string; resuming?: boolean }
   | { kind: 'failed'; pondId: string; credential: PakeCredential; message: string };
 
 export interface UseFindPond {
@@ -72,7 +72,7 @@ const LOOKING_MS = 15_000;
 export function useFindPond(fresh: NearbyPond[]): UseFindPond {
   const { t } = useTranslation();
   const router = useRouter();
-  const { stagePairing, pair, requestSpokenCode, cancelPairing } = useServer();
+  const { stagePairing, pair, requestSpokenCode, cancelPairing, pairedPin, refreshToken, keepRotatedTokens } = useServer();
   const [phase, setPhase] = useState<FindPhase>({ kind: 'browsing' });
   const [phoneName, setPhoneName] = useState(() => defaultPhoneName(Device.deviceName, Device.modelName));
   const [spoken, setSpoken] = useState<{ asking: boolean; error: string | null }>({ asking: false, error: null });
@@ -173,6 +173,32 @@ export function useFindPond(fresh: NearbyPond[]): UseFindPond {
     return () => clearTimeout(timer);
   }, [phase, fresh, claim]);
 
+  /**
+   * A `device` run for a Pond this phone is paired with. It rotates the pair, so the new one is kept at
+   * once, before Wi-Fi: leaving then still leaves a working pairing. False sends the household to the
+   * spoken code, which also covers a refresh token the Pond no longer recognises.
+   */
+  const resume = useCallback(
+    async (pond: NearbyPond, run: ClaimDriver, token: string): Promise<boolean> => {
+      setPhase({ kind: 'claiming', pondId: pond.id, resuming: true });
+      try {
+        const clientId = await getInstallId();
+        const resp = await run.claim({ credential: 'device', code: devicePassword(token), clientId, deviceName: phoneName.trim() });
+        if (!resp.accepted || !resp.session_token || !resp.refresh_token) return false;
+        keepRotatedTokens(resp.session_token, resp.refresh_token);
+        void confirm();
+        driver.current = null;
+        router.replace('/(onboarding)/pond-wifi');
+        return true;
+      } catch (e) {
+        const wait = refusalWait(e, 'device_cooling');
+        if (wait) setSpoken({ asking: false, error: t('pairingErrors.deviceCooling', { count: wait }) });
+        return false;
+      }
+    },
+    [keepRotatedTokens, phoneName, router, t],
+  );
+
   const pick = useCallback(
     (pond: NearbyPond) => {
       setSpoken({ asking: false, error: null });
@@ -192,6 +218,8 @@ export function useFindPond(fresh: NearbyPond[]): UseFindPond {
           const greeted = await run.greet();
           const claimed = greeted?.claimed ?? false;
           if (claimed) setClaimedIds((ids) => (ids.includes(pond.id) ? ids : [...ids, pond.id]));
+          // This phone's own Pond, by its pin: it can come back in on its refresh token, with no code.
+          if (claimed && greeted && refreshToken && greeted.pin === pairedPin && (await resume(pond, run, refreshToken))) return;
           setPhase({ kind: 'entering', pondId: pond.id, credential: claimed ? 'pairing' : 'setup', spoken: false });
         } catch (e) {
           void reject();
@@ -199,7 +227,7 @@ export function useFindPond(fresh: NearbyPond[]): UseFindPond {
         }
       })();
     },
-    [claim, describe, driverFor],
+    [claim, describe, driverFor, pairedPin, refreshToken, resume],
   );
 
   const picked = (): NearbyPond | null => {

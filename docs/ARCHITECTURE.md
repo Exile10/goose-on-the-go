@@ -209,6 +209,19 @@ link. Messages are length-prefixed JSON cut to `ATT_MTU - 3` (`framing.ts`).
   `unknown_type`; `invalid_request`; `internal_error`) have sentences of their own
   (`channelErrorKey`).
 
+**Resuming as a paired device** (P5e). Over the setup channel only, a phone that holds a pairing
+can run the same exchange with `"credential": "device"`. The password is the 64 lowercase hex
+characters of SHA-256 over its current refresh token (`devicePassword`), and the label is
+`goose-device-cpace-v1`. A confirmed run rotates the session, as `/handshake/refresh` does, so the
+new pair is kept at once (`keepRotatedTokens`). Two places use it before asking for a spoken code.
+One is the Wi-Fi step, when its session drops before the Pond has an address: the phone finds the
+Pond by its card id (`findPondById`) and resumes on the claim's own tokens. The other is a claimed
+Pond on Find your Pond whose `hello` pin is the pin this phone is paired with. A refusal
+(`invalid_confirmation` for a dead token, `invalid_or_expired_refresh`, `device_cooling` with its
+wait) falls back to "Have it say a code". `cpace-vectors.json`'s `device` run, including its
+`raw_digest`, `uppercase_hash` and `setup_label` negatives, is checked byte for byte in
+`pairing-exchange.test.ts`.
+
 **The handover.** `wifi_join` answers with the Pond's address and HTTPS port. `adoptPairing` in
 `ServerProvider` keeps the pairing there at once: the pin proven by the exchange, the tokens from
 the sealed answer, the host name kept for rediscovery. Nothing is probed first. The phone may not

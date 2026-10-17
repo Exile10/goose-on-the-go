@@ -1,6 +1,7 @@
 import { randomBytes } from 'node:crypto';
 
 import { BleUnreachableError, WrongPondError } from '@/services/ble';
+import { devicePassword } from '@/services/cpace';
 import type { HeldSetup } from '@/services/setup-session';
 import { SetupChannelClosed } from '@/services/setup-channel/session';
 import { fakePond, POND_PIN, SETUP_CODE } from '@/services/__tests__/support/setup-channel-pond';
@@ -51,9 +52,9 @@ describe('claiming over Bluetooth', () => {
 
   it('says whether a Pond is already someone’s, from hello, before any code is asked for', async () => {
     const fresh = bleClaim(nearby(), { connect: jest.fn().mockResolvedValue(fakePond().link), hold: jest.fn() }, random);
-    await expect(fresh.greet()).resolves.toEqual({ claimed: false });
+    await expect(fresh.greet()).resolves.toEqual({ claimed: false, pin: POND_PIN });
     const owned = bleClaim(nearby(), { connect: jest.fn().mockResolvedValue(fakePond({ claimed: true }).link), hold: jest.fn() }, random);
-    await expect(owned.greet()).resolves.toEqual({ claimed: true });
+    await expect(owned.greet()).resolves.toEqual({ claimed: true, pin: POND_PIN });
   });
 
   it('re-provisions someone’s Pond with a spoken code, holding its channel for Wi-Fi', async () => {
@@ -72,6 +73,18 @@ describe('claiming over Bluetooth', () => {
     await expect(claim.claim(input)).rejects.toBeInstanceOf(WrongPondError);
     expect(pond.requests.map((r) => r.type)).toEqual(['hello']);
     expect(pond.closed()).toBe(true);
+  });
+
+  it('resumes a Pond this phone is paired with on its refresh token, and holds the rotated pair for Wi-Fi', async () => {
+    const pond = fakePond({ claimed: true, refreshToken: 'refresh-held' });
+    const hold = jest.fn<void, [HeldSetup]>();
+    const claim = bleClaim(nearby(), { connect: jest.fn().mockResolvedValue(pond.link), hold }, random);
+    await expect(claim.greet()).resolves.toEqual({ claimed: true, pin: POND_PIN });
+    const resp = await claim.claim({ ...input, credential: 'device', code: devicePassword('refresh-held'), deviceName: '' });
+    expect(resp.accepted).toBe(true);
+    expect(pond.requests.find((r) => r.type === 'pake_init')).toMatchObject({ credential: 'device' });
+    expect(pond.requests.find((r) => r.type === 'pake_verify')).toMatchObject({ device_name: null });
+    expect(hold).toHaveBeenCalledTimes(1);
   });
 
   it('opens a new session after the Pond ended the last one (ATT 0x03, or the 10-minute cap)', async () => {

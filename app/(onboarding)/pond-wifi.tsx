@@ -21,7 +21,7 @@ export default function PondWifiScreen() {
   const styles = useThemedStyles(makeStyles);
   const { t } = useTranslation();
   const wifi = usePondWifi();
-  const { phase, networks, cardId, scanFailure } = wifi.data;
+  const { phase, networks, cardId, scanFailure, canResume } = wifi.data;
 
   // Back would abandon a Pond that is already claimed; the only ways on are forward or "Find it again".
   useFocusEffect(
@@ -55,20 +55,36 @@ export default function PondWifiScreen() {
             {phase.ssid ? t('bleSetup.wifi.unreachableBody', { ssid: phase.ssid }) : t('bleSetup.wifi.unreachableBodyWired')}
           </InkEmptyState>
         );
-      case 'lost':
+      case 'reconnecting':
+        return (
+          <View accessibilityLiveRegion="polite">
+            <InkSpinner label={t('bleSetup.wifi.reconnecting', { id: cardId })} />
+          </View>
+        );
+      case 'lost': {
+        // A resume needs the claim's tokens, which only this run of the app holds, and only until it fails once.
+        const resumable = canResume && !phase.note;
         return (
           <InkEmptyState
             icon="bluetooth"
             title={t('bleSetup.wifi.lostTitle')}
             action={
-              <InkButton variant="primary" onPress={wifi.actions.findAgain}>
-                {t('bleSetup.wifi.findAgain')}
-              </InkButton>
+              <View style={styles.lostActions}>
+                {resumable ? (
+                  <InkButton variant="primary" icon="refresh" onPress={wifi.actions.reconnect}>
+                    {t('bleSetup.wifi.reconnect')}
+                  </InkButton>
+                ) : null}
+                <InkButton variant={resumable ? 'quiet' : 'primary'} onPress={wifi.actions.findAgain}>
+                  {t('bleSetup.wifi.findAgain')}
+                </InkButton>
+              </View>
             }
           >
-            {t('bleSetup.wifi.lostBody')}
+            {phase.note ?? (resumable ? t('bleSetup.wifi.lostBody') : t('bleSetup.wifi.reconnectFailed'))}
           </InkEmptyState>
         );
+      }
       case 'choosing':
       case 'joining':
         return (
@@ -120,4 +136,5 @@ const makeStyles = (c: ThemeColors) =>
     safe: { flex: 1, backgroundColor: c.background },
     scroll: { paddingHorizontal: Spacing.lg, paddingTop: Spacing.md, paddingBottom: Spacing.xl, gap: Spacing.lg },
     start: { alignItems: 'flex-start' },
+    lostActions: { gap: Spacing.sm, alignItems: 'center' },
   });
