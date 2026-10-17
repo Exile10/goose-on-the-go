@@ -210,9 +210,10 @@ records, and the keys each one writes, copied from the desktop's
 - **Each step is saved as it is left**, then recorded with
   `POST /onboard/step/{name}`; a Pond that will not record it has still saved the
   step. Setup reopens on the screen after the furthest one recorded.
-- **What the Pond will not answer until setup is done** shapes the rest. `GET
-  /settings` is refused, so the record is read back with an empty `PUT`, which
-  writes nothing. `GET /profiles` is refused and `PATCH /profiles/{id}` replaces
+- **What the Pond will not answer until setup is done** shapes the rest. The
+  record is read with `GET /settings`, which a paired token may use before setup
+  from goose-in-a-pond#579 (P4) on; an older Pond refuses it with a 403, and then
+  an empty `PUT`, which writes nothing, answers the same record. `GET /profiles` is refused and `PATCH /profiles/{id}` replaces
   the whole preference map, so the draft is kept on the phone
   (`storageFamily('setupDrafts')`, by pairing) and every PATCH sends the whole
   map. `GET /models` is refused, so the voices offered are the installed ones

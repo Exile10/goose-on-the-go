@@ -51,6 +51,17 @@ function missingKey(field: string): TranslationKey {
   }
 }
 
+// P4 answers GET /settings to a paired token before setup; an older Pond refuses it with a 403,
+// and an empty PUT, which writes nothing, answers the same record.
+async function readRecord(): Promise<PondSettings | null> {
+  try {
+    return await api.getSettings();
+  } catch (e) {
+    if (!(e instanceof ApiError) || e.status !== 403) return null;
+    return api.updateSettings({}).catch(() => null);
+  }
+}
+
 function saveMessage(e: unknown): string {
   // A 422 names what the Pond would not take, such as a wake phrase it cannot listen for.
   if (e instanceof ApiError && e.status === 422 && e.detail) return e.detail;
@@ -135,9 +146,8 @@ export function useOwnerSetup(): UseOwnerSetup {
         return;
       }
       const resumeAt = resumeIndex(status.current_step);
-      // GET /settings is refused until setup is done; an empty PUT changes nothing and answers the record.
       const [settings, saved, info] = await Promise.all([
-        api.updateSettings({}).catch((): PondSettings | null => null),
+        readRecord(),
         drafts.getJSON<Saved>(profileId).catch((): Saved | null => null),
         api.systemInfo().catch((): SystemInfo | null => null),
       ]);

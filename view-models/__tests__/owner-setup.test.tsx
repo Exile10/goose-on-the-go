@@ -1,6 +1,6 @@
 /**
  * Owner setup against a Pond that refuses most reads until it is done. Pinned: the owner is made
- * once however many steps write to them, the record is read without GET /settings, a part-done
+ * once however many steps write to them, the record is read without writing, a part-done
  * setup reopens on the right step, and a refused finish sends the household where the gap is.
  */
 
@@ -8,7 +8,7 @@ import React from 'react';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import { api } from '@/services/api-client';
+import { ApiError, api } from '@/services/api-client';
 import type { OnboardStatus, PondSettings } from '@/services/types';
 import { useOwnerSetup, type UseOwnerSetup } from '@/view-models/use-owner-setup';
 import { resetSetupGate } from '@/view-models/use-setup-gate';
@@ -65,26 +65,46 @@ beforeEach(async () => {
   resetSetupGate();
   await AsyncStorage.clear();
   pond.updateSettings.mockResolvedValue(record());
+  pond.getSettings.mockResolvedValue(record());
   pond.recordOnboardStep.mockResolvedValue(status('Basics'));
   pond.systemInfo.mockResolvedValue({ hostname: 'nano', version: '0.9.0' });
   pond.createProfile.mockResolvedValue({ id: 'owner-1', display_name: 'Amina', avatar_emoji: '' });
   pond.setProfilePrefs.mockResolvedValue({ id: 'owner-1', display_name: 'Amina', preferences: {} });
 });
 
-it('reads the record with an empty PUT, never the GET the Pond refuses until setup is done', async () => {
+it('reads the record with GET, and writes nothing to read it', async () => {
   pond.onboardStatus.mockResolvedValue(status('not_started'));
+  pond.getSettings.mockResolvedValue(record());
   const m = await mount();
   expect(m.vm.phase).toBe('wizard');
   expect(m.vm.step).toBe('welcome');
-  expect(pond.getSettings).not.toHaveBeenCalled();
+  expect(pond.getSettings).toHaveBeenCalledTimes(1);
+  expect(pond.updateSettings).not.toHaveBeenCalled();
+  m.unmount();
+});
+
+it('reads it with an empty PUT from a Pond that refuses GET until setup is done', async () => {
+  pond.onboardStatus.mockResolvedValue(status('not_started'));
+  pond.getSettings.mockRejectedValue(new ApiError('GET /api/v1/settings → 403', 403, null, 'onboarding_required'));
+  const m = await mount();
+  expect(m.vm.phase).toBe('wizard');
   expect(pond.updateSettings).toHaveBeenCalledTimes(1);
   expect(pond.updateSettings).toHaveBeenCalledWith({});
   m.unmount();
 });
 
+it('does not write to read when the Pond simply cannot be reached', async () => {
+  pond.onboardStatus.mockResolvedValue(status('not_started'));
+  pond.getSettings.mockRejectedValue(new Error('Network request failed'));
+  const m = await mount();
+  expect(m.vm.phase).toBe('wizard');
+  expect(pond.updateSettings).not.toHaveBeenCalled();
+  m.unmount();
+});
+
 it('reopens on the step after the one the Pond last recorded', async () => {
   pond.onboardStatus.mockResolvedValue(status('Basics'));
-  pond.updateSettings.mockResolvedValue(record({ user_name: 'Amina' }));
+  pond.getSettings.mockResolvedValue(record({ user_name: 'Amina' }));
   const m = await mount();
   expect(m.vm.step).toBe('locale');
   expect(m.vm.draft.userName).toBe('Amina');
@@ -119,7 +139,7 @@ it('makes the owner once, and sends their whole preference map from each step th
 
 it('uses the owner the Pond already has rather than making a second', async () => {
   pond.onboardStatus.mockResolvedValue(status('Welcome'));
-  pond.updateSettings.mockResolvedValue(record({ primary_profile_id: 'owner-0' }));
+  pond.getSettings.mockResolvedValue(record({ primary_profile_id: 'owner-0' }));
   const m = await mount();
   await act(async () => m.vm.actions.patch({ userName: 'Amina' }));
   await act(async () => m.vm.actions.next());
