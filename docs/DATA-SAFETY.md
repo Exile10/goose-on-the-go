@@ -86,6 +86,17 @@ token registration below and the remote-access enrollment below.
 For the forms, this is the important framing and it is worth stating precisely: the Pond
 is the user's own hardware. Data reaching it has not left the household.
 
+What the app sends it, beyond the control traffic of the screens themselves:
+
+| What | When | Where in the code |
+|---|---|---|
+| What the user types to Goose | Each message | `services/api-client.ts` (chat) |
+| Recorded speech | Voice mode, only the stretches where the user is speaking | `view-models/use-voice.ts` (`api.transcribe`), `services/api-client.ts` (`transcribe`, `POST /api/v1/transcribe`) |
+| Photos and files the user attaches | When the user picks or takes one for a message | `services/media.ts` |
+| The device's location | Once, when the user asks for a ride fare | `view-models/use-ride.ts` (`locateHere`), `services/api-client.ts` (`POST /api/v1/rides/quote`) |
+
+Each is described under its own heading below.
+
 ### 2. The coordinator — only after the user opts in to remote access
 
 Remote access is opt-in and declinable, and the app is usable without it.
@@ -134,26 +145,75 @@ content from the Pond over its own authenticated channel.
 So Google and Apple see a device token and the fact that a ping occurred. They do not see
 notification text, because there is none to see.
 
-### 4. Nobody else
+### 4. Uber — through the Pond, for a ride the user asks for
+
+The app never contacts Uber. When the user asks for a fare, the app sends the pickup point
+to the Pond (`POST /api/v1/rides/quote`), and the Pond sends it to `api.uber.com` directly
+(the Pond's `pond-adapters-uber`) to price the ride and, if the user confirms, book it.
+Jarida's sign-in relay is involved only when a member connects an Uber account on the Pond,
+where it adds the app's client secret to the token exchange; it does not carry trips or
+locations. That is the Pond's behaviour, not this app's, and the Pond's own statement has
+to cover it.
+
+A Pond notification about a ride can carry a link, and the app opens it only if its host is
+Uber's or a maps provider's (`ALLOWED_HOSTS` in `services/notification-link.ts`). Opening it
+hands the user to that app or site; this app sends it nothing.
+
+### 5. Nobody else
 
 Verified against the dependency list rather than asserted: there is no analytics SDK, no
 crash reporter, no advertising or attribution SDK, and no tracking library of any kind in
-`package.json`. There is no location permission, no contacts access, and no advertising
-identifier.
+`package.json`. There is no contacts access and no advertising identifier. Location is read
+only for a ride fare, below.
 
 `expo-device` is present but is used only to establish whether the code is running on
 physical hardware before attempting push registration; it transmits nothing.
 
 ---
 
-## Camera
+## Camera, photos and files
 
-`expo-camera`, declared in `app.json` with a purpose string that already says what it is
-for. Two uses, both QR codes: the Pond's pairing code, and a Matter device's setup code.
+The camera has two uses, and they answer the forms differently.
 
-Decoding happens on device. No image is stored, and no image is transmitted. For Apple's
-label this is camera access without data collection, which is a category the form supports
-and which should be selected deliberately rather than by defaulting to "collected".
+- **QR codes,** through `expo-camera`: the Pond's pairing code, and a Matter device's setup
+  code. Decoding happens on device. No image is stored, and no image is transmitted.
+- **A photo for a message,** through `expo-image-picker` (`launchCameraAsync` in
+  `services/media.ts`), when the user chooses to take one. It is sent to the Pond.
+
+Photos from the library and files come through the system pickers (`launchImageLibraryAsync`
+and `expo-document-picker`'s `getDocumentAsync`, in `services/media.ts`), so the app sees
+only what the user picks. Every picture is requested with `exif: false` and re-encoded to a
+JPEG of at most 1024 px on its long edge before it is sent, so its location and other
+metadata do not travel with it. A file is either a picture, handled the same way, or plain
+text, which is read on the phone and sent inside the message; anything else is refused at
+the picker.
+
+## Microphone
+
+`expo-audio`, with `enableBackgroundRecording: false` in `app.json`. In voice mode the app
+listens for speech; each stretch the user speaks is written to a WAV file in the app's
+cache, sent to the Pond to be transcribed (`POST /api/v1/transcribe`), and deleted in a
+`finally` once the request ends, whether it succeeded or not (`discardFile` in
+`view-models/use-voice.ts`). Nothing is recorded outside voice mode.
+
+`app.json` lists the `expo-audio` plugin twice, with two different microphone purpose
+strings. The first one's string is the one that ships: a prebuilt `Info.plist` (checked
+2026-10-17) carries "Goose On The Go uses your microphone so you can talk to Goose." The
+duplicate should be removed before submission, keeping whichever sentence is meant.
+
+## Location
+
+`expo-location`, with only a when-in-use purpose string in `app.json`, which already says
+what it is for. `locateHere` in `view-models/use-ride.ts` asks for foreground permission and
+takes one high-accuracy fix, when the user asks for a ride fare. The coordinates go to the
+Pond as the pickup point and from there to Uber (above). They are held in memory for the ride
+screen and never written to storage. There is no background location, no geofence, and no
+continuous tracking.
+
+The built apps agree (checked 2026-10-17 in prebuilt native projects): iOS's `Info.plist`
+carries `NSLocationWhenInUseUsageDescription` and no "always" key, and the Android manifest
+has `ACCESS_FINE_LOCATION` and `ACCESS_COARSE_LOCATION` without
+`ACCESS_BACKGROUND_LOCATION`.
 
 ---
 
@@ -165,15 +225,25 @@ and which should be selected deliberately rather than by defaulting to "collecte
 |---|---|---|
 | Does your app collect or share any of the required user data types? | See below; no data is shared with third parties for advertising or analytics | no such SDK exists in the tree |
 | Device or other IDs | Collected, not shared. Sent only to the user's own Pond | `install-id.ts`, `push-token.ts` |
-| App activity, personal info, location, contacts, photos, files | Not collected | no such permission or code path |
+| Location → Precise location | Collected, for app functionality, optional: one reading when the user asks for a ride fare. Passed by the Pond to Uber for that ride; see open input 8 on whether Play counts that as shared | `use-ride.ts` |
+| Photos and videos → Photos | Collected, for app functionality, optional: only photos the user picks or takes for a message, sent to the user's own Pond | `media.ts` |
+| Files and docs | Collected, for app functionality, optional: only files the user attaches, sent to the user's own Pond | `media.ts` |
+| Audio → Voice or sound recordings | Collected, for app functionality, optional: speech in voice mode, sent to the user's own Pond and deleted from the phone once sent | `use-voice.ts` |
+| Messages → Other in-app messages | Collected, for app functionality: what the user types to Goose, sent to the user's own Pond | `api-client.ts` |
+| App activity, personal info, contacts | Not collected | no such permission or code path |
 | Is data encrypted in transit? | Yes — pinned HTTPS locally, encrypted tunnel remotely | `services/api-client.ts`, `PondNetwork.kt` |
 | Can users request data deletion? | Yes — signing out releases this phone's access, and the Pond is the user's own hardware | `profile.signOutWarning` in `services/i18n/locales/en.json` |
 
 ### Apple — privacy nutrition labels
 
-- **Data not collected** for every category except the identifier below.
 - **Identifiers → Device ID**: used for App Functionality only; not linked to an identity,
   not used for tracking.
+- **Location → Precise Location**: App Functionality; one reading for a ride fare the user
+  asks for.
+- **User Content → Photos or Videos**, **Audio Data**, **Other User Content** (files, and what
+  the user types to Goose): App Functionality; sent only to the user's own Pond.
+- Not used for tracking, in every category above.
+- **Data not collected** for every other category.
 - **Tracking**: none. No ATT prompt is required, and none should be added.
 
 ---
@@ -196,6 +266,22 @@ recording a guess here would be worse than recording the gap.
 4. **The hosted policy URL.** Both stores require a stable, publicly reachable URL. It does
    not exist yet, which is also why the app does not yet link to one.
 5. **Support and deletion contact.** The address a user writes to, which must be real.
+6. **What counts as "collected".** The drafts above treat anything this app sends off the
+   phone as collected, even when it goes only to the user's own Pond, because both stores
+   define collection by transmission off the device and neither has a category for the
+   user's own server. That is the conservative reading. If the submitter takes the other
+   reading, it has to apply to every category at once, the device ID included, not be
+   chosen category by category.
+7. **Storage permissions on Android.** A debug build's merged manifest (2026-10-13) lists
+   `READ_EXTERNAL_STORAGE` and `WRITE_EXTERNAL_STORAGE`, brought in by the media plugins; the
+   app itself uses the system pickers, which need neither. Check the release manifest, and
+   remove them if they are there, before answering Play's questions about photo and file
+   access.
+8. **The ride pickup and Uber.** Play does not count a transfer as sharing when it follows a
+   specific action the user takes and expects to share data with, and asking for a ride
+   fare is one. Whether to rely on that exemption, or declare location as shared with Uber
+   anyway, is a judgement for whoever submits. Apple's label asks whether data is linked to
+   the user's identity: the pickup reaches Uber on the member's own Uber account.
 
 ---
 

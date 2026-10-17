@@ -19,6 +19,10 @@ We are not a cloud service holding your data. There is no account with us, no an
 no advertising, and no third party watching what you do in the app. If you never turn on
 remote access, your phone and your Pond never talk to us at all.
 
+One thing you can ask for does reach a company outside your home: a ride. When you ask
+Goose for a ride fare, your phone reads where you are once and your Pond passes that pickup
+point to Uber, so Uber can price the ride you asked for. That is described below too.
+
 The rest of this document says exactly what happens when you do turn it on, because a
 promise like the one above is only worth anything if the exceptions are stated plainly.
 
@@ -41,6 +45,10 @@ screen you were last on, your settings. None of this leaves your phone.
 Everything the app does functionally — conversations, devices, schedules, everything —
 happens between your phone and your Pond, over an encrypted connection that your phone
 verifies is really your Pond and not something pretending to be it.
+
+That includes what you choose to give Goose: what you type, what you say when you talk to
+it, the photos and files you attach, and, when you ask for a ride fare, where you are. Each
+of these is described in its own section below.
 
 Your Pond is your hardware, in your home. Data that reaches it has not left your household,
 and we have no access to it.
@@ -88,19 +96,49 @@ was pinged. What was in it, they do not have.
 To make this work, your phone gives its notification token to your Pond, and your Pond
 talks to Google or Apple directly. We are not in that path either.
 
-## Camera
+## Your voice
 
-The app uses your camera to read QR codes: the pairing code your Pond displays, and the
-setup code on a smart-home device you are adding.
+When you open voice mode to talk to Goose, the app listens through the microphone for you
+to speak, and records what you say. Only the stretches where you are speaking are sent, to
+your Pond, which turns them into text; the copy on your phone is deleted as soon as it has
+been sent. The microphone is used only while voice mode is open. The app is not allowed to
+record in the background, and it does not.
 
-The code is read on your phone. No photograph is saved, and no image is sent anywhere.
+## Camera, photos and files
+
+The app uses your camera for two things.
+
+- **Reading QR codes:** the pairing code your Pond displays, and the setup code on a
+  smart-home device you are adding. The code is read on your phone. No photograph is saved,
+  and no image is sent anywhere.
+- **Taking a photo to send to Goose,** when you choose to.
+
+You can also pick photos from your library, or files, to send to Goose. The app sees only
+the photos and files you pick, never your whole library. Before a photo is sent it is made
+smaller and saved afresh as a new picture, which leaves out its location and the other
+details a camera records about it. A text file is read on your phone and sent as part of
+your message. All of it goes to your Pond, and nowhere else.
+
+## Your location, for a ride
+
+The app reads your location only when you ask Goose for a ride fare, and only while the app
+is open. It reads it once, precisely enough for a driver to find you. It never tracks where
+you go, and it does not read your location in the background.
+
+That one reading goes to your Pond, which sends it to Uber as the pickup point, so Uber can
+price the ride and, if you confirm it, send a driver. Uber's own privacy policy covers what
+Uber does with it. The reading goes from your Pond to Uber directly; it does not pass
+through us, and your phone does not keep it after the ride.
 
 ## What we do not do
 
 - We do not use analytics, of any kind, from anyone.
 - We do not use crash-reporting or attribution services.
 - We do not serve advertising, and we do not use an advertising identifier.
-- We do not ask for your location, your contacts, or your photo library.
+- We do not read your contacts.
+- We do not read your location except when you ask for a ride fare, and we never read it in
+  the background.
+- We do not look through your photo library. The app sees only the photos you pick.
 - We do not track you across other apps or websites, and we never will.
 
 These are not intentions. There is no third-party code in the app capable of doing any of
