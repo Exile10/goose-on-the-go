@@ -343,8 +343,9 @@ export default function HomeScreen() {
         {/* Offered once per pairing, and declinable. It draws nothing unless
             the Pond is reachable and remote access is off, so it sits under the
             card that says the Pond is reachable. */}
-        <RemoteAccessOffer />
+        {/* Whether Goose can answer yet matters more than reaching it from away, so it comes first. */}
         <PondGettingReady />
+        <RemoteAccessOffer />
 
         {offline ? null : (
           <>

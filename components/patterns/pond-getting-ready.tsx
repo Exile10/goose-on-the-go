@@ -26,7 +26,8 @@ function GettingReadyCard() {
   }, [done]);
 
   return (
-    <InkCard contentStyle={styles.card}>
+    // Flat: Home already spends Ink's raised budget on the Pond card and the remote access offer.
+    <InkCard raised={false} contentStyle={styles.card}>
       <InkTitle level={3}>{done ? t('setup.gettingReady.readyTitle') : t('setup.gettingReady.title')}</InkTitle>
       {done ? <InkText tone="secondary">{t('setup.gettingReady.readyBody')}</InkText> : <ReadinessStatus ready={ready} />}
       {done ? (
