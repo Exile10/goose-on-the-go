@@ -189,6 +189,7 @@ export const SAMPLE_SETTINGS: PondSettings = {
   voice_thinking_tone_enabled: true,
   voice_max_turns: 0,
   chat_provider: '',
+  chat_model: '',
   llm_provider: '',
   tool_model: null,
   llm_max_tokens: 4096,

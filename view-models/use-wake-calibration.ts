@@ -182,11 +182,14 @@ export function useWakeCalibration(phrase: string): UseWakeCalibration {
       .catch((e) => {
         if (!alive.current) return;
         void reject();
-        // A 422 is a take with no speech in it: the same sentence again, not a failure.
+        // A 422 is a take with no speech in it: the same sentence again, not a failure. A 502 is the
+        // Pond's speech-to-text not answering, which no amount of trying again on this phone fixes.
         setError(
           e instanceof ApiError && e.status === 422
             ? i18n.t('setup.wake.calibrate.nothingHeard')
-            : describeApiError(e) ?? i18n.t('setup.wake.calibrate.failed'),
+            : e instanceof ApiError && e.status === 502
+              ? i18n.t('setup.wake.calibrate.noTranscriber')
+              : describeApiError(e) ?? i18n.t('setup.wake.calibrate.failed'),
         );
         end('error');
       })

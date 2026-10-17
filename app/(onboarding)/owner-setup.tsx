@@ -101,7 +101,8 @@ export default function OwnerSetupScreen() {
             <InkMeter value={setup.index / last} label={t('setup.progressLabel')} />
           </View>
         ) : null}
-        <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+        {/* Keyed by step, so each step opens at its top rather than where the last one was left. */}
+        <ScrollView key={setup.step} contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
           {setup.notice ? <InkNotice tone="warning">{setup.notice}</InkNotice> : null}
           <StepBody setup={setup} />
         </ScrollView>

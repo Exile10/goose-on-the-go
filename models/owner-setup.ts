@@ -326,3 +326,16 @@ export function calibrationPrompts(phrase: string): string[] {
   const p = phrase.trim();
   return [p, `Hey ${p}, good morning`, `OK ${p}, what time is it`, `${p}, tell me a joke`, `Thank you ${p}`];
 }
+
+/** A birthday as `YYYY-MM-DD`, or null for a date that cannot exist; it is held back, never rounded. */
+export function birthdayOf(parts: { year: string; month: string; day: string }, thisYear: number): string | null {
+  if (!parts.year || !parts.month || !parts.day) return null;
+  const year = Number(parts.year);
+  const month = Number(parts.month);
+  const day = Number(parts.day);
+  if (!Number.isInteger(year) || year < thisYear - 120 || year > thisYear) return null;
+  if (!Number.isInteger(month) || month < 1 || month > 12) return null;
+  const last = new Date(year, month, 0).getDate();
+  if (!Number.isInteger(day) || day < 1 || day > last) return null;
+  return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}

@@ -43,6 +43,7 @@ export function usePondReadiness(): UsePondReadiness {
   const library = useModelLibrary();
   const [warmup, setWarmup] = useState<WarmupStatus | null>(null);
   const [self, setSelf] = useState<DeviceSelf | null>(null);
+  const [configured, setConfigured] = useState<string | null>(null);
 
   const readWarmup = useCallback(async () => {
     try {
@@ -56,9 +57,13 @@ export function usePondReadiness(): UsePondReadiness {
   useEffect(() => {
     if (!hydrated) return;
     void api.deviceSelf().then(setSelf).catch(() => setSelf(null));
+    void api.getSettings().then((s) => setConfigured(s.chat_model || null)).catch(() => setConfigured(null));
   }, [hydrated]);
 
-  const chat = holderOf(library.models, 'chat');
+  // A chat model that is named but not on disk serves nothing, so the catalogue does not mark it active.
+  const chat =
+    holderOf(library.models, 'chat') ??
+    (configured ? library.models.find((m) => roleOf(m) === 'chat' && m.name === configured) ?? null : null);
   const live = downloadsByModel(library.downloads).filter((d) => d.status === 'downloading' || d.status === 'paused');
   // Only a chat model's download keeps Goose from answering; a voice fetching meanwhile does not.
   const chatIds = new Set(library.models.filter((m) => roleOf(m) === 'chat').map(pondModelId));

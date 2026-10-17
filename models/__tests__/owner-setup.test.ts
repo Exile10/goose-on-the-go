@@ -4,6 +4,7 @@
  */
 
 import {
+  birthdayOf,
   calibrationPrompts,
   defaultDraft,
   draftFromPond,
@@ -144,5 +145,19 @@ describe('the wake phrase', () => {
       'goose, tell me a joke',
       'Thank you goose',
     ]);
+  });
+});
+
+describe('a birthday', () => {
+  it('is the date typed, zero-padded as the desktop stores it', () => {
+    expect(birthdayOf({ year: '1990', month: '3', day: '7' }, 2026)).toBe('1990-03-07');
+  });
+
+  it('is held back until it is a date that exists, rather than moved to one', () => {
+    expect(birthdayOf({ year: '1990', month: '2', day: '30' }, 2026)).toBeNull();
+    expect(birthdayOf({ year: '2000', month: '2', day: '29' }, 2026)).toBe('2000-02-29');
+    expect(birthdayOf({ year: '1990', month: '', day: '7' }, 2026)).toBeNull();
+    expect(birthdayOf({ year: '2031', month: '3', day: '7' }, 2026)).toBeNull();
+    expect(birthdayOf({ year: '1850', month: '3', day: '7' }, 2026)).toBeNull();
   });
 });

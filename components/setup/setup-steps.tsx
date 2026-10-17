@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next';
 import {
   InkAvatar,
   InkButton,
+  InkCard,
   InkFormField,
   InkGroup,
   InkInput,
@@ -207,14 +208,15 @@ export function LocaleStep({ setup }: { setup: UseOwnerSetup }) {
         </View>
         {place.note ? <InkNotice tone={place.tone === 'danger' ? 'warning' : 'neutral'}>{place.note}</InkNotice> : null}
       </InkFormField>
-      <InkGroup title={t('setup.locale.weather')} raised={false}>
+      {/* One row, so no group heading: it would only repeat the row's own name. */}
+      <InkCard raised={false} contentStyle={styles.flush}>
         <CheckRow
           label={t('setup.locale.weather')}
           description={t('setup.locale.weatherBody')}
           checked={draft.enableWeather}
           onChange={(enableWeather) => actions.patch({ enableWeather })}
         />
-      </InkGroup>
+      </InkCard>
     </>
   );
 }
@@ -240,14 +242,14 @@ export function CompleteStep({ setup }: { setup: UseOwnerSetup }) {
           <InkNotice tone="warning">{t('setup.complete.noModelBody')}</InkNotice>
         </View>
       ) : null}
-      <InkGroup title={t('setup.complete.memory')} raised={false}>
+      <InkCard raised={false} contentStyle={styles.flush}>
         <CheckRow
           label={t('setup.complete.memory')}
           description={t('setup.complete.memoryBody')}
           checked={draft.enableMemory}
           onChange={(enableMemory) => actions.patch({ enableMemory })}
         />
-      </InkGroup>
+      </InkCard>
       <InkGroup title={t('setup.complete.summary')} raised={false}>
         {rows.map((row, i) => (
           <InkRow key={row.key} divided={i > 0} label={row.label}>
@@ -267,4 +269,5 @@ const styles = StyleSheet.create({
   avatarRow: { flexDirection: 'row', alignItems: 'flex-end', gap: Spacing.md },
   fill: { flex: 1 },
   detect: { alignItems: 'flex-start' },
+  flush: { padding: 0 },
 });

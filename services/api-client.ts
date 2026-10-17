@@ -256,6 +256,12 @@ const STREAM_IDLE_MS = 60_000;
 const VOICE_TIMEOUT_MS = 45_000;
 
 /**
+ * Switching the speaking tier fetches its weights before the Pond answers, tens of megabytes. At the
+ * default 15s a first switch on a fresh Pond was abandoned mid-download and reported as a failure.
+ */
+const TTS_APPLY_TIMEOUT_MS = 180_000;
+
+/**
  * An event, as the frame it carries.
  *
  * `[DONE]` is an older end marker pond-desktop still honours; the Pond itself
@@ -1514,7 +1520,11 @@ export class PondApiClient {
 
   /** Storing a voice setting waits for the engine to reload; this downloads and switches now. */
   applyTts(change: { voice?: string; speed?: number; quality?: string }): Promise<TtsApplyResult> {
-    return this.post<TtsApplyResult>('/api/v1/voice/tts/apply', change);
+    return this.request<TtsApplyResult>('/api/v1/voice/tts/apply', {
+      method: 'POST',
+      body: JSON.stringify(change),
+      signal: timeoutSignal(TTS_APPLY_TIMEOUT_MS),
+    });
   }
 
   /** Forget the wake word's learned pronunciations. */

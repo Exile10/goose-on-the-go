@@ -2267,7 +2267,8 @@
       "atypical": "Atypical speech support",
       "atypicalBody": "Goose waits longer before it answers. Helpful for a stutter, long pauses or non-standard speech.",
       "slow": "Slow speech mode",
-      "slowBody": "Goose speaks more slowly, so its answers are easier to follow."
+      "slowBody": "Goose speaks more slowly, so its answers are easier to follow.",
+      "birthdayInvalid": "That isn't a date. Check the day and the year."
     },
     "locale": {
       "title": "Language and location",
@@ -2287,7 +2288,8 @@
       "guessed": "Guessed {{name}} from your time zone.",
       "detectFailed": "Couldn't work that out. Type the nearest town instead.",
       "weather": "Live weather",
-      "weatherBody": "Forecasts from Open-Meteo for the place above. No GPS needed."
+      "weatherBody": "Forecasts from Open-Meteo for the place above. No GPS needed.",
+      "zoneClear": "Clear"
     },
     "personality": {
       "title": "How Goose talks",
@@ -2347,7 +2349,8 @@
         "done": "Done. Your Pond now knows {{count}} ways you say it.",
         "doneOne": "Done. Your Pond now knows how you say it.",
         "nothingHeard": "Your Pond didn't hear that. Say the sentence again, a little closer to the phone.",
-        "failed": "Your Pond couldn't check that sentence. Try again."
+        "failed": "Your Pond couldn't check that sentence. Try again.",
+        "noTranscriber": "Your Pond can't listen to recordings yet: its speech-to-text isn't running. Skip this for now."
       }
     },
     "complete": {
@@ -2363,7 +2366,7 @@
       "assistant": "Assistant",
       "wake": "Wake word",
       "noModelTitle": "Your Pond has no model to think with",
-      "noModelBody": "It can't finish setting up without one. Everything else is saved. Choosing a model from a phone needs a Pond update, so start your Pond with a model and then finish here."
+      "noModelBody": "It can't finish setting up without one, and choosing a model from a phone needs a Pond update. Everything else is saved: once your Pond has a model, finish here."
     },
     "ready": {
       "title": "Getting your Pond ready",

@@ -974,6 +974,8 @@ export interface PondSettings {
 
   // Models and generation
   chat_provider: string;
+  /** The model the chat job loads; empty on a fresh Pond, which `/onboard/complete` refuses. */
+  chat_model: string;
   llm_provider: string;
   tool_model: string | null;
   llm_max_tokens: number;

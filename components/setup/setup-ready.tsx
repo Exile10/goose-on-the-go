@@ -7,7 +7,7 @@ import React from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { InkButton, InkDots, InkGroup, InkNotice, InkRow, InkSpinner, InkText, InkTitle } from '@jarida/ink/native';
+import { InkButton, InkCard, InkDots, InkNotice, InkRow, InkSpinner, InkText, InkTitle } from '@jarida/ink/native';
 
 import { askToDownload, DownloadRow } from '@/components/settings/model-rows';
 import { Spacing } from '@/constants/spacing';
@@ -96,12 +96,12 @@ export function SetupReady() {
         <ReadinessStatus ready={ready} />
       </View>
       {ready.library.notice ? <InkNotice tone="danger">{ready.library.notice.text}</InkNotice> : null}
-      <InkGroup title={t('setup.ready.phone')} raised={false}>
+      <InkCard raised={false} contentStyle={styles.flush}>
         <InkRow
           label={t('setup.ready.phone')}
           description={ready.self?.profile ? t('setup.ready.phoneOwner', { name: ready.self.profile.display_name }) : t('setup.ready.phoneNobody')}
         />
-      </InkGroup>
+      </InkCard>
       <View style={styles.actions}>
         <InkButton variant={done ? 'primary' : 'quiet'} block onPress={leave}>
           {done ? t('setup.ready.goHome') : t('setup.ready.goOn')}
@@ -116,4 +116,5 @@ const styles = StyleSheet.create({
   block: { gap: Spacing.md },
   row: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
   actions: { gap: Spacing.sm },
+  flush: { padding: 0 },
 });
