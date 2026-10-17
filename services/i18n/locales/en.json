@@ -2086,7 +2086,9 @@
     "spokenLimited_other": "Your Pond has just said a code. You can ask for another in {{count}} seconds.",
     "spokenLimitedNoHint": "Your Pond has said several codes recently. Wait a minute, then ask again.",
     "spokenDisabled": "This Pond does not say codes aloud: its household has turned that off. Ask the person who set it up for a pairing code.",
-    "spokenSilent": "Your Pond cannot make a sound right now. Check its speaker, or use the code on its setup card."
+    "spokenSilent": "Your Pond cannot make a sound right now. Check its speaker, or use the code on its setup card.",
+    "resumeRotated": "This phone's sign-in changed while it was reconnecting. Try again.",
+    "deviceCooling": "This phone has reconnected too often. Wait {{count}} s, or have your Pond say a code."
   },
   "memories": {
     "segment": {
@@ -2421,7 +2423,8 @@
       "connecting": "Connecting to Pond {{id}}",
       "wrongPond": "That isn't the Pond it said it was, so this phone stopped. Move closer to your Pond and try again.",
       "needsWifi": "Set up, needs Wi-Fi",
-      "sessionEnded": "The Bluetooth connection to your Pond ended. Try again to start a new one."
+      "sessionEnded": "The Bluetooth connection to your Pond ended. Try again to start a new one.",
+      "resuming": "Reconnecting to Pond {{id}}"
     },
     "wifi": {
       "title": "Connect your Pond to Wi-Fi",
@@ -2470,10 +2473,13 @@
       "unreachableBodyWired": "Your Pond is on your home network. Join it on this phone, and setup carries on here.",
       "checkAgain": "Check again",
       "lostTitle": "Lost touch with your Pond",
-      "lostBody": "The Bluetooth connection to your Pond dropped. It's set up as yours now, so find it again and have it say a code.",
+      "lostBody": "The Bluetooth connection to your Pond dropped. It's set up as yours, so this phone can reconnect without a code.",
       "findAgain": "Find it again",
       "listTitle": "Networks your Pond can hear",
-      "scanFailed": "Your Pond couldn't list the networks it hears. Look again in a moment."
+      "scanFailed": "Your Pond couldn't list the networks it hears. Look again in a moment.",
+      "reconnect": "Reconnect",
+      "reconnecting": "Reconnecting to Pond {{id}}",
+      "reconnectFailed": "This phone couldn't reconnect by itself. Find your Pond again and have it say a code."
     }
   }
 }

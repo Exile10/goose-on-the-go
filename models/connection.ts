@@ -93,7 +93,8 @@ export type PinSource = 'checked' | 'advertised';
  */
 export function pickBeforeExchange(exchange: {
   pin: PinSource;
-  credential: 'pairing' | 'setup';
+  // A `device` run binds the pin as a setup run does, so only a six-digit pairing code needs the pick.
+  credential: 'pairing' | 'setup' | 'device';
   codeSpoken: boolean;
 }): boolean {
   return exchange.pin === 'advertised' && exchange.credential === 'pairing' && !exchange.codeSpoken;

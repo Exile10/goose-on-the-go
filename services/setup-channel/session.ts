@@ -203,7 +203,7 @@ export class SetupChannel {
       client_version: '1.0.0',
       channel_binding: hello.pin,
       client_nonce: toBase64(clientNonce),
-      ...(input.credential === 'setup' ? { credential: 'setup' } : {}),
+      ...(input.credential !== 'pairing' ? { credential: input.credential } : {}),
     });
     let run: CpaceResponse;
     try {
@@ -229,7 +229,7 @@ export class SetupChannel {
       try {
         verify = await this.request('pake_verify', {
           challenge_id: str(init.challenge_id),
-          device_name: input.deviceName ?? null,
+          device_name: input.deviceName?.trim() || null,
           share: toBase64(run.share),
           confirm: bytesToHex(run.confirm),
         });

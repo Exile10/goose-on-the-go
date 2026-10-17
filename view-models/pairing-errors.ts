@@ -85,6 +85,9 @@ export function explainRejection(
       return t('pairingErrors.setupClaimed');
     case 'setup_code_cooling':
       return t('pairingErrors.setupCoolingNoHint');
+    // A device resume: the session rotated (an HTTPS refresh) between init and verify.
+    case 'invalid_or_expired_refresh':
+      return t('pairingErrors.resumeRotated');
     // The phone only ever names pairing or setup, so a Pond refusing either does not know this exchange.
     case 'invalid_credential':
       return t('pairingErrors.pondOutdated');
@@ -124,7 +127,7 @@ export function isClaimedRefusal(e: unknown): boolean {
 }
 
 /** The seconds a refusal named by `code` asked the phone to wait, when it named any. */
-export function refusalWait(e: unknown, code: 'setup_code_cooling' | 'spoken_code_limited'): number | null {
+export function refusalWait(e: unknown, code: 'setup_code_cooling' | 'spoken_code_limited' | 'device_cooling'): number | null {
   if (!(e instanceof ApiError) || e.detail !== code) return null;
   return e.retryAfterSecs && e.retryAfterSecs > 0 ? e.retryAfterSecs : null;
 }

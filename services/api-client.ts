@@ -475,7 +475,7 @@ export class PondApiClient {
         channel_binding: input.channelBinding,
         client_nonce: toBase64(input.clientNonce),
         // Absent means pairing, so a pairing init is still the request the Pond's vectors pin.
-        ...(input.credential === 'setup' ? { credential: 'setup' } : {}),
+        ...(input.credential && input.credential !== 'pairing' ? { credential: input.credential } : {}),
       }),
     });
     if (!res.ok) throw await handshakeRefusal(`handshake/pake/init failed: ${res.status}`, res);

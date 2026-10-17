@@ -6,6 +6,7 @@
 import { randomBytes } from 'node:crypto';
 
 import { ApiError, PondOutdatedError } from '../api-client';
+import { devicePassword } from '../cpace';
 import { PondTrustError } from '../pond-trust';
 import { encodeFrame } from '../setup-channel/framing';
 import { SetupChannel, SetupChannelClosed } from '../setup-channel/session';
@@ -62,6 +63,22 @@ describe('setup channel session', () => {
     const tokens = await channel.exchange({ credential: 'pairing', code: '482913', clientId: 'install-1' });
     expect(tokens.accepted).toBe(true);
     expect(pond.requests.find((r) => r.type === 'pake_init')).not.toHaveProperty('credential');
+  });
+
+  it('resumes a paired phone with no code, keyed on its refresh token, and hands back the rotated tokens', async () => {
+    const { channel, pond } = open({ claimed: true, refreshToken: 'refresh-held' });
+    await channel.greet();
+    const tokens = await channel.exchange({ credential: 'device', code: devicePassword('refresh-held'), clientId: 'install-1' });
+    expect(tokens).toMatchObject({ accepted: true, session_token: 'session', refresh_token: 'refresh' });
+    expect(pond.requests.find((r) => r.type === 'pake_init')).toMatchObject({ credential: 'device', channel_binding: POND_PIN });
+    expect(channel.sealed).toBe(true);
+  });
+
+  it('refuses a resume keyed on a dead refresh token as a wrong code', async () => {
+    const { channel } = open({ claimed: true, refreshToken: 'refresh-new' });
+    await channel.greet();
+    const answer = await channel.exchange({ credential: 'device', code: devicePassword('refresh-old'), clientId: 'install-1' });
+    expect(answer).toMatchObject({ accepted: false, rejection_reason: 'invalid_confirmation' });
   });
 
   it('turns a refused verify (ok: false) into the refusal HTTPS answers, and stays unsealed', async () => {

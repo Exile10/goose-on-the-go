@@ -17,6 +17,7 @@ import {
   CLIENT_CONFIRM_LABEL,
   confirmationKey,
   confirmationTag,
+  devicePassword,
   intermediateSessionKey,
   sampleScalar,
   scalarMult,
@@ -45,6 +46,8 @@ export interface FakePondOptions {
   helloPin?: string;
   setupCode?: string;
   pairingCode?: string;
+  /** The refresh token the Pond holds for this phone, which a `device` run is keyed on. */
+  refreshToken?: string;
   claimed?: boolean;
   protocol?: number;
   /** The phone's largest write, ATT_MTU - 3. */
@@ -102,6 +105,8 @@ export function fakePond(options: FakePondOptions = {}): FakePond {
   let forgotten = false;
   let lastSealed: Message | null = null;
   let inits = 0;
+  let mints = 0;
+  let heldRefresh = options.refreshToken ?? '';
 
   const deliver = (bytes: Uint8Array) => {
     setTimeout(() => {
@@ -134,10 +139,11 @@ export function fakePond(options: FakePondOptions = {}): FakePond {
           return { ...base, ok: false, error: 'too_many_attempts' };
         }
         const setup = request.credential === 'setup';
+        const device = request.credential === 'device';
         const challenge = random(32);
         const sid = concatBytes(challenge, unb64(String(request.client_nonce)));
-        const secret = setup ? options.setupCode ?? SETUP_CODE : options.pairingCode ?? '';
-        const credential = setup ? 'setup' : 'pairing';
+        const secret = setup ? options.setupCode ?? SETUP_CODE : device ? devicePassword(heldRefresh) : options.pairingCode ?? '';
+        const credential = setup ? 'setup' : device ? 'device' : 'pairing';
         const g = calculateGenerator(utf8ToBytes(secret), channelIdentifier(pin, String(request.client_id), channelLabel(credential)), sid);
         const ya = sampleScalar(random);
         run = { ya, share: scalarMult(ya, g), sid, setup, clientId: String(request.client_id) };
@@ -158,7 +164,11 @@ export function fakePond(options: FakePondOptions = {}): FakePond {
         const keys = channelKeys(isk, sid);
         toPhone = new SealedDirection(keys.pondToPhone);
         fromPhone = new SealedDirection(keys.phoneToPond);
-        const sealed = sealMessage(toPhone, { session_token: 'session', refresh_token: 'refresh', expires_at: '2026-10-18T00:00:00Z' });
+        // Each confirmed run mints a session; a device run rotates it, so the old refresh token dies.
+        mints += 1;
+        const tokens = mints === 1 ? { session_token: 'session', refresh_token: 'refresh' } : { session_token: `session-${mints}`, refresh_token: `refresh-${mints}` };
+        heldRefresh = tokens.refresh_token;
+        const sealed = sealMessage(toPhone, { ...tokens, expires_at: '2026-10-18T00:00:00Z' });
         return { ...base, ok: true, accepted: true, server_proof: bytesToHex(confirmationTag(SERVER_CONFIRM_LABEL, macKey, share, yb)), ...sealed };
       }
       case 'status':

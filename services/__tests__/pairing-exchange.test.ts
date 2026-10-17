@@ -18,6 +18,8 @@ import {
   channelLabel,
   CI_LABEL,
   CLIENT_CONFIRM_LABEL,
+  DEVICE_CI_LABEL,
+  devicePassword,
   confirmationKey,
   confirmationTag,
   DSI,
@@ -191,6 +193,86 @@ describe('the setup run, value by value', () => {
     expect(hex(out.share)).toBe(v.Yb);
     expect(hex(out.confirm)).toBe(v.T_client);
     expect(hex(out.confirm)).not.toBe(o.T_client);
+  });
+});
+
+describe('the device run (a paired phone resuming over the setup channel), value by value', () => {
+  const device = vectors.device;
+  const { inputs: d, outputs: o } = device;
+  const sid = concatBytes(bytes(d.challenge), bytes(d.client_nonce));
+  const ci = channelIdentifier(d.spki_pin, d.client_id, DEVICE_CI_LABEL);
+  const run = (credential: 'pairing' | 'setup' | 'device', code: string) => respond({
+    code, pin: d.spki_pin, clientId: d.client_id, credential,
+    challenge: bytes(d.challenge), clientNonce: bytes(d.client_nonce),
+    initiatorShare: bytes(o.Ya), random: fixed(d.yb),
+  });
+
+  it('keys on the lowercase hex SHA-256 of the refresh token, as ASCII, under the device label', () => {
+    expect(device.credential).toBe('device');
+    expect(DEVICE_CI_LABEL).toBe(device.labels.channel);
+    expect(channelLabel('device')).toBe(DEVICE_CI_LABEL);
+    expect(devicePassword(d.refresh_token)).toBe(d.refresh_hash);
+    expect(hex(utf8ToBytes(devicePassword(d.refresh_token)))).toBe(d.PRS);
+    expect(device.wire.init_request.credential).toBe('device');
+  });
+
+  it('CI, sid, g, both shares, K, ISK, K_mac and both tags', () => {
+    expect(hex(ci)).toBe(o.CI);
+    expect(hex(sid)).toBe(o.sid);
+    expect(hex(generatorString(DSI, bytes(d.PRS), ci, sid, 128))).toBe(o.generator_string);
+    const g = calculateGenerator(bytes(d.PRS), ci, sid);
+    expect(hex(g.toBytes())).toBe(o.g);
+    const ya = scalarMult(bytesToNumberLE(bytes(d.ya)), g);
+    const yb = scalarMult(bytesToNumberLE(bytes(d.yb)), g);
+    expect(hex(ya)).toBe(o.Ya);
+    expect(hex(yb)).toBe(o.Yb);
+    const k = scalarMultVfy(bytesToNumberLE(bytes(d.yb)), ya);
+    expect(hex(k)).toBe(o.K);
+    const isk = intermediateSessionKey(sid, k, ya, NO_AD, yb, NO_AD);
+    expect(hex(isk)).toBe(o.ISK);
+    const macKey = confirmationKey(sid, isk);
+    expect(hex(macKey)).toBe(o.K_mac);
+    expect(hex(confirmationTag(CLIENT_CONFIRM_LABEL, macKey, ya, yb))).toBe(o.T_client);
+    expect(hex(confirmationTag(SERVER_CONFIRM_LABEL, macKey, ya, yb))).toBe(o.T_server);
+  });
+
+  it('respond() sends the Pond\'s device verify and expects its tag', () => {
+    const out = run('device', devicePassword(d.refresh_token));
+    expect(hex(out.share)).toBe(o.Yb);
+    expect(Buffer.from(out.share).toString('base64')).toBe(device.wire.verify_request.share);
+    expect(hex(out.confirm)).toBe(device.wire.verify_request.confirm);
+    expect(hex(out.expectedServerConfirm)).toBe(device.wire.verify_response.server_proof);
+  });
+
+  // From the PRS bytes, since raw_digest's 32 bytes are not a string respond() could be given.
+  function phoneSide(prs: Uint8Array, label: string) {
+    const g = calculateGenerator(prs, channelIdentifier(d.spki_pin, d.client_id, label), sid);
+    const ya = bytes(o.Ya);
+    const yb = scalarMult(bytesToNumberLE(bytes(d.yb)), g);
+    const k = scalarMultVfy(bytesToNumberLE(bytes(d.yb)), ya);
+    const macKey = confirmationKey(sid, intermediateSessionKey(sid, k, ya, NO_AD, yb, NO_AD));
+    return { share: yb, confirm: confirmationTag(CLIENT_CONFIRM_LABEL, macKey, ya, yb) };
+  }
+
+  it.each(['raw_digest', 'uppercase_hash', 'setup_label'])('%s: the phone sends what the Pond refuses as invalid_confirmation', (name) => {
+    const v = device.negative.find((n) => n.name === name) as Record<string, string | undefined> | undefined;
+    if (!v) throw new Error(`no device negative vector ${name}`);
+    expect(v.pond_result).toBe('invalid_confirmation');
+    const out = name === 'setup_label'
+      ? phoneSide(bytes(d.PRS), SETUP_CI_LABEL)
+      : phoneSide(bytes(need(v.phone_PRS)), DEVICE_CI_LABEL);
+    if (v.CI) expect(hex(channelIdentifier(d.spki_pin, d.client_id, SETUP_CI_LABEL))).toBe(v.CI);
+    expect(hex(out.share)).toBe(v.Yb);
+    expect(hex(out.confirm)).toBe(v.T_client);
+    expect(hex(out.confirm)).not.toBe(o.T_client);
+  });
+
+  it('never produces either wrong form itself', () => {
+    expect(devicePassword(d.refresh_token)).toMatch(/^[0-9a-f]{64}$/);
+    for (const name of ['raw_digest', 'uppercase_hash']) {
+      const v = device.negative.find((n) => n.name === name) as Record<string, string | undefined>;
+      expect(hex(utf8ToBytes(devicePassword(d.refresh_token)))).not.toBe(v.phone_PRS);
+    }
   });
 });
 
