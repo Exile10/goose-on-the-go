@@ -115,6 +115,16 @@ export function securityKey(security: WifiNetwork['security']): TranslationKey {
   }
 }
 
+/**
+ * The phone's default name when it says nothing about whose phone it is: iOS 16 and later report
+ * plain "iPhone" without a special entitlement, and Android's default is the model. Null otherwise.
+ */
+export function genericPhoneName(deviceName: string | null | undefined, modelName: string | null | undefined): string | null {
+  const name = defaultPhoneName(deviceName, modelName);
+  if (!name) return null;
+  return /^(iphone|ipad|ipod touch)$/i.test(name) || name === modelName?.trim() ? name : null;
+}
+
 /** What the phone is called on the Pond until someone changes it: its own name, else its model. */
 export function defaultPhoneName(deviceName: string | null | undefined, modelName: string | null | undefined): string {
   const name = deviceName?.trim() || modelName?.trim() || '';

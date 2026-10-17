@@ -3,6 +3,7 @@ import type { ChannelStatus } from '@/services/setup-channel/session';
 import {
   channelErrorKey,
   defaultPhoneName,
+  genericPhoneName,
   handoverProfile,
   joinedAt,
   needsPassphrase,
@@ -70,6 +71,14 @@ describe('setting up over the setup channel', () => {
     expect(channelErrorKey('wrong_phase')).toBe(channelErrorKey('unknown_type'));
     expect(channelErrorKey('internal_error')).toBe('bleSetup.find.pondError');
     expect(channelErrorKey('invalid_confirmation')).toBeNull();
+  });
+
+  it('knows a name that says nothing about whose phone it is', () => {
+    expect(genericPhoneName('iPhone', 'iPhone 17 Pro')).toBe('iPhone');
+    expect(genericPhoneName('Galaxy A57', 'Galaxy A57')).toBe('Galaxy A57');
+    expect(genericPhoneName(null, 'Galaxy A57')).toBe('Galaxy A57');
+    expect(genericPhoneName('Wanjiru’s iPhone', 'iPhone 17 Pro')).toBeNull();
+    expect(genericPhoneName(null, null)).toBeNull();
   });
 
   it('names the phone after itself, else its model', () => {

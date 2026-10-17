@@ -2373,7 +2373,8 @@
       "review": "Look over your choices",
       "reviewBody": "Your name, Goose's voice and where you live are all in Settings.",
       "dismiss": "Put away"
-    }
+    },
+    "phoneOf": "{{name}}'s {{device}}"
   },
   "bleSetup": {
     "find": {

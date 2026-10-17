@@ -5,12 +5,14 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import * as Device from 'expo-device';
 import { getLocales } from 'expo-localization';
 
 import { useServer } from '@/providers/server-provider';
 import { ApiError, api } from '@/services/api-client';
 import { confirm, reject } from '@/services/haptics';
 import i18n, { type TranslationKey } from '@/services/i18n';
+import { getInstallId } from '@/services/install-id';
 import { storageFamily } from '@/services/storage';
 import type { OnboardStatus, PondSettings, SystemInfo } from '@/services/types';
 import {
@@ -30,6 +32,7 @@ import {
   type SetupDraft,
   type SetupStep,
 } from '@/models/owner-setup';
+import { genericPhoneName } from '@/models/ble-setup';
 import { describeApiError } from './describe-error';
 import { openSetupChecklist } from './use-setup-checklist';
 import { markGettingReady, markSetupDone } from './use-setup-gate';
@@ -65,6 +68,20 @@ function missingKey(field: string): TranslationKey {
     default:
       return 'setup.missing.other';
   }
+}
+
+/**
+ * A phone paired as plain "iPhone" becomes "Amina's iPhone" once setup knows who Amina is. Only after
+ * setup, since the Pond guards its device routes until then; and only a name nobody has changed since.
+ * `PUT /devices/{id}` replaces the host name and room as well, so both are sent back as they were.
+ */
+async function nameThisPhone(owner: string): Promise<void> {
+  const generic = genericPhoneName(Device.deviceName, Device.modelName);
+  if (!generic || !owner) return;
+  const id = await getInstallId();
+  const mine = (await api.listDevices()).find((d) => d.id === id);
+  if (!mine || mine.name !== generic) return;
+  await api.updateDevice(id, { name: i18n.t('setup.phoneOf', { name: owner, device: generic }), hostname: mine.hostname, room: mine.room });
 }
 
 /** The model step says it itself; every other missing field is named over the step it sends back to. */
@@ -256,6 +273,9 @@ export function useOwnerSetup(): UseOwnerSetup {
           // Home says whether Goose can answer yet, and what is left to do, in place of two screens.
           markGettingReady(profileId, true);
           void openSetupChecklist(profileId);
+          void nameThisPhone(d.preferredName.trim() || d.userName.trim().split(/\s+/)[0] || '').catch(() => {
+            console.warn('[setup] this phone keeps its own name on the Pond');
+          });
           void drafts.remove([profileId]).catch(() => {});
         }
         setPhase('finished');

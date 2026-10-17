@@ -29,6 +29,8 @@ jest.mock('@/services/api-client', () => {
       setProfilePrefs: jest.fn(),
       systemInfo: jest.fn(),
       detectLocation: jest.fn(),
+      listDevices: jest.fn(),
+      updateDevice: jest.fn(),
     },
   };
 });
@@ -36,6 +38,8 @@ jest.mock('@/providers/server-provider', () => ({
   useServer: () => ({ hydrated: true, paired: true, profileId: 'pairing-1' }),
 }));
 jest.mock('expo-localization', () => ({ getLocales: () => [{ languageTag: 'sw-KE' }] }));
+jest.mock('expo-device', () => ({ deviceName: 'iPhone', modelName: 'iPhone 17 Pro' }));
+jest.mock('@/services/install-id', () => ({ getInstallId: jest.fn().mockResolvedValue('install-1') }));
 
 const pond = jest.mocked(api);
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -73,6 +77,8 @@ beforeEach(async () => {
   pond.systemInfo.mockResolvedValue({ hostname: 'nano', version: '0.9.0' });
   pond.createProfile.mockResolvedValue({ id: 'owner-1', display_name: 'Amina', avatar_emoji: '' });
   pond.setProfilePrefs.mockResolvedValue({ id: 'owner-1', display_name: 'Amina', preferences: {} });
+  pond.listDevices.mockResolvedValue([{ id: 'install-1', name: 'iPhone', is_online: true, room: 'Kitchen' }]);
+  pond.updateDevice.mockImplementation(async (id, req) => ({ id, is_online: true, ...req }));
 });
 
 it('reads the record with GET, and writes nothing to read it', async () => {
@@ -196,6 +202,33 @@ it('finishes from How Goose talks, saving it first, and leaves the rest for Home
   expect(pond.updateSettings).toHaveBeenCalledWith({ agent_memory_inject: true });
   expect(pond.recordOnboardStep).toHaveBeenLastCalledWith('GooseIdentity');
   expect(JSON.parse((await AsyncStorage.getItem('@goose/setup-checklist/pairing-1')) ?? '{}')).toEqual({ open: ['wake', 'review'] });
+  m.unmount();
+});
+
+it('renames a phone paired as plain “iPhone” after its owner, once setup is done', async () => {
+  pond.onboardStatus.mockResolvedValue(status('Location'));
+  pond.getSettings.mockResolvedValue(record({ user_name: 'Amina Wanjiru' }));
+  pond.completeOnboarding.mockResolvedValue({ completed: true });
+  const m = await mount();
+  await act(async () => {
+    await m.vm.actions.finish();
+    await new Promise((r) => setTimeout(r, 0));
+  });
+  expect(pond.updateDevice).toHaveBeenCalledWith('install-1', { name: "Amina's iPhone", hostname: undefined, room: 'Kitchen' });
+  m.unmount();
+});
+
+it('leaves a phone alone whose name someone has already changed', async () => {
+  pond.onboardStatus.mockResolvedValue(status('Location'));
+  pond.getSettings.mockResolvedValue(record({ user_name: 'Amina' }));
+  pond.completeOnboarding.mockResolvedValue({ completed: true });
+  pond.listDevices.mockResolvedValue([{ id: 'install-1', name: 'Kitchen phone', is_online: true }]);
+  const m = await mount();
+  await act(async () => {
+    await m.vm.actions.finish();
+    await new Promise((r) => setTimeout(r, 0));
+  });
+  expect(pond.updateDevice).not.toHaveBeenCalled();
   m.unmount();
 });
 
