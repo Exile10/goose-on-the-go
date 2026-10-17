@@ -28,7 +28,7 @@ import {
   useInkTheme,
   type InkNavDestination,
 } from '@jarida/ink/native';
-import { View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { GIcon } from '@/components/ui/g-icon';
@@ -40,7 +40,9 @@ import {
 } from '@/providers/chrome-provider';
 import { useServer } from '@/providers/server-provider';
 import { useOnboarding } from '@/view-models/use-onboarding';
+import { useSettingsIssues } from '@/view-models/use-settings-issues';
 import { selectionTick } from '@/services/haptics';
+import { Semantic } from '@/constants/colors';
 import type { IconName } from '@/constants/icons';
 import type { TranslationKey } from '@/services/i18n';
 
@@ -98,6 +100,8 @@ function AppTabBar({ state, navigation }: TabBarProps) {
   const restore = useChromeRestore();
 
   const current = state.routes[state.index]?.name ?? 'index';
+  // Settings lists what needs attention, so its tab says when something does.
+  const issueTone = useSettingsIssues()[0]?.tone ?? null;
   const [height, setHeight] = useState(0);
 
   const items = useMemo<InkNavDestination[]>(
@@ -108,15 +112,22 @@ function AppTabBar({ state, navigation }: TabBarProps) {
         // Ink's own text tokens, because the label beside the icon is already
         // drawn in them — `textOnBrand` is white, which read as selected only
         // for as long as the bar was assumed to be dark.
+        // The dot is drawn on the glyph rather than through Ink's `badge`, which sits at 60% of
+        // the whole item and so off the icon, and which the collapsed bar does not draw.
         icon: (
-          <GIcon
-            name={d.icon}
-            size={22}
-            color={d.name === current ? theme.color.text : theme.color.textSecondary}
-          />
+          <View style={styles.glyph}>
+            <GIcon
+              name={d.icon}
+              size={22}
+              color={d.name === current ? theme.color.text : theme.color.textSecondary}
+            />
+            {d.name === 'profile' && issueTone ? (
+              <View style={[styles.dot, { backgroundColor: issueTone === 'info' ? theme.color.accent : Semantic.danger }]} />
+            ) : null}
+          </View>
         ),
       })),
-    [current, theme.color.text, theme.color.textSecondary, t],
+    [current, theme.color.text, theme.color.textSecondary, theme.color.accent, issueTone, t],
   );
 
   // The bar draws a dash over the selected destination in `accentLine`, and
@@ -250,3 +261,8 @@ export default function TabLayout() {
     </ChromeProvider>
   );
 }
+
+const styles = StyleSheet.create({
+  glyph: { width: 22, height: 22 },
+  dot: { position: 'absolute', top: -3, right: -5, width: 9, height: 9, borderRadius: 4.5 },
+});

@@ -68,7 +68,30 @@ export default function StackLayout() {
         contentStyle: { backgroundColor: colors.background },
       }}
     >
+      <Stack.Screen name="settings-assistant" options={{ title: t('screens.settingsAssistant') }} />
+      <Stack.Screen name="settings-voice" options={{ title: t('screens.settingsVoice') }} />
+      <Stack.Screen name="settings-speaking" options={{ title: t('screens.settingsSpeaking') }} />
+      <Stack.Screen name="settings-listening" options={{ title: t('screens.settingsListening') }} />
+      <Stack.Screen name="settings-thinking" options={{ title: t('screens.settingsThinking') }} />
+      <Stack.Screen name="settings-memory" options={{ title: t('screens.settingsMemory') }} />
+      <Stack.Screen name="settings-memory-tuning" options={{ title: t('screens.settingsMemoryTuning') }} />
+      <Stack.Screen name="settings-tools" options={{ title: t('screens.settingsTools') }} />
+      <Stack.Screen name="settings-internet" options={{ title: t('screens.settingsInternet') }} />
+      <Stack.Screen name="settings-home" options={{ title: t('screens.settingsHome') }} />
+      <Stack.Screen name="settings-timezone" options={{ title: t('screens.settingsTimezone') }} />
+      <Stack.Screen name="settings-issue" options={{ title: t('screens.settingsIssue') }} />
+      <Stack.Screen name="settings-household" options={{ title: t('screens.settingsHousehold') }} />
+      <Stack.Screen name="settings-cameras" options={{ title: t('screens.settingsCameras') }} />
+      <Stack.Screen name="settings-announcements" options={{ title: t('screens.settingsAnnouncements') }} />
+      <Stack.Screen name="settings-privacy" options={{ title: t('screens.settingsPrivacy') }} />
+      <Stack.Screen name="settings-retention" options={{ title: t('screens.settingsRetention') }} />
+      <Stack.Screen name="settings-appearance" options={{ title: t('screens.settingsAppearance') }} />
+      <Stack.Screen name="settings-advanced" options={{ title: t('screens.settingsAdvanced') }} />
       <Stack.Screen name="models" options={{ title: t('screens.models') }} />
+      <Stack.Screen name="settings-model-role" options={{ title: t('screens.settingsModelRole') }} />
+      <Stack.Screen name="settings-model" options={{ title: t('screens.settingsModel') }} />
+      <Stack.Screen name="settings-model-catalog" options={{ title: t('screens.settingsModelCatalog') }} />
+      <Stack.Screen name="settings-model-search" options={{ title: t('screens.settingsModelSearch') }} />
       <Stack.Screen name="memories" options={{ title: t('screens.memories') }} />
       <Stack.Screen name="sessions" options={{ title: t('screens.sessions') }} />
       <Stack.Screen name="logs" options={{ title: t('screens.logs') }} />

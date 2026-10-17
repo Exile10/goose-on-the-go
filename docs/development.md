@@ -74,9 +74,9 @@ EXPO_PUBLIC_POND_INSECURE_DEV=1 npx expo start --go
 
 In the app the pairing wizard opens on address entry (nothing advertises the
 plaintext listener, and Expo Go has no mDNS module). Type
-`http://<the Pond's LAN address>:4080`, then the six-digit code as usual. A
-persistent "Insecure development connection" banner stays at the top of every
-screen while the mode is on; it cannot be dismissed.
+`http://<the Pond's LAN address>:4080`, then the six-digit code as usual. While
+the mode is on, the You tab carries a red dot and the top of Settings has a row
+that opens a page on what the mode exposes; neither can be dismissed.
 
 How it is gated: `services/dev-mode.ts` exports `insecureDevMode`, which is
 `__DEV__ && process.env.EXPO_PUBLIC_POND_INSECURE_DEV === '1'`, and every

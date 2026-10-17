@@ -1,0 +1,262 @@
+/**
+ * The pieces of a settings list, drawn in Ink: groups of rows on hairline surfaces, each row a
+ * coloured icon, a label, what it is set to, and a chevron when it leads somewhere. Groups take no
+ * plate, because Ink spends the raised edge on what is chosen, about twice a screen.
+ */
+
+import React, { Children, isValidElement, type ReactNode } from 'react';
+import { Pressable, Text, View, type StyleProp, type ViewStyle } from 'react-native';
+import { InkEdge, InkTitle } from '@jarida/ink/native';
+
+import { GIcon } from '@/components/ui/g-icon';
+import { Brand, TileColors, type TileColor } from '@/constants/colors';
+import type { IconName } from '@/constants/icons';
+import { Spacing } from '@/constants/spacing';
+import {
+  useSettingsColors,
+  useSettingsMetrics,
+  useSettingsStyles,
+  type SettingsColors,
+  type SettingsMetrics,
+  type SettingsType,
+} from './settings-theme';
+
+const TILE = 30;
+const ROW_PADDING = Spacing.lg;
+/** Where a hairline starts in a group whose rows carry tiles: under the label. */
+export const TILE_INSET = ROW_PADDING + TILE + Spacing.md;
+
+export function IconTile({ icon, tile, size = TILE }: { icon: IconName; tile: TileColor; size?: number }) {
+  return (
+    <View
+      style={{
+        width: size,
+        height: size,
+        borderRadius: Math.round(size * 0.3),
+        backgroundColor: TileColors[tile],
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
+    >
+      <GIcon name={icon} size={Math.round(size * 0.58)} color={Brand.white} strokeWidth={2} />
+    </View>
+  );
+}
+
+/**
+ * A group of rows on one hairline surface, its name in Ink's eyebrow at the top as pond-desktop's
+ * cards carry it. Hairlines go between rows and start at `inset`, so one never cuts under an icon.
+ */
+export function SettingsGroup({
+  title,
+  footer,
+  inset = 0,
+  children,
+  style,
+}: {
+  title?: string | null;
+  footer?: ReactNode;
+  inset?: number;
+  children: ReactNode;
+  style?: StyleProp<ViewStyle>;
+}) {
+  const styles = useSettingsStyles(makeStyles);
+  const m = useSettingsMetrics();
+  const rows = Children.toArray(children).filter((child) => isValidElement(child) || typeof child === 'string');
+  if (rows.length === 0 && !footer) return null;
+
+  return (
+    <View style={[styles.groupWrap, style]}>
+      {rows.length > 0 ? (
+        <InkEdge raised={false} radius={m.radius.lg} contentStyle={styles.group}>
+          {title ? (
+            <Text style={styles.groupTitle} accessibilityRole="header">
+              {title}
+            </Text>
+          ) : null}
+          {rows.map((row, i) => (
+            <View key={isValidElement(row) && row.key != null ? row.key : i}>
+              {i > 0 ? <View style={[styles.separator, { marginLeft: inset }]} /> : null}
+              {row}
+            </View>
+          ))}
+        </InkEdge>
+      ) : null}
+      {footer ? (typeof footer === 'string' ? <Text style={styles.footer}>{footer}</Text> : footer) : null}
+    </View>
+  );
+}
+
+/** A hairline inside a row that draws two rows of its own, matching the group's own dividers. */
+export function RowSeparator({ inset = 0 }: { inset?: number }) {
+  const styles = useSettingsStyles(makeStyles);
+  return <View style={[styles.separator, { marginLeft: inset }]} />;
+}
+
+export interface SettingsRowProps {
+  label: string;
+  icon?: IconName;
+  tile?: TileColor;
+  /** A line under the label saying what the setting does. */
+  description?: string | null;
+  /** What the setting is set to, on the right. */
+  value?: string | null;
+  /** A control on the right in place of a value, such as a switch. */
+  trailing?: ReactNode;
+  /** `next` leads to another page; `menu` opens a list of choices. */
+  accessory?: 'next' | 'menu' | 'none';
+  /** Under the description: why a change will wait, or why the Pond refused one. */
+  note?: string | null;
+  error?: string | null;
+  destructive?: boolean;
+  /** A row that does something rather than shows something, in the accent like a button. */
+  action?: boolean;
+  disabled?: boolean;
+  onPress?: () => void;
+  /** The row's control, read with it by a screen reader: `switch`, `button`, `radio`. */
+  accessibilityRole?: 'button' | 'switch' | 'radio' | 'link' | 'adjustable';
+  accessibilityState?: { checked?: boolean; selected?: boolean; disabled?: boolean; busy?: boolean };
+  /** Content under the label, such as a text field, that belongs to this row. */
+  children?: ReactNode;
+}
+
+export function SettingsRow({
+  label,
+  icon,
+  tile = 'slate',
+  description,
+  value,
+  trailing,
+  accessory = 'none',
+  note,
+  error,
+  destructive,
+  action,
+  disabled,
+  onPress,
+  accessibilityRole,
+  accessibilityState,
+  children,
+}: SettingsRowProps) {
+  const styles = useSettingsStyles(makeStyles);
+  const colors = useSettingsColors();
+  const body = (
+    <View style={[styles.row, disabled && styles.disabled]}>
+      {icon ? <IconTile icon={icon} tile={tile} /> : null}
+      <View style={styles.main}>
+        <View style={styles.line}>
+          <View style={styles.labels}>
+            <Text style={[styles.label, action && { color: colors.accent }, destructive && { color: colors.danger }]}>{label}</Text>
+            {description ? <Text style={styles.description}>{description}</Text> : null}
+          </View>
+          {value ? (
+            <Text style={styles.value} numberOfLines={1}>
+              {value}
+            </Text>
+          ) : null}
+          {trailing}
+          {accessory === 'next' ? <GIcon name="chevron-right" size={18} color={colors.textTertiary} strokeWidth={2.5} /> : null}
+          {accessory === 'menu' ? <GIcon name="updown" size={16} color={colors.textTertiary} strokeWidth={2.5} /> : null}
+        </View>
+        {children}
+        {note ? <Text style={styles.note}>{note}</Text> : null}
+        {error ? (
+          <Text style={[styles.note, { color: colors.danger }]} accessibilityLiveRegion="polite">
+            {error}
+          </Text>
+        ) : null}
+      </View>
+    </View>
+  );
+
+  if (!onPress) return body;
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={disabled}
+      accessibilityRole={accessibilityRole ?? 'button'}
+      accessibilityState={{ disabled, ...accessibilityState }}
+      accessibilityLabel={value ? `${label}, ${value}` : label}
+      accessibilityHint={description ?? undefined}
+      // The press shows the instant a finger lands, not when it lifts.
+      style={({ pressed }) => (pressed ? { backgroundColor: colors.pressed } : null)}
+    >
+      {body}
+    </Pressable>
+  );
+}
+
+/** The top of a detail page, as pond-desktop opens one: its title, and a line on what it covers. */
+export function SettingsHeader({
+  icon,
+  tile,
+  title,
+  description,
+}: {
+  icon: IconName;
+  tile: TileColor;
+  title: string;
+  description: string;
+}) {
+  const styles = useSettingsStyles(makeStyles);
+  return (
+    <View style={styles.header}>
+      <IconTile icon={icon} tile={tile} size={44} />
+      <InkTitle level={2}>{title}</InkTitle>
+      <Text style={styles.headerBody}>{description}</Text>
+    </View>
+  );
+}
+
+/** A centred line on the page itself, for a state rather than a setting. */
+export function SettingsMessage({ children, tone = 'neutral' }: { children: ReactNode; tone?: 'neutral' | 'danger' }) {
+  const styles = useSettingsStyles(makeStyles);
+  const colors = useSettingsColors();
+  return (
+    <Text style={[styles.message, tone === 'danger' && { color: colors.danger }]} accessibilityLiveRegion="polite">
+      {children}
+    </Text>
+  );
+}
+
+const makeStyles = (c: SettingsColors, type: SettingsType, m: SettingsMetrics) => ({
+  groupWrap: { marginBottom: Spacing.xl },
+  group: { overflow: 'hidden' as const, paddingBottom: 2 },
+  groupTitle: {
+    ...type.eyebrow,
+    paddingHorizontal: m.rowH,
+    paddingTop: m.rowV,
+    paddingBottom: 2,
+  },
+  separator: { height: m.hairline, backgroundColor: c.line },
+  footer: {
+    ...type.prose,
+    marginTop: Spacing.sm,
+    marginHorizontal: m.rowH,
+  },
+  row: {
+    flexDirection: 'row' as const,
+    alignItems: 'flex-start' as const,
+    gap: Spacing.md,
+    minHeight: m.tapMin,
+    paddingHorizontal: m.rowH,
+    paddingVertical: m.rowV,
+  },
+  disabled: { opacity: 0.45 },
+  main: { flex: 1, gap: Spacing.sm, justifyContent: 'center' as const, minHeight: TILE },
+  line: { flexDirection: 'row' as const, alignItems: 'center' as const, gap: Spacing.sm, minHeight: TILE },
+  labels: { flex: 1, gap: 2 },
+  label: type.label,
+  description: type.description,
+  value: { ...type.value, maxWidth: '55%' as const, textAlign: 'right' as const },
+  note: type.note,
+  // On the page's gutter, where the cards below begin.
+  header: { alignItems: 'flex-start' as const, gap: Spacing.sm, marginBottom: Spacing.xl },
+  headerBody: { ...type.prose, fontSize: type.body.fontSize, lineHeight: type.body.lineHeight },
+  message: {
+    ...type.prose,
+    textAlign: 'center' as const,
+    marginVertical: Spacing.lg,
+    marginHorizontal: Spacing.xl,
+  },
+});

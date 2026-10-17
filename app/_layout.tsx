@@ -25,7 +25,6 @@ import {
 import { InkProvider } from '@jarida/ink/native';
 
 import { ConnectionStatus } from '@/components/patterns/connection-status';
-import { InsecureDevBanner } from '@/components/patterns/insecure-dev-banner';
 import { NotificationsProvider } from '@/providers/notifications-provider';
 import { ThemeProvider, useTheme } from '@/providers/theme-provider';
 // Registers the app's icons with Ink. Imported for the side effect: on native
@@ -34,6 +33,7 @@ import '@/components/ui/ink-icons';
 // Initialises i18next before the first screen renders.
 import '@/services/i18n';
 import { ServerProvider } from '@/providers/server-provider';
+import { loadHapticsPreference } from '@/services/haptics';
 
 /**
  * Keep the splash up until the app can draw itself.
@@ -97,6 +97,7 @@ export default function RootLayout() {
     loadFontsAsync(DEFERRED_FONTS).catch((e) =>
       console.warn('[fonts] deferred fonts failed to load', e),
     );
+    void loadHapticsPreference();
   }, []);
 
   if (!fontsLoaded && !fontError) {
@@ -124,7 +125,6 @@ function ThemedApp() {
   return (
     <NavThemeProvider value={isDark ? DarkTheme : DefaultTheme}>
       <InkProvider scheme={isDark ? 'dark' : 'light'} accent="Purple">
-        <InsecureDevBanner />
         <ConnectionStatus />
         <Stack>
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
