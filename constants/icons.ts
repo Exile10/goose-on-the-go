@@ -11,9 +11,9 @@
  */
 
 import {
-  Activity, Archive, ArrowRight, AudioLines, Bell, Bot, Boxes, Brain, Calendar, Camera,
+  Activity, Archive, ArrowRight, AudioLines, Bell, Bluetooth, Bot, Boxes, Brain, Calendar, Camera,
   Check, ChevronDown, ChevronLeft, ChevronRight, ChevronsUpDown, CircleCheck, Clock, Cloud, Copy, Cpu,
-  Download, Ear, Eye, HardDrive, Info, Palette, SlidersHorizontal,
+  Download, Ear, Eye, EyeOff, HardDrive, Info, Palette, SlidersHorizontal,
   Ellipsis, ExternalLink, File, Filter, Folder, Frame, Globe, House, Image,
   Key, Keyboard, Lightbulb, Link, ListFilter, Lock, MessageCircle, MessageSquareText, Mic, Minus,
   MonitorSmartphone, Moon, Music, Package, Pause, Pencil, Play, Plug, Plus,
@@ -31,6 +31,7 @@ export const ICONS = {
   agent: Bot,
   arrow: ArrowRight,
   bell: Bell,
+  bluetooth: Bluetooth,
   bolt: Zap,
   bridge: Router,
   calendar: Calendar,
@@ -51,6 +52,7 @@ export const ICONS = {
   disk: HardDrive,
   ear: Ear,
   eye: Eye,
+  'eye-off': EyeOff,
   edit: Pencil,
   external: ExternalLink,
   face: ScanFace,
