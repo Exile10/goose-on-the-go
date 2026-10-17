@@ -40,6 +40,12 @@ interface ServerContextValue {
   stagePairing: (profile: ConnectionProfile, pin: string) => Promise<void>;
   cancelPairing: () => Promise<void>;
   pair: (opts: PairOptions) => Promise<HandshakeResponse>;
+  /**
+   * Keep a pairing the setup channel made: its pin proven by CPace over BLE, its tokens opened from
+   * the sealed answer, its address from `wifi_join`. Nothing is probed first, since the phone may not
+   * be on the Pond's network yet, and losing the tokens would leave a claimed Pond nobody holds.
+   */
+  adoptPairing: (profile: ConnectionProfile, pin: string, resp: HandshakeResponse) => Promise<void>;
   /** Ask the staged Pond to read a pairing code aloud; it answers only a phone on its own network. */
   requestSpokenCode: () => Promise<SpokenCode>;
   unpair: () => Promise<void>;
@@ -448,6 +454,29 @@ export function ServerProvider({ children }: PropsWithChildren) {
     return resp;
   }, [restore]);
 
+  const adoptPairing = useCallback(async (rawProfile: ConnectionProfile, pin: string, resp: HandshakeResponse) => {
+    await committing.current?.catch(() => undefined);
+    await cancelRemoteAccess();
+    const profile = parseConnectionProfile({ ...rawProfile, remoteAccess: { mode: 'local' } });
+    if (!profile || !validPin(pin) || !profile.localUrls.every(isLocalPairingUrl) || !resp.accepted || !resp.session_token) {
+      throw new Error(i18n.t('pairing.invalid'));
+    }
+    operation.current++;
+    staged.current = null;
+    api.invalidateIdentity();
+    const next: Identity = { id: `${Date.now()}-${Math.random().toString(36).slice(2)}`, pin,
+      session: resp.session_token, refresh: resp.refresh_token ?? null };
+    const previous = saved.current;
+    const commit = (async () => {
+      await tokenWrite.current;
+      saved.current = await commitPairedProfile(previous, { identity: next, profile });
+      setHasPairing(true);
+      await restore();
+    })();
+    committing.current = commit;
+    try { await commit; } finally { if (committing.current === commit) committing.current = null; }
+  }, [restore]);
+
   const requestSpokenCode = useCallback(async () => {
     const pending = staged.current;
     if (!pending) throw new Error(i18n.t('pairing.lan'));
@@ -544,8 +573,8 @@ export function ServerProvider({ children }: PropsWithChildren) {
     refreshToken: identity?.refresh ?? null, connectionState: snapshot.state,
     profileId: identity?.id ?? '', paired: hasPairing, remoteEnabled: saved.current?.profile.remoteAccess?.mode === 'embedded',
     keepLocalOnly, hydrated, screenModes, isScreenReal, setScreenMode,
-    checkHealth, setRemoteEndpoint, recover: manager.recover, revoke: manager.revoke.bind(manager), stagePairing, cancelPairing, pair, requestSpokenCode, unpair,
-  }), [snapshot, identity, hasPairing, hydrated, screenModes, isScreenReal, setScreenMode, checkHealth, setRemoteEndpoint, keepLocalOnly, manager, stagePairing, cancelPairing, pair, requestSpokenCode, unpair]);
+    checkHealth, setRemoteEndpoint, recover: manager.recover, revoke: manager.revoke.bind(manager), stagePairing, cancelPairing, pair, adoptPairing, requestSpokenCode, unpair,
+  }), [snapshot, identity, hasPairing, hydrated, screenModes, isScreenReal, setScreenMode, checkHealth, setRemoteEndpoint, keepLocalOnly, manager, stagePairing, cancelPairing, pair, adoptPairing, requestSpokenCode, unpair]);
   return <ServerContext.Provider value={value}>{children}</ServerContext.Provider>;
 }
 export function useServer(): ServerContextValue {
