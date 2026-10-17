@@ -376,6 +376,9 @@ const VOICE_GRADES: Record<string, string> = {
   bm_fable: 'C', bm_george: 'C', bm_lewis: 'D+', bm_daniel: 'D',
 };
 
+/** Kokoro's graded voices, which a Pond fetches by name before it is set up enough to list its models. */
+export const KNOWN_VOICES: readonly string[] = Object.keys(VOICE_GRADES);
+
 function titleCase(segment: string): string {
   return segment
     .split(/[_-]/)
