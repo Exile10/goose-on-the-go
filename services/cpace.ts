@@ -197,6 +197,10 @@ export interface CpaceResponse {
   confirm: Uint8Array;
   /** T_server as the Pond must send it. Compare with {@link confirmationMatches}. */
   expectedServerConfirm: Uint8Array;
+  /** sid, `challenge || client_nonce`, which the setup channel salts its keys with. */
+  sid: Uint8Array;
+  /** ISK, only when asked for: the setup channel seals with keys drawn from it, and the caller zeroes it. */
+  isk?: Uint8Array;
 }
 
 /**
@@ -218,6 +222,8 @@ export function respond(input: {
   clientNonce: Uint8Array;
   initiatorShare: Uint8Array;
   random: (count: number) => Uint8Array;
+  /** Hand ISK back rather than zeroing it, for a run over the setup channel. */
+  keepIsk?: boolean;
 }): CpaceResponse {
   if (input.challenge.length !== NONCE_BYTES || input.clientNonce.length !== NONCE_BYTES) {
     throw new CpaceAbort('sid halves must be 32 bytes each');
@@ -231,12 +237,15 @@ export function respond(input: {
   if (equalBytes(k, IDENTITY)) throw new CpaceAbort('invalid_share');
   const isk = intermediateSessionKey(sid, k, input.initiatorShare, NO_AD, share, NO_AD);
   const macKey = confirmationKey(sid, isk);
-  const result = {
+  const result: CpaceResponse = {
     share,
     confirm: confirmationTag(CLIENT_CONFIRM_LABEL, macKey, input.initiatorShare, share),
     expectedServerConfirm: confirmationTag(SERVER_CONFIRM_LABEL, macKey, input.initiatorShare, share),
+    sid,
+    ...(input.keepIsk ? { isk } : {}),
   };
-  k.fill(0); isk.fill(0); macKey.fill(0);
+  k.fill(0); macKey.fill(0);
+  if (!input.keepIsk) isk.fill(0);
   return result;
 }
 
