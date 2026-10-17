@@ -11,6 +11,7 @@ import { Spacing } from '@/constants/spacing';
 import { PROMPT_STYLES, type PromptStyle } from '@/models/owner-setup';
 import type { TranslationKey } from '@/services/i18n';
 import type { UseOwnerSetup } from '@/view-models/use-owner-setup';
+import { usePondVoiceSample } from '@/view-models/use-pond-voice-sample';
 import { useSetupVoice } from '@/view-models/use-setup-voice';
 import { styleLabelKey } from './setup-steps';
 
@@ -31,6 +32,7 @@ export function PersonalityStep({ setup }: { setup: UseOwnerSetup }) {
   const { t } = useTranslation();
   const { draft, actions } = setup;
   const voice = useSetupVoice(draft, actions.patch);
+  const sample = usePondVoiceSample(draft.ttsVoice);
   const style = (PROMPT_STYLES as readonly string[]).includes(draft.promptStyle) ? (draft.promptStyle as PromptStyle) : 'balanced';
 
   return (
@@ -73,7 +75,7 @@ export function PersonalityStep({ setup }: { setup: UseOwnerSetup }) {
               problem={voice.error}
               onChoose={voice.choose}
               onPace={voice.setPace}
-              preview={null}
+              preview={sample}
               silentLine={t('setup.personality.noPreview')}
             />
           )}

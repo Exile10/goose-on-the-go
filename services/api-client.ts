@@ -1606,6 +1606,16 @@ export class PondApiClient {
     return (await res.json()) as CalibrationTake;
   }
 
+  /**
+   * Have the Pond say a short sample in `voice` on its own speaker (goose-in-a-pond#579, P4): the way
+   * to hear a voice during setup, when `/tts` answers loopback only. A 202 means it is speaking;
+   * refusals are 404 `unknown_voice`, 429 with Retry-After, and 503 `voice_unavailable`. An older Pond
+   * answers 404 with no code, having no such route.
+   */
+  async voiceSample(voice: string): Promise<void> {
+    await this.post<unknown>('/api/v1/voice/sample', { voice });
+  }
+
   /** Which household member this device belongs to, as the Pond sees it. */
   deviceSelf(): Promise<DeviceSelf> {
     return this.get<DeviceSelf>('/api/v1/devices/self');
