@@ -69,6 +69,10 @@ identifier, session id and confirmation tags. The draft half is held to the draf
 own vectors (`services/__tests__/vectors/`). Its randomness is a parameter, which
 `api-client.ts` fills from `secure-random.ts`; noble's own `randomBytes` is never
 used. See [PINNED_HTTPS.md](./PINNED_HTTPS.md) "Trust lifecycle".
+A 403 whose `error` is `onboarding_required` is reported once through
+`setOnboardingRequired`, which the setup gate listens on, and `ApiError` keeps a
+refusal's parsed `body` for a route that answers more than a sentence, such as
+`/onboard/complete`'s `missing_fields`.
 Wire types live in `services/types.ts`, in the server's own snake_case —
 deliberately separate from the display-shaped types in `models/`.
 `services/notification-stream.ts` — the foreground SSE stream. Only a 401 means

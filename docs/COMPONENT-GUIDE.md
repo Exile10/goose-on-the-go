@@ -200,8 +200,18 @@ Android.
 | SettingsSlider | value, min, max, step, onCommit | Becomes a drag after 8 px of sideways movement and then tracks 1:1, holding the gesture from the page's scroll; a vertical swipe across it scrolls, a tap sets the value. Drawn as the desktop's pace slider; `InkSlider` reads `locationX` and loses drags to the scroll |
 | SettingsPageScreen | page | Draws one page of `SETTINGS_PAGES` |
 | DownloadRow, ModelRow | download / model | A model's download with its controls, and a model with its size and job |
+| VoicePickerView | voices, current, pace, applying, problem, onChoose, onPace, preview, silentLine | The picker with no store behind it; owner setup drives it with `preview={null}`, since a Pond plays no samples to a phone until it is set up |
 | VoicePicker | vm | pond-desktop's picker: `VoiceOrb` on an `InkStage` with the voice, its line and play; the accents as a sideways row of `InkChoice` pills; the best six voices as chips with "Show all"; the pace. Previews come from `useVoicePreview`, the line's loudness driving the face |
 | IssuePage, IssueRows, IssueDot | issue, ctx / issues / tone | One entry of `SETTINGS_ISSUES` as a page; the rows for the top of Settings; the dot the row and the You tab carry |
+
+### Owner setup (components/setup/)
+
+The steps of `app/(onboarding)/owner-setup.tsx`, in Ink. A choice saved with its
+step is an `InkCheckbox` in a `CheckRow`, not a switch: Ink's rule is that a switch
+applies on flip. Birthdays are three `InkSelect`s and the zone is a searchable
+`InkSheet` (`setup-fields.tsx`), because a calendar opens on this month and a
+birth year is decades back. `SetupReady` and its `ReadinessStatus` say whether the
+Pond can answer yet; Home's `PondGettingReady` reuses the status.
 
 ### Patterns (components/patterns/)
 | Component | Props | Description |
@@ -209,7 +219,8 @@ Android.
 | ServerStatus | online, label | Whether the Pond is reachable, as a dot and a word |
 | ConnectionStatus | — | The connection banner; sends an unpaired or revoked phone to pairing. Silent until the saved pairing has loaded (`hydrated`), and shows reconnecting only after 1.5 s (`RECONNECT_GRACE_MS`) |
 | RemoteAccessOffer | — | Home's dismissible offer of remote access to a Pond paired without it |
-| PondList | title, ponds, phase, onSelect | The Ponds on this network, shared by first run and Switch Pond |
+| PondList | title, ponds, phase, onSelect | The Ponds on this network, shared by first run and Switch Pond; an unclaimed one is badged "Not set up" with its card id |
+| PondGettingReady | — | Home's card for a Pond whose setup was left before it could answer; mounted only then, so Home reads no models otherwise |
 | ConversationWall | cards, loading, selecting, onOpen, … | The Chat tab's wall of conversation cards |
 | ConversationCard | card, onOpen, onAskDelete, … | One conversation on the wall |
 | ConversationList | sections, loading, header | The wall read as an index instead |
