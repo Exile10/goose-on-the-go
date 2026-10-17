@@ -1,4 +1,5 @@
 // The wake phrase, and teaching the Pond how this person says it, from takes recorded on this phone.
+// Owner setup leaves it for later; Home's "Finish setting up" card opens it on its own screen.
 
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
@@ -6,9 +7,8 @@ import { useTranslation } from 'react-i18next';
 import { InkButton, InkCard, InkFormField, InkInput, InkMeter, InkNotice, InkRadioGroup, InkSpinner, InkText, InkTitle } from '@jarida/ink/native';
 
 import { Spacing } from '@/constants/spacing';
-import { WAKE_PRESETS, shortPhraseSuggestion, wakePhrase, wakePhraseProblem, type WakePreset } from '@/models/owner-setup';
+import { WAKE_PRESETS, shortPhraseSuggestion, wakePhrase, wakePhraseProblem, type SetupDraft, type WakePreset } from '@/models/owner-setup';
 import type { TranslationKey } from '@/services/i18n';
-import type { UseOwnerSetup } from '@/view-models/use-owner-setup';
 import { useWakeCalibration } from '@/view-models/use-wake-calibration';
 
 function presetKeys(preset: WakePreset): { label: TranslationKey; body: TranslationKey } {
@@ -82,9 +82,10 @@ function Calibration({ phrase }: { phrase: string }) {
   );
 }
 
-export function WakeStep({ setup }: { setup: UseOwnerSetup }) {
+type WakeChoice = Pick<SetupDraft, 'wakeWord' | 'wakeWordCustom'>;
+
+export function WakeStep({ draft, patch }: { draft: WakeChoice; patch: (change: Partial<WakeChoice>) => void }) {
   const { t } = useTranslation();
-  const { draft, actions } = setup;
   const custom = draft.wakeWord === 'custom';
   const typed = draft.wakeWordCustom.trim();
   const problem = custom && typed ? wakePhraseProblem(typed) : null;
@@ -106,7 +107,7 @@ export function WakeStep({ setup }: { setup: UseOwnerSetup }) {
             const keys = presetKeys(value);
             return { value, label: t(keys.label), description: t(keys.body) };
           })}
-          onChange={(wakeWord) => actions.patch({ wakeWord })}
+          onChange={(wakeWord) => patch({ wakeWord })}
         />
       </InkFormField>
       {custom ? (
@@ -120,7 +121,7 @@ export function WakeStep({ setup }: { setup: UseOwnerSetup }) {
             placeholder={t('setup.wake.customPlaceholder')}
             value={draft.wakeWordCustom}
             invalid={problem ? t(problemKey(problem)) : undefined}
-            onChange={(wakeWordCustom) => actions.patch({ wakeWordCustom })}
+            onChange={(wakeWordCustom) => patch({ wakeWordCustom })}
           />
         </InkFormField>
       ) : null}
