@@ -161,7 +161,9 @@ it('takes the household back to the step that sets a field the Pond is missing',
   pond.completeOnboarding.mockResolvedValue({ completed: false, missing: ['timezone', 'chat_model'] });
   const m = await mount();
   expect(m.vm.step).toBe('personality');
-  await act(async () => m.vm.actions.finish());
+  await act(async () => {
+    await m.vm.actions.finish();
+  });
   expect(m.vm.step).toBe('about-you');
   expect(m.vm.notice).toBeTruthy();
   expect(m.vm.noChatModel).toBe(true);
@@ -172,7 +174,9 @@ it('opens the model step, quietly, when only the chat model is missing', async (
   pond.onboardStatus.mockResolvedValue(status('GooseIdentity'));
   pond.completeOnboarding.mockResolvedValue({ completed: false, missing: ['chat_model'] });
   const m = await mount();
-  await act(async () => m.vm.actions.finish());
+  await act(async () => {
+    await m.vm.actions.finish();
+  });
   expect(m.vm.step).toBe('model');
   expect(m.vm.noChatModel).toBe(true);
   expect(m.vm.notice).toBeNull();
@@ -184,7 +188,9 @@ it('finishes from How Goose talks, saving it first, and leaves the rest for Home
   pond.onboardStatus.mockResolvedValue(status('Location'));
   pond.completeOnboarding.mockResolvedValue({ completed: true });
   const m = await mount();
-  await act(async () => m.vm.actions.finish());
+  await act(async () => {
+    await m.vm.actions.finish();
+  });
   expect(m.vm.phase).toBe('finished');
   expect(pond.updateSettings).toHaveBeenCalledWith(expect.objectContaining({ assistant_name: 'Goose', voice_tts_voice: 'af_heart' }));
   expect(pond.updateSettings).toHaveBeenCalledWith({ agent_memory_inject: true });

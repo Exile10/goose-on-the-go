@@ -2362,7 +2362,8 @@
       "keepOpen": "Setup finishes by itself once it's on your Pond. You can leave this screen open, or come back to it.",
       "using": "Giving {{name}} the job",
       "none": "Your Pond has no model to suggest. Choose one from its models.",
-      "others": "See other models"
+      "others": "See other models",
+      "stalled": "Your Pond didn't keep {{name}} as the model Goose thinks with. Try again, or choose another."
     },
     "checklist": {
       "title": "Finish setting up",

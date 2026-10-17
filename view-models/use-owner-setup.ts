@@ -116,7 +116,8 @@ export interface UseOwnerSetup {
     next: () => Promise<void>;
     skip: () => Promise<void>;
     back: () => void;
-    finish: () => Promise<void>;
+    /** Resolves true once the Pond has finished setup. */
+    finish: () => Promise<boolean>;
     reload: () => void;
     /** Ask the Pond where this home is, from the zone and anything typed. Saves nothing until Continue. */
     detectPlace: () => Promise<void>;
@@ -238,10 +239,10 @@ export function useOwnerSetup(): UseOwnerSetup {
   const next = useCallback(() => advanceFrom(draftRef.current), [advanceFrom]);
 
   const finish = useCallback(async () => {
-    if (saving) return;
+    if (saving) return false;
     const d = draftRef.current;
     const step = SETUP_STEPS[index];
-    if (!canContinue(step, d)) return;
+    if (!canContinue(step, d)) return false;
     setSaving(true);
     setError(null);
     try {
@@ -258,7 +259,7 @@ export function useOwnerSetup(): UseOwnerSetup {
           void drafts.remove([profileId]).catch(() => {});
         }
         setPhase('finished');
-        return;
+        return true;
       }
       const back = firstStepFor(result.missing);
       const onlyModel = result.missing.every((f) => f === 'chat_model');
@@ -266,9 +267,11 @@ export function useOwnerSetup(): UseOwnerSetup {
       if (!onlyModel) void reject();
       setNotice(onlyModel ? null : namedMissing(result.missing));
       if (back) setIndex(SETUP_STEPS.indexOf(back));
+      return false;
     } catch (e) {
       void reject();
       setError(saveMessage(e));
+      return false;
     } finally {
       setSaving(false);
     }

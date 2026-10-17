@@ -16,7 +16,7 @@ import { useSetupModel } from '@/view-models/use-setup-model';
 export function ModelStep({ setup }: { setup: UseOwnerSetup }) {
   const { t } = useTranslation();
   const router = useRouter();
-  const { choice, unavailable, library } = useSetupModel(setup);
+  const { choice, unavailable, stalled, retry, library } = useSetupModel(setup);
 
   const others = (
     <InkButton
@@ -37,7 +37,17 @@ export function ModelStep({ setup }: { setup: UseOwnerSetup }) {
     switch (choice.kind) {
       case 'held':
       case 'ready':
-        return <InkSpinner label={t('setup.model.using', { name: titleOf(choice.model) })} />;
+        return stalled ? (
+          <View style={styles.block}>
+            <InkNotice tone="warning">{t('setup.model.stalled', { name: titleOf(choice.model) })}</InkNotice>
+            <InkButton variant="primary" block icon="refresh" disabled={setup.saving} onPress={retry}>
+              {t('common.retry')}
+            </InkButton>
+            {others}
+          </View>
+        ) : (
+          <InkSpinner label={t('setup.model.using', { name: titleOf(choice.model) })} />
+        );
       case 'downloading':
         return (
           <View style={styles.block} accessibilityLiveRegion="polite">

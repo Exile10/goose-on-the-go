@@ -5,7 +5,7 @@
  * step says what is missing instead.
  */
 
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { setupModelChoice, type SetupModelChoice } from '@/models/model-library';
 import type { UseOwnerSetup } from './use-owner-setup';
@@ -15,6 +15,9 @@ export interface UseSetupModel {
   /** Null until the Pond has answered; `unavailable` when it will not list models before setup. */
   choice: SetupModelChoice | null;
   unavailable: boolean;
+  /** The model was given the job and the Pond still would not finish: its write did not stick. */
+  stalled: boolean;
+  retry: () => void;
   library: UseModelLibrary;
 }
 
@@ -22,22 +25,36 @@ export function useSetupModel(setup: UseOwnerSetup): UseSetupModel {
   const library = useModelLibrary();
   const choice = library.loaded ? setupModelChoice(library.models, library.downloads) : null;
   const handled = useRef<string | null>(null);
+  const [stalled, setStalled] = useState<string | null>(null);
   const kind = choice?.kind ?? null;
   const modelId = choice && choice.kind !== 'none' ? choice.model.id : null;
   const { activate } = library.actions;
   const { finish } = setup.actions;
 
-  // A model on the Pond is given the job, and a model holding it lets setup finish, each once.
+  // Each model is given the job and finished with once, by itself; after that only Try again asks.
+  // Keyed on the model, not on what the list says of it: a Pond that drops the activation would
+  // otherwise flip it between ready and held and be asked again on every read.
   useEffect(() => {
     if (!choice || !modelId || (kind !== 'ready' && kind !== 'held')) return;
-    const key = `${kind}:${modelId}`;
-    if (handled.current === key) return;
-    handled.current = key;
+    if (handled.current === modelId) return;
+    handled.current = modelId;
     void (async () => {
       if (kind === 'ready' && choice.kind === 'ready' && !(await activate(choice.model))) return;
-      await finish();
+      // The Pond writes chat_model on activation but ignores a failed write, so finishing can still refuse.
+      if (!(await finish())) setStalled(modelId);
     })();
   }, [choice, kind, modelId, activate, finish]);
 
-  return { choice, unavailable: !library.loaded && !!library.error, library };
+  const retry = useCallback(() => {
+    if (!choice || choice.kind === 'none' || choice.kind === 'download' || choice.kind === 'downloading') return;
+    const model = choice.model;
+    setStalled(null);
+    handled.current = model.id;
+    void (async () => {
+      if (!(await activate(model))) return;
+      if (!(await finish())) setStalled(model.id);
+    })();
+  }, [choice, activate, finish]);
+
+  return { choice, unavailable: !library.loaded && !!library.error, stalled: !!modelId && stalled === modelId, retry, library };
 }
