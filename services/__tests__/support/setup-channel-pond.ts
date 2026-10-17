@@ -73,6 +73,8 @@ export interface FakePond {
   writes: number[];
   /** Drop the link from the Pond's end. */
   drop: () => void;
+  /** End the session but keep the link, as the 10-minute cap does: writes are refused with ATT error 0x03. */
+  forget: () => void;
   /** Push raw bytes at the phone, as if the Pond had notified them. */
   notify: (bytes: Uint8Array) => void;
   /** The last sealed envelope the Pond sent, for a replay. */
@@ -97,6 +99,7 @@ export function fakePond(options: FakePondOptions = {}): FakePond {
   let toPhone: SealedDirection | null = null;
   let fromPhone: SealedDirection | null = null;
   let isClosed = false;
+  let forgotten = false;
   let lastSealed: Message | null = null;
   let inits = 0;
 
@@ -211,6 +214,8 @@ export function fakePond(options: FakePondOptions = {}): FakePond {
     writeSize: options.writeSize ?? 182,
     async write(bytes) {
       if (isClosed) throw new Error('link closed');
+      // What both platforms' native modules reject with for a write the Pond answered with ATT 0x03.
+      if (forgotten) throw new Error('gatt_3');
       if (bytes.length > (options.writeSize ?? 182)) throw new Error('write longer than the link takes');
       receive(bytes.slice());
     },
@@ -233,6 +238,9 @@ export function fakePond(options: FakePondOptions = {}): FakePond {
     wire,
     writes,
     drop: shut,
+    forget: () => {
+      forgotten = true;
+    },
     notify: deliver,
     lastSealed: () => lastSealed,
     closed: () => isClosed,

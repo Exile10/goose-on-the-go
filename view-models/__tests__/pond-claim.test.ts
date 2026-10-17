@@ -2,6 +2,7 @@ import { randomBytes } from 'node:crypto';
 
 import { BleUnreachableError, WrongPondError } from '@/services/ble';
 import type { HeldSetup } from '@/services/setup-session';
+import { SetupChannelClosed } from '@/services/setup-channel/session';
 import { fakePond, POND_PIN, SETUP_CODE } from '@/services/__tests__/support/setup-channel-pond';
 import type { NearbyPond } from '@/models/nearby-pond';
 import { bleClaim, networkClaim, prefersNetwork } from '../pond-claim';
@@ -71,6 +72,18 @@ describe('claiming over Bluetooth', () => {
     await expect(claim.claim(input)).rejects.toBeInstanceOf(WrongPondError);
     expect(pond.requests.map((r) => r.type)).toEqual(['hello']);
     expect(pond.closed()).toBe(true);
+  });
+
+  it('opens a new session after the Pond ended the last one (ATT 0x03, or the 10-minute cap)', async () => {
+    const first = fakePond();
+    const second = fakePond();
+    const connect = jest.fn().mockResolvedValueOnce(first.link).mockResolvedValueOnce(second.link);
+    const claim = bleClaim(nearby(), { connect, hold: jest.fn() }, random);
+    await claim.greet();
+    first.forget();
+    await expect(claim.claim(input)).rejects.toBeInstanceOf(SetupChannelClosed);
+    expect((await claim.claim(input)).accepted).toBe(true);
+    expect(connect).toHaveBeenCalledTimes(2);
   });
 
   it('names a Pond it cannot reach as out of Bluetooth range', async () => {

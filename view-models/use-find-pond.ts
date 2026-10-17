@@ -19,6 +19,7 @@ import type { PakeCredential } from '@/services/cpace';
 import { confirm, reject } from '@/services/haptics';
 import { getInstallId } from '@/services/install-id';
 import { takeSetupCard } from '@/services/pairing-handoff';
+import { SetupChannelClosed } from '@/services/setup-channel/session';
 import { holdSetup } from '@/services/setup-session';
 import {
   describePairingFailure,
@@ -104,6 +105,8 @@ export function useFindPond(fresh: NearbyPond[]): UseFindPond {
     (e: unknown, credential: PakeCredential) => {
       if (e instanceof BleUnreachableError) return t('bleSetup.find.unreachable');
       if (e instanceof WrongPondError) return t('bleSetup.find.wrongPond');
+      // The Pond ended it (a refused write, the 10-minute cap, a dropped link); the next try connects afresh.
+      if (e instanceof SetupChannelClosed) return t('bleSetup.find.sessionEnded');
       const channel = e instanceof ApiError ? channelErrorKey(e.detail) : null;
       if (channel) return t(channel);
       return describePairingFailure(e, t, credential);

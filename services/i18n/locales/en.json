@@ -2420,7 +2420,8 @@
       "claimedBody": "Pond {{id}} belongs to a household but has lost its network. Have it say a code, and you can give it Wi-Fi from here.",
       "connecting": "Connecting to Pond {{id}}",
       "wrongPond": "That isn't the Pond it said it was, so this phone stopped. Move closer to your Pond and try again.",
-      "needsWifi": "Set up, needs Wi-Fi"
+      "needsWifi": "Set up, needs Wi-Fi",
+      "sessionEnded": "The Bluetooth connection to your Pond ended. Try again to start a new one."
     },
     "wifi": {
       "title": "Connect your Pond to Wi-Fi",

@@ -202,6 +202,15 @@ describe('setup channel session', () => {
     await expect(channel.status()).rejects.toBeInstanceOf(SetupChannelClosed);
   });
 
+  it('takes a write the Pond refuses (ATT 0x03, no session) as the session over, and lets go of the link', async () => {
+    const { channel, pond } = await claimed();
+    pond.forget();
+    await expect(channel.status()).rejects.toBeInstanceOf(SetupChannelClosed);
+    expect(channel.isClosed).toBe(true);
+    expect(pond.closed()).toBe(true);
+    await expect(channel.wifiScan()).rejects.toBeInstanceOf(SetupChannelClosed);
+  });
+
   it('gives up on a Pond that never answers, and closes the link rather than read a late answer', async () => {
     jest.useFakeTimers();
     try {
