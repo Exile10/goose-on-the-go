@@ -18,6 +18,19 @@ import Zeroconf, { type Service } from 'react-native-zeroconf';
 import { validPin } from '@/models/connection';
 import i18n from './i18n';
 
+/**
+ * How long to look before saying nothing is there.
+ *
+ * mDNS has no "that's all" signal — a hub that is switched on later simply
+ * answers later — so the only honest end to a search is a clock. Eight seconds
+ * is long enough for a hub on the same switch to answer several times over, and
+ * short enough that a spinner does not become the screen.
+ *
+ * Browsing continues after the deadline: the deadline only changes what the
+ * screen says, so a late arrival still appears.
+ */
+export const SEARCH_TIMEOUT_MS = 8_000;
+
 /** The service pond-server registers. */
 const SERVICE_TYPE = 'pond';
 const PROTOCOL = 'tcp';
@@ -60,6 +73,10 @@ export interface DiscoveredPond {
    * numeric address discovery found for it. See `findPondByHost`.
    */
   hostname?: string;
+  /** The TXT `id`, four lowercase hex digits, which a scanned setup card names. See `findPondBySetupId`. */
+  setupId?: string;
+  /** TXT `setup=1`: nobody has claimed this Pond yet, so its setup card still works. */
+  unclaimed: boolean;
 }
 
 /** IPv4 only. An IPv6 literal needs bracketing in a URL and buys nothing here. */
@@ -99,7 +116,14 @@ export function toPond(service: Service): DiscoveredPond | null {
     version,
     pin: advertisedPin(service.txt?.pin),
     hostname: normalizeHostname(service.host),
+    setupId: advertisedSetupId(service.txt?.id),
+    unclaimed: service.txt?.setup === '1',
   };
+}
+
+/** Lowercased, because a card may print the id in either case and the match must not care. */
+function advertisedSetupId(raw: unknown): string | undefined {
+  return typeof raw === 'string' && /^[0-9a-fA-F]{4}$/.test(raw) ? raw.toLowerCase() : undefined;
 }
 
 /**
@@ -261,6 +285,19 @@ export function findPondAt(
     (p) => p.port === port && (p.address === host || (!!wanted && p.hostname === wanted)),
     timeoutMs,
   );
+}
+
+/**
+ * Find the Pond a scanned setup card names, so the phone connects to the one on its card
+ * among several. Claimed or not: a claimed Pond's own refusal says more than "not found".
+ */
+export function findPondBySetupId(
+  setupId: string,
+  timeoutMs = SEARCH_TIMEOUT_MS,
+): Promise<DiscoveredPond | null> {
+  if (!/^[0-9a-fA-F]{4}$/.test(setupId)) return Promise.resolve(null);
+  const wanted = setupId.toLowerCase();
+  return findPond((p) => p.setupId === wanted, timeoutMs);
 }
 
 /**
