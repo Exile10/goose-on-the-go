@@ -129,7 +129,8 @@ export function CheckRow({
 }
 
 const styles = StyleSheet.create({
-  actions: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: Spacing.sm },
-  forward: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
+  // Wraps rather than running off the edge with three buttons and a large text size.
+  actions: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: Spacing.sm },
+  forward: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'flex-end', gap: Spacing.sm, flexShrink: 1 },
   warmup: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
 });
