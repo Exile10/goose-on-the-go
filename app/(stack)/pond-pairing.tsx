@@ -810,8 +810,15 @@ export default function PondPairingScreen() {
   // from the welcome screen, which has already searched, it starts past the search.
   // In insecure development mode it is the start: the plaintext listener is never
   // advertised, and Expo Go, which that mode exists for, has no mDNS module.
-  const [manualEntry, setManualEntry] = useState(insecureDevMode || start !== null);
+  const [manualEntry, setManualEntry] = useState(insecureDevMode || (start !== null && start.kind !== 'scan'));
   const openScanner = useCallback(() => router.push('/(stack)/connect-desktop'), [router]);
+  // Opened to scan a setup card: the scanner goes over the wizard, which takes the card when it returns.
+  const scanFirst = useRef(start?.kind === 'scan');
+  useEffect(() => {
+    if (!scanFirst.current) return;
+    scanFirst.current = false;
+    openScanner();
+  }, [openScanner]);
 
   const stage = useCallback(async (url: string, pin: string, source: PinSource) => {
     const parsed = new URL(url);

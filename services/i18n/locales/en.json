@@ -388,7 +388,17 @@
     "noneFound": "No Ponds found yet",
     "noneFoundBody": "Make sure your Pond is running and on this network.",
     "discoveryUnavailable": "Finding Ponds on the network needs a development or release build of the app. Enter your Pond's address instead.",
-    "manual": "Enter an address"
+    "manual": "Enter an address",
+    "newTitle": "Set up a new Pond",
+    "newBody": "Scan the setup card that came with it, or pick it below and have it say a code.",
+    "scanCard": "Scan its setup card",
+    "newFound": "New Ponds on this network",
+    "newNone": "A new Pond appears here once it's switched on and on this network.",
+    "joinTitle": "Join a Pond that's already set up",
+    "joinBody": "Use the six-digit pairing code from a screen its owner can see.",
+    "joinFound": "Ponds on this network",
+    "notSetUp": "Not set up",
+    "cardId": "Card {{id}}"
   },
   "settings": {
     "appearance": "Appearance",

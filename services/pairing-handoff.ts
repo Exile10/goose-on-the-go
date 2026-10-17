@@ -88,7 +88,9 @@ export function takeSetupCode(): string | null {
  */
 export type PairingStart =
   | { kind: 'pond'; url: string; pin?: string; unclaimed?: boolean }
-  | { kind: 'address' };
+  | { kind: 'address' }
+  // Straight to the scanner, for a new Pond's setup card; the wizard sits under it to take the card.
+  | { kind: 'scan' };
 
 let pendingStart: PairingStart | null = null;
 
