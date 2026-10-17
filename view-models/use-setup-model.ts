@@ -1,8 +1,8 @@
 /**
  * Owner setup's model step, for a Pond that will not finish without a chat model: the Pond's own
- * suggestion with its size, fetched only once asked, then given the chat job, then setup finishes.
- * P4 lets a paired phone read and change models before setup is done; an older Pond refuses, and the
- * step says what is missing instead.
+ * suggestion with its size, fetched only once asked. P4 gives a model the chat job without waiting
+ * for its file, so setup finishes as soon as the download starts, and Home's getting-ready card shows
+ * the rest. An older Pond refuses to list models before setup, and the step says what is missing.
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -35,18 +35,18 @@ export function useSetupModel(setup: UseOwnerSetup): UseSetupModel {
   // Keyed on the model, not on what the list says of it: a Pond that drops the activation would
   // otherwise flip it between ready and held and be asked again on every read.
   useEffect(() => {
-    if (!choice || !modelId || (kind !== 'ready' && kind !== 'held')) return;
+    if (!choice || !modelId || (kind !== 'ready' && kind !== 'held' && kind !== 'downloading')) return;
     if (handled.current === modelId) return;
     handled.current = modelId;
     void (async () => {
-      if (kind === 'ready' && choice.kind === 'ready' && !(await activate(choice.model))) return;
+      if ((choice.kind === 'ready' || choice.kind === 'downloading') && !(await activate(choice.model))) return;
       // The Pond writes chat_model on activation but ignores a failed write, so finishing can still refuse.
       if (!(await finish())) setStalled(modelId);
     })();
   }, [choice, kind, modelId, activate, finish]);
 
   const retry = useCallback(() => {
-    if (!choice || choice.kind === 'none' || choice.kind === 'download' || choice.kind === 'downloading') return;
+    if (!choice || choice.kind === 'none' || choice.kind === 'download') return;
     const model = choice.model;
     setStalled(null);
     handled.current = model.id;

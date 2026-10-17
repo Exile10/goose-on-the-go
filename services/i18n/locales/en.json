@@ -2359,11 +2359,11 @@
       "suggested": "Your Pond's suggestion for the way Goose thinks and talks.",
       "downloadSized": "Download ({{size}})",
       "downloading": "Your Pond is downloading {{name}}.",
-      "keepOpen": "Setup finishes by itself once it's on your Pond. You can leave this screen open, or come back to it.",
       "using": "Giving {{name}} the job",
       "none": "Your Pond has no model to suggest. Choose one from its models.",
       "others": "See other models",
-      "stalled": "Your Pond didn't keep {{name}} as the model Goose thinks with. Try again, or choose another."
+      "stalled": "Your Pond didn't keep {{name}} as the model Goose thinks with. Try again, or choose another.",
+      "finishing": "Setup finishes now; Home shows the download until Goose can answer."
     },
     "checklist": {
       "title": "Finish setting up",

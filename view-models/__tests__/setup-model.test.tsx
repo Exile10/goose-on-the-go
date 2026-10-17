@@ -8,7 +8,7 @@ import React from 'react';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 
 import { api } from '@/services/api-client';
-import type { ModelEntry } from '@/services/types';
+import type { DownloadEntry, ModelEntry } from '@/services/types';
 import { resetModelLibrary } from '@/view-models/use-model-library';
 import type { UseOwnerSetup } from '@/view-models/use-owner-setup';
 import { useSetupModel, type UseSetupModel } from '@/view-models/use-setup-model';
@@ -106,5 +106,23 @@ it('asks once, not on every read, when the Pond never keeps the activation', asy
   expect(pond.activateModel).toHaveBeenCalledTimes(1);
   expect(finish).toHaveBeenCalledTimes(1);
   expect(m.vm.stalled).toBe(true);
+  m.unmount();
+});
+
+it('finishes as soon as the chat model’s download is moving, leaving the rest to Home', async () => {
+  const fetching = { ...onDisk, downloaded: false } as ModelEntry;
+  pond.listModels.mockResolvedValue([fetching]);
+  const moving: DownloadEntry = {
+    model_id: 'llm/gemma-3-4b', filename: 'gemma.gguf', category: 'llm', status: 'downloading', downloaded_bytes: 10, total_bytes: 100, resumable: true,
+  };
+  pond.downloadProgress.mockResolvedValue([moving]);
+  const finish = jest.fn().mockResolvedValue(true);
+  const m = await mount(finish);
+  await act(async () => {
+    await new Promise((r) => setTimeout(r, 0));
+  });
+  expect(m.vm.choice?.kind).toBe('downloading');
+  expect(pond.activateModel).toHaveBeenCalledWith('llm', 'gemma-3-4b', 'chat');
+  expect(finish).toHaveBeenCalledTimes(1);
   m.unmount();
 });

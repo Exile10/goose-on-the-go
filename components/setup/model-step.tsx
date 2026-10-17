@@ -49,7 +49,14 @@ export function ModelStep({ setup }: { setup: UseOwnerSetup }) {
           <InkSpinner label={t('setup.model.using', { name: titleOf(choice.model) })} />
         );
       case 'downloading':
-        return (
+        return stalled ? (
+          <View style={styles.block}>
+            <InkNotice tone="warning">{t('setup.model.stalled', { name: titleOf(choice.model) })}</InkNotice>
+            <InkButton variant="primary" block icon="refresh" disabled={setup.saving} onPress={retry}>
+              {t('common.retry')}
+            </InkButton>
+          </View>
+        ) : (
           <View style={styles.block} accessibilityLiveRegion="polite">
             <InkText>{t('setup.model.downloading', { name: titleOf(choice.model) })}</InkText>
             <DownloadRow
@@ -57,7 +64,7 @@ export function ModelStep({ setup }: { setup: UseOwnerSetup }) {
               title={titleOf(choice.model)}
               onControl={(action) => void library.actions.control(choice.download.modelId, action)}
             />
-            <InkText size="sm" tone="tertiary">{t('setup.model.keepOpen')}</InkText>
+            <InkText size="sm" tone="tertiary">{t('setup.model.finishing')}</InkText>
           </View>
         );
       case 'download': {

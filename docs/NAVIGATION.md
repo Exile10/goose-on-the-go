@@ -218,8 +218,9 @@ What the removed screens held, and where it is now:
 - **Finishing.** Finish sends `agent_memory_inject` and `POST /onboard/complete`. A 400 names `missing_fields`: setup goes back to the earliest step that sets one, and says which. `chat_model` alone opens the model step, quietly.
 - **The model step** (`components/setup/model-step.tsx`, `view-models/use-setup-model.ts`) reads the Pond's models, which P4 opens to a paired token before setup.
   - It offers the chat model already chosen or on the Pond, else the Pond's own suggestion, with its size.
-  - It asks before downloading (`askToDownload`, shared with Models) and shows the progress.
-  - It gives the model the chat job (`POST /models/{category}/{name}/activate {"role":"chat"}`) and finishes by itself, once per model. The Pond ignores a failed write of `chat_model`, so a finish that still refuses shows Try again rather than spinning or asking again on every read.
+  - It asks before downloading (`askToDownload`, shared with Models).
+  - Once the model is on the Pond or its download is moving, it gives it the chat job (`POST /models/{category}/{name}/activate {"role":"chat"}`, which P4 accepts without waiting for the file) and finishes by itself, once per model. Home's getting-ready card then shows the download until Goose can answer.
+  - The Pond ignores a failed write of `chat_model`, so a finish that still refuses shows Try again, rather than spinning or asking again on every read.
   - A Pond that refuses `/models` gets the old notice.
 - **After finishing**, setup leaves for Home. Home's `PondGettingReady` shows whether the chat model is downloading, warming or ready, and the "Finish setting up" card (`components/patterns/finish-setup.tsx`, kept per pairing in `storageFamily('setupChecklist')`) holds the wake word and a look over the defaults. Only the phone that set the Pond up sees that card.
 - **The phone's owner is shown as the Pond reports it** (`/devices/self`). A claim binds the phone to nobody, since a new Pond has no members yet, and nothing attributes it afterwards.
