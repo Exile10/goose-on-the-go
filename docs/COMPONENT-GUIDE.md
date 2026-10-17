@@ -220,7 +220,8 @@ under the picked row. `PhoneName` shows the name this phone pairs under, with Ch
 `WifiList` is a Pond's own network list, with a join panel under the chosen row.
 `claim-fields.tsx` has the two fields Ink's input cannot be: a code typed in
 fixed-width digits, and a Wi-Fi password that is masked, never autocorrected, and
-never offered to the phone's password store.
+never saved by the phone. iOS still shows its Passwords key on any
+masked field; nothing here asks it to save one.
 
 ### Patterns (components/patterns/)
 | Component | Props | Description |

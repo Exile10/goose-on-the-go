@@ -179,7 +179,7 @@ A choice reaches the wizard through `offerPairingStart` in `services/pairing-han
 **Wi-Fi** (`app/(onboarding)/pond-wifi.tsx`, `view-models/use-pond-wifi.ts`) follows a claim over Bluetooth.
 
 - **Its list** is the Pond's own `wifi_scan`: known networks first, then strongest. The phone's own network is never read.
-- **A network** opens under its row, with a masked password field that never offers the phone's password store, then Join. Progress and every `wifi_join` refusal show there.
+- **A network** opens under its row, with a masked password field the phone never saves, then Join. iOS still shows its Passwords key above the keyboard on any masked field; nothing asks it to save one. Progress and every `wifi_join` refusal show there.
 - **Keeping the session open.** A `status` request every 45 s keeps the Bluetooth session inside the Pond's 120 s idle limit while someone types.
 - **Already online.** A Pond already on a network (Ethernet, or a network it knew) passes through without a choice.
 - **The handover.** Once the Pond has an address, the pairing is kept at once (`adoptPairing`), then the Pond is reached over HTTPS. A phone not on that network sees one state, "Connect this phone to <ssid>", which checks again on every network change and on Check again.

@@ -168,8 +168,8 @@ Android `BLUETOOTH_SCAN` with `usesPermissionFlags="neverForLocation"`, `BLUETOO
 
 The Wi-Fi networks listed are the Pond's own scan; the phone's Wi-Fi is never read. The
 password travels to the Pond under ChaCha20-Poly1305 with a key from that connection's CPace
-exchange, is never written to storage on the phone, and is not offered to the system's password
-store. For both stores this is Bluetooth use without data collection: nothing goes anywhere but
+exchange, is never written to storage on the phone, and nothing asks the system's password store
+to save it (iOS still shows its Passwords key above the keyboard on every masked field). For both stores this is Bluetooth use without data collection: nothing goes anywhere but
 the user's own Pond.
 
 ---

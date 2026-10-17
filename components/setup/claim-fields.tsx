@@ -1,5 +1,5 @@
 // Two fields Ink's input cannot be: a code typed off a card in fixed-width digits, and a Wi-Fi
-// password that is masked, never autocorrected, and never offered to the phone's password store.
+// password that is masked, never autocorrected, and never saved by the phone.
 
 import React, { useState } from 'react';
 import { StyleSheet, TextInput, View } from 'react-native';
@@ -108,7 +108,8 @@ export function SecretField({
           autoCorrect={false}
           autoCapitalize="none"
           spellCheck={false}
-          // The Pond keeps this password, and the phone must not: no keychain, no autofill.
+          // The Pond keeps this password and the phone must not, so nothing asks the system to save it.
+          // iOS still shows its Passwords key on any masked field; that only fills, it does not save.
           autoComplete="off"
           textContentType="none"
           importantForAutofill="no"
