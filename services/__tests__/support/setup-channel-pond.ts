@@ -39,6 +39,8 @@ export const SETUP_CODE = '12345678903';
 
 export interface FakePondOptions {
   pin?: string;
+  /** The card id `hello` reports as `pond_id`. */
+  pondId?: string;
   /** What `hello` claims the pin is; a relay substituting its own. */
   helloPin?: string;
   setupCode?: string;
@@ -78,6 +80,11 @@ export interface FakePond {
   closed: () => boolean;
 }
 
+/** As the Pond refuses a verify: `ok: false`, the reason in both `error` and `rejection_reason`. */
+function refusedVerify(base: Message, reason: string): Message {
+  return { ...base, ok: false, accepted: false, error: reason, rejection_reason: reason };
+}
+
 export function fakePond(options: FakePondOptions = {}): FakePond {
   const pin = options.pin ?? POND_PIN;
   const dataListeners = new Set<(bytes: Uint8Array) => void>();
@@ -91,6 +98,7 @@ export function fakePond(options: FakePondOptions = {}): FakePond {
   let fromPhone: SealedDirection | null = null;
   let isClosed = false;
   let lastSealed: Message | null = null;
+  let inits = 0;
 
   const deliver = (bytes: Uint8Array) => {
     setTimeout(() => {
@@ -112,11 +120,16 @@ export function fakePond(options: FakePondOptions = {}): FakePond {
     if (refused) return { ...base, ...refused };
     switch (type) {
       case 'hello':
-        return { ...base, ok: true, protocol: options.protocol ?? 1, claimed: options.claimed ?? false,
+        return { ...base, ok: true, protocol: options.protocol ?? 1, pond_id: options.pondId ?? 'c1cd', claimed: options.claimed ?? false,
           pin: options.helloPin ?? pin, capabilities: ['wifi_scan', 'wifi_join', 'spoken_code'] };
       case 'spoken_code':
         return { ...base, ok: true, spoken: true, expires_at: '2026-10-17T12:10:00Z' };
       case 'pake_init': {
+        // The contract's limit: a fourth run on one connection is refused and the session ends.
+        if (++inits > 3) {
+          setTimeout(shut, 20);
+          return { ...base, ok: false, error: 'too_many_attempts' };
+        }
         const setup = request.credential === 'setup';
         const challenge = random(32);
         const sid = concatBytes(challenge, unb64(String(request.client_nonce)));
@@ -129,7 +142,7 @@ export function fakePond(options: FakePondOptions = {}): FakePond {
           suite: 'CPACE-RISTR255-SHA512', share: b64(run.share) };
       }
       case 'pake_verify': {
-        if (!run || request.challenge_id !== 'c1') return { ...base, ok: true, accepted: false, rejection_reason: 'unknown_challenge' };
+        if (!run || request.challenge_id !== 'c1') return refusedVerify(base, 'unknown_challenge');
         const { ya, share, sid } = run;
         run = null;
         const yb = unb64(String(request.share));
@@ -137,7 +150,7 @@ export function fakePond(options: FakePondOptions = {}): FakePond {
         const isk = intermediateSessionKey(sid, k, share, NO_AD, yb, NO_AD);
         const macKey = confirmationKey(sid, isk);
         if (!equalBytes(hexToBytes(String(request.confirm)), confirmationTag(CLIENT_CONFIRM_LABEL, macKey, share, yb))) {
-          return { ...base, ok: true, accepted: false, rejection_reason: 'invalid_confirmation' };
+          return refusedVerify(base, 'invalid_confirmation');
         }
         const keys = channelKeys(isk, sid);
         toPhone = new SealedDirection(keys.pondToPhone);
@@ -146,6 +159,7 @@ export function fakePond(options: FakePondOptions = {}): FakePond {
         return { ...base, ok: true, accepted: true, server_proof: bytesToHex(confirmationTag(SERVER_CONFIRM_LABEL, macKey, share, yb)), ...sealed };
       }
       case 'status':
+        if (!fromPhone) return { ...base, ok: false, error: 'wrong_phase' };
         return { ...base, ok: true, claimed: true, onboarded: false,
           network: options.network ?? { state: 'disconnected' }, https_port: 4443, hostname: 'nano' };
       case 'wifi_scan':

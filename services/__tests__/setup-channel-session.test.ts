@@ -30,9 +30,14 @@ describe('setup channel session', () => {
   it('learns the pin and what the Pond can do from hello, in the clear', async () => {
     const { channel, pond } = open();
     const hello = await channel.greet();
-    expect(hello).toEqual({ protocol: 1, claimed: false, pin: POND_PIN, capabilities: ['wifi_scan', 'wifi_join', 'spoken_code'] });
+    expect(hello).toEqual({ protocol: 1, pondId: 'c1cd', claimed: false, pin: POND_PIN, capabilities: ['wifi_scan', 'wifi_join', 'spoken_code'] });
     expect(pond.wire).toEqual([{ id: 1, type: 'hello' }]);
     expect(channel.sealed).toBe(false);
+  });
+
+  it('takes no pond_id it cannot read as a card id', async () => {
+    const { channel } = open({ pondId: 'C1CD' });
+    expect((await channel.greet()).pondId).toBeNull();
   });
 
   it('refuses a Pond speaking another channel protocol', async () => {
@@ -59,13 +64,34 @@ describe('setup channel session', () => {
     expect(pond.requests.find((r) => r.type === 'pake_init')).not.toHaveProperty('credential');
   });
 
-  it('reports a wrong code as the Pond’s refusal and stays unsealed', async () => {
+  it('turns a refused verify (ok: false) into the refusal HTTPS answers, and stays unsealed', async () => {
     const { channel } = open();
     await channel.greet();
     const answer = await channel.exchange({ ...claim, code: '00000000000' });
     expect(answer).toMatchObject({ accepted: false, rejection_reason: 'invalid_confirmation', session_token: null });
     expect(channel.sealed).toBe(false);
     expect(channel.isClosed).toBe(false);
+  });
+
+  it('reads a verify refusal’s reason from error when rejection_reason is missing', async () => {
+    const { channel } = open({ refuse: { pake_verify: { ok: false, accepted: false, error: 'setup_code_unavailable' } } });
+    await channel.greet();
+    await expect(channel.exchange(claim)).resolves.toMatchObject({ accepted: false, rejection_reason: 'setup_code_unavailable' });
+  });
+
+  it('carries a verify refusal that is not a rejection, such as the attempt limit, as an error', async () => {
+    const { channel } = open({ refuse: { pake_verify: { ok: false, error: 'internal_error' } } });
+    await channel.greet();
+    await expect(channel.exchange(claim)).rejects.toMatchObject({ detail: 'internal_error' });
+  });
+
+  it('is cut off after three runs on one connection', async () => {
+    const { channel } = open();
+    await channel.greet();
+    for (let i = 0; i < 3; i++) expect((await channel.exchange({ ...claim, code: '00000000000' })).accepted).toBe(false);
+    await expect(channel.exchange(claim)).rejects.toMatchObject({ detail: 'too_many_attempts' });
+    await new Promise((r) => setTimeout(r, 30));
+    expect(channel.isClosed).toBe(true);
   });
 
   it('fails the exchange when hello carried a pin that is not the Pond’s', async () => {

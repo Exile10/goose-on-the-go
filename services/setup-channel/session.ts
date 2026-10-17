@@ -38,6 +38,8 @@ export type ChannelCapability = 'wifi_scan' | 'wifi_join' | 'spoken_code';
 
 export interface ChannelHello {
   protocol: number;
+  /** The card's four hex digits, which the advertised name should already have said. */
+  pondId: string | null;
   claimed: boolean;
   /** The Pond's public-key pin, which the exchange binds and HTTPS is later pinned to. */
   pin: string;
@@ -99,7 +101,20 @@ function refusal(type: string, answer: Message): ApiError {
   const code = typeof answer.error === 'string' && answer.error ? answer.error : 'refused';
   const wait = typeof answer.retry_after === 'number' && Number.isFinite(answer.retry_after) && answer.retry_after >= 0 ? answer.retry_after : null;
   // No HTTP here; a refusal that names a wait reads as the rate limit it is, any other as a refusal.
-  return new ApiError(`${type} refused: ${code}`, wait !== null ? 429 : 400, wait, code);
+  return new ApiError(`${type} refused: ${code}`, wait !== null ? 429 : 400, wait, code, answer);
+}
+
+/** A refused verify, shaped as HTTPS answers it, so the wizard's sentences for each reason apply as they are. */
+function refusedVerify(reason: string | null): HandshakeResponse {
+  return {
+    accepted: false,
+    session_token: null,
+    refresh_token: null,
+    hostname: '',
+    server_version: '',
+    capabilities: [],
+    rejection_reason: reason,
+  };
 }
 
 function str(value: unknown): string {
@@ -160,7 +175,8 @@ export class SetupChannel {
     const capabilities = Array.isArray(answer.capabilities)
       ? known.filter((c) => (answer.capabilities as unknown[]).includes(c))
       : [];
-    this.greeting = { protocol, claimed: answer.claimed === true, pin, capabilities };
+    const pondId = /^[0-9a-f]{4}$/.test(str(answer.pond_id)) ? str(answer.pond_id) : null;
+    this.greeting = { protocol, pondId, claimed: answer.claimed === true, pin, capabilities };
     return this.greeting;
   }
 
@@ -209,23 +225,21 @@ export class SetupChannel {
     }
     const isk = run.isk as Uint8Array;
     try {
-      const verify = await this.request('pake_verify', {
-        challenge_id: str(init.challenge_id),
-        device_name: input.deviceName ?? null,
-        share: toBase64(run.share),
-        confirm: bytesToHex(run.confirm),
-      });
-      if (verify.accepted === false) {
-        return {
-          accepted: false,
-          session_token: null,
-          refresh_token: null,
-          hostname: '',
-          server_version: '',
-          capabilities: [],
-          rejection_reason: str(verify.rejection_reason) || null,
-        };
+      let verify: Message;
+      try {
+        verify = await this.request('pake_verify', {
+          challenge_id: str(init.challenge_id),
+          device_name: input.deviceName ?? null,
+          share: toBase64(run.share),
+          confirm: bytesToHex(run.confirm),
+        });
+      } catch (e) {
+        // Every refusal is `ok: false`; a refused verify carries its reason as HTTPS's `rejection_reason`.
+        const body = e instanceof ApiError ? (e.body as Message | null) : null;
+        if (body?.accepted === false) return refusedVerify(str(body.rejection_reason) || str(body.error) || null);
+        throw e;
       }
+      if (verify.accepted === false) return refusedVerify(str(verify.rejection_reason) || null);
       // Without the Pond's confirmation nothing in `sealed` can be trusted to be the Pond's.
       if (!confirmationMatches(parseTag(verify.server_proof), run.expectedServerConfirm)) {
         await this.close();
