@@ -1,7 +1,7 @@
 /**
  * PondPairingScreen — 4-step pairing wizard:
- *   0. Find the GIAP server: discovered over mDNS, scanned from the QR, or typed
- *   1. Enter the 6-digit pairing code shown on the GIAP host
+ *   0. Find the GIAP server: discovered over mDNS, scanned from the QR or a setup card, or typed
+ *   1. Enter the 6-digit pairing code shown or said by the GIAP host, or its setup card's code
  *   2. Name this device
  *   3. Run the two-phase handshake and confirm
  */
@@ -25,20 +25,33 @@ import { Grey, JaridaPurple, Brand, Semantic } from '@/constants/colors';
 import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
 import { Spacing } from '@/constants/spacing';
 import { Radii } from '@/constants/radii';
-import { ApiError, PondApiClient, PondOutdatedError } from '@/services/api-client';
-import { PondTrustError } from '@/services/pond-trust';
+import { PondApiClient } from '@/services/api-client';
+import type { PakeCredential } from '@/services/cpace';
 import { useServer } from '@/providers/server-provider';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 
 import { fingerprintChoices, isInsecureDevOrigin, normalizePondUrl, pinPreview, validPin } from '@/models/connection';
+import { isValidSetupCode, readSetupCode, type SetupCard } from '@/models/setup-card';
 import { insecureDevMode } from '@/services/dev-mode';
 import { randomBytes } from '@/services/secure-random';
 import { getInstallId } from '@/services/install-id';
-import { clearPairingStart, peekPairingStart, takePairingPayload } from '@/services/pairing-handoff';
-import { findPondAt, type DiscoveredPond } from '@/services/discovery';
+import {
+  clearPairingStart,
+  peekPairingStart,
+  takePairingPayload,
+  takeSetupCard,
+} from '@/services/pairing-handoff';
+import { findPondAt, findPondBySetupId, type DiscoveredPond } from '@/services/discovery';
 import { useDiscovery } from '@/view-models/use-discovery';
-import { describeApiError } from '@/view-models/describe-error';
+import {
+  describePairingFailure,
+  explainRefusedPairing,
+  isClaimedRefusal,
+  refusalWait,
+} from '@/view-models/pairing-errors';
+import { useSpokenCode, type UseSpokenCode } from '@/view-models/use-spoken-code';
+import { useCountdown } from '@/hooks/use-countdown';
 import { useThemedStyles } from '@/hooks/use-themed-styles';
 import type { ThemeColors } from '@/constants/colors';
 
@@ -168,7 +181,7 @@ function DiscoverStep({
   onManual,
   onScan,
 }: {
-  onNext: (url: string, pin?: string) => void;
+  onNext: (url: string, pin: string | undefined, unclaimed: boolean) => void;
   onManual: () => void;
   onScan: () => void;
 }) {
@@ -178,7 +191,7 @@ function DiscoverStep({
   // The advertisement already carried a pin, so hand it on rather than making
   // the next step browse for the same record again. It is still only a claim:
   // the next step has the user check it against the Pond's own screen.
-  const pick = (pond: DiscoveredPond) => onNext(pond.url, pond.pin);
+  const pick = (pond: DiscoveredPond) => onNext(pond.url, pond.pin, pond.unclaimed);
 
   return (
     <StepBody>
@@ -256,10 +269,10 @@ function DiscoverStep({
  * is used (see ServerStep), the out-of-band check that a QR scan or a typed
  * fingerprint already is.
  */
-async function discoverFingerprint(origin: string): Promise<string | null> {
+async function discoverFingerprint(origin: string): Promise<{ pin: string; unclaimed: boolean } | null> {
   const { hostname, port } = new URL(origin);
   const found = await findPondAt(hostname, Number(port) || 443);
-  return found?.pin ?? null;
+  return found?.pin ? { pin: found.pin, unclaimed: found.unclaimed } : null;
 }
 
 /**
@@ -280,6 +293,8 @@ function ServerStep({
   initial,
   initialPin,
   picked,
+  initialUnclaimed,
+  setupExchange,
   onNext,
   onScan,
 }: {
@@ -292,7 +307,11 @@ function ServerStep({
    * against the Pond's screen instead of on an address form waiting for Continue.
    */
   picked: boolean;
-  onNext: (url: string, pin: string) => Promise<void>;
+  /** The picked Pond advertised itself unclaimed, so its next exchange is a setup one. */
+  initialUnclaimed: boolean;
+  /** A setup card is in hand, so the exchange that follows is a setup one whatever the Pond advertises. */
+  setupExchange: boolean;
+  onNext: (url: string, pin: string, unclaimed: boolean) => Promise<void>;
   onScan: () => void;
 }) {
   const styles = useThemedStyles(makeStyles);
@@ -301,12 +320,13 @@ function ServerStep({
   // A pin that came off the network rather than from the user must be confirmed
   // against the Pond's screen before it is trusted. See discoverFingerprint.
   const [pinFromNetwork, setPinFromNetwork] = useState(!!initialPin);
+  const [networkUnclaimed, setNetworkUnclaimed] = useState(initialUnclaimed && !!initialPin);
   // The three previews are drawn once per pin: offering a fresh set after a wrong
   // pick would let the user guess until one works.
   const [confirming, setConfirming] = useState<{ url: string; pin: string; choices: string[] } | null>(() => {
     // Only what Continue would have reached anyway: a usable address and a well-formed pin.
     // Anything less opens on the form, where the user can see and fix it.
-    if (!picked || !validPin(initialPin)) return null;
+    if (!picked || !validPin(initialPin) || setupExchange || initialUnclaimed) return null;
     const normalized = normalizeServerUrl(initial);
     return normalized
       ? { url: normalized, pin: initialPin, choices: fingerprintChoices(initialPin, randomBytes) }
@@ -347,7 +367,7 @@ function ServerStep({
           setError(t('pairing.fingerprintMissing'));
           return;
         }
-        await onNext(normalized, reported);
+        await onNext(normalized, reported, false);
         return;
       }
       // No fingerprint in hand is a request to look one up, not a mistake: the
@@ -355,6 +375,7 @@ function ServerStep({
       // it by, so the only things anybody should have to read off a screen are
       // the address and the six-digit code.
       let fingerprint = pin.trim();
+      let unclaimed = networkUnclaimed;
       if (!fingerprint && networkPinRefused) {
         setAskForPin(true);
         setError(t('pairing.fingerprintMismatch'));
@@ -370,28 +391,37 @@ function ServerStep({
           setError(t('pairing.fingerprintMissing'));
           return;
         }
-        setPin(discovered);
+        setPin(discovered.pin);
         setPinFromNetwork(true);
-        fingerprint = discovered;
+        setNetworkUnclaimed(discovered.unclaimed);
+        fingerprint = discovered.pin;
+        unclaimed = discovered.unclaimed;
       }
       if (!validPin(fingerprint)) {
         setError(t('pairing.invalid'));
         return;
       }
       if (pinFromNetwork || fingerprint !== pin.trim()) {
+        // No pick-from-three before a setup exchange: it is bound to the Pond's real pin through the
+        // channel identifier, so a spoofed pin can only fail, never succeed.
+        if (setupExchange || unclaimed) {
+          await onNext(normalized, fingerprint, unclaimed);
+          return;
+        }
         setConfirming({ url: normalized, pin: fingerprint, choices: fingerprintChoices(fingerprint, randomBytes) });
         return;
       }
-      await onNext(normalized, fingerprint);
+      await onNext(normalized, fingerprint, false);
     }
     catch (error) { setError(error instanceof Error ? error.message : t('pairing.failed')); }
     finally { setChecking(false); }
-  }, [url, pin, pinFromNetwork, networkPinRefused, onNext, t]);
+  }, [url, pin, pinFromNetwork, networkUnclaimed, networkPinRefused, setupExchange, onNext, t]);
 
   const rejectMatch = useCallback(() => {
     setConfirming(null);
     setPin('');
     setPinFromNetwork(false);
+    setNetworkUnclaimed(false);
     setNetworkPinRefused(true);
     setAskForPin(true);
     setError(t('pairing.fingerprintMismatch'));
@@ -402,7 +432,7 @@ function ServerStep({
     if (!confirming) return;
     if (choice !== pinPreview(confirming.pin)) { rejectMatch(); return; }
     setChecking(true); setError(null);
-    try { await onNext(confirming.url, confirming.pin); }
+    try { await onNext(confirming.url, confirming.pin, false); }
     catch (error) { setError(error instanceof Error ? error.message : t('pairing.failed')); }
     finally { setChecking(false); setConfirming(null); }
   }, [confirming, onNext, rejectMatch, t]);
@@ -465,6 +495,7 @@ function ServerStep({
             onChangeText={(next) => {
               setPin(next);
               setPinFromNetwork(false);
+              setNetworkUnclaimed(false);
               setError(null);
             }}
             placeholder="sha256/..."
@@ -485,25 +516,99 @@ function ServerStep({
   );
 }
 
-/** Step 1: the six digits the Pond is showing. */
+/** A link-styled action under a step's main button. */
+function TextAction({ label, onPress }: { label: string; onPress: () => void }) {
+  const styles = useThemedStyles(makeStyles);
+  return (
+    <GPressable onPress={onPress} hitSlop={8} style={styles.scanLink}>
+      <Text style={styles.scanLinkText}>{label}</Text>
+    </GPressable>
+  );
+}
+
+/** Asks the Pond to read a pairing code aloud, for a household member with no card and no screen to read. */
+function SpokenCodeAction({ spoken, onSpoken }: { spoken: UseSpokenCode; onSpoken: () => void }) {
+  const styles = useThemedStyles(makeStyles);
+  const { t } = useTranslation();
+  const { data, error, actions } = spoken;
+  const label = data.phase === 'asking'
+    ? t('pairing.spokenAsking')
+    : data.phase === 'spoken' ? t('pairing.spokenAgain') : t('pairing.spokenAsk');
+  return (
+    <View style={styles.inputGroup}>
+      <InkButton
+        variant="quiet"
+        icon="volume"
+        disabled={data.phase === 'asking' || data.waitSecs > 0}
+        onPress={() => void actions.ask().then((said) => { if (said) onSpoken(); })}
+      >
+        {label}
+      </InkButton>
+      {error ? <Text style={styles.stepError}>{error}</Text> : null}
+    </View>
+  );
+}
+
+/** Step 1: the six digits the Pond is showing or saying, or the eleven on its setup card. */
 function PairingCodeStep({
+  credential,
   initial,
+  onCredential,
   onNext,
   onScan,
 }: {
+  credential: PakeCredential;
   initial: string;
+  onCredential: (credential: PakeCredential) => void;
   onNext: (code: string) => void;
   onScan: () => void;
 }) {
   const styles = useThemedStyles(makeStyles);
   const { t } = useTranslation();
-  const [code, setCode] = useState(initial);
+  const [code, setCode] = useState(credential === 'pairing' ? initial : '');
+  const [setupDigits, setSetupDigits] = useState(credential === 'setup' ? initial : '');
+  // One request state for both entries, so a code the Pond is saying survives the switch to six digits.
+  const spoken = useSpokenCode();
+  const setup = readSetupCode(setupDigits);
   const valid = /^\d{6}$/.test(code);
+
+  if (credential === 'setup') {
+    return (
+      <StepBody>
+        <GIcon name="key" size={28} color={JaridaPurple[500]} />
+        <Text style={styles.stepTitle}>{t('pairing.setupCodeTitle')}</Text>
+        <Text style={styles.stepDesc}>{t('pairing.setupCodeBody')}</Text>
+        <View style={styles.inputGroup}>
+          <Text style={styles.inputLabel}>{t('pairing.setupCodeLabel')}</Text>
+          <TextInput
+            style={[styles.textInput, styles.codeInput]}
+            value={setup.display}
+            onChangeText={(next) => setSetupDigits(readSetupCode(next).digits)}
+            placeholder={t('pairing.setupCodePlaceholder')}
+            placeholderTextColor={Grey[400]}
+            keyboardType="number-pad"
+            autoCorrect={false}
+            autoFocus
+          />
+          {setup.status === 'typo' ? <Text style={styles.stepError}>{t('pairing.setupCodeTypo')}</Text> : null}
+        </View>
+        <InkButton variant="primary" disabled={setup.status !== 'valid'} onPress={() => onNext(setup.digits)}>
+          {t('pairing.continueAction')}
+        </InkButton>
+        <ScanLink onPress={onScan} />
+        <SpokenCodeAction spoken={spoken} onSpoken={() => onCredential('pairing')} />
+        <TextAction label={t('pairing.usePairingCode')} onPress={() => onCredential('pairing')} />
+      </StepBody>
+    );
+  }
+
   return (
     <StepBody>
       <GIcon name="wifi" size={28} color={JaridaPurple[500]} />
       <Text style={styles.stepTitle}>{t('pairing.codeTitle')}</Text>
-      <Text style={styles.stepDesc}>{t('pairing.codeBody')}</Text>
+      <Text style={styles.stepDesc}>
+        {spoken.data.phase === 'spoken' ? t('pairing.spokenSaid') : t('pairing.codeBody')}
+      </Text>
       <View style={styles.inputGroup}>
         <Text style={styles.inputLabel}>{t('pairing.codeLabel')}</Text>
         <TextInput
@@ -520,15 +625,17 @@ function PairingCodeStep({
         {t('pairing.continueAction')}
       </InkButton>
       <ScanLink onPress={onScan} />
+      <SpokenCodeAction spoken={spoken} onSpoken={() => setCode('')} />
+      <TextAction label={t('pairing.useSetupCode')} onPress={() => onCredential('setup')} />
     </StepBody>
   );
 }
 
 /** Step 2: what this phone is called in the Pond's device list. */
-function NameStep({ onNext }: { onNext: (name: string) => void }) {
+function NameStep({ initial, onNext }: { initial: string; onNext: (name: string) => void }) {
   const styles = useThemedStyles(makeStyles);
   const { t } = useTranslation();
-  const [name, setName] = useState('');
+  const [name, setName] = useState(initial);
   return (
     <StepBody>
       <GIcon name="edit" size={28} color={JaridaPurple[500]} />
@@ -551,107 +658,31 @@ function NameStep({ onNext }: { onNext: (name: string) => void }) {
   );
 }
 
-/**
- * Describe a failure that never reached the verifier — a transport or HTTP
- * error rather than a rejected code.
- *
- * The 429 case is the one that matters. GIAP gives pairing its own rate-limit
- * budget (30/60s, with /handshake/verify further limited to 10/60s), and it
- * sends Retry-After when it throttles. Showing "handshake/init failed: 429",
- * which is what this screen used to print, tells a user nothing and invites
- * them to hammer the button — which is how a phone spends the budget it needs
- * to recover. Naming the wait turns a dead end into an instruction.
- *
- * It takes `t` rather than reaching for a module-level translator: a constant
- * is evaluated at import, before i18next has a language.
- */
-function describeTransportFailure(e: unknown, t: TFunction): string {
-  if (e instanceof ApiError) {
-    if (e.status === 429) {
-      const wait = e.retryAfterSecs;
-      return wait
-        ? t('pairingErrors.rateLimited', { count: wait, plural: wait === 1 ? '' : 's' })
-        : t('pairingErrors.rateLimitedNoHint');
-    }
-    if (e.status >= 500) {
-      return t('pairingErrors.serverError');
-    }
-    // The wizard runs before there is a session to revoke, so a refusal here
-    // is about this attempt and the screen has to say so itself.
-    return describeApiError(e) ?? t('pairingErrors.refused');
-  }
-  return t('pairingErrors.unreachable');
-}
-
-/**
- * Turn the server's rejection code into something a person can act on.
- *
- * `rejection_reason` is a closed set from pond-core's handshake verifier, and it
- * was rendered raw -- someone who mistyped a digit was shown the identifier. The
- * cases are split because they call for different things: a stale challenge only
- * needs the same code re-sent, while an expired or retired code needs a new one
- * fetched from the Pond.
- *
- * The 60-second challenge lifetime is worth naming rather than folding into a
- * generic retry message. It is far shorter than the code's ten minutes, so it is
- * the limit a user actually hits. `code_retired` is the Pond's per-code budget:
- * after 10 failed confirmations it stops accepting that code at all, because
- * online guessing is the only attack left on it.
- *
- * The Pond names a refusal of `pake/init` the same way, as an error code rather
- * than a rejection, so this reads both. Null for an identifier this screen has no
- * sentence for.
- */
-function explainRejection(reason: string | null, t: TFunction): string | null {
-  switch (reason) {
-    case 'invalid_confirmation':
-      return t('pairingErrors.badCode');
-    case 'code_retired':
-      return t('pairingErrors.codeRetired');
-    case 'challenge_expired':
-    case 'challenge_used':
-    case 'unknown_challenge':
-      return t('pairingErrors.expired');
-    case 'no_active_pairing_code':
-      return t('pairingErrors.noCode');
-    // The pin this phone holds is not the Pond's own.
-    case 'channel_binding_mismatch':
-      return t('connection.trust');
-    // Too many runs waiting on their second half; the Pond asks for a short wait.
-    case 'pairing_busy':
-      return t('pairingErrors.rateLimitedNoHint');
-    default:
-      return null;
-  }
-}
-
-/**
- * Describe a pairing that threw rather than came back refused.
- *
- * Checked in order of how specific the answer is: a Pond too old to speak CPace,
- * a Pond whose answers did not verify, a refusal the Pond named, and only then
- * the transport.
- */
-function describePairingFailure(e: unknown, t: TFunction): string {
-  if (e instanceof PondOutdatedError) return t('pairingErrors.pondOutdated');
-  if (e instanceof PondTrustError) return t('connection.trust');
-  if (e instanceof ApiError) {
-    const named = explainRejection(e.detail, t);
-    if (named) return named;
-    // Any other 403 is the Pond refusing enrolment from off its own network.
-    if (e.status === 403) return t('pairing.lan');
-  }
-  return describeTransportFailure(e, t);
+/** Step 0 while the wizard looks for a card's Pond or reaches an unclaimed one: nothing to do but wait. */
+function WaitStep({ title, body }: { title: string; body?: string }) {
+  const styles = useThemedStyles(makeStyles);
+  return (
+    <StepBody>
+      <ActivityIndicator color={JaridaPurple[500]} />
+      <Text style={styles.stepTitle}>{title}</Text>
+      {body ? <Text style={styles.stepDesc}>{body}</Text> : null}
+    </StepBody>
+  );
 }
 
 /** Step 3: run the handshake, then say how it went. */
 function CompleteStep({
   state,
   reason,
+  retryLabel,
+  retryDisabled,
   onRetry,
 }: {
   state: 'pending' | 'error';
   reason: string | null;
+  retryLabel?: string;
+  /** While the Pond is cooling between setup code attempts, a retry could only be refused. */
+  retryDisabled?: boolean;
   onRetry: () => void;
 }) {
   const styles = useThemedStyles(makeStyles);
@@ -672,8 +703,8 @@ function CompleteStep({
         <GIcon name="x" size={28} color={Semantic.danger} />
         <Text style={styles.stepTitle}>{t('pairing.failed')}</Text>
         <Text style={styles.stepDesc}>{reason ?? t('pairingErrors.rejected')}</Text>
-        <InkButton variant="primary" onPress={onRetry}>
-          {t('common.retry')}
+        <InkButton variant="primary" disabled={retryDisabled} onPress={onRetry}>
+          {retryLabel ?? t('common.retry')}
         </InkButton>
       </StepBody>
     );
@@ -715,11 +746,14 @@ export default function PondPairingScreen() {
   // after mount; see peekPairingStart.
   const [start] = useState(peekPairingStart);
   useEffect(() => { clearPairingStart(); }, []);
+  const startedUnclaimed = start?.kind === 'pond' && !!start.unclaimed;
   const [manualUrl, setManualUrl] = useState(start?.kind === 'pond' ? start.url : serverUrl);
   const [manualPin, setManualPin] = useState(start?.kind === 'pond' ? (start.pin ?? '') : '');
   // Whether the address came off a discovery list, here or on the welcome screen.
   const [picked, setPicked] = useState(start?.kind === 'pond');
+  const [pickedUnclaimed, setPickedUnclaimed] = useState(startedUnclaimed);
   const [pairingError, setPairingError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   useEffect(() => () => { void cancelPairing(); }, [cancelPairing]);
   // Stable per-install client_id, hydrated from SecureStorage on mount. The
   // server uses this to recognise a returning device and revoke prior tokens
@@ -733,6 +767,12 @@ export default function PondPairingScreen() {
 
   const [step, setStep] = useState<Step>(0);
   const [code, setCode] = useState('');
+  // An unclaimed Pond takes its setup card's code; anything else, a pairing code.
+  const [credential, setCredential] = useState<PakeCredential>(startedUnclaimed ? 'setup' : 'pairing');
+  const [deviceName, setDeviceName] = useState('');
+  const [cardSearch, setCardSearch] = useState<SetupCard | null>(null);
+  const [reaching, setReaching] = useState<{ url: string; pin: string } | null>(() =>
+    start?.kind === 'pond' && start.unclaimed && start.pin ? { url: start.url, pin: start.pin } : null);
   // Step 0 searches the network by default; typing an address is the fallback
   // for a network that filters multicast, which plenty of guest wifi does. Opened
   // from the welcome screen, which has already searched, it starts past the search.
@@ -740,6 +780,12 @@ export default function PondPairingScreen() {
   // advertised, and Expo Go, which that mode exists for, has no mDNS module.
   const [manualEntry, setManualEntry] = useState(insecureDevMode || start !== null);
   const openScanner = useCallback(() => router.push('/(stack)/connect-desktop'), [router]);
+
+  const stage = useCallback(async (url: string, pin: string) => {
+    const parsed = new URL(url);
+    await stagePairing({ version: 2, host: parsed.hostname, port: Number(parsed.port) || 443, localUrls: [url] }, pin);
+    setManualUrl(url);
+  }, [stagePairing]);
 
   /**
    * Pick up a scanned payload when the scanner navigates back.
@@ -756,13 +802,23 @@ export default function PondPairingScreen() {
    */
   useFocusEffect(
     useCallback(() => {
+      const card = takeSetupCard();
+      if (card) {
+        setPairingError(null);
+        setNotice(null);
+        setCredential('setup');
+        setCode(card.code);
+        setStep(0);
+        setCardSearch(card);
+        return;
+      }
       const scanned = takePairingPayload();
       if (!scanned) return;
 
       let cancelled = false;
       setPairingError(null);
       void stagePairing(scanned.profile, scanned.pin).then(() => {
-        if (!cancelled) { setCode(scanned.code); setStep(2); }
+        if (!cancelled) { setCredential('pairing'); setCode(scanned.code); setStep(2); }
       }).catch((error) => {
         if (!cancelled) setPairingError(error instanceof Error ? error.message : t('pairing.failed'));
       });
@@ -770,18 +826,81 @@ export default function PondPairingScreen() {
     }, [stagePairing, t]),
   );
 
+  // A card names its Pond by id. Found, the card already holds the code, so only a name is left to ask.
+  useEffect(() => {
+    if (!cardSearch) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const pond = await findPondBySetupId(cardSearch.id);
+        if (cancelled) return;
+        if (!pond?.pin) {
+          setManualUrl(pond?.url ?? '');
+          setManualPin('');
+          setPicked(false);
+          setManualEntry(true);
+          setNotice(t('pairing.setupCardNotFound'));
+          return;
+        }
+        setManualUrl(pond.url);
+        // No pick-from-three: a completed setup exchange is bound to the Pond's real pin through
+        // the channel identifier, so a spoofed pin can only fail, never succeed.
+        await stage(pond.url, pond.pin);
+        if (!cancelled) setStep(2);
+      } catch (error) {
+        if (cancelled) return;
+        setPairingError(error instanceof Error ? error.message : t('pairing.failed'));
+        setPicked(false);
+        setManualEntry(true);
+      } finally {
+        if (!cancelled) setCardSearch(null);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [cardSearch, stage, t]);
+
+  // An unclaimed Pond is reached without the pick-from-three too, since its next exchange is a setup one.
+  useEffect(() => {
+    if (!reaching) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        await stage(reaching.url, reaching.pin);
+        if (!cancelled) { setCredential('setup'); setStep(1); }
+      } catch (error) {
+        if (cancelled) return;
+        setPairingError(error instanceof Error ? error.message : t('pairing.failed'));
+        setManualUrl(reaching.url);
+        setManualPin(reaching.pin);
+        setPicked(true);
+        setPickedUnclaimed(true);
+        setManualEntry(true);
+      } finally {
+        if (!cancelled) setReaching(null);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [reaching, stage, t]);
+
   const [completionState, setCompletionState] = useState<'pending' | 'error'>('pending');
   const [completionReason, setCompletionReason] = useState<string | null>(null);
+  // Set when the Pond turned out to be claimed, so the way on is a pairing code instead of the card.
+  const [claimed, setClaimed] = useState(false);
+  const { left: coolingLeft, start: startCooling, stop: stopCooling } = useCountdown();
 
   const runPair = useCallback(
-    async (deviceName: string) => {
+    async (name: string) => {
+      setDeviceName(name);
       setStep(3);
       setCompletionState('pending');
       setCompletionReason(null);
+      setClaimed(false);
+      stopCooling();
+      const toPairingCode = () => { setCredential('pairing'); setCode(''); setClaimed(true); };
       try {
         const clientId = clientIdRef.current || (await getInstallId());
         clientIdRef.current = clientId;
-        const resp = await pair({ clientId, pairingCode: code, deviceName });
+        const resp = await pair({ clientId, pairingCode: code, credential, deviceName: name });
         if (resp.accepted) {
           // Leave on success rather than waiting to be dismissed. The wizard
           // has nothing left to say, and the remote access offer it used to
@@ -789,24 +908,29 @@ export default function PondPairingScreen() {
           router.replace('/(tabs)');
         } else {
           setCompletionState('error');
-          setCompletionReason(explainRejection(resp.rejection_reason, t) ?? t('pairingErrors.rejected'));
+          setCompletionReason(explainRefusedPairing(resp.rejection_reason, t, credential));
+          if (resp.rejection_reason === 'setup_code_unavailable') toPairingCode();
         }
       } catch (e) {
         // A throw is anything but a plain refusal: a Pond too old to pair with,
         // answers that did not verify, a refusal carried as an HTTP error, or no
         // answer at all.
         setCompletionState('error');
-        setCompletionReason(describePairingFailure(e, t));
+        setCompletionReason(describePairingFailure(e, t, credential));
+        const wait = refusalWait(e, 'setup_code_cooling');
+        if (wait) startCooling(wait);
+        if (isClaimedRefusal(e)) toPairingCode();
       }
     },
-    [code, pair, router, t],
+    [code, credential, pair, router, startCooling, stopCooling, t],
   );
 
-  const onServerNext = useCallback(async (url: string, pin: string) => {
-    const parsed = new URL(url);
-    await stagePairing({ version: 2, host: parsed.hostname, port: Number(parsed.port) || 443, localUrls: [url] }, pin);
-    setManualUrl(url); setStep(1);
-  }, [stagePairing]);
+  const onServerNext = useCallback(async (url: string, pin: string, unclaimed: boolean) => {
+    await stage(url, pin);
+    if (unclaimed) setCredential('setup');
+    // A scanned card already gave the code, so all that is left to ask for is a name.
+    setStep(credential === 'setup' && isValidSetupCode(code) ? 2 : 1);
+  }, [stage, credential, code]);
 
   const onCodeNext = useCallback((nextCode: string) => {
     setCode(nextCode);
@@ -833,30 +957,52 @@ export default function PondPairingScreen() {
       />
       <StepIndicator current={step} />
       {pairingError ? <Text style={styles.stepError}>{pairingError}</Text> : null}
+      {notice && step === 0 && !cardSearch ? <Text style={styles.stepDesc}>{notice}</Text> : null}
       {step === 0 &&
-        (manualEntry ? (
+        (cardSearch ? (
+          <WaitStep title={t('pairing.setupCardSearching')} body={t('pairing.setupCardSearchingBody')} />
+        ) : reaching ? (
+          <WaitStep title={t('pairing.fingerprintSearching')} />
+        ) : manualEntry ? (
           <ServerStep
             initial={manualUrl}
             initialPin={manualPin}
             picked={picked}
+            initialUnclaimed={pickedUnclaimed}
+            setupExchange={credential === 'setup'}
             onNext={onServerNext}
             onScan={openScanner}
           />
         ) : (
           <DiscoverStep
-            onNext={(url, pin) => { setManualUrl(url); setManualPin(pin ?? ''); setPicked(true); setManualEntry(true); }}
-            onManual={() => { setPicked(false); setManualEntry(true); }}
+            onNext={(url, pin, unclaimed) => {
+              if (unclaimed && pin) {
+                setPairingError(null);
+                setReaching({ url, pin });
+                return;
+              }
+              setManualUrl(url); setManualPin(pin ?? ''); setPicked(true); setPickedUnclaimed(unclaimed); setManualEntry(true);
+            }}
+            onManual={() => { setPicked(false); setPickedUnclaimed(false); setManualEntry(true); }}
             onScan={openScanner}
           />
         ))}
       {step === 1 && (
-        <PairingCodeStep initial={code} onNext={onCodeNext} onScan={openScanner} />
+        <PairingCodeStep
+          credential={credential}
+          initial={code}
+          onCredential={setCredential}
+          onNext={onCodeNext}
+          onScan={openScanner}
+        />
       )}
-      {step === 2 && <NameStep onNext={runPair} />}
+      {step === 2 && <NameStep initial={deviceName} onNext={runPair} />}
       {step === 3 && (
         <CompleteStep
           state={completionState}
-          reason={completionReason}
+          reason={coolingLeft > 0 ? t('pairingErrors.setupCooling', { count: coolingLeft }) : completionReason}
+          retryLabel={claimed ? t('pairing.claimedNext') : undefined}
+          retryDisabled={coolingLeft > 0}
           onRetry={() => setStep(1)}
         />
       )}
@@ -943,6 +1089,12 @@ const makeStyles = (c: ThemeColors) =>
       fontFamily: FontFamily.mono,
       fontSize: FontSize.lg,
       color: c.text,
+      letterSpacing: 1,
+    },
+    // Copied off a printed card group by group, so every digit keeps a fixed-width column.
+    codeInput: {
+      fontFamily: FontFamily.mono,
+      fontSize: FontSize.lg,
       letterSpacing: 1,
     },
     stepError: {

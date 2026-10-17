@@ -2,8 +2,8 @@
  * ConnectDesktopScreen — the viewfinder, for both QR codes the app reads.
  *
  * `?mode=matter` scans a Matter device's setup code for the commissioning
- * screen; without it, the pairing QR shown on the Pond's dashboard, for the
- * pairing wizard. One screen rather than two because everything around the
+ * screen; without it, the pairing QR shown on the Pond's dashboard or the QR on
+ * a Pond's printed setup card, for the pairing wizard. One screen rather than two because everything around the
  * decode is the same problem: camera permission with its no-second-prompt case,
  * the hold-to-confirm rule, and a viewfinder that owns the whole screen.
  *
@@ -33,7 +33,13 @@ import {
   parsePairingPayload,
   type PairingPayload,
 } from '@/models/pairing';
-import { offerPairingPayload, offerSetupCode } from '@/services/pairing-handoff';
+import {
+  InvalidSetupCardError,
+  isSetupCardLink,
+  parseSetupCard,
+  type SetupCard,
+} from '@/models/setup-card';
+import { offerPairingPayload, offerSetupCard, offerSetupCode } from '@/services/pairing-handoff';
 import { advanceHold, HOLD_STEADY_MS, LOST_AFTER_MS, type Hold } from '@/models/scan-hold';
 import { Brand, JaridaPurple, Semantic } from '@/constants/colors';
 import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
@@ -101,14 +107,24 @@ export default function ConnectDesktopScreen() {
       };
 
       let payload: PairingPayload | null = null;
+      let card: SetupCard | null = null;
       if (matter) {
         if (!looksLikeMatterSetupCode(data)) {
           // The mirror of the message below. Somebody who opened this from Add
           // device and pointed it at the Pond's own dashboard is holding a code
           // that is valid, just for the other flow.
+          if (isSetupCardLink(data)) return reject(t('commission.isPondSetupCard'));
           return reject(
             t(isPairingPayload(data) ? 'commission.isPondCode' : 'commission.notSetupCode'),
           );
+        }
+      } else if (isSetupCardLink(data)) {
+        try {
+          card = parseSetupCard(data);
+        } catch (e) {
+          // A card printed for a later app scans as a card, so it is the app that needs updating.
+          const newer = e instanceof InvalidSetupCardError && e.problem === 'unsupported_version';
+          return reject(t(newer ? 'scanErrors.setupCardNewer' : 'scanErrors.setupCardUnreadable'));
         }
       } else {
         try {
@@ -155,7 +171,8 @@ export default function ConnectDesktopScreen() {
       if (lostTimer.current) clearTimeout(lostTimer.current);
       setScanning(false);
       abandonHold();
-      if (payload) offerPairingPayload(payload);
+      if (card) offerSetupCard(card);
+      else if (payload) offerPairingPayload(payload);
       else offerSetupCode(data.trim());
       router.back();
     },

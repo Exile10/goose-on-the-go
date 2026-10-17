@@ -1,8 +1,11 @@
 import {
   clearPairingStart,
   offerPairingStart,
+  offerSetupCard,
   peekPairingStart,
   takePairingPayload,
+  takeSetupCard,
+  takeSetupCode,
 } from '@/services/pairing-handoff';
 
 afterEach(() => clearPairingStart());
@@ -30,5 +33,23 @@ describe('where the pairing wizard begins', () => {
     offerPairingStart({ kind: 'address' });
     expect(takePairingPayload()).toBeNull();
     expect(peekPairingStart()).toEqual({ kind: 'address' });
+  });
+});
+
+describe('a scanned setup card', () => {
+  const card = { code: '34970112339', id: '7f3a' };
+
+  it('is handed to exactly one reader, so a code cannot be replayed on a later visit', () => {
+    offerSetupCard(card);
+    expect(takeSetupCard()).toEqual(card);
+    expect(takeSetupCard()).toBeNull();
+  });
+
+  // Its own slot: a Matter scan must not be read as a Pond's card, or the other way round.
+  it('is not mistaken for a pairing payload or a Matter setup code', () => {
+    offerSetupCard(card);
+    expect(takePairingPayload()).toBeNull();
+    expect(takeSetupCode()).toBeNull();
+    expect(takeSetupCard()).toEqual(card);
   });
 });

@@ -43,7 +43,7 @@ export default function Welcome() {
   );
 
   const onSelect = useCallback(
-    (pond: DiscoveredPond) => openPairing({ kind: 'pond', url: pond.url, pin: pond.pin }),
+    (pond: DiscoveredPond) => openPairing({ kind: 'pond', url: pond.url, pin: pond.pin, unclaimed: pond.unclaimed }),
     [openPairing],
   );
   const { ponds, phase } = discovery.data;

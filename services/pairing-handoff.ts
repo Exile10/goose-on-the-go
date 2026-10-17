@@ -1,8 +1,8 @@
 /**
  * Carries a scanned credential from the scanner screen back to the screen that
- * asked for it: a Pond pairing payload to the wizard, or a Matter setup code to
- * the commissioning screen. It also carries where the welcome screen left the
- * wizard to begin (`PairingStart`).
+ * asked for it: a Pond pairing payload or a Pond's setup card to the wizard, or a
+ * Matter setup code to the commissioning screen. It also carries where the
+ * welcome screen left the wizard to begin (`PairingStart`).
  *
  * Expo Router has no return value for a pushed screen, and the obvious
  * alternative — route params — would put a live pairing code in the URL. On web
@@ -31,6 +31,7 @@
  */
 
 import type { PairingPayload } from '@/models/pairing';
+import type { SetupCard } from '@/models/setup-card';
 
 let pending: PairingPayload | null = null;
 
@@ -43,6 +44,20 @@ export function offerPairingPayload(payload: PairingPayload): void {
 export function takePairingPayload(): PairingPayload | null {
   const held = pending;
   pending = null;
+  return held;
+}
+
+let pendingCard: SetupCard | null = null;
+
+/** Hand a freshly scanned Pond setup card, which is not a Matter device's setup code, to whoever reads next. */
+export function offerSetupCard(card: SetupCard): void {
+  pendingCard = card;
+}
+
+/** Take the pending setup card, clearing it. Returns null when there is none. */
+export function takeSetupCard(): SetupCard | null {
+  const held = pendingCard;
+  pendingCard = null;
   return held;
 }
 
@@ -71,7 +86,9 @@ export function takeSetupCode(): string | null {
  * The pin is only ever a claim the next step has the user check, but it should
  * not be possible to plant one.
  */
-export type PairingStart = { kind: 'pond'; url: string; pin?: string } | { kind: 'address' };
+export type PairingStart =
+  | { kind: 'pond'; url: string; pin?: string; unclaimed?: boolean }
+  | { kind: 'address' };
 
 let pendingStart: PairingStart | null = null;
 

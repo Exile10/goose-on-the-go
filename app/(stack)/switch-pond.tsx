@@ -42,7 +42,7 @@ export default function SwitchPond() {
     (pond: DiscoveredPond) => {
       void selectionTick();
       if (pond.url === serverUrl) return;
-      openPairing({ kind: 'pond', url: pond.url, pin: pond.pin });
+      openPairing({ kind: 'pond', url: pond.url, pin: pond.pin, unclaimed: pond.unclaimed });
     },
     [openPairing, serverUrl],
   );
