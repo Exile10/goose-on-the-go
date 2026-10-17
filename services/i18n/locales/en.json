@@ -608,6 +608,21 @@
     "noCode": "Your Pond has no pairing code right now. Codes last 10 minutes — open the dashboard on the host machine to show a fresh one.",
     "noAnswer": "No Pond answered at {{address}}. Check the address, and that the phone is on the same network.",
     "codeBody": "Your Pond shows a six-digit code on its dashboard, or in the terminal when it starts. It expires after ten minutes.",
+    "setupCodeTitle": "Enter the code on your Pond's card",
+    "setupCodeBody": "A Pond without a screen comes with a setup card. Type the eleven digits printed on it, or scan its QR code. The card works until somebody has set the Pond up.",
+    "setupCodeLabel": "Setup code",
+    "setupCodePlaceholder": "0000-000-0000",
+    "setupCodeTypo": "That code has a typo: its digits do not add up the way a card's do. Check each group against the card.",
+    "usePairingCode": "Enter a six-digit pairing code instead",
+    "useSetupCode": "Enter the code on the Pond's setup card instead",
+    "spokenAsk": "Have the Pond say a code",
+    "spokenAsking": "Asking your Pond",
+    "spokenAgain": "Have the Pond say it again",
+    "spokenSaid": "Your Pond is reading a six-digit pairing code aloud, twice. Type it here. It lasts ten minutes.",
+    "setupCardSearching": "Looking for the Pond on your card",
+    "setupCardSearchingBody": "It needs to be switched on and on this Wi-Fi network.",
+    "setupCardNotFound": "No Pond matching this card answered on this network. Check that it is switched on and on the same Wi-Fi, or enter its address.",
+    "claimedNext": "Pair with a code instead",
     "nameBody": "This is the name your Pond lists this phone under. Pick something you will recognise.",
     "pairingBody": "Checking the code and exchanging keys with your Pond.",
     "stepComplete": "Complete",
@@ -655,7 +670,7 @@
     "scanAgain": "Scan again",
     "codeUnreadable": "Could not read that code. Try again.",
     "holdSteady": "Hold steady…",
-    "aimAtPond": "Point the camera at the QR code on your Pond's dashboard"
+    "aimAtPond": "Point the camera at the QR code on your Pond's dashboard or on its setup card"
   },
   "privacy": {
     "policy": "Privacy policy",
@@ -795,6 +810,7 @@
     "camera": "Scanning a device setup code needs the camera. You can also type the code printed on the device instead.",
     "notSetupCode": "That is not a Matter setup code. Look for a QR beginning MT: on the device or its box.",
     "isPondCode": "That is your Pond’s pairing code, not a device setup code. This phone is already paired — scan the QR on the device itself, or on its packaging.",
+    "isPondSetupCard": "That is your Pond's setup card, not a device setup code. Scan the QR on the device itself, or on its packaging.",
     "desc": "Scan or enter the setup code printed on the device or its packaging. A device only accepts pairing for about 15 minutes after it starts up, so power-cycle it first if it has been sitting.",
     "addingDesc": "This can take a couple of minutes. Keep the device powered and nearby.",
     "controllerStarting": "Your Pond is still starting its Matter controller. Adding a device will not work until it has finished.",
@@ -1052,7 +1068,9 @@
   },
   "scanErrors": {
     "matterCode": "That is a Matter device setup code, not a Pond pairing code. Use Devices, then Add device, to commission it. The pairing code is the one on your Pond dashboard.",
-    "notPondCode": "That is not a Goose In A Pond pairing code. Open Pairing on your Pond and scan the code it shows."
+    "notPondCode": "That is not a Goose In A Pond pairing code. Open Pairing on your Pond and scan the code it shows, or scan the QR on its setup card.",
+    "setupCardNewer": "This setup card is newer than this app. Update Goose On The Go, then scan it again.",
+    "setupCardUnreadable": "This is a Pond setup card, but its code did not read correctly. Type the code printed on the card instead."
   },
   "pairingErrors": {
     "rateLimited": "Your Pond is rate-limiting pairing attempts. Wait {{count}} second{{plural}} and try again.",
@@ -1065,7 +1083,18 @@
     "expired": "This attempt took too long — the server holds a challenge for only 60 seconds. Enter the same code again; you do not need a new one.",
     "noCode": "Your Pond has no pairing code right now. Codes last 10 minutes — open the dashboard on the host machine to show a fresh one.",
     "rejected": "The server rejected the pairing attempt. Double-check the code and try again.",
-    "pondOutdated": "This Pond is too old to pair with this version of the app. Update the software on your Pond, then try again."
+    "pondOutdated": "This Pond is too old to pair with this version of the app. Update the software on your Pond, then try again.",
+    "setupBadCode": "That setup code did not match this Pond. Check it against the card and try again. After several wrong tries your Pond makes you wait between attempts.",
+    "setupClaimed": "This Pond has already been set up, so its card no longer works. Ask the person who set it up to add you, or have the Pond say a pairing code.",
+    "setupClaimedFirst": "Another phone set this Pond up a moment ago, so its card no longer works. Ask whoever set it up to add you, or have the Pond say a pairing code.",
+    "setupCooling_one": "Several wrong setup codes were tried, so your Pond is waiting before it takes another. Try again in {{count}} second.",
+    "setupCooling_other": "Several wrong setup codes were tried, so your Pond is waiting before it takes another. Try again in {{count}} seconds.",
+    "setupCoolingNoHint": "Several wrong setup codes were tried, so your Pond is waiting before it takes another. Check the code on the card, then try again.",
+    "spokenLimited_one": "Your Pond has just said a code. You can ask for another in {{count}} second.",
+    "spokenLimited_other": "Your Pond has just said a code. You can ask for another in {{count}} seconds.",
+    "spokenLimitedNoHint": "Your Pond has said several codes recently. Wait a minute, then ask again.",
+    "spokenDisabled": "This Pond does not say codes aloud: its household has turned that off. Ask the person who set it up for a pairing code.",
+    "spokenSilent": "Your Pond cannot make a sound right now. Check its speaker, or use the code on its setup card."
   },
   "memories": {
     "segment": {
