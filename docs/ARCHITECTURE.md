@@ -60,6 +60,9 @@ Pond refused rather than on the status alone. `pair()` runs CPace (2026-10-13): 
 reads `/system/info` first and throws `PondOutdatedError` unless the Pond reports
 `protocol: 3`, then `handshake/pake/init` and `handshake/pake/verify`, and keeps
 no token until the Pond's confirmation tag verifies (`PondTrustError` otherwise).
+With `credential: 'setup'` it runs the same exchange against a setup card's eleven
+digits, to claim a Pond, and `requestSpokenCode()` asks a Pond to read a pairing
+code aloud (2026-10-17; PINNED_HTTPS.md, "Setup cards and spoken codes").
 `services/cpace.ts` — CPace (draft-irtf-cfrg-cpace-21, CPACE-RISTR255-SHA512) over
 `@noble/curves` and `@noble/hashes`, both pinned exactly, and the pairing's channel
 identifier, session id and confirmation tags. The draft half is held to the draft's
@@ -96,7 +99,7 @@ pond-server advertises `_pond._tcp.local.`; `services/discovery.ts` browses for
 it through `react-native-zeroconf`, and `view-models/use-discovery.ts` turns that
 into the `{data, loading, error, actions}` shape the wizard renders.
 
-Four things about this are load-bearing and easy to undo by accident.
+Five things about this are load-bearing and easy to undo by accident.
 
 **Only numeric addresses are kept.** A resolved service carries both a `host`
 (`<name>.local`) and `addresses` (numeric). Android's resolver does no mDNS at
@@ -117,6 +120,21 @@ perfectly and answers nothing.
 with a discovered Pond is only a claim. `fingerprintChoices`
 (`models/connection.ts`) offers three previews that differ only after the first
 group, drawn once per pin, so a wrong pick cannot be retried against a fresh set.
+
+The one exception is a pin that a setup exchange is about to prove (2026-10-17). A
+Pond with no screen has nothing to pick a fingerprint against, so the pick is
+skipped when the next exchange runs on a setup card's code: after a scanned card,
+and for a Pond whose advertisement says `setup=1`. That exchange puts the pin into
+its channel identifier exactly as pairing does, so a spoofed pin can only fail it.
+`setup=1` is itself only a claim; a spoofed one skips the pick for a claimed Pond,
+and the exchange that follows still fails under the wrong pin.
+
+**A setup card names its Pond by `id`.** The TXT record carries `id`, the four hex
+digits printed on the Pond's setup card, and `setup=1` while nobody has claimed it.
+`findPondBySetupId` browses for the card's id on the same 8 s clock as the search
+below, lowercasing both sides because a card may print it in either case, and finds
+a claimed Pond too: its own refusal ("ask whoever set it up") says more than "not
+found". Nothing found opens the address form, with the reason above it.
 
 The search ends on a clock (8 s), because mDNS has no "that is all" signal, and
 browsing continues past the deadline so a hub switched on later still appears.
