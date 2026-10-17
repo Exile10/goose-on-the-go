@@ -1,8 +1,8 @@
 /**
- * PondPairingScreen — 4-step pairing wizard:
+ * PondPairingScreen — the pairing wizard, for joining a Pond that is already set up:
  *   0. Find the GIAP server: discovered over mDNS, scanned from the QR or a setup card, or typed
  *   1. Enter the 6-digit pairing code shown or said by the GIAP host, or its setup card's code
- *   2. Name this device
+ *   2. Pair under the phone's own name, shown on the code step with Change
  *   3. Run the two-phase handshake and confirm
  */
 
@@ -41,6 +41,9 @@ import {
   type PinSource,
 } from '@/models/connection';
 import { isValidSetupCode, readSetupCode, type SetupCard } from '@/models/setup-card';
+import { defaultPhoneName } from '@/models/ble-setup';
+import { PhoneName } from '@/components/setup/phone-name';
+import * as Device from 'expo-device';
 import { insecureDevMode } from '@/services/dev-mode';
 import { randomBytes } from '@/services/secure-random';
 import { getInstallId } from '@/services/install-id';
@@ -65,7 +68,8 @@ import { useThemedStyles } from '@/hooks/use-themed-styles';
 import type { ThemeColors } from '@/constants/colors';
 
 type Step = 0 | 1 | 2 | 3;
-const STEPS = ['find', 'code', 'name', 'complete'] as const;
+// Step 2 has no screen: the phone pairs under its own name, which the code step shows.
+const STEPS = ['find', 'code', 'complete'] as const;
 
 /**
  * A step's label, one literal key per branch, as the Memories tabs do: a key assembled at runtime
@@ -77,7 +81,6 @@ function stepLabel(step: (typeof STEPS)[number], t: TFunction): string {
   switch (step) {
     case 'find': return t('pairing.stepFind');
     case 'code': return t('pairing.stepCode');
-    case 'name': return t('pairing.stepName');
     case 'complete': return t('pairing.stepDone');
   }
 }
@@ -89,8 +92,9 @@ function StepIndicator({ current }: { current: Step }) {
   return (
     <View style={styles.stepRow}>
       {STEPS.map((step, i) => {
-        const isActive = i === current;
-        const isDone = i < current;
+        const at = current >= 2 ? current - 1 : current;
+        const isActive = i === at;
+        const isDone = i < at;
         return (
           <View key={step} style={styles.stepItem}>
             <View
@@ -580,6 +584,8 @@ function PairingCodeStep({
   credential,
   initial,
   spoken,
+  phoneName,
+  onPhoneName,
   onCredential,
   onNext,
   onScan,
@@ -587,6 +593,8 @@ function PairingCodeStep({
   credential: PakeCredential;
   initial: string;
   spoken: UseSpokenCode;
+  phoneName: string;
+  onPhoneName: (name: string) => void;
   onCredential: (credential: PakeCredential) => void;
   onNext: (code: string) => void;
   onScan: () => void;
@@ -618,8 +626,9 @@ function PairingCodeStep({
           />
           {setup.status === 'typo' ? <Text style={styles.stepError}>{t('pairing.setupCodeTypo')}</Text> : null}
         </View>
-        <InkButton variant="primary" disabled={setup.status !== 'valid'} onPress={() => onNext(setup.digits)}>
-          {t('pairing.continueAction')}
+        <PhoneName value={phoneName} onChange={onPhoneName} />
+        <InkButton variant="primary" disabled={setup.status !== 'valid' || !phoneName.trim()} onPress={() => onNext(setup.digits)}>
+          {t('pairing.pairDevice')}
         </InkButton>
         <ScanLink onPress={onScan} />
         <SpokenCodeAction spoken={spoken} onSpoken={() => onCredential('pairing')} />
@@ -647,39 +656,13 @@ function PairingCodeStep({
           autoFocus
         />
       </View>
-      <InkButton variant="primary" disabled={!valid} onPress={() => onNext(code)}>
-        {t('pairing.continueAction')}
+      <PhoneName value={phoneName} onChange={onPhoneName} />
+      <InkButton variant="primary" disabled={!valid || !phoneName.trim()} onPress={() => onNext(code)}>
+        {t('pairing.pairDevice')}
       </InkButton>
       <ScanLink onPress={onScan} />
       <SpokenCodeAction spoken={spoken} onSpoken={() => setCode('')} />
       <TextAction label={t('pairing.useSetupCode')} onPress={() => onCredential('setup')} />
-    </StepBody>
-  );
-}
-
-/** Step 2: what this phone is called in the Pond's device list. */
-function NameStep({ initial, onNext }: { initial: string; onNext: (name: string) => void }) {
-  const styles = useThemedStyles(makeStyles);
-  const { t } = useTranslation();
-  const [name, setName] = useState(initial);
-  return (
-    <StepBody>
-      <GIcon name="edit" size={28} color={JaridaPurple[500]} />
-      <Text style={styles.stepTitle}>{t('pairing.nameTitle')}</Text>
-      <Text style={styles.stepDesc}>{t('pairing.nameBody')}</Text>
-      <View style={styles.inputGroup}>
-        <Text style={styles.inputLabel}>{t('pairing.nameLabel')}</Text>
-        <TextInput
-          style={styles.textInput}
-          value={name}
-          onChangeText={setName}
-          placeholder={t('pairing.namePlaceholder')}
-          placeholderTextColor={Grey[400]}
-        />
-      </View>
-      <InkButton variant="primary" disabled={!name.trim()} onPress={() => onNext(name.trim())}>
-        {t('pairing.pairDevice')}
-      </InkButton>
     </StepBody>
   );
 }
@@ -795,7 +778,7 @@ export default function PondPairingScreen() {
   const [code, setCode] = useState('');
   // An unclaimed Pond takes its setup card's code; anything else, a pairing code.
   const [credential, setCredential] = useState<PakeCredential>(startedUnclaimed ? 'setup' : 'pairing');
-  const [deviceName, setDeviceName] = useState('');
+  const [deviceName, setDeviceName] = useState(() => defaultPhoneName(Device.deviceName, Device.modelName));
   const [cardSearch, setCardSearch] = useState<SetupCard | null>(null);
   // Held here, not in the code step, so the wizard knows a code was said when it decides on the pick.
   const spoken = useSpokenCode();
@@ -936,7 +919,6 @@ export default function PondPairingScreen() {
 
   const runPair = useCallback(
     async (name: string) => {
-      setDeviceName(name);
       setStep(3);
       setCompletionState('pending');
       setCompletionReason(null);
@@ -969,6 +951,14 @@ export default function PondPairingScreen() {
     },
     [code, credential, pair, router, startCooling, stopCooling, t],
   );
+
+  // Step 2 is the moment everything is in hand; pairing starts by itself, under the name shown.
+  useEffect(() => {
+    if (step !== 2) return;
+    const name = deviceName.trim() || defaultPhoneName(Device.deviceName, Device.modelName);
+    const timer = setTimeout(() => void runPair(name), 0);
+    return () => clearTimeout(timer);
+  }, [step, runPair, deviceName]);
 
   const onServerNext = useCallback(async (url: string, pin: string, unclaimed: boolean, pickSkipped: boolean) => {
     await stage(url, pin, pickSkipped ? 'advertised' : 'checked');
@@ -1054,15 +1044,16 @@ export default function PondPairingScreen() {
           credential={credential}
           initial={code}
           spoken={spoken}
+          phoneName={deviceName}
+          onPhoneName={setDeviceName}
           onCredential={setCredential}
           onNext={onCodeNext}
           onScan={openScanner}
         />
       )}
-      {step === 2 && <NameStep initial={deviceName} onNext={runPair} />}
-      {step === 3 && (
+      {step >= 2 && (
         <CompleteStep
-          state={completionState}
+          state={step === 2 ? 'pending' : completionState}
           reason={coolingLeft > 0 ? t('pairingErrors.setupCooling', { count: coolingLeft }) : completionReason}
           retryLabel={claimed ? t('pairing.claimedNext') : undefined}
           retryDisabled={coolingLeft > 0}
