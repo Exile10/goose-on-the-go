@@ -6,7 +6,8 @@ import NetInfo from '@react-native-community/netinfo';
 import { forgetAllCards } from '@/services/card-cache';
 import { Storage, purgeLegacyStorage } from '@/services/storage';
 import { SecureStorage } from '@/services/secure-storage';
-import { ApiError, api, PondApiClient, type HandshakeResponse } from '@/services/api-client';
+import { ApiError, api, PondApiClient, type HandshakeResponse, type SpokenCode } from '@/services/api-client';
+import type { PakeCredential } from '@/services/cpace';
 import { ConnectionManager, type ConnectionSnapshot } from '@/services/connection-manager';
 import { configurePondTrust, PondTrustError } from '@/services/pond-trust';
 import { findPondAt, findPondByHost } from '@/services/discovery';
@@ -18,7 +19,7 @@ import { canBeat, HEARTBEAT_MS } from '@/services/heartbeat';
 
 const NUMERIC_HOST = /^\d{1,3}(\.\d{1,3}){3}$/;
 
-interface PairOptions { clientId: string; pairingCode: string; deviceName?: string }
+interface PairOptions { clientId: string; pairingCode: string; credential?: PakeCredential; deviceName?: string }
 interface ServerContextValue {
   serverUrl: string; online: boolean; token: string | null; refreshToken: string | null;
   connectionState: ConnectionSnapshot['state'];
@@ -39,6 +40,8 @@ interface ServerContextValue {
   stagePairing: (profile: ConnectionProfile, pin: string) => Promise<void>;
   cancelPairing: () => Promise<void>;
   pair: (opts: PairOptions) => Promise<HandshakeResponse>;
+  /** Ask the staged Pond to read a pairing code aloud; it answers only a phone on its own network. */
+  requestSpokenCode: () => Promise<SpokenCode>;
   unpair: () => Promise<void>;
   /** Per-screen mock/real backend flags (dev only) — see MIGRATION_SCREENS. */
   screenModes: ScreenModes;
@@ -445,6 +448,14 @@ export function ServerProvider({ children }: PropsWithChildren) {
     return resp;
   }, [restore]);
 
+  const requestSpokenCode = useCallback(async () => {
+    const pending = staged.current;
+    if (!pending) throw new Error(i18n.t('pairing.lan'));
+    const net = await NetInfo.fetch();
+    if (!['wifi', 'ethernet'].includes(net.type)) throw new Error(i18n.t('pairing.lan'));
+    return pending.client.requestSpokenCode();
+  }, []);
+
   /**
    * Persisted dev toggles, read once on mount.
    *
@@ -533,8 +544,8 @@ export function ServerProvider({ children }: PropsWithChildren) {
     refreshToken: identity?.refresh ?? null, connectionState: snapshot.state,
     profileId: identity?.id ?? '', paired: hasPairing, remoteEnabled: saved.current?.profile.remoteAccess?.mode === 'embedded',
     keepLocalOnly, hydrated, screenModes, isScreenReal, setScreenMode,
-    checkHealth, setRemoteEndpoint, recover: manager.recover, revoke: manager.revoke.bind(manager), stagePairing, cancelPairing, pair, unpair,
-  }), [snapshot, identity, hasPairing, hydrated, screenModes, isScreenReal, setScreenMode, checkHealth, setRemoteEndpoint, keepLocalOnly, manager, stagePairing, cancelPairing, pair, unpair]);
+    checkHealth, setRemoteEndpoint, recover: manager.recover, revoke: manager.revoke.bind(manager), stagePairing, cancelPairing, pair, requestSpokenCode, unpair,
+  }), [snapshot, identity, hasPairing, hydrated, screenModes, isScreenReal, setScreenMode, checkHealth, setRemoteEndpoint, keepLocalOnly, manager, stagePairing, cancelPairing, pair, requestSpokenCode, unpair]);
   return <ServerContext.Provider value={value}>{children}</ServerContext.Provider>;
 }
 export function useServer(): ServerContextValue {

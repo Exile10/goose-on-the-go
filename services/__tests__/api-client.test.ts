@@ -323,3 +323,133 @@ describe('pair() over CPace', () => {
     }
   });
 });
+
+/**
+ * Claiming a Pond with its printed setup card: the same exchange as pairing, opened with
+ * `credential: "setup"`, and the two refusals only a setup run can meet.
+ */
+describe('pair() with a setup card', () => {
+  const PIN = 'sha256/TnkUsN+AaLec3BDTh/KUwSokXTmCq2+4rlfBnmJxPkE=';
+  const SETUP = '34970112339';
+  const CODE = '048291';
+  const CLIENT_ID = 'install-abcdef';
+
+  let warn: jest.SpyInstance;
+  beforeEach(() => { warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined); });
+  afterEach(() => warn.mockRestore());
+
+  const body = (fetch: jest.Mock, path: string) =>
+    JSON.parse(String(fetch.mock.calls.find(([url]) => String(url).endsWith(path))?.[1]?.body));
+  const claim = (client: PondApiClient) =>
+    client.pair({ clientId: CLIENT_ID, pairingCode: SETUP, credential: 'setup', channelBinding: PIN });
+
+  it('names the setup credential, runs the exchange and keeps the tokens once the Pond confirms', async () => {
+    const fetch = pakePond({ code: CODE, pin: PIN, setupCode: SETUP }); setFetch(fetch);
+    const client = new PondApiClient('https://192.168.1.7:4443');
+    const rotated = jest.fn(); client.setOnTokensRotated(rotated);
+
+    const resp = await claim(client);
+
+    expect(resp.accepted).toBe(true);
+    expect(rotated).toHaveBeenCalledWith('session', 'refresh');
+    expect(body(fetch, '/pake/init')).toMatchObject({ client_id: CLIENT_ID, channel_binding: PIN, credential: 'setup' });
+    for (const [, req] of fetch.mock.calls) expect(String(req?.body ?? '')).not.toContain(SETUP);
+  });
+
+  // Absent means pairing, and an older Pond reads the request it always has.
+  it('leaves the credential out of an ordinary pairing init', async () => {
+    const fetch = pakePond({ code: CODE, pin: PIN, setupCode: SETUP }); setFetch(fetch);
+    await new PondApiClient('https://192.168.1.7:4443')
+      .pair({ clientId: CLIENT_ID, pairingCode: CODE, channelBinding: PIN });
+    expect(Object.keys(body(fetch, '/pake/init'))).not.toContain('credential');
+  });
+
+  it('is refused for a setup code the Pond does not hold, and keeps nothing', async () => {
+    setFetch(pakePond({ code: CODE, pin: PIN, setupCode: '79927398713' }));
+    const client = new PondApiClient('https://192.168.1.7:4443');
+    const rotated = jest.fn(); client.setOnTokensRotated(rotated);
+    await expect(claim(client)).resolves.toMatchObject({ accepted: false, rejection_reason: 'invalid_confirmation' });
+    expect(rotated).not.toHaveBeenCalled();
+  });
+
+  it('carries a claimed Pond\'s refusal from init, and sends nothing derived from the code', async () => {
+    const fetch = pakePond({ code: CODE, pin: PIN, setupCode: SETUP,
+      setupRefusal: { status: 409, error: 'setup_code_unavailable' } });
+    setFetch(fetch);
+    await expect(claim(new PondApiClient('https://192.168.1.7:4443')))
+      .rejects.toMatchObject({ status: 409, detail: 'setup_code_unavailable', retryAfterSecs: null });
+    expect(fetch.mock.calls.some(([url]) => String(url).endsWith('/pake/verify'))).toBe(false);
+  });
+
+  it('carries how long the setup code is cooling, from Retry-After', async () => {
+    setFetch(pakePond({ code: CODE, pin: PIN, setupCode: SETUP,
+      setupRefusal: { status: 429, error: 'setup_code_cooling', retryAfter: 30 } }));
+    const error = await claim(new PondApiClient('https://192.168.1.7:4443')).catch((e) => e);
+    expect(error).toBeInstanceOf(ApiError);
+    expect(error).toMatchObject({ status: 429, detail: 'setup_code_cooling', retryAfterSecs: 30 });
+  });
+
+  it('reads the wait from the body when no Retry-After came with it', async () => {
+    const pond = pakePond({ code: CODE, pin: PIN, setupCode: SETUP });
+    setFetch(jest.fn(async (url: string, init?: RequestInit) => String(url).endsWith('/pake/init')
+      ? new Response(JSON.stringify({ error: 'setup_code_cooling', retry_after: 45 }), { status: 429 })
+      : pond(url, init)));
+    await expect(claim(new PondApiClient('https://192.168.1.7:4443')))
+      .rejects.toMatchObject({ status: 429, detail: 'setup_code_cooling', retryAfterSecs: 45 });
+  });
+
+  it('prefers the header to the body, and ignores a wait that is not a number of seconds', async () => {
+    const pond = pakePond({ code: CODE, pin: PIN, setupCode: SETUP });
+    for (const [headers, retry_after, expected] of [
+      [{ 'Retry-After': '12' }, 99, 12],
+      [{}, 'soon', null],
+      [{}, -1, null],
+    ] as const) {
+      setFetch(jest.fn(async (url: string, init?: RequestInit) => String(url).endsWith('/pake/init')
+        ? new Response(JSON.stringify({ error: 'setup_code_cooling', retry_after }), { status: 429, headers })
+        : pond(url, init)));
+      await expect(claim(new PondApiClient('https://192.168.1.7:4443'))).rejects.toMatchObject({ retryAfterSecs: expected });
+    }
+  });
+
+  it('keeps no token when another phone claimed the Pond between init and verify', async () => {
+    setFetch(pakePond({ code: CODE, pin: PIN, setupCode: SETUP, claimedDuringRun: true }));
+    const client = new PondApiClient('https://192.168.1.7:4443');
+    const rotated = jest.fn(); client.setOnTokensRotated(rotated);
+    await expect(claim(client)).resolves.toMatchObject({ accepted: false, rejection_reason: 'setup_code_unavailable' });
+    expect(rotated).not.toHaveBeenCalled();
+  });
+});
+
+describe('requestSpokenCode()', () => {
+  it('posts no body and no token, and reports that the code was said', async () => {
+    const fetch = stubFetch({ status: 202, body: { spoken: true, expires_at: '2026-10-17T10:10:00Z' } }); setFetch(fetch);
+    const client = new PondApiClient('https://192.168.1.7:4443');
+    client.setToken('session');
+
+    await expect(client.requestSpokenCode()).resolves.toEqual({ spoken: true, expires_at: '2026-10-17T10:10:00Z' });
+
+    expect(fetch).toHaveBeenCalledTimes(1);
+    const [url, init] = fetch.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe('https://192.168.1.7:4443/api/v1/handshake/spoken-code');
+    expect(init.method).toBe('POST');
+    expect(init.body).toBeUndefined();
+    expect(new Headers(init.headers).get('Authorization')).toBeNull();
+  });
+
+  it.each([
+    [429, { error: 'spoken_code_limited', retry_after: 30 }, { 'Retry-After': '30' }, 30],
+    [403, { error: 'spoken_codes_disabled' }, {}, null],
+    [503, { error: 'announcer_unavailable' }, {}, null],
+  ])('carries a %s refusal and its wait, and does not ask again by itself', async (status, refusal, headers, wait) => {
+    const fetch = stubFetch({ status, body: refusal, headers }); setFetch(fetch);
+    await expect(new PondApiClient('https://192.168.1.7:4443').requestSpokenCode())
+      .rejects.toMatchObject({ status, detail: refusal.error, retryAfterSecs: wait });
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not take an answer without spoken: true as a code said', async () => {
+    setFetch(stubFetch({ status: 202, body: {} }));
+    await expect(new PondApiClient('https://192.168.1.7:4443').requestSpokenCode()).rejects.toThrow('did not confirm');
+  });
+});

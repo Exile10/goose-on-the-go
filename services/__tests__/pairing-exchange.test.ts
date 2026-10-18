@@ -15,6 +15,7 @@ import { PondApiClient } from '@/services/api-client';
 import {
   calculateGenerator,
   channelIdentifier,
+  channelLabel,
   CI_LABEL,
   CLIENT_CONFIRM_LABEL,
   confirmationKey,
@@ -22,10 +23,12 @@ import {
   DSI,
   generatorString,
   intermediateSessionKey,
+  lvCat,
   respond,
   scalarMult,
   scalarMultVfy,
   SERVER_CONFIRM_LABEL,
+  SETUP_CI_LABEL,
 } from '@/services/cpace';
 import { PondTrustError } from '@/services/pond-trust';
 import { randomBytes } from '@/services/secure-random';
@@ -102,6 +105,24 @@ describe('the exchange, value by value', () => {
     expect(hex(confirmationTag(SERVER_CONFIRM_LABEL, macKey, ya, yb))).toBe(outputs.T_server);
   });
 
+  // The same construction under another label; the setup run below pins its bytes.
+  it('opens a setup run\'s CI with the setup label, and so draws a different generator', () => {
+    expect(SETUP_CI_LABEL).toBe('goose-setup-cpace-v1');
+    expect(channelLabel('setup')).toBe(SETUP_CI_LABEL);
+    expect(channelLabel('pairing')).toBe(CI_LABEL);
+    expect(hex(channelIdentifier(inputs.spki_pin, inputs.client_id, CI_LABEL))).toBe(outputs.CI);
+    const setupCi = channelIdentifier(inputs.spki_pin, inputs.client_id, SETUP_CI_LABEL);
+    expect(hex(setupCi)).toBe(hex(lvCat(utf8ToBytes(SETUP_CI_LABEL), utf8ToBytes(inputs.spki_pin), utf8ToBytes(inputs.client_id))));
+    const run = (credential?: 'pairing' | 'setup') => respond({
+      code: inputs.code, pin: inputs.spki_pin, clientId: inputs.client_id, credential,
+      challenge: bytes(inputs.challenge), clientNonce: bytes(inputs.client_nonce),
+      initiatorShare: bytes(outputs.Ya), random: fixed(inputs.yb),
+    });
+    expect(hex(run('pairing').share)).toBe(outputs.Yb);
+    expect(hex(run('setup').share)).toBe(hex(scalarMult(bytesToNumberLE(bytes(inputs.yb)), calculateGenerator(bytes(inputs.PRS), setupCi, sid))));
+    expect(hex(run('setup').share)).not.toBe(outputs.Yb);
+  });
+
   it('respond() produces the phone\'s message and expects the Pond\'s tag', () => {
     const out = respond({
       code: inputs.code, pin: inputs.spki_pin, clientId: inputs.client_id,
@@ -111,6 +132,65 @@ describe('the exchange, value by value', () => {
     expect(hex(out.share)).toBe(outputs.Yb);
     expect(hex(out.confirm)).toBe(outputs.T_client);
     expect(hex(out.expectedServerConfirm)).toBe(outputs.T_server);
+  });
+});
+
+describe('the setup run, value by value', () => {
+  const setup = vectors.setup;
+  const { inputs: s, outputs: o } = setup;
+  const sid = concatBytes(bytes(s.challenge), bytes(s.client_nonce));
+  const ci = channelIdentifier(s.spki_pin, s.client_id, SETUP_CI_LABEL);
+  const run = (credential: 'pairing' | 'setup', code: string = s.code) => respond({
+    code, pin: s.spki_pin, clientId: s.client_id, credential,
+    challenge: bytes(s.challenge), clientNonce: bytes(s.client_nonce),
+    initiatorShare: bytes(o.Ya), random: fixed(s.yb),
+  });
+
+  it('is the Pond\'s setup credential, under the setup label', () => {
+    expect(setup.credential).toBe('setup');
+    expect(SETUP_CI_LABEL).toBe(setup.labels.channel);
+    expect(channelLabel('setup')).toBe(SETUP_CI_LABEL);
+    expect(hex(utf8ToBytes(s.code))).toBe(s.PRS);
+    expect(setup.wire.init_request.credential).toBe('setup');
+  });
+
+  it('CI, sid, g, both shares, K, ISK, K_mac and both tags', () => {
+    expect(hex(ci)).toBe(o.CI);
+    expect(hex(sid)).toBe(o.sid);
+    expect(hex(generatorString(DSI, bytes(s.PRS), ci, sid, 128))).toBe(o.generator_string);
+    const g = calculateGenerator(bytes(s.PRS), ci, sid);
+    expect(hex(g.toBytes())).toBe(o.g);
+    const ya = scalarMult(bytesToNumberLE(bytes(s.ya)), g);
+    const yb = scalarMult(bytesToNumberLE(bytes(s.yb)), g);
+    expect(hex(ya)).toBe(o.Ya);
+    expect(hex(yb)).toBe(o.Yb);
+    const k = scalarMultVfy(bytesToNumberLE(bytes(s.yb)), ya);
+    expect(hex(k)).toBe(o.K);
+    const isk = intermediateSessionKey(sid, k, ya, NO_AD, yb, NO_AD);
+    expect(hex(isk)).toBe(o.ISK);
+    const macKey = confirmationKey(sid, isk);
+    expect(hex(macKey)).toBe(o.K_mac);
+    expect(hex(confirmationTag(CLIENT_CONFIRM_LABEL, macKey, ya, yb))).toBe(o.T_client);
+    expect(hex(confirmationTag(SERVER_CONFIRM_LABEL, macKey, ya, yb))).toBe(o.T_server);
+  });
+
+  it('respond() sends the Pond\'s setup verify and expects its tag', () => {
+    const out = run('setup');
+    expect(hex(out.share)).toBe(o.Yb);
+    expect(hex(out.confirm)).toBe(o.T_client);
+    expect(hex(out.confirm)).toBe(setup.wire.verify_request.confirm);
+    expect(hex(out.expectedServerConfirm)).toBe(o.T_server);
+  });
+
+  it.each(['pairing_label', 'wrong_code'])('%s: the phone sends what the Pond refuses as invalid_confirmation', (name) => {
+    const v = setup.negative.find((n) => n.name === name) as Record<string, string | undefined> | undefined;
+    if (!v) throw new Error(`no setup negative vector ${name}`);
+    expect(v.pond_result).toBe('invalid_confirmation');
+    const out = name === 'pairing_label' ? run('pairing') : run('setup', need(v.phone_code));
+    if (v.CI) expect(hex(channelIdentifier(s.spki_pin, s.client_id, CI_LABEL))).toBe(v.CI);
+    expect(hex(out.share)).toBe(v.Yb);
+    expect(hex(out.confirm)).toBe(v.T_client);
+    expect(hex(out.confirm)).not.toBe(o.T_client);
   });
 });
 

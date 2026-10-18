@@ -18,6 +18,7 @@ import { useThemedStyles } from '@/hooks/use-themed-styles';
 import { useDiscovery } from '@/view-models/use-discovery';
 import { useServer } from '@/providers/server-provider';
 import { selectionTick } from '@/services/haptics';
+import { offerPairingStart, type PairingStart } from '@/services/pairing-handoff';
 import type { DiscoveredPond } from '@/services/discovery';
 import type { ThemeColors } from '@/constants/colors';
 import { Spacing } from '@/constants/spacing';
@@ -29,13 +30,21 @@ export default function SwitchPond() {
   const discovery = useDiscovery();
   const { serverUrl } = useServer();
 
+  const openPairing = useCallback(
+    (start: PairingStart) => {
+      offerPairingStart(start);
+      router.push('/(stack)/pond-pairing');
+    },
+    [router],
+  );
+
   const onSelect = useCallback(
     (pond: DiscoveredPond) => {
       void selectionTick();
       if (pond.url === serverUrl) return;
-      router.push({ pathname: '/(stack)/pond-pairing', params: { url: pond.url } });
+      openPairing({ kind: 'pond', url: pond.url, pin: pond.pin, unclaimed: pond.unclaimed });
     },
-    [router, serverUrl],
+    [openPairing, serverUrl],
   );
 
   const { ponds, phase } = discovery.data;
@@ -79,7 +88,7 @@ export default function SwitchPond() {
             variant="primary"
             block
             icon="plus"
-            onPress={() => router.push('/(stack)/pond-pairing')}
+            onPress={() => openPairing({ kind: 'address' })}
           >
             {t('onboarding.manual')}
           </InkButton>

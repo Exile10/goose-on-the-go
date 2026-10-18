@@ -127,10 +127,14 @@ Four more stack screens aren't in the hub:
 - **Pond Pairing** (`/(stack)/pond-pairing`) — from the pairing gate below, first
   run, Switch Pond, Your home and the connection banner.
 - **Switch Pond** (`/(stack)/switch-pond`) — from Home's Pond card; the Ponds on
-  this network, the one in use marked.
+  this network, the one in use marked. A pick opens the wizard at that Pond through
+  `offerPairingStart`, as the welcome screen does; until 2026-10-17 it went in a
+  route param the wizard never read, and the wizard opened on its own search.
 - **Add a device** (`/(stack)/commission-device`) — from the Devices tab and Home.
 - **Connect Desktop** (`/(stack)/connect-desktop`) — the QR scanner opened from
-  Pond Pairing. It has no header at all; the viewfinder carries its own dismiss.
+  Pond Pairing. It reads the pairing QR and a Pond's printed setup card
+  (`pond://setup`), and hands either back through `services/pairing-handoff.ts`.
+  It has no header at all; the viewfinder carries its own dismiss.
 
 Every other stack screen gets its header, and its back control, from
 `app/(stack)/_layout.tsx`: these screens are pushed through the root stack, so
@@ -171,6 +175,16 @@ restore from.
 Until 2026-10-05 the welcome screen put the address in a route param the wizard
 never read, so either choice landed on the same search the welcome screen had
 just shown.
+
+A Pond that advertises itself unclaimed (`setup=1`) skips the fingerprint check:
+the wizard stages it and opens at the code step on its setup card's entry, which
+also offers "Have the Pond say a code" and a six-digit pairing code instead. A
+scanned setup card goes further, since it carries the code: the wizard finds the
+Pond with the card's id and opens at naming the phone (2026-10-17). The
+fingerprint check itself offers "My Pond has no screen: have it say a code", which
+skips the check and opens the code step while the Pond speaks; a code typed from a
+screen after any skipped check returns to the check first. Why the check can be
+skipped is in ARCHITECTURE.md, "Finding the Pond".
 
 ## Pairing gate (2026-09-21)
 

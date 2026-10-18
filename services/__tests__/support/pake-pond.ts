@@ -1,7 +1,8 @@
 /**
  * The Pond's half of CPace pairing, for tests: a `fetch` that answers
  * `/system/info`, `pake/init` and `pake/verify` as the Pond does, so the client
- * is exercised against a real exchange rather than canned bytes.
+ * is exercised against a real exchange rather than canned bytes. It runs a setup
+ * card's exchange too, under the setup label, when `init` names that credential.
  *
  * Built from the same primitives as the client, so on its own it proves the two
  * halves agree with each other, not with the Pond. Agreement with the Pond is
@@ -16,6 +17,7 @@ import { randomBytes } from 'node:crypto';
 import {
   calculateGenerator,
   channelIdentifier,
+  channelLabel,
   CLIENT_CONFIRM_LABEL,
   confirmationKey,
   confirmationTag,
@@ -49,6 +51,12 @@ export interface PakePondOptions {
   pin: string;
   /** What `/system/info` reports. */
   protocol?: number | null;
+  /** The printed card's code, for a run opened with `credential: "setup"`. */
+  setupCode?: string;
+  /** How `pake/init` refuses a setup run: claimed (409) or cooling (429, with its wait). */
+  setupRefusal?: { status: number; error: string; retryAfter?: number };
+  /** Another phone claimed the Pond between this run's init and its verify. */
+  claimedDuringRun?: boolean;
   /** Rewrites the `pake/init` answer, for a Pond that sends something it should not. */
   init?: (answer: Record<string, unknown>) => Record<string, unknown>;
   /** Rewrites an accepted `pake/verify` answer, for something that invents one. */
@@ -61,7 +69,7 @@ function json(body: unknown, status = 200): Response {
 
 /** A `fetch` mock playing the Pond. Every request is in `.mock.calls`. */
 export function pakePond(options: PakePondOptions): jest.Mock<Promise<Response>, [string, RequestInit?]> {
-  let run: { ya: bigint; share: Uint8Array; sid: Uint8Array } | null = null;
+  let run: { ya: bigint; share: Uint8Array; sid: Uint8Array; setup: boolean } | null = null;
   return jest.fn(async (url: string, init?: RequestInit) => {
     const path = new URL(url).pathname;
     if (path === '/api/v1/system/info') {
@@ -70,24 +78,38 @@ export function pakePond(options: PakePondOptions): jest.Mock<Promise<Response>,
     }
     const body = JSON.parse(String(init?.body ?? '{}'));
     if (path === '/api/v1/handshake/pake/init') {
+      const credential = body.credential ?? 'pairing';
+      if (credential !== 'pairing' && credential !== 'setup') return json({ error: 'invalid_credential' }, 400);
+      const setup = credential === 'setup';
+      const refusal = options.setupRefusal;
+      if (setup && refusal) {
+        return new Response(JSON.stringify({ error: refusal.error, ...(refusal.retryAfter === undefined ? {} : { retry_after: refusal.retryAfter }) }), {
+          status: refusal.status,
+          headers: { 'Content-Type': 'application/json', ...(refusal.retryAfter === undefined ? {} : { 'Retry-After': String(refusal.retryAfter) }) },
+        });
+      }
       const challenge = random(32);
       const sid = concatBytes(challenge, unb64(body.client_nonce));
-      const g = calculateGenerator(utf8ToBytes(options.code), channelIdentifier(options.pin, body.client_id), sid);
+      const secret = setup ? options.setupCode ?? '' : options.code;
+      const g = calculateGenerator(utf8ToBytes(secret), channelIdentifier(options.pin, body.client_id, channelLabel(credential)), sid);
       const ya = sampleScalar(random);
-      run = { ya, share: scalarMult(ya, g), sid };
+      run = { ya, share: scalarMult(ya, g), sid, setup };
       const answer = { challenge_id: 'c1', challenge: b64(challenge), expires_at: '',
         suite: 'CPACE-RISTR255-SHA512', share: b64(run.share) };
       return json(options.init ? options.init(answer) : answer);
     }
     if (path === '/api/v1/handshake/pake/verify') {
       if (!run || body.challenge_id !== 'c1') return json({ ...ACCEPTED, accepted: false, session_token: null, rejection_reason: 'unknown_challenge' });
-      const { ya, share, sid } = run;
+      const { ya, share, sid, setup } = run;
       run = null;
       const yb = unb64(body.share);
       const k = scalarMultVfy(ya, yb);
       const macKey = confirmationKey(sid, intermediateSessionKey(sid, k, share, NO_AD, yb, NO_AD));
       if (!equalBytes(hexToBytes(body.confirm), confirmationTag(CLIENT_CONFIRM_LABEL, macKey, share, yb))) {
         return json({ ...ACCEPTED, accepted: false, session_token: null, refresh_token: null, rejection_reason: 'invalid_confirmation' });
+      }
+      if (setup && options.claimedDuringRun) {
+        return json({ ...ACCEPTED, accepted: false, session_token: null, refresh_token: null, rejection_reason: 'setup_code_unavailable' });
       }
       const answer = { ...ACCEPTED, server_proof: bytesToHex(confirmationTag(SERVER_CONFIRM_LABEL, macKey, share, yb)) };
       return json(options.accept ? options.accept(answer) : answer);

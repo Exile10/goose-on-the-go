@@ -50,7 +50,7 @@ jest.mock('react-native-zeroconf', () => ({
   default: jest.fn().mockImplementation(() => new MockZeroconf()),
 }));
 
-import { dedupe, findPondAt, findPondByHost, startDiscovery, toPond } from '../discovery';
+import { dedupe, findPondAt, findPondByHost, findPondBySetupId, startDiscovery, toPond } from '../discovery';
 
 /** A real pin, in the `sha256/<base64>` form `tls_identity.pin()` emits. */
 const PIN = 'sha256/TnkUsN+AaLec3BDTh/KUwSokXTmCq2+4rlfBnmJxPkE=';
@@ -90,6 +90,7 @@ describe('toPond', () => {
       url: 'https://192.168.1.7:8080',
       version: '0.1.0',
       hostname: 'nano',
+      unclaimed: false,
     });
   });
 
@@ -373,5 +374,64 @@ describe('a numeric address as a host', () => {
 
   it('is not searched for as a name', async () => {
     await expect(findPondByHost('192.168.1.7', 8080, 1_000)).resolves.toBeNull();
+  });
+});
+
+/**
+ * The TXT keys a Pond adds for its setup card: `id`, which the card names, and `setup=1`
+ * while nobody has claimed it.
+ */
+describe('the setup id and claim state', () => {
+  it('reads both from the TXT record, the id lowercased', () => {
+    expect(toPond(resolved({ txt: { scheme: 'https', id: '7F3A', setup: '1' } }))).toMatchObject({
+      setupId: '7f3a', unclaimed: true,
+    });
+  });
+
+  // A Pond older than the card advertises neither, and a claimed one drops `setup`.
+  it('reads a Pond without them as having no id and as claimed', () => {
+    expect(toPond(resolved())).toMatchObject({ setupId: undefined, unclaimed: false });
+    expect(toPond(resolved({ txt: { scheme: 'https', id: '7f3a' } }))).toMatchObject({ setupId: '7f3a', unclaimed: false });
+  });
+
+  it('drops an id that is not four hex digits, and any setup value but 1', () => {
+    for (const id of ['', '7f3', '7f3a0', '7g3a', 7, null]) {
+      expect(toPond(resolved({ txt: { scheme: 'https', id } }))?.setupId).toBeUndefined();
+    }
+    for (const setup of ['0', 'true', 1, '']) {
+      expect(toPond(resolved({ txt: { scheme: 'https', setup } }))?.unclaimed).toBe(false);
+    }
+  });
+});
+
+describe('findPondBySetupId', () => {
+  it('returns the Pond whose advertised id the card names, in either case', async () => {
+    const pending = findPondBySetupId('7F3A', 1_000);
+    instances[0].emit('resolved', resolved({ name: 'Pond Hub @ other', addresses: ['192.168.1.9'], txt: { scheme: 'https', id: '0001', setup: '1' } }));
+    instances[0].emit('resolved', resolved({ txt: { scheme: 'https', id: '7f3a', setup: '1', pin: PIN } }));
+
+    await expect(pending).resolves.toMatchObject({ url: 'https://192.168.1.7:8080', pin: PIN, unclaimed: true });
+    expect(instances[0].stopped).toBe(1);
+  });
+
+  // Its own refusal tells the user to ask the owner, which "not found" would not.
+  it('still finds a Pond that has been claimed', async () => {
+    const pending = findPondBySetupId('7f3a', 1_000);
+    instances[0].emit('resolved', resolved({ txt: { scheme: 'https', id: '7f3a' } }));
+
+    await expect(pending).resolves.toMatchObject({ unclaimed: false });
+  });
+
+  it('resolves null when no Pond with that id answers before the deadline', async () => {
+    const pending = findPondBySetupId('7f3a', 30);
+    instances[0].emit('resolved', resolved({ txt: { scheme: 'https', id: '0001', setup: '1' } }));
+
+    await expect(pending).resolves.toBeNull();
+    expect(instances[0].stopped).toBe(1);
+  });
+
+  it('does not browse for an id that is not one', async () => {
+    await expect(findPondBySetupId('7f3', 1_000)).resolves.toBeNull();
+    expect(instances).toHaveLength(0);
   });
 });

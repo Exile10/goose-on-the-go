@@ -71,6 +71,22 @@ export function fingerprintChoices(
   return choices;
 }
 
+/** Whether the wizard's pin was checked (a QR, a typed fingerprint, a pick) or only advertised over mDNS. */
+export type PinSource = 'checked' | 'advertised';
+
+/**
+ * Whether an advertised pin must be picked out against the Pond's screen before this exchange runs.
+ * A setup code and a spoken code skip it: both run CPace with the pin in the channel identifier, so a
+ * spoofed pin can only fail them, and a Pond that has no screen has nothing to pick against.
+ */
+export function pickBeforeExchange(exchange: {
+  pin: PinSource;
+  credential: 'pairing' | 'setup';
+  codeSpoken: boolean;
+}): boolean {
+  return exchange.pin === 'advertised' && exchange.credential === 'pairing' && !exchange.codeSpoken;
+}
+
 /** A uniform integer in [0, bound), rejecting the bytes that would bias it. */
 function uniformBelow(bound: number, randomBytes: (count: number) => Uint8Array): number {
   const limit = 256 - (256 % bound);

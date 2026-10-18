@@ -7,20 +7,12 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { startDiscovery, type DiscoveredPond, type DiscoveryHandle } from '@/services/discovery';
-
-/**
- * How long to look before saying nothing is there.
- *
- * mDNS has no "that's all" signal — a hub that is switched on later simply
- * answers later — so the only honest end to a search is a clock. Eight seconds
- * is long enough for a hub on the same switch to answer several times over, and
- * short enough that a spinner does not become the screen.
- *
- * Browsing continues after the deadline: the deadline only changes what the
- * screen says, so a late arrival still appears.
- */
-const SEARCH_TIMEOUT_MS = 8_000;
+import {
+  SEARCH_TIMEOUT_MS,
+  startDiscovery,
+  type DiscoveredPond,
+  type DiscoveryHandle,
+} from '@/services/discovery';
 
 export type DiscoveryPhase = 'searching' | 'found' | 'empty' | 'failed';
 

@@ -9,7 +9,7 @@ import { readWebSearch } from '@/models/web-search';
  * Implements the GIAP ↔ GOTG handshake protocol:
  *   1. handshakeInit    — POST /api/v1/handshake/pake/init   → challenge + the Pond's CPace share
  *   2. handshakeVerify  — POST /api/v1/handshake/pake/verify → tokens + the Pond's confirmation
- *   3. pair             — runs both with the six-digit code (see services/cpace.ts)
+ *   3. pair             — runs both with the six-digit code or a setup card's (see services/cpace.ts)
  *   4. handshakeRefresh                                      → fresh tokens
  *
  * The active session token is automatically attached to every request as
@@ -19,7 +19,7 @@ import { readWebSearch } from '@/models/web-search';
 
 import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js';
 
-import { confirmationMatches, NONCE_BYTES, respond } from './cpace';
+import { confirmationMatches, NONCE_BYTES, respond, type PakeCredential } from './cpace';
 import { randomBytes } from './secure-random';
 import { timeoutSignal } from './http';
 import { readSse, type SseEvent } from './sse';
@@ -162,6 +162,12 @@ export interface PakeChallenge {
   share: string;
 }
 
+/** The Pond's answer to `handshake/spoken-code`. It never carries the code, only that one was said. */
+export interface SpokenCode {
+  spoken: true;
+  expires_at: string;
+}
+
 /** The suite `pake/init` must answer with. */
 const PAKE_SUITE = 'CPACE-RISTR255-SHA512';
 
@@ -275,6 +281,15 @@ async function parseBody<T>(res: Response): Promise<T | undefined> {
   const text = await res.text();
   if (text.length === 0) return undefined;
   return JSON.parse(text) as T;
+}
+
+/** A handshake refusal, read from one body: the Pond names a wait in `retry_after` as well as in Retry-After. */
+async function handshakeRefusal(message: string, res: Response): Promise<ApiError> {
+  const body = (await parseBody<{ error?: unknown; retry_after?: unknown }>(res).catch(() => undefined)) ?? {};
+  const detail = typeof body.error === 'string' && body.error.trim() ? body.error : null;
+  const wait = body.retry_after;
+  const bodyWait = typeof wait === 'number' && Number.isFinite(wait) && wait >= 0 ? wait : null;
+  return new ApiError(message, res.status, parseRetryAfter(res) ?? bodyWait, detail);
 }
 
 /** The `error` string of a refusal's JSON body, or null for any other body. */
@@ -417,6 +432,7 @@ export class PondApiClient {
     channelBinding: string;
     /** This phone's half of sid, {@link NONCE_BYTES} from the platform CSPRNG. */
     clientNonce: Uint8Array;
+    credential?: PakeCredential;
     clientType?: string;
     clientVersion?: string;
   }): Promise<PakeChallenge> {
@@ -429,16 +445,11 @@ export class PondApiClient {
         client_version: input.clientVersion ?? '1.0.0',
         channel_binding: input.channelBinding,
         client_nonce: toBase64(input.clientNonce),
+        // Absent means pairing, so a pairing init is still the request the Pond's vectors pin.
+        ...(input.credential === 'setup' ? { credential: 'setup' } : {}),
       }),
     });
-    if (!res.ok) {
-      throw new ApiError(
-        `handshake/pake/init failed: ${res.status}`,
-        res.status,
-        parseRetryAfter(res),
-        await errorDetail(res),
-      );
-    }
+    if (!res.ok) throw await handshakeRefusal(`handshake/pake/init failed: ${res.status}`, res);
     return (await res.json()) as PakeChallenge;
   }
 
@@ -461,20 +472,14 @@ export class PondApiClient {
         confirm: bytesToHex(input.confirm),
       }),
     });
-    if (!res.ok) {
-      throw new ApiError(
-        `handshake/pake/verify failed: ${res.status}`,
-        res.status,
-        parseRetryAfter(res),
-        await errorDetail(res),
-      );
-    }
+    if (!res.ok) throw await handshakeRefusal(`handshake/pake/verify failed: ${res.status}`, res);
     return (await res.json()) as HandshakeResponse;
   }
 
   /**
-   * Pair with the six-digit code over CPace. On success the session+refresh
-   * tokens are stored on this client (use {@link setOnTokensRotated} to persist).
+   * Pair with the six-digit code, or claim with a setup card's, over CPace. On
+   * success the session+refresh tokens are stored on this client (use
+   * {@link setOnTokensRotated} to persist).
    *
    * Throws {@link PondOutdatedError} before sending anything when the Pond does
    * not report {@link PAIRING_PROTOCOL}, and {@link PondTrustError} when the
@@ -483,7 +488,9 @@ export class PondApiClient {
    */
   async pair(input: {
     clientId: string;
+    /** The six pairing digits, or the eleven setup digits without dashes when `credential` is setup. */
     pairingCode: string;
+    credential?: PakeCredential;
     deviceName?: string;
     /**
      * The Pond public-key pin this connection is pinned to. It goes into the
@@ -507,6 +514,7 @@ export class PondApiClient {
       clientId: input.clientId,
       channelBinding: input.channelBinding,
       clientNonce,
+      credential: input.credential,
     });
     if (epoch !== this.identityEpoch) throw new Error('Pond profile changed');
     let exchange: ReturnType<typeof respond>;
@@ -516,6 +524,7 @@ export class PondApiClient {
         code: input.pairingCode,
         pin: input.channelBinding,
         clientId: input.clientId,
+        credential: input.credential,
         challenge: fromBase64(init.challenge),
         clientNonce,
         initiatorShare: fromBase64(init.share),
@@ -552,6 +561,18 @@ export class PondApiClient {
       }
     }
     return resp;
+  }
+
+  /**
+   * Ask the Pond to read a pairing code aloud, for a phone with no card and no screen to read one from.
+   * No token and no body: the Pond answers only LAN peers, and only someone in earshot learns the code.
+   */
+  async requestSpokenCode(): Promise<SpokenCode> {
+    const res = await this.send(`${this.baseUrl}/api/v1/handshake/spoken-code`, { method: 'POST', headers: {} });
+    if (!res.ok) throw await handshakeRefusal(`handshake/spoken-code failed: ${res.status}`, res);
+    const body = await parseBody<{ spoken?: unknown; expires_at?: unknown }>(res);
+    if (body?.spoken !== true) throw new Error('Pond did not confirm that it said a code');
+    return { spoken: true, expires_at: typeof body.expires_at === 'string' ? body.expires_at : '' };
   }
 
   /** Exchange the stored refresh token for a fresh pair. */
