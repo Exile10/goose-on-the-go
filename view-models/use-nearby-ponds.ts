@@ -106,7 +106,12 @@ export function useNearbyPonds(): UseNearbyPonds {
           const next = await scanForPonds(
             (s) =>
               setSightings((prev) =>
-                new Map(prev).set(s.peripheral, { ...s, name: s.name ?? prev.get(s.peripheral)?.name ?? null, seenAt: Date.now() }),
+                new Map(prev).set(s.peripheral, {
+                  ...s,
+                  services: s.services.length ? s.services : prev.get(s.peripheral)?.services ?? [],
+                  name: s.name ?? prev.get(s.peripheral)?.name ?? null,
+                  seenAt: Date.now(),
+                }),
               ),
             () => halt('failed'),
           );

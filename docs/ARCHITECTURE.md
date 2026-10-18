@@ -172,11 +172,17 @@ A brand-new Pond with no network is found and claimed over Bluetooth LE, told wh
 and then reached over HTTPS. The contract is goose-in-a-pond's
 `docs/architecture/pond-setup-channel.md` (P5); this is the phone's half (P5d).
 
-**Finding it.** A Pond advertises one service UUID and the local name `Pond <card id>`, nothing
-more. The phone scans for the UUID while Find your Pond is in front, and reads the card id from
-the advertised name (`cardIdFromName`), never from the GAP name, which on a Mac is its computer
-name. Android scans with `BLUETOOTH_SCAN` marked `neverForLocation`, so no location permission is
-asked for; iOS asks for Bluetooth the first time the module touches it. A Pond seen on the network
+**Finding it.** A Pond advertises one service UUID, `185b51bd-e038-4b6c-99b0-4e2379dd<card id>`,
+with the card's four hex digits in its last two bytes (`cardIdOf`). The UUID sits in the
+advertisement itself; the local name `Pond <card id>` rides in the scan response, which some
+adapters never send and iOS's passive background scans never ask for, so the name is only a
+label. A Pond name naming another card drops the sighting. The GATT service the phone connects
+to is always `…4e2379dd362c`. Android scans for the prefix with a masked filter. iOS has no masked
+filter, so Find your Pond scans for everything in the foreground and keeps the prefix, and
+`findPondById` scans for the one card's UUID. The name is read from the advertisement, never the
+GAP name, which on a Mac is its computer name. Android scans with `BLUETOOTH_SCAN` marked
+`neverForLocation`, so no location permission is asked for; iOS asks for Bluetooth the first time
+the module touches it. A Pond seen on the network
 as well is one row, and is claimed over HTTPS, which needs no Wi-Fi step.
 
 **Choosing the transport.** `react-native-ble-plx` was assessed and passed over. It has no codegen
@@ -189,7 +195,7 @@ can be tested lives in TypeScript.
 **The exchange.** `SetupChannel` (`services/setup-channel/session.ts`) runs over any ordered byte
 link. Messages are length-prefixed JSON cut to `ATT_MTU - 3` (`framing.ts`).
 
-- **hello** gives the pin, and `pond_id`, which must match the card id the advertised name
+- **hello** gives the pin, and `pond_id`, which must match the card id the advertised UUID
   carried, or the phone stops. It also says whether the Pond is `claimed`. A claimed Pond with no
   network still advertises, because the Pond advertises while unclaimed OR without a network. Such
   a Pond is given Wi-Fi again after a spoken code, from the same row.

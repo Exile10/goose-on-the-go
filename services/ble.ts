@@ -9,11 +9,14 @@
 
 import { NativeEventEmitter, NativeModules, PermissionsAndroid, Platform } from 'react-native';
 
-import { cardIdFromName } from '@/models/nearby-pond';
+import { cardIdOf, SETUP_ADVERT_PREFIX, setupAdvertUuid } from '@/models/nearby-pond';
 import type { SetupLink } from './setup-channel/session';
 import { fromBase64, toBase64 } from './setup-channel/sealing';
 
 export const SETUP_SERVICE_UUID = '185b51bd-e038-4b6c-99b0-4e2379dd362c';
+// The advertised UUID carries the card id in its last two bytes; the GATT service is always the one above.
+const ADVERT_BASE = `${SETUP_ADVERT_PREFIX}0000`;
+const ADVERT_MASK = 'ffffffff-ffff-ffff-ffff-ffffffff0000';
 export const RX_UUID = '72172de5-d65e-47ad-857d-1b9dd7623d33';
 export const TX_UUID = '1065b140-d075-431c-b981-7e1a735960cb';
 
@@ -25,7 +28,7 @@ export class BleUnreachableError extends Error {
   }
 }
 
-/** The Pond answered with another card id than its advertised name carried: not the Pond that was picked. */
+/** The Pond answered with another card id than it advertised: not the Pond that was picked. */
 export class WrongPondError extends Error {
   constructor(advertised: string, answered: string) {
     super(`advertised as ${advertised}, answered as ${answered}`);
@@ -38,14 +41,16 @@ export type BleState = 'on' | 'off' | 'unauthorized' | 'unsupported' | 'unknown'
 export interface BleSighting {
   /** The phone's handle for the advertiser: an address on Android, a UUID on iOS. */
   peripheral: string;
-  /** The advertised local name, which may only arrive with a later scan response. */
+  /** The advertised setup service UUIDs, whose last two bytes are the card's id. */
+  services: string[];
+  /** The advertised local name, a label only: it rides in a scan response that may never come. */
   name: string | null;
   rssi: number;
 }
 
 interface PondBleModule {
   state(): Promise<BleState>;
-  startScan(service: string): Promise<void>;
+  startScan(service: string, mask: string | null): Promise<void>;
   stopScan(): Promise<void>;
   connect(id: string, service: string, rx: string, tx: string): Promise<{ writeSize: number }>;
   write(id: string, value: string): Promise<void>;
@@ -93,16 +98,23 @@ export function onBleState(listener: (state: BleState) => void): () => void {
   return () => sub?.remove();
 }
 
-/** Scan for the setup service until the returned stop is called. One scan at a time. */
-export async function scanForPonds(onSighting: (sighting: BleSighting) => void, onFailed: () => void): Promise<() => void> {
+/**
+ * Scan for setup advertisements until the returned stop is called: every card id, or only `cardId`'s.
+ * One scan at a time.
+ */
+export async function scanForPonds(
+  onSighting: (sighting: BleSighting) => void,
+  onFailed: () => void,
+  cardId?: string,
+): Promise<() => void> {
   if (!native) throw new Error('Bluetooth is not available in this build');
   const subs = [
-    events()?.addListener('PondBleDiscovered', (e: { id: string; name: string | null; rssi: number }) =>
-      onSighting({ peripheral: e.id, name: e.name ?? null, rssi: e.rssi })),
+    events()?.addListener('PondBleDiscovered', (e: { id: string; name: string | null; services?: string[]; rssi: number }) =>
+      onSighting({ peripheral: e.id, services: e.services ?? [], name: e.name ?? null, rssi: e.rssi })),
     events()?.addListener('PondBleScanFailed', () => onFailed()),
   ];
   try {
-    await native.startScan(SETUP_SERVICE_UUID);
+    await (cardId ? native.startScan(setupAdvertUuid(cardId), null) : native.startScan(ADVERT_BASE, ADVERT_MASK));
   } catch (e) {
     subs.forEach((s) => s?.remove());
     throw e;
@@ -172,8 +184,8 @@ export async function connectPond(peripheral: string): Promise<SetupLink> {
 }
 
 /**
- * Scan until the advertiser named `Pond <cardId>` is heard, then stop: how a phone finds again a
- * Pond it was talking to. Null when it is not heard within `timeoutMs`, or Bluetooth is not on.
+ * Scan until the Pond advertising `cardId` is heard, then stop: how a phone finds again a Pond it
+ * was talking to. Null when it is not heard within `timeoutMs`, or Bluetooth is not on.
  */
 export async function findPondById(cardId: string, timeoutMs = 20_000): Promise<string | null> {
   if ((await bleState()) !== 'on') return null;
@@ -190,9 +202,10 @@ export async function findPondById(cardId: string, timeoutMs = 20_000): Promise<
     const timer = setTimeout(() => finish(null), timeoutMs);
     scanForPonds(
       (s) => {
-        if (cardIdFromName(s.name) === cardId) finish(s.peripheral);
+        if (cardIdOf(s) === cardId) finish(s.peripheral);
       },
       () => finish(null),
+      cardId,
     )
       .then((next) => {
         stop = next;

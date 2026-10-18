@@ -1,9 +1,37 @@
 // New Ponds near the phone, however each was heard: over BLE, on the network, or both.
 
+/** Every setup advertisement's service UUID starts so; its last two bytes are the card's id. */
+export const SETUP_ADVERT_PREFIX = '185b51bd-e038-4b6c-99b0-4e2379dd';
+
+/** The service UUID a Pond with this card id advertises. */
+export function setupAdvertUuid(cardId: string): string {
+  return SETUP_ADVERT_PREFIX + cardId;
+}
+
+/** The card's id from an advertised setup service UUID, or null for any other UUID. */
+export function cardIdFromService(uuid: string): string | null {
+  const lower = uuid.toLowerCase();
+  if (!lower.startsWith(SETUP_ADVERT_PREFIX)) return null;
+  const id = lower.slice(SETUP_ADVERT_PREFIX.length);
+  return /^[0-9a-f]{4}$/.test(id) ? id : null;
+}
+
 /** The card's id from an advertised local name, `Pond <4 lowercase hex>`, or null for anything else. */
 export function cardIdFromName(name: string | null | undefined): string | null {
   const match = /^Pond ([0-9a-f]{4})$/.exec(name ?? '');
   return match ? match[1] : null;
+}
+
+/**
+ * A sighting's card id comes from its service UUID, which is in the advertisement itself; the name
+ * rides in a scan response that may never arrive. A Pond name naming another card drops the sighting.
+ */
+export function cardIdOf(sighting: { services: readonly string[]; name: string | null }): string | null {
+  const ids = new Set(sighting.services.map(cardIdFromService).filter((id): id is string => id !== null));
+  if (ids.size !== 1) return null;
+  const [id] = ids;
+  const named = cardIdFromName(sighting.name);
+  return named === null || named === id ? id : null;
 }
 
 export interface NearbyPond {
@@ -23,6 +51,8 @@ export interface NearbyPond {
 
 export interface BleSightingLike {
   peripheral: string;
+  /** The advertised setup service UUIDs. */
+  services: readonly string[];
   name: string | null;
   rssi: number;
 }
@@ -37,7 +67,7 @@ export interface NetworkPondLike {
 
 /**
  * One row per card id. A Pond on the network as well is one Pond, and the network path is preferred
- * for it later: HTTPS needs no Wi-Fi step. A sighting with no name yet has no id, so it waits.
+ * for it later: HTTPS needs no Wi-Fi step.
  */
 export function mergeNearby(
   ble: ReadonlyMap<string, BleSightingLike & { seenAt: number }>,
@@ -45,7 +75,7 @@ export function mergeNearby(
 ): NearbyPond[] {
   const byId = new Map<string, NearbyPond>();
   for (const s of ble.values()) {
-    const id = cardIdFromName(s.name);
+    const id = cardIdOf(s);
     if (!id) continue;
     const held = byId.get(id);
     // Two advertisers with one card id: keep the louder, which is the nearer.

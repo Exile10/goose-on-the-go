@@ -15,6 +15,9 @@ final class PondBle: RCTEventEmitter, CBCentralManagerDelegate, CBPeripheralDele
   private var seen: [UUID: CBPeripheral] = [:]
   private var lastReport: [UUID: Date] = [:]
   private var names: [UUID: String] = [:]
+  private var services: [UUID: [String]] = [:]
+  private var scanBase: [UInt8]?
+  private var scanMask: [UInt8]?
   private var link: Link?
 
   private final class Link {
@@ -85,15 +88,21 @@ final class PondBle: RCTEventEmitter, CBCentralManagerDelegate, CBPeripheralDele
     emit("PondBleState", ["state": state])
   }
 
-  @objc(startScan:resolver:rejecter:)
-  func startScan(_ service: String, resolver resolve: @escaping RCTPromiseResolveBlock, rejecter reject: @escaping RCTPromiseRejectBlock) {
+  // With a mask, every UUID matching `service` under it: how one scan hears every card id.
+  @objc(startScan:mask:resolver:rejecter:)
+  func startScan(_ service: String, mask: String?, resolver resolve: @escaping RCTPromiseResolveBlock, rejecter reject: @escaping RCTPromiseRejectBlock) {
     queue.async {
       let central = self.manager()
       guard central.state == .poweredOn else { reject("pond_ble_unavailable", self.describe(central.state), nil); return }
       self.lastReport = [:]
       self.names = [:]
-      // Duplicates on, so a name that only comes in the scan response, and a changing signal, still arrive.
-      central.scanForPeripherals(withServices: [CBUUID(string: service)], options: [CBCentralManagerScanOptionAllowDuplicatesKey: true])
+      self.services = [:]
+      self.scanBase = Array(CBUUID(string: service).data)
+      self.scanMask = mask.map { Array(CBUUID(string: $0).data) }
+      // CoreBluetooth filters only on whole UUIDs, so a masked scan hears everything and keeps the
+      // matches below; that works only in the foreground. Duplicates on, for the signal and a late name.
+      let filter = mask == nil ? [CBUUID(string: service)] : nil
+      central.scanForPeripherals(withServices: filter, options: [CBCentralManagerScanOptionAllowDuplicatesKey: true])
       resolve(nil)
     }
   }
@@ -106,17 +115,35 @@ final class PondBle: RCTEventEmitter, CBCentralManagerDelegate, CBPeripheralDele
     }
   }
 
+  private func matches(_ uuid: CBUUID) -> Bool {
+    guard let base = scanBase else { return false }
+    let bytes = Array(uuid.data)
+    guard bytes.count == 16, base.count == 16 else { return false }
+    guard let mask = scanMask, mask.count == 16 else { return bytes == base }
+    return (0..<16).allSatisfy { bytes[$0] & mask[$0] == base[$0] & mask[$0] }
+  }
+
   func centralManager(_ central: CBCentralManager, didDiscover peripheral: CBPeripheral, advertisementData: [String: Any], rssi RSSI: NSNumber) {
     let id = peripheral.identifier
+    let advertised = (advertisementData[CBAdvertisementDataServiceUUIDsKey] as? [CBUUID] ?? [])
+      + (advertisementData[CBAdvertisementDataOverflowServiceUUIDsKey] as? [CBUUID] ?? [])
+    let heard = advertised.filter(matches).map { $0.uuidString.lowercased() }
+    if !heard.isEmpty {
+      services[id] = heard
+    } else if scanMask == nil, services[id] == nil, let base = scanBase {
+      // A scan for one whole UUID only reports advertisers of it, even when iOS leaves the list out.
+      services[id] = [CBUUID(data: Data(base)).uuidString.lowercased()]
+    }
+    guard let uuids = services[id] else { return }
     seen[id] = peripheral
     // The advertised local name, never `peripheral.name`: a Mac's GAP name is its computer name.
-    let advertised = advertisementData[CBAdvertisementDataLocalNameKey] as? String
-    let firstName = advertised != nil && names[id] == nil
-    if let advertised { names[id] = advertised }
+    let localName = advertisementData[CBAdvertisementDataLocalNameKey] as? String
+    let firstName = localName != nil && names[id] == nil
+    if let localName { names[id] = localName }
     let now = Date()
     if !firstName, let last = lastReport[id], now.timeIntervalSince(last) < 1 { return }
     lastReport[id] = now
-    emit("PondBleDiscovered", ["id": id.uuidString, "name": names[id] ?? NSNull(), "rssi": RSSI.intValue])
+    emit("PondBleDiscovered", ["id": id.uuidString, "name": names[id] ?? NSNull(), "services": uuids, "rssi": RSSI.intValue])
   }
 
   @objc(connect:service:rx:tx:resolver:rejecter:)

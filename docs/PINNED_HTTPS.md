@@ -210,8 +210,7 @@ A Pond with no network is claimed over its BLE setup channel (goose-in-a-pond
   (`adoptPairing`). From then on the Pond is pinned HTTPS like any other. The address came over
   the sealed channel, and a substituted address would fail the pin.
 
-Owed on a device: the scan finding "Pond <id>" (macOS's helper puts the name in the scan
-response), the claim, a Wi-Fi join with a wrong and then a right password, the handover with
+Owed on a device: the scan finding the Pond by the card id in its advertised service UUID, the claim, a Wi-Fi join with a wrong and then a right password, the handover with
 the phone on the same network, and the "connect this phone" state from cellular.
 
 ## Recovery

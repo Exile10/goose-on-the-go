@@ -53,6 +53,9 @@ class PondBleModule(private val context: ReactApplicationContext) : ReactContext
   private var scanning: ScanCallback? = null
   private val lastSeen = HashMap<String, Long>()
   private val names = HashMap<String, String>()
+  private val services = HashMap<String, List<String>>()
+  private var scanBase: UUID? = null
+  private var scanMask: UUID? = null
   private var link: Link? = null
   private var stateReceiver: BroadcastReceiver? = null
 
@@ -101,12 +104,18 @@ class PondBleModule(private val context: ReactApplicationContext) : ReactContext
 
   @ReactMethod fun state(promise: Promise) = promise.resolve(currentState())
 
-  @ReactMethod fun startScan(serviceUuid: String, promise: Promise) {
+  // With a mask, every UUID matching `serviceUuid` under it: how one scan hears every card id.
+  @ReactMethod fun startScan(serviceUuid: String, mask: String?, promise: Promise) {
     val scanner = adapter?.bluetoothLeScanner
     if (currentState() != "on" || scanner == null) { promise.reject("pond_ble_unavailable", currentState()); return }
     stopScanning()
     lastSeen.clear()
     names.clear()
+    services.clear()
+    val base = UUID.fromString(serviceUuid)
+    val bits = mask?.let(UUID::fromString)
+    scanBase = base
+    scanMask = bits
     val callback = object : ScanCallback() {
       override fun onScanResult(callbackType: Int, result: ScanResult) = report(result)
       override fun onBatchScanResults(results: MutableList<ScanResult>) = results.forEach(::report)
@@ -115,7 +124,9 @@ class PondBleModule(private val context: ReactApplicationContext) : ReactContext
         emit("PondBleScanFailed", Arguments.createMap().apply { putInt("code", errorCode) })
       }
     }
-    val filter = ScanFilter.Builder().setServiceUuid(ParcelUuid(UUID.fromString(serviceUuid))).build()
+    val filter = ScanFilter.Builder().apply {
+      if (bits == null) setServiceUuid(ParcelUuid(base)) else setServiceUuid(ParcelUuid(base), ParcelUuid(bits))
+    }.build()
     val settings = ScanSettings.Builder().setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY).build()
     try {
       scanner.startScan(listOf(filter), settings, callback)
@@ -124,10 +135,20 @@ class PondBleModule(private val context: ReactApplicationContext) : ReactContext
     } catch (e: Exception) { promise.reject("pond_ble_scan", "Scan could not start", e) }
   }
 
+  private fun matches(uuid: UUID): Boolean {
+    val base = scanBase ?: return false
+    val mask = scanMask ?: return uuid == base
+    return (uuid.mostSignificantBits and mask.mostSignificantBits) == (base.mostSignificantBits and mask.mostSignificantBits) &&
+      (uuid.leastSignificantBits and mask.leastSignificantBits) == (base.leastSignificantBits and mask.leastSignificantBits)
+  }
+
   // Each Pond reports several times a second; once a second is plenty for a list.
   private fun report(result: ScanResult) {
     val address = result.device.address
     val now = SystemClock.elapsedRealtime()
+    val heard = result.scanRecord?.serviceUuids?.map { it.uuid }?.filter(::matches)?.map { it.toString() }
+    if (!heard.isNullOrEmpty()) services[address] = heard
+    val uuids = services[address] ?: return
     val name = result.scanRecord?.deviceName ?: names[address]
     val named = name != null && names[address] == null
     if (!named && (now - (lastSeen[address] ?: 0L)) < 1000) return
@@ -136,6 +157,7 @@ class PondBleModule(private val context: ReactApplicationContext) : ReactContext
     emit("PondBleDiscovered", Arguments.createMap().apply {
       putString("id", address)
       if (name != null) putString("name", name) else putNull("name")
+      putArray("services", Arguments.fromList(uuids))
       putInt("rssi", result.rssi)
     })
   }

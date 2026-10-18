@@ -38,7 +38,7 @@ export type ChannelCapability = 'wifi_scan' | 'wifi_join' | 'spoken_code';
 
 export interface ChannelHello {
   protocol: number;
-  /** The card's four hex digits, which the advertised name should already have said. */
+  /** The card's four hex digits, which the advertised service UUID should already have said. */
   pondId: string | null;
   claimed: boolean;
   /** The Pond's public-key pin, which the exchange binds and HTTPS is later pinned to. */
