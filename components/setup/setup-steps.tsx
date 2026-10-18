@@ -1,8 +1,7 @@
-// The setup steps that are forms and nothing else; the voice and the wake word have files of their own.
+// About you, the setup step that is a form and nothing else; the voice and the model have files of their own.
 
 import React from 'react';
-import { Image, StyleSheet, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { StyleSheet, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import {
   InkAvatar,
@@ -12,39 +11,18 @@ import {
   InkGroup,
   InkInput,
   InkNotice,
-  InkRow,
   InkSelect,
-  InkStepper,
   InkText,
   InkTitle,
 } from '@jarida/ink/native';
 
 import { Spacing } from '@/constants/spacing';
-import { describeVoice } from '@/models/pond-settings';
-import { SETUP_LANGUAGES, stepLabelKey, wakePhrase, type PromptStyle, type SetupStep } from '@/models/owner-setup';
-import { useTheme } from '@/providers/theme-provider';
+import { SETUP_LANGUAGES, type PromptStyle } from '@/models/owner-setup';
 import { selectionTick } from '@/services/haptics';
 import type { TranslationKey } from '@/services/i18n';
 import type { UseOwnerSetup } from '@/view-models/use-owner-setup';
 import { CheckRow } from './setup-chrome';
 import { BirthdayField, ZoneField } from './setup-fields';
-
-function stepNoteKey(step: SetupStep): TranslationKey | null {
-  switch (step) {
-    case 'about-you':
-      return 'setup.stepNotes.aboutYou';
-    case 'locale':
-      return 'setup.stepNotes.locale';
-    case 'personality':
-      return 'setup.stepNotes.personality';
-    case 'wake-word':
-      return 'setup.stepNotes.wakeWord';
-    case 'complete':
-      return 'setup.stepNotes.complete';
-    default:
-      return null;
-  }
-}
 
 export function styleLabelKey(style: PromptStyle | string): TranslationKey {
   switch (style) {
@@ -64,59 +42,6 @@ function StepHead({ title, lead }: { title: string; lead: string }) {
     <View style={styles.head}>
       <InkTitle level={2}>{title}</InkTitle>
       <InkText tone="secondary">{lead}</InkText>
-    </View>
-  );
-}
-
-const OVERVIEW: SetupStep[] = ['about-you', 'locale', 'personality', 'wake-word', 'complete'];
-
-export function WelcomeStep({ setup }: { setup: UseOwnerSetup }) {
-  const { t } = useTranslation();
-  const { isDark } = useTheme();
-  const router = useRouter();
-  const { system, saving, actions } = setup;
-  return (
-    <View style={styles.welcome}>
-      <Image
-        source={isDark ? require('@/assets/images/logo-dark.png') : require('@/assets/images/logo.png')}
-        style={styles.mark}
-        resizeMode="contain"
-      />
-      <InkTitle level={1}>{t('setup.welcome.title')}</InkTitle>
-      <InkText>{t('setup.welcome.body')}</InkText>
-      {system ? (
-        <InkGroup title={t('setup.welcome.pond')} raised={false}>
-          <InkRow label={t('setup.welcome.pondName')}>
-            <InkText mono tone="secondary">
-              {system.hostname}
-            </InkText>
-          </InkRow>
-          {system.version ? (
-            <InkRow divided label={t('setup.welcome.pondVersion')}>
-              <InkText mono tone="secondary">
-                {system.version}
-              </InkText>
-            </InkRow>
-          ) : null}
-        </InkGroup>
-      ) : null}
-      <InkStepper
-        label={t('setup.welcome.overview')}
-        orientation="vertical"
-        current={0}
-        steps={OVERVIEW.map((step) => {
-          const note = stepNoteKey(step);
-          return { key: step, label: t(stepLabelKey(step)), description: note ? t(note) : undefined };
-        })}
-      />
-      <View style={styles.actions}>
-        <InkButton variant="primary" block disabled={saving} onPress={() => void actions.start()}>
-          {t('setup.welcome.start')}
-        </InkButton>
-        <InkButton variant="quiet" block onPress={() => router.push('/(stack)/switch-pond')}>
-          {t('setup.welcome.other')}
-        </InkButton>
-      </View>
     </View>
   );
 }
@@ -169,16 +94,21 @@ export function AboutStep({ setup }: { setup: UseOwnerSetup }) {
       <InkText size="sm" tone="tertiary">
         {t('setup.about.speechHint')}
       </InkText>
+      <WhereStep setup={setup} />
     </>
   );
 }
 
-export function LocaleStep({ setup }: { setup: UseOwnerSetup }) {
+/** Where the home is, filled from this phone: there to confirm, and change if it is wrong. */
+function WhereStep({ setup }: { setup: UseOwnerSetup }) {
   const { t } = useTranslation();
   const { draft, place, actions } = setup;
   return (
-    <>
-      <StepHead title={t('setup.locale.title')} lead={t('setup.locale.lead')} />
+    <View style={styles.where}>
+      <View style={styles.head}>
+        <InkTitle level={3}>{t('setup.locale.title')}</InkTitle>
+        <InkText tone="secondary">{t('setup.locale.fromPhone')}</InkText>
+      </View>
       <InkFormField label={t('setup.locale.language')}>
         <InkSelect
           label={t('setup.locale.language')}
@@ -217,55 +147,13 @@ export function LocaleStep({ setup }: { setup: UseOwnerSetup }) {
           onChange={(enableWeather) => actions.patch({ enableWeather })}
         />
       </InkCard>
-    </>
-  );
-}
-
-export function CompleteStep({ setup }: { setup: UseOwnerSetup }) {
-  const { t } = useTranslation();
-  const { draft, noChatModel, actions } = setup;
-  const language = SETUP_LANGUAGES.find((l) => l.key === draft.language)?.name ?? draft.language;
-  const rows: { key: string; label: string; value: string }[] = [
-    { key: 'you', label: t('setup.complete.you'), value: draft.preferredName.trim() || draft.userName.trim() },
-    { key: 'language', label: t('setup.complete.language'), value: language },
-    { key: 'zone', label: t('setup.complete.zone'), value: draft.timezone.replace(/_/g, ' ') },
-    { key: 'style', label: t('setup.complete.style'), value: t(styleLabelKey(draft.promptStyle)) },
-    { key: 'assistant', label: t('setup.complete.assistant'), value: `${draft.assistantName.trim()} · ${describeVoice(draft.ttsVoice).name}` },
-    { key: 'wake', label: t('setup.complete.wake'), value: wakePhrase(draft) },
-  ];
-  return (
-    <>
-      <StepHead title={t('setup.complete.title')} lead={t('setup.complete.lead')} />
-      {noChatModel ? (
-        <View style={styles.head} accessibilityLiveRegion="polite">
-          <InkTitle level={3}>{t('setup.complete.noModelTitle')}</InkTitle>
-          <InkNotice tone="warning">{t('setup.complete.noModelBody')}</InkNotice>
-        </View>
-      ) : null}
-      <InkCard raised={false} contentStyle={styles.flush}>
-        <CheckRow
-          label={t('setup.complete.memory')}
-          description={t('setup.complete.memoryBody')}
-          checked={draft.enableMemory}
-          onChange={(enableMemory) => actions.patch({ enableMemory })}
-        />
-      </InkCard>
-      <InkGroup title={t('setup.complete.summary')} raised={false}>
-        {rows.map((row, i) => (
-          <InkRow key={row.key} divided={i > 0} label={row.label}>
-            <InkText tone="secondary">{row.value}</InkText>
-          </InkRow>
-        ))}
-      </InkGroup>
-    </>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   head: { gap: Spacing.sm },
-  welcome: { gap: Spacing.lg },
-  mark: { width: 72, height: 72, marginTop: Spacing.lg },
-  actions: { gap: Spacing.sm },
+  where: { gap: Spacing.lg, marginTop: Spacing.md },
   avatarRow: { flexDirection: 'row', alignItems: 'flex-end', gap: Spacing.md },
   fill: { flex: 1 },
   detect: { alignItems: 'flex-start' },

@@ -130,6 +130,22 @@ price the ride and, if you confirm it, send a driver. Uber's own privacy policy 
 Uber does with it. The reading goes from your Pond to Uber directly; it does not pass
 through us, and your phone does not keep it after the ride.
 
+## Bluetooth
+
+The app uses Bluetooth to find a new Pond near you, claim it with the code on its setup card,
+and tell it which Wi-Fi network to join. It talks only to the Pond you pick, and only while you
+are setting one up. On Android the app tells the system that Bluetooth is never used to work out
+where you are, so it does not ask for your location to do this.
+
+The list of Wi-Fi networks comes from your Pond, not from your phone. Your Wi-Fi password goes
+from your phone to your Pond encrypted, under a key only the two of them share for that
+connection, and your phone does not keep it. Your Pond keeps it the way your computer would, so it
+can rejoin the network.
+
+When this phone joins a Pond, it uses its own name (such as "Wanjiru's iPhone"), which you can
+change first, so you can tell your devices apart in your Pond's list. That name goes to your Pond
+and nowhere else.
+
 ## What we do not do
 
 - We do not use analytics, of any kind, from anyone.

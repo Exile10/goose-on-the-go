@@ -139,3 +139,19 @@ describe('a Pond nobody has set up', () => {
     expect(required).not.toHaveBeenCalled();
   });
 });
+
+describe('a voice sample on the Pond’s speaker (P4)', () => {
+  it('asks for the voice by id, with the token', async () => {
+    const seen: Seen[] = [];
+    recordInto(seen, '', 202);
+    await api().voiceSample('af_heart');
+    expect(seen).toEqual([{ url: `${BASE}/voice/sample`, method: 'POST', body: { voice: 'af_heart' }, auth: 'Bearer session-token' }]);
+  });
+
+  it('carries each refusal by its code', async () => {
+    recordInto([], '{"error":"unknown_voice"}', 404);
+    await expect(api().voiceSample('nope')).rejects.toMatchObject({ status: 404, detail: 'unknown_voice' });
+    recordInto([], '{"error":"voice_unavailable"}', 503);
+    await expect(api().voiceSample('af_heart')).rejects.toMatchObject({ status: 503, detail: 'voice_unavailable' });
+  });
+});

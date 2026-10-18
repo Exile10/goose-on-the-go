@@ -102,3 +102,12 @@ describe('a spoken code that is refused', () => {
     }
   });
 });
+
+describe('a device resume that is refused', () => {
+  it('names a session that rotated between init and verify, and carries the device cooling wait', () => {
+    expect(explainRejection('invalid_or_expired_refresh', t)).toBe(t('pairingErrors.resumeRotated'));
+    const cooling = new ApiError('pake_init refused: device_cooling', 429, 45, 'device_cooling');
+    expect(refusalWait(cooling, 'device_cooling')).toBe(45);
+    expect(refusalWait(cooling, 'setup_code_cooling')).toBeNull();
+  });
+});

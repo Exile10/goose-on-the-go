@@ -6,13 +6,19 @@
 import {
   birthdayOf,
   calibrationPrompts,
+  canContinue,
   defaultDraft,
   draftFromPond,
+  finishPatch,
   firstStepFor,
   profilePrefs,
   resumeIndex,
   settingsPatch,
+  setupLanguageFor,
   shortPhraseSuggestion,
+  stepRecords,
+  wakeChoiceValid,
+  wakeDraftFrom,
   wakePhrase,
   wakePhraseProblem,
   writesProfile,
@@ -23,32 +29,38 @@ const draft = (change: Partial<ReturnType<typeof defaultDraft>> = {}) => ({ ...d
 describe('resuming', () => {
   it('opens on the step after the furthest one the Pond recorded', () => {
     expect(resumeIndex('not_started')).toBe(0);
-    expect(resumeIndex('Welcome')).toBe(1);
-    expect(resumeIndex('Basics')).toBe(2);
-    expect(resumeIndex('Location')).toBe(3);
-    expect(resumeIndex('GooseIdentity')).toBe(4);
-    expect(resumeIndex('WakeWord')).toBe(5);
+    expect(resumeIndex('Location')).toBe(1);
+    expect(resumeIndex('GooseIdentity')).toBe(1);
   });
 
-  it('folds the steps the desktop merged into the screen that holds them', () => {
-    expect(resumeIndex('Accessibility')).toBe(resumeIndex('Basics'));
-    expect(resumeIndex('Personality')).toBe(resumeIndex('GooseIdentity'));
+  it('asks About you again when only part of it was recorded, by an older build', () => {
+    expect(resumeIndex('Welcome')).toBe(0);
+    expect(resumeIndex('Basics')).toBe(0);
+    expect(resumeIndex('Accessibility')).toBe(0);
   });
 
-  it('never runs past the last screen, and starts over on a name it does not know', () => {
-    expect(resumeIndex('Extensions')).toBe(5);
-    expect(resumeIndex('Completed')).toBe(5);
+  it('reopens anything past How Goose talks there, where finishing is', () => {
+    for (const step of ['Personality', 'WakeWord', 'Model', 'Extensions', 'Completed']) expect(resumeIndex(step)).toBe(1);
     expect(resumeIndex('Somewhere')).toBe(0);
     expect(resumeIndex(null)).toBe(0);
+  });
+
+  it('records the desktop’s steps each screen stands for', () => {
+    expect(stepRecords('about-you')).toEqual(['Basics', 'Location']);
+    expect(stepRecords('personality')).toEqual(['GooseIdentity']);
+    expect(stepRecords('model')).toEqual(['Model']);
   });
 });
 
 describe('what each step writes', () => {
   it('writes the desktop’s settings keys and no others', () => {
     const d = draft({ userName: ' Amina ', assistantName: ' Bata ', ttsVoice: 'bf_emma', ttsSpeed: 1.2, wakeWord: 'hey goose' });
-    expect(settingsPatch('welcome', d)).toBeNull();
-    expect(settingsPatch('about-you', d)).toEqual({ user_name: 'Amina' });
-    expect(settingsPatch('locale', d)).toEqual({ timezone: 'Africa/Nairobi', weather_location_name: '', weather_enabled: false });
+    expect(settingsPatch('about-you', d)).toEqual({
+      user_name: 'Amina',
+      timezone: 'Africa/Nairobi',
+      weather_location_name: '',
+      weather_enabled: false,
+    });
     expect(settingsPatch('personality', d)).toEqual({
       prompt_style: 'balanced',
       assistant_personality: 'friendly and helpful',
@@ -56,13 +68,13 @@ describe('what each step writes', () => {
       voice_tts_voice: 'bf_emma',
       voice_tts_speed: 1.2,
     });
-    expect(settingsPatch('wake-word', d)).toEqual({ voice_wake_word: 'hey goose' });
-    expect(settingsPatch('complete', d)).toEqual({ agent_memory_inject: true });
+    expect(settingsPatch('model', d)).toBeNull();
+    expect(finishPatch(d)).toEqual({ agent_memory_inject: true });
   });
 
   it('leaves coordinates out until something has found some', () => {
-    expect(settingsPatch('locale', draft())).not.toHaveProperty('weather_latitude');
-    expect(settingsPatch('locale', draft({ latitude: -1.29, longitude: 36.82 }))).toMatchObject({
+    expect(settingsPatch('about-you', draft())).not.toHaveProperty('weather_latitude');
+    expect(settingsPatch('about-you', draft({ latitude: -1.29, longitude: 36.82 }))).toMatchObject({
       weather_latitude: -1.29,
       weather_longitude: 36.82,
     });
@@ -76,8 +88,13 @@ describe('what each step writes', () => {
       accessibility_slow_speech: 'false',
     });
     expect(writesProfile('about-you')).toBe(true);
-    expect(writesProfile('locale')).toBe(true);
     expect(writesProfile('personality')).toBe(false);
+  });
+
+  it('asks for a name and a zone before About you is saved', () => {
+    expect(canContinue('about-you', draft())).toBe(false);
+    expect(canContinue('about-you', draft({ userName: 'Amina' }))).toBe(true);
+    expect(canContinue('about-you', draft({ userName: 'Amina', timezone: ' ' }))).toBe(false);
   });
 
   it('stores a custom phrase as typed and a preset as itself', () => {
@@ -86,36 +103,50 @@ describe('what each step writes', () => {
   });
 });
 
+describe('starting from the phone', () => {
+  it('takes the phone’s language when the desktop offers it, else English', () => {
+    expect(setupLanguageFor(['sw-KE', 'en-GB'])).toBe('sw');
+    expect(setupLanguageFor(['nl-NL', 'fr-BE'])).toBe('fr');
+    expect(setupLanguageFor(['nl-NL'])).toBe('en');
+    expect(setupLanguageFor([])).toBe('en');
+    expect(defaultDraft('Africa/Nairobi', 'sw').language).toBe('sw');
+  });
+});
+
 describe('filling the draft back in', () => {
   // What GET /settings would say on a Pond nobody has touched.
   const fresh = { user_name: 'Friend', assistant_name: 'Goose', timezone: 'UTC', voice_wake_word: 'goose', voice_tts_voice: '' };
 
   it('does not take a fresh Pond’s defaults for anybody’s answers', () => {
-    const d = draftFromPond(draft(), fresh, 1);
-    expect(d.userName).toBe('');
-    expect(d.timezone).toBe('Africa/Nairobi');
+    expect(draftFromPond(draft(), fresh, 0).userName).toBe('');
   });
 
   it('takes the Pond’s record for the steps it recorded', () => {
-    const d = draftFromPond(draft(), { ...fresh, user_name: 'Amina', timezone: 'Europe/London', voice_wake_word: 'hey duck' }, 5);
+    const d = draftFromPond(draft(), { ...fresh, user_name: 'Amina', timezone: 'Europe/London', voice_wake_word: 'hey duck' }, 1);
     expect(d.userName).toBe('Amina');
     expect(d.timezone).toBe('Europe/London');
-    expect(d.wakeWord).toBe('custom');
-    expect(d.wakeWordCustom).toBe('hey duck');
     expect(d.ttsVoice).toBe('af_heart');
+  });
+
+  it('reads the wake phrase the Pond holds as a preset or a phrase of its own', () => {
+    expect(wakeDraftFrom('hey duck')).toEqual({ wakeWord: 'custom', wakeWordCustom: 'hey duck' });
+    expect(wakeDraftFrom('ok computer')).toEqual({ wakeWord: 'ok computer', wakeWordCustom: '' });
+    expect(wakeDraftFrom(null)).toEqual({ wakeWord: 'goose', wakeWordCustom: '' });
+    expect(wakeChoiceValid({ wakeWord: 'custom', wakeWordCustom: 'a' })).toBe(false);
   });
 });
 
 describe('finishing', () => {
   it('goes back to the earliest step that sets a missing field', () => {
     expect(firstStepFor(['assistant_name', 'user_name'])).toBe('about-you');
-    expect(firstStepFor(['timezone'])).toBe('locale');
+    expect(firstStepFor(['timezone'])).toBe('about-you');
     expect(firstStepFor(['assistant_name'])).toBe('personality');
   });
 
-  it('has no step to send anyone to for a missing chat model', () => {
-    expect(firstStepFor(['chat_model'])).toBeNull();
-    expect(firstStepFor(['chat_model', 'timezone'])).toBe('locale');
+  it('opens the model step for a missing chat model, and only after the others', () => {
+    expect(firstStepFor(['chat_model'])).toBe('model');
+    expect(firstStepFor(['chat_model', 'timezone'])).toBe('about-you');
+    expect(firstStepFor(['nonsense'])).toBeNull();
   });
 });
 

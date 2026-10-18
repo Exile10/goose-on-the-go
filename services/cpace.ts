@@ -27,8 +27,8 @@
 import { ristretto255, ristretto255_hasher } from '@noble/curves/ed25519.js';
 import { bytesToNumberLE, concatBytes, equalBytes } from '@noble/curves/utils.js';
 import { hmac } from '@noble/hashes/hmac.js';
-import { sha512 } from '@noble/hashes/sha2.js';
-import { utf8ToBytes } from '@noble/hashes/utils.js';
+import { sha256, sha512 } from '@noble/hashes/sha2.js';
+import { bytesToHex, utf8ToBytes } from '@noble/hashes/utils.js';
 
 type Point = InstanceType<typeof ristretto255.Point>;
 
@@ -148,6 +148,8 @@ export function intermediateSessionKey(
 export const CI_LABEL = 'goose-pair-cpace-v1';
 /** The setup code's own label, so a setup code and a pairing code never share a generator. */
 export const SETUP_CI_LABEL = 'goose-setup-cpace-v1';
+/** A paired phone resuming over the setup channel, keyed on its refresh token; its own label again. */
+export const DEVICE_CI_LABEL = 'goose-device-cpace-v1';
 /** The label inside the phone's confirmation tag. */
 export const CLIENT_CONFIRM_LABEL = 'goose-pair-cpace-client-v1';
 /** The label inside the Pond's confirmation tag. Different from the phone's, so neither reflects. */
@@ -171,12 +173,30 @@ export function channelIdentifier(pin: string, clientId: string, label: string =
   return lvCat(utf8ToBytes(label), utf8ToBytes(pin), utf8ToBytes(clientId));
 }
 
-/** Which secret the phone holds, as `pake/init` names it: a printed setup card's or a pairing code. */
-export type PakeCredential = 'pairing' | 'setup';
+/**
+ * Which secret the phone holds, as `pake/init` names it: a pairing code, a printed setup card's, or
+ * (over the setup channel only) its own refresh token, to resume without a code.
+ */
+export type PakeCredential = 'pairing' | 'setup' | 'device';
 
 /** The label each secret's channel identifier opens with. */
 export function channelLabel(credential: PakeCredential): string {
-  return credential === 'setup' ? SETUP_CI_LABEL : CI_LABEL;
+  switch (credential) {
+    case 'setup':
+      return SETUP_CI_LABEL;
+    case 'device':
+      return DEVICE_CI_LABEL;
+    default:
+      return CI_LABEL;
+  }
+}
+
+/**
+ * A `device` run's password: the 64 lowercase hex characters of SHA-256 over the current refresh
+ * token, as ASCII. Not the 32 raw digest bytes, and not upper case; the Pond's vectors refuse both.
+ */
+export function devicePassword(refreshToken: string): string {
+  return bytesToHex(sha256(utf8ToBytes(refreshToken)));
 }
 
 /** Draft 10.4: `mac_key = SHA-512("CPaceMac" || sid || ISK)`. */
@@ -197,6 +217,10 @@ export interface CpaceResponse {
   confirm: Uint8Array;
   /** T_server as the Pond must send it. Compare with {@link confirmationMatches}. */
   expectedServerConfirm: Uint8Array;
+  /** sid, `challenge || client_nonce`, which the setup channel salts its keys with. */
+  sid: Uint8Array;
+  /** ISK, only when asked for: the setup channel seals with keys drawn from it, and the caller zeroes it. */
+  isk?: Uint8Array;
 }
 
 /**
@@ -212,12 +236,14 @@ export function respond(input: {
   code: string;
   pin: string;
   clientId: string;
-  /** Absent is a pairing code, as it is on the wire. */
+  /** Absent is a pairing code, as it is on the wire. A `device` code is {@link devicePassword}'s. */
   credential?: PakeCredential;
   challenge: Uint8Array;
   clientNonce: Uint8Array;
   initiatorShare: Uint8Array;
   random: (count: number) => Uint8Array;
+  /** Hand ISK back rather than zeroing it, for a run over the setup channel. */
+  keepIsk?: boolean;
 }): CpaceResponse {
   if (input.challenge.length !== NONCE_BYTES || input.clientNonce.length !== NONCE_BYTES) {
     throw new CpaceAbort('sid halves must be 32 bytes each');
@@ -231,12 +257,15 @@ export function respond(input: {
   if (equalBytes(k, IDENTITY)) throw new CpaceAbort('invalid_share');
   const isk = intermediateSessionKey(sid, k, input.initiatorShare, NO_AD, share, NO_AD);
   const macKey = confirmationKey(sid, isk);
-  const result = {
+  const result: CpaceResponse = {
     share,
     confirm: confirmationTag(CLIENT_CONFIRM_LABEL, macKey, input.initiatorShare, share),
     expectedServerConfirm: confirmationTag(SERVER_CONFIRM_LABEL, macKey, input.initiatorShare, share),
+    sid,
+    ...(input.keepIsk ? { isk } : {}),
   };
-  k.fill(0); isk.fill(0); macKey.fill(0);
+  k.fill(0); macKey.fill(0);
+  if (!input.keepIsk) isk.fill(0);
   return result;
 }
 

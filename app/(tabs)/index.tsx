@@ -31,6 +31,7 @@ import type { ThemeColors } from '@/constants/colors';
 import { GIcon } from '@/components/ui/g-icon';
 import { GPressable } from '@/components/ui/g-pressable';
 import { EqualizerBars } from '@/components/ui/equalizer-bars';
+import { FinishSetup } from '@/components/patterns/finish-setup';
 import { PondGettingReady } from '@/components/patterns/pond-getting-ready';
 import { RemoteAccessOffer } from '@/components/patterns/remote-access-offer';
 import { useRecentSessions } from '@/view-models/use-recent-sessions';
@@ -345,6 +346,7 @@ export default function HomeScreen() {
             card that says the Pond is reachable. */}
         {/* Whether Goose can answer yet matters more than reaching it from away, so it comes first. */}
         <PondGettingReady />
+        <FinishSetup />
         <RemoteAccessOffer />
 
         {offline ? null : (

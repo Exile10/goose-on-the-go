@@ -389,11 +389,6 @@
     "noneFoundBody": "Make sure your Pond is running and on this network.",
     "discoveryUnavailable": "Finding Ponds on the network needs a development or release build of the app. Enter your Pond's address instead.",
     "manual": "Enter an address",
-    "newTitle": "Set up a new Pond",
-    "newBody": "Scan the setup card that came with it, or pick it below and have it say a code.",
-    "scanCard": "Scan its setup card",
-    "newFound": "New Ponds on this network",
-    "newNone": "A new Pond appears here once it's switched on and on this network.",
     "joinTitle": "Join a Pond that's already set up",
     "joinBody": "Use the six-digit pairing code from a screen its owner can see.",
     "joinFound": "Ponds on this network",
@@ -1321,7 +1316,8 @@
     "settingsModelSearch": "Search Hugging Face",
     "settingsIssue": "Needs attention",
     "settingsSpeaking": "Speaking voice",
-    "ownerSetup": "Set up your Pond"
+    "ownerSetup": "Set up your Pond",
+    "wakeWord": "Wake word"
   },
   "nav": {
     "goose": "Goose",
@@ -1575,7 +1571,6 @@
   "pairing": {
     "stepFind": "Find",
     "stepCode": "Code",
-    "stepName": "Name",
     "stepDone": "Done",
     "scanQr": "Scan a QR code instead",
     "searching": "Searching this Wi-Fi network.",
@@ -1587,9 +1582,6 @@
     "codeTitle": "Enter the pairing code",
     "codeLabel": "Code",
     "codePlaceholder": "123456",
-    "nameTitle": "Name this phone",
-    "nameLabel": "Name",
-    "namePlaceholder": "My iPhone",
     "pairing": "Pairing",
     "failed": "Pairing failed",
     "done": "You're paired",
@@ -1621,7 +1613,6 @@
     "setupCardSearchingBody": "It needs to be switched on and on this Wi-Fi network.",
     "setupCardNotFound": "No Pond matching this card answered on this network. Check that it is switched on and on the same Wi-Fi, or enter its address.",
     "claimedNext": "Pair with a code instead",
-    "nameBody": "This is the name your Pond lists this phone under. Pick something you will recognise.",
     "pairingBody": "Checking the code and exchanging keys with your Pond.",
     "stepComplete": "Complete",
     "lan": "Connect to the same home network as your Pond to pair.",
@@ -2095,7 +2086,9 @@
     "spokenLimited_other": "Your Pond has just said a code. You can ask for another in {{count}} seconds.",
     "spokenLimitedNoHint": "Your Pond has said several codes recently. Wait a minute, then ask again.",
     "spokenDisabled": "This Pond does not say codes aloud: its household has turned that off. Ask the person who set it up for a pairing code.",
-    "spokenSilent": "Your Pond cannot make a sound right now. Check its speaker, or use the code on its setup card."
+    "spokenSilent": "Your Pond cannot make a sound right now. Check its speaker, or use the code on its setup card.",
+    "resumeRotated": "This phone's sign-in changed while it was reconnecting. Try again.",
+    "deviceCooling": "This phone has reconnected too often. Wait {{count}} s, or have your Pond say a code."
   },
   "memories": {
     "segment": {
@@ -2205,27 +2198,17 @@
     "progress": "Step {{step}} of {{count}}",
     "progressLabel": "Setup progress",
     "continue": "Continue",
-    "skip": "Skip for now",
+    "skip": "Use defaults",
     "back": "Back",
-    "finish": "Finish setup",
+    "finish": "Finish",
     "loading": "Reading what your Pond already knows",
     "loadFailed": "Couldn't reach your Pond",
     "loadFailedBody": "Check that it's switched on and on the same network as this phone.",
     "saveFailed": "Your Pond didn't save that. Try again.",
     "steps": {
-      "welcome": "Welcome",
       "aboutYou": "About you",
-      "locale": "Language and location",
       "personality": "How Goose talks",
-      "wakeWord": "Wake word",
-      "complete": "All set"
-    },
-    "stepNotes": {
-      "aboutYou": "Your name, and how you speak",
-      "locale": "Language, time zone and weather",
-      "personality": "Style, name and voice",
-      "wakeWord": "What to say to get Goose's attention",
-      "complete": "Check it over and finish"
+      "model": "Goose's model"
     },
     "warmup": {
       "warming": "Goose is warming up on your Pond.",
@@ -2238,16 +2221,6 @@
       "assistantName": "Your Pond needs a name for your assistant before it can finish.",
       "timezone": "Your Pond needs a time zone before it can finish.",
       "other": "Your Pond needs a few more details before it can finish."
-    },
-    "welcome": {
-      "title": "Set up your Pond",
-      "body": "Your Pond has no screen of its own, so you set it up from here. It takes about two minutes, and what you enter stays on your Pond.",
-      "pond": "Your Pond",
-      "pondName": "Name",
-      "pondVersion": "Version",
-      "overview": "What you'll set up",
-      "start": "Get started",
-      "other": "Use a different Pond"
     },
     "about": {
       "title": "About you",
@@ -2271,8 +2244,7 @@
       "birthdayInvalid": "That isn't a date. Check the day and the year."
     },
     "locale": {
-      "title": "Language and location",
-      "lead": "Used for spoken answers, the weather, and anything that depends on the time.",
+      "title": "Where you are",
       "language": "Language",
       "zone": "Time zone",
       "zoneChange": "Change time zone",
@@ -2289,7 +2261,8 @@
       "detectFailed": "Couldn't work that out. Type the nearest town instead.",
       "weather": "Live weather",
       "weatherBody": "Forecasts from Open-Meteo for the place above. No GPS needed.",
-      "zoneClear": "Clear"
+      "zoneClear": "Clear",
+      "fromPhone": "Filled in from this phone. Change anything that's wrong."
     },
     "personality": {
       "title": "How Goose talks",
@@ -2310,7 +2283,13 @@
       "name": "Assistant name",
       "voice": "Voice",
       "voiceLoading": "Asking your Pond about its voices",
-      "noPreview": "You can hear each voice once setup is finished. Until then your Pond only plays samples to itself."
+      "noPreview": "You can hear each voice once setup is finished. Until then your Pond only plays samples to itself.",
+      "sampleHint": "Press play to hear this voice on your Pond's speaker.",
+      "samplePlaying": "Listen to your Pond.",
+      "sampleWait": "Your Pond needs a moment. Try again in {{count}} s.",
+      "sampleUnknown": "Your Pond doesn't have this voice, so it can't play a sample of it.",
+      "sampleUnavailable": "Your Pond's voice isn't ready yet. Try again in a moment.",
+      "sampleFailed": "Your Pond couldn't play a sample."
     },
     "wake": {
       "title": "Wake word",
@@ -2351,26 +2330,15 @@
         "nothingHeard": "Your Pond didn't hear that. Say the sentence again, a little closer to the phone.",
         "failed": "Your Pond couldn't check that sentence. Try again.",
         "noTranscriber": "Your Pond can't listen to recordings yet: its speech-to-text isn't running. Skip this for now."
-      }
+      },
+      "save": "Save wake word",
+      "saved": "Saved. Goose now answers to “{{phrase}}”.",
+      "current": "Goose answers to “{{phrase}}” now."
     },
     "complete": {
-      "title": "All set",
-      "lead": "Here's what your Pond knows. You can change any of it later in Settings.",
-      "memory": "Memory",
-      "memoryBody": "Goose remembers facts across conversations, kept on your Pond. Nothing leaves it.",
-      "summary": "Your setup",
-      "you": "You",
-      "language": "Language",
-      "zone": "Time zone",
-      "style": "Style",
-      "assistant": "Assistant",
-      "wake": "Wake word",
-      "noModelTitle": "Your Pond has no model to think with",
       "noModelBody": "It can't finish setting up without one, and choosing a model from a phone needs a Pond update. Everything else is saved: once your Pond has a model, finish here."
     },
     "ready": {
-      "title": "Getting your Pond ready",
-      "titleReady": "Goose is ready",
       "checking": "Checking on your Pond",
       "downloading": "Your Pond is downloading {{name}}, the model Goose thinks with.",
       "notDownloaded": "{{name}} is chosen, but it isn't on your Pond yet.",
@@ -2378,18 +2346,140 @@
       "suggestion": "Your Pond suggests {{name}}.",
       "chooseModel": "Choose a model",
       "warming": "Your Pond has its model and is warming up.",
-      "ready": "Your Pond can answer now.",
-      "phone": "This phone",
-      "phoneOwner": "Linked to {{name}} on your Pond.",
-      "phoneNobody": "Not linked to anyone on your Pond yet, so Goose doesn't use your details when you talk from here. That needs a Pond update.",
-      "goHome": "Go to Home",
-      "goOn": "Continue while it gets ready"
+      "ready": "Your Pond can answer now."
     },
     "gettingReady": {
-      "title": "Your Pond is still getting ready",
+      "title": "Goose is set up and getting ready",
       "readyTitle": "Goose is ready",
       "readyBody": "Your Pond has its model and can answer now.",
       "dismiss": "Dismiss"
+    },
+    "model": {
+      "title": "Choose what Goose thinks with",
+      "lead": "Your Pond has no model to think with yet, and Goose can't answer without one. Your Pond suggests one that fits it.",
+      "checking": "Asking your Pond what fits it",
+      "suggested": "Your Pond's suggestion for the way Goose thinks and talks.",
+      "downloadSized": "Download ({{size}})",
+      "downloading": "Your Pond is downloading {{name}}.",
+      "using": "Giving {{name}} the job",
+      "none": "Your Pond has no model to suggest. Choose one from its models.",
+      "others": "See other models",
+      "stalled": "Your Pond didn't keep {{name}} as the model Goose thinks with. Try again, or choose another.",
+      "finishing": "Setup finishes now; Home shows the download until Goose can answer."
+    },
+    "checklist": {
+      "title": "Finish setting up",
+      "lead": "Everything else has a sensible default. These are worth a minute when you have one.",
+      "wake": "Choose a wake word",
+      "wakeBody": "Goose answers to its default until you pick a phrase and teach it your voice.",
+      "review": "Look over your choices",
+      "reviewBody": "Your name, Goose's voice and where you live are all in Settings.",
+      "dismiss": "Put away"
+    },
+    "phoneOf": "{{name}}'s {{device}}"
+  },
+  "bleSetup": {
+    "find": {
+      "title": "Find your Pond",
+      "lede": "Switch your Pond on and keep this phone close. A new one shows up here by itself.",
+      "newTitle": "Ponds nearby",
+      "scanning": "Looking nearby and on this network",
+      "none": "No new Pond yet. One can take a minute to appear after it's switched on.",
+      "bleOff": "Bluetooth is off. Turn it on to find a new Pond nearby.",
+      "bleDenied": "Goose On The Go isn't allowed to use Bluetooth, so only Ponds already on this network show here.",
+      "bleFailed": "Bluetooth stopped looking.",
+      "bleUnsupported": "This phone can't look over Bluetooth, so only Ponds on this network show here.",
+      "openSettings": "Open Settings",
+      "lookAgain": "Look again",
+      "scanCard": "Scan the setup card",
+      "rowName": "Pond {{id}}",
+      "nearby": "Nearby",
+      "onNetwork": "On this network",
+      "onNetworkAt": "On this network as {{host}}",
+      "looking": "Looking for Pond {{id}}",
+      "lookingLate": "Make sure Pond {{id}} is switched on and within a few metres of this phone.",
+      "codeLabel": "The code on its setup card",
+      "codeHint": "Eleven digits, printed under the QR code.",
+      "spokenLabel": "The code your Pond is saying",
+      "spokenHint": "Six digits. Have it say them again if you missed them.",
+      "claim": "Set up this Pond",
+      "claiming": "Setting up Pond {{id}}",
+      "askSpoken": "Have it say a code",
+      "askingSpoken": "Asking your Pond to speak",
+      "askAgain": "Say it again",
+      "useCard": "Use the card's code instead",
+      "cancel": "Cancel",
+      "unreachable": "Your Pond didn't answer over Bluetooth. Move this phone closer to it and try again.",
+      "phoneLabel": "This phone joins as {{name}}",
+      "phoneUnnamed": "This phone has no name yet",
+      "phoneChange": "Change",
+      "phoneDone": "Done",
+      "phoneName": "This phone's name",
+      "phoneHint": "How this phone appears in your Pond's list of devices.",
+      "tooManyAttempts": "Your Pond stopped taking codes on this connection. Pick it again to start a new one.",
+      "notUnderstood": "Your Pond didn't understand this phone. Updating the app and your Pond should fix it.",
+      "pondError": "Something went wrong on your Pond. Try again in a moment.",
+      "claimedBody": "Pond {{id}} belongs to a household but has lost its network. Have it say a code, and you can give it Wi-Fi from here.",
+      "connecting": "Connecting to Pond {{id}}",
+      "wrongPond": "That isn't the Pond it said it was, so this phone stopped. Move closer to your Pond and try again.",
+      "needsWifi": "Set up, needs Wi-Fi",
+      "sessionEnded": "The Bluetooth connection to your Pond ended. Try again to start a new one.",
+      "resuming": "Reconnecting to Pond {{id}}"
+    },
+    "wifi": {
+      "title": "Connect your Pond to Wi-Fi",
+      "lede": "These are the networks your Pond can hear. The password goes to your Pond sealed, and this phone doesn't keep it.",
+      "checking": "Asking your Pond about its network",
+      "scanning": "Your Pond is listing the networks it can hear",
+      "rescan": "Look again",
+      "known": "Known",
+      "signalStrong": "Strong signal",
+      "signalFair": "Fair signal",
+      "signalWeak": "Weak signal",
+      "other": "Another network",
+      "otherName": "Network name",
+      "otherHint": "For a network that doesn't show its name.",
+      "password": "Password",
+      "show": "Show password",
+      "hide": "Hide password",
+      "join": "Join",
+      "joining": "Your Pond is joining {{ssid}}",
+      "passwordShort": "A Wi-Fi password is at least 8 characters.",
+      "enterprise": "Needs a username as well as a password, which can't be set from here yet.",
+      "none": "Your Pond can't hear any networks. Move it closer to your router, then look again.",
+      "keepAlive": "Your Pond keeps the connection open while you choose.",
+      "errors": {
+        "wrongPassword": "That password didn't work for {{ssid}}. Check it and try again.",
+        "notFound": "Your Pond can't hear {{ssid}} any more. Move it closer to the router, or look again.",
+        "noAddress": "Your Pond joined {{ssid}}, but the network gave it no address. Try again, or check the router.",
+        "timeout": "Joining {{ssid}} took too long. Try again.",
+        "notPermitted": "Your Pond isn't allowed to change its own Wi-Fi yet. Running its installer again fixes this.",
+        "unsupported": "Your Pond can't join Wi-Fi by itself. Connect it with a network cable instead.",
+        "busy": "Your Pond is still busy with the last network. Try again in a moment.",
+        "other": "Your Pond couldn't join {{ssid}}."
+      },
+      "security": {
+        "open": "Open",
+        "wep": "WEP",
+        "enterprise": "Work or school",
+        "secured": "Secured"
+      },
+      "online": "Your Pond is already on a network",
+      "handover": "Reaching your Pond on {{ssid}}",
+      "handoverWired": "Reaching your Pond on your network",
+      "unreachableTitle": "Connect this phone to {{ssid}}",
+      "unreachableBody": "Your Pond is on {{ssid}} now. Join the same network on this phone, and setup carries on here.",
+      "unreachableTitleWired": "Connect this phone to your Pond's network",
+      "unreachableBodyWired": "Your Pond is on your home network. Join it on this phone, and setup carries on here.",
+      "checkAgain": "Check again",
+      "lostTitle": "Lost touch with your Pond",
+      "lostBody": "The Bluetooth connection to your Pond dropped. It's set up as yours, so this phone can reconnect without a code.",
+      "findAgain": "Find it again",
+      "listTitle": "Networks your Pond can hear",
+      "scanFailed": "Your Pond couldn't list the networks it hears. Look again in a moment.",
+      "reconnect": "Reconnect",
+      "reconnecting": "Reconnecting to Pond {{id}}",
+      "reconnectFailed": "This phone couldn't reconnect by itself. Find your Pond again and have it say a code."
     }
   }
 }

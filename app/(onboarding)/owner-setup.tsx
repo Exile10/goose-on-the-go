@@ -1,6 +1,7 @@
 /**
- * Owner setup, for a Pond with no screen: who you are, where you are, how Goose talks and what wakes
- * it. Opened after a claim or a pairing to a Pond that is not set up, and on launch while it is not.
+ * Owner setup, for a Pond with no screen: who you are and where, how Goose talks, and a model only
+ * when the Pond has none. Opened after a claim or a pairing to a Pond that is not set up, and on
+ * launch while it is not. It ends on Home, which says whether Goose can answer yet.
  */
 
 import React, { useCallback } from 'react';
@@ -10,11 +11,10 @@ import { useTranslation } from 'react-i18next';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { InkButton, InkEmptyState, InkEyebrow, InkMeter, InkNotice, InkSpinner } from '@jarida/ink/native';
 
+import { ModelStep } from '@/components/setup/model-step';
 import { SetupFooter, SetupWarmup } from '@/components/setup/setup-chrome';
-import { AboutStep, CompleteStep, LocaleStep, WelcomeStep } from '@/components/setup/setup-steps';
+import { AboutStep } from '@/components/setup/setup-steps';
 import { PersonalityStep } from '@/components/setup/personality-step';
-import { SetupReady } from '@/components/setup/setup-ready';
-import { WakeStep } from '@/components/setup/wake-step';
 import { GKeyboardView } from '@/components/ui/g-keyboard-view';
 import type { ThemeColors } from '@/constants/colors';
 import { Spacing } from '@/constants/spacing';
@@ -24,18 +24,12 @@ import { useOwnerSetup, type UseOwnerSetup } from '@/view-models/use-owner-setup
 
 function StepBody({ setup }: { setup: UseOwnerSetup }) {
   switch (setup.step) {
-    case 'welcome':
-      return <WelcomeStep setup={setup} />;
     case 'about-you':
       return <AboutStep setup={setup} />;
-    case 'locale':
-      return <LocaleStep setup={setup} />;
     case 'personality':
       return <PersonalityStep setup={setup} />;
-    case 'wake-word':
-      return <WakeStep setup={setup} />;
-    case 'complete':
-      return <CompleteStep setup={setup} />;
+    case 'model':
+      return <ModelStep setup={setup} />;
   }
 }
 
@@ -43,7 +37,8 @@ export default function OwnerSetupScreen() {
   const styles = useThemedStyles(makeStyles);
   const { t } = useTranslation();
   const setup = useOwnerSetup();
-  const last = SETUP_STEPS.length - 1;
+  // The model step counts only once the Pond has asked for it.
+  const count = setup.noChatModel ? SETUP_STEPS.length : SETUP_STEPS.indexOf('model');
   const { index, phase } = setup;
   const back = setup.actions.back;
 
@@ -52,13 +47,13 @@ export default function OwnerSetupScreen() {
     useCallback(() => {
       const sub = BackHandler.addEventListener('hardwareBackPress', () => {
         if (phase === 'wizard' && index > 0) back();
-        return phase === 'wizard' || phase === 'finished';
+        return phase === 'wizard';
       });
       return () => sub.remove();
     }, [phase, index, back]),
   );
 
-  if (setup.phase === 'alreadyDone') return <Redirect href="/(tabs)" />;
+  if (setup.phase === 'alreadyDone' || setup.phase === 'finished') return <Redirect href="/(tabs)" />;
   if (setup.phase === 'unpaired') return <Redirect href="/(onboarding)/welcome" />;
 
   if (setup.phase === 'loading' || setup.phase === 'failed') {
@@ -83,36 +78,24 @@ export default function OwnerSetupScreen() {
     );
   }
 
-  if (setup.phase === 'finished') {
-    return (
-      <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
-        <SetupReady />
-      </SafeAreaView>
-    );
-  }
-
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
       <Stack.Screen options={{ gestureEnabled: false }} />
       <GKeyboardView>
-        {setup.index > 0 ? (
-          <View style={styles.progress}>
-            <InkEyebrow>{t('setup.progress', { step: setup.index, count: last })}</InkEyebrow>
-            <InkMeter value={setup.index / last} label={t('setup.progressLabel')} />
-          </View>
-        ) : null}
+        <View style={styles.progress}>
+          <InkEyebrow>{t('setup.progress', { step: index + 1, count })}</InkEyebrow>
+          <InkMeter value={(index + 1) / count} label={t('setup.progressLabel')} />
+        </View>
         {/* Keyed by step, so each step opens at its top rather than where the last one was left. */}
         <ScrollView key={setup.step} contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
           {setup.notice ? <InkNotice tone="warning">{setup.notice}</InkNotice> : null}
           <StepBody setup={setup} />
         </ScrollView>
-        {setup.index > 0 ? (
-          <View style={styles.foot}>
-            {setup.error ? <InkNotice tone="danger">{setup.error}</InkNotice> : null}
-            <SetupWarmup />
-            <SetupFooter setup={setup} />
-          </View>
-        ) : null}
+        <View style={styles.foot}>
+          {setup.error ? <InkNotice tone="danger">{setup.error}</InkNotice> : null}
+          <SetupWarmup />
+          <SetupFooter setup={setup} />
+        </View>
       </GKeyboardView>
     </SafeAreaView>
   );

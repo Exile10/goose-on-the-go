@@ -22,6 +22,10 @@ const NUMERIC_HOST = /^\d{1,3}(\.\d{1,3}){3}$/;
 interface PairOptions { clientId: string; pairingCode: string; credential?: PakeCredential; deviceName?: string }
 interface ServerContextValue {
   serverUrl: string; online: boolean; token: string | null; refreshToken: string | null;
+  /** The pin of the Pond this phone is paired with, so a setup channel can tell it is the same Pond. */
+  pairedPin: string | null;
+  /** Keep a pair a device resume over the setup channel rotated; the old refresh token no longer works. */
+  keepRotatedTokens: (session: string, refresh: string) => void;
   connectionState: ConnectionSnapshot['state'];
   checkHealth: () => Promise<boolean>;
   /**
@@ -40,6 +44,12 @@ interface ServerContextValue {
   stagePairing: (profile: ConnectionProfile, pin: string) => Promise<void>;
   cancelPairing: () => Promise<void>;
   pair: (opts: PairOptions) => Promise<HandshakeResponse>;
+  /**
+   * Keep a pairing the setup channel made: its pin proven by CPace over BLE, its tokens opened from
+   * the sealed answer, its address from `wifi_join`. Nothing is probed first, since the phone may not
+   * be on the Pond's network yet, and losing the tokens would leave a claimed Pond nobody holds.
+   */
+  adoptPairing: (profile: ConnectionProfile, pin: string, resp: HandshakeResponse) => Promise<void>;
   /** Ask the staged Pond to read a pairing code aloud; it answers only a phone on its own network. */
   requestSpokenCode: () => Promise<SpokenCode>;
   unpair: () => Promise<void>;
@@ -236,6 +246,23 @@ export function ServerProvider({ children }: PropsWithChildren) {
   }, [restore]);
 
   const invalidateOperation = useCallback(() => { operation.current++; }, []);
+  // A refresh over HTTPS and a device resume over the setup channel both rotate the pair: the old refresh token is dead.
+  const keepRotated = useCallback((session: string, refresh: string) => {
+    const current = saved.current;
+    if (!current || staged.current) return;
+    const next = { ...current.identity, session, refresh };
+    saved.current = { ...current, identity: next };
+    setIdentity(next);
+    tokenWrite.current = tokenWrite.current.then(() => SecureStorage.set('pondIdentity', JSON.stringify(next))).catch(() => {
+      console.warn('[connection] rotated credentials could not be saved');
+      setSnapshot({ state: 'disconnected', url: null });
+    });
+  }, []);
+  const keepRotatedTokens = useCallback((session: string, refresh: string) => {
+    api.setToken(session);
+    api.setRefreshToken(refresh);
+    keepRotated(session, refresh);
+  }, [keepRotated]);
   useEffect(() => {
     mounted.current = true;
     let cancelled = false;
@@ -292,23 +319,13 @@ export function ServerProvider({ children }: PropsWithChildren) {
         if (!cancelled) setHydrated(true);
       }
     })();
-    api.setOnTokensRotated((session, refresh) => {
-      const current = saved.current;
-      if (!current || staged.current) return;
-      const next = { ...current.identity, session, refresh };
-      saved.current = { ...current, identity: next };
-      setIdentity(next);
-      tokenWrite.current = tokenWrite.current.then(() => SecureStorage.set('pondIdentity', JSON.stringify(next))).catch(() => {
-        console.warn('[connection] rotated credentials could not be saved');
-        setSnapshot({ state: 'disconnected', url: null });
-      });
-    });
+    api.setOnTokensRotated(keepRotated);
     return () => {
       cancelled = true; mounted.current = false; invalidateOperation();
       networkSub(); appSub.remove(); manager.environment(false, false);
       api.setRecovery(null); api.setOnTokensRotated(null);
     };
-  }, [manager, restore, invalidateOperation, resumeTransport, forgetPairing]);
+  }, [manager, restore, invalidateOperation, resumeTransport, forgetPairing, keepRotated]);
 
   /**
    * Keep this phone's row in the Pond's device registry fresh while the app is open.
@@ -448,6 +465,29 @@ export function ServerProvider({ children }: PropsWithChildren) {
     return resp;
   }, [restore]);
 
+  const adoptPairing = useCallback(async (rawProfile: ConnectionProfile, pin: string, resp: HandshakeResponse) => {
+    await committing.current?.catch(() => undefined);
+    await cancelRemoteAccess();
+    const profile = parseConnectionProfile({ ...rawProfile, remoteAccess: { mode: 'local' } });
+    if (!profile || !validPin(pin) || !profile.localUrls.every(isLocalPairingUrl) || !resp.accepted || !resp.session_token) {
+      throw new Error(i18n.t('pairing.invalid'));
+    }
+    operation.current++;
+    staged.current = null;
+    api.invalidateIdentity();
+    const next: Identity = { id: `${Date.now()}-${Math.random().toString(36).slice(2)}`, pin,
+      session: resp.session_token, refresh: resp.refresh_token ?? null };
+    const previous = saved.current;
+    const commit = (async () => {
+      await tokenWrite.current;
+      saved.current = await commitPairedProfile(previous, { identity: next, profile });
+      setHasPairing(true);
+      await restore();
+    })();
+    committing.current = commit;
+    try { await commit; } finally { if (committing.current === commit) committing.current = null; }
+  }, [restore]);
+
   const requestSpokenCode = useCallback(async () => {
     const pending = staged.current;
     if (!pending) throw new Error(i18n.t('pairing.lan'));
@@ -541,11 +581,11 @@ export function ServerProvider({ children }: PropsWithChildren) {
   const checkHealth = useCallback(async () => !!await manager.recover(), [manager]);
   const value = useMemo<ServerContextValue>(() => ({
     serverUrl: snapshot.url ?? '', online: !!snapshot.url, token: identity?.session ?? null,
-    refreshToken: identity?.refresh ?? null, connectionState: snapshot.state,
+    refreshToken: identity?.refresh ?? null, pairedPin: identity?.pin ?? null, keepRotatedTokens, connectionState: snapshot.state,
     profileId: identity?.id ?? '', paired: hasPairing, remoteEnabled: saved.current?.profile.remoteAccess?.mode === 'embedded',
     keepLocalOnly, hydrated, screenModes, isScreenReal, setScreenMode,
-    checkHealth, setRemoteEndpoint, recover: manager.recover, revoke: manager.revoke.bind(manager), stagePairing, cancelPairing, pair, requestSpokenCode, unpair,
-  }), [snapshot, identity, hasPairing, hydrated, screenModes, isScreenReal, setScreenMode, checkHealth, setRemoteEndpoint, keepLocalOnly, manager, stagePairing, cancelPairing, pair, requestSpokenCode, unpair]);
+    checkHealth, setRemoteEndpoint, recover: manager.recover, revoke: manager.revoke.bind(manager), stagePairing, cancelPairing, pair, adoptPairing, requestSpokenCode, unpair,
+  }), [snapshot, identity, hasPairing, hydrated, screenModes, isScreenReal, setScreenMode, checkHealth, setRemoteEndpoint, keepLocalOnly, keepRotatedTokens, manager, stagePairing, cancelPairing, pair, adoptPairing, requestSpokenCode, unpair]);
   return <ServerContext.Provider value={value}>{children}</ServerContext.Provider>;
 }
 export function useServer(): ServerContextValue {

@@ -475,7 +475,7 @@ export class PondApiClient {
         channel_binding: input.channelBinding,
         client_nonce: toBase64(input.clientNonce),
         // Absent means pairing, so a pairing init is still the request the Pond's vectors pin.
-        ...(input.credential === 'setup' ? { credential: 'setup' } : {}),
+        ...(input.credential && input.credential !== 'pairing' ? { credential: input.credential } : {}),
       }),
     });
     if (!res.ok) throw await handshakeRefusal(`handshake/pake/init failed: ${res.status}`, res);
@@ -1604,6 +1604,16 @@ export class PondApiClient {
       throw new ApiError(`POST /api/v1/voice/calibrate → ${res.status}`, res.status, parseRetryAfter(res), detailOf(body), body);
     }
     return (await res.json()) as CalibrationTake;
+  }
+
+  /**
+   * Have the Pond say a short sample in `voice` on its own speaker (goose-in-a-pond#579, P4): the way
+   * to hear a voice during setup, when `/tts` answers loopback only. A 202 means it is speaking;
+   * refusals are 404 `unknown_voice`, 429 with Retry-After, and 503 `voice_unavailable`. An older Pond
+   * answers 404 with no code, having no such route.
+   */
+  async voiceSample(voice: string): Promise<void> {
+    await this.post<unknown>('/api/v1/voice/sample', { voice });
   }
 
   /** Which household member this device belongs to, as the Pond sees it. */

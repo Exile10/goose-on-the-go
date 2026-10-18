@@ -23,6 +23,18 @@ export type ConnectionState =
   | 'trust' | 'unpaired' | 'upgrade' | 'reconnecting'
   | 'local' | 'remote' | 'disconnected' | 'revoked';
 
+/** Screens that are themselves the pairing the banner would send someone to. */
+const PAIRING_SCREENS = ['pond-pairing', 'connect-desktop'];
+
+/**
+ * Whether the connection banner stays out of the way on the route `segments` name. First run and
+ * pairing say where things stand in their own words, and the banner's title would sit stacked
+ * above theirs, saying "pair with your Pond" on the very screen that is doing it.
+ */
+export function bannerHiddenOn(segments: readonly string[]): boolean {
+  return segments[0] === '(onboarding)' || (segments[0] === '(stack)' && PAIRING_SCREENS.includes(segments[1] ?? ''));
+}
+
 export function validPin(pin: string): boolean {
   return /^sha256\/[A-Za-z0-9+/]{43}=$/.test(pin);
 }
@@ -81,7 +93,8 @@ export type PinSource = 'checked' | 'advertised';
  */
 export function pickBeforeExchange(exchange: {
   pin: PinSource;
-  credential: 'pairing' | 'setup';
+  // A `device` run binds the pin as a setup run does, so only a six-digit pairing code needs the pick.
+  credential: 'pairing' | 'setup' | 'device';
   codeSpoken: boolean;
 }): boolean {
   return exchange.pin === 'advertised' && exchange.credential === 'pairing' && !exchange.codeSpoken;

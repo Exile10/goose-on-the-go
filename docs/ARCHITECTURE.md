@@ -88,6 +88,13 @@ the Pond each time; these cards are kept in plain storage, capped at 100
 conversations, dropped with their conversation, and cleared on sign-out.
 `services/discovery.ts` — finds Ponds over mDNS, so step 0 of the pairing wizard
 can offer a hub rather than ask for its address. See "Finding the Pond" below.
+`services/ble.ts` — the Pond's BLE setup service through `PondBle`, the local native module in
+`plugins/pond-ble` (CoreBluetooth on iOS, BluetoothLeScanner and GATT on Android). The module only
+scans, connects, writes with response and delivers notifications; it never bonds. See "The setup
+channel" below.
+`services/setup-channel/` — the setup channel itself: framing, sealing and the session that runs
+`hello`, the CPace exchange and the sealed Wi-Fi requests. `services/setup-session.ts` holds the
+open session and the claim's tokens between Find your Pond and the Wi-Fi step, in memory only.
 `services/secure-random.ts` — platform CSPRNG bytes (`randomBytes`, from
 expo-crypto), for anything an observer must not be able to predict.
 `services/notifications-module.ts` — `expo-notifications`, or null in Expo Go,
@@ -158,6 +165,81 @@ callback rather than throwing.
 `types/react-native-zeroconf.d.ts` declares the library's browsing API, which
 ships no types of its own. Field names there are taken from its Android NSD
 implementation, which is the default backend.
+
+## The setup channel (2026-10-17)
+
+A brand-new Pond with no network is found and claimed over Bluetooth LE, told which Wi-Fi to join,
+and then reached over HTTPS. The contract is goose-in-a-pond's
+`docs/architecture/pond-setup-channel.md` (P5); this is the phone's half (P5d).
+
+**Finding it.** A Pond advertises one service UUID, `185b51bd-e038-4b6c-99b0-4e2379dd<card id>`,
+with the card's four hex digits in its last two bytes (`cardIdOf`). The UUID sits in the
+advertisement itself; the local name `Pond <card id>` rides in the scan response, which some
+adapters never send and iOS's passive background scans never ask for, so the name is only a
+label. A Pond name naming another card drops the sighting. The GATT service the phone connects
+to is always `…4e2379dd362c`. Android scans for the prefix with a masked filter. iOS has no masked
+filter, so Find your Pond scans for everything in the foreground and keeps the prefix, and
+`findPondById` scans for the one card's UUID. The name is read from the advertisement, never the
+GAP name, which on a Mac is its computer name. Android scans with `BLUETOOTH_SCAN` marked
+`neverForLocation`, so no location permission is asked for; iOS asks for Bluetooth the first time
+the module touches it. A Pond seen on the network
+as well is one row, and is claimed over HTTPS, which needs no Wi-Fi step.
+
+**Choosing the transport.** `react-native-ble-plx` was assessed and passed over. It has no codegen
+spec, so it runs only through the New Architecture interop layer. It has had one release in twenty
+months, and it brings RxJava 2, RxAndroidBle and a plugin that adds location permissions.
+`react-native-ble-manager` is the maintained alternative. The five calls this needs are a smaller
+surface than either library, so the module follows pond-tls's pattern instead, and everything that
+can be tested lives in TypeScript.
+
+**The exchange.** `SetupChannel` (`services/setup-channel/session.ts`) runs over any ordered byte
+link. Messages are length-prefixed JSON cut to `ATT_MTU - 3` (`framing.ts`).
+
+- **hello** gives the pin, and `pond_id`, which must match the card id the advertised UUID
+  carried, or the phone stops. It also says whether the Pond is `claimed`. A claimed Pond with no
+  network still advertises, because the Pond advertises while unclaimed OR without a network. Such
+  a Pond is given Wi-Fi again after a spoken code, from the same row.
+- **The claim** is `pake_init` and `pake_verify`, the exchange `pair()` runs over HTTPS, with the
+  same `respond()` and the pin from `hello` in the channel identifier. A substituted pin can only
+  fail it.
+- **The tokens** come back sealed. They are opened only after the Pond's `server_proof` verifies.
+- **Sealing** (`sealing.ts`) is ChaCha20-Poly1305 under per-direction keys drawn with HKDF-SHA-512
+  from CPace's ISK, salted with sid, with counter nonces. `respond()` hands ISK back only when asked
+  (`keepIsk`), and the channel zeroes it once the keys are drawn.
+- **Anything unreadable ends the session**: a frame that does not parse, a tag or counter that does
+  not check, an answer to no question. A counter out of step cannot be put back.
+- **Refusals.** Every refusal is `ok: false`. A refused `pake_verify` is returned as HTTPS returns
+  it, `accepted: false` with its `rejection_reason`. Every other refusal arrives as `ApiError`
+  carrying the code, so the pairing wizard's sentences apply unchanged. The channel's own codes
+  (`too_many_attempts`, after a fourth `pake_init`, which also ends the session; `wrong_phase`;
+  `unknown_type`; `invalid_request`; `internal_error`) have sentences of their own
+  (`channelErrorKey`).
+
+**Resuming as a paired device** (P5e). Over the setup channel only, a phone that holds a pairing
+can run the same exchange with `"credential": "device"`. The password is the 64 lowercase hex
+characters of SHA-256 over its current refresh token (`devicePassword`), and the label is
+`goose-device-cpace-v1`. A confirmed run rotates the session, as `/handshake/refresh` does, so the
+new pair is kept at once (`keepRotatedTokens`). Two places use it before asking for a spoken code.
+One is the Wi-Fi step, when its session drops before the Pond has an address: the phone finds the
+Pond by its card id (`findPondById`) and resumes on the claim's own tokens. The other is a claimed
+Pond on Find your Pond whose `hello` pin is the pin this phone is paired with. A refusal
+(`invalid_confirmation` for a dead token, `invalid_or_expired_refresh`, `device_cooling` with its
+wait) falls back to "Have it say a code". `cpace-vectors.json`'s `device` run, including its
+`raw_digest`, `uppercase_hash` and `setup_label` negatives, is checked byte for byte in
+`pairing-exchange.test.ts`.
+
+**The handover.** `wifi_join` answers with the Pond's address and HTTPS port. `adoptPairing` in
+`ServerProvider` keeps the pairing there at once: the pin proven by the exchange, the tokens from
+the sealed answer, the host name kept for rediscovery. Nothing is probed first. The phone may not
+be on that network yet, and tokens held only in memory would leave a claimed Pond that nobody
+holds. Then the Pond is reached over pinned HTTPS, and owner setup runs there.
+
+**Tests.** `services/__tests__/support/setup-channel-pond.ts` plays the Pond's end, built from the
+same primitives and following the agreed contract. HKDF and the AEAD are checked against Node's
+OpenSSL. `setup-channel-vectors.test.ts` checks the keys, four sealed messages in session order,
+and framing at ATT_MTU 23 against `vectors/setup-channel-vectors.json`. That file is a
+byte-identical copy of goose-in-a-pond's `crates/pond-connect/tests/fixtures/setup-channel-vectors.json`,
+and its ISK and sid chain to `cpace-vectors.json`. Everything native is owed a device test.
 
 ## Providers
 

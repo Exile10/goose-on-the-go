@@ -122,6 +122,7 @@
         }
       ],
       "./plugins/with-pond-tls",
+      "./plugins/with-pond-ble",
       "./plugins/with-release-signing",
       "expo-asset"
     ],

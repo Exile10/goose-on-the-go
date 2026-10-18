@@ -48,6 +48,8 @@ const FAMILIES = {
   toolCards: '@goose/tool-cards/',
   /** Owner setup in progress, by paired profile: the Pond cannot be asked for profile preferences until it is done. */
   setupDrafts: '@goose/setup-drafts/',
+  /** What owner setup left for later, by paired profile: shown on Home until done or put away. */
+  setupChecklist: '@goose/setup-checklist/',
 } as const;
 
 type StorageFamily = keyof typeof FAMILIES;

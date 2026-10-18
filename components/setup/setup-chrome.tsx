@@ -21,15 +21,29 @@ import type { UseOwnerSetup } from '@/view-models/use-owner-setup';
 
 export function SetupFooter({ setup }: { setup: UseOwnerSetup }) {
   const { t } = useTranslation();
-  const { step, saving, canContinue, actions } = setup;
-  const finishing = step === 'complete';
+  const { step, index, saving, canContinue, actions } = setup;
+  // How Goose talks is the last thing asked; the model step finishes by itself once a model is in place.
+  const finishing = step === 'personality';
+  if (step === 'model') {
+    return (
+      <View style={styles.actions}>
+        <InkButton variant="quiet" icon="chevron-left" disabled={saving} onPress={actions.back}>
+          {t('setup.back')}
+        </InkButton>
+      </View>
+    );
+  }
   return (
     <View style={styles.actions}>
-      <InkButton variant="quiet" icon="chevron-left" disabled={saving} onPress={actions.back}>
-        {t('setup.back')}
-      </InkButton>
+      {index > 0 ? (
+        <InkButton variant="quiet" icon="chevron-left" disabled={saving} onPress={actions.back}>
+          {t('setup.back')}
+        </InkButton>
+      ) : (
+        <View />
+      )}
       <View style={styles.forward}>
-        {!finishing && !isRequired(step) ? (
+        {!isRequired(step) ? (
           <InkButton variant="quiet" disabled={saving} onPress={() => void actions.skip()}>
             {t('setup.skip')}
           </InkButton>
@@ -115,7 +129,8 @@ export function CheckRow({
 }
 
 const styles = StyleSheet.create({
-  actions: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: Spacing.sm },
-  forward: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
+  // Wraps rather than running off the edge with three buttons and a large text size.
+  actions: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: Spacing.sm },
+  forward: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'flex-end', gap: Spacing.sm, flexShrink: 1 },
   warmup: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
 });
