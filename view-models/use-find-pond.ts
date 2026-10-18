@@ -4,14 +4,14 @@
  * The phone's name defaults to the device's own and is changed on the same screen.
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as Device from 'expo-device';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 
 import { useCountdown } from '@/hooks/use-countdown';
 import { channelErrorKey, defaultPhoneName } from '@/models/ble-setup';
-import type { NearbyPond } from '@/models/nearby-pond';
+import { keepPicked, type NearbyPond } from '@/models/nearby-pond';
 import { useServer } from '@/providers/server-provider';
 import { ApiError } from '@/services/api-client';
 import { BleUnreachableError, connectPond, WrongPondError } from '@/services/ble';
@@ -45,6 +45,8 @@ export type FindPhase =
 
 export interface UseFindPond {
   data: {
+    /** The nearby Ponds, the picked one kept even once it stops being heard. */
+    ponds: NearbyPond[];
     phase: FindPhase;
     /** Ponds whose hello said they are already someone's: these need a spoken code, then Wi-Fi. */
     claimedIds: string[];
@@ -69,7 +71,8 @@ export interface UseFindPond {
 // Long enough for a Pond just switched on to start advertising; the search carries on after it.
 const LOOKING_MS = 15_000;
 
-export function useFindPond(fresh: NearbyPond[]): UseFindPond {
+/** `rescan` restarts the Bluetooth scan, which connecting to a Pond stops. */
+export function useFindPond(fresh: NearbyPond[], rescan?: () => void): UseFindPond {
   const { t } = useTranslation();
   const router = useRouter();
   const { stagePairing, pair, requestSpokenCode, cancelPairing, pairedPin, refreshToken, keepRotatedTokens } = useServer();
@@ -81,10 +84,12 @@ export function useFindPond(fresh: NearbyPond[]): UseFindPond {
   const { left: spokenWaitSecs, start: startSpokenWait } = useCountdown();
   const card = useRef<{ id: string; code: string } | null>(null);
   const driver = useRef<{ pondId: string; claim: ClaimDriver } | null>(null);
-  const ponds = useRef(fresh);
+  const [chosen, setChosen] = useState<NearbyPond | null>(null);
+  const listed = useMemo(() => keepPicked(fresh, chosen), [fresh, chosen]);
+  const ponds = useRef(listed);
   useEffect(() => {
-    ponds.current = fresh;
-  }, [fresh]);
+    ponds.current = listed;
+  }, [listed]);
 
   const driverFor = useCallback(
     (pond: NearbyPond): ClaimDriver => {
@@ -116,6 +121,7 @@ export function useFindPond(fresh: NearbyPond[]): UseFindPond {
 
   const claim = useCallback(
     async (pond: NearbyPond, credential: PakeCredential, code: string) => {
+      setChosen(pond);
       setPhase({ kind: 'claiming', pondId: pond.id });
       stopCooling();
       const run = driverFor(pond);
@@ -202,6 +208,7 @@ export function useFindPond(fresh: NearbyPond[]): UseFindPond {
   const pick = useCallback(
     (pond: NearbyPond) => {
       setSpoken({ asking: false, error: null });
+      setChosen(pond);
       if (card.current?.id === pond.id) {
         void claim(pond, 'setup', card.current.code);
         return;
@@ -274,11 +281,13 @@ export function useFindPond(fresh: NearbyPond[]): UseFindPond {
     card.current = null;
     stopCooling();
     setSpoken({ asking: false, error: null });
+    setChosen(null);
     setPhase({ kind: 'browsing' });
-  }, [stopCooling]);
+    rescan?.();
+  }, [stopCooling, rescan]);
 
   return {
-    data: { phase, claimedIds, phoneName, coolingSecs, spoken },
+    data: { ponds: listed, phase, claimedIds, phoneName, coolingSecs, spoken },
     actions: { pick, submit, askSpoken, useCard, setPhoneName, cancel },
   };
 }

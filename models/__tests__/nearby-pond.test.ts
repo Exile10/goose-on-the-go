@@ -1,4 +1,4 @@
-import { cardIdFromName, cardIdFromService, cardIdOf, mergeNearby, pruneSightings, setupAdvertUuid, signalBars } from '../nearby-pond';
+import { cardIdFromName, cardIdFromService, cardIdOf, keepPicked, mergeNearby, pruneSightings, setupAdvertUuid, signalBars } from '../nearby-pond';
 
 const uuid = (id: string) => `185b51bd-e038-4b6c-99b0-4e2379dd${id}`;
 const sighting = (peripheral: string, id: string | null, rssi: number, seenAt = 1, name: string | null = null) =>
@@ -68,6 +68,13 @@ describe('nearby Ponds', () => {
       { url: 'https://192.168.1.12:4443', setupId: 'cccc', unclaimed: true },
     ]);
     expect(rows.map((r) => r.id)).toEqual(['bbbb', 'aaaa', 'cccc', 'dddd']);
+  });
+
+  it('keeps the picked Pond listed once it stops being heard', () => {
+    const [row] = mergeNearby(new Map([sighting('a', '7f3a', -50)]), []);
+    expect(keepPicked([], row)).toEqual([row]);
+    expect(keepPicked([row], { ...row, rssi: -90 })).toEqual([row]);
+    expect(keepPicked([row], null)).toEqual([row]);
   });
 
   it('forgets advertisers that have gone quiet', () => {

@@ -31,6 +31,8 @@ export interface UseNearbyPonds {
     retry: () => void;
     /** Ask again for Bluetooth, or open Settings when the system will not ask twice. */
     fixBluetooth: () => void;
+    /** Start the Bluetooth scan again, after a connection stopped it. */
+    rescan: () => void;
   };
 }
 
@@ -160,6 +162,8 @@ export function useNearbyPonds(): UseNearbyPonds {
     retryNetwork();
   }, [retryNetwork]);
 
+  const rescan = useCallback(() => restart.current?.(), []);
+
   const fixBluetooth = useCallback(() => {
     if (ble === 'denied') {
       // Both systems ask once; after a refusal only Settings can change it.
@@ -174,6 +178,6 @@ export function useNearbyPonds(): UseNearbyPonds {
     data: { fresh, joinable, ble, network: phase },
     loading: ble === 'starting' || phase === 'searching',
     error: discovery.error,
-    actions: { retry, fixBluetooth },
+    actions: { retry, fixBluetooth, rescan },
   };
 }

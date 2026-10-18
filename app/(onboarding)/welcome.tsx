@@ -66,9 +66,9 @@ export default function Welcome() {
   const { isDark } = useTheme();
   const router = useRouter();
   const nearby = useNearbyPonds();
-  const find = useFindPond(nearby.data.fresh);
-  const { fresh, joinable, ble, network } = nearby.data;
-  const { phase, phoneName } = find.data;
+  const find = useFindPond(nearby.data.fresh, nearby.actions.rescan);
+  const { joinable, ble, network } = nearby.data;
+  const { ponds: fresh, phase, phoneName } = find.data;
 
   const scanCard = useCallback(() => {
     void selectionTick();

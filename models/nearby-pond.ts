@@ -100,6 +100,15 @@ export function mergeNearby(
   return [...byId.values()].sort((a, b) => (b.rssi ?? -999) - (a.rssi ?? -999) || a.id.localeCompare(b.id));
 }
 
+/**
+ * The list with the picked Pond kept in it: connecting stops the scan, so a picked Pond is soon
+ * pruned, and its claim must not go with it.
+ */
+export function keepPicked(fresh: NearbyPond[], picked: NearbyPond | null): NearbyPond[] {
+  if (!picked || fresh.some((p) => p.id === picked.id)) return fresh;
+  return [picked, ...fresh];
+}
+
 /** Forget advertisers not heard for a while: a Pond that has joined Wi-Fi stops advertising. */
 export function pruneSightings<T extends { seenAt: number }>(sightings: Map<string, T>, now: number, maxAgeMs = 15_000): boolean {
   let changed = false;
