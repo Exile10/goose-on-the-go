@@ -83,6 +83,25 @@ export const RoleColors = {
   tts: '#F31260',
 } as const;
 
+/**
+ * The squares behind Settings icons, so a row is found by colour before it is read. pond-desktop's
+ * own settings accents, so a setting wears the same colour on both; white glyphs clear 3:1 on each.
+ */
+export const TileColors = {
+  purple: Accent.base,
+  blue: Semantic.info,
+  green: '#16A34A',
+  teal: '#0D9488',
+  orange: '#EA580C',
+  red: Semantic.danger,
+  pink: '#DB2777',
+  indigo: '#4F46E5',
+  amber: '#B45309',
+  slate: '#475569',
+} as const;
+
+export type TileColor = keyof typeof TileColors;
+
 /** Theme color shape */
 export interface ThemeColors {
   background: string;

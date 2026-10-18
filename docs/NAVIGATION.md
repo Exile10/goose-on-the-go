@@ -45,24 +45,68 @@ own `NavbarBehaviour`.
 
 ## Sub-Screens (stack navigation from the Profile hub)
 
-The hub is `PROFILE_NAV` in `constants/navigation.ts`, rendered by the You tab.
-Its labels are `TranslationKey`s under `screens.*` and `nav.*`, never text.
+The hub is `PROFILE_NAV` in `constants/navigation.ts`, rendered by the You tab
+as iPhone Settings lays its root out, drawn in Ink: groups without headings, each
+row an icon on a coloured tile, its label, how it stands (`summary`, worked out by
+`summarize` in `view-models/use-settings-extras.ts`) and a chevron. The raised card
+at the top leads to `ACCOUNT_ROUTE`, You and your household. Labels are
+`TranslationKey`s, never text.
 
-| Screen | Route | Hub group |
-|--------|-------|-----------|
-| Models | `/(stack)/models` | Goose |
-| Memories | `/(stack)/memories` | Goose |
-| Conversations | `/(stack)/sessions` | Goose |
-| Activity | `/(stack)/logs` | Goose |
-| Schedule | `/(stack)/schedule` | Goose |
-| Connected apps | `/(stack)/app-management` | Integrations |
-| MCP servers | `/(stack)/mcp-servers` | Integrations |
-| Web search | `/(stack)/web-search` | Integrations |
-| People | `/(stack)/add-users` | Household |
-| Your home | `/(stack)/home-management` | Household |
-| Remote access | `/(stack)/remote-access` | Data and privacy; also the Home offer |
-| Privacy and licenses | `/(stack)/privacy` | Data and privacy |
-| Developer mode | `/(stack)/developer` | Developer (dev builds only, #21) |
+| Group | Rows |
+|-------|------|
+| Connection | Remote access, Internet, Web search |
+| Goose | Assistant, Voice, Thinking, Models, Memory, Tools, Extensions |
+| Home | Your home, People, Cameras and smart home, Rooms and Ponds |
+| Notices and privacy | Announcements, Privacy |
+| Records | Memories, Conversations, Activity, Schedule |
+| This phone | Appearance, and Haptic feedback as a switch on the row |
+| Advanced | Advanced |
+| Developer | Developer mode (dev builds only, #21) |
+
+### Settings pages
+
+The Pond's settings live on sixteen `settings-*` pages, each a thin route over
+`SettingsPageScreen` (`components/settings/settings-page.tsx`), which draws the
+page `constants/settings-pages.ts` describes. That catalogue is lifted from
+pond-desktop's `src/settings/catalogue.ts`; fields nothing on the Pond reads are
+left out, as the desktop hides them. Every field is read with `GET` and written
+with a partial `PUT /api/v1/settings` through `view-models/use-pond-settings.ts`,
+one shared store, so a change on a page shows on the menu behind it. A change is
+sent alone, the moment it is made: the Pond marks every key it is sent as the
+household's choice for good. Its answer replaces the record, and a refusal puts
+the old value back with the Pond's reason under the row. A setting the Pond
+reads only at start says that a change waits for a restart.
+
+Two kinds of page are not catalogue pages: Time zone (`settings-timezone`,
+searchable) is a picker, and the Models pages below have their own screens. The
+speaking voice has a catalogue page of its own, Speaking voice
+(`settings-speaking`), reached from Voice: pond-desktop's voice picker and the
+sound quality, which would otherwise be most of the Voice page. Choosing a voice
+saves it, has the engine switch to it, and then plays the next of seven lines in
+it, the same line for every voice in turn.
+
+### What needs attention
+
+Anything a household should know about is an issue in
+`constants/settings-issues.ts`: a tone, an icon, a row line, a page of facts and
+sections, an optional action, and an `active(ctx)` test. `useSettingsIssues()`
+lists the ones that apply, most serious first; Settings shows them above the
+account card, the You tab carries a dot while there is one, and each opens
+`settings-issue?id=…`, which renders it through `IssuePage`. A new issue is a
+catalogue entry and, if it needs more than the phone already holds, a field on
+`IssueContext`; it is never a new screen. Settings is behind the Developer
+toggle (`settings`, real by default); on mock it works on the Pond's own defaults.
+
+### Models
+
+`/(stack)/models` is a storage page over `view-models/use-model-library.ts`:
+which model does each job, what is downloading (read every 1.5 s while a
+download moves), the Pond's recommendations, what is on the Pond, and the disk
+and memory it costs. A job opens `settings-model-role`, a model opens
+`settings-model` (use, picture support, download, delete), and Get more opens
+`settings-model-catalog` and `settings-model-search` (Hugging Face, through the
+Pond). Activation names the model's own category (`pond_category`, such as
+`tts_kokoro`) and its role; the Pond refuses one without a role.
 
 Conversations is the rename-and-delete list of what the Pond holds. The Chat
 tab's wall is the way into a conversation; this is the way to tidy them, and it
@@ -98,7 +142,7 @@ header is the one surface `useThemedStyles` cannot reach.
 
 expo-router resolves routes at runtime, so a menu row pointing at a deleted screen passes `tsc` and fails only when someone taps it, on an unmatched-route screen. `constants/__tests__/navigation.test.ts` holds three rules:
 
-- every profile menu row in `constants/navigation.ts` reaches a screen file;
+- every profile menu row in `constants/navigation.ts` reaches a screen file, and every catalogue settings page is reached from a menu row or a page link;
 - every screen `app/(stack)/_layout.tsx` registers exists;
 - every screen file in `app/(stack)` is registered.
 

@@ -8,8 +8,8 @@ the four systems a screen touches every time it is written.
 `ThemeProvider` is the only thing that resolves the scheme. It owns a stored
 `preference` (`system` | `light` | `dark`), consults the system only when that
 is `system`, and hands the result to React Navigation and to Ink. People choose
-the preference in the Appearance row on the You tab (`app/(tabs)/profile.tsx`),
-the only caller of `setPreference`.
+the preference on the Appearance page (the `theme` row in
+`components/settings/settings-page.tsx`), the only caller of `setPreference`.
 
 Nothing else may call `useColorScheme()`. Two resolvers is how a theme starts
 flipping on its own — the app and the library disagree about who won, and the

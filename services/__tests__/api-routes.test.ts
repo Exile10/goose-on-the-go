@@ -237,7 +237,15 @@ describe('a catalogue the server did not send', () => {
     setFetch(async () => reply('{"gguf":[{"provider":"p","name":"m","is_active":true}],"ollama":null}'));
     const api = new PondApiClient('https://pond.test:4000');
     await expect(api.listModels()).resolves.toEqual([
-      { provider: 'p', name: 'm', is_active: true, category: 'gguf', id: 'gguf:m' },
+      { provider: 'p', name: 'm', is_active: true, category: 'gguf', id: 'gguf:m', pond_category: 'gguf' },
+    ]);
+  });
+
+  it('keeps the row’s own category, which activation names, beside the bucket it came in', async () => {
+    setFetch(async () => reply('{"tts":[{"name":"af_heart","category":"tts_kokoro"}]}'));
+    const api = new PondApiClient('https://pond.test:4000');
+    await expect(api.listModels()).resolves.toEqual([
+      { name: 'af_heart', category: 'tts', pond_category: 'tts_kokoro', id: 'tts:af_heart' },
     ]);
   });
 
