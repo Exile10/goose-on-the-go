@@ -72,7 +72,20 @@ export function useNearbyPonds(): UseNearbyPonds {
         if (next === 'off' || next === 'denied') setSightings(new Map());
       };
 
+      // One start at a time: returning to the app (a link, a permission dialog) fires while the
+      // first is still asking, and two would leave two subscriptions and every sighting twice.
+      let starting = false;
       const start = async () => {
+        if (starting) return;
+        starting = true;
+        try {
+          await begin();
+        } finally {
+          starting = false;
+        }
+      };
+
+      const begin = async () => {
         stop?.();
         stop = null;
         setBle('starting');
