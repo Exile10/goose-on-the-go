@@ -1,7 +1,7 @@
 /**
  * The setup channel's framing (goose-in-a-pond `docs/architecture/pond-setup-channel.md`,
  * "Framing"): one JSON object, its UTF-8 length as four big-endian bytes before it, split across
- * BLE writes or notifications of at most `ATT_MTU - 3` bytes each.
+ * BLE writes or notifications of at most `min(ATT_MTU - 3, 512)` bytes each.
  */
 
 import { bytesToUtf8, utf8ToBytes } from '@noble/ciphers/utils.js';
@@ -9,10 +9,13 @@ import { bytesToUtf8, utf8ToBytes } from '@noble/ciphers/utils.js';
 /** The largest message either side will take; a longer length closes the session. */
 export const MAX_MESSAGE_BYTES = 16 * 1024;
 const LENGTH_BYTES = 4;
+// ATT caps an attribute value at 512 whatever the MTU: Android drops a longer notification whole,
+// and BlueZ refuses a longer write.
+export const MAX_CHUNK_BYTES = 512;
 
 /** A frame the other side should never have sent. The session closes on it, as the Pond's does. */
 export class FramingError extends Error {
-  readonly problem: 'too_long' | 'overrun' | 'not_json';
+  readonly problem: 'too_long' | 'overrun' | 'not_json' | 'chunk_too_long';
 
   constructor(problem: FramingError['problem']) {
     super(`setup channel framing: ${problem}`);
@@ -31,11 +34,12 @@ export function encodeFrame(message: object): Uint8Array {
   return out;
 }
 
-/** `bytes` cut into writes of at most `size`, in order. */
+/** `bytes` cut into writes of at most `size`, and never more than 512, in order. */
 export function chunk(bytes: Uint8Array, size: number): Uint8Array[] {
   if (!Number.isInteger(size) || size < 1) throw new RangeError('chunk size must be a positive integer');
+  const step = Math.min(size, MAX_CHUNK_BYTES);
   const out: Uint8Array[] = [];
-  for (let at = 0; at < bytes.length; at += size) out.push(bytes.subarray(at, Math.min(at + size, bytes.length)));
+  for (let at = 0; at < bytes.length; at += step) out.push(bytes.subarray(at, Math.min(at + step, bytes.length)));
   return out;
 }
 
@@ -51,6 +55,7 @@ export class FrameReader {
 
   /** Feed one notification; returns each message it completed, parsed. */
   push(bytes: Uint8Array): unknown[] {
+    if (bytes.length > MAX_CHUNK_BYTES) throw new FramingError('chunk_too_long');
     const done: unknown[] = [];
     let at = 0;
     while (at < bytes.length) {

@@ -27,6 +27,20 @@ describe('setup channel framing', () => {
     expect(Buffer.concat(parts.map((p) => Buffer.from(p)))).toEqual(Buffer.from(frame));
   });
 
+  it('never cuts a chunk over 512, ATT’s longest value, even at MTU 517', () => {
+    // pake_verify's answer is about 700 bytes: a 514-byte first chunk was dropped whole on the A16.
+    const frame = encodeFrame({ pad: 'z'.repeat(700) });
+    const parts = chunk(frame, 517 - 3);
+    expect(parts.map((p) => p.length)).toEqual([512, frame.length - 512]);
+  });
+
+  it('refuses a notification over 512 as a framing error', () => {
+    const reader = new FrameReader();
+    expect(() => reader.push(encodeFrame({ pad: 'z'.repeat(600) }).subarray(0, 513))).toThrow(
+      expect.objectContaining({ problem: 'chunk_too_long' }),
+    );
+  });
+
   it.each([1, 3, 4, 5, 20, 182, 512])('reassembles a message cut into %i-byte notifications', (size) => {
     const message = { id: 7, type: 'wifi_scan', ok: true, networks: [{ ssid: 'Home', signal: 80 }] };
     const reader = new FrameReader();
