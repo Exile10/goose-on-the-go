@@ -56,6 +56,7 @@ Metro over Wi-Fi rather than USB, see [Development](docs/development.md).
 - [Design System](docs/DESIGN-SYSTEM.md)
 - [Navigation](docs/NAVIGATION.md)
 - [Testing](docs/TESTING.md)
+- [Phone context](docs/PHONE-CONTEXT.md) — proposal: what the phone could share with its Pond
 
 ## Tech Stack
 
