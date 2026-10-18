@@ -189,6 +189,7 @@ export const SAMPLE_SETTINGS: PondSettings = {
   voice_thinking_tone_enabled: true,
   voice_max_turns: 0,
   chat_provider: '',
+  chat_model: '',
   llm_provider: '',
   tool_model: null,
   llm_max_tokens: 4096,
@@ -375,6 +376,9 @@ const VOICE_GRADES: Record<string, string> = {
   bf_emma: 'B-', bf_isabella: 'C', bf_alice: 'D', bf_lily: 'D',
   bm_fable: 'C', bm_george: 'C', bm_lewis: 'D+', bm_daniel: 'D',
 };
+
+/** Kokoro's graded voices, which a Pond fetches by name before it is set up enough to list its models. */
+export const KNOWN_VOICES: readonly string[] = Object.keys(VOICE_GRADES);
 
 function titleCase(segment: string): string {
   return segment

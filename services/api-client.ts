@@ -89,6 +89,11 @@ import type {
   HfModel,
   HfModelFile,
   ModelRole,
+  CalibrationTake,
+  OnboardCompletion,
+  OnboardStatus,
+  ProfilePrefs,
+  WarmupStatus,
 } from './types';
 import { MODEL_CATEGORIES } from './types';
 
@@ -110,13 +115,16 @@ export class ApiError extends Error {
    * which a caller matches rather than shows.
    */
   readonly detail: string | null;
+  /** The refusal's parsed JSON, for a route whose answer is more than a sentence, such as `missing_fields`. */
+  readonly body: unknown;
 
-  constructor(message: string, status: number, retryAfterSecs: number | null, detail: string | null = null) {
+  constructor(message: string, status: number, retryAfterSecs: number | null, detail: string | null = null, body: unknown = null) {
     super(message);
     this.name = 'ApiError';
     this.status = status;
     this.retryAfterSecs = retryAfterSecs;
     this.detail = detail;
+    this.body = body;
   }
 
   /** True when retrying later could plausibly succeed. */
@@ -248,6 +256,12 @@ const STREAM_IDLE_MS = 60_000;
 const VOICE_TIMEOUT_MS = 45_000;
 
 /**
+ * Switching the speaking tier fetches its weights before the Pond answers, tens of megabytes. At the
+ * default 15s a first switch on a fresh Pond was abandoned mid-download and reported as a failure.
+ */
+const TTS_APPLY_TIMEOUT_MS = 180_000;
+
+/**
  * An event, as the frame it carries.
  *
  * `[DONE]` is an older end marker pond-desktop still honours; the Pond itself
@@ -292,15 +306,27 @@ async function handshakeRefusal(message: string, res: Response): Promise<ApiErro
   return new ApiError(message, res.status, parseRetryAfter(res) ?? bodyWait, detail);
 }
 
-/** The `error` string of a refusal's JSON body, or null for any other body. */
-async function errorDetail(res: Response): Promise<string | null> {
+/** A refusal's JSON body, or null for any other body. */
+async function errorBody(res: Response): Promise<unknown> {
   try {
-    const body = (await parseBody<{ error?: unknown }>(res)) ?? {};
-    return typeof body.error === 'string' && body.error.trim() ? body.error : null;
+    return (await parseBody<unknown>(res)) ?? null;
   } catch {
     return null;
   }
 }
+
+/** The `error` string of a refusal's body, or null. */
+function detailOf(body: unknown): string | null {
+  const error = (body as { error?: unknown } | null)?.error;
+  return typeof error === 'string' && error.trim() ? error : null;
+}
+
+async function errorDetail(res: Response): Promise<string | null> {
+  return detailOf(await errorBody(res));
+}
+
+/** The guard's refusal of every protected route until the Pond's owner has finished setting it up. */
+export const ONBOARDING_REQUIRED = 'onboarding_required';
 
 
 /**
@@ -336,6 +362,7 @@ export class PondApiClient {
 
   private recovery: (() => Promise<string | null>) | null = null;
   private authRevoked: (() => void) | null = null;
+  private onboardingRequired: (() => void) | null = null;
   private identityEpoch = 0;
   setRecovery(recover: (() => Promise<string | null>) | null) { this.recovery = recover; }
 
@@ -350,6 +377,8 @@ export class PondApiClient {
    * request still fails).
    */
   setAuthRevoked(onRevoked: (() => void) | null) { this.authRevoked = onRevoked; }
+  /** Called when the Pond refuses a request because its owner has not finished setting it up. */
+  setOnboardingRequired(onRequired: (() => void) | null) { this.onboardingRequired = onRequired; }
   invalidateIdentity() { this.identityEpoch++; this.token = null; this.refreshToken = null; }
 
   constructor(baseUrl = 'https://127.0.0.1:4443') {
@@ -657,12 +686,16 @@ export class PondApiClient {
     // discovering it separately and asking the transport to reconnect.
     if (res.status === 401 && epoch === this.identityEpoch) this.authRevoked?.();
     if (!res.ok) {
+      const body = await errorBody(res);
+      const detail = detailOf(body);
+      if (res.status === 403 && detail === ONBOARDING_REQUIRED && epoch === this.identityEpoch) this.onboardingRequired?.();
       // Message format unchanged — existing logs stay readable.
       throw new ApiError(
         `${init.method ?? 'GET'} ${path} → ${res.status}`,
         res.status,
         parseRetryAfter(res),
-        await errorDetail(res),
+        detail,
+        body,
       );
     }
     return (await parseBody<T>(res)) as T;
@@ -687,11 +720,13 @@ export class PondApiClient {
       if (refreshed?.accepted) res = await doFetch();
     }
     if (!res.ok) {
+      const detail = await errorDetail(res);
+      if (res.status === 403 && detail === ONBOARDING_REQUIRED) this.onboardingRequired?.();
       throw new ApiError(
         `${init.method ?? 'GET'} ${path} → ${res.status}`,
         res.status,
         parseRetryAfter(res),
-        await errorDetail(res),
+        detail,
       );
     }
     return res;
@@ -1485,7 +1520,11 @@ export class PondApiClient {
 
   /** Storing a voice setting waits for the engine to reload; this downloads and switches now. */
   applyTts(change: { voice?: string; speed?: number; quality?: string }): Promise<TtsApplyResult> {
-    return this.post<TtsApplyResult>('/api/v1/voice/tts/apply', change);
+    return this.request<TtsApplyResult>('/api/v1/voice/tts/apply', {
+      method: 'POST',
+      body: JSON.stringify(change),
+      signal: timeoutSignal(TTS_APPLY_TIMEOUT_MS),
+    });
   }
 
   /** Forget the wake word's learned pronunciations. */
@@ -1514,6 +1553,57 @@ export class PondApiClient {
 
   deleteProfile(id: string): Promise<void> {
     return this.del<void>(`/api/v1/profiles/${encodeURIComponent(id)}`);
+  }
+
+  /** Replaces the member's whole preference map: a key left out is deleted. */
+  setProfilePrefs(id: string, preferences: Record<string, string>): Promise<ProfilePrefs> {
+    return this.patch<ProfilePrefs>(`/api/v1/profiles/${encodeURIComponent(id)}`, { preferences });
+  }
+
+  // ── Owner setup ─────────────────────────────────────────────
+
+  onboardStatus(): Promise<OnboardStatus> {
+    return this.get<OnboardStatus>('/api/v1/onboard/status');
+  }
+
+  /** Progress only moves forward: recording an earlier step answers the current one unchanged. */
+  recordOnboardStep(step: string): Promise<OnboardStatus> {
+    return this.post<OnboardStatus>(`/api/v1/onboard/step/${encodeURIComponent(step)}`, {});
+  }
+
+  /** A 400 naming `missing_fields` is an answer here, not a failure: it says which steps to revisit. */
+  async completeOnboarding(): Promise<OnboardCompletion> {
+    try {
+      await this.post<unknown>('/api/v1/onboard/complete', {});
+      return { completed: true };
+    } catch (e) {
+      const fields = e instanceof ApiError && e.status === 400 ? (e.body as { missing_fields?: unknown } | null)?.missing_fields : null;
+      if (!Array.isArray(fields)) throw e;
+      return { completed: false, missing: fields.filter((f): f is string => typeof f === 'string') };
+    }
+  }
+
+  warmup(): Promise<WarmupStatus> {
+    return this.get<WarmupStatus>('/api/v1/warmup');
+  }
+
+  /** One take of the wake phrase, recorded on this phone; the Pond transcribes it and keeps what it heard. */
+  async calibrateWakeWord(fileUri: string, prompt: string): Promise<CalibrationTake> {
+    const form = new FormData();
+    form.append('audio', new File(fileUri), 'sample.wav');
+    form.append('prompt', prompt);
+    const res = await this.send(`${this.baseUrl}/api/v1/voice/calibrate`, {
+      method: 'POST',
+      // No Content-Type: the runtime writes the multipart boundary itself.
+      headers: this.token ? { Authorization: `Bearer ${this.token}` } : {},
+      body: form,
+      signal: timeoutSignal(VOICE_TIMEOUT_MS),
+    });
+    if (!res.ok) {
+      const body = await errorBody(res);
+      throw new ApiError(`POST /api/v1/voice/calibrate → ${res.status}`, res.status, parseRetryAfter(res), detailOf(body), body);
+    }
+    return (await res.json()) as CalibrationTake;
   }
 
   /** Which household member this device belongs to, as the Pond sees it. */

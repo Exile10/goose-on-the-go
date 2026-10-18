@@ -46,6 +46,8 @@ type StorageKey = keyof typeof KEYS;
  */
 const FAMILIES = {
   toolCards: '@goose/tool-cards/',
+  /** Owner setup in progress, by paired profile: the Pond cannot be asked for profile preferences until it is done. */
+  setupDrafts: '@goose/setup-drafts/',
 } as const;
 
 type StorageFamily = keyof typeof FAMILIES;

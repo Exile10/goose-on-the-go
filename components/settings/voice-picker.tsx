@@ -16,8 +16,8 @@ import { describeVoice, sortVoices, voiceInUse, VOICE_LANGUAGES, type VoiceInfo 
 import type { VoiceState } from '@/models/voice';
 import { selectionTick } from '@/services/haptics';
 import type { UsePondSettings } from '@/view-models/use-pond-settings';
-import { useModelChoices, voiceChoices } from '@/view-models/use-settings-extras';
-import { useVoicePreview, type PreviewState } from '@/view-models/use-voice-preview';
+import { useModelChoices, voiceChoices, type VoiceChoice } from '@/view-models/use-settings-extras';
+import { useVoicePreview, type PreviewState, type VoicePreview } from '@/view-models/use-voice-preview';
 import { sliderText } from './setting-controls';
 import { SettingsMessage } from './settings-list';
 import { SettingsSlider } from './settings-slider';
@@ -81,31 +81,60 @@ function faceState(state: PreviewState, applying: boolean): VoiceState {
 
 export function VoicePicker({ vm }: { vm: UsePondSettings }) {
   const { t } = useTranslation();
-  const theme = useInkTheme();
-  const styles = useSettingsStyles(makeStyles);
   const models = useModelChoices();
   const preview = useVoicePreview();
   const settings = vm.settings;
-  const current = voiceInUse(settings?.voice_tts_voice ?? '');
-  const applying = vm.voice.applying;
+  const voices = useMemo(() => voiceChoices(models.items), [models.items]);
+
+  if (!settings || (models.loading && voices.length === 0)) {
+    return vm.failed ? <SettingsMessage tone="danger">{vm.error}</SettingsMessage> : <InkSpinner label={t('settings.loading')} />;
+  }
+  if (voices.length === 0) return <SettingsMessage>{models.error ?? t('settings.voice.noVoices')}</SettingsMessage>;
+
+  return (
+    <VoicePickerView
+      voices={voices}
+      current={voiceInUse(settings.voice_tts_voice ?? '')}
+      pace={settings.voice_tts_speed}
+      applying={vm.voice.applying}
+      problem={vm.voice.error ?? vm.fieldErrors.voice_tts_voice ?? vm.fieldErrors.voice_tts_speed ?? null}
+      onChoose={(id) => vm.actions.update('voice_tts_voice', id)}
+      onPace={(next) => vm.actions.update('voice_tts_speed', next)}
+      preview={preview}
+    />
+  );
+}
+
+export interface VoicePickerViewProps {
+  voices: VoiceChoice[];
+  current: string;
+  pace: number;
+  applying: boolean;
+  problem: string | null;
+  /** Resolves to whether the voice was kept. */
+  onChoose: (id: string) => Promise<boolean>;
+  onPace: (next: number) => Promise<boolean>;
+  /** Null where the Pond cannot play a sample to this phone; `silentLine` is shown in its place. */
+  preview: VoicePreview | null;
+  silentLine?: string;
+}
+
+export function VoicePickerView({ voices, current, pace: savedPace, applying, problem: saveProblem, onChoose, onPace, preview, silentLine }: VoicePickerViewProps) {
+  const { t } = useTranslation();
+  const theme = useInkTheme();
+  const styles = useSettingsStyles(makeStyles);
   // A voice fetched by choosing it is installed from then on, without waiting for a re-read.
   const [fetched, setFetched] = useState<ReadonlySet<string>>(() => new Set());
   const [movingPace, setMovingPace] = useState<number | null>(null);
   const [rowWidth, setRowWidth] = useState(0);
   const [showAll, setShowAll] = useState(false);
 
-  const voices = useMemo(() => voiceChoices(models.items), [models.items]);
   const installed = useMemo(() => new Set(voices.filter((v) => v.installed).map((v) => v.id)), [voices]);
   const infos = useMemo(() => voices.map((v) => describeVoice(v.id)), [voices]);
   const accents = useMemo(() => {
     const present = new Set<Accent>(infos.map((v) => v.language ?? OTHER));
     return [...VOICE_LANGUAGES.filter((l) => present.has(l)), ...(present.has(OTHER) ? [OTHER] : [])] as Accent[];
   }, [infos]);
-
-  if (!settings || (models.loading && voices.length === 0)) {
-    return vm.failed ? <SettingsMessage tone="danger">{vm.error}</SettingsMessage> : <InkSpinner label={t('settings.loading')} />;
-  }
-  if (voices.length === 0) return <SettingsMessage>{models.error ?? t('settings.voice.noVoices')}</SettingsMessage>;
 
   const chosen = describeVoice(current);
   const accent: Accent = chosen.language ?? OTHER;
@@ -117,20 +146,24 @@ export function VoicePicker({ vm }: { vm: UsePondSettings }) {
   const grade = chosen.grade ?? t('settings.voice.ungraded');
   const about = note ? t('settings.voice.gradeNote', { grade, note: t(note) }) : t('settings.voice.grade', { grade });
 
-  const pace = movingPace ?? settings.voice_tts_speed;
+  const pace = movingPace ?? savedPace;
   const paceText = sliderText('pace', pace, t);
-  const said = applying ? t('settings.voice.gettingReady') : preview.statement ?? t('settings.voice.pressPlay');
-  const problem = preview.error ?? vm.voice.error ?? vm.fieldErrors.voice_tts_voice ?? vm.fieldErrors.voice_tts_speed ?? null;
+  const said = applying
+    ? t('settings.voice.gettingReady')
+    : preview
+      ? preview.statement ?? t('settings.voice.pressPlay')
+      : silentLine ?? null;
+  const problem = preview?.error ?? saveProblem;
   const chipWidth = rowWidth ? Math.floor((rowWidth - CHIP_GAP * (PER_ROW - 1)) / PER_ROW) : undefined;
 
   const choose = async (id: string) => {
     if (id === current || applying) return;
     void selectionTick();
-    preview.stop();
-    const kept = await vm.actions.update('voice_tts_voice', id);
+    preview?.stop();
+    const kept = await onChoose(id);
     if (!kept) return;
     setFetched((prev) => new Set(prev).add(id));
-    void preview.play();
+    void preview?.play();
   };
 
   const chooseAccent = (next: Accent) => {
@@ -141,44 +174,52 @@ export function VoicePicker({ vm }: { vm: UsePondSettings }) {
 
   const commitPace = async (next: number) => {
     setMovingPace(null);
-    if (next === settings.voice_tts_speed) return;
-    preview.stop();
-    const kept = await vm.actions.update('voice_tts_speed', next);
-    if (kept) void preview.play();
+    if (next === savedPace) return;
+    preview?.stop();
+    const kept = await onPace(next);
+    if (kept) void preview?.play();
   };
 
-  const playLabel =
-    preview.state === 'loading' ? t('settings.voice.preparing') : preview.state === 'playing' ? t('settings.voice.stop') : t('settings.voice.play');
+  const playLabel = !preview
+    ? ''
+    : preview.state === 'loading'
+      ? t('settings.voice.preparing')
+      : preview.state === 'playing'
+        ? t('settings.voice.stop')
+        : t('settings.voice.play');
 
   return (
     <View style={styles.picker}>
       {/* Who is speaking, what they say, and play, together: choosing and hearing on one screen. */}
       <InkStage>
-        <VoiceOrb state={faceState(preview.state, applying)} level={preview.level} size={FACE} />
+        <VoiceOrb state={faceState(preview?.state ?? 'idle', applying)} level={preview?.level ?? 0} size={FACE} />
         <View style={styles.who}>
           <Text style={styles.name}>{chosen.name}</Text>
           <Text style={styles.about}>{about}</Text>
         </View>
-        <Text style={styles.said} accessibilityLiveRegion="polite">
-          {said}
-        </Text>
-        <InkButton
-          variant="primary"
-          style={styles.play}
-          icon={
-            preview.state === 'loading' ? (
-              <InkSpinner label={t('settings.voice.preparing')} size={16} />
-            ) : (
-              <GIcon name={preview.state === 'playing' ? 'stop' : 'play'} size={16} color={theme.color.textOnAccent} />
-            )
-          }
-          disabled={applying}
-          onPress={() => (preview.busy ? preview.stop() : void preview.play())}
-        >
-          {playLabel}
-        </InkButton>
+        {said ? (
+          <Text style={styles.said} accessibilityLiveRegion="polite">
+            {said}
+          </Text>
+        ) : null}
+        {preview ? (
+          <InkButton
+            variant="primary"
+            style={styles.play}
+            icon={
+              preview.state === 'loading' ? (
+                <InkSpinner label={t('settings.voice.preparing')} size={16} />
+              ) : (
+                <GIcon name={preview.state === 'playing' ? 'stop' : 'play'} size={16} color={theme.color.textOnAccent} />
+              )
+            }
+            disabled={applying}
+            onPress={() => (preview.busy ? preview.stop() : void preview.play())}
+          >
+            {playLabel}
+          </InkButton>
+        ) : null}
       </InkStage>
-
       {problem ? <InkNotice tone="warning">{problem}</InkNotice> : null}
 
       {accents.length > 1 ? (

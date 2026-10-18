@@ -31,6 +31,7 @@ import type { ThemeColors } from '@/constants/colors';
 import { GIcon } from '@/components/ui/g-icon';
 import { GPressable } from '@/components/ui/g-pressable';
 import { EqualizerBars } from '@/components/ui/equalizer-bars';
+import { PondGettingReady } from '@/components/patterns/pond-getting-ready';
 import { RemoteAccessOffer } from '@/components/patterns/remote-access-offer';
 import { useRecentSessions } from '@/view-models/use-recent-sessions';
 import { supports, useDevices } from '@/view-models/use-devices';
@@ -342,6 +343,8 @@ export default function HomeScreen() {
         {/* Offered once per pairing, and declinable. It draws nothing unless
             the Pond is reachable and remote access is off, so it sits under the
             card that says the Pond is reachable. */}
+        {/* Whether Goose can answer yet matters more than reaching it from away, so it comes first. */}
+        <PondGettingReady />
         <RemoteAccessOffer />
 
         {offline ? null : (

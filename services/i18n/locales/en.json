@@ -388,7 +388,17 @@
     "noneFound": "No Ponds found yet",
     "noneFoundBody": "Make sure your Pond is running and on this network.",
     "discoveryUnavailable": "Finding Ponds on the network needs a development or release build of the app. Enter your Pond's address instead.",
-    "manual": "Enter an address"
+    "manual": "Enter an address",
+    "newTitle": "Set up a new Pond",
+    "newBody": "Scan the setup card that came with it, or pick it below and have it say a code.",
+    "scanCard": "Scan its setup card",
+    "newFound": "New Ponds on this network",
+    "newNone": "A new Pond appears here once it's switched on and on this network.",
+    "joinTitle": "Join a Pond that's already set up",
+    "joinBody": "Use the six-digit pairing code from a screen its owner can see.",
+    "joinFound": "Ponds on this network",
+    "notSetUp": "Not set up",
+    "cardId": "Card {{id}}"
   },
   "settings": {
     "appearance": "Appearance",
@@ -1310,7 +1320,8 @@
     "settingsModelCatalog": "Available to download",
     "settingsModelSearch": "Search Hugging Face",
     "settingsIssue": "Needs attention",
-    "settingsSpeaking": "Speaking voice"
+    "settingsSpeaking": "Speaking voice",
+    "ownerSetup": "Set up your Pond"
   },
   "nav": {
     "goose": "Goose",
@@ -2189,5 +2200,196 @@
       "failed": "Something went wrong. Nothing was booked."
     },
     "done": "Done"
+  },
+  "setup": {
+    "progress": "Step {{step}} of {{count}}",
+    "progressLabel": "Setup progress",
+    "continue": "Continue",
+    "skip": "Skip for now",
+    "back": "Back",
+    "finish": "Finish setup",
+    "loading": "Reading what your Pond already knows",
+    "loadFailed": "Couldn't reach your Pond",
+    "loadFailedBody": "Check that it's switched on and on the same network as this phone.",
+    "saveFailed": "Your Pond didn't save that. Try again.",
+    "steps": {
+      "welcome": "Welcome",
+      "aboutYou": "About you",
+      "locale": "Language and location",
+      "personality": "How Goose talks",
+      "wakeWord": "Wake word",
+      "complete": "All set"
+    },
+    "stepNotes": {
+      "aboutYou": "Your name, and how you speak",
+      "locale": "Language, time zone and weather",
+      "personality": "Style, name and voice",
+      "wakeWord": "What to say to get Goose's attention",
+      "complete": "Check it over and finish"
+    },
+    "warmup": {
+      "warming": "Goose is warming up on your Pond.",
+      "ready": "Goose is warmed up and ready.",
+      "waiting": "Goose warms up once your Pond has a model to think with.",
+      "failed": "Goose couldn't warm up yet. Your Pond tries again on its own."
+    },
+    "missing": {
+      "userName": "Your Pond needs your name before it can finish.",
+      "assistantName": "Your Pond needs a name for your assistant before it can finish.",
+      "timezone": "Your Pond needs a time zone before it can finish.",
+      "other": "Your Pond needs a few more details before it can finish."
+    },
+    "welcome": {
+      "title": "Set up your Pond",
+      "body": "Your Pond has no screen of its own, so you set it up from here. It takes about two minutes, and what you enter stays on your Pond.",
+      "pond": "Your Pond",
+      "pondName": "Name",
+      "pondVersion": "Version",
+      "overview": "What you'll set up",
+      "start": "Get started",
+      "other": "Use a different Pond"
+    },
+    "about": {
+      "title": "About you",
+      "lead": "Goose uses this to greet you by name and make its answers yours.",
+      "name": "Your name",
+      "namePlaceholder": "e.g. Amina Otieno",
+      "preferred": "What should Goose call you?",
+      "preferredHint": "Optional. Leave it empty and Goose uses your name.",
+      "birthday": "Birthday",
+      "birthdayHint": "Optional. Goose will wish you well on the day.",
+      "day": "Day",
+      "month": "Month",
+      "year": "Year",
+      "clearBirthday": "Clear birthday",
+      "speech": "How you speak",
+      "speechHint": "You can change these any time in Settings.",
+      "atypical": "Atypical speech support",
+      "atypicalBody": "Goose waits longer before it answers. Helpful for a stutter, long pauses or non-standard speech.",
+      "slow": "Slow speech mode",
+      "slowBody": "Goose speaks more slowly, so its answers are easier to follow.",
+      "birthdayInvalid": "That isn't a date. Check the day and the year."
+    },
+    "locale": {
+      "title": "Language and location",
+      "lead": "Used for spoken answers, the weather, and anything that depends on the time.",
+      "language": "Language",
+      "zone": "Time zone",
+      "zoneChange": "Change time zone",
+      "zoneSearch": "Search by city, zone or offset",
+      "zoneNone": "No time zone matches that.",
+      "zonePhone": "This phone's time zone",
+      "place": "Town or city",
+      "placeHint": "Optional. For the weather, and for answers about where you are.",
+      "placePlaceholder": "e.g. Nairobi, London, New York",
+      "detect": "Find it for me",
+      "detecting": "Looking",
+      "found": "Found {{name}}.",
+      "guessed": "Guessed {{name}} from your time zone.",
+      "detectFailed": "Couldn't work that out. Type the nearest town instead.",
+      "weather": "Live weather",
+      "weatherBody": "Forecasts from Open-Meteo for the place above. No GPS needed.",
+      "zoneClear": "Clear"
+    },
+    "personality": {
+      "title": "How Goose talks",
+      "lead": "Choose how Goose answers, and give your assistant a name and a voice.",
+      "style": "Conversation style",
+      "styles": {
+        "balanced": "Balanced",
+        "balancedBody": "Warm and practical. Just enough detail.",
+        "concise": "Concise",
+        "conciseBody": "Short and action-first. Skips the small talk.",
+        "technical": "Technical",
+        "technicalBody": "Step by step, with detail for tinkerers.",
+        "warm": "Warm",
+        "warmBody": "Conversational, like a helpful neighbour."
+      },
+      "hint": "Personality",
+      "hintBody": "Optional. A few words to shape Goose's character, such as “curious and warm”.",
+      "name": "Assistant name",
+      "voice": "Voice",
+      "voiceLoading": "Asking your Pond about its voices",
+      "noPreview": "You can hear each voice once setup is finished. Until then your Pond only plays samples to itself."
+    },
+    "wake": {
+      "title": "Wake word",
+      "lead": "Say this to your Pond to get Goose's attention.",
+      "phrase": "Wake phrase",
+      "presets": {
+        "goose": "“Goose”",
+        "gooseBody": "Short and memorable.",
+        "heyGoose": "“Hey Goose”",
+        "heyGooseBody": "Natural call and response.",
+        "okComputer": "“OK Computer”",
+        "okComputerBody": "Classic command style.",
+        "custom": "Your own phrase",
+        "customBody": "Say anything you like."
+      },
+      "custom": "Your phrase",
+      "customPlaceholder": "e.g. hey duck",
+      "problem": {
+        "characters": "Use only letters, spaces, apostrophes and hyphens.",
+        "length": "Keep it to four words or fewer.",
+        "tooShort": "Type a word or two to say."
+      },
+      "short": "Short phrases like this wake your Pond by accident more often.",
+      "shortTry": "Short phrases like this wake your Pond by accident more often. Try “{{phrase}}”.",
+      "calibrate": {
+        "title": "Teach Goose your voice",
+        "body": "Read five short sentences aloud to this phone. Your Pond learns how you say the phrase, so it hears you more reliably. You can skip this.",
+        "start": "Start",
+        "again": "Start again",
+        "resume": "Carry on",
+        "stop": "Stop",
+        "say": "Say this to your phone",
+        "take": "Sentence {{step}} of {{count}}",
+        "listening": "Listening",
+        "sending": "Checking what your Pond heard",
+        "done": "Done. Your Pond now knows {{count}} ways you say it.",
+        "doneOne": "Done. Your Pond now knows how you say it.",
+        "nothingHeard": "Your Pond didn't hear that. Say the sentence again, a little closer to the phone.",
+        "failed": "Your Pond couldn't check that sentence. Try again.",
+        "noTranscriber": "Your Pond can't listen to recordings yet: its speech-to-text isn't running. Skip this for now."
+      }
+    },
+    "complete": {
+      "title": "All set",
+      "lead": "Here's what your Pond knows. You can change any of it later in Settings.",
+      "memory": "Memory",
+      "memoryBody": "Goose remembers facts across conversations, kept on your Pond. Nothing leaves it.",
+      "summary": "Your setup",
+      "you": "You",
+      "language": "Language",
+      "zone": "Time zone",
+      "style": "Style",
+      "assistant": "Assistant",
+      "wake": "Wake word",
+      "noModelTitle": "Your Pond has no model to think with",
+      "noModelBody": "It can't finish setting up without one, and choosing a model from a phone needs a Pond update. Everything else is saved: once your Pond has a model, finish here."
+    },
+    "ready": {
+      "title": "Getting your Pond ready",
+      "titleReady": "Goose is ready",
+      "checking": "Checking on your Pond",
+      "downloading": "Your Pond is downloading {{name}}, the model Goose thinks with.",
+      "notDownloaded": "{{name}} is chosen, but it isn't on your Pond yet.",
+      "noModel": "Nothing is doing Goose's thinking yet.",
+      "suggestion": "Your Pond suggests {{name}}.",
+      "chooseModel": "Choose a model",
+      "warming": "Your Pond has its model and is warming up.",
+      "ready": "Your Pond can answer now.",
+      "phone": "This phone",
+      "phoneOwner": "Linked to {{name}} on your Pond.",
+      "phoneNobody": "Not linked to anyone on your Pond yet, so Goose doesn't use your details when you talk from here. That needs a Pond update.",
+      "goHome": "Go to Home",
+      "goOn": "Continue while it gets ready"
+    },
+    "gettingReady": {
+      "title": "Your Pond is still getting ready",
+      "readyTitle": "Goose is ready",
+      "readyBody": "Your Pond has its model and can answer now.",
+      "dismiss": "Dismiss"
+    }
   }
 }

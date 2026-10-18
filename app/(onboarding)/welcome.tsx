@@ -47,6 +47,8 @@ export default function Welcome() {
     [openPairing],
   );
   const { ponds, phase } = discovery.data;
+  const fresh = ponds.filter((p) => p.unclaimed);
+  const claimed = ponds.filter((p) => !p.unclaimed);
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
@@ -65,16 +67,34 @@ export default function Welcome() {
           <InkText>{t('onboarding.welcomeBody')}</InkText>
         </View>
 
-        <PondList
-          title={t('onboarding.findTitle')}
-          ponds={ponds}
-          phase={phase}
-          error={discovery.error}
-          onSelect={onSelect}
-        />
+        {/* Two ways in, because a Pond nobody has set up is claimed with its card and then set up from
+            here, while one already set up only needs this phone paired to it. */}
+        <View style={styles.path}>
+          <InkTitle level={3}>{t('onboarding.newTitle')}</InkTitle>
+          <InkText tone="secondary">{t('onboarding.newBody')}</InkText>
+          <InkButton variant="primary" block icon="camera" onPress={() => openPairing({ kind: 'scan' })}>
+            {t('onboarding.scanCard')}
+          </InkButton>
+          {fresh.length > 0 ? (
+            <PondList title={t('onboarding.newFound')} ponds={fresh} phase={phase} onSelect={onSelect} />
+          ) : phase !== 'searching' ? (
+            <InkText size="sm" tone="tertiary">{t('onboarding.newNone')}</InkText>
+          ) : null}
+        </View>
 
-        <View style={styles.actions}>
-          <InkButton variant="primary" block icon="plus" onPress={() => openPairing({ kind: 'address' })}>
+        <View style={styles.path}>
+          <InkTitle level={3}>{t('onboarding.joinTitle')}</InkTitle>
+          <InkText tone="secondary">{t('onboarding.joinBody')}</InkText>
+          {claimed.length > 0 || ponds.length === 0 ? (
+            <PondList
+              title={t('onboarding.joinFound')}
+              ponds={claimed}
+              phase={phase}
+              error={discovery.error}
+              onSelect={onSelect}
+            />
+          ) : null}
+          <InkButton variant="quiet" block icon="plus" onPress={() => openPairing({ kind: 'address' })}>
             {t('onboarding.manual')}
           </InkButton>
         </View>
@@ -89,5 +109,5 @@ const makeStyles = (c: ThemeColors) =>
     scroll: { paddingHorizontal: Spacing.lg, paddingBottom: Spacing.xl },
     mark: { width: 72, height: 72, marginTop: Spacing.xl, marginBottom: Spacing.md },
     lede: { marginBottom: Spacing.lg, maxWidth: 420 },
-    actions: { marginTop: Spacing.lg, gap: Spacing.sm },
+    path: { marginTop: Spacing.lg, gap: Spacing.sm },
   });

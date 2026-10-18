@@ -115,9 +115,11 @@ exposing, and pair again over HTTPS before trusting that Pond or that phone agai
 
 ## Troubleshooting
 
-- **Expo Go against a Pond that has not finished onboarding.** The notification
-  stream gets 403 `onboarding_required`, and the app retries quietly with backoff
-  until onboarding completes. Finish onboarding on the Pond.
+- **A Pond that has not finished onboarding.** The app opens owner setup
+  (NAVIGATION.md, "Owner setup"). The notification stream still retries its 403
+  `onboarding_required` quietly with backoff until setup completes. A Pond started
+  without `--model` has no `chat_model`, and setup cannot finish from the phone
+  until it has one.
 
 ## Tests
 

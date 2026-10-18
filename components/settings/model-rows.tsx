@@ -4,7 +4,8 @@
  */
 
 import React from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Alert, Pressable, Text, View } from 'react-native';
+import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
 
 import { Spacing } from '@/constants/spacing';
@@ -12,15 +13,31 @@ import {
   formatBytes,
   formatMegabytes,
   fractionDone,
+  picturesOf,
   roleOf,
   titleOf,
   type ModelDownload,
 } from '@/models/model-library';
 import { tap } from '@/services/haptics';
 import type { DownloadAction, ModelEntry } from '@/services/types';
-import { roleLabelKey } from '@/view-models/use-model-library';
+import { roleLabelKey, type UseModelLibrary } from '@/view-models/use-model-library';
 import { SettingsRow } from './settings-list';
 import { useSettingsColors, useSettingsStyles, type SettingsColors, type SettingsMetrics, type SettingsType } from './settings-theme';
+
+/** A download is never started without asking: the size first, and picture support where it can come too. */
+export function askToDownload(model: ModelEntry, download: UseModelLibrary['actions']['download'], t: TFunction): void {
+  void tap();
+  const size = formatMegabytes(model.size_mb);
+  const pictures = picturesOf(model);
+  const body = size ? t('models.library.downloadBody', { size }) : t('models.library.downloadBodyNoSize');
+  const options = pictures && pictures.state === 'available'
+    ? [
+        { text: t('models.library.withPictures'), onPress: () => void download(model, true) },
+        { text: t('models.library.textOnly'), onPress: () => void download(model, false) },
+      ]
+    : [{ text: t('models.library.download'), onPress: () => void download(model, true) }];
+  Alert.alert(t('models.library.downloadTitle', { name: titleOf(model) }), body, [{ text: t('common.cancel'), style: 'cancel' }, ...options]);
+}
 
 export function ProgressBar({ fraction }: { fraction: number | null }) {
   const styles = useSettingsStyles(makeStyles);

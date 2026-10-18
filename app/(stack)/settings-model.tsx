@@ -8,7 +8,7 @@ import { Alert } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 
-import { DownloadRow } from '@/components/settings/model-rows';
+import { askToDownload, DownloadRow } from '@/components/settings/model-rows';
 import { SettingsGroup, SettingsHeader, SettingsMessage, SettingsRow } from '@/components/settings/settings-list';
 import { SettingsNotice, SettingsScroll } from '@/components/settings/settings-scroll';
 import {
@@ -49,17 +49,7 @@ export default function ModelScreen() {
   const busy = lib.busy === model.id;
   const runnable = model.available !== false;
 
-  const askDownload = () => {
-    void tap();
-    const body = size ? t('models.library.downloadBody', { size }) : t('models.library.downloadBodyNoSize');
-    const options = pictures && pictures.state === 'available'
-      ? [
-          { text: t('models.library.withPictures'), onPress: () => void lib.actions.download(model, true) },
-          { text: t('models.library.textOnly'), onPress: () => void lib.actions.download(model, false) },
-        ]
-      : [{ text: t('models.library.download'), onPress: () => void lib.actions.download(model, true) }];
-    Alert.alert(t('models.library.downloadTitle', { name: titleOf(model) }), body, [{ text: t('common.cancel'), style: 'cancel' }, ...options]);
-  };
+  const askDownload = () => askToDownload(model, lib.actions.download, t);
 
   const askDelete = () => {
     void caution();

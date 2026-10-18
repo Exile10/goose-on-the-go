@@ -974,6 +974,8 @@ export interface PondSettings {
 
   // Models and generation
   chat_provider: string;
+  /** The model the chat job loads; empty on a fresh Pond, which `/onboard/complete` refuses. */
+  chat_model: string;
   llm_provider: string;
   tool_model: string | null;
   llm_max_tokens: number;
@@ -1115,4 +1117,47 @@ export interface TtsApplyResult {
 export interface RetitleResult {
   started: boolean;
   reason?: string;
+}
+
+// ── Owner setup ───────────────────────────────────────────────
+
+/** `GET /api/v1/onboard/status`. `current_step` is the furthest step recorded, PascalCase, or `not_started`. */
+export interface OnboardStatus {
+  onboarded: boolean;
+  current_step: string;
+  steps_completed: number;
+  total_steps: number;
+}
+
+/** `POST /api/v1/onboard/complete`: done, or the settings it refused to finish without. */
+export type OnboardCompletion = { completed: true } | { completed: false; missing: string[] };
+
+/** `GET /api/v1/warmup`: whether the chat model has been primed for a first message. */
+export interface WarmupStatus {
+  state: 'warming' | 'ready' | 'skipped' | 'failed';
+  reason?: string;
+  model: string;
+  started_unix_ms: number;
+  finished_unix_ms: number | null;
+  elapsed_ms: number;
+}
+
+/** `PATCH /api/v1/profiles/{id}`. The map sent replaces the stored one whole. */
+export interface ProfilePrefs {
+  id: string;
+  display_name: string;
+  preferences: Record<string, string>;
+}
+
+/** `POST /api/v1/voice/calibrate`: what the Pond heard in one take. */
+export interface CalibrationTake {
+  transcript: string;
+  normalized: string;
+  /** The wake phrase as heard in this take; null when the take did not contain it. */
+  heard: string | null;
+  new_variant: boolean;
+  all_variants: string[];
+  sample_count: number;
+  target_count: number;
+  complete: boolean;
 }

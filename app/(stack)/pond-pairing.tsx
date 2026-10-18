@@ -59,6 +59,7 @@ import {
   refusalWait,
 } from '@/view-models/pairing-errors';
 import { useSpokenCode, type UseSpokenCode } from '@/view-models/use-spoken-code';
+import { setupNeededNow } from '@/view-models/use-setup-gate';
 import { useCountdown } from '@/hooks/use-countdown';
 import { useThemedStyles } from '@/hooks/use-themed-styles';
 import type { ThemeColors } from '@/constants/colors';
@@ -809,8 +810,15 @@ export default function PondPairingScreen() {
   // from the welcome screen, which has already searched, it starts past the search.
   // In insecure development mode it is the start: the plaintext listener is never
   // advertised, and Expo Go, which that mode exists for, has no mDNS module.
-  const [manualEntry, setManualEntry] = useState(insecureDevMode || start !== null);
+  const [manualEntry, setManualEntry] = useState(insecureDevMode || (start !== null && start.kind !== 'scan'));
   const openScanner = useCallback(() => router.push('/(stack)/connect-desktop'), [router]);
+  // Opened to scan a setup card: the scanner goes over the wizard, which takes the card when it returns.
+  const scanFirst = useRef(start?.kind === 'scan');
+  useEffect(() => {
+    if (!scanFirst.current) return;
+    scanFirst.current = false;
+    openScanner();
+  }, [openScanner]);
 
   const stage = useCallback(async (url: string, pin: string, source: PinSource) => {
     const parsed = new URL(url);
@@ -940,10 +948,9 @@ export default function PondPairingScreen() {
         clientIdRef.current = clientId;
         const resp = await pair({ clientId, pairingCode: code, credential, deviceName: name });
         if (resp.accepted) {
-          // Leave on success rather than waiting to be dismissed. The wizard
-          // has nothing left to say, and the remote access offer it used to
-          // push you onto is a dismissible card on Home now.
-          router.replace('/(tabs)');
+          // Leave on success rather than waiting to be dismissed: for Home, or for owner setup on a
+          // Pond nobody has set up yet, as a freshly claimed one is.
+          router.replace((await setupNeededNow()) ? '/(onboarding)/owner-setup' : '/(tabs)');
         } else {
           setCompletionState('error');
           setCompletionReason(explainRefusedPairing(resp.rejection_reason, t, credential));

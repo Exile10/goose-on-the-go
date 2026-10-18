@@ -76,11 +76,21 @@ export function PondList({
                 </View>
               }
               description={
-                <Text style={styles.addr}>{`${pond.address}:${pond.port}`}</Text>
+                <Text style={styles.addr}>
+                  {/* The card's id is printed on it, so it says which of several new Ponds a card belongs to. */}
+                  {pond.unclaimed && pond.setupId
+                    ? `${pond.address}:${pond.port} · ${t('onboarding.cardId', { id: pond.setupId.toUpperCase() })}`
+                    : `${pond.address}:${pond.port}`}
+                </Text>
               }
             >
               {active ? (
                 <InkBadge tone="success">{t('common.online')}</InkBadge>
+              ) : pond.unclaimed ? (
+                <View style={styles.trail}>
+                  <InkBadge tone="brand">{t('onboarding.notSetUp')}</InkBadge>
+                  <GIcon name="chevron-right" size={18} />
+                </View>
               ) : (
                 <GIcon name="chevron-right" size={18} />
               )}
@@ -95,6 +105,7 @@ export function PondList({
 const makeStyles = (c: ThemeColors) =>
   StyleSheet.create({
     label: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
+    trail: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs },
     name: { fontFamily: FontFamily.body, fontSize: FontSize.base, color: c.text, flexShrink: 1 },
     addr: { fontFamily: FontFamily.mono, fontSize: FontSize.xs, color: c.textTertiary },
     scanning: {
