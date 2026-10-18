@@ -1,5 +1,5 @@
 /**
- * The setup channel's keys, sealing and framing, byte for byte against the Pond's own vectors.
+ * The setup channel's advertisement, keys, sealing and framing, byte for byte against the Pond's own vectors.
  *
  * `vectors/setup-channel-vectors.json` is a byte-identical copy of goose-in-a-pond's
  * `crates/pond-connect/tests/fixtures/setup-channel-vectors.json`. Its ISK and sid are the setup run's
@@ -10,6 +10,8 @@ import { bytesToHex, hexToBytes, utf8ToBytes } from '@noble/hashes/utils.js';
 import { extract } from '@noble/hashes/hkdf.js';
 import { sha512 } from '@noble/hashes/sha2.js';
 
+import { cardIdFromService, cardIdOf, SETUP_ADVERT_PREFIX, setupAdvertUuid } from '@/models/nearby-pond';
+import { SETUP_SERVICE_UUID } from '../ble';
 import { chunk, encodeFrame, FrameReader } from '../setup-channel/framing';
 import {
   channelKeys,
@@ -23,12 +25,25 @@ import {
 import cpace from './vectors/cpace-vectors.json';
 import vectors from './vectors/setup-channel-vectors.json';
 
-const { inputs, outputs, kdf, sealed, framed, wire } = vectors;
+const { advertisement, inputs, outputs, kdf, sealed, framed, wire } = vectors;
 const isk = () => hexToBytes(inputs.ISK);
 const sid = () => hexToBytes(inputs.sid);
 const keyFor = (name: string) => hexToBytes(name === 'k_p2c' ? outputs.k_p2c : outputs.k_c2p);
 
 describe('the Pond’s setup-channel vectors', () => {
+  it('advertise the card id in the service UUID, and connect to the unchanged GATT service', () => {
+    expect(advertisement.prefix).toBe(SETUP_ADVERT_PREFIX);
+    expect(setupAdvertUuid(advertisement.pond_id)).toBe(advertisement.service_uuid);
+    expect(cardIdFromService(advertisement.service_uuid)).toBe(advertisement.pond_id);
+    expect(cardIdOf({ services: [advertisement.service_uuid], name: advertisement.local_name })).toBe(advertisement.pond_id);
+    expect(advertisement.gatt_service_uuid).toBe(SETUP_SERVICE_UUID);
+  });
+
+  it('put the UUID on the air as one complete 128-bit list, least significant byte first', () => {
+    const uuid = hexToBytes(advertisement.service_uuid.replaceAll('-', '')).reverse();
+    expect(bytesToHex(new Uint8Array([uuid.length + 1, 0x07, ...uuid]))).toBe(advertisement.uuid_ad_structure);
+  });
+
   it('start from the setup run’s own ISK and sid', () => {
     expect(inputs.ISK).toBe(cpace.setup.outputs.ISK);
     expect(inputs.sid).toBe(cpace.setup.outputs.sid);
