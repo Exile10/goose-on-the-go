@@ -9,8 +9,9 @@
 import React, { useState } from 'react';
 import { ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { InkButton, InkChip, InkFormField, InkNotice, InkSheet, InkSwitch, InkText, InkTextArea } from '@jarida/ink/native';
+import { InkButton, InkChip, InkFormField, InkNotice, InkSheet, InkText, InkTextArea } from '@jarida/ink/native';
 
+import { LabelledSwitch } from '@/components/patterns/labelled-switch';
 import { GKeyboardView } from '@/components/ui/g-keyboard-view';
 import { MEMORY_SEGMENTS, isKept, saveEdit, segmentLabel } from '@/models/memory';
 import { confirm, reject } from '@/services/haptics';
@@ -91,7 +92,7 @@ export function MemorySheet({ open, editing, onClose, onSave, onReword, onSetKep
             </>
           )}
 
-          <InkSwitch label={t('memories.form.keep')} checked={keep} onChange={setKeep} />
+          <LabelledSwitch label={t('memories.form.keep')} checked={keep} onChange={setKeep} />
           <InkText size="sm" tone="tertiary">{t('memories.form.keepHint')}</InkText>
 
           {error ? <InkNotice tone="danger">{error}</InkNotice> : null}
