@@ -40,6 +40,7 @@ import type {
   Extension,
   ExtensionSecretsResult,
   LogEntry,
+  SecretSaveResult,
   TelemetrySummary,
   TurnMetrics,
   MarketplaceExtension,
@@ -1396,9 +1397,9 @@ export class PondApiClient {
   }
 
   /**
-   * Store an installed extension's credentials, bulk, as `{ KEY: value }`. Unlike
-   * `setSecret`, the Pond also restarts the extension, since a stdio extension's
-   * environment is fixed when it is spawned.
+   * Store an installed extension's credentials, bulk, as `{ KEY: value }`. The Pond
+   * also restarts the extension, since a stdio extension's environment is fixed
+   * when it is spawned.
    */
   setExtensionSecrets(name: string, secrets: Record<string, string>): Promise<ExtensionSecretsResult> {
     return this.request<ExtensionSecretsResult>(`/api/v1/extensions/${encodeURIComponent(name)}/secrets`, {
@@ -1435,14 +1436,33 @@ export class PondApiClient {
    * server keeps the material.
    */
   async listSecretKeys(): Promise<string[]> {
-    const res = await this.get<{ keys: string[] }>('/api/v1/secrets');
-    return res.keys;
+    const res = await this.get<{ keys?: unknown } | null>('/api/v1/secrets');
+    const keys = res?.keys;
+    // `request<T>` casts whatever it parsed, so a body that is not the listing must not pass as an
+    // empty one: that would tell somebody their keys are gone.
+    if (!Array.isArray(keys)) throw new Error('The Pond answered the secret listing with something unexpected');
+    return keys.filter((key): key is string => typeof key === 'string');
   }
 
-  setSecret(key: string, value: string): Promise<void> {
-    return this.put<void>(`/api/v1/secrets/${encodeURIComponent(key)}`, { value });
+  /**
+   * `PUT /secrets/{key}` with `{ value }`: stores or replaces the value, which is never sent back.
+   * The Pond then restarts every enabled extension that reads this key, and names the ones that
+   * could not restart, so a saved key that nothing is using yet can be said so.
+   */
+  async setSecret(key: string, value: string): Promise<SecretSaveResult> {
+    const res = await this.put<{ restarted?: unknown; restart_errors?: unknown } | null>(
+      `/api/v1/secrets/${encodeURIComponent(key)}`,
+      { value },
+    );
+    const restarted = Array.isArray(res?.restarted)
+      ? res.restarted.filter((name): name is string => typeof name === 'string')
+      : [];
+    const errors = res?.restart_errors;
+    const restartFailed = errors && typeof errors === 'object' && !Array.isArray(errors) ? Object.keys(errors) : [];
+    return { restarted, restartFailed };
   }
 
+  /** `DELETE /secrets/{key}`, a 204. The Pond stops the extensions that cannot run without it. */
   deleteSecret(key: string): Promise<void> {
     return this.del<void>(`/api/v1/secrets/${encodeURIComponent(key)}`);
   }

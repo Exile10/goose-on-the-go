@@ -363,6 +363,7 @@ const tools: SettingsPage = {
       items: [
         { kind: 'link', route: '/(stack)/extensions', icon: 'link', tile: 'orange', labelKey: 'screens.extensions', summary: 'extensions' },
         { kind: 'link', route: '/(stack)/web-search', icon: 'search', tile: 'blue', labelKey: 'screens.webSearch', summary: 'webSearch' },
+        { kind: 'link', route: '/(stack)/secrets', icon: 'key', tile: 'slate', labelKey: 'screens.secrets' },
       ],
     },
   ],
