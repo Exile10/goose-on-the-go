@@ -140,9 +140,23 @@ export default function DevicesTab() {
             {total > 0 ? ` · ${t('devices.online', { count: data.onlineCount })}` : ''}
           </Text>
         </View>
-        <InkButton variant="quiet" icon="refresh" onPress={handleRefresh}>
-          {t('common.refresh')}
-        </InkButton>
+        {/* Add lives up here rather than under the grid, so it stays in reach
+            however many devices there are. With none, the empty state below
+            carries it instead, and the screen still has a single primary. */}
+        <View style={styles.headerActions}>
+          <InkButton variant="quiet" icon="refresh" onPress={handleRefresh}>
+            {t('common.refresh')}
+          </InkButton>
+          {total > 0 ? (
+            <InkButton
+              variant="primary"
+              icon="plus"
+              onPress={() => router.push('/(stack)/commission-device')}
+            >
+              {t('devices.addDevice')}
+            </InkButton>
+          ) : null}
+        </View>
       </View>
 
       {/* Room tabs, derived from the rooms devices are actually in. The
@@ -236,18 +250,6 @@ export default function DevicesTab() {
           </View>
         ))}
 
-        {total > 0 ? (
-          <InkButton
-            variant="primary"
-            icon="plus"
-            block
-            onPress={() => router.push('/(stack)/commission-device')}
-            style={styles.action}
-          >
-            {t('devices.addDevice')}
-          </InkButton>
-        ) : null}
-
       </ScrollView>
     </SafeAreaView>
   );
@@ -256,7 +258,6 @@ export default function DevicesTab() {
 const makeStyles = (c: ThemeColors) =>
   StyleSheet.create({
     safe: { flex: 1, backgroundColor: c.background },
-    action: { marginTop: Spacing.md },
     notice: { marginBottom: Spacing.md },
 
     header: {
@@ -269,6 +270,7 @@ const makeStyles = (c: ThemeColors) =>
       paddingBottom: Spacing.md,
     },
     headerText: { flexShrink: 1 },
+    headerActions: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
     subtitle: {
       fontFamily: FontFamily.body,
       fontSize: FontSize.sm,
