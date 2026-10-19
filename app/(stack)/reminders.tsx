@@ -1,0 +1,85 @@
+/**
+ * RemindersScreen — the dated things the Pond picked out of conversations,
+ * each with the words that said when, and a way to dismiss one.
+ *
+ * Dismissal cannot be undone from anywhere, so it is confirmed first.
+ */
+
+import React, { useCallback } from 'react';
+import { Alert, ScrollView, StyleSheet, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
+import { InkButton, InkCard, InkEmptyState, InkNotice, InkSpinner, InkText } from '@jarida/ink/native';
+
+import { useReminders, type ReminderRow } from '@/view-models/use-reminders';
+import { useThemedStyles } from '@/hooks/use-themed-styles';
+import type { ThemeColors } from '@/constants/colors';
+import { Spacing } from '@/constants/spacing';
+
+export default function RemindersScreen() {
+  const { t } = useTranslation();
+  const styles = useThemedStyles(makeStyles);
+  const { data, loading, error, failed, dismissing, actionError, actions } = useReminders();
+
+  const { dismiss } = actions;
+  const confirmDismiss = useCallback(
+    (row: ReminderRow) => {
+      Alert.alert(t('reminders.dismissTitle'), t('reminders.dismissBody'), [
+        { text: t('common.cancel'), style: 'cancel' },
+        { text: t('reminders.card.dismiss'), style: 'destructive', onPress: () => void dismiss(row.id) },
+      ]);
+    },
+    [t, dismiss],
+  );
+
+  return (
+    <ScrollView style={styles.container} contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+      <InkText size="sm" tone="secondary">{t('reminders.intro')}</InkText>
+
+      {loading ? <InkSpinner label={t('reminders.list.loading')} /> : null}
+
+      {actionError ? <InkNotice tone="danger">{actionError}</InkNotice> : null}
+
+      {/* A failed read with no sentence of its own still leaves the list unknown. */}
+      {error || failed ? (
+        <View style={styles.notice}>
+          <InkNotice tone="danger">{error ?? t('reminders.list.failed')}</InkNotice>
+          <InkButton variant="quiet" icon="refresh" onPress={actions.refresh}>
+            {t('common.retry')}
+          </InkButton>
+        </View>
+      ) : null}
+
+      {!loading && !error && !failed && data.rows.length === 0 ? (
+        <InkEmptyState icon="calendar" title={t('reminders.list.emptyTitle')}>
+          <InkText>{t('reminders.list.emptyBody')}</InkText>
+        </InkEmptyState>
+      ) : null}
+
+      {data.rows.map((row) => (
+        <InkCard key={row.id}>
+          <InkText weight="semibold">{row.due ?? t('reminders.card.noDue')}</InkText>
+          <InkText>{row.text}</InkText>
+          <View style={styles.footer}>
+            <InkText size="sm" tone="tertiary">{t('reminders.card.said', { when: row.said })}</InkText>
+            <InkButton
+              variant="quiet"
+              icon="check"
+              disabled={dismissing !== null}
+              onPress={() => confirmDismiss(row)}
+            >
+              {dismissing === row.id ? t('reminders.card.dismissing') : t('reminders.card.dismiss')}
+            </InkButton>
+          </View>
+        </InkCard>
+      ))}
+    </ScrollView>
+  );
+}
+
+const makeStyles = (c: ThemeColors) =>
+  StyleSheet.create({
+    container: { flex: 1, backgroundColor: c.background },
+    scroll: { padding: Spacing.lg, gap: Spacing.md, paddingBottom: Spacing['4xl'] },
+    notice: { gap: Spacing.sm },
+    footer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: Spacing.sm },
+  });

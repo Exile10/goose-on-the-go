@@ -254,6 +254,34 @@ export interface UsageSummary {
   session_count: number;
 }
 
+// ── Reminders ─────────────────────────────────────────────────
+
+/**
+ * `GET /api/v1/reminders`: a dated thing the Pond lifted out of a conversation.
+ *
+ * There is no parsed due time on purpose. `when_said` is the conversation's own
+ * words about the timing ("next Tuesday", "before the school run"), and the Pond
+ * never turns them into a date, so neither does this app.
+ */
+export interface Reminder {
+  id: string;
+  /** What it is about, with no date in it. */
+  about: string;
+  /** The words used about when. Never parsed. */
+  when_said: string;
+  /** Whose reminder it is, by name. */
+  subject: string;
+  profile_id: string | null;
+  /** When the conversation happened. */
+  said_at: string;
+  /** When the Pond lifted it out of that conversation. */
+  captured_at: string;
+  /** Always `pending` from the list route; the other values are for what dismiss returns. */
+  disposition: 'pending' | 'proposed' | 'dismissed' | 'expired';
+  session_id: string;
+  window_id: string;
+}
+
 // ── Memory ────────────────────────────────────────────────────
 //
 // The Pond's `MemoryFragment` (`pond-core/src/user_data/domain/memory.rs`),
