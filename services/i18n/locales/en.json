@@ -486,7 +486,8 @@
       "cost": "What a cloud service would charge, so your Pond can show what it saved you."
     },
     "link": {
-      "whatItRemembers": "What Goose remembers"
+      "whatItRemembers": "What Goose remembers",
+      "cameraEvents": "What the camera saw"
     },
     "unit": {
       "ms": "ms",
@@ -1317,7 +1318,8 @@
     "settingsIssue": "Needs attention",
     "settingsSpeaking": "Speaking voice",
     "ownerSetup": "Set up your Pond",
-    "wakeWord": "Wake word"
+    "wakeWord": "Wake word",
+    "cameraEvents": "What the camera saw"
   },
   "nav": {
     "goose": "Goose",
@@ -2151,6 +2153,32 @@
       "saveFailed": "Could not save that memory.",
       "deleteFailed": "Could not forget that memory.",
       "keepNeedsUpdate": "Your Pond needs an update before it can change whether a memory is kept."
+    }
+  },
+  "cameraEvents": {
+    "showing": "From the camera named {{camera}}.",
+    "unacknowledged_one": "{{count}} not acknowledged yet",
+    "unacknowledged_other": "{{count}} not acknowledged yet",
+    "loading": "Loading what the camera saw…",
+    "failed": "Could not load camera events from your Pond.",
+    "settingsFailed": "Could not read which camera your Pond watches.",
+    "emptyTitle": "Nothing seen yet",
+    "emptyBody": "When the camera notices something, it shows up here.",
+    "acknowledge": "Acknowledge",
+    "acknowledged": "Acknowledged",
+    "new": "New",
+    "detail": "{{camera}} · {{confidence}}",
+    "confidence": "{{percent}}% sure",
+    "type": {
+      "motion": "Movement",
+      "person": "A person",
+      "pet": "A pet",
+      "package": "A package",
+      "vehicle": "A vehicle",
+      "unknown": "Something"
+    },
+    "errors": {
+      "acknowledgeFailed": "Could not acknowledge that event. Try again."
     }
   },
   "devMode": {

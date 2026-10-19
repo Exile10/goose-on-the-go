@@ -607,6 +607,31 @@ export interface RuleRequest {
   cooldown_secs?: number;
 }
 
+// ── Camera events (`/api/v1/camera/events`) ───────────────────
+//
+// What the Pond's vision pipeline, or anything posting to `POST /camera/events`,
+// recorded. Serialised by `list_camera_events` in `pond-api/src/routes.rs`; the
+// rows live in `pond_logs.db`, and acknowledged ones are pruned after 14 days.
+
+/**
+ * One thing a camera saw.
+ *
+ * `event_type` is the Pond's own free-form string; its documented values are
+ * `motion`, `person`, `pet`, `package` and `vehicle`. `snapshot_path` is a file
+ * path on the Pond itself: no route serves it, so the phone cannot show it.
+ */
+export interface CameraEvent {
+  id: number;
+  camera_id: string;
+  event_type: string;
+  /** The classifier's score from 0 to 1, or null for plain motion. */
+  confidence: number | null;
+  snapshot_path: string | null;
+  acknowledged: boolean;
+  /** RFC 3339. */
+  created_at: string;
+}
+
 // ── Logs and activity ─────────────────────────────────────────
 
 /**

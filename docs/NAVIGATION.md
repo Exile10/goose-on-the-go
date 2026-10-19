@@ -85,6 +85,21 @@ sound quality, which would otherwise be most of the Voice page. Choosing a voice
 saves it, has the engine switch to it, and then plays the next of seven lines in
 it, the same line for every voice in turn.
 
+### Camera events
+
+`/(stack)/camera-events`, What the camera saw, is the first row on Cameras and
+smart home, above the controls that name the camera. It lists, newest first, the
+events the Pond recorded for the camera its settings name (`vision_camera_id`),
+over `view-models/use-camera-events.ts`, read every 30 s while it is in front.
+`GET /api/v1/camera/events` lists one camera per call and has no read across
+cameras, so an event posted under another `camera_id` does not show here, and
+renaming the camera shows the new name's events only. Each new event has an
+Acknowledge button (`PATCH /api/v1/camera/events/{id}/acknowledge`), and the
+list is read back after one lands. The Pond has no acknowledge-all and no
+delete, so neither does the screen; it prunes acknowledged events after 14
+days on its own. No picture is shown: `snapshot_path` is a file on the Pond
+that no route serves. Like Devices it always reads the real Pond.
+
 ### What needs attention
 
 Anything a household should know about is an issue in

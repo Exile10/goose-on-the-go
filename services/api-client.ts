@@ -30,6 +30,7 @@ import type {
   ActivityResponse,
   ActivitySummary,
   ActivityWindow,
+  CameraEvent,
   CommissionDeviceRequest,
   CommissionDeviceResponse,
   CreateDeviceRequest,
@@ -1301,6 +1302,32 @@ export class PondApiClient {
 
   resumeRule(id: string): Promise<void> {
     return this.post<void>(`/api/v1/rules/${encodeURIComponent(id)}/resume`, {});
+  }
+
+  // ── Camera events ───────────────────────────────────────────
+
+  /**
+   * What one camera saw, newest first. The Pond lists a single camera per call
+   * and has no "every camera" read: without `camera_id` it answers for the
+   * camera named `default`. `limit` defaults to 20 there and is capped at 100.
+   */
+  async listCameraEvents(cameraId: string, limit?: number): Promise<CameraEvent[]> {
+    const qs = new URLSearchParams({ camera_id: cameraId });
+    if (limit) qs.set('limit', String(limit));
+    const res = await this.request<{ events?: CameraEvent[] } | CameraEvent[]>(
+      `/api/v1/camera/events?${qs.toString()}`,
+    );
+    return collection<CameraEvent>(res, 'events');
+  }
+
+  /**
+   * Mark an event as seen. The route reads no body, and answers 200 for an id
+   * it has no row for too, since the update simply touches nothing.
+   */
+  acknowledgeCameraEvent(id: number): Promise<void> {
+    return this.request<void>(`/api/v1/camera/events/${encodeURIComponent(String(id))}/acknowledge`, {
+      method: 'PATCH',
+    });
   }
 
   // ── Logs and activity ───────────────────────────────────────

@@ -468,6 +468,11 @@ const cameras: SettingsPage = {
   descriptionKey: 'settings.page.cameras',
   sections: [
     {
+      items: [
+        { kind: 'link', route: '/(stack)/camera-events', icon: 'eye', tile: 'slate', labelKey: 'settings.link.cameraEvents' },
+      ],
+    },
+    {
       titleKey: 'settings.section.camera',
       footerKey: 'settings.footer.restartCamera',
       items: [
