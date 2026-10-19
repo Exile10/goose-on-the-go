@@ -1,17 +1,21 @@
 /**
- * CreateAutomationSheet — a new sensor-triggered rule, with one action.
+ * AutomationFormSheet — a new sensor-triggered rule, or an edit to one.
  *
  * The Pond takes several actions per rule; one is what this form offers, which
- * covers "when X, do Y" and keeps the form one screen long. The checks the
- * Pond would answer with a 400 — no action, a condition with an operator but
- * no value — run here first.
+ * covers "when X, do Y" and keeps the form one screen long. An edit to a rule
+ * with more changes its first action and sends the rest back as they were,
+ * since `PUT /rules/{id}` replaces the whole rule and a field left out is a
+ * field lost. The checks the Pond would answer with a 400 (no action, a
+ * condition with an operator but no value, a time bound that is not HH:MM)
+ * run here first.
  *
  * The form only exists while the sheet is open, so the device list it reads
- * is not polled behind a closed sheet, and closing it clears what was typed.
+ * is not polled behind a closed sheet, closing it clears what was typed, and
+ * an edit opens on the rule as it is now.
  */
 
 import React, { useState } from 'react';
-import { Platform, ScrollView, StyleSheet, useWindowDimensions } from 'react-native';
+import { Alert, Platform, ScrollView, StyleSheet, useWindowDimensions } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import {
   InkButton,
@@ -22,6 +26,7 @@ import {
   InkSegmented,
   InkSelect,
   InkSheet,
+  InkText,
   InkTextArea,
   type InkRadioOption,
 } from '@jarida/ink/native';
@@ -29,24 +34,35 @@ import {
 import { sourceKey } from '@/components/patterns/automation-card';
 import { GKeyboardView } from '@/components/ui/g-keyboard-view';
 import { confirm, reject } from '@/services/haptics';
-import type { RuleRequest, TriggerAction, TriggerCondition, TriggerSource } from '@/services/types';
+import type { Rule, RuleRequest, TriggerAction, TriggerCondition, TriggerSource } from '@/services/types';
 import { supports, useDevices } from '@/view-models/use-devices';
 import { Spacing } from '@/constants/spacing';
 
 type Op = NonNullable<TriggerCondition['op']>;
 
-export interface CreateAutomationSheetProps {
+export interface AutomationFormSheetProps {
   open: boolean;
   onClose: () => void;
-  /** Resolves to why it was refused, or null once it exists. */
-  onCreate: (req: RuleRequest) => Promise<string | null>;
+  /** The rule being edited, or absent for a new one. */
+  rule?: Rule;
+  /** Resolves to why it was refused, or null once it is saved: created, or the edit stored. */
+  onSubmit: (req: RuleRequest) => Promise<string | null>;
+  /** Only for an edit. Resolves to why it was refused, or null once it is gone. */
+  onDelete?: () => Promise<string | null>;
 }
 
-export function CreateAutomationSheet({ open, onClose, onCreate }: CreateAutomationSheetProps) {
+/** "HH:MM", 24-hour, as the Pond parses a time bound. */
+const TIME_BOUND = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+export function AutomationFormSheet({ open, onClose, rule, onSubmit, onDelete }: AutomationFormSheetProps) {
   const { t } = useTranslation();
   return (
-    <InkSheet open={open} onClose={onClose} title={t('schedule.form.automationTitle')}>
-      {open ? <AutomationForm onClose={onClose} onCreate={onCreate} /> : null}
+    <InkSheet
+      open={open}
+      onClose={onClose}
+      title={rule ? t('schedule.form.editAutomationTitle') : t('schedule.form.automationTitle')}
+    >
+      {open ? <AutomationForm onClose={onClose} rule={rule} onSubmit={onSubmit} onDelete={onDelete} /> : null}
     </InkSheet>
   );
 }
@@ -79,26 +95,31 @@ function DeviceList({
   );
 }
 
-function AutomationForm({ onClose, onCreate }: Omit<CreateAutomationSheetProps, 'open'>) {
+function AutomationForm({ onClose, rule, onSubmit, onDelete }: Omit<AutomationFormSheetProps, 'open'>) {
   const { t } = useTranslation();
   const { height } = useWindowDimensions();
   const { data } = useDevices();
   const switchable = data.devices.filter((d) => supports(d, 'power'));
+  const first = rule?.actions[0];
+  // Kept as they are; see the file comment.
+  const rest = rule?.actions.slice(1) ?? [];
 
-  const [name, setName] = useState('');
-  const [sourceKind, setSourceKind] = useState<TriggerSource['kind']>('sensor');
+  const [name, setName] = useState(rule?.name ?? '');
+  const [sourceKind, setSourceKind] = useState<TriggerSource['kind']>(rule?.source.kind ?? 'sensor');
   // '' is "any": the Pond matches every device or signal when the field is left out.
-  const [deviceId, setDeviceId] = useState('');
-  const [signal, setSignal] = useState('');
-  const [op, setOp] = useState<Op | ''>('');
-  const [value, setValue] = useState('');
-  const [cooldown, setCooldown] = useState('60');
-  const [actionType, setActionType] = useState<TriggerAction['type']>('agent_prompt');
-  const [prompt, setPrompt] = useState('');
-  const [targetId, setTargetId] = useState('');
-  const [turnOn, setTurnOn] = useState<'on' | 'off'>('on');
-  const [notifyTitle, setNotifyTitle] = useState('');
-  const [notifyBody, setNotifyBody] = useState('');
+  const [deviceId, setDeviceId] = useState(rule?.source.device_id ?? '');
+  const [signal, setSignal] = useState(rule?.source.signal ?? '');
+  const [op, setOp] = useState<Op | ''>(rule?.condition?.op ?? '');
+  const [value, setValue] = useState(rule?.condition?.value != null ? String(rule.condition.value) : '');
+  const [after, setAfter] = useState(rule?.condition?.after ?? '');
+  const [before, setBefore] = useState(rule?.condition?.before ?? '');
+  const [cooldown, setCooldown] = useState(String(rule?.cooldown_secs ?? 60));
+  const [actionType, setActionType] = useState<TriggerAction['type']>(first?.type ?? 'agent_prompt');
+  const [prompt, setPrompt] = useState(first?.type === 'agent_prompt' ? first.prompt : '');
+  const [targetId, setTargetId] = useState(first?.type === 'device_power' ? first.device_id : '');
+  const [turnOn, setTurnOn] = useState<'on' | 'off'>(first?.type === 'device_power' && !first.on ? 'off' : 'on');
+  const [notifyTitle, setNotifyTitle] = useState(first?.type === 'notify' ? first.title : '');
+  const [notifyBody, setNotifyBody] = useState(first?.type === 'notify' ? first.body : '');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -121,8 +142,14 @@ function AutomationForm({ onClose, onCreate }: Omit<CreateAutomationSheetProps, 
     if (op && (!value.trim() || !Number.isFinite(reading))) return t('schedule.errors.valueRequired');
     const wait = Number(cooldown);
     if (!/^\d+$/.test(cooldown.trim()) || !Number.isFinite(wait)) return t('schedule.errors.cooldownInvalid');
+    if ([after, before].some((b) => b.trim() && !TIME_BOUND.test(b.trim()))) return t('schedule.errors.timeBound');
     const act = action();
     if (!act) return t('schedule.errors.actionIncomplete');
+    const condition: TriggerCondition = {
+      ...(op ? { op, value: reading } : {}),
+      ...(after.trim() ? { after: after.trim() } : {}),
+      ...(before.trim() ? { before: before.trim() } : {}),
+    };
     return {
       name: name.trim(),
       source: {
@@ -130,8 +157,8 @@ function AutomationForm({ onClose, onCreate }: Omit<CreateAutomationSheetProps, 
         ...(deviceId ? { device_id: deviceId } : {}),
         ...(signal.trim() ? { signal: signal.trim() } : {}),
       },
-      ...(op ? { condition: { op, value: reading } } : {}),
-      actions: [act],
+      ...(Object.keys(condition).length > 0 ? { condition } : {}),
+      actions: [act, ...rest],
       cooldown_secs: wait,
     };
   };
@@ -145,7 +172,7 @@ function AutomationForm({ onClose, onCreate }: Omit<CreateAutomationSheetProps, 
     }
     setError(null);
     setSubmitting(true);
-    const refused = await onCreate(req);
+    const refused = await onSubmit(req);
     setSubmitting(false);
     if (refused) {
       void reject();
@@ -154,6 +181,28 @@ function AutomationForm({ onClose, onCreate }: Omit<CreateAutomationSheetProps, 
     }
     void confirm();
     onClose();
+  };
+
+  const confirmDelete = () => {
+    if (!rule || !onDelete) return;
+    Alert.alert(t('schedule.list.deleteAutomationTitle'), t('schedule.list.deleteAutomationBody', { name: rule.name }), [
+      { text: t('common.cancel'), style: 'cancel' },
+      {
+        text: t('schedule.form.delete'),
+        style: 'destructive',
+        onPress: () => {
+          void onDelete().then((refused) => {
+            if (refused) {
+              void reject();
+              setError(refused);
+              return;
+            }
+            void confirm();
+            onClose();
+          });
+        },
+      },
+    ]);
   };
 
   const devices = [
@@ -222,6 +271,14 @@ function AutomationForm({ onClose, onCreate }: Omit<CreateAutomationSheetProps, 
           </InkFormField>
         ) : null}
 
+        <InkFormField label={t('schedule.form.after')}>
+          <InkInput label={t('schedule.form.after')} placeholder="18:30" value={after} onChange={setAfter} />
+        </InkFormField>
+        <InkFormField label={t('schedule.form.before')}>
+          <InkInput label={t('schedule.form.before')} placeholder="06:00" value={before} onChange={setBefore} />
+        </InkFormField>
+        <InkText size="sm" tone="tertiary">{t('schedule.form.timeBoundHint')}</InkText>
+
         <InkFormField label={t('schedule.form.cooldown')}>
           <InkInput label={t('schedule.form.cooldown')} type="number" value={cooldown} onChange={setCooldown} />
         </InkFormField>
@@ -286,11 +343,20 @@ function AutomationForm({ onClose, onCreate }: Omit<CreateAutomationSheetProps, 
           </>
         ) : null}
 
+        {rest.length > 0 ? (
+          <InkText size="sm" tone="tertiary">{t('schedule.form.moreActions', { count: rest.length })}</InkText>
+        ) : null}
+
         {error ? <InkNotice tone="danger">{error}</InkNotice> : null}
 
         <InkButton variant="primary" block disabled={submitting} onPress={submit}>
-          {t('schedule.form.create')}
+          {rule ? t('schedule.form.save') : t('schedule.form.create')}
         </InkButton>
+        {rule && onDelete ? (
+          <InkButton variant="danger" block icon="delete" disabled={submitting} onPress={confirmDelete}>
+            {t('schedule.form.delete')}
+          </InkButton>
+        ) : null}
       </ScrollView>
     </GKeyboardView>
   );

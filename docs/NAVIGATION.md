@@ -122,6 +122,16 @@ is always on screen. The screen is behind the Developer toggle (`webSearch`,
 real by default): on mock, typing `invalid`, `quota` or `offline` as the key
 reaches the refused, spent and unchecked states without a Pond.
 
+Schedule (`/(stack)/schedule`) has two tabs over the Pond's scheduler:
+Schedules (`/schedules`) and Automations (`/rules`). A schedule's card opens
+`schedule-detail?id=…`: what it runs, when in words and as its cron, its zone,
+next and last run, its recent runs with what each said or why it failed, and
+edit, on/off, Run now and delete. An automation's card opens its edit sheet,
+which also deletes it. Opened with `?schedule_id=…`, as a schedule notification
+does, the list goes straight on to that schedule's screen, with the list left
+beneath it for Back. Both tabs are behind the Developer toggle (`schedule`, real
+by default); on mock they show the samples in `models/schedule.ts`.
+
 Five more stack screens aren't in the hub:
 
 - **Pond Pairing** (`/(stack)/pond-pairing`) — from the pairing gate below, first

@@ -116,7 +116,12 @@ export type ScreenModes = Record<MigrationScreen, boolean>;
  */
 // `settings` starts real for the same reason: a release build must never show a change as saved when
 // nothing reached the Pond. The mock exists to build and look at the menus without one.
-const REAL_BY_DEFAULT: readonly MigrationScreen[] = ['chat', 'webSearch', 'settings'];
+// `schedule` starts real because its wiring has been checked against the Pond's own routes: the
+// `/schedules` and `/rules` shapes in `services/types.ts` are the scheduler's types as serialised,
+// and a paired phone's token reaches every one of them. On mock, a release build showed two sample
+// schedules where the household's own should be, and an edit made there reached nothing. The same
+// key covers the Automations tab, which reads `/rules`.
+const REAL_BY_DEFAULT: readonly MigrationScreen[] = ['chat', 'webSearch', 'settings', 'schedule'];
 
 export const DEFAULT_SCREEN_MODES: ScreenModes = MIGRATION_SCREENS.reduce(
   (acc, screen) => ({ ...acc, [screen]: REAL_BY_DEFAULT.includes(screen) }),

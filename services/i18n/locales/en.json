@@ -1317,7 +1317,8 @@
     "settingsIssue": "Needs attention",
     "settingsSpeaking": "Speaking voice",
     "ownerSetup": "Set up your Pond",
-    "wakeWord": "Wake word"
+    "wakeWord": "Wake word",
+    "scheduleDetail": "Schedule"
   },
   "nav": {
     "goose": "Goose",
@@ -1877,7 +1878,9 @@
       "polling": "Live updates are paused. This list refreshes every 30 seconds.",
       "rulesNote": "Automations run when a reading matches, so they have no Run now.",
       "schedulesFailed": "Could not load your schedules.",
-      "rulesFailed": "Could not load your automations."
+      "rulesFailed": "Could not load your automations.",
+      "deleteAutomationTitle": "Delete this automation?",
+      "deleteAutomationBody": "“{{name}}” will be removed from your Pond and will stop reacting."
     },
     "runs": {
       "title": "Recent runs",
@@ -1928,7 +1931,18 @@
       "turnOn": "Turn on",
       "turnOff": "Turn off",
       "notifyTitle": "Title",
-      "notifyBody": "Message"
+      "notifyBody": "Message",
+      "editScheduleTitle": "Edit schedule",
+      "editAutomationTitle": "Edit automation",
+      "save": "Save",
+      "timezone": "Time zone",
+      "phoneZone": "{{zone}} is this phone's time zone.",
+      "after": "Only after (optional)",
+      "before": "Only before (optional)",
+      "timeBoundHint": "24-hour times, such as 18:30. Leave both empty to react at any time.",
+      "moreActions_one": "This automation has {{count}} more action, kept as it is.",
+      "moreActions_other": "This automation has {{count}} more actions, kept as they are.",
+      "delete": "Delete automation"
     },
     "errors": {
       "nameRequired": "Give it a name.",
@@ -1941,7 +1955,50 @@
       "cooldownInvalid": "The wait has to be a whole number of seconds.",
       "createFailed": "Your Pond could not create it. Try again in a moment.",
       "gone": "That one is no longer on your Pond.",
-      "noScheduler": "Your Pond is running without its scheduler, so it cannot keep schedules."
+      "noScheduler": "Your Pond is running without its scheduler, so it cannot keep schedules.",
+      "timeBound": "Use a 24-hour time such as 18:30.",
+      "saveFailed": "Your Pond could not save the change. Try again in a moment.",
+      "deleteFailed": "Your Pond could not delete it. Try again in a moment."
+    },
+    "cron": {
+      "everyDay": "Every day at {{time}}",
+      "weekdays": "Weekdays at {{time}}",
+      "weekends": "Weekends at {{time}}",
+      "onDays": "Every {{days}} at {{time}}",
+      "monthly": "Monthly on day {{day}} at {{time}}",
+      "yearly": "Every year on {{date}} at {{time}}",
+      "onDate": "On {{date}} at {{time}}",
+      "hourly": "Every hour at {{minute}} minutes past",
+      "everyHours_one": "Every hour at {{minute}} minutes past",
+      "everyHours_other": "Every {{count}} hours at {{minute}} minutes past",
+      "everyMinutes_one": "Every minute",
+      "everyMinutes_other": "Every {{count}} minutes",
+      "once": "Once, {{when}}",
+      "inZone": "{{when}} ({{zone}})"
+    },
+    "detail": {
+      "loading": "Reading this schedule from your Pond",
+      "failed": "Could not load this schedule.",
+      "prompt": "Prompt",
+      "webhook": "Calls a webhook",
+      "webhookNote": "This schedule calls a webhook. Its address can only be changed on the Pond itself.",
+      "when": "When",
+      "cron": "Cron",
+      "timezone": "Time zone",
+      "status": "Status",
+      "enabled": "On",
+      "paused": "Paused",
+      "nextRun": "Next run",
+      "lastRun": "Last run",
+      "never": "Not yet",
+      "notScheduled": "Not scheduled",
+      "oneOffNoPause": "A one-off cannot be paused from here, because your Pond cannot resume one.",
+      "edit": "Edit",
+      "delete": "Delete",
+      "deleteTitle": "Delete this schedule?",
+      "deleteBody": "“{{name}}” will be removed from your Pond and will not run again.",
+      "saved": "Saved on your Pond.",
+      "runStarted": "Your Pond has started a run."
     }
   },
   "remote": {

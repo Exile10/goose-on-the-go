@@ -5,7 +5,9 @@
  * run-now either: a rule fires when a reading matches it, and pretending to
  * fire one by hand would skip the very condition that makes it a rule.
  *
- * Behind the same Developer toggle as schedules.
+ * Real by default, behind the same Developer toggle as schedules in a dev
+ * build. `PUT /rules/{id}` replaces the whole rule, so an edit sends every
+ * field, not only the changed ones.
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -31,6 +33,10 @@ export interface UseRules {
     refresh: () => Promise<void>;
     /** Resolves to why the Pond refused it, or null once it exists. */
     create: (req: RuleRequest) => Promise<string | null>;
+    /** Resolves to why the Pond refused it, or null once saved. */
+    update: (rule: Rule, req: RuleRequest) => Promise<string | null>;
+    /** Resolves to why the Pond refused it, or null once it is gone. */
+    remove: (rule: Rule) => Promise<string | null>;
     setPaused: (rule: Rule, paused: boolean) => Promise<void>;
   };
 }
@@ -108,6 +114,53 @@ export function useRules(): UseRules {
     [real],
   );
 
+  const update = useCallback(
+    async (rule: Rule, req: RuleRequest) => {
+      if (!real) {
+        changes.current += 1;
+        setRules((current) => current.map((r) => (r.id === rule.id ? { ...mockRule(req), id: r.id, paused: r.paused } : r)));
+        return null;
+      }
+      try {
+        const saved = await api.updateRule(rule.id, req);
+        changes.current += 1;
+        setRules((current) => current.map((r) => (r.id === rule.id ? saved : r)));
+        return null;
+      } catch (e) {
+        console.warn('[rules] update refused', e instanceof ApiError ? e.status : 'network');
+        return describeScheduleError(e) ?? i18n.t('schedule.errors.saveFailed');
+      }
+    },
+    [real],
+  );
+
+  const remove = useCallback(
+    async (rule: Rule) => {
+      const drop = () => {
+        changes.current += 1;
+        setRules((current) => current.filter((r) => r.id !== rule.id));
+      };
+      if (!real) {
+        drop();
+        return null;
+      }
+      try {
+        await api.deleteRule(rule.id);
+        drop();
+        return null;
+      } catch (e) {
+        // Already gone is what was asked for.
+        if (e instanceof ApiError && e.status === 404) {
+          drop();
+          return null;
+        }
+        console.warn('[rules] delete refused', e instanceof ApiError ? e.status : 'network');
+        return describeScheduleError(e) ?? i18n.t('schedule.errors.deleteFailed');
+      }
+    },
+    [real],
+  );
+
   const setPaused = useCallback(
     async (rule: Rule, paused: boolean) => {
       changes.current += 1;
@@ -124,7 +177,7 @@ export function useRules(): UseRules {
     [real],
   );
 
-  return { data: { rules }, loading, error, failed, actions: { refresh, create, setPaused } };
+  return { data: { rules }, loading, error, failed, actions: { refresh, create, update, remove, setPaused } };
 }
 
 function mockRule(req: RuleRequest): Rule {

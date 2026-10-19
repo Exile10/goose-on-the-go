@@ -1,17 +1,20 @@
 /**
- * ScheduleTab — the timed schedules: list, create, pause and resume, run now,
- * and each one's run history.
+ * ScheduleTab — the timed schedules: list, create, pause and resume, and run
+ * now. A card opens the schedule's own screen, which has its run history and
+ * the edit and delete.
  */
 
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
+import { useRouter } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { InkButton, InkEmptyState, InkNotice, InkSpinner, InkText } from '@jarida/ink/native';
 
-import { CreateScheduleSheet } from '@/components/patterns/create-schedule-sheet';
 import { ScheduleCard } from '@/components/patterns/schedule-card';
-import { ScheduleRunsSheet } from '@/components/patterns/schedule-runs-sheet';
+import { ScheduleFormSheet } from '@/components/patterns/schedule-form-sheet';
+import { deviceTimeZone } from '@/models/schedule';
 import { useServer } from '@/providers/server-provider';
+import { selectionTick } from '@/services/haptics';
 import type { Schedule } from '@/services/types';
 import { useSchedules } from '@/view-models/use-schedules';
 import { Spacing } from '@/constants/spacing';
@@ -22,7 +25,15 @@ export function ScheduleTab() {
   const real = isScreenReal('schedule');
   const { data, loading, error, failed, actions } = useSchedules();
   const [creating, setCreating] = useState(false);
-  const [open, setOpen] = useState<Schedule | null>(null);
+  const [phoneZone] = useState(deviceTimeZone);
+  const router = useRouter();
+  const open = useCallback(
+    (schedule: Schedule) => {
+      void selectionTick();
+      router.push({ pathname: '/(stack)/schedule-detail', params: { id: schedule.id } });
+    },
+    [router],
+  );
 
   return (
     <View style={styles.body}>
@@ -61,14 +72,14 @@ export function ScheduleTab() {
           key={schedule.id}
           schedule={schedule}
           canRun={real}
-          onOpen={setOpen}
+          phoneZone={phoneZone}
+          onOpen={open}
           onSetPaused={actions.setPaused}
           onRunNow={actions.runNow}
         />
       ))}
 
-      <CreateScheduleSheet open={creating} onClose={() => setCreating(false)} onCreate={actions.create} />
-      <ScheduleRunsSheet schedule={open} onClose={() => setOpen(null)} />
+      <ScheduleFormSheet open={creating} onClose={() => setCreating(false)} onCreate={actions.create} />
     </View>
   );
 }

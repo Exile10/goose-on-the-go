@@ -6,9 +6,14 @@
  * schedule has a next run and a Run now, and a rule has a trigger and a
  * cooldown instead; shown together, each card would be missing half of what
  * the other says. See `models/schedule.ts` for the rest of that decision.
+ *
+ * Opened with a `schedule_id` search param, as a schedule notification does,
+ * it goes straight on to that schedule's own screen. The list stays beneath
+ * it, so Back lands on the schedules rather than leaving the app.
  */
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ScrollView, StyleSheet } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { InkSegmented } from '@jarida/ink/native';
@@ -16,6 +21,7 @@ import { InkSegmented } from '@jarida/ink/native';
 import { AutomationsTab } from '@/components/patterns/automations-tab';
 import { ScheduleTab } from '@/components/patterns/schedule-tab';
 import { useThemedStyles } from '@/hooks/use-themed-styles';
+import { linkedScheduleId } from '@/models/schedule';
 import { selectionTick } from '@/services/haptics';
 import type { ThemeColors } from '@/constants/colors';
 import { Spacing } from '@/constants/spacing';
@@ -26,6 +32,16 @@ export default function ScheduleScreen() {
   const { t } = useTranslation();
   const styles = useThemedStyles(makeStyles);
   const [tab, setTab] = useState<Tab>('schedules');
+  const router = useRouter();
+  const { schedule_id } = useLocalSearchParams<{ schedule_id?: string }>();
+  const linked = linkedScheduleId(schedule_id);
+
+  useEffect(() => {
+    if (!linked) return;
+    // Cleared first, so coming Back to the list does not open the schedule again.
+    router.setParams({ schedule_id: undefined });
+    router.push({ pathname: '/(stack)/schedule-detail', params: { id: linked } });
+  }, [linked, router]);
 
   return (
     <ScrollView

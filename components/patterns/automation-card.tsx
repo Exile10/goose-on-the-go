@@ -2,6 +2,9 @@
  * AutomationCard — one sensor-triggered rule: what it listens for, when it
  * last fired, and a switch. No Run now: a rule fires on a matching reading,
  * and the Pond's `/rules` routes have no way to fire one by hand.
+ *
+ * The top of the card opens the rule for editing; the switch sits below it,
+ * not inside the same pressable, as on a schedule's card.
  */
 
 import React from 'react';
@@ -9,6 +12,7 @@ import { StyleSheet, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { InkBadge, InkCard, InkSwitch, InkText } from '@jarida/ink/native';
 
+import { GPressable } from '@/components/ui/g-pressable';
 import { formatScheduleTime } from '@/models/schedule';
 import { toggle } from '@/services/haptics';
 import type { TranslationKey } from '@/services/i18n';
@@ -17,6 +21,7 @@ import { Spacing } from '@/constants/spacing';
 
 export interface AutomationCardProps {
   rule: Rule;
+  onOpen: (rule: Rule) => void;
   onSetPaused: (rule: Rule, paused: boolean) => void;
 }
 
@@ -47,7 +52,7 @@ export function sourceKey(kind: TriggerSource['kind']): TranslationKey {
   }
 }
 
-export const AutomationCard = React.memo(function AutomationCard({ rule, onSetPaused }: AutomationCardProps) {
+export const AutomationCard = React.memo(function AutomationCard({ rule, onOpen, onSetPaused }: AutomationCardProps) {
   const { t } = useTranslation();
   const subject = rule.source.signal ?? rule.source.device_id ?? t(sourceKey(rule.source.kind));
   const { op, value } = rule.condition ?? {};
@@ -58,30 +63,32 @@ export const AutomationCard = React.memo(function AutomationCard({ rule, onSetPa
 
   return (
     <InkCard style={rule.paused ? styles.paused : undefined}>
-      <View style={styles.top}>
-        <View style={styles.title}>
-          <InkText weight="semibold">{rule.name}</InkText>
-          <InkText size="sm" tone="secondary">
-            {trigger} · {t('schedule.card.actions', { count: rule.actions.length })}
+      <GPressable onPress={() => onOpen(rule)} accessibilityRole="button">
+        <View style={styles.top}>
+          <View style={styles.title}>
+            <InkText weight="semibold">{rule.name}</InkText>
+            <InkText size="sm" tone="secondary">
+              {trigger} · {t('schedule.card.actions', { count: rule.actions.length })}
+            </InkText>
+          </View>
+          <InkBadge tone="neutral">{t(sourceKey(rule.source.kind))}</InkBadge>
+        </View>
+
+        <View style={styles.status}>
+          {rule.currently_running ? (
+            <InkBadge tone="brand">{t('schedule.card.running')}</InkBadge>
+          ) : (
+            <InkText size="sm" tone="tertiary">
+              {rule.last_fired
+                ? t('schedule.card.lastFired', { when: formatScheduleTime(rule.last_fired) })
+                : t('schedule.card.neverFired')}
+            </InkText>
+          )}
+          <InkText size="sm" tone="tertiary">
+            {t('schedule.card.cooldown', { seconds: rule.cooldown_secs })}
           </InkText>
         </View>
-        <InkBadge tone="neutral">{t(sourceKey(rule.source.kind))}</InkBadge>
-      </View>
-
-      <View style={styles.status}>
-        {rule.currently_running ? (
-          <InkBadge tone="brand">{t('schedule.card.running')}</InkBadge>
-        ) : (
-          <InkText size="sm" tone="tertiary">
-            {rule.last_fired
-              ? t('schedule.card.lastFired', { when: formatScheduleTime(rule.last_fired) })
-              : t('schedule.card.neverFired')}
-          </InkText>
-        )}
-        <InkText size="sm" tone="tertiary">
-          {t('schedule.card.cooldown', { seconds: rule.cooldown_secs })}
-        </InkText>
-      </View>
+      </GPressable>
 
       <View style={styles.actions}>
         <InkSwitch

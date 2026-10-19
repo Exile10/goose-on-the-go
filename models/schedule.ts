@@ -16,7 +16,8 @@
 import type { CivilDate, CivilTime } from '@jarida/ink';
 
 import i18n from '@/services/i18n';
-import type { Rule, Schedule } from '@/services/types';
+import type { TranslationKey } from '@/services/i18n';
+import type { CreateScheduleRequest, Rule, Schedule, UpdateScheduleRequest } from '@/services/types';
 
 /** A sensor rule, which `GET /schedules` returns alongside the timed schedules. */
 export function isRule(schedule: Schedule): boolean {
@@ -63,15 +64,15 @@ export function oneOffCron(date: CivilDate, time: CivilTime): string {
 }
 
 /**
- * The phone's IANA time zone, which a one-off is created in.
+ * The phone's IANA time zone, which every schedule made here is created in.
  *
- * A one-off only. The Pond works a one-off's cron out into the instant it
- * fires in this zone, so "the 24th at 18:05" is 18:05 here. A repeating
- * schedule is sent without one: the Pond registers every repeat with
- * `Job::new_async`, which fires in UTC whatever zone the schedule names, and
- * the zone would move only the `next_run` it reports, so the card would
- * promise a local time the job does not keep. Left in UTC, `next_run` is when
- * it really fires. The real fix is the Pond's, `Job::new_async_tz`.
+ * The Pond reads a schedule's cron as wall-clock time in its own zone, one-off
+ * and repeating alike, so "every day at 08:00" made on this phone is 08:00
+ * here. Repeating schedules used to be sent without one, because the Pond
+ * then fired every repeat in UTC whatever zone it named; it has since resolved
+ * each occurrence in the schedule's zone (`next_occurrence` in its
+ * `cron_scheduler.rs`), and a repeat sent in UTC now runs hours away from the
+ * time the person picked.
  *
  * `expo-localization` is native, so a JS-only run falls back to UTC rather
  * than throwing.
@@ -106,6 +107,267 @@ export function formatScheduleTime(iso: string, now = new Date()): string {
 
 function startOfDay(d: Date): number {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+}
+
+// ── Cron in words ────────────────────────────────────────────────────────────
+
+/** A one-off: the Pond stores it with the `@once` cron and the instant in `fire_at`. */
+export function isOneOff(schedule: Schedule): boolean {
+  return schedule.fire_at != null || schedule.cron === '@once';
+}
+
+const NUMBER = /^\d{1,2}$/;
+const ANY = new Set(['*', '?']);
+
+function twoDigits(n: number): string {
+  return String(n).padStart(2, '0');
+}
+
+/**
+ * The weekdays a cron's weekday field names, 0 for Sunday, or null for a shape
+ * this does not read (names such as `MON`, steps, `L`, `#`). `7` is Sunday too,
+ * as croner reads it.
+ */
+function weekdays(field: string): Set<number> | null {
+  const days = new Set<number>();
+  for (const part of field.split(',')) {
+    const range = /^(\d)(?:-(\d))?$/.exec(part);
+    if (!range) return null;
+    const from = Number(range[1]);
+    const to = range[2] == null ? from : Number(range[2]);
+    if (from > 7 || to > 7 || to < from) return null;
+    for (let d = from; d <= to; d++) days.add(d % 7);
+  }
+  return days;
+}
+
+function dayName(day: number): string {
+  // 2023-01-01 was a Sunday, so day n of that week is weekday n.
+  return new Date(2023, 0, 1 + day).toLocaleDateString(undefined, { weekday: 'long' });
+}
+
+const same = (a: Set<number>, b: number[]) => a.size === b.length && b.every((d) => a.has(d));
+
+/**
+ * A cron expression in words: "Every Sunday at 18:30", "Weekdays at 07:00",
+ * "Every 15 minutes". The Pond's cron has six fields, seconds first, and an
+ * optional seventh for the year, which is how a one-off made here is pinned.
+ *
+ * Null for any shape this does not read, so the caller shows the cron itself
+ * rather than words that might say something the Pond will not do. The time
+ * is the schedule's own wall-clock time, in its own zone.
+ */
+export function describeCron(cron: string): string | null {
+  const fields = cron.trim().split(/\s+/);
+  if (fields.length !== 6 && fields.length !== 7) return null;
+  const [sec, min, hour, dom, month, dow, year] = fields;
+  if (!NUMBER.test(sec)) return null;
+  const pinnedYear = year != null && !ANY.has(year) ? year : null;
+  if (pinnedYear != null && !/^\d{4}$/.test(pinnedYear)) return null;
+  const anyDay = ANY.has(dom) && ANY.has(month) && ANY.has(dow);
+
+  // Intervals within a day.
+  if (anyDay && pinnedYear == null && ANY.has(hour)) {
+    if (ANY.has(min)) return i18n.t('schedule.cron.everyMinutes', { count: 1 });
+    const minuteStep = /^\*\/(\d{1,2})$/.exec(min);
+    if (minuteStep) return i18n.t('schedule.cron.everyMinutes', { count: Number(minuteStep[1]) });
+    if (NUMBER.test(min)) return i18n.t('schedule.cron.hourly', { minute: twoDigits(Number(min)) });
+    return null;
+  }
+  const hourStep = /^\*\/(\d{1,2})$/.exec(hour);
+  if (anyDay && pinnedYear == null && hourStep && NUMBER.test(min)) {
+    return i18n.t('schedule.cron.everyHours', { count: Number(hourStep[1]), minute: twoDigits(Number(min)) });
+  }
+
+  // At one time of day.
+  if (!NUMBER.test(min) || !NUMBER.test(hour)) return null;
+  const time = `${twoDigits(Number(hour))}:${twoDigits(Number(min))}`;
+
+  if (ANY.has(dom) && ANY.has(month) && pinnedYear == null) {
+    if (ANY.has(dow)) return i18n.t('schedule.cron.everyDay', { time });
+    const days = weekdays(dow);
+    if (!days) return null;
+    if (same(days, [1, 2, 3, 4, 5])) return i18n.t('schedule.cron.weekdays', { time });
+    if (same(days, [0, 6])) return i18n.t('schedule.cron.weekends', { time });
+    // Monday first, as a week reads.
+    const names = [1, 2, 3, 4, 5, 6, 0].filter((d) => days.has(d)).map(dayName);
+    return i18n.t('schedule.cron.onDays', { days: names.join(', '), time });
+  }
+
+  if (!NUMBER.test(dom) || !ANY.has(dow)) return null;
+  if (ANY.has(month)) {
+    return pinnedYear == null ? i18n.t('schedule.cron.monthly', { day: Number(dom), time }) : null;
+  }
+  if (!NUMBER.test(month)) return null;
+  if (pinnedYear != null) {
+    const date = new Date(Number(pinnedYear), Number(month) - 1, Number(dom)).toLocaleDateString(undefined, {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    });
+    return i18n.t('schedule.cron.onDate', { date, time });
+  }
+  const date = new Date(2000, Number(month) - 1, Number(dom)).toLocaleDateString(undefined, {
+    month: 'long',
+    day: 'numeric',
+  });
+  return i18n.t('schedule.cron.yearly', { date, time });
+}
+
+/**
+ * When a schedule runs, as its card and its detail say it: the cron in words,
+ * or for a one-off the moment it fires. A zone other than the phone's is
+ * named, since the words are that zone's wall-clock time. `words` is false
+ * when nothing better than the raw cron could be said, which is then shown in
+ * a monospaced face.
+ */
+export function describeWhen(schedule: Schedule, phoneZone: string): { text: string; words: boolean } {
+  if (isOneOff(schedule)) {
+    // A one-off's moment is an instant, shown in the phone's own time.
+    const at = schedule.fire_at ? formatScheduleTime(schedule.fire_at) : '';
+    return { text: i18n.t('schedule.cron.once', { when: at }), words: true };
+  }
+  const words = describeCron(schedule.cron);
+  if (!words) return { text: schedule.cron, words: false };
+  if (schedule.timezone === phoneZone) return { text: words, words: true };
+  return { text: i18n.t('schedule.cron.inZone', { when: words, zone: schedule.timezone }), words: true };
+}
+
+// ── Opening one schedule ─────────────────────────────────────────────────────
+
+/** A Pond id: a UUID, optionally prefixed. Nothing that could be a path. */
+const POND_ID = /^[A-Za-z0-9_-]{1,128}$/;
+
+/**
+ * The schedule a `schedule_id` search param names, or null. The param comes
+ * from a notification tap, or any link that opens the Schedule screen, so it
+ * is checked again here rather than trusted: a malformed one opens the list.
+ */
+export function linkedScheduleId(param: string | string[] | undefined): string | null {
+  const raw = Array.isArray(param) ? param[0] : param;
+  return typeof raw === 'string' && POND_ID.test(raw) ? raw : null;
+}
+
+// ── The schedule form ────────────────────────────────────────────────────────
+
+export type Timing = 'once' | 'repeat';
+
+/** What the create and edit form holds, as typed. */
+export interface ScheduleDraft {
+  name: string;
+  prompt: string;
+  timing: Timing;
+  date: CivilDate | null;
+  time: CivilTime | null;
+  cron: string;
+  timezone: string;
+}
+
+/** The request, or the key of the sentence that says what to fix. */
+export type DraftResult<T> = { ok: true; req: T } | { ok: false; error: TranslationKey };
+
+/** The prompt a schedule runs, or null for a webhook, which has none. */
+export function promptOf(schedule: Schedule): string | null {
+  return schedule.kind.type === 'agent_prompt' ? schedule.kind.prompt : null;
+}
+
+/** An empty form for a new schedule, in the phone's zone. */
+export function emptyDraft(timezone: string): ScheduleDraft {
+  return { name: '', prompt: '', timing: 'once', date: null, time: null, cron: '', timezone };
+}
+
+/**
+ * The form filled with a schedule as the Pond has it. A one-off's instant is
+ * read back as a date and a time on this phone, which is how it was picked.
+ */
+export function draftFrom(schedule: Schedule): ScheduleDraft {
+  const base = { name: schedule.label, prompt: promptOf(schedule) ?? '', timezone: schedule.timezone };
+  if (isOneOff(schedule) && schedule.fire_at) {
+    const at = new Date(schedule.fire_at);
+    return {
+      ...base,
+      timing: 'once',
+      date: { year: at.getFullYear(), month: at.getMonth() + 1, day: at.getDate() },
+      time: { hour: at.getHours(), minute: at.getMinutes() },
+      cron: '',
+    };
+  }
+  return { ...base, timing: 'repeat', date: null, time: null, cron: schedule.cron };
+}
+
+/** The checks the Pond would answer with a 400, and the one-off's instant. */
+function checkTiming(d: ScheduleDraft, now: Date): DraftResult<{ at: Date | null; cron: string }> {
+  if (d.timing === 'once') {
+    if (!d.date || !d.time) return { ok: false, error: 'schedule.errors.whenRequired' };
+    const at = new Date(d.date.year, d.date.month - 1, d.date.day, d.time.hour, d.time.minute);
+    if (at.getTime() <= now.getTime()) return { ok: false, error: 'schedule.errors.whenPast' };
+    return { ok: true, req: { at, cron: oneOffCron(d.date, d.time) } };
+  }
+  if (!isSixFieldCron(d.cron)) return { ok: false, error: 'schedule.errors.cronFields' };
+  return { ok: true, req: { at: null, cron: d.cron.trim() } };
+}
+
+/**
+ * `POST /schedules` for a new schedule. A one-off is a pinned cron sent with
+ * `once: true` (see `oneOffCron`); both kinds carry the draft's zone.
+ */
+export function createRequest(d: ScheduleDraft, now = new Date()): DraftResult<CreateScheduleRequest> {
+  if (!d.name.trim()) return { ok: false, error: 'schedule.errors.nameRequired' };
+  if (!d.prompt.trim()) return { ok: false, error: 'schedule.errors.promptRequired' };
+  const timing = checkTiming(d, now);
+  if (!timing.ok) return timing;
+  return {
+    ok: true,
+    req: {
+      name: d.name.trim(),
+      cron: timing.req.cron,
+      prompt: d.prompt.trim(),
+      timezone: d.timezone,
+      once: d.timing === 'once',
+    },
+  };
+}
+
+/**
+ * `PUT /schedules/{id}` for an edit, carrying only what changed: the Pond
+ * leaves an absent field as it is, and a changed shape re-registers the job,
+ * so an edit to the name alone should not touch when it runs.
+ *
+ * A one-off's new moment goes as `fire_at`, an instant, which keeps it a
+ * one-off; a cron alone would make it repeat. A cron sent for a one-off turns
+ * it into a repeating schedule, which is what choosing "On repeat" means.
+ *
+ * A webhook's URL is not here: `PUT /schedules/{id}` takes a prompt, which
+ * would replace the webhook with an agent prompt, and nothing else changes the
+ * kind. Its prompt field is therefore ignored.
+ */
+export function updateRequest(
+  original: Schedule,
+  d: ScheduleDraft,
+  now = new Date(),
+): DraftResult<UpdateScheduleRequest> {
+  const prompt = promptOf(original);
+  if (!d.name.trim()) return { ok: false, error: 'schedule.errors.nameRequired' };
+  if (prompt != null && !d.prompt.trim()) return { ok: false, error: 'schedule.errors.promptRequired' };
+
+  const req: UpdateScheduleRequest = {};
+  if (d.name.trim() !== original.label) req.name = d.name.trim();
+  if (prompt != null && d.prompt.trim() !== prompt) req.prompt = d.prompt.trim();
+  if (d.timezone !== original.timezone) req.timezone = d.timezone;
+
+  const was = draftFrom(original);
+  const timingChanged =
+    d.timing !== was.timing ||
+    (d.timing === 'once'
+      ? JSON.stringify([d.date, d.time]) !== JSON.stringify([was.date, was.time])
+      : d.cron.trim() !== was.cron.trim());
+  if (timingChanged) {
+    const timing = checkTiming(d, now);
+    if (!timing.ok) return timing;
+    if (timing.req.at) req.fire_at = timing.req.at.toISOString();
+    else req.cron = timing.req.cron;
+  }
+  return { ok: true, req };
 }
 
 // ── Mock data ────────────────────────────────────────────────────────────────

@@ -6,8 +6,9 @@
  * picks up what the stream does not carry, such as the next run the scheduler
  * worked out afterwards, and carries on alone while the stream is down.
  *
- * Behind the Developer toggle for `schedule`: on mock, the same cards render
- * `SAMPLE_SCHEDULES` and the actions change them locally.
+ * Real by default, and behind the Developer toggle for `schedule` in a dev
+ * build: on mock, the same cards render `SAMPLE_SCHEDULES` and the actions
+ * change them locally. One schedule's own screen is `use-schedule-detail`.
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -17,7 +18,7 @@ import { useServer } from '@/providers/server-provider';
 import { ApiError, api } from '@/services/api-client';
 import i18n from '@/services/i18n';
 import type { CreateScheduleRequest, Schedule } from '@/services/types';
-import { SAMPLE_SCHEDULES, deviceTimeZone, isRule, timedSchedules } from '@/models/schedule';
+import { SAMPLE_SCHEDULES, isRule, timedSchedules } from '@/models/schedule';
 import { describeApiError } from './describe-error';
 import { MIN_POLL_MS, useLive } from './use-live';
 
@@ -50,7 +51,7 @@ export interface UseSchedules {
   actions: {
     refresh: () => Promise<void>;
     /** Resolves to why the Pond refused it, or null once it exists. */
-    create: (req: Omit<CreateScheduleRequest, 'timezone'>) => Promise<string | null>;
+    create: (req: CreateScheduleRequest) => Promise<string | null>;
     setPaused: (schedule: Schedule, paused: boolean) => Promise<void>;
     runNow: (schedule: Schedule) => Promise<void>;
   };
@@ -213,16 +214,14 @@ export function useSchedules(): UseSchedules {
   }, [hydrated, real, load]);
 
   const create = useCallback(
-    async (req: Omit<CreateScheduleRequest, 'timezone'>) => {
-      // Only a one-off carries the zone; see deviceTimeZone for why.
-      const full: CreateScheduleRequest = req.once ? { ...req, timezone: deviceTimeZone() } : req;
+    async (req: CreateScheduleRequest) => {
       if (!real) {
         changes.current += 1;
-        setAll((current) => [...current, mockSchedule(full)]);
+        setAll((current) => [...current, mockSchedule(req)]);
         return null;
       }
       try {
-        const created = await api.createSchedule(full);
+        const created = await api.createSchedule(req);
         changes.current += 1;
         setAll((current) => [...current, created]);
         return null;
