@@ -27,6 +27,7 @@ import { useServer } from '@/providers/server-provider';
 import { api } from '@/services/api-client';
 import { forgetCards } from '@/services/card-cache';
 import { Storage } from '@/services/storage';
+import { matchesQuery } from '@/utils/search';
 import type { SessionSummary } from '@/services/types';
 
 /** How much conversation a card has to show, which is how tall it gets. */
@@ -166,27 +167,6 @@ export function passesFilter(card: Pick<HistoryCard, 'routine'>, filter: History
   if (filter === 'chats') return !card.routine;
   if (filter === 'routines') return card.routine;
   return true;
-}
-
-/** Case and accents folded away, so "cafe" finds "Café". */
-export function fold(text: string): string {
-  const decomposed = typeof text.normalize === 'function' ? text.normalize('NFD') : text;
-  return decomposed.replace(/[̀-ͯ]/g, '').toLowerCase();
-}
-
-/**
- * Whether a card answers a query: every word of it, somewhere in the title or
- * the preview, in any order.
- *
- * The desktop matches the query as one run, so "cry devil" misses "Devil May
- * Cry". Words in any order is closer to what a half-remembered conversation
- * gives you to search with.
- */
-export function matchesQuery(card: Pick<HistoryCard, 'title' | 'preview'>, query: string): boolean {
-  const words = fold(query).split(/\s+/).filter(Boolean);
-  if (words.length === 0) return true;
-  const haystack = fold(`${card.title ?? ''} ${card.preview ?? ''}`);
-  return words.every((word) => haystack.includes(word));
 }
 
 /** Where a card sits on the wall, in rows rather than points. */
@@ -580,7 +560,7 @@ export function useChatHistory(): UseChatHistory {
   }, [sessions, t, i18n.language]);
 
   const cards = useMemo(
-    () => all.filter((c) => passesFilter(c, filter) && matchesQuery(c, query)),
+    () => all.filter((c) => passesFilter(c, filter) && matchesQuery([c.title, c.preview], query)),
     [all, filter, query],
   );
 

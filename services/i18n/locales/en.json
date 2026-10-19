@@ -1268,6 +1268,15 @@
         "off": "Turning it off",
         "offBody": "Start the app without EXPO_PUBLIC_POND_INSECURE_DEV, then pair again over your Pond's encrypted address. A release build never has this mode."
       }
+    },
+    "search": {
+      "label": "Search settings",
+      "placeholder": "Search settings",
+      "clear": "Clear search",
+      "inPage": "In {{page}}",
+      "none": "No setting matches “{{query}}”",
+      "results_one": "{{count}} setting found",
+      "results_other": "{{count}} settings found"
     }
   },
   "screens": {

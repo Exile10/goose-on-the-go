@@ -4,7 +4,7 @@
  */
 
 import React, { useCallback, useMemo, useState } from 'react';
-import { Alert, Pressable, ScrollView, Text, View } from 'react-native';
+import { Alert, Keyboard, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -13,8 +13,14 @@ import { InkButton, InkEdge, InkTitle } from '@jarida/ink/native';
 import { IssueRows } from '@/components/settings/issue-page';
 import { PAGE_GUTTER } from '@/components/settings/settings-scroll';
 import { SwitchRow } from '@/components/settings/setting-controls';
-import { SettingsGroup, SettingsRow, TILE_INSET } from '@/components/settings/settings-list';
-import { useSettingsColors, useSettingsStyles, type SettingsColors, type SettingsType } from '@/components/settings/settings-theme';
+import { SettingsGroup, SettingsMessage, SettingsRow, TILE_INSET } from '@/components/settings/settings-list';
+import {
+  useSettingsColors,
+  useSettingsStyles,
+  type SettingsColors,
+  type SettingsMetrics,
+  type SettingsType,
+} from '@/components/settings/settings-theme';
 import { GIcon } from '@/components/ui/g-icon';
 import { APP_VERSION } from '@/constants/app';
 import { Brand, JaridaPurple } from '@/constants/colors';
@@ -29,6 +35,7 @@ import { initialOf, useHousehold } from '@/view-models/use-household';
 import { usePondSettings } from '@/view-models/use-pond-settings';
 import { summarize, useSummaryExtras } from '@/view-models/use-settings-extras';
 import { useSettingsIssues } from '@/view-models/use-settings-issues';
+import { useSettingsSearch, type SettingsSearchEntry } from '@/view-models/use-settings-search';
 
 const SUMMARY_IDS: SummaryId[] = PROFILE_NAV.flatMap((group) =>
   group.items.flatMap((item) => (item.summary ? [item.summary] : [])),
@@ -78,6 +85,29 @@ function AccountRow({ onPress }: { onPress: () => void }) {
   );
 }
 
+/** What a search found, in place of the menu; a match inside a page names the page it is on. */
+function SearchResults({ results, query, onOpen }: { results: SettingsSearchEntry[]; query: string; onOpen: (route: string) => void }) {
+  const { t } = useTranslation();
+  if (results.length === 0) return <SettingsMessage>{t('settings.search.none', { query: query.trim() })}</SettingsMessage>;
+  return (
+    <View accessibilityLabel={t('settings.search.results', { count: results.length })}>
+      <SettingsGroup inset={TILE_INSET}>
+        {results.map((entry) => (
+          <SettingsRow
+            key={entry.id}
+            label={entry.label}
+            description={entry.parent ? t('settings.search.inPage', { page: entry.parent }) : null}
+            icon={entry.icon}
+            tile={entry.tile}
+            accessory="next"
+            onPress={() => onOpen(entry.route)}
+          />
+        ))}
+      </SettingsGroup>
+    </View>
+  );
+}
+
 export default function ProfileHub() {
   const styles = useSettingsStyles(makeStyles);
   const colors = useSettingsColors();
@@ -91,6 +121,7 @@ export default function ProfileHub() {
   const { settings } = usePondSettings();
   const issues = useSettingsIssues();
   const extras = useSummaryExtras(SUMMARY_IDS);
+  const search = useSettingsSearch();
 
   const go = useCallback(
     (route: string) => {
@@ -129,57 +160,101 @@ export default function ProfileHub() {
         {...chrome}
         contentContainerStyle={[styles.content, { paddingBottom: bottomInset + Spacing.lg }]}
         showsVerticalScrollIndicator={false}
+        // A result can be tapped while the keyboard is still up, and a scroll puts it away.
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
       >
         <InkTitle style={styles.title}>{t('screens.settings')}</InkTitle>
 
-        <IssueRows issues={issues} />
+        <View style={styles.search}>
+          <GIcon name="search" size={18} color={colors.textTertiary} />
+          <TextInput
+            value={search.query}
+            onChangeText={search.setQuery}
+            placeholder={t('settings.search.placeholder')}
+            placeholderTextColor={colors.textTertiary}
+            autoCapitalize="none"
+            autoCorrect={false}
+            returnKeyType="search"
+            // The results are already on screen, so "Search" only puts the keyboard away.
+            onSubmitEditing={() => Keyboard.dismiss()}
+            accessibilityLabel={t('settings.search.label')}
+            style={styles.searchInput}
+          />
+          {search.query ? (
+            <Pressable onPress={search.clear} accessibilityRole="button" accessibilityLabel={t('settings.search.clear')} hitSlop={8}>
+              <GIcon name="x" size={18} color={colors.textTertiary} />
+            </Pressable>
+          ) : null}
+        </View>
 
-        <AccountRow onPress={() => go(ACCOUNT_ROUTE)} />
+        {search.result.mode === 'results' ? (
+          <SearchResults results={search.result.results} query={search.query} onOpen={go} />
+        ) : (
+          <>
+          <IssueRows issues={issues} />
 
-        {PROFILE_NAV.map((group) => (
-          <View key={group.groupKey} accessibilityLabel={t(group.groupKey)}>
-            <SettingsGroup inset={TILE_INSET}>
-              {group.items.map((item) => (
-                <SettingsRow
-                  key={item.id}
-                  label={t(item.labelKey)}
-                  icon={item.icon}
-                  tile={item.tile}
-                  value={item.summary ? values[item.summary] : null}
-                  accessory="next"
-                  onPress={() => go(item.route)}
-                />
-              ))}
-              {group.groupKey === 'settings.menu.phone' ? (
-                <SwitchRow
-                  key="haptics"
-                  label={t('settings.hapticsLabel')}
-                  value={hapticsOn}
-                  onChange={(next) => {
-                    setHapticsOn(next);
-                    void saveHapticsPreference(next);
-                  }}
-                />
-              ) : null}
-            </SettingsGroup>
-          </View>
-        ))}
+          <AccountRow onPress={() => go(ACCOUNT_ROUTE)} />
 
-        {/* Signing out is also the only way to release a remote enrollment the Pond still calls
-            active, so it has to work, and say that it is working. */}
-        <InkButton variant="danger" disabled={unpairing} onPress={confirmUnpair} style={styles.unpair}>
-          {unpairing ? t('profile.unpairing') : t('common.unpair')}
-        </InkButton>
-        <Text style={styles.version}>{t('profile.version', { version: APP_VERSION })}</Text>
+          {PROFILE_NAV.map((group) => (
+            <View key={group.groupKey} accessibilityLabel={t(group.groupKey)}>
+              <SettingsGroup inset={TILE_INSET}>
+                {group.items.map((item) => (
+                  <SettingsRow
+                    key={item.id}
+                    label={t(item.labelKey)}
+                    icon={item.icon}
+                    tile={item.tile}
+                    value={item.summary ? values[item.summary] : null}
+                    accessory="next"
+                    onPress={() => go(item.route)}
+                  />
+                ))}
+                {group.groupKey === 'settings.menu.phone' ? (
+                  <SwitchRow
+                    key="haptics"
+                    label={t('settings.hapticsLabel')}
+                    value={hapticsOn}
+                    onChange={(next) => {
+                      setHapticsOn(next);
+                      void saveHapticsPreference(next);
+                    }}
+                  />
+                ) : null}
+              </SettingsGroup>
+            </View>
+          ))}
+
+          {/* Signing out is also the only way to release a remote enrollment the Pond still calls
+              active, so it has to work, and say that it is working. */}
+          <InkButton variant="danger" disabled={unpairing} onPress={confirmUnpair} style={styles.unpair}>
+            {unpairing ? t('profile.unpairing') : t('common.unpair')}
+          </InkButton>
+          <Text style={styles.version}>{t('profile.version', { version: APP_VERSION })}</Text>
+          </>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
 }
 
-const makeStyles = (c: SettingsColors, type: SettingsType) => ({
+const makeStyles = (c: SettingsColors, type: SettingsType, m: SettingsMetrics) => ({
   safe: { flex: 1 },
   content: { paddingHorizontal: PAGE_GUTTER },
   title: { marginTop: Spacing.md, marginBottom: Spacing.lg },
+  search: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: Spacing.sm,
+    backgroundColor: c.group,
+    borderRadius: m.radius.md,
+    borderWidth: m.hairline,
+    borderColor: c.edge,
+    paddingHorizontal: Spacing.md,
+    minHeight: 44,
+    marginBottom: Spacing.lg,
+  },
+  searchInput: { ...type.body, flex: 1, paddingVertical: Spacing.sm },
   accountWrap: { marginBottom: Spacing.xl },
   account: {
     flexDirection: 'row' as const,
