@@ -10,8 +10,9 @@
 import React, { useState } from 'react';
 import { ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { InkButton, InkCheckbox, InkFormField, InkInput, InkNotice, InkSheet, InkText } from '@jarida/ink/native';
+import { InkButton, InkFormField, InkInput, InkNotice, InkSheet, InkText } from '@jarida/ink/native';
 
+import { LabelledCheckbox } from '@/components/patterns/labelled-checkbox';
 import { GKeyboardView } from '@/components/ui/g-keyboard-view';
 import { confirm, reject } from '@/services/haptics';
 import type { Device } from '@/services/types';
@@ -77,7 +78,7 @@ export function RoomSheet({ devices, room, onClose, onSave }: RoomSheetProps) {
               <InkText size="sm" tone="tertiary">{t('rooms.addHint')}</InkText>
               <View style={styles.devices}>
                 {devices.map((d) => (
-                  <InkCheckbox
+                  <LabelledCheckbox
                     key={d.id}
                     checked={chosen.has(d.id)}
                     onChange={(on) => choose(d.id, on)}
