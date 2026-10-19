@@ -1305,6 +1305,7 @@
     "settingsHousehold": "You and your household",
     "settingsCameras": "Cameras and smart home",
     "settingsAnnouncements": "Announcements",
+    "suggestions": "Suggestions",
     "settingsPrivacy": "Privacy",
     "settingsRetention": "Keeping records",
     "settingsAppearance": "Appearance",
@@ -2480,6 +2481,30 @@
       "reconnect": "Reconnect",
       "reconnecting": "Reconnecting to Pond {{id}}",
       "reconnectFailed": "This phone couldn't reconnect by itself. Find your Pond again and have it say a code."
+    }
+  },
+  "proposals": {
+    "intro": "Things the Pond noticed and offers to do for you. Accepting records your yes; the Pond does not act on it by itself yet.",
+    "accepted": "Accepted. The Pond has noted it; nothing was run.",
+    "declined": "Declined. It is off your list.",
+    "list": {
+      "loading": "Loading suggestions",
+      "failed": "Could not load suggestions.",
+      "emptyTitle": "No suggestions",
+      "emptyBody": "When the Pond notices something it could help with, it asks here first."
+    },
+    "card": {
+      "why": "Why: {{rationale}}",
+      "expires": "Offered until {{when}}",
+      "accept": "Accept",
+      "decline": "Decline",
+      "deciding": "Saving"
+    },
+    "errors": {
+      "unaddressed": "The Pond cannot tell which household member this phone belongs to, so it cannot show suggestions meant for one person. Pair this phone to a member from the Pond to see yours.",
+      "gone": "That suggestion has expired or was already decided, so the list has been refreshed.",
+      "conflict": "The Pond would not record that decision. The list has been refreshed.",
+      "decideFailed": "Could not save that decision. Try again."
     }
   }
 }

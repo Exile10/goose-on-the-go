@@ -64,6 +64,7 @@ export const PROFILE_NAV: NavGroup[] = [
     groupKey: 'settings.menu.notices',
     items: [
       { id: 'announcements', labelKey: 'screens.settingsAnnouncements', icon: 'bell', tile: 'red', route: '/(stack)/settings-announcements', summary: 'announcements' },
+      { id: 'suggestions', labelKey: 'screens.suggestions', icon: 'light', tile: 'indigo', route: '/(stack)/suggestions' },
       { id: 'privacy', labelKey: 'screens.settingsPrivacy', icon: 'shield', tile: 'blue', route: '/(stack)/settings-privacy', summary: 'privacy' },
     ],
   },
