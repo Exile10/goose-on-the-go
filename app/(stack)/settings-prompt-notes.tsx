@@ -9,8 +9,9 @@
 import React, { useCallback, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { InkButton, InkCard, InkEmptyState, InkNotice, InkSpinner, InkSwitch, InkText } from '@jarida/ink/native';
+import { InkButton, InkCard, InkEmptyState, InkNotice, InkSpinner, InkText } from '@jarida/ink/native';
 
+import { LabelledSwitch } from '@/components/patterns/labelled-switch';
 import { PromptNoteSheet } from '@/components/patterns/prompt-note-sheet';
 import { noteName } from '@/models/prompt-extras';
 import type { PromptExtra } from '@/services/types';
@@ -84,7 +85,7 @@ export default function AssistantNotesScreen() {
           <InkText weight="semibold">{noteName(extra.key)}</InkText>
           <InkText tone={extra.active ? 'default' : 'tertiary'}>{extra.instruction}</InkText>
           <View style={styles.footer}>
-            <InkSwitch
+            <LabelledSwitch
               label={extra.active ? t('promptNotes.card.on') : t('promptNotes.card.off')}
               checked={extra.active}
               onChange={(active) => void actions.setActive(extra, active)}
