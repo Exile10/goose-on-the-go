@@ -86,3 +86,64 @@ export function rideOfferFromData(data: unknown): RideOffer | null {
   const provider = typeof data.provider === 'string' && data.provider ? data.provider : 'uber';
   return { provider, dropoff: { name: name.trim(), latitude, longitude: longitude as number } };
 }
+
+/**
+ * The app screen a Pond notification asks a tap to open. The Pond puts it in
+ * `Notification.data` as `{ open: "schedule", schedule_id, run_id }`,
+ * `{ open: "devices" }` or `{ open: "chat" }`.
+ *
+ * Only these three screens are accepted, and only ids of the shape the Pond
+ * mints, so a notification can open one of them and nothing else. An older Pond
+ * sends no `open`, and the tap opens the app where it was, as before.
+ */
+export type OpenRoute =
+  | { open: 'schedule'; scheduleId?: string; runId?: string }
+  | { open: 'devices' }
+  | { open: 'chat' };
+
+/** A Pond id: a UUID, optionally prefixed (`timer-...`). Nothing that could be a path. */
+const POND_ID = /^[A-Za-z0-9_-]{1,128}$/;
+
+function pondId(raw: unknown): string | undefined {
+  return typeof raw === 'string' && POND_ID.test(raw) ? raw : undefined;
+}
+
+/**
+ * The screen in a notification's `data`, or null when it names none or one we
+ * do not open. A malformed schedule or run id is dropped, not the screen: the
+ * schedules list is still the right place to land.
+ */
+export function openRouteFromData(data: unknown): OpenRoute | null {
+  if (!isRecord(data)) return null;
+  switch (data.open) {
+    case 'schedule': {
+      const route: OpenRoute = { open: 'schedule' };
+      const scheduleId = pondId(data.schedule_id);
+      const runId = pondId(data.run_id);
+      if (scheduleId) route.scheduleId = scheduleId;
+      if (runId) route.runId = runId;
+      return route;
+    }
+    case 'devices':
+      return { open: 'devices' };
+    case 'chat':
+      return { open: 'chat' };
+    default:
+      return null;
+  }
+}
+
+/**
+ * The expo-router path a route opens. The schedules screen takes no id to
+ * scroll to, so a schedule notification opens the list.
+ */
+export function screenPath(route: OpenRoute): '/(stack)/schedule' | '/(tabs)/devices' | '/(tabs)/chat' {
+  switch (route.open) {
+    case 'schedule':
+      return '/(stack)/schedule';
+    case 'devices':
+      return '/(tabs)/devices';
+    case 'chat':
+      return '/(tabs)/chat';
+  }
+}

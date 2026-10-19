@@ -24,7 +24,7 @@ import { Linking, Platform } from 'react-native';
 
 import { router } from 'expo-router';
 
-import { linkFromData, rideOfferFromData } from './notification-link';
+import { linkFromData, openRouteFromData, rideOfferFromData, screenPath } from './notification-link';
 import type { ServerNotification } from './notification-stream';
 
 /**
@@ -108,7 +108,7 @@ export async function presentLocally(notification: ServerNotification): Promise<
       content: {
         title: notification.title,
         body: notification.body,
-        // A link or a ride offer rides along, already checked, for the tap to act on.
+        // A link, a ride offer or a screen to open rides along, already checked, for the tap to act on.
         data: {
           id: notification.id,
           category: notification.category,
@@ -129,12 +129,30 @@ export async function presentLocally(notification: ServerNotification): Promise<
   }
 }
 
-/** The open-link fields to store on a shade notification; empty when it carries no link. */
+/**
+ * The fields to store on a shade notification for its tap: a link or a ride
+ * offer, and a screen to open. Empty when it carries none of them.
+ */
 function linkData(data: unknown): Record<string, unknown> {
+  return { ...actionData(data), ...openData(data) };
+}
+
+function actionData(data: unknown): Record<string, unknown> {
   const link = linkFromData(data);
   if (link) return { action: 'open_url', kind: link.kind, url: link.url, label: link.label };
   const offer = rideOfferFromData(data);
   return offer ? { action: 'ride_offer', provider: offer.provider, dropoff: offer.dropoff } : {};
+}
+
+function openData(data: unknown): Record<string, unknown> {
+  const route = openRouteFromData(data);
+  if (!route) return {};
+  if (route.open !== 'schedule') return { open: route.open };
+  return {
+    open: route.open,
+    ...(route.scheduleId ? { schedule_id: route.scheduleId } : {}),
+    ...(route.runId ? { run_id: route.runId } : {}),
+  };
 }
 
 /** Notifications whose tap has been handled in this JS session, by identifier. */
@@ -165,16 +183,21 @@ function openTapped(Notifications: NotificationsModule, response: NotificationRe
     return;
   }
   const link = linkFromData(data);
-  if (!link) return;
-  Linking.openURL(link.url).catch((e) => {
-    // No app and no browser can take it; the notification itself still says where to.
-    console.warn('[notifications] could not open link', e);
-  });
+  if (link) {
+    Linking.openURL(link.url).catch((e) => {
+      // No app and no browser can take it; the notification itself still says where to.
+      console.warn('[notifications] could not open link', e);
+    });
+    return;
+  }
+  const route = openRouteFromData(data);
+  if (route) router.push(screenPath(route));
 }
 
 /**
- * Open ride and directions links, and the ride screen for a ride offer, when
- * their notification is tapped, including the tap that launched the app.
+ * Open ride and directions links, the ride screen for a ride offer, and the
+ * schedules, devices or chat screen the Pond names, when their notification is
+ * tapped, including the tap that launched the app.
  * Returns the unsubscribe.
  */
 export function watchLinkTaps(): () => void {
