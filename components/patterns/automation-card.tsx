@@ -10,8 +10,9 @@
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { InkBadge, InkCard, InkSwitch, InkText } from '@jarida/ink/native';
+import { InkBadge, InkCard, InkText } from '@jarida/ink/native';
 
+import { LabelledSwitch } from '@/components/patterns/labelled-switch';
 import { GPressable } from '@/components/ui/g-pressable';
 import { formatScheduleTime } from '@/models/schedule';
 import { toggle } from '@/services/haptics';
@@ -91,7 +92,7 @@ export const AutomationCard = React.memo(function AutomationCard({ rule, onOpen,
       </GPressable>
 
       <View style={styles.actions}>
-        <InkSwitch
+        <LabelledSwitch
           label={rule.paused ? t('schedule.card.paused') : t('schedule.card.enabled')}
           checked={!rule.paused}
           onChange={(on) => {

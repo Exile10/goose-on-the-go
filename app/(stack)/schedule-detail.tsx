@@ -6,6 +6,10 @@
  * zone, whether it is on, its next and last run, and its recent runs with what
  * each said or why it failed. Edit, pause and resume, run now and delete are
  * here; each change is the Pond's answer, not a guess, and a refusal says why.
+ *
+ * Delete is kept apart from the rest, at the foot of the screen below the
+ * runs: it is the one action that cannot be taken back, and sitting in the
+ * same wrapped row as Edit it read as a stray.
  */
 
 import React, { useState } from 'react';
@@ -18,13 +22,13 @@ import {
   InkCard,
   InkNotice,
   InkSpinner,
-  InkSwitch,
   InkText,
   inkText,
   useInkTheme,
 } from '@jarida/ink/native';
 import type { InkTone } from '@jarida/ink';
 
+import { LabelledSwitch } from '@/components/patterns/labelled-switch';
 import { ScheduleFormSheet } from '@/components/patterns/schedule-form-sheet';
 import { useThemedStyles } from '@/hooks/use-themed-styles';
 import { deviceTimeZone, describeWhen, formatScheduleTime, isOneOff, linkedScheduleId, promptOf } from '@/models/schedule';
@@ -177,7 +181,7 @@ export default function ScheduleDetailScreen() {
           {oneOff ? (
             <InkText size="sm" tone="tertiary">{t('schedule.detail.oneOffNoPause')}</InkText>
           ) : (
-            <InkSwitch
+            <LabelledSwitch
               label={schedule.paused ? t('schedule.detail.paused') : t('schedule.detail.enabled')}
               checked={!schedule.paused}
               onChange={(on) => {
@@ -187,22 +191,21 @@ export default function ScheduleDetailScreen() {
             />
           )}
           <View style={styles.buttons}>
-            <InkButton variant="quiet" icon="edit" onPress={() => setEditing(true)}>
+            <InkButton variant="quiet" icon="edit" block style={styles.button} onPress={() => setEditing(true)}>
               {t('schedule.detail.edit')}
             </InkButton>
             {real ? (
               <InkButton
                 variant="quiet"
                 icon="play"
+                block
+                style={styles.button}
                 disabled={schedule.currently_running || schedule.paused}
                 onPress={actions.runNow}
               >
                 {t('schedule.card.runNow')}
               </InkButton>
             ) : null}
-            <InkButton variant="danger" icon="delete" onPress={confirmDelete}>
-              {t('schedule.detail.delete')}
-            </InkButton>
           </View>
         </View>
       </InkCard>
@@ -221,6 +224,12 @@ export default function ScheduleDetailScreen() {
         ))}
       </View>
 
+      <View style={styles.dangerZone}>
+        <InkButton variant="danger" icon="delete" block onPress={confirmDelete}>
+          {t('schedule.detail.delete')}
+        </InkButton>
+      </View>
+
       <ScheduleFormSheet
         open={editing}
         onClose={() => setEditing(false)}
@@ -237,7 +246,15 @@ const makeStyles = (c: ThemeColors) =>
     scroll: { padding: Spacing.lg, gap: Spacing.lg, paddingBottom: Spacing['4xl'] },
     gap: { gap: Spacing.sm },
     fact: { gap: Spacing.xs },
-    buttons: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm },
+    buttons: { flexDirection: 'row', gap: Spacing.sm },
+    // Edit and Run now split the row evenly; Edit alone fills it.
+    button: { flex: 1 },
+    dangerZone: {
+      marginTop: Spacing.lg,
+      paddingTop: Spacing.lg,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: c.border,
+    },
     run: {
       gap: Spacing.xs,
       paddingVertical: Spacing.sm,

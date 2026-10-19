@@ -9,8 +9,9 @@
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { InkBadge, InkButton, InkCard, InkSwitch, InkText } from '@jarida/ink/native';
+import { InkBadge, InkButton, InkCard, InkText } from '@jarida/ink/native';
 
+import { LabelledSwitch } from '@/components/patterns/labelled-switch';
 import { GPressable } from '@/components/ui/g-pressable';
 import { describeWhen, formatScheduleTime, isOneOff } from '@/models/schedule';
 import { toggle } from '@/services/haptics';
@@ -73,7 +74,7 @@ export const ScheduleCard = React.memo(function ScheduleCard({
 
       <View style={styles.actions}>
         {oneOff ? null : (
-          <InkSwitch
+          <LabelledSwitch
             label={schedule.paused ? t('schedule.card.paused') : t('schedule.card.enabled')}
             checked={!schedule.paused}
             onChange={(on) => {
