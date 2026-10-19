@@ -21,8 +21,10 @@
  * Below it, a card shows how Goose's latest conversation went, from the Pond's
  * telemetry; tapping it lists that conversation's turns.
  *
- * Clearing is at the foot of the activity list, behind a confirmation: it
- * deletes the Pond's activity history for everyone in the household.
+ * Clearing sits just under the filters, outside the list so it does not scroll
+ * away, behind a confirmation: it deletes the Pond's activity history for
+ * everyone in the household. With nothing listed there is nothing to clear,
+ * so it is disabled rather than offering a deletion that does nothing.
  */
 
 import React, { useState, useCallback, useMemo } from 'react';
@@ -261,6 +263,19 @@ export default function ActivityScreen() {
         ))}
       </ScrollView>
 
+      {showingProblems ? null : (
+        <View style={styles.clearBar}>
+          <InkButton
+            variant="quiet"
+            icon="trash"
+            disabled={clearing || loading || data.events.length === 0}
+            onPress={askClear}
+          >
+            {clearing ? t('activity.clear.clearing') : t('activity.clear.button')}
+          </InkButton>
+        </View>
+      )}
+
       {showingProblems ? (
         <FlatList
           data={problems.data.problems}
@@ -287,15 +302,6 @@ export default function ActivityScreen() {
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
           ListHeaderComponent={header}
-          ListFooterComponent={
-            data.events.length > 0 && !loading ? (
-              <View style={styles.footer}>
-                <InkButton variant="danger" icon="trash" disabled={clearing} onPress={askClear}>
-                  {clearing ? t('activity.clear.clearing') : t('activity.clear.button')}
-                </InkButton>
-              </View>
-            ) : null
-          }
           // A list that failed to load is unknown, not empty.
           ListEmptyComponent={
             !loading && !error && !failed ? (
@@ -413,7 +419,11 @@ const makeStyles = (c: ThemeColors) =>
     color: c.textSecondary,
   },
   notice: { gap: Spacing.sm, marginBottom: Spacing.md },
-  footer: { marginTop: Spacing.lg, alignItems: 'flex-start' },
+  clearBar: {
+    paddingHorizontal: Spacing.lg,
+    paddingTop: Spacing.md,
+    alignItems: 'flex-end',
+  },
 
   /* Today */
   today: {
