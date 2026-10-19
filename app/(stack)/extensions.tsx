@@ -10,7 +10,7 @@ import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import React, { useCallback, useState } from 'react';
 import { InkButton, InkEmptyState, InkNotice, InkSegmented, InkSpinner, InkSwitch, InkText, InkTitle } from '@jarida/ink/native';
-import { Alert, View, Text, StyleSheet, ScrollView, TextInput } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TextInput } from 'react-native';
 
 import { GIcon } from '@/components/ui/g-icon';
 import { GPressable } from '@/components/ui/g-pressable';
@@ -21,6 +21,7 @@ import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
 import { Spacing } from '@/constants/spacing';
 import { Radii } from '@/constants/radii';
 import { useThemedStyles } from '@/hooks/use-themed-styles';
+import { useConfirm } from '@/providers/confirm-provider';
 import type { ThemeColors } from '@/constants/colors';
 import type { Extension, MarketplaceExtension } from '@/services/types';
 import { credentialFields, useExtensions } from '@/view-models/use-extensions';
@@ -241,6 +242,7 @@ const MarketplaceCard = React.memo(function MarketplaceCard({
 export default function ExtensionsScreen() {
   const styles = useThemedStyles(makeStyles);
   const { t } = useTranslation();
+  const confirm = useConfirm();
   const { data, loading, error, failed, actions } = useExtensions();
   const [installingId, setInstallingId] = useState<string | null>(null);
   const [form, setForm] = useState<{ item: MarketplaceExtension; mode: FormMode } | null>(null);
@@ -266,21 +268,19 @@ export default function ExtensionsScreen() {
    * so an install is confirmed first. One with credentials is confirmed by its form.
    */
   const handleInstall = useCallback(
-    (item: MarketplaceExtension) => {
+    async (item: MarketplaceExtension) => {
       if (credentialFields(item).length > 0) {
         setForm({ item, mode: 'install' });
         return;
       }
-      Alert.alert(
-        t('extensions.installConfirmTitle', { name: item.name }),
-        t('extensions.installConfirmBody', { name: item.name }),
-        [
-          { text: t('common.cancel'), style: 'cancel' },
-          { text: t('extensions.install'), onPress: () => void runInstall(item) },
-        ],
-      );
+      const yes = await confirm({
+        title: t('extensions.installConfirmTitle', { name: item.name }),
+        message: t('extensions.installConfirmBody', { name: item.name }),
+        confirmLabel: t('extensions.install'),
+      });
+      if (yes) void runInstall(item);
     },
-    [runInstall, t],
+    [confirm, runInstall, t],
   );
 
   const handleCredentials = useCallback(
@@ -292,18 +292,17 @@ export default function ExtensionsScreen() {
   );
 
   const confirmRemove = useCallback(
-    (name: string) => {
+    async (name: string) => {
       const label = data.marketplace.find((m) => m.id === name)?.name ?? name;
-      Alert.alert(
-        t('extensions.removeConfirmTitle', { name: label }),
-        t('extensions.removeConfirmBody', { name: label }),
-        [
-          { text: t('common.cancel'), style: 'cancel' },
-          { text: t('common.remove'), style: 'destructive', onPress: () => void actions.remove(name) },
-        ],
-      );
+      const yes = await confirm({
+        title: t('extensions.removeConfirmTitle', { name: label }),
+        message: t('extensions.removeConfirmBody', { name: label }),
+        confirmLabel: t('common.remove'),
+        destructive: true,
+      });
+      if (yes) void actions.remove(name);
     },
-    [actions, data.marketplace, t],
+    [actions, confirm, data.marketplace, t],
   );
 
   /** Closes the form only on success, so a refused submit keeps what was typed. */

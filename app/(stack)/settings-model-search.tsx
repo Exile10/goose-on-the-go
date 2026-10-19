@@ -3,7 +3,7 @@
  */
 
 import React from 'react';
-import { Alert, Pressable, Text, TextInput, View } from 'react-native';
+import { Pressable, Text, TextInput, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { InkSpinner } from '@jarida/ink/native';
 
@@ -19,6 +19,7 @@ import {
 import { GIcon } from '@/components/ui/g-icon';
 import { Spacing } from '@/constants/spacing';
 import { formatBytes, formatMegabytes } from '@/models/model-library';
+import { useChoice } from '@/providers/confirm-provider';
 import { confirm, selectionTick, tap } from '@/services/haptics';
 import type { HfModelFile } from '@/services/types';
 import { useModelLibrary, useModelSearch } from '@/view-models/use-model-library';
@@ -27,6 +28,7 @@ export default function ModelSearchScreen() {
   const { t } = useTranslation();
   const styles = useSettingsStyles(makeStyles);
   const colors = useSettingsColors();
+  const choose = useChoice();
   const lib = useModelLibrary();
   const search = useModelSearch();
   const [started, setStarted] = React.useState<string | null>(null);
@@ -37,26 +39,24 @@ export default function ModelSearchScreen() {
     return size ? t('models.library.filePicturesSize', { size }) : t('models.library.filePictures');
   };
 
-  const askFile = (file: HfModelFile) => {
+  const askFile = async (file: HfModelFile) => {
     void tap();
     const size = formatMegabytes(file.size_mb);
-    const start = (pictures: boolean) =>
-      void lib.actions.downloadFile(file, pictures).then((ok) => {
-        if (!ok) return;
-        void confirm();
-        setStarted(file.filename);
-      });
     const options = file.pictures
       ? [
-          { text: t('models.library.withPictures'), onPress: () => start(true) },
-          { text: t('models.library.textOnly'), onPress: () => start(false) },
+          { label: t('models.library.withPictures'), value: true },
+          { label: t('models.library.textOnly'), value: false },
         ]
-      : [{ text: t('models.library.download'), onPress: () => start(false) }];
-    Alert.alert(
-      t('models.library.downloadTitle', { name: file.filename }),
-      size ? t('models.library.downloadBody', { size }) : t('models.library.downloadBodyNoSize'),
-      [{ text: t('common.cancel'), style: 'cancel' }, ...options],
-    );
+      : [{ label: t('models.library.download'), value: false }];
+    const pictures = await choose({
+      title: t('models.library.downloadTitle', { name: file.filename }),
+      message: size ? t('models.library.downloadBody', { size }) : t('models.library.downloadBodyNoSize'),
+      options,
+    });
+    if (pictures === null) return;
+    if (!(await lib.actions.downloadFile(file, pictures))) return;
+    void confirm();
+    setStarted(file.filename);
   };
 
   return (
@@ -98,7 +98,7 @@ export default function ModelSearchScreen() {
               label={file.filename}
               description={[formatMegabytes(file.size_mb), picturesNote(file)].filter(Boolean).join(' · ') || null}
               trailing={<GIcon name="download" size={18} color={colors.accent} />}
-              onPress={() => askFile(file)}
+              onPress={() => void askFile(file)}
             />
           ))}
         </SettingsGroup>

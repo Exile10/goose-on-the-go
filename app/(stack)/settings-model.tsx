@@ -4,7 +4,6 @@
  */
 
 import React from 'react';
-import { Alert } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 
@@ -22,13 +21,16 @@ import {
   titleOf,
   tooBig,
 } from '@/models/model-library';
-import { caution, tap } from '@/services/haptics';
+import { useChoice, useConfirm } from '@/providers/confirm-provider';
+import { tap } from '@/services/haptics';
 import { formatContextWindow } from '@/view-models/use-models';
 import { roleLabelKey, useModelLibrary } from '@/view-models/use-model-library';
 
 export default function ModelScreen() {
   const { t } = useTranslation();
   const router = useRouter();
+  const confirm = useConfirm();
+  const choose = useChoice();
   const { id } = useLocalSearchParams<{ id?: string }>();
   const lib = useModelLibrary();
   const model = lib.models.find((m) => m.id === id);
@@ -49,26 +51,16 @@ export default function ModelScreen() {
   const busy = lib.busy === model.id;
   const runnable = model.available !== false;
 
-  const askDownload = () => askToDownload(model, lib.actions.download, t);
+  const askDownload = () => void askToDownload(model, lib.actions.download, choose, t);
 
-  const askDelete = () => {
-    void caution();
-    Alert.alert(
-      t('models.library.deleteTitle', { name: titleOf(model) }),
-      size ? t('models.library.deleteBody', { size }) : t('models.library.deleteBodyNoSize'),
-      [
-        { text: t('common.cancel'), style: 'cancel' },
-        {
-          text: t('models.library.delete'),
-          style: 'destructive',
-          onPress: () => {
-            void lib.actions.remove(model).then((ok) => {
-              if (ok) router.back();
-            });
-          },
-        },
-      ],
-    );
+  const askDelete = async () => {
+    const yes = await confirm({
+      title: t('models.library.deleteTitle', { name: titleOf(model) }),
+      message: size ? t('models.library.deleteBody', { size }) : t('models.library.deleteBodyNoSize'),
+      confirmLabel: t('models.library.delete'),
+      destructive: true,
+    });
+    if (yes && (await lib.actions.remove(model))) router.back();
   };
 
   const facts = [
@@ -127,7 +119,7 @@ export default function ModelScreen() {
             }}
           />
         ) : null}
-        {downloaded ? <SettingsRow label={t('models.library.delete')} destructive disabled={busy || model.active} note={model.active ? t('models.library.inUse') : null} onPress={askDelete} /> : null}
+        {downloaded ? <SettingsRow label={t('models.library.delete')} destructive disabled={busy || model.active} note={model.active ? t('models.library.inUse') : null} onPress={() => void askDelete()} /> : null}
       </SettingsGroup>
 
       <SettingsGroup title={t('models.library.section.facts')}>

@@ -7,7 +7,7 @@
  */
 
 import React, { useCallback, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { InkButton, InkChip, InkEmptyState, InkNotice, InkSpinner, InkText } from '@jarida/ink/native';
 
@@ -15,6 +15,7 @@ import { ConsolidationCard } from '@/components/patterns/consolidation-card';
 import { MemoryCard } from '@/components/patterns/memory-card';
 import { MemorySheet } from '@/components/patterns/memory-sheet';
 import { segmentLabel, segmentsIn } from '@/models/memory';
+import { useConfirm } from '@/providers/confirm-provider';
 import type { MemoryFragment, MemorySegment } from '@/services/types';
 import { useConsolidation } from '@/view-models/use-consolidation';
 import { useMemories } from '@/view-models/use-memories';
@@ -25,6 +26,7 @@ import { Spacing } from '@/constants/spacing';
 export default function MemoriesScreen() {
   const { t } = useTranslation();
   const styles = useThemedStyles(makeStyles);
+  const confirm = useConfirm();
   const { data, loading, error, failed, actions } = useMemories();
   const consolidation = useConsolidation(actions.refresh);
   const [filter, setFilter] = useState<MemorySegment | null>(null);
@@ -46,13 +48,16 @@ export default function MemoriesScreen() {
 
   const { remove } = actions;
   const confirmDelete = useCallback(
-    (memory: MemoryFragment) => {
-      Alert.alert(t('memories.forgetTitle'), t('memories.forgetBody'), [
-        { text: t('common.cancel'), style: 'cancel' },
-        { text: t('memories.card.forget'), style: 'destructive', onPress: () => void remove(memory) },
-      ]);
+    async (memory: MemoryFragment) => {
+      const yes = await confirm({
+        title: t('memories.forgetTitle'),
+        message: t('memories.forgetBody'),
+        confirmLabel: t('memories.card.forget'),
+        destructive: true,
+      });
+      if (yes) void remove(memory);
     },
-    [t, remove],
+    [confirm, t, remove],
   );
 
   return (

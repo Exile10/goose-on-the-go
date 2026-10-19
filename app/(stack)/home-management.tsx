@@ -10,7 +10,6 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 
@@ -23,6 +22,7 @@ import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
 import { Spacing } from '@/constants/spacing';
 import { Radii } from '@/constants/radii';
 import { useThemedStyles } from '@/hooks/use-themed-styles';
+import { useConfirm } from '@/providers/confirm-provider';
 import type { ThemeColors } from '@/constants/colors';
 
 interface RoomItem {
@@ -57,16 +57,17 @@ export default function HomeManagementScreen() {
   const router = useRouter();
   const [rooms, setRooms] = useState(ROOMS);
 
-  const handleRemoveRoom = useCallback((id: string) => {
-    Alert.alert(t('homeManagementAlert.removeTitle'), t('homeManagementAlert.removeBody'), [
-      { text: t('common.cancel'), style: 'cancel' },
-      {
-        text: t('homeManagementAlert.remove'),
-        style: 'destructive',
-        onPress: () => setRooms((prev) => prev.filter((r) => r.id !== id)),
-      },
-    ]);
-  }, [t]);
+  const confirm = useConfirm();
+
+  const handleRemoveRoom = useCallback(async (id: string) => {
+    const yes = await confirm({
+      title: t('homeManagementAlert.removeTitle'),
+      message: t('homeManagementAlert.removeBody'),
+      confirmLabel: t('homeManagementAlert.remove'),
+      destructive: true,
+    });
+    if (yes) setRooms((prev) => prev.filter((r) => r.id !== id));
+  }, [confirm, t]);
 
   return (
     <GKeyboardView>
@@ -93,7 +94,7 @@ export default function HomeManagementScreen() {
             </GPressable>
             <GPressable
               style={styles.roomAction}
-              onPress={() => handleRemoveRoom(room.id)}
+              onPress={() => void handleRemoveRoom(room.id)}
             >
               <GIcon name="trash" size={16} color={Semantic.danger} />
             </GPressable>
