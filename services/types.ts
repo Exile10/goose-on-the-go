@@ -44,6 +44,11 @@ export interface CreateDeviceRequest {
   room?: string;
 }
 
+/**
+ * `PUT /devices/{id}`. An omitted field keeps its stored value; a blank `hostname` or `room` clears
+ * it. The Pond refuses a blank name with 400, and a paired phone's row for any caller but that
+ * phone or the host with 403 `device_not_yours`.
+ */
 export interface UpdateDeviceRequest {
   name: string;
   hostname?: string;

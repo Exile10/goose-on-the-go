@@ -2036,7 +2036,12 @@
     "deviceGone": "That device is no longer registered with your Pond.",
     "bridgedEndpoint": "Your Pond will not remove a bridged endpoint on its own.",
     "noModelCatalogue": "This Pond does not expose a model catalogue.",
-    "profileExists": "A profile with that name already exists."
+    "profileExists": "A profile with that name already exists.",
+    "deviceNotYours": "That device is another member's phone. Only that phone can change it.",
+    "deviceNameRequired": "A device needs a name.",
+    "deviceNotSaved": "Your Pond did not save that change. Try again.",
+    "someDevicesNotSaved_one": "{{count}} of {{total}} devices was not moved. {{reason}}",
+    "someDevicesNotSaved_other": "{{count}} of {{total}} devices were not moved. {{reason}}"
   },
   "sessions": {
     "justNow": "Just now",
@@ -2481,5 +2486,14 @@
       "reconnecting": "Reconnecting to Pond {{id}}",
       "reconnectFailed": "This phone couldn't reconnect by itself. Find your Pond again and have it say a code."
     }
+  },
+  "deviceEdit": {
+    "title": "Edit device",
+    "name": "Name",
+    "namePlaceholder": "Desk lamp",
+    "room": "Room",
+    "roomPlaceholder": "No room",
+    "roomHint": "Type a new room, or pick one your devices are already in.",
+    "save": "Save"
   }
 }
