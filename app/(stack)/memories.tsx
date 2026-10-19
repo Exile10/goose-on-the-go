@@ -64,6 +64,7 @@ export default function MemoriesScreen() {
     >
       <ConsolidationCard
         progress={consolidation.progress}
+        stopError={consolidation.stopError}
         available={consolidation.available}
         onStart={consolidation.actions.start}
         onStop={consolidation.actions.stop}

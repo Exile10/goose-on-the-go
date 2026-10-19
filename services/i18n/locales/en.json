@@ -2143,14 +2143,17 @@
       "done": "Done. Changes made: {{accepted}}. Turned down: {{rejected}}.",
       "stopped": "Tidy-up stopped.",
       "failed": "The tidy-up did not finish.",
+      "stopFailed": "Could not stop the tidy-up. It may still be running on your Pond.",
       "notEnabled": "Tidying up is switched off on your Pond. Turn on memory consolidation in its settings.",
+      "notBuilt": "Your Pond was built without tidying up. It needs a build that includes memory consolidation.",
       "mock": "Switch Memories to the real Pond on the Developer screen to tidy up."
     },
     "errors": {
       "contentRequired": "Write what Goose should remember.",
       "saveFailed": "Could not save that memory.",
       "deleteFailed": "Could not forget that memory.",
-      "keepNeedsUpdate": "Your Pond needs an update before it can change whether a memory is kept."
+      "keepNeedsUpdate": "Your Pond needs an update before it can change whether a memory is kept.",
+      "forbidden": "Your Pond does not allow this phone to see or change memories."
     }
   },
   "devMode": {

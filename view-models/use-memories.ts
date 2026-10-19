@@ -3,14 +3,15 @@
  *
  * A poll, because the Pond writes memories in the background (extraction after
  * a conversation, consolidation merging and pruning) and has no event stream
- * for them. Behind the Developer toggle for `memory`: on mock, the same cards
- * render `SAMPLE_MEMORIES` and the actions change them locally.
+ * for them. Real by default, release builds included; in dev the Developer
+ * toggle for `memory` can switch it to mock, where the same cards render
+ * `SAMPLE_MEMORIES` and the actions change them locally.
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { useServer } from '@/providers/server-provider';
-import { ApiError, api } from '@/services/api-client';
+import { ApiError, ONBOARDING_REQUIRED, api } from '@/services/api-client';
 import i18n from '@/services/i18n';
 import type { MemoryFragment, SaveMemoryRequest } from '@/services/types';
 import { SAMPLE_MEMORIES, unkeptTier } from '@/models/memory';
@@ -38,9 +39,16 @@ export interface UseMemories {
   };
 }
 
-/** A 400 says why ("a memory cannot be blank"); the rest is the shared reading. */
+/**
+ * A 400 says why ("a memory cannot be blank"). A 403 other than the onboarding
+ * guard's is this phone being refused the memory routes, which no banner
+ * explains, so it gets a sentence of its own. The rest is the shared reading.
+ */
 export function describeMemoryError(e: unknown): string | null {
   if (e instanceof ApiError && e.status === 400 && e.detail) return e.detail;
+  if (e instanceof ApiError && e.status === 403 && e.detail !== ONBOARDING_REQUIRED) {
+    return i18n.t('memories.errors.forbidden');
+  }
   return describeApiError(e);
 }
 
@@ -108,18 +116,26 @@ export function useMemories(): UseMemories {
 
   useLive(() => load(false), MEMORIES_MS, hydrated && real);
 
+  // After a change the Pond took, read the list back rather than trust the local edit alone: the
+  // Pond may have trimmed the words or set a tier from the segment. Quiet, so a failed read keeps
+  // the list on screen.
+  const reread = useCallback(() => {
+    if (real) void load(false);
+  }, [real, load]);
+
   const save = useCallback(
     async (req: SaveMemoryRequest) => {
       try {
         const saved = real ? await api.saveMemory(req) : mockMemory(req);
         changes.current += 1;
         setMemories((current) => [saved, ...current]);
+        reread();
         return null;
       } catch (e) {
         return describeMemoryError(e) ?? i18n.t('memories.errors.saveFailed');
       }
     },
-    [real],
+    [real, reread],
   );
 
   const reword = useCallback(
@@ -128,12 +144,13 @@ export function useMemories(): UseMemories {
         if (real) await api.updateMemory(memory.id, { content });
         changes.current += 1;
         setMemories((current) => current.map((m) => (m.id === memory.id ? { ...m, content } : m)));
+        reread();
         return null;
       } catch (e) {
         return describeMemoryError(e) ?? i18n.t('memories.errors.saveFailed');
       }
     },
-    [real],
+    [real, reread],
   );
 
   // Sent on its own, never beside new words, so an older Pond refuses it
@@ -145,12 +162,13 @@ export function useMemories(): UseMemories {
         if (real) await api.updateMemory(memory.id, { tier });
         changes.current += 1;
         setMemories((current) => current.map((m) => (m.id === memory.id ? { ...m, tier } : m)));
+        reread();
         return null;
       } catch (e) {
         return describeKeepError(e);
       }
     },
-    [real],
+    [real, reread],
   );
 
   const remove = useCallback(
@@ -160,13 +178,14 @@ export function useMemories(): UseMemories {
       if (!real) return;
       try {
         await api.deleteMemory(memory.id);
+        reread();
       } catch (e) {
         changes.current += 1;
         setMemories((current) => [memory, ...current.filter((m) => m.id !== memory.id)]);
         setError(describeMemoryError(e) ?? i18n.t('memories.errors.deleteFailed'));
       }
     },
-    [real],
+    [real, reread],
   );
 
   return { data: { memories }, loading, error, failed, actions: { refresh, save, reword, setKept, remove } };

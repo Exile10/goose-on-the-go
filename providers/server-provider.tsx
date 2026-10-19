@@ -116,7 +116,11 @@ export type ScreenModes = Record<MigrationScreen, boolean>;
  */
 // `settings` starts real for the same reason: a release build must never show a change as saved when
 // nothing reached the Pond. The mock exists to build and look at the menus without one.
-const REAL_BY_DEFAULT: readonly MigrationScreen[] = ['chat', 'webSearch', 'settings'];
+// `memory` earned it the way `chat` did: every call it makes (list, save, reword, re-tier, forget,
+// and the consolidation stream and its stop) was checked against the Pond's routes and serde types,
+// and a paired phone's token reaches all of them. On mock, a release build showed four sample
+// memories as the household's, and "Tidy up now" could never run, since nothing could flip it.
+const REAL_BY_DEFAULT: readonly MigrationScreen[] = ['chat', 'webSearch', 'settings', 'memory'];
 
 export const DEFAULT_SCREEN_MODES: ScreenModes = MIGRATION_SCREENS.reduce(
   (acc, screen) => ({ ...acc, [screen]: REAL_BY_DEFAULT.includes(screen) }),
