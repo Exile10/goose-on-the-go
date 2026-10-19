@@ -133,14 +133,25 @@ export function openRouteFromData(data: unknown): OpenRoute | null {
   }
 }
 
+/** Where a route opens: an expo-router path, with the schedule's id when it names one. */
+type ScreenHref =
+  | '/(stack)/schedule'
+  | { pathname: '/(stack)/schedule'; params: { schedule_id: string } }
+  | '/(tabs)/devices'
+  | '/(tabs)/chat';
+
 /**
- * The expo-router path a route opens. The schedules screen takes no id to
- * scroll to, so a schedule notification opens the list.
+ * The expo-router location a route opens. A schedule notification names the
+ * schedule that ran, so the list is opened with its `schedule_id` and can go on
+ * to that schedule. The id is already one `openRouteFromData` accepted; without
+ * one the list opens as it is. A list that does not read the param ignores it.
  */
-export function screenPath(route: OpenRoute): '/(stack)/schedule' | '/(tabs)/devices' | '/(tabs)/chat' {
+export function screenPath(route: OpenRoute): ScreenHref {
   switch (route.open) {
     case 'schedule':
-      return '/(stack)/schedule';
+      return route.scheduleId
+        ? { pathname: '/(stack)/schedule', params: { schedule_id: route.scheduleId } }
+        : '/(stack)/schedule';
     case 'devices':
       return '/(tabs)/devices';
     case 'chat':

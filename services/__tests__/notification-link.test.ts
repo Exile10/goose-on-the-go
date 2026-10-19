@@ -132,8 +132,19 @@ describe('openRouteFromData', () => {
 
 describe('screenPath', () => {
   it('maps each route to its screen', () => {
-    expect(screenPath({ open: 'schedule', scheduleId: 'sched-1' })).toBe('/(stack)/schedule');
     expect(screenPath({ open: 'devices' })).toBe('/(tabs)/devices');
     expect(screenPath({ open: 'chat' })).toBe('/(tabs)/chat');
+  });
+
+  it('opens the schedules list on the schedule the notification names', () => {
+    expect(screenPath({ open: 'schedule', scheduleId: 'sched-1', runId: 'run-9' })).toEqual({
+      pathname: '/(stack)/schedule',
+      params: { schedule_id: 'sched-1' },
+    });
+  });
+
+  /** A malformed id was dropped by openRouteFromData; the list is still the place to land. */
+  it('opens the list alone when there is no schedule id', () => {
+    expect(screenPath({ open: 'schedule' })).toBe('/(stack)/schedule');
   });
 });

@@ -40,9 +40,9 @@ describe('openTapped', () => {
   });
   afterEach(() => stop());
 
-  it('opens the schedules list for a schedule notification', () => {
+  it('opens the schedule a schedule notification names', () => {
     tap({ id: 'a', open: 'schedule', schedule_id: 'sched-1', run_id: 'run-9' });
-    expect(mockPush).toHaveBeenCalledWith('/(stack)/schedule');
+    expect(mockPush).toHaveBeenCalledWith({ pathname: '/(stack)/schedule', params: { schedule_id: 'sched-1' } });
   });
 
   it('opens the devices tab and the chat tab', () => {
