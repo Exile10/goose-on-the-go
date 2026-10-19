@@ -27,7 +27,7 @@ import {
 } from '@jarida/ink/native';
 
 import { sourceKey } from '@/components/patterns/automation-card';
-import { GKeyboardView } from '@/components/ui/g-keyboard-view';
+import { GSheetBody } from '@/components/ui/g-sheet-body';
 import { confirm, reject } from '@/services/haptics';
 import type { RuleRequest, TriggerAction, TriggerCondition, TriggerSource } from '@/services/types';
 import { supports, useDevices } from '@/view-models/use-devices';
@@ -81,7 +81,6 @@ function DeviceList({
 
 function AutomationForm({ onClose, onCreate }: Omit<CreateAutomationSheetProps, 'open'>) {
   const { t } = useTranslation();
-  const { height } = useWindowDimensions();
   const { data } = useDevices();
   const switchable = data.devices.filter((d) => supports(d, 'power'));
 
@@ -162,8 +161,7 @@ function AutomationForm({ onClose, onCreate }: Omit<CreateAutomationSheetProps, 
   ];
 
   return (
-    // Bounded as the schedule sheet is, keyboard included; see there.
-    <GKeyboardView style={{ maxHeight: height * 0.7 }}>
+    <GSheetBody>
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <InkFormField label={t('schedule.form.name')}>
           <InkInput
@@ -292,7 +290,7 @@ function AutomationForm({ onClose, onCreate }: Omit<CreateAutomationSheetProps, 
           {t('schedule.form.create')}
         </InkButton>
       </ScrollView>
-    </GKeyboardView>
+    </GSheetBody>
   );
 }
 
