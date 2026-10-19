@@ -13,7 +13,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { useServer } from '@/providers/server-provider';
-import { ApiError, api } from '@/services/api-client';
+import { ApiError, ONBOARDING_REQUIRED, api } from '@/services/api-client';
+import i18n from '@/services/i18n';
 import type { ActivityEvent } from '@/services/types';
 import { SAMPLE_ACTIVITY, categoriesOf, inFilter, newestFirst, type ActivityFilter } from '@/models/log';
 import { describeApiError } from './describe-error';
@@ -46,6 +47,21 @@ async function readActivity(filter: ActivityFilter): Promise<ActivityEvent[]> {
   // The agent category also carries presence and session events, which Actions leaves out.
   const events = reads.flatMap((r) => r.events ?? []).filter((e) => inFilter(e, filter));
   return newestFirst(events, ACTIVITY_LIMIT);
+}
+
+/**
+ * What a failed read or clear of the Pond's activity, log or telemetry says on screen.
+ *
+ * A 403 is the one case the shared reading leaves blank that these routes need said. Every paired
+ * token may read them, so the Pond refuses only while it is not set up (`onboarding_required`),
+ * and a 403 never puts the connection banner into its revoked state: only a 401 does. Left to
+ * `describeApiError`, the Problems filter showed "No problems" under a refusal.
+ */
+export function describeActivityError(e: unknown): string | null {
+  if (e instanceof ApiError && e.status === 403) {
+    return e.detail === ONBOARDING_REQUIRED ? i18n.t('activity.setupRequired') : i18n.t('activity.forbidden');
+  }
+  return describeApiError(e);
 }
 
 const sampleFor = (filter: ActivityFilter) => SAMPLE_ACTIVITY.filter((e) => inFilter(e, filter));
@@ -98,7 +114,7 @@ export function useActivity(filter: ActivityFilter): UseActivity {
       } catch (e) {
         if (mine !== latest.current) return;
         if (!loaded) setFailed(true);
-        if (loud || !loaded) setError(describeApiError(e));
+        if (loud || !loaded) setError(describeActivityError(e));
         else console.warn('[activity] refresh failed; showing the last result', e instanceof ApiError ? e.status : 'network');
       } finally {
         if (mine === latest.current) setLoading(false);

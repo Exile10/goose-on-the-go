@@ -48,7 +48,6 @@ import {
 import { GIcon } from '@/components/ui/g-icon';
 import { TelemetryCard, TurnsSheet } from '@/components/patterns/conversation-telemetry';
 import { caution, confirm, selectionTick } from '@/services/haptics';
-import { describeApiError } from '@/view-models/describe-error';
 import type { ActivityEvent, ActivitySummary, LogEntry } from '@/services/types';
 import {
   ACTIVITY_FILTERS,
@@ -61,7 +60,7 @@ import {
   parsePondLogTime,
   type ActivityFilter,
 } from '@/models/log';
-import { useActivity } from '@/view-models/use-activity';
+import { describeActivityError, useActivity } from '@/view-models/use-activity';
 import { useActivitySummary } from '@/view-models/use-activity-summary';
 import { useConversationTelemetry, useConversationTurns } from '@/view-models/use-conversation-telemetry';
 import { useLogExport } from '@/view-models/use-log-export';
@@ -180,7 +179,7 @@ export default function ActivityScreen() {
       void activitySummary.actions.refresh();
     } catch (e) {
       // Somebody asked for this: a failure is said even when the banner explains why.
-      setClearResult({ tone: 'danger', text: describeApiError(e) ?? t('activity.clear.failed') });
+      setClearResult({ tone: 'danger', text: describeActivityError(e) ?? t('activity.clear.failed') });
     } finally {
       setClearing(false);
     }
@@ -193,7 +192,7 @@ export default function ActivityScreen() {
   }, [latest, turns.actions]);
   const problems = useProblems(showingProblems);
   const { loading, error, actions } = showingProblems ? problems : activity;
-  const failed = !showingProblems && activity.failed;
+  const failed = showingProblems ? problems.failed : activity.failed;
   const data = activity.data;
 
   const renderItem = useCallback(
@@ -228,7 +227,7 @@ export default function ActivityScreen() {
       {/* A failed read with nothing to add still says so: the connection banner gives the cause. */}
       {error || failed ? (
         <View style={styles.notice}>
-          <InkNotice tone="danger">{error ?? t('activity.failed')}</InkNotice>
+          <InkNotice tone="danger">{error ?? (showingProblems ? t('activity.problemsFailed') : t('activity.failed'))}</InkNotice>
           <InkButton variant="quiet" icon="refresh" onPress={actions.refresh}>
             {t('common.retry')}
           </InkButton>
@@ -271,7 +270,7 @@ export default function ActivityScreen() {
           showsVerticalScrollIndicator={false}
           ListHeaderComponent={header}
           ListEmptyComponent={
-            !loading && !error ? (
+            !loading && !error && !failed ? (
               <InkEmptyState icon="check" title={t('activity.noProblems')}>
                 <InkText>{t('activity.noProblemsBody')}</InkText>
               </InkEmptyState>

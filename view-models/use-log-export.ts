@@ -14,7 +14,7 @@ import { useServer } from '@/providers/server-provider';
 import { ApiError, api } from '@/services/api-client';
 import { SharingUnavailableError, shareLogsCsv } from '@/services/log-export';
 import { SAMPLE_PROBLEMS, logsToCsv } from '@/models/log';
-import { describeApiError } from './describe-error';
+import { describeActivityError } from './use-activity';
 
 export interface UseLogExport {
   exporting: boolean;
@@ -41,7 +41,7 @@ export function useLogExport(): UseLogExport {
       // 501: the Pond was started without its operational log.
       else if (e instanceof ApiError && e.status === 501) setError(t('activity.export.noLog'));
       // Somebody pressed a button: a failure says so even when the banner explains why.
-      else setError(describeApiError(e) ?? t('activity.export.failed'));
+      else setError(describeActivityError(e) ?? t('activity.export.failed'));
     } finally {
       setExporting(false);
     }
