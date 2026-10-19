@@ -6,6 +6,8 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import type { TFunction } from 'i18next';
+import React from 'react';
+import { act, create } from 'react-test-renderer';
 
 import { SETTINGS_PAGES } from '@/constants/settings-pages';
 import type { SettingsPageId } from '@/models/pond-settings';
@@ -15,6 +17,7 @@ import {
   routeOfPage,
   searchSettings,
   type SettingsSearchEntry,
+  useSettingsSearch,
 } from '@/view-models/use-settings-search';
 
 const t = i18n.t.bind(i18n) as TFunction;
@@ -114,5 +117,24 @@ describe('developer rows', () => {
 
   it('are found in a development build, as the menu shows them', () => {
     expect(developerIn(true)).toBe(true);
+  });
+});
+
+describe('the screen hook', () => {
+  // The Settings tab clears the search when it loses focus; this is the action it calls.
+  it('goes back to the menu when the search is cleared', () => {
+    let latest: ReturnType<typeof useSettingsSearch> | null = null;
+    function Probe() {
+      latest = useSettingsSearch();
+      return null;
+    }
+    act(() => {
+      create(React.createElement(Probe));
+    });
+    act(() => latest!.setQuery('think'));
+    expect(latest!.result.mode).toBe('results');
+    act(() => latest!.clear());
+    expect(latest!.query).toBe('');
+    expect(latest!.result).toEqual({ mode: 'browse' });
   });
 });

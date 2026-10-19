@@ -5,7 +5,7 @@
 
 import React, { useCallback, useMemo, useState } from 'react';
 import { Alert, Keyboard, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { InkButton, InkEdge, InkTitle } from '@jarida/ink/native';
@@ -122,6 +122,19 @@ export default function ProfileHub() {
   const issues = useSettingsIssues();
   const extras = useSummaryExtras(SUMMARY_IDS);
   const search = useSettingsSearch();
+  const { clear: clearSearch } = search;
+
+  // Leaving the tab puts the search away, so coming back shows the menu rather than results
+  // that were typed for a different moment, with the keyboard still asking for more.
+  useFocusEffect(
+    useCallback(
+      () => () => {
+        Keyboard.dismiss();
+        clearSearch();
+      },
+      [clearSearch],
+    ),
+  );
 
   const go = useCallback(
     (route: string) => {
