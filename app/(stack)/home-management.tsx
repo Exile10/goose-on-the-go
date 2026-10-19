@@ -1,260 +1,147 @@
 /**
- * HomeManagementScreen — Room list with rename/remove, Pond device list.
+ * HomeManagementScreen — the rooms your devices are in, and the Pond this phone is paired with.
+ *
+ * Rooms come from the devices, because that is all a room is on the Pond: the `room` field its
+ * devices share. Renaming, deleting and adding a room are each a set of device edits
+ * (`view-models/rooms.ts`), and a device with no room sits under Unassigned, which can be neither
+ * renamed nor deleted.
  */
 
-import React, { useState, useCallback } from 'react';
-import { useTranslation } from 'react-i18next';
-import { InkTitle } from '@jarida/ink/native';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  Alert,
-} from 'react-native';
+import React, { useCallback, useState } from 'react';
+import { Alert } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
+import { InkSpinner } from '@jarida/ink/native';
 
+import { RoomSheet } from '@/components/patterns/room-sheet';
+import { SettingsGroup, SettingsMessage, SettingsRow, TILE_INSET } from '@/components/settings/settings-list';
+import { SettingsNotice, SettingsScroll } from '@/components/settings/settings-scroll';
+import { useSettingsColors } from '@/components/settings/settings-theme';
 import { GIcon } from '@/components/ui/g-icon';
 import { GPressable } from '@/components/ui/g-pressable';
-import type { IconName } from '@/constants/icons';
-import { GKeyboardView } from '@/components/ui/g-keyboard-view';
-import { Grey, JaridaPurple, Semantic } from '@/constants/colors';
-import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
-import { Spacing } from '@/constants/spacing';
-import { Radii } from '@/constants/radii';
-import { useThemedStyles } from '@/hooks/use-themed-styles';
-import type { ThemeColors } from '@/constants/colors';
+import { useServer } from '@/providers/server-provider';
+import { hostOf } from '@/services/discovery';
+import { confirm, reject } from '@/services/haptics';
+import { usePondSettings } from '@/view-models/use-pond-settings';
+import { UNASSIGNED_ROOM, roomLabel, useDevices, type DeviceRoom } from '@/view-models/use-devices';
+import { unassignRoom } from '@/view-models/rooms';
 
-interface RoomItem {
-  id: string;
-  name: string;
-  deviceCount: number;
-  icon: IconName;
-}
-
-interface PondDevice {
-  id: string;
-  name: string;
-  status: 'online' | 'offline';
-  firmware: string;
-}
-
-const ROOMS: RoomItem[] = [
-  { id: '1', name: 'Living Room', deviceCount: 3, icon: 'home' },
-  { id: '2', name: 'Bedroom', deviceCount: 2, icon: 'moon' },
-  { id: '3', name: 'Entrance', deviceCount: 2, icon: 'lock' },
-  { id: '4', name: 'Kitchen', deviceCount: 1, icon: 'light' },
-];
-
-const POND_DEVICES: PondDevice[] = [
-  { id: '1', name: 'Pond Hub (Main)', status: 'online', firmware: 'v2.4.1' },
-  { id: '2', name: 'Pond Mini (Bedroom)', status: 'online', firmware: 'v2.4.0' },
-];
+/** The open sheet: a room's rename, or (`room: null`) a new room. */
+type Sheet = { room: string | null } | null;
 
 export default function HomeManagementScreen() {
   const { t } = useTranslation();
-  const styles = useThemedStyles(makeStyles);
   const router = useRouter();
-  const [rooms, setRooms] = useState(ROOMS);
+  const colors = useSettingsColors();
+  const { data, loading, error, actions } = useDevices();
+  const { settings } = usePondSettings();
+  const { paired, serverUrl, connectionState } = useServer();
+  const [sheet, setSheet] = useState<Sheet>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const { devices, rooms } = data;
 
-  const handleRemoveRoom = useCallback((id: string) => {
-    Alert.alert(t('homeManagementAlert.removeTitle'), t('homeManagementAlert.removeBody'), [
-      { text: t('common.cancel'), style: 'cancel' },
-      {
-        text: t('homeManagementAlert.remove'),
-        style: 'destructive',
-        onPress: () => setRooms((prev) => prev.filter((r) => r.id !== id)),
-      },
-    ]);
-  }, [t]);
+  const deleteRoom = useCallback(
+    (room: DeviceRoom) => {
+      Alert.alert(t('rooms.deleteTitle', { room: room.name }), t('rooms.deleteBody', { count: room.devices.length }), [
+        { text: t('common.cancel'), style: 'cancel' },
+        {
+          text: t('rooms.delete'),
+          style: 'destructive',
+          onPress: async () => {
+            setActionError(null);
+            const refused = await actions.edit(unassignRoom(devices, room.name));
+            if (refused) {
+              void reject();
+              setActionError(refused);
+            } else {
+              void confirm();
+            }
+          },
+        },
+      ]);
+    },
+    [actions, devices, t],
+  );
+
+  const pondName = settings?.home_name?.trim() || t('profile.yourPond');
+  const pondState =
+    connectionState === 'local'
+      ? t('connection.local')
+      : connectionState === 'remote'
+        ? t('connection.remote')
+        : t('connection.offline');
 
   return (
-    <GKeyboardView>
-      <ScrollView
-        style={styles.container}
-        contentContainerStyle={styles.scroll}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Rooms */}
-        <InkTitle level={3}>{t('sections.rooms')}</InkTitle>
-        {rooms.map((room) => (
-          <View key={room.id} style={styles.roomCard}>
-            <View style={{ marginRight: Spacing.md }}>
-              <GIcon name={room.icon} size={20} color={JaridaPurple[500]} />
-            </View>
-            <View style={styles.roomInfo}>
-              <Text style={styles.roomName}>{room.name}</Text>
-              <Text style={styles.roomDevices}>
-                {t('homeManagement.deviceCount', { count: room.deviceCount })}
-              </Text>
-            </View>
-            <GPressable style={styles.roomAction}>
-              <GIcon name="edit" size={16} color={Grey[400]} />
-            </GPressable>
-            <GPressable
-              style={styles.roomAction}
-              onPress={() => handleRemoveRoom(room.id)}
-            >
-              <GIcon name="trash" size={16} color={Semantic.danger} />
-            </GPressable>
-          </View>
-        ))}
+    <SettingsScroll>
+      {error ? <SettingsNotice tone="danger">{error}</SettingsNotice> : null}
+      {actionError ? <SettingsNotice tone="danger">{actionError}</SettingsNotice> : null}
 
-        {/* Add room */}
-        <GPressable feedback="lift" style={styles.addBtn}>
-          <GIcon name="plus" size={16} color={JaridaPurple[500]} />
-          <Text style={styles.addBtnText}>{t('rooms.add')}</Text>
-        </GPressable>
+      {loading && devices.length === 0 ? <InkSpinner label={t('pond.checking')} /> : null}
+      {/* A list that failed to load is unknown, not empty, and the notice above says so. */}
+      {!loading && !error && devices.length === 0 ? <SettingsMessage>{t('rooms.noDevices')}</SettingsMessage> : null}
 
-        {/* Pond devices */}
-        <InkTitle level={3}>{t('sections.pondDevices')}</InkTitle>
-        {POND_DEVICES.map((pd) => (
-          <View key={pd.id} style={styles.pondCard}>
-            <View style={styles.pondHeader}>
-              <View
-                style={[
-                  styles.pondDot,
-                  { backgroundColor: pd.status === 'online' ? Semantic.success : Grey[400] },
-                ]}
+      {devices.length > 0 ? (
+        <SettingsGroup title={t('sections.rooms')} inset={TILE_INSET} footer={t('rooms.footer')}>
+          {rooms.map((room) =>
+            room.name === UNASSIGNED_ROOM ? (
+              <SettingsRow
+                key={room.name}
+                icon="device"
+                tile="slate"
+                label={roomLabel(room.name)}
+                description={t('rooms.deviceCount', { count: room.devices.length })}
               />
-              <Text style={styles.pondName}>{pd.name}</Text>
-            </View>
-            <View style={styles.pondMeta}>
-              <Text style={styles.pondFirmware}>
-                {t('homeManagement.firmware', { version: pd.firmware })}
-              </Text>
-              <View style={styles.pondStatus}>
-                <Text
-                  style={[
-                    styles.pondStatusText,
-                    { color: pd.status === 'online' ? Semantic.success : Grey[500] },
-                  ]}
-                >
-                  {t(pd.status === 'online' ? 'common.online' : 'common.offline')}
-                </Text>
-              </View>
-            </View>
-          </View>
-        ))}
+            ) : (
+              <SettingsRow
+                key={room.name}
+                icon="home"
+                tile="green"
+                label={room.name}
+                description={t('rooms.deviceCount', { count: room.devices.length })}
+                onPress={() => setSheet({ room: room.name })}
+                trailing={
+                  <GPressable
+                    onPress={() => deleteRoom(room)}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('rooms.deleteLabel', { room: room.name })}
+                    hitSlop={8}
+                  >
+                    <GIcon name="trash" size={18} color={colors.danger} />
+                  </GPressable>
+                }
+              />
+            ),
+          )}
+          <SettingsRow key="add" icon="plus" tile="purple" label={t('rooms.add')} action onPress={() => setSheet({ room: null })} />
+        </SettingsGroup>
+      ) : null}
 
-        {/* Pair new device */}
-        <GPressable
-          feedback="lift"
-          style={styles.addBtn}
-          onPress={() => router.push('/(stack)/pond-pairing')}
-        >
-          <GIcon name="plus" size={16} color={JaridaPurple[500]} />
-          <Text style={styles.addBtnText}>{t('rooms.pairDevice')}</Text>
-        </GPressable>
+      {paired ? (
+        <SettingsGroup title={t('rooms.pondTitle')} inset={TILE_INSET}>
+          <SettingsRow icon="bridge" tile="slate" label={pondName} value={pondState} />
+          {serverUrl ? (
+            <SettingsRow icon="link" tile="slate" label={t('rooms.pondAddress')} value={hostOf(serverUrl)} />
+          ) : null}
+          <SettingsRow
+            icon="plus"
+            tile="purple"
+            label={t('rooms.pairDevice')}
+            action
+            accessory="next"
+            onPress={() => router.push('/(stack)/pond-pairing')}
+          />
+        </SettingsGroup>
+      ) : null}
 
-        <View style={{ height: 32 }} />
-      </ScrollView>
-    </GKeyboardView>
+      {sheet ? (
+        <RoomSheet
+          key={sheet.room ?? 'new'}
+          devices={devices}
+          room={sheet.room}
+          onClose={() => setSheet(null)}
+          onSave={actions.edit}
+        />
+      ) : null}
+    </SettingsScroll>
   );
 }
-
-const makeStyles = (c: ThemeColors) =>
-  StyleSheet.create({
-    container: { flex: 1, backgroundColor: c.background },
-    scroll: { paddingHorizontal: Spacing.lg, paddingTop: Spacing.lg },
-
-    /* Room card */
-    roomCard: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      backgroundColor: c.card,
-      borderRadius: Radii.xl,
-      padding: Spacing.md,
-      borderWidth: 1,
-      borderColor: c.border,
-      marginBottom: Spacing.sm,
-    },
-    roomInfo: { flex: 1 },
-    roomName: {
-      fontFamily: FontFamily.heading,
-      fontSize: FontSize.base,
-      fontWeight: FontWeight.semibold,
-      color: c.text,
-    },
-    roomDevices: {
-      fontFamily: FontFamily.body,
-      fontSize: FontSize.sm,
-      color: c.textTertiary,
-      marginTop: 2,
-    },
-    roomAction: {
-      width: 36,
-      height: 36,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-
-    /* Add button */
-    addBtn: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: Spacing.sm,
-      paddingVertical: Spacing.md,
-      borderRadius: Radii.xl,
-      borderWidth: 2,
-      borderStyle: 'dashed',
-      borderColor: JaridaPurple[200],
-      backgroundColor: c.tintSoft,
-      marginBottom: Spacing.lg,
-    },
-    addBtnText: {
-      fontFamily: FontFamily.body,
-      fontSize: FontSize.base,
-      fontWeight: FontWeight.semibold,
-      color: c.textBrand,
-    },
-
-    /* Pond device */
-    pondCard: {
-      backgroundColor: c.card,
-      borderRadius: Radii.xl,
-      padding: Spacing.lg,
-      borderWidth: 1,
-      borderColor: c.border,
-      marginBottom: Spacing.sm,
-    },
-    pondHeader: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: Spacing.sm,
-      marginBottom: Spacing.sm,
-    },
-    pondDot: {
-      width: 8,
-      height: 8,
-      borderRadius: 4,
-    },
-    pondName: {
-      fontFamily: FontFamily.heading,
-      fontSize: FontSize.md,
-      fontWeight: FontWeight.bold,
-      color: c.text,
-    },
-    pondMeta: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-    },
-    pondFirmware: {
-      fontFamily: FontFamily.mono,
-      fontSize: FontSize.xs,
-      color: c.textTertiary,
-    },
-    pondStatus: {
-      paddingHorizontal: Spacing.sm,
-      paddingVertical: 2,
-      borderRadius: Radii.pill,
-      backgroundColor: c.backgroundSecondary,
-    },
-    pondStatusText: {
-      fontFamily: FontFamily.body,
-      fontSize: FontSize.xs,
-      fontWeight: FontWeight.bold,
-    },
-  });
