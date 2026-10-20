@@ -132,17 +132,39 @@ export default function DevicesTab() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
+      {/* Title, count and actions each get their own line: squeezed into one
+          row at phone width, the count wrapped and both buttons shrank. */}
       <View style={styles.header}>
-        <View style={styles.headerText}>
-          <InkTitle level={1}>{t('devices.title')}</InkTitle>
-          <Text style={styles.subtitle}>
-            {t('devices.count', { count: total })}
-            {total > 0 ? ` · ${t('devices.online', { count: data.onlineCount })}` : ''}
-          </Text>
+        <InkTitle level={1}>{t('devices.title')}</InkTitle>
+        <Text style={styles.subtitle} numberOfLines={1}>
+          {t('devices.count', { count: total })}
+          {total > 0 ? ` · ${t('devices.online', { count: data.onlineCount })}` : ''}
+        </Text>
+        {/* Add lives up here rather than under the grid, so it stays in reach
+            however many devices there are. With none, the empty state below
+            carries it instead, and the screen still has a single primary. */}
+        <View style={styles.headerActions}>
+          {total > 0 ? (
+            <InkButton
+              variant="primary"
+              icon="plus"
+              block
+              style={styles.headerButton}
+              onPress={() => router.push('/(stack)/commission-device')}
+            >
+              {t('devices.addDevice')}
+            </InkButton>
+          ) : null}
+          <InkButton
+            variant="quiet"
+            icon="refresh"
+            block={total > 0}
+            style={total > 0 ? styles.headerButton : null}
+            onPress={handleRefresh}
+          >
+            {t('common.refresh')}
+          </InkButton>
         </View>
-        <InkButton variant="quiet" icon="refresh" onPress={handleRefresh}>
-          {t('common.refresh')}
-        </InkButton>
       </View>
 
       {/* Room tabs, derived from the rooms devices are actually in. The
@@ -236,18 +258,6 @@ export default function DevicesTab() {
           </View>
         ))}
 
-        {total > 0 ? (
-          <InkButton
-            variant="primary"
-            icon="plus"
-            block
-            onPress={() => router.push('/(stack)/commission-device')}
-            style={styles.action}
-          >
-            {t('devices.addDevice')}
-          </InkButton>
-        ) : null}
-
       </ScrollView>
     </SafeAreaView>
   );
@@ -256,25 +266,22 @@ export default function DevicesTab() {
 const makeStyles = (c: ThemeColors) =>
   StyleSheet.create({
     safe: { flex: 1, backgroundColor: c.background },
-    action: { marginTop: Spacing.md },
     notice: { marginBottom: Spacing.md },
 
     header: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      gap: Spacing.md,
       paddingHorizontal: Spacing.lg,
       paddingTop: Spacing.lg,
       paddingBottom: Spacing.md,
     },
-    headerText: { flexShrink: 1 },
     subtitle: {
       fontFamily: FontFamily.body,
       fontSize: FontSize.sm,
       color: c.textTertiary,
-      marginTop: 2,
+      marginTop: Spacing.xs,
     },
+    headerActions: { flexDirection: 'row', gap: Spacing.sm, marginTop: Spacing.md },
+    // Split the row evenly, so neither label is squeezed by the other.
+    headerButton: { flex: 1 },
 
     // Pins this ScrollView's own height to its content instead of letting it
     // compete for leftover flex space in the column layout below — without
