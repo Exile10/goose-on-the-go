@@ -58,6 +58,8 @@ import type {
   ProposalList,
   SaveMemoryRequest,
   UpdateMemoryRequest,
+  PromptExtra,
+  SavePromptExtraRequest,
   ModelActiveRoles,
   ModelCapabilities,
   ModelEntry,
@@ -1119,6 +1121,23 @@ export class PondApiClient {
 
   deleteMemory(id: string): Promise<void> {
     return this.del<void>(`/api/v1/memories/${encodeURIComponent(id)}`);
+  }
+
+  // ── Prompt extras ───────────────────────────────────────────
+
+  /** Every note, on or off, in the order the Pond sends them. */
+  async listPromptExtras(): Promise<PromptExtra[]> {
+    const res = await this.request<{ extras?: PromptExtra[] } | PromptExtra[]>('/api/v1/agent/extras');
+    return collection<PromptExtra>(res, 'extras');
+  }
+
+  /** Upsert by `key`: the Pond replaces a note already under that key without saying so. */
+  savePromptExtra(req: SavePromptExtraRequest): Promise<void> {
+    return this.post<void>('/api/v1/agent/extras', req);
+  }
+
+  deletePromptExtra(key: string): Promise<void> {
+    return this.del<void>(`/api/v1/agent/extras/${encodeURIComponent(key)}`);
   }
 
   /**

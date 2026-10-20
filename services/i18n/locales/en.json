@@ -1306,6 +1306,7 @@
     "ride": "Ride",
     "settings": "Settings",
     "settingsAssistant": "Assistant",
+    "settingsPromptNotes": "Assistant notes",
     "settingsVoice": "Voice",
     "settingsListening": "Listening",
     "settingsThinking": "Thinking",
@@ -2696,6 +2697,45 @@
       "gone": "That suggestion has expired or was already decided, so the list has been refreshed.",
       "conflict": "The Pond would not record that decision. The list has been refreshed.",
       "decideFailed": "Could not save that decision. Try again."
+    }
+  },
+  "promptNotes": {
+    "intro": "Short notes Goose follows in every conversation, such as \"Always answer in Swahili\". Each note that is on is added to its instructions, in this order.",
+    "everyTurn": "Every note that is on is read again on every turn, so long notes slow down the small model on your Pond. Keep each one to a sentence or two.",
+    "add": "Add a note",
+    "loading": "Loading notes",
+    "failed": "Couldn't load the notes from your Pond.",
+    "emptyTitle": "No notes yet",
+    "emptyBody": "Add one to have Goose follow it in every conversation.",
+    "deleteTitle": "Delete \"{{name}}\"?",
+    "deleteBody": "Goose stops following this note from the next turn. This can't be undone.",
+    "card": {
+      "edit": "Edit",
+      "delete": "Delete",
+      "on": "On",
+      "off": "Off"
+    },
+    "form": {
+      "newTitle": "New note",
+      "editTitle": "Edit \"{{name}}\"",
+      "name": "Name",
+      "namePlaceholder": "Language",
+      "nameHint": "A short name for the list. It can't be changed later.",
+      "text": "Note",
+      "textPlaceholder": "Always answer in Swahili.",
+      "length_one": "{{count}} character. Your Pond sets no limit; about {{advised}} is advised.",
+      "length_other": "{{count}} characters. Your Pond sets no limit; about {{advised}} is advised.",
+      "tooLong": "This note is long. Goose reads it on every turn, which slows answers on a small Pond.",
+      "save": "Save note"
+    },
+    "errors": {
+      "nameRequired": "Give the note a name.",
+      "nameUnusable": "Use some letters or numbers in the name.",
+      "nameTaken": "There is already a note with that name. Edit that one, or choose another name.",
+      "textRequired": "Write what Goose should do.",
+      "saveFailed": "Couldn't save the note. Try again.",
+      "deleteFailed": "Couldn't delete the note. It's back in the list.",
+      "unavailable": "This Pond can't keep notes. Update it to add them here."
     }
   }
 }

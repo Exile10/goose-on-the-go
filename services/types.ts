@@ -391,6 +391,21 @@ export interface UpdateMemoryRequest {
   tier?: MemoryTier;
 }
 
+/**
+ * A note added to the assistant's instructions on every turn while `active`: `GET /api/v1/agent/extras`.
+ * The Pond sends each one, in `sort_order` then `key` order, as its own block after its built-in
+ * prompt; `key` names the block and is the note's identity.
+ */
+export interface PromptExtra {
+  key: string;
+  instruction: string;
+  active: boolean;
+  sort_order: number;
+}
+
+/** `POST /api/v1/agent/extras`: creates the note, or replaces the one already under `key`. */
+export type SavePromptExtraRequest = PromptExtra;
+
 /** The tally a finished consolidation run reports. */
 export interface ConsolidationRunResult {
   accepted_count: number;

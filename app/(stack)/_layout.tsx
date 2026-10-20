@@ -69,6 +69,7 @@ export default function StackLayout() {
       }}
     >
       <Stack.Screen name="settings-assistant" options={{ title: t('screens.settingsAssistant') }} />
+      <Stack.Screen name="settings-prompt-notes" options={{ title: t('screens.settingsPromptNotes') }} />
       <Stack.Screen name="settings-voice" options={{ title: t('screens.settingsVoice') }} />
       <Stack.Screen name="settings-speaking" options={{ title: t('screens.settingsSpeaking') }} />
       <Stack.Screen name="wake-word" options={{ title: t('screens.wakeWord') }} />
