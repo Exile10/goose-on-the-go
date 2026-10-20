@@ -1,5 +1,6 @@
 package io.jarida.pondpresence
 
+import android.annotation.SuppressLint
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -80,6 +81,19 @@ class PondPresenceService : Service() {
     private const val EXTRA_BODY = "body"
     private const val EXTRA_CHANNEL_NAME = "channelName"
     private const val EXTRA_CHANNEL_DESCRIPTION = "channelDescription"
+    private const val NOTIFICATION_ICON = "notification_icon"
+
+    /**
+     * The silhouette expo-notifications installs from app.json's `icon` (prebuild writes it as
+     * `drawable/notification_icon`), so this ongoing notice wears the same status-bar icon as
+     * every other one. Looked up by name because a build without that config has no such
+     * resource; the launcher icon is the fallback, which Android draws as a white blob.
+     */
+    @SuppressLint("DiscouragedApi") // A name lookup is the point: see above.
+    private fun smallIcon(context: Context): Int {
+      val installed = context.resources.getIdentifier(NOTIFICATION_ICON, "drawable", context.packageName)
+      return if (installed != 0) installed else context.applicationInfo.icon
+    }
 
     private fun build(context: Context, texts: Texts): Notification {
       val manager = context.getSystemService(NotificationManager::class.java)
@@ -102,7 +116,7 @@ class PondPresenceService : Service() {
       return builder
         .setContentTitle(texts.title)
         .setContentText(texts.body)
-        .setSmallIcon(context.applicationInfo.icon)
+        .setSmallIcon(smallIcon(context))
         .setOngoing(true)
         .setOnlyAlertOnce(true)
         .also { if (pending != null) it.setContentIntent(pending) }
