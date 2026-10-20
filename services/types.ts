@@ -860,6 +860,16 @@ export interface ExtensionSecretsResult {
   restart_error: string | null;
 }
 
+/**
+ * What `PUT /api/v1/secrets/{key}` reports beyond "stored": the enabled extensions that read the
+ * key and were restarted to pick it up, and the ones that could not be. Never the value.
+ */
+export interface SecretSaveResult {
+  restarted: string[];
+  /** Extension names only. The Pond's reasons are English for a log, not for the screen. */
+  restartFailed: string[];
+}
+
 export interface MarketplaceExtension {
   id: string;
   name: string;

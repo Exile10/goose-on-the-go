@@ -147,6 +147,20 @@ does, the list goes straight on to that schedule's screen, with the list left
 beneath it for Back. Both tabs are behind the Developer toggle (`schedule`, real
 by default); on mock they show the samples in `models/schedule.ts`.
 
+Secrets (Settings, Tools, beside Extensions and Web search) lists, adds,
+replaces and deletes the keys the Pond holds for outside services, over
+`GET /api/v1/secrets`, `PUT /api/v1/secrets/{key}` and
+`DELETE /api/v1/secrets/{key}` (pond-api `routes.rs`, `list_secrets_handler`
+and its neighbours). The routes need a paired session and nothing more, so any
+paired phone may use them; none is host-only. The exception is members' Uber
+sign-ins (`UBER_` and anything after it): the listing leaves them out and the
+other routes answer 403 `secret_reserved`, which the screen says in words. The
+Pond lists names only. Known keys show the catalogue's friendly name
+(`models/secrets.ts`), others their own. The value field is masked and
+write-only, and is emptied the moment it is submitted, whatever the answer. Add
+will not overwrite a stored key; Replace is the way to change one. A save names
+any extension that could not restart to use the new value.
+
 Five more stack screens aren't in the hub:
 
 - **Pond Pairing** (`/(stack)/pond-pairing`) — from the pairing gate below, first

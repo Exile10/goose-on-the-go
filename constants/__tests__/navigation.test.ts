@@ -63,6 +63,14 @@ it('offers Web search beside the other ways the Pond reaches out', () => {
   );
 });
 
+/** The way in to Secrets is a row on the Tools page, beside the extensions whose keys these are. */
+it('offers Secrets beside Extensions on the Tools page', () => {
+  const links = SETTINGS_PAGES.tools.sections.flatMap((section) => section.items).filter((item) => item.kind === 'link');
+
+  expect(links).toContainEqual(expect.objectContaining({ route: '/(stack)/extensions' }));
+  expect(links).toContainEqual(expect.objectContaining({ route: '/(stack)/secrets', labelKey: 'screens.secrets', icon: 'key' }));
+});
+
 it('offers every settings page from a menu row or a page that is', () => {
   const routes = new Set([ACCOUNT_ROUTE, ...PROFILE_NAV.flatMap((group) => group.items.map((item) => item.route))]);
   for (const page of Object.values(SETTINGS_PAGES)) {
