@@ -3,7 +3,13 @@
  * other scheme or host, or a Google URL outside its maps path, is refused.
  */
 
-import { allowedUrl, linkFromData, rideOfferFromData } from '@/services/notification-link';
+import {
+  allowedUrl,
+  linkFromData,
+  openRouteFromData,
+  rideOfferFromData,
+  screenPath,
+} from '@/services/notification-link';
 
 const UBER =
   'https://m.uber.com/ul/?action=setPickup&pickup=my_location' +
@@ -88,5 +94,57 @@ describe('rideOfferFromData', () => {
     expect(rideOfferFromData({ ...offer, dropoff: { name: 'X', latitude: 0, longitude: 0 } })).toBeNull();
     expect(rideOfferFromData({ ...offer, dropoff: { name: 'X', latitude: '1', longitude: 2 } })).toBeNull();
     expect(rideOfferFromData(undefined)).toBeNull();
+  });
+});
+
+describe('openRouteFromData', () => {
+  const SCHEDULE = 'timer-6f1c2a9e-3b4d-4e5f-8a9b-0c1d2e3f4a5b';
+  const RUN = '0c1d2e3f-4a5b-4e5f-8a9b-6f1c2a9e3b4d';
+
+  it('reads a schedule route with its ids', () => {
+    expect(openRouteFromData({ open: 'schedule', schedule_id: SCHEDULE, run_id: RUN })).toEqual({
+      open: 'schedule',
+      scheduleId: SCHEDULE,
+      runId: RUN,
+    });
+  });
+
+  it('reads the devices and chat routes', () => {
+    expect(openRouteFromData({ open: 'devices' })).toEqual({ open: 'devices' });
+    expect(openRouteFromData({ open: 'chat', proposal_id: 'p-1', rationale: 'why' })).toEqual({ open: 'chat' });
+  });
+
+  it('keeps the schedule screen but drops an id that is not a Pond id', () => {
+    expect(openRouteFromData({ open: 'schedule', schedule_id: '../settings', run_id: 7 })).toEqual({
+      open: 'schedule',
+    });
+    expect(openRouteFromData({ open: 'schedule', schedule_id: 'x'.repeat(129) })).toEqual({ open: 'schedule' });
+  });
+
+  it('ignores a screen outside the allow-list, and data with no open', () => {
+    expect(openRouteFromData({ open: 'settings-advanced' })).toBeNull();
+    expect(openRouteFromData({ open: '/(stack)/developer' })).toBeNull();
+    expect(openRouteFromData({ open: ['chat'] })).toBeNull();
+    expect(openRouteFromData({ action: 'open_url' })).toBeNull();
+    expect(openRouteFromData(null)).toBeNull();
+  });
+});
+
+describe('screenPath', () => {
+  it('maps each route to its screen', () => {
+    expect(screenPath({ open: 'devices' })).toBe('/(tabs)/devices');
+    expect(screenPath({ open: 'chat' })).toBe('/(tabs)/chat');
+  });
+
+  it('opens the schedules list on the schedule the notification names', () => {
+    expect(screenPath({ open: 'schedule', scheduleId: 'sched-1', runId: 'run-9' })).toEqual({
+      pathname: '/(stack)/schedule',
+      params: { schedule_id: 'sched-1' },
+    });
+  });
+
+  /** A malformed id was dropped by openRouteFromData; the list is still the place to land. */
+  it('opens the list alone when there is no schedule id', () => {
+    expect(screenPath({ open: 'schedule' })).toBe('/(stack)/schedule');
   });
 });

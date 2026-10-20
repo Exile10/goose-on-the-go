@@ -152,7 +152,7 @@ export function NotificationsProvider({ children }: PropsWithChildren) {
     };
   }, [serverUrl, token, online, recover, deduplicator]);
 
-  // Taps work whether or not a Pond is reachable: the link goes to Uber or a maps app.
+  // Taps work whether or not a Pond is reachable: a link goes to Uber or a maps app, a screen opens here.
   useEffect(() => watchLinkTaps(), []);
 
   const markAllRead = useCallback(() => setUnreadCount(0), []);
