@@ -225,7 +225,7 @@ export default function ScheduleDetailScreen() {
       </View>
 
       <View style={styles.dangerZone}>
-        <InkButton variant="danger" icon="delete" block onPress={confirmDelete}>
+        <InkButton variant="danger" icon="trash" block onPress={confirmDelete}>
           {t('schedule.detail.delete')}
         </InkButton>
       </View>

@@ -351,7 +351,7 @@ function AutomationForm({ onClose, rule, onSubmit, onDelete }: Omit<AutomationFo
           {rule ? t('schedule.form.save') : t('schedule.form.create')}
         </InkButton>
         {rule && onDelete ? (
-          <InkButton variant="danger" block icon="delete" disabled={submitting} onPress={confirmDelete}>
+          <InkButton variant="danger" block icon="trash" disabled={submitting} onPress={confirmDelete}>
             {t('schedule.form.delete')}
           </InkButton>
         ) : null}
