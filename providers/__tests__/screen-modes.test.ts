@@ -62,6 +62,12 @@ describe('resolveScreenReal', () => {
     expect(resolveScreenReal('memory', release)).toBe(true);
   });
 
+  /** Activity on mock showed a release build a sample household's day as if it were this one's. */
+  it('sends activity and logs to the Pond in a release build', () => {
+    const release = { isDev: false, screenModes: DEFAULT_SCREEN_MODES, defaults: DEFAULT_SCREEN_MODES };
+    expect(resolveScreenReal('logs', release)).toBe(true);
+  });
+
   // Alternating real and mock, with every toggle set the other way, so an
   // answer that reads the wrong record, or neither, cannot pass.
   const defaults = modes((_, i) => i % 2 === 0);

@@ -113,6 +113,12 @@ export type ScreenModes = Record<MigrationScreen, boolean>;
  * answers "saved" to any key, and a release build showing a key as stored when
  * nothing reached the Pond is worse than a screen that says the Pond cannot do
  * this. Flip it to mock in the Developer screen to work without a Pond.
+ *
+ * `logs` earned it the way `chat` did: `/activity`, `/activity/summary`,
+ * `/logs`, `/logs/export` and `/telemetry/*` are all served, to any paired
+ * token, and the shapes in services/types.ts are checked against the Pond's.
+ * Its mock showed a release build a made-up household's day as if it were
+ * this one's.
  */
 // `settings` starts real for the same reason: a release build must never show a change as saved when
 // nothing reached the Pond. The mock exists to build and look at the menus without one.
@@ -125,7 +131,7 @@ export type ScreenModes = Record<MigrationScreen, boolean>;
 // and the consolidation stream and its stop) was checked against the Pond's routes and serde types,
 // and a paired phone's token reaches all of them. On mock, a release build showed four sample
 // memories as the household's, and "Tidy up now" could never run, since nothing could flip it.
-const REAL_BY_DEFAULT: readonly MigrationScreen[] = ['chat', 'webSearch', 'settings', 'schedule', 'memory'];
+const REAL_BY_DEFAULT: readonly MigrationScreen[] = ['chat', 'logs', 'webSearch', 'settings', 'schedule', 'memory'];
 
 export const DEFAULT_SCREEN_MODES: ScreenModes = MIGRATION_SCREENS.reduce(
   (acc, screen) => ({ ...acc, [screen]: REAL_BY_DEFAULT.includes(screen) }),

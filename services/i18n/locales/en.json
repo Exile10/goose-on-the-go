@@ -1524,6 +1524,9 @@
     "emptyBody": "What Goose does around the house shows up here.",
     "loading": "Reading your Pond's activity",
     "failed": "Could not read your Pond's activity.",
+    "problemsFailed": "Could not read your Pond's problems.",
+    "setupRequired": "Finish setting up your Pond to see its activity.",
+    "forbidden": "Your Pond did not let this phone read its activity.",
     "event": {
       "agentTurn": "Answered in a conversation",
       "inference": "Ran a model",
@@ -1558,7 +1561,8 @@
       "turnTitle": "Turn {{number}} · {{model}}",
       "turnDetail": "Started in {{firstWord}} · done in {{total}} · {{tokens}} tokens",
       "tool": "{{tool}} ({{time}})",
-      "loading": "Reading this conversation's turns"
+      "loading": "Reading this conversation's turns",
+      "off": "Conversation stats are turned off on your Pond."
     },
     "export": {
       "button": "Export log (CSV)",

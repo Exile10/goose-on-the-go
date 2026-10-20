@@ -15,9 +15,10 @@ import { useCallback, useState } from 'react';
 
 import { useServer } from '@/providers/server-provider';
 import { ApiError, api } from '@/services/api-client';
+import i18n from '@/services/i18n';
 import type { SessionSummary, TelemetrySummary, TurnMetrics } from '@/services/types';
 import { SAMPLE_SESSION, SAMPLE_TELEMETRY, SAMPLE_TURNS, latestSession } from '@/models/telemetry';
-import { describeApiError } from './describe-error';
+import { describeActivityError } from './use-activity';
 import { useLive } from './use-live';
 import { SUMMARY_MS } from './use-activity-summary';
 
@@ -96,7 +97,8 @@ export function useConversationTurns(): UseConversationTurns {
       try {
         setTurns(await api.telemetryTurns(sessionId));
       } catch (e) {
-        setError(describeApiError(e));
+        // 503: the Pond's telemetry setting is off, which waiting will not change.
+        setError(e instanceof ApiError && e.status === 503 ? i18n.t('activity.telemetry.off') : describeActivityError(e));
       } finally {
         setLoading(false);
       }

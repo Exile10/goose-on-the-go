@@ -21,8 +21,10 @@
  * Below it, a card shows how Goose's latest conversation went, from the Pond's
  * telemetry; tapping it lists that conversation's turns.
  *
- * Clearing is at the foot of the activity list, behind a confirmation: it
- * deletes the Pond's activity history for everyone in the household.
+ * Clearing sits just under the filters, outside the list so it does not scroll
+ * away, behind a confirmation: it deletes the Pond's activity history for
+ * everyone in the household. With nothing listed there is nothing to clear,
+ * so it is disabled rather than offering a deletion that does nothing.
  */
 
 import React, { useState, useCallback, useMemo } from 'react';
@@ -48,7 +50,6 @@ import {
 import { GIcon } from '@/components/ui/g-icon';
 import { TelemetryCard, TurnsSheet } from '@/components/patterns/conversation-telemetry';
 import { caution, confirm, selectionTick } from '@/services/haptics';
-import { describeApiError } from '@/view-models/describe-error';
 import type { ActivityEvent, ActivitySummary, LogEntry } from '@/services/types';
 import {
   ACTIVITY_FILTERS,
@@ -61,7 +62,7 @@ import {
   parsePondLogTime,
   type ActivityFilter,
 } from '@/models/log';
-import { useActivity } from '@/view-models/use-activity';
+import { describeActivityError, useActivity } from '@/view-models/use-activity';
 import { useActivitySummary } from '@/view-models/use-activity-summary';
 import { useConversationTelemetry, useConversationTurns } from '@/view-models/use-conversation-telemetry';
 import { useLogExport } from '@/view-models/use-log-export';
@@ -180,7 +181,7 @@ export default function ActivityScreen() {
       void activitySummary.actions.refresh();
     } catch (e) {
       // Somebody asked for this: a failure is said even when the banner explains why.
-      setClearResult({ tone: 'danger', text: describeApiError(e) ?? t('activity.clear.failed') });
+      setClearResult({ tone: 'danger', text: describeActivityError(e) ?? t('activity.clear.failed') });
     } finally {
       setClearing(false);
     }
@@ -193,7 +194,7 @@ export default function ActivityScreen() {
   }, [latest, turns.actions]);
   const problems = useProblems(showingProblems);
   const { loading, error, actions } = showingProblems ? problems : activity;
-  const failed = !showingProblems && activity.failed;
+  const failed = showingProblems ? problems.failed : activity.failed;
   const data = activity.data;
 
   const renderItem = useCallback(
@@ -228,7 +229,7 @@ export default function ActivityScreen() {
       {/* A failed read with nothing to add still says so: the connection banner gives the cause. */}
       {error || failed ? (
         <View style={styles.notice}>
-          <InkNotice tone="danger">{error ?? t('activity.failed')}</InkNotice>
+          <InkNotice tone="danger">{error ?? (showingProblems ? t('activity.problemsFailed') : t('activity.failed'))}</InkNotice>
           <InkButton variant="quiet" icon="refresh" onPress={actions.refresh}>
             {t('common.retry')}
           </InkButton>
@@ -262,6 +263,19 @@ export default function ActivityScreen() {
         ))}
       </ScrollView>
 
+      {showingProblems ? null : (
+        <View style={styles.clearBar}>
+          <InkButton
+            variant="quiet"
+            icon="trash"
+            disabled={clearing || loading || data.events.length === 0}
+            onPress={askClear}
+          >
+            {clearing ? t('activity.clear.clearing') : t('activity.clear.button')}
+          </InkButton>
+        </View>
+      )}
+
       {showingProblems ? (
         <FlatList
           data={problems.data.problems}
@@ -271,7 +285,7 @@ export default function ActivityScreen() {
           showsVerticalScrollIndicator={false}
           ListHeaderComponent={header}
           ListEmptyComponent={
-            !loading && !error ? (
+            !loading && !error && !failed ? (
               <InkEmptyState icon="check" title={t('activity.noProblems')}>
                 <InkText>{t('activity.noProblemsBody')}</InkText>
               </InkEmptyState>
@@ -288,15 +302,6 @@ export default function ActivityScreen() {
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
           ListHeaderComponent={header}
-          ListFooterComponent={
-            data.events.length > 0 && !loading ? (
-              <View style={styles.footer}>
-                <InkButton variant="danger" icon="trash" disabled={clearing} onPress={askClear}>
-                  {clearing ? t('activity.clear.clearing') : t('activity.clear.button')}
-                </InkButton>
-              </View>
-            ) : null
-          }
           // A list that failed to load is unknown, not empty.
           ListEmptyComponent={
             !loading && !error && !failed ? (
@@ -414,7 +419,11 @@ const makeStyles = (c: ThemeColors) =>
     color: c.textSecondary,
   },
   notice: { gap: Spacing.sm, marginBottom: Spacing.md },
-  footer: { marginTop: Spacing.lg, alignItems: 'flex-start' },
+  clearBar: {
+    paddingHorizontal: Spacing.lg,
+    paddingTop: Spacing.md,
+    alignItems: 'flex-end',
+  },
 
   /* Today */
   today: {
