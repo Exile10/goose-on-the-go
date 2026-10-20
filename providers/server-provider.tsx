@@ -121,7 +121,11 @@ export type ScreenModes = Record<MigrationScreen, boolean>;
 // and a paired phone's token reaches every one of them. On mock, a release build showed two sample
 // schedules where the household's own should be, and an edit made there reached nothing. The same
 // key covers the Automations tab, which reads `/rules`.
-const REAL_BY_DEFAULT: readonly MigrationScreen[] = ['chat', 'webSearch', 'settings', 'schedule'];
+// `memory` earned it the way `chat` did: every call it makes (list, save, reword, re-tier, forget,
+// and the consolidation stream and its stop) was checked against the Pond's routes and serde types,
+// and a paired phone's token reaches all of them. On mock, a release build showed four sample
+// memories as the household's, and "Tidy up now" could never run, since nothing could flip it.
+const REAL_BY_DEFAULT: readonly MigrationScreen[] = ['chat', 'webSearch', 'settings', 'schedule', 'memory'];
 
 export const DEFAULT_SCREEN_MODES: ScreenModes = MIGRATION_SCREENS.reduce(
   (acc, screen) => ({ ...acc, [screen]: REAL_BY_DEFAULT.includes(screen) }),

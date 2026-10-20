@@ -53,6 +53,15 @@ describe('resolveScreenReal', () => {
     expect(resolveScreenReal('schedule', release)).toBe(true);
   });
 
+  /**
+   * On mock, a release build showed four sample memories as the household's and could never
+   * tidy up, since the toggle that would have fixed it exists only in dev.
+   */
+  it('sends memories to the Pond in a release build', () => {
+    const release = { isDev: false, screenModes: DEFAULT_SCREEN_MODES, defaults: DEFAULT_SCREEN_MODES };
+    expect(resolveScreenReal('memory', release)).toBe(true);
+  });
+
   // Alternating real and mock, with every toggle set the other way, so an
   // answer that reads the wrong record, or neither, cannot pass.
   const defaults = modes((_, i) => i % 2 === 0);

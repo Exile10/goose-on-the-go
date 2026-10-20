@@ -328,6 +328,12 @@ async function errorDetail(res: Response): Promise<string | null> {
 /** The guard's refusal of every protected route until the Pond's owner has finished setting it up. */
 export const ONBOARDING_REQUIRED = 'onboarding_required';
 
+/**
+ * The Pond's 501 for consolidation when its build has no runner, as opposed to the setting being
+ * off (`start_consolidation` in `pond-api/src/routes.rs`). The two want different fixes.
+ */
+export const CONSOLIDATION_NOT_BUILT = 'Memory consolidation is not available in this build';
+
 
 /**
  * Unwrap a collection that may arrive bare or inside an envelope.

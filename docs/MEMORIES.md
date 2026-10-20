@@ -61,5 +61,36 @@ applied, then a tally. The list reloads when it ends.
 
 The Pond also runs consolidation on its own timer when `memory_consolidation_enabled` is
 on, but it has no route that reports a run already going, so those runs are not shown.
-A `501` means consolidation is switched off in the Pond's settings or missing from its
-build.
+A `501` means consolidation is switched off in the Pond's settings, or missing from its
+build; the screen tells the two apart by the Pond's `error` text (`CONSOLIDATION_NOT_BUILT`
+in `services/api-client.ts`), because one is a setting the owner can turn on and the other
+needs a different build. Stop only asks: the run ends on the Pond's `cancelled` frame, and a
+Stop that does not reach the Pond says so on the card.
+
+## Real by default
+
+`memory` is in `REAL_BY_DEFAULT` (`providers/server-provider.tsx`), so a release build reads
+the Pond's memories and can tidy up. Before that it showed `SAMPLE_MEMORIES` as the
+household's, with no way to switch, because the Developer screen exists only in dev. An empty
+Pond shows the empty state, never the samples.
+
+After an add, reword, keep or forget the Pond accepts, the list is read back quietly, so what
+is shown is what the Pond holds rather than the local edit.
+
+## Access and scope
+
+Every memory route sits behind the ordinary bearer-token check: a paired phone reaches all of
+them, and none is host-only. A `403` that is not the onboarding guard gets its own sentence
+(`memories.errors.forbidden`) rather than the generic one, since no banner explains it.
+
+What the Pond does not do, as of 2026-10-19 (goose-in-a-pond `routes.rs`, `list_memories`,
+`update_memory`, `delete_memory`):
+
+- **No per-member scoping.** The list is read with `ProfileScope::Household`, which filters
+  nothing: every member's memories, personal ones included, reach every paired phone. A memory
+  added from the phone is saved with no `profile_id`, so it is household-wide.
+- **Reword, re-tier and forget take any id.** None checks who owns the memory, and an id that
+  matches nothing still answers 204.
+- **No way to change a memory's segment.** `PUT /memories/{id}` takes `content` and `tier`
+  only, so the edit sheet offers the words and the keep, and the segment is chosen once, when
+  the memory is added.
