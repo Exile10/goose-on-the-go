@@ -83,6 +83,7 @@ export default function StackLayout() {
       <Stack.Screen name="settings-issue" options={{ title: t('screens.settingsIssue') }} />
       <Stack.Screen name="settings-household" options={{ title: t('screens.settingsHousehold') }} />
       <Stack.Screen name="settings-cameras" options={{ title: t('screens.settingsCameras') }} />
+      <Stack.Screen name="camera-events" options={{ title: t('screens.cameraEvents') }} />
       <Stack.Screen name="settings-announcements" options={{ title: t('screens.settingsAnnouncements') }} />
       <Stack.Screen name="suggestions" options={{ title: t('screens.suggestions') }} />
       <Stack.Screen name="settings-privacy" options={{ title: t('screens.settingsPrivacy') }} />
