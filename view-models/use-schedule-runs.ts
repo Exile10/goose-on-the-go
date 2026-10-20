@@ -1,8 +1,9 @@
 /**
- * One schedule's run history, for the sheet a card opens.
+ * One schedule's run history, for its detail screen.
  *
- * Read once each time the sheet opens. History only grows at the schedule's
- * own pace, and the sheet is open for seconds.
+ * Read when the screen opens, and again whenever `version` changes: the
+ * detail screen bumps it when a run it watched finishes, which is the only
+ * time the history grows while somebody is looking at it.
  */
 
 import { useEffect, useState } from 'react';
@@ -25,8 +26,8 @@ export interface UseScheduleRuns {
   failed: boolean;
 }
 
-/** `scheduleId` null means the sheet is closed, and nothing is read. */
-export function useScheduleRuns(scheduleId: string | null): UseScheduleRuns {
+/** `scheduleId` null means there is no schedule to read, and nothing is read. */
+export function useScheduleRuns(scheduleId: string | null, version = 0): UseScheduleRuns {
   const { hydrated, isScreenReal } = useServer();
   // The samples have never run, and an empty history is the honest mock.
   const reading = scheduleId && hydrated && isScreenReal('schedule') ? scheduleId : null;
@@ -36,7 +37,7 @@ export function useScheduleRuns(scheduleId: string | null): UseScheduleRuns {
   const [error, setError] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
 
-  // A different schedule's sheet starts empty, not showing the last one's runs.
+  // A different schedule starts empty, not showing the last one's runs.
   const [shown, setShown] = useState<string | null>(null);
   if (shown !== reading) {
     setShown(reading);
@@ -67,7 +68,7 @@ export function useScheduleRuns(scheduleId: string | null): UseScheduleRuns {
     return () => {
       current = false;
     };
-  }, [reading]);
+  }, [reading, version]);
 
   return { data: { runs }, loading, error, failed };
 }

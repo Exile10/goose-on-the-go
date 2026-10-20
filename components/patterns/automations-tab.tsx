@@ -1,5 +1,6 @@
 /**
- * AutomationsTab — the sensor-triggered rules: list, create, pause and resume.
+ * AutomationsTab — the sensor-triggered rules: list, create, edit, delete,
+ * pause and resume.
  */
 
 import React, { useState } from 'react';
@@ -8,7 +9,8 @@ import { useTranslation } from 'react-i18next';
 import { InkButton, InkEmptyState, InkNotice, InkSpinner, InkText } from '@jarida/ink/native';
 
 import { AutomationCard } from '@/components/patterns/automation-card';
-import { CreateAutomationSheet } from '@/components/patterns/create-automation-sheet';
+import { AutomationFormSheet } from '@/components/patterns/automation-form-sheet';
+import type { Rule } from '@/services/types';
 import { useRules } from '@/view-models/use-rules';
 import { Spacing } from '@/constants/spacing';
 
@@ -16,6 +18,7 @@ export function AutomationsTab() {
   const { t } = useTranslation();
   const { data, loading, error, failed, actions } = useRules();
   const [creating, setCreating] = useState(false);
+  const [editing, setEditing] = useState<Rule | null>(null);
 
   return (
     <View style={styles.body}>
@@ -48,10 +51,19 @@ export function AutomationsTab() {
       ) : null}
 
       {data.rules.map((rule) => (
-        <AutomationCard key={rule.id} rule={rule} onSetPaused={actions.setPaused} />
+        <AutomationCard key={rule.id} rule={rule} onOpen={setEditing} onSetPaused={actions.setPaused} />
       ))}
 
-      <CreateAutomationSheet open={creating} onClose={() => setCreating(false)} onCreate={actions.create} />
+      <AutomationFormSheet open={creating} onClose={() => setCreating(false)} onSubmit={actions.create} />
+      {editing ? (
+        <AutomationFormSheet
+          open
+          onClose={() => setEditing(null)}
+          rule={editing}
+          onSubmit={(req) => actions.update(editing, req)}
+          onDelete={() => actions.remove(editing)}
+        />
+      ) : null}
     </View>
   );
 }

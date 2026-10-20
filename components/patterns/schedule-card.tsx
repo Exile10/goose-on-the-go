@@ -1,7 +1,7 @@
 /**
  * ScheduleCard — one cron or one-off schedule.
  *
- * The top of the card opens its run history; the switch and Run now sit below
+ * The top of the card opens the schedule's own screen; the switch and Run now sit below
  * it as siblings, not inside the same pressable, so a flip of the switch is
  * never also read as a tap on the card.
  */
@@ -9,10 +9,11 @@
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { InkBadge, InkButton, InkCard, InkSwitch, InkText } from '@jarida/ink/native';
+import { InkBadge, InkButton, InkCard, InkText } from '@jarida/ink/native';
 
+import { LabelledSwitch } from '@/components/patterns/labelled-switch';
 import { GPressable } from '@/components/ui/g-pressable';
-import { formatScheduleTime } from '@/models/schedule';
+import { describeWhen, formatScheduleTime, isOneOff } from '@/models/schedule';
 import { toggle } from '@/services/haptics';
 import type { Schedule } from '@/services/types';
 import { Spacing } from '@/constants/spacing';
@@ -24,6 +25,8 @@ export interface ScheduleCardProps {
   onRunNow: (schedule: Schedule) => void;
   /** Absent on mock, where there is nothing to run. */
   canRun: boolean;
+  /** The phone's IANA zone; a schedule kept in another one says so. */
+  phoneZone: string;
 }
 
 export const ScheduleCard = React.memo(function ScheduleCard({
@@ -32,18 +35,16 @@ export const ScheduleCard = React.memo(function ScheduleCard({
   onSetPaused,
   onRunNow,
   canRun,
+  phoneZone,
 }: ScheduleCardProps) {
   const { t } = useTranslation();
-  // The next run when there is one, else when a one-off fires, else the cron itself.
-  const when = schedule.next_run
-    ? t('schedule.card.next', { when: formatScheduleTime(schedule.next_run) })
-    : schedule.fire_at
-      ? formatScheduleTime(schedule.fire_at)
-      : schedule.cron;
-  const mono = !schedule.next_run && !schedule.fire_at;
+  // When it runs in words, or the cron itself where there are none for it.
+  const when = describeWhen(schedule, phoneZone);
   // The Pond cannot resume a paused one-off: it re-parses the `@once`
   // placeholder as a cron and answers 404, so a one-off gets no switch.
-  const oneOff = schedule.fire_at != null || schedule.cron === '@once';
+  const oneOff = isOneOff(schedule);
+  // A one-off's line already says when it fires.
+  const next = !oneOff && schedule.next_run ? t('schedule.card.next', { when: formatScheduleTime(schedule.next_run) }) : null;
 
   return (
     <InkCard style={schedule.paused ? styles.paused : undefined}>
@@ -51,7 +52,8 @@ export const ScheduleCard = React.memo(function ScheduleCard({
         <View style={styles.top}>
           <View style={styles.title}>
             <InkText weight="semibold">{schedule.label}</InkText>
-            <InkText size="sm" tone="secondary" mono={mono}>{when}</InkText>
+            <InkText size="sm" tone="secondary" mono={!when.words}>{when.text}</InkText>
+            {next ? <InkText size="sm" tone="secondary">{next}</InkText> : null}
           </View>
           <InkBadge tone="neutral">
             {schedule.kind.type === 'webhook' ? t('schedule.card.kindWebhook') : t('schedule.card.kindPrompt')}
@@ -72,7 +74,7 @@ export const ScheduleCard = React.memo(function ScheduleCard({
 
       <View style={styles.actions}>
         {oneOff ? null : (
-          <InkSwitch
+          <LabelledSwitch
             label={schedule.paused ? t('schedule.card.paused') : t('schedule.card.enabled')}
             checked={!schedule.paused}
             onChange={(on) => {

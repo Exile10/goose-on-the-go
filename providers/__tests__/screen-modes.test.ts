@@ -43,6 +43,16 @@ describe('resolveScreenReal', () => {
     expect(resolveScreenReal('webSearch', release)).toBe(true);
   });
 
+  /**
+   * On mock, a release build showed sample schedules ("Morning briefing") in place of the
+   * household's own, and nothing created or edited there reached the Pond. The Automations tab
+   * reads the same key.
+   */
+  it('sends schedules and automations to the Pond in a release build', () => {
+    const release = { isDev: false, screenModes: DEFAULT_SCREEN_MODES, defaults: DEFAULT_SCREEN_MODES };
+    expect(resolveScreenReal('schedule', release)).toBe(true);
+  });
+
   // Alternating real and mock, with every toggle set the other way, so an
   // answer that reads the wrong record, or neither, cannot pass.
   const defaults = modes((_, i) => i % 2 === 0);
