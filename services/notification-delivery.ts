@@ -84,6 +84,23 @@ export async function deliver(notification: ServerNotification): Promise<boolean
   return true;
 }
 
+/**
+ * Show one notice if this runtime has not shown it, then acknowledge it either
+ * way. The Pond holds a phone's notice until it is acknowledged, and re-sends
+ * every unacknowledged one on each new stream connection and in each pending
+ * list: a repeat that was already shown still needs its acknowledgement, since
+ * the first one may have been lost, or it is offered again every time.
+ */
+export async function deliverAndAcknowledge(
+  client: DeliveryClient,
+  notification: ServerNotification,
+  source: string,
+): Promise<{ presented: boolean; acked: boolean }> {
+  const presented = await deliver(notification);
+  const acked = await acknowledge(client, notification.id, source);
+  return { presented, acked };
+}
+
 /** What one fetch of the pending list did, for the caller's log line and for tests. */
 export interface DrainResult { fetched: number; presented: number; acked: number }
 
@@ -101,8 +118,9 @@ export async function drainPending(client: DeliveryClient, source: 'wake' | 'for
       console.warn('[notifications] pending item ignored: not a notification', { kind: 'notification_pending', source });
       continue;
     }
-    if (await deliver(notification)) result.presented++;
-    if (await acknowledge(client, notification.id, source)) result.acked++;
+    const { presented, acked } = await deliverAndAcknowledge(client, notification, source);
+    if (presented) result.presented++;
+    if (acked) result.acked++;
   }
   console.info('[notifications] pending drained', { kind: 'notification_pending', source, ...result });
   return result;

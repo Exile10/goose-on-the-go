@@ -22,7 +22,7 @@ import { NativeModules, Platform } from 'react-native';
 
 import i18n from './i18n';
 import { api } from './api-client';
-import { acknowledge, deliver } from './notification-delivery';
+import { deliver, deliverAndAcknowledge } from './notification-delivery';
 import { NotificationStream, type ServerNotification } from './notification-stream';
 import { Storage } from './storage';
 
@@ -184,8 +184,8 @@ export function disconnectLink(): void {
 }
 
 async function presentFromStream(n: ServerNotification): Promise<void> {
-  if (!(await deliver(n))) return;
-  // Acknowledged so the next pending fetch does not offer it again. Only through a client whose
-  // token rotation is persisted: see PondApiClient.hasSession.
-  if (api.hasSession) await acknowledge(api, n.id, 'stream');
+  // Acknowledged, repeats included, so the Pond stops re-sending it on every connection. Only
+  // through a client whose token rotation is persisted: see PondApiClient.hasSession.
+  if (api.hasSession) await deliverAndAcknowledge(api, n, 'stream');
+  else await deliver(n);
 }

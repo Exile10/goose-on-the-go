@@ -5,7 +5,7 @@
  * throws.
  */
 
-import { deliver, onDelivered, type DeliveryClient } from '@/services/notification-delivery';
+import { deliver, deliverAndAcknowledge, onDelivered, type DeliveryClient } from '@/services/notification-delivery';
 import { handleWake, isWake } from '@/services/notification-wake';
 
 // Hoisted above the imports by babel-jest; `mock`-prefixed so the factory may read it.
@@ -131,5 +131,20 @@ describe('no double display', () => {
     expect(presented).toEqual([a.id]);
     expect(listed).toEqual([a.id]);
     expect(client.acked).toEqual([a.id]);
+  });
+});
+
+// The stream's path. The Pond re-sends every notice the phone has not acknowledged on each
+// new connection, so one already shown here is acknowledged again rather than skipped.
+describe('deliverAndAcknowledge', () => {
+  it('shows a new notice once and acknowledges it every time it arrives', async () => {
+    const n = notice();
+    const client = fakeClient([]);
+
+    expect(await deliverAndAcknowledge(client, n, 'stream')).toEqual({ presented: true, acked: true });
+    expect(await deliverAndAcknowledge(client, n, 'stream')).toEqual({ presented: false, acked: true });
+
+    expect(presented).toEqual([n.id]);
+    expect(client.acked).toEqual([n.id, n.id]);
   });
 });
