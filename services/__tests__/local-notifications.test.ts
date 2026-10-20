@@ -103,3 +103,55 @@ describe('presentLocally', () => {
     });
   });
 });
+
+// Android shows a heads-up banner only for a HIGH-importance channel, and never raises the
+// importance of a channel that already exists, so Updates moved to a new id.
+describe('notification channels', () => {
+  // The tap tests above already loaded the module-level mock of notifications-module, and an
+  // isolated require reuses a cached mock before it consults a fresh doMock factory.
+  beforeEach(() => jest.resetModules());
+  afterEach(() => {
+    jest.resetModules();
+    jest.restoreAllMocks();
+  });
+
+  function configureOnAndroid() {
+    const setNotificationChannelAsync = jest.fn(async () => null);
+    const deleteNotificationChannelAsync = jest.fn(async () => undefined);
+    const fake = {
+      AndroidImportance: { DEFAULT: 3, HIGH: 4 },
+      setNotificationHandler: jest.fn(),
+      setNotificationChannelAsync,
+      deleteNotificationChannelAsync,
+    };
+    let configure: () => Promise<void> = async () => undefined;
+    jest.isolateModules(() => {
+      jest.doMock('react-native', () => ({ Platform: { OS: 'android' }, Linking: { openURL: jest.fn() } }));
+      jest.doMock('expo-router', () => ({ router: { push: jest.fn() } }));
+      jest.doMock('@/services/notifications-module', () => ({ notifications: fake }));
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      ({ configureLocalNotifications: configure } = require('@/services/local-notifications'));
+    });
+    return { configure, setNotificationChannelAsync, deleteNotificationChannelAsync };
+  }
+
+  it('creates Updates at HIGH importance under its new id', async () => {
+    const { configure, setNotificationChannelAsync } = configureOnAndroid();
+    await configure();
+    expect(setNotificationChannelAsync).toHaveBeenCalledWith('giap-info-v2', {
+      name: 'Updates',
+      importance: 4,
+    });
+    expect(setNotificationChannelAsync).toHaveBeenCalledWith(
+      'giap-alerts',
+      expect.objectContaining({ importance: 4 }),
+    );
+    expect(setNotificationChannelAsync).not.toHaveBeenCalledWith('giap-info', expect.anything());
+  });
+
+  it('deletes the old DEFAULT-importance Updates channel', async () => {
+    const { configure, deleteNotificationChannelAsync } = configureOnAndroid();
+    await configure();
+    expect(deleteNotificationChannelAsync).toHaveBeenCalledWith('giap-info');
+  });
+});
