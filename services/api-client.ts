@@ -49,6 +49,7 @@ import type {
   MatterStatus,
   ConsolidationEvent,
   MemoryFragment,
+  Reminder,
   SaveMemoryRequest,
   UpdateMemoryRequest,
   ModelActiveRoles,
@@ -1047,6 +1048,26 @@ export class PondApiClient {
 
   usageSummary(): Promise<UsageSummary> {
     return this.get<UsageSummary>('/api/v1/usage/summary');
+  }
+
+  // ── Reminders ───────────────────────────────────────────────
+
+  /**
+   * Pending reminders, most recently said first, narrowed by the Pond to the
+   * household member this phone is paired as. The Pond pages at 100 by default.
+   */
+  async listReminders(): Promise<Reminder[]> {
+    const res = await this.request<{ reminders?: Reminder[] } | Reminder[]>('/api/v1/reminders');
+    return collection<Reminder>(res, 'reminders');
+  }
+
+  /**
+   * Takes a reminder off the list for good: the Pond has no route that brings
+   * one back. A 404 means nothing was waiting under that id for this caller,
+   * which includes one somebody else already dismissed.
+   */
+  async dismissReminder(id: string): Promise<void> {
+    await this.post(`/api/v1/reminders/${encodeURIComponent(id)}/dismiss`, {});
   }
 
   // ── Memory ──────────────────────────────────────────────────

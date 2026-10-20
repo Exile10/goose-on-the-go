@@ -74,6 +74,7 @@ export const PROFILE_NAV: NavGroup[] = [
       { id: 'sessions', labelKey: 'screens.sessions', icon: 'chat', tile: 'green', route: '/(stack)/sessions' },
       { id: 'logs', labelKey: 'screens.logs', icon: 'logs', tile: 'slate', route: '/(stack)/logs' },
       { id: 'schedule', labelKey: 'screens.schedule', icon: 'schedule', tile: 'amber', route: '/(stack)/schedule' },
+      { id: 'reminders', labelKey: 'screens.reminders', icon: 'calendar', tile: 'amber', route: '/(stack)/reminders' },
     ],
   },
   {

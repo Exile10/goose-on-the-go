@@ -1284,6 +1284,7 @@
     "memories": "Memories",
     "logs": "Activity",
     "schedule": "Schedule",
+    "reminders": "Reminders",
     "extensions": "Extensions",
     "webSearch": "Web search",
     "userMedia": "Photos and videos",
@@ -2576,5 +2577,26 @@
     "roomPlaceholder": "No room",
     "roomHint": "Type a new room, or pick one your devices are already in.",
     "save": "Save"
+  },
+  "reminders": {
+    "intro": "Dates and plans the Pond picked out of your conversations, in the words that were used.",
+    "dismissTitle": "Dismiss this reminder?",
+    "dismissBody": "It leaves the list for good. The Pond cannot bring it back.",
+    "list": {
+      "loading": "Loading reminders",
+      "failed": "Could not load reminders.",
+      "emptyTitle": "No reminders",
+      "emptyBody": "When a conversation mentions something with a date, the Pond keeps it here."
+    },
+    "card": {
+      "noDue": "No time mentioned",
+      "said": "Said: {{when}}",
+      "dismiss": "Dismiss",
+      "dismissing": "Dismissing"
+    },
+    "errors": {
+      "gone": "That reminder was already gone, so the list has been refreshed.",
+      "dismissFailed": "Could not dismiss that reminder. Try again."
+    }
   }
 }
