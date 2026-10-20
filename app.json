@@ -124,6 +124,7 @@
       "./plugins/with-pond-tls",
       "./plugins/with-pond-ble",
       "./plugins/with-release-signing",
+      "./plugins/with-appearance-resync",
       "expo-asset"
     ],
     "experiments": {
