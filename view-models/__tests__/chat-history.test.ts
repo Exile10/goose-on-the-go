@@ -1,6 +1,6 @@
 /**
  * The decisions the conversation wall makes before anything is drawn: how tall
- * a card is, what its date says, where it lands, and whether a search finds it.
+ * a card is, what its date says, where it lands, and which cards a filter keeps.
  *
  * The first two are copies of pond-desktop's `ChatHistory` rules, so these
  * pin the phone to the same answers the desktop's own tests give.
@@ -14,11 +14,9 @@
 import {
   calendarDaysBetween,
   cardWeight,
-  fold,
   isEmpty,
   isHistoryView,
   isRoutine,
-  matchesQuery,
   passesFilter,
   placeOnWall,
   recencyKey,
@@ -172,26 +170,6 @@ describe('isRoutine and passesFilter', () => {
       false,
       true,
     ]);
-  });
-});
-
-describe('matchesQuery', () => {
-  const card = { title: 'Devil May Cry order', preview: 'Dante’s Awakening comes first.' };
-
-  it('finds words in any order, across title and preview', () => {
-    expect(matchesQuery(card, 'cry devil')).toBe(true);
-    expect(matchesQuery(card, 'devil awakening')).toBe(true);
-    expect(matchesQuery(card, 'devil trigger')).toBe(false);
-  });
-
-  it('ignores case, accents and stray whitespace', () => {
-    expect(fold('Café')).toBe('cafe');
-    expect(matchesQuery({ title: 'Café opening hours', preview: null }, '  CAFE  ')).toBe(true);
-  });
-
-  it('lets an empty query through, and survives a card with nothing on it', () => {
-    expect(matchesQuery(card, '   ')).toBe(true);
-    expect(matchesQuery({ title: null, preview: null }, 'anything')).toBe(false);
   });
 });
 
