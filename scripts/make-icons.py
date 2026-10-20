@@ -10,6 +10,7 @@ Outputs (all committed, so nobody has to run this):
     assets/images/android-icon-monochrome.png    themed-icon silhouette
     assets/images/splash-icon.png                launch screen mark
     assets/images/favicon.png                    web
+    assets/images/notification-icon.png          Android notification small icon
 
 Everything derives from the brand mark in assets/brand/, which is the same
 artwork the Pond's desktop icon uses. It ships in two variants: goose-logo.png
@@ -23,11 +24,12 @@ chevron with its construction guides, and the grid-and-circles placeholder on
 the launch screen. The app had shipped unbranded.
 """
 
+import math
 import sys
 from pathlib import Path
 
 try:
-    from PIL import Image
+    from PIL import Image, ImageDraw, ImageFilter
 except ImportError:
     sys.exit("This script needs Pillow: python3 -m pip install Pillow")
 
@@ -127,6 +129,69 @@ def monochrome(mark: Image.Image, size: int, ratio: float) -> Image.Image:
     return out
 
 
+# The notification small icon: 96 px is xxxhdpi for Android's 24dp, and
+# expo-notifications scales it to the other densities at prebuild.
+NOTIFICATION_SIZE = 96
+# Android's 2dp padding at xxxhdpi.
+NOTIFICATION_PADDING = 8
+# Drawn this many times larger, then reduced, for smooth edges.
+NOTIFICATION_SUPERSAMPLE = 8
+# The brand mark's water starts here (500 px canvas); above it is the G and the beak.
+WATERLINE = 308
+# Stroke growth in source pixels: the G's 27 px stroke becomes about 38 px.
+BOLDEN = 11
+
+
+def notification_silhouette(source: Path) -> Image.Image:
+    """A bold white silhouette of the mark for the status bar.
+
+    Android draws a notification's small icon from its alpha alone, white, at
+    24dp. The full mark there is a faint thin "G": its ripples and the gap
+    between head and beak are hairlines at that size, and the themed-icon
+    silhouette above sits inside a 66% safe zone. So this one is simplified,
+    the only icon here that is: the G and beak, their strokes thickened (which
+    also joins the beak to the head), on one bold wave in place of the ripples,
+    filling the canvas to the padding. The OS forces the white; it is not a
+    recolour of the logo.
+    """
+    alpha = Image.open(source).convert("RGBA").getchannel("A")
+    ink = alpha.point(lambda v: 255 if v > 128 else 0)
+    goose = ink.crop((0, 0, ink.width, WATERLINE)).filter(ImageFilter.MaxFilter(BOLDEN))
+    goose = goose.crop(goose.getbbox())
+
+    work = NOTIFICATION_SIZE * NOTIFICATION_SUPERSAMPLE
+    live = work - 2 * NOTIFICATION_PADDING * NOTIFICATION_SUPERSAMPLE
+    gap = round(live * 0.06)
+    wave_height = round(live * 0.17)
+    goose_height = live - gap - wave_height
+    goose = goose.resize(
+        (round(goose.width * goose_height / goose.height), goose_height), Image.LANCZOS
+    )
+
+    canvas = Image.new("L", (work, work), 0)
+    top = NOTIFICATION_PADDING * NOTIFICATION_SUPERSAMPLE
+    canvas.paste(255, ((work - goose.width) // 2, top), goose)
+
+    # One wave, a sine of one and a half periods, a little wider than the G,
+    # drawn as a round pen swept along it so its ends are round and it has no
+    # seams. The pen's radius stays inside the padding at both ends.
+    stroke = round(live * 0.10)
+    radius = stroke / 2
+    wave_width = min(live - stroke, round(goose.width * 1.25))
+    amplitude = (wave_height - stroke) / 2
+    left = (work - wave_width) / 2
+    middle = top + goose_height + gap + wave_height / 2
+    draw = ImageDraw.Draw(canvas)
+    for x in range(wave_width + 1):
+        cx = left + x
+        cy = middle + amplitude * math.sin(x / wave_width * 3 * math.pi)
+        draw.ellipse((cx - radius, cy - radius, cx + radius, cy + radius), fill=255)
+
+    out = Image.new("RGBA", (NOTIFICATION_SIZE, NOTIFICATION_SIZE), (255, 255, 255, 0))
+    out.putalpha(canvas.resize((NOTIFICATION_SIZE, NOTIFICATION_SIZE), Image.LANCZOS))
+    return out
+
+
 def main() -> None:
     if not MARK_ON_DARK.exists():
         sys.exit(f"missing brand mark: {MARK_ON_DARK}")
@@ -148,6 +213,8 @@ def main() -> None:
     # mark ships without a ground of its own.
     save(transparent(mark, MASTER, 0.72), "splash-icon.png")
     save(plated(mark, 48, MARK_WIDTH_RATIO), "favicon.png")
+    # Wired in app.json as expo-notifications' `icon`.
+    save(notification_silhouette(MARK_ON_DARK), "notification-icon.png")
 
     print("wrote:")
     for line in written:
