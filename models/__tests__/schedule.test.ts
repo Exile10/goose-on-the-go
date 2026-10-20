@@ -7,6 +7,7 @@
 import {
   createRequest,
   describeCron,
+  draftCron,
   describeWhen,
   draftFrom,
   emptyDraft,
@@ -15,6 +16,7 @@ import {
   isSixFieldCron,
   linkedScheduleId,
   oneOffCron,
+  repeatFrom,
   timedSchedules,
   updateRequest,
   type ScheduleDraft,
@@ -210,7 +212,7 @@ describe('the schedule form', () => {
    * zone it names, so "07:00" would have run at 07:00 UTC.
    */
   it('creates a repeat in the phone\'s zone', () => {
-    expect(createRequest(draft({ timing: 'repeat', cron: ' 0 0 7 * * * ' }), now)).toEqual({
+    expect(createRequest(draft({ timing: 'custom', cron: ' 0 0 7 * * * ' }), now)).toEqual({
       ok: true,
       req: { name: 'Daily Brief', cron: '0 0 7 * * *', prompt: 'Brief me', timezone: 'Africa/Nairobi', once: false },
     });
@@ -230,7 +232,7 @@ describe('the schedule form', () => {
   it('says what is missing before anything is sent', () => {
     expect(createRequest(draft({ name: ' ' }), now)).toEqual({ ok: false, error: 'schedule.errors.nameRequired' });
     expect(createRequest(draft({ prompt: '' }), now)).toEqual({ ok: false, error: 'schedule.errors.promptRequired' });
-    expect(createRequest(draft({ timing: 'repeat', cron: '0 9 * * *' }), now)).toEqual({
+    expect(createRequest(draft({ timing: 'custom', cron: '0 9 * * *' }), now)).toEqual({
       ok: false,
       error: 'schedule.errors.cronFields',
     });
@@ -250,9 +252,13 @@ describe('the schedule form', () => {
     expect(draftFrom(brief)).toEqual({
       name: 'Daily Brief',
       prompt: 'Brief me',
-      timing: 'repeat',
+      timing: 'daily',
       date: null,
-      time: null,
+      time: { hour: 7, minute: 0 },
+      everyHours: 1,
+      minute: 0,
+      weekdays: [1],
+      dayOfMonth: 1,
       cron: '0 0 7 * * *',
       timezone: 'Africa/Nairobi',
     });
@@ -272,9 +278,13 @@ describe('the schedule form', () => {
       ok: true,
       req: { name: 'Morning Brief' },
     });
-    expect(updateRequest(brief, { ...draftFrom(brief), prompt: 'Brief me, briefly', cron: '0 30 6 * * *' }, now)).toEqual(
-      { ok: true, req: { prompt: 'Brief me, briefly', cron: '0 30 6 * * *' } },
-    );
+    expect(
+      updateRequest(brief, { ...draftFrom(brief), prompt: 'Brief me, briefly', time: { hour: 6, minute: 30 } }, now),
+    ).toEqual({ ok: true, req: { prompt: 'Brief me, briefly', cron: '0 30 6 * * *' } });
+    expect(updateRequest(brief, { ...draftFrom(brief), timing: 'custom', cron: '0 30 6 * * *' }, now)).toEqual({
+      ok: true,
+      req: { cron: '0 30 6 * * *' },
+    });
     expect(updateRequest(brief, { ...draftFrom(brief), timezone: 'UTC' }, now)).toEqual({
       ok: true,
       req: { timezone: 'UTC' },
@@ -293,7 +303,7 @@ describe('the schedule form', () => {
 
   it('turns a one-off into a repeat with a cron', () => {
     const oneOff = schedule({ cron: '@once', fire_at: new Date(2026, 9, 24, 18, 5).toISOString() });
-    const repeat = { ...draftFrom(oneOff), timing: 'repeat' as const, cron: '0 0 7 * * *' };
+    const repeat = { ...draftFrom(oneOff), timing: 'custom' as const, cron: '0 0 7 * * *' };
     expect(updateRequest(oneOff, repeat, now)).toEqual({ ok: true, req: { cron: '0 0 7 * * *' } });
   });
 
@@ -308,9 +318,103 @@ describe('the schedule form', () => {
       ok: false,
       error: 'schedule.errors.promptRequired',
     });
-    expect(updateRequest(brief, { ...draftFrom(brief), cron: '* 0 7 * * *' }, now)).toEqual({
+    expect(updateRequest(brief, { ...draftFrom(brief), timing: 'custom', cron: '* 0 7 * * *' }, now)).toEqual({
       ok: false,
       error: 'schedule.errors.cronFields',
+    });
+  });
+});
+
+describe('the repeat presets', () => {
+  const now = new Date(2026, 9, 19, 12, 0);
+  const at = (hour: number, minute: number) => ({ hour, minute });
+  const draft = (overrides: Partial<ScheduleDraft>): ScheduleDraft => ({
+    ...emptyDraft('Africa/Nairobi'),
+    name: 'Daily Brief',
+    prompt: 'Brief me',
+    ...overrides,
+  });
+  const cronOf = (overrides: Partial<ScheduleDraft>) => {
+    const built = createRequest(draft(overrides), now);
+    return built.ok ? built.req.cron : built.error;
+  };
+
+  /** The dashboard's `buildCron`, field for field: a schedule made on either reads the same on the other. */
+  it('builds the cron the dashboard builds', () => {
+    expect(cronOf({ timing: 'hourly', everyHours: 1, minute: 0 })).toBe('0 0 */1 * * *');
+    expect(cronOf({ timing: 'hourly', everyHours: 3, minute: 15 })).toBe('0 15 */3 * * *');
+    expect(cronOf({ timing: 'daily', time: at(7, 5) })).toBe('0 5 7 * * *');
+    expect(cronOf({ timing: 'weekly', weekdays: [1, 3, 5], time: at(18, 30) })).toBe('0 30 18 * * 1,3,5');
+    expect(cronOf({ timing: 'monthly', dayOfMonth: 15, time: at(9, 0) })).toBe('0 0 9 15 * *');
+    expect(cronOf({ timing: 'custom', cron: '0 0 9 * * 1-5' })).toBe('0 0 9 * * 1-5');
+  });
+
+  it('writes Sunday as 7 and the days in week order, whatever order they were tapped', () => {
+    expect(cronOf({ timing: 'weekly', weekdays: [7, 1], time: at(8, 0) })).toBe('0 0 8 * * 1,7');
+  });
+
+  it('sends a repeat without once, and a one-off with it', () => {
+    const repeat = createRequest(draft({ timing: 'weekly', weekdays: [6, 7], time: at(10, 0) }), now);
+    expect(repeat.ok && repeat.req.once).toBe(false);
+    const once = createRequest(draft({ timing: 'once', date: { year: 2026, month: 10, day: 24 }, time: at(9, 0) }), now);
+    expect(once.ok && once.req).toMatchObject({ cron: '0 0 9 24 10 * 2026', once: true });
+  });
+
+  it('says what a preset is missing', () => {
+    expect(cronOf({ timing: 'daily', time: null })).toBe('schedule.errors.timeRequired');
+    expect(cronOf({ timing: 'weekly', weekdays: [], time: at(8, 0) })).toBe('schedule.errors.daysRequired');
+    expect(cronOf({ timing: 'hourly', everyHours: 0 })).toBe('schedule.errors.repeatNumbers');
+    expect(cronOf({ timing: 'hourly', everyHours: 2, minute: 1.5 })).toBe('schedule.errors.repeatNumbers');
+    expect(cronOf({ timing: 'monthly', dayOfMonth: 32, time: at(8, 0) })).toBe('schedule.errors.repeatNumbers');
+  });
+
+  it('opens a cron on the preset that writes it back', () => {
+    expect(repeatFrom('0 0 7 * * 1,3,5')).toMatchObject({ timing: 'weekly', weekdays: [1, 3, 5], time: at(7, 0) });
+    expect(repeatFrom('0 30 18 * * 7')).toMatchObject({ timing: 'weekly', weekdays: [7], time: at(18, 30) });
+    expect(repeatFrom('0 0 9 15 * *')).toMatchObject({ timing: 'monthly', dayOfMonth: 15, time: at(9, 0) });
+    expect(repeatFrom('0 10 */4 * * *')).toMatchObject({ timing: 'hourly', everyHours: 4, minute: 10 });
+    expect(repeatFrom('0 0 7 * * *')).toMatchObject({ timing: 'daily', time: at(7, 0) });
+  });
+
+  /** Anything the presets would write differently stays as the Pond has it, so a save loses nothing. */
+  it('opens anything else as custom, with the cron untouched', () => {
+    for (const cron of [
+      '0 0 7 * * 1-5', // a range: the weekly picker writes a list
+      '0 0 7 * * 5,1', // days out of week order
+      '0 0 7 * * 0', // Sunday as 0
+      '0 07 7 * * *', // a padded minute
+      '30 0 7 * * *', // a second other than 0
+      '0 */15 * * * *', // every 15 minutes
+      '0 0 */24 * * *', // more hours than the picker offers
+      '0 0 9 1 1 *', // once a year
+      '0 0 9 * * 1 2027', // a seventh field
+      '0 9 * * *', // five fields
+    ]) {
+      expect(repeatFrom(cron)).toMatchObject({ timing: 'custom', cron });
+    }
+  });
+
+  it('previews a draft as the cron it would send, and nothing until it is complete', () => {
+    expect(draftCron(draft({ timing: 'weekly', weekdays: [1, 2, 3, 4, 5], time: at(7, 0) }))).toBe('0 0 7 * * 1,2,3,4,5');
+    expect(describeCron('0 0 7 * * 1,2,3,4,5')).toBe('Weekdays at 07:00');
+    expect(draftCron(draft({ timing: 'daily', time: null }))).toBeNull();
+    expect(draftCron(draft({ timing: 'custom', cron: '0 9 * * *' }))).toBeNull();
+  });
+
+  /** Opening a schedule on its preset and saving it unchanged sends nothing about when. */
+  it('sends no cron for an edit that leaves the time alone', () => {
+    const weekly = schedule({ cron: '0 0 7 * * 1,3,5', timezone: 'Africa/Nairobi' });
+    expect(updateRequest(weekly, draftFrom(weekly), now)).toEqual({ ok: true, req: {} });
+    expect(updateRequest(weekly, { ...draftFrom(weekly), timing: 'custom' }, now)).toEqual({ ok: true, req: {} });
+    expect(updateRequest(weekly, { ...draftFrom(weekly), weekdays: [1, 3, 5, 6] }, now)).toEqual({
+      ok: true,
+      req: { cron: '0 0 7 * * 1,3,5,6' },
+    });
+    // A cron the form would refuse still allows an edit to the name.
+    const odd = schedule({ cron: '0 0 9 * * 1 2027', timezone: 'Africa/Nairobi' });
+    expect(updateRequest(odd, { ...draftFrom(odd), name: 'Renamed' }, now)).toEqual({
+      ok: true,
+      req: { name: 'Renamed' },
     });
   });
 });
