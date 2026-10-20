@@ -287,6 +287,48 @@ export interface Reminder {
   window_id: string;
 }
 
+// ── Proposals (shown as "Suggestions") ────────────────────────
+
+/**
+ * `GET /api/v1/proposals`: something the Pond noticed and offers to do, waiting for
+ * the one household member it is addressed to. Not the chat's `Suggestion`, which is
+ * a question to ask and needs no decision.
+ */
+export interface Proposal {
+  id: string;
+  summary: string;
+  /** Why the Pond is proposing it. A separate key so showing `summary` alone cannot pass for the reason. */
+  rationale: string;
+  confidence: number;
+  profile_id: string | null;
+  created_at: string;
+  /** After this the Pond stops listing it and refuses a decision. */
+  expires_at: string;
+  /** What would be staged: the Pond's `TaskKind`, serde-tagged on "type". */
+  proposed_action: { type: string; [field: string]: unknown };
+  trigger: {
+    kind: string;
+    source_id: string | null;
+    signal: string | null;
+    observed_at: string;
+  };
+}
+
+export interface ProposalList {
+  profile_id: string | null;
+  proposals: Proposal[];
+}
+
+/** No default on the Pond: anything else is a 400, never an approval. */
+export type ProposalDecision = 'approve' | 'reject';
+
+/** `POST /api/v1/proposals/{id}/decide`. `executed` is always false: approving runs nothing. */
+export interface ProposalDecisionResult {
+  id: string;
+  status: string;
+  executed: boolean;
+}
+
 // ── Memory ────────────────────────────────────────────────────
 //
 // The Pond's `MemoryFragment` (`pond-core/src/user_data/domain/memory.rs`),

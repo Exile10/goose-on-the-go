@@ -50,6 +50,10 @@ import type {
   ConsolidationEvent,
   MemoryFragment,
   Reminder,
+  Proposal,
+  ProposalDecision,
+  ProposalDecisionResult,
+  ProposalList,
   SaveMemoryRequest,
   UpdateMemoryRequest,
   ModelActiveRoles,
@@ -1068,6 +1072,30 @@ export class PondApiClient {
    */
   async dismissReminder(id: string): Promise<void> {
     await this.post(`/api/v1/reminders/${encodeURIComponent(id)}/dismiss`, {});
+  }
+
+  // ── Proposals (shown as "Suggestions") ──────────────────────
+
+  /**
+   * The live proposals addressed to this caller, newest first. `sessionId` is
+   * required and never defaulted: the Pond answers 400 without it, and 403 when
+   * it cannot resolve the caller to exactly one household member.
+   */
+  async listProposals(sessionId: string): Promise<Proposal[]> {
+    const res = await this.get<ProposalList>(`/api/v1/proposals?session_id=${encodeURIComponent(sessionId)}`);
+    return res.proposals ?? [];
+  }
+
+  /**
+   * Accept (`approve`) or decline (`reject`) one proposal. Approving records the
+   * decision and executes nothing. 404 covers expired, already decided and
+   * unknown alike; 409 is the Pond refusing that status change.
+   */
+  decideProposal(id: string, sessionId: string, decision: ProposalDecision): Promise<ProposalDecisionResult> {
+    return this.post<ProposalDecisionResult>(`/api/v1/proposals/${encodeURIComponent(id)}/decide`, {
+      session_id: sessionId,
+      decision,
+    });
   }
 
   // ── Memory ──────────────────────────────────────────────────
