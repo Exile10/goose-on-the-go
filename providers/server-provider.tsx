@@ -9,7 +9,8 @@ import { SecureStorage } from '@/services/secure-storage';
 import { ApiError, api, PondApiClient, type HandshakeResponse, type SpokenCode } from '@/services/api-client';
 import type { PakeCredential } from '@/services/cpace';
 import { ConnectionManager, type ConnectionSnapshot } from '@/services/connection-manager';
-import { configurePondTrust, PondTrustError } from '@/services/pond-trust';
+import { PondTrustError } from '@/services/pond-trust';
+import { probePond as probe, trustPond as trust } from '@/services/pond-session';
 import { findPondAt, findPondByHost } from '@/services/discovery';
 import { parseConnectionProfile, validPin, isInsecureDevOrigin, isLocalPairingUrl, type ConnectionProfile } from '@/models/connection';
 import i18n from '@/services/i18n';
@@ -158,12 +159,6 @@ export function resolveScreenReal(
 }
 
 const ServerContext = createContext<ServerContextValue | null>(null);
-const trust = (urls: string[], pin: string) => configurePondTrust(urls.map((url) => ({ url, pin })));
-const probe = async (url: string) => {
-  const result = await new PondApiClient(url).health();
-  if (result.trustFailure) throw new PondTrustError();
-  return result.ok;
-};
 /**
  * Last working route per Pond, for the life of the process. Module scope on purpose: Android
  * recreates the activity on a return to the app, React remounts this provider and builds a new

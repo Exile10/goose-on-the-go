@@ -418,7 +418,8 @@
       "retention": "How long your Pond keeps things before it deletes them.",
       "appearance": "How this app looks on this phone. Your Pond never sees it.",
       "advanced": "Tuning for how Goose thinks and runs. Safe to leave alone.",
-      "speaking": "How Goose sounds when it answers out loud: the voice, its pace and how clear it is."
+      "speaking": "How Goose sounds when it answers out loud: the voice, its pace and how clear it is.",
+      "phoneNotifications": "How this phone hears from your Pond when the app is closed."
     },
     "section": {
       "nameAndManner": "Name and manner",
@@ -483,7 +484,8 @@
       "retention": "Zero keeps things for good.",
       "haptics": "Small taps you feel when you flip a switch or finish something.",
       "engine": "Where Goose runs. Leave these alone unless you run models somewhere other than your Pond.",
-      "cost": "What a cloud service would charge, so your Pond can show what it saved you."
+      "cost": "What a cloud service would charge, so your Pond can show what it saved you.",
+      "stayConnected": "Keeps a connection to your Pond open after you leave the app, so notices arrive straight away. Android shows an ongoing notification while it is on, and it uses some battery. With it off, your Pond still wakes the phone with a push, which can arrive later when the phone is idle."
     },
     "link": {
       "whatItRemembers": "What Goose remembers",
@@ -1278,6 +1280,10 @@
       "none": "No setting matches “{{query}}”",
       "results_one": "{{count}} setting found",
       "results_other": "{{count}} settings found"
+    },
+    "stayConnected": {
+      "label": "Stay connected in the background",
+      "ios": "iPhone does not let apps hold a connection open in the background. Your Pond wakes this phone with a push instead, and iOS decides how soon that arrives."
     }
   },
   "screens": {
@@ -1333,7 +1339,8 @@
     "ownerSetup": "Set up your Pond",
     "wakeWord": "Wake word",
     "scheduleDetail": "Schedule",
-    "cameraEvents": "What the camera saw"
+    "cameraEvents": "What the camera saw",
+    "settingsPhoneNotifications": "Notifications"
   },
   "nav": {
     "goose": "Goose",
@@ -2736,6 +2743,14 @@
       "saveFailed": "Couldn't save the note. Try again.",
       "deleteFailed": "Couldn't delete the note. It's back in the list.",
       "unavailable": "This Pond can't keep notes. Update it to add them here."
+    }
+  },
+  "notifications": {
+    "background": {
+      "title": "Connected to your Pond",
+      "body": "Notices from your Pond arrive here straight away. You can turn this off in Settings.",
+      "channel": "Background connection",
+      "channelDescription": "Shown while this phone keeps a connection to your Pond open in the background."
     }
   }
 }

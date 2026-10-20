@@ -90,6 +90,7 @@ export type SpecialId =
   | 'primaryProfile'
   | 'theme'
   | 'haptics'
+  | 'stayConnected'
   | 'posture';
 
 export type SliderFormat = 'pace' | 'creativity' | 'fraction';
@@ -140,6 +141,7 @@ export type SettingsPageId =
   | 'privacy'
   | 'retention'
   | 'appearance'
+  | 'phoneNotifications'
   | 'advanced';
 
 export interface SettingsPage {

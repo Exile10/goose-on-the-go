@@ -408,6 +408,21 @@ export class PondApiClient {
     this.token = token;
   }
 
+  /**
+   * Whether this client holds a session token and something persists its
+   * rotation -- in the app, the ServerProvider that restored the pairing. A
+   * push wake-up that finds one uses this client as it is rather than restoring
+   * a second copy of the pairing beside it.
+   *
+   * The rotation handler is part of the test because a refresh without it
+   * rotates the pair in memory only, and the next launch reads a refresh token
+   * the Pond has already retired. The provider clears the handler when it
+   * unmounts, which is when a background caller has to restore its own.
+   */
+  get hasSession(): boolean {
+    return this.token !== null && this.onTokensRotated !== null;
+  }
+
   setRefreshToken(token: string | null) {
     this.refreshToken = token;
   }
@@ -1811,6 +1826,20 @@ export class PondApiClient {
    */
   deviceHeartbeat(deviceId: string): Promise<void> {
     return this.post<void>(`/api/v1/devices/${encodeURIComponent(deviceId)}/heartbeat`, {});
+  }
+
+  /**
+   * Notices the Pond holds for this phone and has not seen acknowledged, in
+   * the stream's `ServerNotification` shape. Accepts a bare array or
+   * `{ notifications: [...] }`; anything else is an empty list.
+   */
+  async pendingNotifications(): Promise<unknown[]> {
+    return collection<unknown>(await this.request<unknown>('/api/v1/notifications/pending'), 'notifications');
+  }
+
+  /** Tell the Pond this phone has put a notice in front of the user, so it stops holding it. */
+  ackNotification(id: string): Promise<void> {
+    return this.post<void>(`/api/v1/notifications/${encodeURIComponent(id)}/ack`, {});
   }
 
   private post<T>(path: string, body: unknown): Promise<T> {

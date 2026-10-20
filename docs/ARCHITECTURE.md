@@ -75,7 +75,9 @@ refusal's parsed `body` for a route that answers more than a sentence, such as
 `/onboard/complete`'s `missing_fields`.
 Wire types live in `services/types.ts`, in the server's own snake_case —
 deliberately separate from the display-shaped types in `models/`.
-`services/notification-stream.ts` — the foreground SSE stream. Only a 401 means
+`services/notification-stream.ts` — the SSE stream, owned by `services/background-connection.ts`
+so it can outlive the React tree while the Android foreground service runs; the push wake-up and
+shared delivery are in [NOTIFICATIONS.md](./NOTIFICATIONS.md). Only a 401 means
 its token is dead: it stops and the owner refreshes. A 403 is the Pond declining
 to serve the stream yet (before onboarding, for one), so the stream retries with
 its usual backoff, up to 30 s, and logs the reason. Treating a 403 as a dead token
@@ -247,7 +249,7 @@ and its ISK and sid chain to `cpace-vectors.json`. Everything native is owed a d
 
 - **ThemeProvider** (`providers/theme-provider.tsx`) — Jarida color tokens resolved for light/dark mode. Access via `useTheme()`.
 - **ServerProvider** (`providers/server-provider.tsx`) — Server connection state and the dev mock/real toggles. Access via `useServer()`.
-- **NotificationsProvider** (`providers/notifications-provider.tsx`) — Push registration.
+- **NotificationsProvider** (`providers/notifications-provider.tsx`) — Push registration, the stream's lifecycle and the background-connection service. See [NOTIFICATIONS.md](./NOTIFICATIONS.md).
 - **InkProvider** (`@jarida/ink/native`) — Theme context for the ink primitives (#17).
 
 ## Presence: telling the Pond this phone is still here

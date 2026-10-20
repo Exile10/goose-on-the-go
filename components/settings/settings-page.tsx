@@ -3,7 +3,7 @@
  */
 
 import React, { useMemo, useState, type ReactElement } from 'react';
-import { View } from 'react-native';
+import { Platform, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
@@ -20,6 +20,7 @@ import {
 } from '@/models/pond-settings';
 import { useTheme } from '@/providers/theme-provider';
 import { hapticsEnabled, saveHapticsPreference, selectionTick } from '@/services/haptics';
+import { saveStayConnectedPreference, stayConnectedEnabled } from '@/services/background-connection';
 import type { PondSettings } from '@/services/types';
 import { summarize, useSummaryExtras, type Extras } from '@/view-models/use-settings-extras';
 import { usePondSettings, type UsePondSettings } from '@/view-models/use-pond-settings';
@@ -61,7 +62,7 @@ const RESTART_FOOTERS = new Set<TranslationKey>([
 ]);
 
 /** Settings that live on this phone, so the page works with no Pond at all. */
-const PHONE_PAGES = new Set<SettingsPageId>(['appearance']);
+const PHONE_PAGES = new Set<SettingsPageId>(['appearance', 'phoneNotifications']);
 
 interface Context {
   settings: PondSettings;
@@ -72,6 +73,7 @@ interface Context {
   go: (route: string) => void;
   theme: ReturnType<typeof useTheme>;
   haptics: { on: boolean; set: (next: boolean) => void };
+  stayConnected: { on: boolean; set: (next: boolean) => void };
 }
 
 function noteFor(item: { restart?: boolean }, ctx: Context): string | null {
@@ -216,6 +218,14 @@ function specialRows(id: SpecialId, ctx: Context): ReactElement[] {
       return [
         <SwitchRow key={id} label={t('settings.hapticsLabel')} value={ctx.haptics.on} onChange={ctx.haptics.set} />,
       ];
+    case 'stayConnected':
+      // Only Android has foreground services; an iPhone relies on the push wake-up alone.
+      if (Platform.OS !== 'android') {
+        return [<SettingsMessage key={id}>{t('settings.stayConnected.ios')}</SettingsMessage>];
+      }
+      return [
+        <SwitchRow key={id} label={t('settings.stayConnected.label')} value={ctx.stayConnected.on} onChange={ctx.stayConnected.set} />,
+      ];
   }
 }
 
@@ -234,6 +244,7 @@ export function SettingsPageScreen({ page: id }: { page: SettingsPageId }) {
   const summaryIds = useMemo(() => linkSummaries(id), [id]);
   const extras = useSummaryExtras(summaryIds);
   const [hapticsOn, setHapticsOn] = useState(hapticsEnabled);
+  const [stayConnectedOn, setStayConnectedOn] = useState(stayConnectedEnabled);
   const phoneOnly = PHONE_PAGES.has(id);
   const settings = vm.settings;
 
@@ -267,6 +278,13 @@ export function SettingsPageScreen({ page: id }: { page: SettingsPageId }) {
         set: (next) => {
           setHapticsOn(next);
           void saveHapticsPreference(next);
+        },
+      },
+      stayConnected: {
+        on: stayConnectedOn,
+        set: (next) => {
+          setStayConnectedOn(next);
+          void saveStayConnectedPreference(next);
         },
       },
     };
