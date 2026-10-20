@@ -8,7 +8,7 @@
  */
 
 import React, { useState } from 'react';
-import { ScrollView, StyleSheet, useWindowDimensions } from 'react-native';
+import { ScrollView, StyleSheet } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import {
   InkButton,
@@ -24,7 +24,7 @@ import {
 } from '@jarida/ink/native';
 import type { CivilDate, CivilTime } from '@jarida/ink';
 
-import { GKeyboardView } from '@/components/ui/g-keyboard-view';
+import { GSheetBody } from '@/components/ui/g-sheet-body';
 import { isSixFieldCron, oneOffCron } from '@/models/schedule';
 import { confirm, reject } from '@/services/haptics';
 import type { CreateScheduleRequest } from '@/services/types';
@@ -46,7 +46,6 @@ function todayCivil(): CivilDate {
 
 export function CreateScheduleSheet({ open, onClose, onCreate }: CreateScheduleSheetProps) {
   const { t } = useTranslation();
-  const { height } = useWindowDimensions();
   const [name, setName] = useState('');
   const [timing, setTiming] = useState<Timing>('once');
   const [date, setDate] = useState<CivilDate | null>(null);
@@ -109,10 +108,7 @@ export function CreateScheduleSheet({ open, onClose, onCreate }: CreateScheduleS
 
   return (
     <InkSheet open={open} onClose={onClose} title={t('schedule.form.scheduleTitle')}>
-      {/* `InkSheet` has no height limit of its own. The bound includes the
-          keyboard's padding, so with the keyboard up the form scrolls in what
-          is left rather than pushing the sheet off the top of the window. */}
-      <GKeyboardView style={{ maxHeight: height * 0.7 }}>
+      <GSheetBody>
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
           <InkFormField label={t('schedule.form.name')}>
             <InkInput
@@ -182,7 +178,7 @@ export function CreateScheduleSheet({ open, onClose, onCreate }: CreateScheduleS
             {t('schedule.form.create')}
           </InkButton>
         </ScrollView>
-      </GKeyboardView>
+      </GSheetBody>
     </InkSheet>
   );
 }

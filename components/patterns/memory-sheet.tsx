@@ -7,11 +7,11 @@
  */
 
 import React, { useState } from 'react';
-import { ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { InkButton, InkChip, InkFormField, InkNotice, InkSheet, InkSwitch, InkText, InkTextArea } from '@jarida/ink/native';
 
-import { GKeyboardView } from '@/components/ui/g-keyboard-view';
+import { GSheetBody } from '@/components/ui/g-sheet-body';
 import { MEMORY_SEGMENTS, isKept, saveEdit, segmentLabel } from '@/models/memory';
 import { confirm, reject } from '@/services/haptics';
 import type { MemoryFragment, MemorySegment, SaveMemoryRequest } from '@/services/types';
@@ -30,7 +30,6 @@ export interface MemorySheetProps {
 
 export function MemorySheet({ open, editing, onClose, onSave, onReword, onSetKept }: MemorySheetProps) {
   const { t } = useTranslation();
-  const { height } = useWindowDimensions();
   // Mounted afresh for each opening (the screen keys it), so this starts from
   // the memory being edited, or blank.
   const [content, setContent] = useState(editing?.content ?? '');
@@ -63,7 +62,7 @@ export function MemorySheet({ open, editing, onClose, onSave, onReword, onSetKep
 
   return (
     <InkSheet open={open} onClose={onClose} title={editing ? t('memories.form.editTitle') : t('memories.form.newTitle')}>
-      <GKeyboardView style={{ maxHeight: height * 0.7 }}>
+      <GSheetBody>
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
           <InkFormField label={t('memories.form.content')}>
             <InkTextArea
@@ -100,7 +99,7 @@ export function MemorySheet({ open, editing, onClose, onSave, onReword, onSetKep
             {t('memories.form.save')}
           </InkButton>
         </ScrollView>
-      </GKeyboardView>
+      </GSheetBody>
     </InkSheet>
   );
 }
