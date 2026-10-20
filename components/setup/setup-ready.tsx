@@ -12,6 +12,7 @@ import { InkButton, InkDots, InkNotice, InkSpinner, InkText } from '@jarida/ink/
 import { askToDownload, DownloadRow } from '@/components/settings/model-rows';
 import { Spacing } from '@/constants/spacing';
 import { titleOf } from '@/models/model-library';
+import { useChoice } from '@/providers/confirm-provider';
 import { tap } from '@/services/haptics';
 import type { UsePondReadiness } from '@/view-models/use-pond-readiness';
 
@@ -19,6 +20,7 @@ import type { UsePondReadiness } from '@/view-models/use-pond-readiness';
 export function ReadinessStatus({ ready }: { ready: UsePondReadiness }) {
   const { t } = useTranslation();
   const router = useRouter();
+  const choose = useChoice();
   const { readiness, chat, download, suggestion, library } = ready;
   switch (readiness) {
     case 'checking':
@@ -40,7 +42,7 @@ export function ReadinessStatus({ ready }: { ready: UsePondReadiness }) {
       return chat ? (
         <View style={styles.block}>
           <InkText>{t('setup.ready.notDownloaded', { name: titleOf(chat) })}</InkText>
-          <InkButton variant="quiet" icon="download" onPress={() => askToDownload(chat, library.actions.download, t)}>
+          <InkButton variant="quiet" icon="download" onPress={() => void askToDownload(chat, library.actions.download, choose, t)}>
             {t('models.library.download')}
           </InkButton>
         </View>

@@ -6,7 +6,7 @@
  */
 
 import React, { useCallback, useState } from 'react';
-import { ActivityIndicator, Alert, FlatList, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, FlatList, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
 
 import { GIcon } from '@/components/ui/g-icon';
@@ -18,6 +18,7 @@ import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
 import { Spacing } from '@/constants/spacing';
 import { Radii } from '@/constants/radii';
 import { useThemedStyles } from '@/hooks/use-themed-styles';
+import { useConfirm } from '@/providers/confirm-provider';
 import { useTheme } from '@/providers/theme-provider';
 import i18n from '@/services/i18n';
 
@@ -88,6 +89,7 @@ export default function SessionsScreen() {
   const styles = useThemedStyles(makeStyles);
   const { data, loading, actions } = useSessions();
   const router = useRouter();
+  const confirm = useConfirm();
 
   const openSession = useCallback(
     (session: SessionSummary) => {
@@ -101,13 +103,16 @@ export default function SessionsScreen() {
   );
 
   const confirmDelete = useCallback(
-    (id: string) => {
-      Alert.alert(i18n.t('sessions.deleteTitle'), i18n.t('sessions.deleteBody'), [
-        { text: i18n.t('sessions.cancel'), style: 'cancel' },
-        { text: i18n.t('sessions.delete'), style: 'destructive', onPress: () => actions.remove(id) },
-      ]);
+    async (id: string) => {
+      const yes = await confirm({
+        title: i18n.t('sessions.deleteTitle'),
+        message: i18n.t('sessions.deleteBody'),
+        confirmLabel: i18n.t('sessions.delete'),
+        destructive: true,
+      });
+      if (yes) actions.remove(id);
     },
-    [actions],
+    [actions, confirm],
   );
 
   const renderItem = useCallback(
@@ -116,7 +121,7 @@ export default function SessionsScreen() {
         session={item}
         onPress={() => openSession(item)}
         onRename={(title) => actions.rename(item.id, title)}
-        onDelete={() => confirmDelete(item.id)}
+        onDelete={() => void confirmDelete(item.id)}
       />
     ),
     [actions, openSession, confirmDelete],

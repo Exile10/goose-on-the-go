@@ -33,6 +33,7 @@ import '@/components/ui/ink-icons';
 // Initialises i18next before the first screen renders.
 import '@/services/i18n';
 import { ServerProvider } from '@/providers/server-provider';
+import { ConfirmProvider } from '@/providers/confirm-provider';
 import { loadHapticsPreference } from '@/services/haptics';
 
 /**
@@ -125,17 +126,21 @@ function ThemedApp() {
   return (
     <NavThemeProvider value={isDark ? DarkTheme : DefaultTheme}>
       <InkProvider scheme={isDark ? 'dark' : 'light'} accent="Purple">
-        <ConnectionStatus />
-        <Stack>
-          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-          <Stack.Screen name="(stack)" options={{ headerShown: false }} />
-          <Stack.Screen name="(onboarding)" options={{ headerShown: false }} />
-          {/* Over the tabs rather than inside one, so a conversation has the
-              whole screen: no bar under the composer. It draws its own header. */}
-          <Stack.Screen name="conversation" options={{ headerShown: false }} />
-          <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
-        </Stack>
-        <StatusBar style={isDark ? 'light' : 'dark'} />
+        {/* Inside Ink because the dialog draws with its theme; around every screen so any of them
+            can ask. */}
+        <ConfirmProvider>
+          <ConnectionStatus />
+          <Stack>
+            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+            <Stack.Screen name="(stack)" options={{ headerShown: false }} />
+            <Stack.Screen name="(onboarding)" options={{ headerShown: false }} />
+            {/* Over the tabs rather than inside one, so a conversation has the
+                whole screen: no bar under the composer. It draws its own header. */}
+            <Stack.Screen name="conversation" options={{ headerShown: false }} />
+            <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
+          </Stack>
+          <StatusBar style={isDark ? 'light' : 'dark'} />
+        </ConfirmProvider>
       </InkProvider>
     </NavThemeProvider>
   );

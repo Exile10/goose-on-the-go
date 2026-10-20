@@ -9,6 +9,7 @@ import { InkButton, InkCard, InkNotice, InkRow, InkSpinner, InkText, InkTitle } 
 import { askToDownload, DownloadRow } from '@/components/settings/model-rows';
 import { Spacing } from '@/constants/spacing';
 import { formatMegabytes, titleOf } from '@/models/model-library';
+import { useChoice } from '@/providers/confirm-provider';
 import { tap } from '@/services/haptics';
 import type { UseOwnerSetup } from '@/view-models/use-owner-setup';
 import { useSetupModel } from '@/view-models/use-setup-model';
@@ -16,6 +17,7 @@ import { useSetupModel } from '@/view-models/use-setup-model';
 export function ModelStep({ setup }: { setup: UseOwnerSetup }) {
   const { t } = useTranslation();
   const router = useRouter();
+  const choose = useChoice();
   const { choice, unavailable, stalled, retry, library } = useSetupModel(setup);
 
   const others = (
@@ -84,7 +86,7 @@ export function ModelStep({ setup }: { setup: UseOwnerSetup }) {
               block
               icon="download"
               disabled={library.busy === choice.model.id}
-              onPress={() => askToDownload(choice.model, library.actions.download, t)}
+              onPress={() => void askToDownload(choice.model, library.actions.download, choose, t)}
             >
               {size ? t('setup.model.downloadSized', { size }) : t('models.library.download')}
             </InkButton>

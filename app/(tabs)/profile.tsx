@@ -28,9 +28,10 @@ import { ACCOUNT_ROUTE, PROFILE_NAV } from '@/constants/navigation';
 import { Spacing } from '@/constants/spacing';
 import type { SummaryId } from '@/models/pond-settings';
 import { useBottomBarInset, useChromeScroll } from '@/providers/chrome-provider';
+import { useConfirm } from '@/providers/confirm-provider';
 import { useServer } from '@/providers/server-provider';
 import { hostOf } from '@/services/discovery';
-import { caution, hapticsEnabled, saveHapticsPreference, selectionTick } from '@/services/haptics';
+import { hapticsEnabled, saveHapticsPreference, selectionTick } from '@/services/haptics';
 import { initialOf, useHousehold } from '@/view-models/use-household';
 import { usePondSettings } from '@/view-models/use-pond-settings';
 import { summarize, useSummaryExtras } from '@/view-models/use-settings-extras';
@@ -114,6 +115,7 @@ export default function ProfileHub() {
   const { t } = useTranslation();
   const router = useRouter();
   const { unpair } = useServer();
+  const confirm = useConfirm();
   const [unpairing, setUnpairing] = useState(false);
   const [hapticsOn, setHapticsOn] = useState(hapticsEnabled);
   const chrome = useChromeScroll();
@@ -150,22 +152,19 @@ export default function ProfileHub() {
   );
 
   // Unpairing revokes this phone on the Pond and releases its remote enrollment; it cannot be undone here.
-  const confirmUnpair = useCallback(() => {
-    void caution();
-    Alert.alert(t('common.unpair'), t('profile.unpairWarning'), [
-      { text: t('common.cancel'), style: 'cancel' },
-      {
-        text: t('common.unpair'),
-        style: 'destructive',
-        onPress: () => {
-          setUnpairing(true);
-          void unpair()
-            .catch(() => Alert.alert(t('common.unpair'), t('profile.unpairFailed')))
-            .finally(() => setUnpairing(false));
-        },
-      },
-    ]);
-  }, [unpair, t]);
+  const confirmUnpair = useCallback(async () => {
+    const yes = await confirm({
+      title: t('common.unpair'),
+      message: t('profile.unpairWarning'),
+      confirmLabel: t('common.unpair'),
+      destructive: true,
+    });
+    if (!yes) return;
+    setUnpairing(true);
+    void unpair()
+      .catch(() => Alert.alert(t('common.unpair'), t('profile.unpairFailed')))
+      .finally(() => setUnpairing(false));
+  }, [confirm, unpair, t]);
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: colors.page }]} edges={['top']}>
@@ -240,7 +239,7 @@ export default function ProfileHub() {
 
           {/* Signing out is also the only way to release a remote enrollment the Pond still calls
               active, so it has to work, and say that it is working. */}
-          <InkButton variant="danger" disabled={unpairing} onPress={confirmUnpair} style={styles.unpair}>
+          <InkButton variant="danger" disabled={unpairing} onPress={() => void confirmUnpair()} style={styles.unpair}>
             {unpairing ? t('profile.unpairing') : t('common.unpair')}
           </InkButton>
           <Text style={styles.version}>{t('profile.version', { version: APP_VERSION })}</Text>

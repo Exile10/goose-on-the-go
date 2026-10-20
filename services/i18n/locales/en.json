@@ -2054,7 +2054,6 @@
     "deleteTitle": "Delete Conversation",
     "deleteBody": "This cannot be undone.",
     "delete": "Delete",
-    "cancel": "Cancel",
     "loadFailed": "Could not load conversations (HTTP {{status}}).",
     "unreachable": "Could not reach your Pond.",
     "emptyTitle": "No conversations yet",

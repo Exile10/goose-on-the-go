@@ -3,7 +3,7 @@
  */
 
 import React, { useCallback, useState } from 'react';
-import { Alert, Pressable, Text } from 'react-native';
+import { Pressable, Text } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
@@ -18,7 +18,8 @@ import {
   voiceInUse,
   zoneCity,
 } from '@/models/pond-settings';
-import { caution, selectionTick, tap } from '@/services/haptics';
+import { useConfirm } from '@/providers/confirm-provider';
+import { selectionTick, tap } from '@/services/haptics';
 import type { PondSettings } from '@/services/types';
 import {
   llmModels,
@@ -79,30 +80,25 @@ export function WakeWordResetRow({ settings, vm }: SpecialProps) {
   const { t } = useTranslation();
   const colors = useSettingsColors();
   const styles = useSettingsStyles(makeStyles);
+  const confirm = useConfirm();
   const reset = useResetWakeWord();
   const count = settings.voice_wake_word_transcriptions.length;
-  const confirmClear = useCallback(() => {
-    void caution();
-    Alert.alert(t('settings.wake.clearTitle'), t('settings.wake.clearBody'), [
-      { text: t('common.cancel'), style: 'cancel' },
-      {
-        text: t('settings.wake.clear'),
-        style: 'destructive',
-        onPress: () => {
-          void reset.run().then((ok) => {
-            if (ok) void vm.actions.update('voice_wake_word_transcriptions', []);
-          });
-        },
-      },
-    ]);
-  }, [reset, t, vm.actions]);
+  const confirmClear = useCallback(async () => {
+    const yes = await confirm({
+      title: t('settings.wake.clearTitle'),
+      message: t('settings.wake.clearBody'),
+      confirmLabel: t('settings.wake.clear'),
+      destructive: true,
+    });
+    if (yes && (await reset.run())) void vm.actions.update('voice_wake_word_transcriptions', []);
+  }, [confirm, reset, t, vm.actions]);
   return (
     <SettingsRow
       label={count > 0 ? t('settings.wake.learned', { count }) : t('settings.wake.none')}
       error={reset.message}
       trailing={
         count > 0 ? (
-          <Pressable onPress={confirmClear} disabled={reset.busy} hitSlop={8} accessibilityRole="button">
+          <Pressable onPress={() => void confirmClear()} disabled={reset.busy} hitSlop={8} accessibilityRole="button">
             <Text style={[styles.inlineAction, { color: colors.danger }]}>{t('settings.wake.clear')}</Text>
           </Pressable>
         ) : null

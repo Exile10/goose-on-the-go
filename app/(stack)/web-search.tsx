@@ -10,7 +10,7 @@
  */
 
 import React, { useCallback } from 'react';
-import { Alert, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { InkButton, InkCard, InkNotice, InkSpinner, InkText, InkTitle, inkText, useInkTheme } from '@jarida/ink/native';
 
@@ -23,6 +23,7 @@ import { Spacing } from '@/constants/spacing';
 import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
 import { useThemedStyles } from '@/hooks/use-themed-styles';
 import { BRAVE_DASHBOARD_HOST, webSearchTone } from '@/models/web-search';
+import { useConfirm } from '@/providers/confirm-provider';
 import { confirm, reject, tap } from '@/services/haptics';
 import { statusLabel, useWebSearch } from '@/view-models/use-web-search';
 
@@ -30,6 +31,8 @@ export default function WebSearchScreen() {
   const styles = useThemedStyles(makeStyles);
   const { t } = useTranslation();
   const theme = useInkTheme();
+  // Not `confirm`: that name is the success haptic here.
+  const ask = useConfirm();
   const { data, loading, refreshing, saving, removing, error, keyError, failed, unsupported, actions } = useWebSearch();
 
   const busy = saving || removing;
@@ -39,16 +42,17 @@ export default function WebSearchScreen() {
     void (saved ? confirm() : reject());
   }, [actions]);
 
-  const handleRemove = useCallback(() => {
-    Alert.alert(t('webSearch.removeConfirmTitle'), t('webSearch.removeConfirmBody'), [
-      { text: t('common.cancel'), style: 'cancel' },
-      {
-        text: t('common.remove'),
-        style: 'destructive',
-        onPress: () => void actions.remove().then((removed) => void (removed ? confirm() : reject())),
-      },
-    ]);
-  }, [actions, t]);
+  const handleRemove = useCallback(async () => {
+    const yes = await ask({
+      title: t('webSearch.removeConfirmTitle'),
+      message: t('webSearch.removeConfirmBody'),
+      confirmLabel: t('common.remove'),
+      destructive: true,
+    });
+    if (!yes) return;
+    const removed = await actions.remove();
+    void (removed ? confirm() : reject());
+  }, [actions, ask, t]);
 
   const handleDashboard = useCallback(() => {
     void tap();
@@ -136,7 +140,7 @@ export default function WebSearchScreen() {
 
             <View style={data.configured ? styles.actions : styles.actionsEnd}>
               {data.configured ? (
-                <InkButton variant="quiet" icon="trash" onPress={handleRemove} disabled={busy}>
+                <InkButton variant="quiet" icon="trash" onPress={() => void handleRemove()} disabled={busy}>
                   {removing ? t('webSearch.removing') : t('common.remove')}
                 </InkButton>
               ) : null}

@@ -4,7 +4,7 @@
  */
 
 import React from 'react';
-import { Alert, Pressable, Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
 
@@ -18,6 +18,7 @@ import {
   titleOf,
   type ModelDownload,
 } from '@/models/model-library';
+import type { ChooseFn } from '@/providers/confirm-provider';
 import { tap } from '@/services/haptics';
 import type { DownloadAction, ModelEntry } from '@/services/types';
 import { roleLabelKey, type UseModelLibrary } from '@/view-models/use-model-library';
@@ -25,18 +26,27 @@ import { SettingsRow } from './settings-list';
 import { useSettingsColors, useSettingsStyles, type SettingsColors, type SettingsMetrics, type SettingsType } from './settings-theme';
 
 /** A download is never started without asking: the size first, and picture support where it can come too. */
-export function askToDownload(model: ModelEntry, download: UseModelLibrary['actions']['download'], t: TFunction): void {
+export async function askToDownload(
+  model: ModelEntry,
+  download: UseModelLibrary['actions']['download'],
+  choose: ChooseFn,
+  t: TFunction,
+): Promise<void> {
   void tap();
   const size = formatMegabytes(model.size_mb);
   const pictures = picturesOf(model);
-  const body = size ? t('models.library.downloadBody', { size }) : t('models.library.downloadBodyNoSize');
   const options = pictures && pictures.state === 'available'
     ? [
-        { text: t('models.library.withPictures'), onPress: () => void download(model, true) },
-        { text: t('models.library.textOnly'), onPress: () => void download(model, false) },
+        { label: t('models.library.withPictures'), value: true },
+        { label: t('models.library.textOnly'), value: false },
       ]
-    : [{ text: t('models.library.download'), onPress: () => void download(model, true) }];
-  Alert.alert(t('models.library.downloadTitle', { name: titleOf(model) }), body, [{ text: t('common.cancel'), style: 'cancel' }, ...options]);
+    : [{ label: t('models.library.download'), value: true }];
+  const withPictures = await choose({
+    title: t('models.library.downloadTitle', { name: titleOf(model) }),
+    message: size ? t('models.library.downloadBody', { size }) : t('models.library.downloadBodyNoSize'),
+    options,
+  });
+  if (withPictures !== null) void download(model, withPictures);
 }
 
 export function ProgressBar({ fraction }: { fraction: number | null }) {
