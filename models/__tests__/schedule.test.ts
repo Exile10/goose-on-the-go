@@ -353,6 +353,14 @@ describe('the repeat presets', () => {
     expect(cronOf({ timing: 'weekly', weekdays: [7, 1], time: at(8, 0) })).toBe('0 0 8 * * 1,7');
   });
 
+  /** The dashboard's `formatDays`: three or more days in a row are a range, two are not. */
+  it('writes a run of three or more days as a range, as the dashboard does', () => {
+    expect(cronOf({ timing: 'weekly', weekdays: [5, 4, 3, 2, 1], time: at(7, 0) })).toBe('0 0 7 * * 1-5');
+    expect(cronOf({ timing: 'weekly', weekdays: [6, 7], time: at(7, 0) })).toBe('0 0 7 * * 6,7');
+    expect(cronOf({ timing: 'weekly', weekdays: [1, 2, 3, 5, 6, 7], time: at(7, 0) })).toBe('0 0 7 * * 1-3,5-7');
+    expect(cronOf({ timing: 'weekly', weekdays: [1, 3, 5], time: at(7, 0) })).toBe('0 0 7 * * 1,3,5');
+  });
+
   it('sends a repeat without once, and a one-off with it', () => {
     const repeat = createRequest(draft({ timing: 'weekly', weekdays: [6, 7], time: at(10, 0) }), now);
     expect(repeat.ok && repeat.req.once).toBe(false);
@@ -371,6 +379,8 @@ describe('the repeat presets', () => {
   it('opens a cron on the preset that writes it back', () => {
     expect(repeatFrom('0 0 7 * * 1,3,5')).toMatchObject({ timing: 'weekly', weekdays: [1, 3, 5], time: at(7, 0) });
     expect(repeatFrom('0 30 18 * * 7')).toMatchObject({ timing: 'weekly', weekdays: [7], time: at(18, 30) });
+    expect(repeatFrom('0 0 7 * * 1-5')).toMatchObject({ timing: 'weekly', weekdays: [1, 2, 3, 4, 5], time: at(7, 0) });
+    expect(repeatFrom('0 0 7 * * 1-3,6,7')).toMatchObject({ timing: 'weekly', weekdays: [1, 2, 3, 6, 7] });
     expect(repeatFrom('0 0 9 15 * *')).toMatchObject({ timing: 'monthly', dayOfMonth: 15, time: at(9, 0) });
     expect(repeatFrom('0 10 */4 * * *')).toMatchObject({ timing: 'hourly', everyHours: 4, minute: 10 });
     expect(repeatFrom('0 0 7 * * *')).toMatchObject({ timing: 'daily', time: at(7, 0) });
@@ -379,7 +389,8 @@ describe('the repeat presets', () => {
   /** Anything the presets would write differently stays as the Pond has it, so a save loses nothing. */
   it('opens anything else as custom, with the cron untouched', () => {
     for (const cron of [
-      '0 0 7 * * 1-5', // a range: the weekly picker writes a list
+      '0 0 7 * * 1,2,3,4,5', // a run the picker writes as 1-5
+      '0 0 7 * * 6-7', // a two-day run the picker writes as 6,7
       '0 0 7 * * 5,1', // days out of week order
       '0 0 7 * * 0', // Sunday as 0
       '0 07 7 * * *', // a padded minute
@@ -395,8 +406,8 @@ describe('the repeat presets', () => {
   });
 
   it('previews a draft as the cron it would send, and nothing until it is complete', () => {
-    expect(draftCron(draft({ timing: 'weekly', weekdays: [1, 2, 3, 4, 5], time: at(7, 0) }))).toBe('0 0 7 * * 1,2,3,4,5');
-    expect(describeCron('0 0 7 * * 1,2,3,4,5')).toBe('Weekdays at 07:00');
+    expect(draftCron(draft({ timing: 'weekly', weekdays: [1, 2, 3, 4, 5], time: at(7, 0) }))).toBe('0 0 7 * * 1-5');
+    expect(describeCron('0 0 7 * * 1-5')).toBe('Weekdays at 07:00');
     expect(draftCron(draft({ timing: 'daily', time: null }))).toBeNull();
     expect(draftCron(draft({ timing: 'custom', cron: '0 9 * * *' }))).toBeNull();
   });

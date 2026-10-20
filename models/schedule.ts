@@ -313,10 +313,47 @@ export function emptyDraft(timezone: string): ScheduleDraft {
 const whole = (n: number, min: number, max: number) => Number.isInteger(n) && n >= min && n <= max;
 
 /**
+ * Weekdays as the dashboard's `formatDays` writes them: in week order, with a
+ * run of three or more days as a range and shorter runs as single days, so
+ * Monday to Friday is `1-5`, Saturday and Sunday `6,7`, and `1,3,5` a list.
+ */
+function formatWeekdays(days: number[]): string {
+  const sorted = CRON_WEEKDAYS.filter((day) => days.includes(day));
+  const parts: string[] = [];
+  let i = 0;
+  while (i < sorted.length) {
+    let j = i;
+    while (j + 1 < sorted.length && sorted[j + 1] === sorted[j] + 1) j++;
+    if (j - i >= 2) parts.push(`${sorted[i]}-${sorted[j]}`);
+    else parts.push(...sorted.slice(i, j + 1).map(String));
+    i = j + 1;
+  }
+  return parts.join(',');
+}
+
+/**
+ * The days a weekday field of single days and ranges names (`1-5`, `1,3,5`),
+ * 1 Monday to 7 Sunday, or null for anything else. Whether it is written the
+ * way the form would write it is `repeatFrom`'s round-trip check.
+ */
+function parseWeekdays(field: string): number[] | null {
+  const days: number[] = [];
+  for (const part of field.split(',')) {
+    const range = /^([1-7])(?:-([1-7]))?$/.exec(part);
+    if (!range) return null;
+    const from = Number(range[1]);
+    const to = range[2] == null ? from : Number(range[2]);
+    if (to < from) return null;
+    for (let day = from; day <= to; day++) days.push(day);
+  }
+  return days;
+}
+
+/**
  * The cron a repeat other than `custom` becomes, written exactly as the
  * dashboard's `buildCron` writes it (six fields, seconds first), so a schedule
  * made on either reads back the same on the other. Weekly days go in week
- * order, whatever order they were tapped in.
+ * order, whatever order they were tapped in (see `formatWeekdays`).
  */
 export function presetCron(d: ScheduleDraft): DraftResult<string> {
   if (d.timing === 'hourly') {
@@ -331,9 +368,9 @@ export function presetCron(d: ScheduleDraft): DraftResult<string> {
     case 'daily':
       return { ok: true, req: `0 ${minute} ${hour} * * *` };
     case 'weekly': {
-      const days = CRON_WEEKDAYS.filter((day) => d.weekdays.includes(day));
-      if (days.length === 0) return { ok: false, error: 'schedule.errors.daysRequired' };
-      return { ok: true, req: `0 ${minute} ${hour} * * ${days.join(',')}` };
+      const days = formatWeekdays(d.weekdays);
+      if (!days) return { ok: false, error: 'schedule.errors.daysRequired' };
+      return { ok: true, req: `0 ${minute} ${hour} * * ${days}` };
     }
     case 'monthly':
       if (!whole(d.dayOfMonth, 1, 31)) return { ok: false, error: 'schedule.errors.repeatNumbers' };
@@ -349,9 +386,9 @@ type RepeatFields = Omit<ScheduleDraft, 'name' | 'prompt' | 'timezone'>;
 /**
  * The choice a repeating cron opens on: the preset whose builder writes this
  * very cron back, or `custom` with the cron as it is. Reading it any looser
- * would lose something on save — `1-5` is not a list of days the weekly
- * picker writes, and a `07` minute is not the `7` it would send — so anything
- * that does not round-trip stays the raw cron, untouched.
+ * would lose something on save — `1,2,3,4,5` is not how the weekly picker
+ * writes Monday to Friday (`1-5`), and a `07` minute is not the `7` it would
+ * send — so anything that does not round-trip stays the raw cron, untouched.
  */
 export function repeatFrom(cron: string): RepeatFields {
   const custom: RepeatFields = {
@@ -374,7 +411,7 @@ export function repeatFrom(cron: string): RepeatFields {
     const time = { hour: num(hour), minute: num(min) };
     candidates.push(
       { ...custom, timing: 'daily', time },
-      { ...custom, timing: 'weekly', time, weekdays: dow.split(',').map(num) },
+      { ...custom, timing: 'weekly', time, weekdays: parseWeekdays(dow) ?? [] },
       { ...custom, timing: 'monthly', time, dayOfMonth: num(dom) },
     );
   }
