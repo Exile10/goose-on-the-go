@@ -10,8 +10,8 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 
 import { useServer } from '@/providers/server-provider';
-import { ApiError, api } from '@/services/api-client';
-import type { Device, DeviceStatePatch, MatterStatus } from '@/services/types';
+import { ApiError, api, type PondApiClient } from '@/services/api-client';
+import type { Device, DeviceStatePatch, MatterStatus, UpdateDeviceRequest } from '@/services/types';
 import { describeApiError } from './describe-error';
 import { useLive } from './use-live';
 import i18n from '@/services/i18n';
@@ -94,11 +94,16 @@ export function byReachability(a: Device, b: Device): number {
   return a.name.localeCompare(b.name);
 }
 
+/** The room a device is in as the screens group it: its trimmed name, or `UNASSIGNED_ROOM`. */
+export function roomOf(device: Device): string {
+  return device.room?.trim() || UNASSIGNED_ROOM;
+}
+
 /** Group devices into the rooms the screen renders, in a stable order. */
 export function groupByRoom(devices: Device[]): DeviceRoom[] {
   const rooms = new Map<string, Device[]>();
   for (const d of devices) {
-    const name = d.room?.trim() || UNASSIGNED_ROOM;
+    const name = roomOf(d);
     const existing = rooms.get(name);
     if (existing) existing.push(d);
     else rooms.set(name, [d]);
@@ -111,6 +116,87 @@ export function groupByRoom(devices: Device[]): DeviceRoom[] {
       if (b.name === UNASSIGNED_ROOM) return -1;
       return a.name.localeCompare(b.name);
     });
+}
+
+/**
+ * A change to one device's name and room, the two things `PUT /devices/{id}` lets a person set.
+ *
+ * `room` null moves the device to Unassigned. The Pond has no rooms of its own: a room is only
+ * the `room` field its devices share, so every room operation is a list of these.
+ */
+export interface DeviceEdit {
+  device: Device;
+  name: string;
+  room: string | null;
+}
+
+/**
+ * The request body for an edit. The hostname is left out, so the Pond keeps it; a blank room is
+ * what the Pond reads as "no room" (`device_edit::merge`).
+ */
+export function editRequest(edit: DeviceEdit): UpdateDeviceRequest {
+  return { name: edit.name.trim(), room: edit.room?.trim() ?? '' };
+}
+
+export interface EditFailure {
+  edit: DeviceEdit;
+  error: unknown;
+}
+
+export interface EditOutcome {
+  /** The rows the Pond answered with, for the edits it accepted. */
+  saved: Device[];
+  failed: EditFailure[];
+}
+
+/**
+ * Send every edit, one `PUT` each, and keep going past a refusal.
+ *
+ * In parallel and settled rather than stopped at the first failure: a room rename that moves five
+ * devices and is refused for one (another member's phone, which only that phone may change) has
+ * still moved four, and the person is told about the one rather than left guessing.
+ */
+export async function applyEdits(
+  client: Pick<PondApiClient, 'updateDevice'>,
+  edits: DeviceEdit[],
+): Promise<EditOutcome> {
+  const results = await Promise.allSettled(edits.map((e) => client.updateDevice(e.device.id, editRequest(e))));
+  const saved: Device[] = [];
+  const failed: EditFailure[] = [];
+  results.forEach((r, i) => {
+    if (r.status === 'fulfilled') saved.push(r.value);
+    else failed.push({ edit: edits[i], error: r.reason });
+  });
+  return { saved, failed };
+}
+
+/** Put the rows the Pond answered with in place of the ones they replace. */
+export function mergeSaved(devices: Device[], saved: Device[]): Device[] {
+  const byId = new Map(saved.map((d) => [d.id, d]));
+  return devices.map((d) => byId.get(d.id) ?? d);
+}
+
+/** Why one edit was refused, in words. Always something: a sheet that closes on a failure lies. */
+export function describeEditError(e: unknown): string {
+  if (e instanceof ApiError) {
+    if (e.status === 403 && e.detail === 'device_not_yours') return i18n.t('errors.deviceNotYours');
+    if (e.status === 400) return i18n.t('errors.deviceNameRequired');
+  }
+  return describeDeviceError(e) ?? i18n.t('errors.deviceNotSaved');
+}
+
+/**
+ * What to tell the person about a batch of edits, or null when all of them landed.
+ *
+ * One edit reads as its reason. Several say how many were not saved as well, because some were,
+ * and the reason given is the first refusal's.
+ */
+export function describeEditOutcome(outcome: EditOutcome, total: number): string | null {
+  const first = outcome.failed[0];
+  if (!first) return null;
+  const reason = describeEditError(first.error);
+  if (total === 1) return reason;
+  return i18n.t('errors.someDevicesNotSaved', { count: outcome.failed.length, total, reason });
 }
 
 export interface UseDevices {
@@ -135,6 +221,8 @@ export interface UseDevices {
     setState: (device: Device, patch: DeviceStatePatch) => Promise<void>;
     commission: (code: string, name?: string) => Promise<string | null>;
     remove: (device: Device) => Promise<void>;
+    /** Resolves to why some or all of the edits were refused, or null once every one is saved. */
+    edit: (edits: DeviceEdit[]) => Promise<string | null>;
   };
 }
 
@@ -345,6 +433,27 @@ export function useDevices(): UseDevices {
     [devices],
   );
 
+  const edit = useCallback(async (edits: DeviceEdit[]) => {
+    if (edits.length === 0) return null;
+    const outcome = await applyEdits(api, edits);
+    listChangedAt.current = Date.now();
+    setDevices((current) => mergeSaved(current, outcome.saved));
+    for (const f of outcome.failed) {
+      console.warn('[devices] edit refused', f.edit.device.id, f.error instanceof ApiError ? f.error.status : 'network');
+    }
+    // Then the whole list again, as a commission does: an edit can land a device in a room another
+    // phone renamed meanwhile. The rows above already show this phone's own changes, so a read that
+    // fails here leaves them standing rather than reporting a second failure.
+    try {
+      const list = await api.listDevices();
+      listChangedAt.current = Date.now();
+      setDevices(list);
+    } catch (e) {
+      console.warn('[devices] reread after edit failed', e instanceof ApiError ? e.status : 'network');
+    }
+    return describeEditOutcome(outcome, edits.length);
+  }, []);
+
   const rooms = useMemo(() => groupByRoom(devices), [devices]);
 
   return {
@@ -360,7 +469,7 @@ export function useDevices(): UseDevices {
     },
     loading,
     error,
-    actions: { refresh, setState, commission, remove },
+    actions: { refresh, setState, commission, remove, edit },
   };
 }
 

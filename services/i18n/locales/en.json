@@ -1510,7 +1510,6 @@
     "backupHistory": "Past backups",
     "chooseBackup": "Choose a backup",
     "rooms": "Rooms",
-    "pondDevices": "Pond devices",
     "suggestions": "What Goose noticed"
   },
   "activity": {
@@ -1845,7 +1844,31 @@
   },
   "rooms": {
     "add": "Add a room",
-    "pairDevice": "Pair another Pond"
+    "pairDevice": "Pair another Pond",
+    "footer": "A room is the name its devices share. Add one by moving devices into it; delete one and its devices move to Unassigned.",
+    "deviceCount_one": "{{count}} device",
+    "deviceCount_other": "{{count}} devices",
+    "noDevices": "No devices yet. Rooms appear here once devices are in them.",
+    "deleteTitle": "Delete {{room}}?",
+    "deleteBody_one": "Its {{count}} device moves to Unassigned. The device itself is not removed.",
+    "deleteBody_other": "Its {{count}} devices move to Unassigned. The devices themselves are not removed.",
+    "delete": "Delete room",
+    "deleteLabel": "Delete {{room}}",
+    "addTitle": "New room",
+    "renameTitle": "Rename room",
+    "name": "Room name",
+    "namePlaceholder": "Kitchen",
+    "addHint": "Your Pond keeps a room only while a device is in it, so choose at least one device to move into this room.",
+    "renameHint": "Every device in this room moves to the new name. A name another room already has merges the two.",
+    "deviceInRoom": "{{device}} ({{room}})",
+    "create": "Create room",
+    "save": "Save",
+    "pondTitle": "Your Pond",
+    "pondAddress": "Address",
+    "errors": {
+      "nameRequired": "Give the room a name.",
+      "pickDevice": "Choose at least one device to move into this room."
+    }
   },
   "schedule": {
     "tabs": {
@@ -2069,15 +2092,6 @@
     "idle": "Tap to speak",
     "trySaying": "Try saying:"
   },
-  "homeManagement": {
-    "rooms": "ROOMS",
-    "deviceCount": "{{count}} devices",
-    "addRoom": "Add Room",
-    "pondDevices": "POND DEVICES",
-    "firmware": "Firmware: {{version}}",
-    "pairDevice": "Pair New Pond Device",
-    "deviceCount_one": "{{count}} device"
-  },
   "addUsers": {
     "remove": "Remove",
     "profiles": "HOUSEHOLD PROFILES",
@@ -2106,7 +2120,12 @@
     "deviceGone": "That device is no longer registered with your Pond.",
     "bridgedEndpoint": "Your Pond will not remove a bridged endpoint on its own.",
     "noModelCatalogue": "This Pond does not expose a model catalogue.",
-    "profileExists": "A profile with that name already exists."
+    "profileExists": "A profile with that name already exists.",
+    "deviceNotYours": "That device is another member's phone. Only that phone can change it.",
+    "deviceNameRequired": "A device needs a name.",
+    "deviceNotSaved": "Your Pond did not save that change. Try again.",
+    "someDevicesNotSaved_one": "{{count}} of {{total}} devices was not moved. {{reason}}",
+    "someDevicesNotSaved_other": "{{count}} of {{total}} devices were not moved. {{reason}}"
   },
   "sessions": {
     "justNow": "Just now",
@@ -2121,11 +2140,6 @@
     "emptyMessage": "Start a chat to see it here.",
     "renameFailed": "Failed to rename conversation.",
     "deleteFailed": "Failed to delete conversation."
-  },
-  "homeManagementAlert": {
-    "removeTitle": "Remove Room",
-    "removeBody": "Are you sure you want to remove this room?",
-    "remove": "Remove"
   },
   "scanErrors": {
     "matterCode": "That is a Matter device setup code, not a Pond pairing code. Use Devices, then Add device, to commission it. The pairing code is the one on your Pond dashboard.",
@@ -2553,5 +2567,14 @@
       "reconnecting": "Reconnecting to Pond {{id}}",
       "reconnectFailed": "This phone couldn't reconnect by itself. Find your Pond again and have it say a code."
     }
+  },
+  "deviceEdit": {
+    "title": "Edit device",
+    "name": "Name",
+    "namePlaceholder": "Desk lamp",
+    "room": "Room",
+    "roomPlaceholder": "No room",
+    "roomHint": "Type a new room, or pick one your devices are already in.",
+    "save": "Save"
   }
 }

@@ -34,7 +34,8 @@ import { useBottomBarInset, useChromeScroll } from '@/providers/chrome-provider'
 import { useThemedStyles } from '@/hooks/use-themed-styles';
 import { selectionTick, toggle } from '@/services/haptics';
 import { deviceStyle } from '@/constants/device-style';
-import { ALL_ROOMS, roomLabel, supports, useDevices } from '@/view-models/use-devices';
+import { ALL_ROOMS, UNASSIGNED_ROOM, roomLabel, supports, useDevices } from '@/view-models/use-devices';
+import { DeviceEditSheet } from '@/components/patterns/device-edit-sheet';
 import type { Device } from '@/services/types';
 import { Grey } from '@/constants/colors';
 import type { ThemeColors } from '@/constants/colors';
@@ -42,15 +43,17 @@ import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
 import { Spacing } from '@/constants/spacing';
 import { Radii } from '@/constants/radii';
 
-/** Device card. The switch appears only for devices that accept one. */
+/** Device card. The switch appears only for devices that accept one; a tap opens its name and room. */
 const DeviceCard = React.memo(function DeviceCard({
   device,
   power,
   onToggle,
+  onEdit,
 }: {
   device: Device;
   power: boolean | undefined;
   onToggle: (device: Device, on: boolean) => void;
+  onEdit: (device: Device) => void;
 }) {
   const styles = useThemedStyles(makeStyles);
   const { t } = useTranslation();
@@ -78,7 +81,7 @@ const DeviceCard = React.memo(function DeviceCard({
       : t(power ? 'common.on' : 'common.off');
 
   return (
-    <InkCard style={styles.card}>
+    <InkCard style={styles.card} pressable onPress={() => onEdit(device)}>
       <View style={styles.cardTop}>
         <View style={[styles.iconWrap, { backgroundColor: color + '1F' }]}>
           <GIcon name={icon} size={17} color={lit ? color : Grey[500]} />
@@ -101,6 +104,7 @@ export default function DevicesTab() {
   const router = useRouter();
   const { data, loading, error, actions } = useDevices();
   const [activeRoom, setActiveRoom] = useState(ALL_ROOMS);
+  const [editing, setEditing] = useState<Device | null>(null);
   const chrome = useChromeScroll();
   const bottomInset = useBottomBarInset();
 
@@ -121,6 +125,16 @@ export default function DevicesTab() {
     void selectionTick();
     void actions.refresh();
   }, [actions]);
+
+  const handleEdit = useCallback((device: Device) => {
+    void selectionTick();
+    setEditing(device);
+  }, []);
+
+  const namedRooms = useMemo(
+    () => data.rooms.map((r) => r.name).filter((name) => name !== UNASSIGNED_ROOM),
+    [data.rooms],
+  );
 
   const pickRoom = useCallback((room: string) => {
     void selectionTick();
@@ -252,6 +266,7 @@ export default function DevicesTab() {
                   device={d}
                   power={data.powerById[d.id]}
                   onToggle={handleToggle}
+                  onEdit={handleEdit}
                 />
               ))}
             </View>
@@ -259,6 +274,16 @@ export default function DevicesTab() {
         ))}
 
       </ScrollView>
+
+      {editing ? (
+        <DeviceEditSheet
+          key={editing.id}
+          device={editing}
+          rooms={namedRooms}
+          onClose={() => setEditing(null)}
+          onSave={actions.edit}
+        />
+      ) : null}
     </SafeAreaView>
   );
 }
