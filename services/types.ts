@@ -1186,6 +1186,7 @@ export interface PondSettings {
   vision_fps: number;
   vision_motion_threshold: number;
   vision_classifier_model: string;
+  picture_support_download_enabled: boolean;
   matter_ws_url: string;
   matter_ble_enabled: boolean;
 
