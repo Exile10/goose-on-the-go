@@ -2746,6 +2746,9 @@
     "models": {
       "title": "Models in use",
       "none": "None"
+    },
+    "logs": {
+      "failed": "Could not read your Pond's log."
     }
   }
 }
