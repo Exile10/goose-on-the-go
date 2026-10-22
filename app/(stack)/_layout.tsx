@@ -112,6 +112,7 @@ export default function StackLayout() {
       <Stack.Screen name="home-management" options={{ title: t('screens.homeManagement') }} />
       <Stack.Screen name="pond-pairing" options={{ title: t('screens.pondPairing') }} />
       <Stack.Screen name="developer" options={{ title: t('screens.developer') }} />
+      <Stack.Screen name="debug" options={{ title: t('screens.debug') }} />
       <Stack.Screen name="commission-device" options={{ title: t('screens.commissionDevice') }} />
       <Stack.Screen name="switch-pond" options={{ title: t('screens.switchPond') }} />
       <Stack.Screen

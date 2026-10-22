@@ -86,6 +86,14 @@ function DeveloperScreenContent() {
         </View>
       </View>
 
+      <GPressable style={[styles.card, styles.debugLink]} onPress={() => router.push('/(stack)/debug')}>
+        <View style={styles.screenRowLeft}>
+          <Text style={styles.screenLabel}>{t('developer.openDebug')}</Text>
+          <Text style={styles.screenModeText}>{t('developer.openDebugHint')}</Text>
+        </View>
+        <GIcon name="chevron-right" size={16} color={JaridaPurple[500]} />
+      </GPressable>
+
       <Text style={styles.sectionTitle}>{t('dev.screenMode')}</Text>
       <Text style={styles.sectionHint}>{t('developer.backendHint')}</Text>
       <View style={styles.card}>
@@ -151,6 +159,12 @@ const makeStyles = (c: ThemeColors) =>
       borderColor: c.border,
       padding: Spacing.md,
       ...Shadows.sm,
+    },
+
+    debugLink: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginTop: Spacing.lg,
     },
 
     connectionRow: {

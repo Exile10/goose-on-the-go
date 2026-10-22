@@ -1333,7 +1333,8 @@
     "ownerSetup": "Set up your Pond",
     "wakeWord": "Wake word",
     "scheduleDetail": "Schedule",
-    "cameraEvents": "What the camera saw"
+    "cameraEvents": "What the camera saw",
+    "debug": "Debug"
   },
   "nav": {
     "goose": "Goose",
@@ -2163,7 +2164,9 @@
     "backendHint": "Flip a screen to “Real” once its backend wiring lands (#9–#15). Mock and real code paths coexist — nothing needs to be deleted to test either one.",
     "realBackend": "Real backend",
     "mockData": "Mock data",
-    "devOnly": "This screen is dev-only. It isn’t linked from Settings in production builds."
+    "devOnly": "This screen is dev-only. It isn’t linked from Settings in production builds.",
+    "openDebug": "Debug view",
+    "openDebugHint": "Live logs, the models in use and how long each command took."
   },
   "errors": {
     "busy": "Your Pond is busy. Try again in a moment.",
@@ -2736,6 +2739,13 @@
       "saveFailed": "Couldn't save the note. Try again.",
       "deleteFailed": "Couldn't delete the note. It's back in the list.",
       "unavailable": "This Pond can't keep notes. Update it to add them here."
+    }
+  },
+  "debug": {
+    "intro": "What your Pond is doing right now, for finding out why something went wrong.",
+    "models": {
+      "title": "Models in use",
+      "none": "None"
     }
   }
 }
