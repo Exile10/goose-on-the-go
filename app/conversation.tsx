@@ -27,6 +27,12 @@
  * and the Pond's own replaces it after each reply. Until anything is asked the
  * bar has no title — the greeting card under it already says "New chat".
  *
+ * - **Reading back is left alone.** A reader well back in the thread is not
+ *   pulled down by a reply arriving at its foot; the list holds what they are
+ *   reading where it is, and a round arrow offers the way back to the newest
+ *   message, with a dot when something arrived meanwhile
+ *   (`view-models/latest-button.ts`).
+ *
  * The header reports reachability only when it is bad. A green dot reading
  * "Connected" above every conversation is chrome; an explicit line when the
  * Pond cannot be reached is the thing a reader actually needs.
@@ -44,10 +50,11 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NAVBAR_DEFAULTS, NavbarBehaviour, type NavbarStage } from '@jarida/ink/headless';
-import { InkNavbar, InkNotice, useInkTheme } from '@jarida/ink/native';
+import { InkNavbar, InkNotice, useInkTheme, useReduceMotion } from '@jarida/ink/native';
 
 import { ChatDock } from '@/components/patterns/chat-dock';
 import { GreetingCard } from '@/components/patterns/greeting-card';
+import { JumpToLatest } from '@/components/patterns/jump-to-latest';
 import { MessageRow } from '@/components/patterns/message-row';
 import { VoiceDock } from '@/components/patterns/voice-dock';
 import { GIcon } from '@/components/ui/g-icon';
@@ -61,6 +68,14 @@ import { AttachError, pickAttachments, withinTurnLimit, type Attachment, type At
 import type { Message } from '@/models/chat';
 import type { ThemeColors } from '@/constants/colors';
 import { Spacing } from '@/constants/spacing';
+import {
+  FOLLOW_WITHIN_PT,
+  HIDDEN,
+  afterScroll,
+  footKey,
+  hasUnseen,
+  type LatestButton,
+} from '@/view-models/latest-button';
 import { positionsFor, useChat } from '@/view-models/use-chat';
 import { useGreetingName } from '@/view-models/use-greeting';
 import { useSuggestions, type OfferedPrompt } from '@/view-models/use-suggestions';
@@ -138,13 +153,33 @@ export default function ChatScreen() {
   // or not it may draw the puck that gets it back.
   const [behaviour] = useState(() => new NavbarBehaviour(BEHAVIOUR));
   const [stage, setStage] = useState<NavbarStage>('expanded');
+  // The same scroll decides whether the way back to the newest message shows.
+  // The list is inverted, so its offset is already the distance from the foot.
+  // The foot is the newest row the list draws: the last queued message, else
+  // the last message. When it moves behind a reader back in the thread, the
+  // arrow carries a dot.
+  const [latest, setLatest] = useState<LatestButton>(HIDDEN);
+  const foot = footKey(queued[queued.length - 1] ?? messages[messages.length - 1]);
   const onScroll = useCallback(
     (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-      const next = behaviour.scrolled(e.nativeEvent.contentOffset.y);
+      const { contentOffset, layoutMeasurement } = e.nativeEvent;
+      const next = behaviour.scrolled(contentOffset.y);
       setStage(next === 'collapsed' ? 'condensed' : next);
+      setLatest((state) => afterScroll(state, contentOffset.y, layoutMeasurement.height, foot));
     },
-    [behaviour],
+    [behaviour, foot],
   );
+
+  const listRef = useRef<FlatList<Row>>(null);
+  const reduceMotion = useReduceMotion();
+  const scrollToFoot = useCallback(() => {
+    setLatest(HIDDEN);
+    listRef.current?.scrollToOffset({ offset: 0, animated: !reduceMotion });
+  }, [reduceMotion]);
+  const toLatest = useCallback(() => {
+    void selectionTick();
+    scrollToFoot();
+  }, [scrollToFoot]);
 
   // Whether the model serving chat can read pictures, asked once. Unknown is
   // treated as yes: the Pond's own refusal is clearer than a guess here.
@@ -194,9 +229,12 @@ export default function ChatScreen() {
         return;
       }
       setNotice(null);
+      // What the reader just wrote is where they are now, however far back
+      // they had been reading.
+      scrollToFoot();
       void actions.send(text, attachments);
     },
-    [actions, t],
+    [actions, scrollToFoot, t],
   );
 
   const onPick = useCallback(
@@ -212,6 +250,7 @@ export default function ChatScreen() {
     openedRef.current = null;
     behaviour.set('expanded');
     setStage('expanded');
+    setLatest(HIDDEN);
     actions.newConversation();
   }, [actions, behaviour]);
 
@@ -290,6 +329,7 @@ export default function ChatScreen() {
         <View style={styles.conversation}>
           {started ? (
             <FlatList
+              ref={listRef}
               data={rows}
               keyExtractor={keyExtractor}
               renderItem={renderItem}
@@ -299,6 +339,12 @@ export default function ChatScreen() {
               keyboardDismissMode="interactive"
               keyboardShouldPersistTaps="handled"
               contentContainerStyle={styles.listContent}
+              // Holds what a reader back in the thread is reading where it is
+              // while the foot grows, and carries along one who is at it.
+              maintainVisibleContentPosition={{
+                minIndexForVisible: 0,
+                autoscrollToTopThreshold: FOLLOW_WITHIN_PT,
+              }}
             />
           ) : (
             <View style={styles.opening}>
@@ -311,6 +357,11 @@ export default function ChatScreen() {
               />
             </View>
           )}
+          {started && latest.visible ? (
+            <View pointerEvents="box-none" style={styles.latest}>
+              <JumpToLatest onPress={toLatest} unseen={hasUnseen(latest, foot)} />
+            </View>
+          ) : null}
         </View>
 
         {voice ? (
@@ -347,6 +398,15 @@ const makeStyles = (c: ThemeColors) =>
     },
 
     notice: { paddingHorizontal: Spacing.lg, paddingBottom: Spacing.sm },
+
+    // Over the foot of the thread, centred, clear of the composer under it.
+    latest: {
+      position: 'absolute',
+      left: 0,
+      right: 0,
+      bottom: Spacing.md,
+      alignItems: 'center',
+    },
 
     opening: {
       flex: 1,

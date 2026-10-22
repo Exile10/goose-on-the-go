@@ -83,6 +83,8 @@
     "unqueue": "Remove queued message",
     "stillAnswering": "Goose is still answering",
     "newConversation": "New conversation",
+    "toLatest": "Go to the latest message",
+    "toLatestUnseen": "New messages below. Go to the latest message",
     "starters": {
       "capabilities": "What can you do?",
       "memory": "What do you remember about me?",
