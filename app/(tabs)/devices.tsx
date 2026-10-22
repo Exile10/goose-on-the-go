@@ -13,7 +13,7 @@
  */
 
 import React, { useCallback, useMemo, useState } from 'react';
-import { StyleSheet, ScrollView, Text, View } from 'react-native';
+import { RefreshControl, StyleSheet, ScrollView, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -27,9 +27,11 @@ import {
   InkSwitch,
   InkText,
   InkTitle,
+  useInkTheme,
 } from '@jarida/ink/native';
 
 import { GIcon } from '@/components/ui/g-icon';
+import { GPressable } from '@/components/ui/g-pressable';
 import { useBottomBarInset, useChromeScroll } from '@/providers/chrome-provider';
 import { useThemedStyles } from '@/hooks/use-themed-styles';
 import { selectionTick, toggle } from '@/services/haptics';
@@ -100,9 +102,13 @@ const DeviceCard = React.memo(function DeviceCard({
 
 export default function DevicesTab() {
   const styles = useThemedStyles(makeStyles);
+  const theme = useInkTheme();
   const { t } = useTranslation();
   const router = useRouter();
   const { data, loading, error, actions } = useDevices();
+  // A pull draws its own spinner at the top of the list, so the one in the
+  // list body stands down while it runs rather than showing two.
+  const [pulling, setPulling] = useState(false);
   const [activeRoom, setActiveRoom] = useState(ALL_ROOMS);
   const [editing, setEditing] = useState<Device | null>(null);
   const chrome = useChromeScroll();
@@ -124,6 +130,15 @@ export default function DevicesTab() {
   const handleRefresh = useCallback(() => {
     void selectionTick();
     void actions.refresh();
+  }, [actions]);
+
+  const handlePull = useCallback(async () => {
+    setPulling(true);
+    try {
+      await actions.refresh();
+    } finally {
+      setPulling(false);
+    }
   }, [actions]);
 
   const handleEdit = useCallback((device: Device) => {
@@ -156,7 +171,10 @@ export default function DevicesTab() {
         </Text>
         {/* Add lives up here rather than under the grid, so it stays in reach
             however many devices there are. With none, the empty state below
-            carries it instead, and the screen still has a single primary. */}
+            carries it instead, and the screen still has a single primary.
+            Refresh is a round glyph beside it rather than a second full-width
+            button: it is the lesser action, the list also refreshes on a pull
+            and on its own poll, and half the row was too much to spend on it. */}
         <View style={styles.headerActions}>
           {total > 0 ? (
             <InkButton
@@ -169,15 +187,26 @@ export default function DevicesTab() {
               {t('devices.addDevice')}
             </InkButton>
           ) : null}
-          <InkButton
-            variant="quiet"
-            icon="refresh"
-            block={total > 0}
-            style={total > 0 ? styles.headerButton : null}
+          <GPressable
+            feedback="lift"
             onPress={handleRefresh}
+            accessibilityRole="button"
+            accessibilityLabel={t('devices.refreshList')}
+            accessibilityState={{ busy: loading }}
+            style={[
+              styles.refresh,
+              {
+                width: theme.touch.tapMin,
+                height: theme.touch.tapMin,
+                borderRadius: theme.touch.tapMin / 2,
+                backgroundColor: theme.color.surface,
+                borderColor: theme.color.lineStrong,
+                borderWidth: theme.edge.hairlineWidth,
+              },
+            ]}
           >
-            {t('common.refresh')}
-          </InkButton>
+            <GIcon name="refresh" size={20} color={theme.color.text} />
+          </GPressable>
         </View>
       </View>
 
@@ -210,6 +239,7 @@ export default function DevicesTab() {
         {...chrome}
         contentContainerStyle={[styles.scroll, { paddingBottom: bottomInset }]}
         showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={pulling} onRefresh={() => void handlePull()} />}
       >
         {/* The controller can take minutes to come up on first use, and nothing
             can be commissioned until it has. Say so rather than failing later. */}
@@ -228,7 +258,7 @@ export default function DevicesTab() {
           </View>
         ) : null}
 
-        {loading ? <InkSpinner label={t('pond.checking')} /> : null}
+        {loading && !pulling ? <InkSpinner label={t('pond.checking')} /> : null}
 
         {error ? (
           <View style={styles.notice}>
@@ -304,9 +334,16 @@ const makeStyles = (c: ThemeColors) =>
       color: c.textTertiary,
       marginTop: Spacing.xs,
     },
-    headerActions: { flexDirection: 'row', gap: Spacing.sm, marginTop: Spacing.md },
-    // Split the row evenly, so neither label is squeezed by the other.
+    headerActions: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'flex-end',
+      gap: Spacing.sm,
+      marginTop: Spacing.md,
+    },
+    // Add takes whatever the round refresh leaves.
     headerButton: { flex: 1 },
+    refresh: { alignItems: 'center', justifyContent: 'center' },
 
     // Pins this ScrollView's own height to its content instead of letting it
     // compete for leftover flex space in the column layout below — without

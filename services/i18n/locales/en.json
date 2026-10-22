@@ -363,6 +363,7 @@
     "countOne": "1 device",
     "countMany": "{{count}} devices",
     "refresh": "Refresh",
+    "refreshList": "Refresh devices",
     "matterStartingRetry": "Your Pond is still starting its Matter controller. Wait a moment and try again.",
     "matterRefused": "Your Pond could not reach its Matter controller, or the device refused to pair. Power-cycle the device and try again — a device only accepts pairing for about 15 minutes after it starts up.",
     "setupCodeRejected": "That setup code was not accepted. Check the code on the device or its packaging.",
