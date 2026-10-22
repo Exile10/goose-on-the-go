@@ -30,7 +30,11 @@ export class RemoteInfrastructureUnavailableError extends Error {
   constructor() { super(i18n.t('remote.unconfigured')); this.name = 'RemoteInfrastructureUnavailableError'; }
 }
 
-type NativeStatus = { state: string; authUrl?: string; nodeKey?: string; machineKey?: string; addresses: string[] };
+/**
+ * `background` is set by Android's `PondNetwork.status()` while the platform refuses the
+ * foreground service that keeps the node's network access in the background.
+ */
+type NativeStatus = { state: string; authUrl?: string; nodeKey?: string; machineKey?: string; addresses: string[]; background?: 'unavailable' };
 let generation = 0;
 let busy = false;
 let pendingRecovery: { endpoint: string; id: string } | null = null;
@@ -243,6 +247,28 @@ export async function resumeRemoteAccess(profileId: string, control: string): Pr
   if (running) return false;
   await restoreRemoteAccess(profileId, control);
   return true;
+}
+
+/**
+ * Whether remote access will pause once the app is in the background, because Android
+ * refused the foreground service that holds the node's network access.
+ *
+ * The node itself is unaffected, so remote access still works while the app is open. Only
+ * Android reports this; elsewhere, or with no readable status, the answer is false, since
+ * nothing is known to be wrong. Reading the status also retries the service, so a check made
+ * as the app returns to the foreground is the one most likely to clear it.
+ */
+export async function remoteBackgroundPaused(): Promise<boolean> {
+  const bridge = NativeModules.PondTls;
+  if (!bridge?.remoteStatus) return false;
+  try {
+    const paused = status(await bridge.remoteStatus()).background === 'unavailable';
+    if (paused) console.warn('[remote] Android refused the background service; remote access pauses while the app is in the background');
+    return paused;
+  } catch {
+    console.warn('[remote] node status unreadable; cannot tell whether background access is held');
+    return false;
+  }
 }
 
 /** How long a probe of the tailnet address waits for this phone's own node to come up. */

@@ -41,14 +41,30 @@ object PondNetwork {
    */
   private var announced: String? = null
 
-  /** Keep the foreground service in step with the node, so the notification cannot lie. */
+  /**
+   * Keep the foreground service in step with the node, so the notification cannot lie.
+   *
+   * An unchanged state is re-delivered only after the platform refused the service: the next
+   * poll, which comes from the app returning to the foreground, is the moment a start can
+   * succeed again.
+   */
   private fun announce(raw: String) {
     val state = try { JSONObject(raw).optString("state") } catch (error: Exception) { "" }
     val next = if (state == PondNetworkService.STATE_RUNNING) PondNetworkService.STATE_RUNNING
                else PondNetworkService.STATE_CONNECTING
-    if (next == announced) return
+    if (next == announced && PondNetworkService.refusal == null) return
     announced = next
     PondNetworkService.start(context, next)
+  }
+
+  /**
+   * The node's status, plus `"background": "unavailable"` while the platform refuses the
+   * foreground service. The node itself is unaffected, so remote access keeps working while
+   * the app is open; the field tells the app it will pause once the app is in the background.
+   */
+  private fun report(raw: String): String {
+    if (announced == null || PondNetworkService.refusal == null) return raw
+    return try { JSONObject(raw).put("background", "unavailable").toString() } catch (error: Exception) { raw }
   }
   fun install(value: Context) {
     context = value.applicationContext
@@ -216,7 +232,7 @@ object PondNetwork {
   @Synchronized fun status(): String {
     val raw = Mobile.status()
     announce(raw)
-    return raw
+    return report(raw)
   }
   @Synchronized fun activate(profile: String, control: String) {
     val previous = activeProfile?.first ?: runningProfile?.first

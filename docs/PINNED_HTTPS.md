@@ -744,6 +744,37 @@ The notification reports what the connection is actually doing -- connected, or 
 -- and opens the app when tapped, because a permanent notification reading "Goose is
 running" would be a cost with no return.
 
+### The service type, and what happens when Android refuses it (2026-10-23)
+
+The service was first declared `dataSync`. Android 15 caps that type at six hours in any 24,
+and on 2026-10-22 the A57 crashed three times because of it: twice in the background with
+`ForegroundServiceDidNotStopInTimeException` once the allowance ran out, and once on launch
+with `ForegroundServiceStartNotAllowedException: Time limit already exhausted`. The stack
+traces put that last one in `startForeground()` inside `onStartCommand`, not in
+`PondNetworkService.start`, so the existing try there could never have caught it.
+
+It is now `connectedDevice` (`FOREGROUND_SERVICE_CONNECTED_DEVICE`). Android defines that
+type as interaction with an external device over Bluetooth, NFC, USB or a network
+connection, and the Pond is exactly that: the user's own hub, reached over a tunnel the
+phone holds open. It has no daily cap. Its Android 14 runtime prerequisite is met by
+`CHANGE_WIFI_MULTICAST_STATE`, already declared for local discovery. `remoteMessaging`
+was the alternative; Android scopes it to carrying text messages between devices, which is
+what the presence service on #155 does and not what a network tunnel does. `dataSync` and
+`mediaProcessing` are the capped types and must not come back for this service.
+
+A refusal no longer crashes the app, whatever its cause:
+
+- `startForeground()` refused (background start, exhausted allowance, missing prerequisite):
+  logged as `kind=foreground_service_refused`, the service stops itself, and the node keeps
+  running, because it lives in the app process rather than the service.
+- `onTimeout(int, int)` (Android 15, any capped type): logged as
+  `kind=foreground_service_timeout`, and the service stops itself before the platform's
+  grace period ends.
+- `PondNetwork.status()` then carries `"background": "unavailable"`, and the remote-access
+  screen says that remote access will pause while the app is in the background. The next
+  status read, which the app makes when it returns to the foreground, tries the service
+  again.
+
 ### What this rests on, and what would falsify it
 
 **The controlled measurement in `docs/remote-access-measurement.md` has not been run.** The

@@ -3,6 +3,40 @@ const { withMainApplication, withAndroidManifest, withDangerousMod, withAppBuild
 const fs = require('node:fs');
 const path = require('node:path');
 
+const SERVICE = 'io.jarida.pondtls.PondNetworkService';
+const SERVICE_PERMISSION = 'android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE';
+
+/**
+ * Pin the Pond's HTTPS-only network config and declare the remote-access service.
+ *
+ * Doze withdraws network access from a backgrounded app; it does not kill this one's process.
+ * The service exists to keep that access for the embedded node's tunnel to the user's own
+ * Pond, a device on their network, which is what connectedDevice describes ("interactions
+ * with external devices that require a ... network connection"). It is not dataSync: that
+ * type is for transfers that finish, and Android 15 caps it at six hours a day, after which
+ * the service is torn down with ForegroundServiceDidNotStopInTimeException -- the A57 crashed
+ * that way twice on 2026-10-22, and once more on launch with the allowance exhausted.
+ *
+ * connectedDevice also needs one of a fixed set of runtime prerequisites from Android 14;
+ * CHANGE_WIFI_MULTICAST_STATE, which app.json already declares for local discovery, is one.
+ */
+function applyPondManifest(manifest) {
+  const application = manifest.manifest.application[0];
+  const app = application.$;
+  app['android:usesCleartextTraffic'] = 'false';
+  app['android:networkSecurityConfig'] = '@xml/pond_network_security';
+  application.service = application.service ?? [];
+  const existing = application.service.find((entry) => entry.$?.['android:name'] === SERVICE);
+  const attributes = { 'android:name': SERVICE, 'android:exported': 'false', 'android:foregroundServiceType': 'connectedDevice' };
+  if (existing) existing.$ = { ...existing.$, ...attributes };
+  else application.service.push({ $: attributes });
+  manifest.manifest['uses-permission'] = manifest.manifest['uses-permission'] ?? [];
+  if (!manifest.manifest['uses-permission'].some((entry) => entry.$?.['android:name'] === SERVICE_PERMISSION)) {
+    manifest.manifest['uses-permission'].push({ $: { 'android:name': SERVICE_PERMISSION } });
+  }
+  return manifest;
+}
+
 module.exports = function withPondTls(config) {
   config = require('./with-pond-tls-ios')(config);
   config = withMainApplication(config, (mod) => {
@@ -21,24 +55,7 @@ module.exports = function withPondTls(config) {
     return mod;
   });
   config = withAndroidManifest(config, (mod) => {
-    const application = mod.modResults.manifest.application[0];
-    const app = application.$;
-    app['android:usesCleartextTraffic'] = 'false';
-    app['android:networkSecurityConfig'] = '@xml/pond_network_security';
-    // Doze withdraws network access from a backgrounded app; it does not kill this one's
-    // process. The service exists to keep that access, which is why dataSync is the type:
-    // the node is maintaining a control connection on the user's behalf.
-    application.service = application.service ?? [];
-    const name = 'io.jarida.pondtls.PondNetworkService';
-    if (!application.service.some((entry) => entry.$?.['android:name'] === name)) {
-      application.service.push({
-        $: {
-          'android:name': name,
-          'android:exported': 'false',
-          'android:foregroundServiceType': 'dataSync',
-        },
-      });
-    }
+    applyPondManifest(mod.modResults);
     return mod;
   });
   config = withAppBuildGradle(config, (mod) => {
@@ -118,3 +135,4 @@ tasks.named('preBuild').configure { dependsOn 'verifyPondNetworkAbis' }
     return mod;
   }]);
 };
+module.exports.applyPondManifest = applyPondManifest;

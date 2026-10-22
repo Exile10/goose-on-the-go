@@ -2,7 +2,7 @@ jest.mock('../api-client', () => ({ ApiError: jest.requireActual('../api-client'
 import i18n from '../i18n';
 import { AppState, NativeModules } from 'react-native';
 import { ApiError, api } from '../api-client';
-import { enableRemoteAccess, cancelRemoteAccess, machineKeyPreview, remoteNodeRunning, restoreRemoteAccess, resumeRemoteAccess } from '../remote-access';
+import { enableRemoteAccess, cancelRemoteAccess, machineKeyPreview, remoteBackgroundPaused, remoteNodeRunning, restoreRemoteAccess, resumeRemoteAccess } from '../remote-access';
 const local = 'https://192.168.1.2:4443';
 const control = 'https://coord.example';
 const pending = JSON.stringify({ state: 'NeedsLogin', machineKey: 'mkey:' + 'b'.repeat(64), authUrl: `${control}/register/pending-registration`, addresses: [] });
@@ -210,5 +210,23 @@ describe('a Pond that holds this node identity as revoked', () => {
     expect(bridge.resetIdentity).not.toHaveBeenCalled();
     expect(bridge.beginRemote).toHaveBeenCalledTimes(1);
     expect(enrollments()).toHaveLength(1);
+  });
+});
+
+describe('background access', () => {
+  it('reports a pause while Android refuses the background service', async () => {
+    bridge.remoteStatus.mockResolvedValueOnce(JSON.stringify({ state: 'Running', addresses: [], background: 'unavailable' }));
+    await expect(remoteBackgroundPaused()).resolves.toBe(true);
+  });
+  it('reports no pause while the service holds the foreground', async () => {
+    await expect(remoteBackgroundPaused()).resolves.toBe(false);
+  });
+  it('claims no pause it cannot read', async () => {
+    bridge.remoteStatus.mockRejectedValueOnce(new Error('bridge gone'));
+    await expect(remoteBackgroundPaused()).resolves.toBe(false);
+  });
+  it('claims no pause on a build without the native bridge', async () => {
+    NativeModules.PondTls = {};
+    await expect(remoteBackgroundPaused()).resolves.toBe(false);
   });
 });

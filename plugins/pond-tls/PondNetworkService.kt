@@ -35,14 +35,57 @@ class PondNetworkService : Service() {
   override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
     val state = intent?.getStringExtra(EXTRA_STATE) ?: STATE_CONNECTING
     val notification = build(this, state)
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-      startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
-    } else {
-      startForeground(NOTIFICATION_ID, notification)
+    try {
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+        startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE)
+      } else {
+        startForeground(NOTIFICATION_ID, notification)
+      }
+    } catch (error: IllegalStateException) {
+      // ForegroundServiceStartNotAllowedException (API 31) is an IllegalStateException. It is
+      // raised here, on the main thread, not where the service was started: on 2026-10-22 the
+      // A57 crashed three times inside this call, once with "Time limit already exhausted for
+      // foreground service type dataSync" and twice with "Service.startForeground() not
+      // allowed" after the app had left the foreground. The try in [start] cannot see either.
+      refuse(REFUSED_START, error)
+      return START_NOT_STICKY
+    } catch (error: SecurityException) {
+      // Android 14 raises this when the type's prerequisite permission is missing.
+      refuse(REFUSED_START, error)
+      return START_NOT_STICKY
     }
+    refusal = null
     // The node is restarted by PondNetwork, not by the system: a service recreated without
     // its node would show a notification claiming a connection that does not exist.
     return START_NOT_STICKY
+  }
+
+  /**
+   * Android 15 calls this when a time-limited foreground service type has used its allowance.
+   *
+   * connectedDevice has no such limit today, so this should never run. It is here because the
+   * alternative is fatal: a service still running a few seconds after this call is torn down
+   * with ForegroundServiceDidNotStopInTimeException, which is how the dataSync version of this
+   * service crashed the app in the background twice on 2026-10-22, six hours into a day of
+   * remote access. Stopping is the only answer the platform accepts.
+   */
+  override fun onTimeout(startId: Int, fgsType: Int) {
+    android.util.Log.w("PondNetwork", "kind=foreground_service_timeout type=$fgsType: stopping; remote access pauses while the app is in the background")
+    refusal = REFUSED_TIMEOUT
+    stopSelf()
+  }
+
+  /**
+   * Leave the foreground without crashing, and say so where the app can read it.
+   *
+   * The node keeps running: it lives in the app process, not in this service, so remote access
+   * still works while the app is open. What is lost is network access once the app is in the
+   * background, which is what [refusal] reports through `PondNetwork.status()`.
+   */
+  private fun refuse(reason: String, error: Exception) {
+    android.util.Log.w("PondNetwork", "kind=foreground_service_refused reason=$reason error=${error.javaClass.simpleName}: ${error.message}")
+    refusal = reason
+    stopSelf()
   }
 
   override fun onDestroy() {
@@ -58,6 +101,17 @@ class PondNetworkService : Service() {
     const val STATE_RUNNING = "Running"
     const val STATE_CONNECTING = "Connecting"
 
+    private const val REFUSED_START = "start_refused"
+    private const val REFUSED_TIMEOUT = "timeout"
+
+    /**
+     * Why the platform last refused to keep this service in the foreground, or null while it
+     * holds the foreground (or has not been asked to). Written on the main thread by the
+     * service and read by `PondNetwork` on its own executor.
+     */
+    @Volatile var refusal: String? = null
+      private set
+
     /**
      * Start or update the service.
      *
@@ -66,18 +120,29 @@ class PondNetworkService : Service() {
      * so the app is foreground at that moment -- a restart triggered by a network change
      * need not be. Losing the service costs background survival; letting the exception out
      * would take the node down with it, which is strictly worse than the problem.
+     *
+     * A refusal can also arrive later, from `startForeground` inside [onStartCommand]; that
+     * one is handled there. Both are recorded in [refusal].
      */
     fun start(context: Context, state: String) {
       val intent = Intent(context, PondNetworkService::class.java).putExtra(EXTRA_STATE, state)
       try {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) context.startForegroundService(intent)
         else context.startService(intent)
-      } catch (error: Exception) {
-        android.util.Log.i("PondNetwork", "foreground service refused: ${error.javaClass.simpleName}")
+      } catch (error: IllegalStateException) {
+        // ForegroundServiceStartNotAllowedException on API 31+, and the background-start
+        // IllegalStateException that startService raises on older releases.
+        android.util.Log.w("PondNetwork", "kind=foreground_service_refused reason=$REFUSED_START error=${error.javaClass.simpleName}: ${error.message}")
+        refusal = REFUSED_START
+      } catch (error: SecurityException) {
+        android.util.Log.w("PondNetwork", "kind=foreground_service_refused reason=$REFUSED_START error=${error.javaClass.simpleName}: ${error.message}")
+        refusal = REFUSED_START
       }
     }
 
     fun stop(context: Context) {
+      // No node, so nothing is waiting on the background exemption.
+      refusal = null
       try {
         context.stopService(Intent(context, PondNetworkService::class.java))
       } catch (error: Exception) {

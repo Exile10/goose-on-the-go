@@ -23,8 +23,9 @@ Verify before you reuse any of this: grep the symbol, the paths below will drift
   fix, sent to the Pond and on to the ride company. This is the only location the app reads.
 
 No background work exists. There is no `expo-task-manager`, `expo-background-fetch`,
-`expo-calendar` or `expo-contacts` in `package.json`. `app.json` declares Android's
-`FOREGROUND_SERVICE_DATA_SYNC`, which nothing uses yet.
+`expo-calendar` or `expo-contacts` in `package.json`. The only foreground service is remote
+access's `PondNetworkService` (type `connectedDevice`, declared by `plugins/with-pond-tls.js`),
+which holds network access for the tunnel and reads nothing from the phone.
 
 The connection manager already knows how it reached the Pond: `services/connection-manager.ts`
 types a route as `'local' | 'remote'`, the home network or the embedded tailnet.
