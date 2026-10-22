@@ -1,5 +1,6 @@
 package io.jarida.pondtls
 
+import android.annotation.SuppressLint
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -85,6 +86,32 @@ class PondNetworkService : Service() {
       }
     }
 
+    /**
+     * The status-bar silhouette expo-notifications installs from app.json's `icon` (prebuild
+     * writes it as `drawable/notification_icon`), so this notice wears the same icon as every
+     * other one the app posts. It used to pass the launcher icon, which Android flattens to a
+     * faint white blob, so the status bar switched between that and the bold icon as this
+     * notification and the others came and went.
+     *
+     * Looked up by name, because a build without that config has no such resource; the
+     * launcher icon is then the fallback, as in `PondPresence`.
+     */
+    @SuppressLint("DiscouragedApi") // A name lookup is the point: see above.
+    private fun smallIcon(context: Context): Int {
+      val installed = context.resources.getIdentifier("notification_icon", "drawable", context.packageName)
+      return if (installed != 0) installed else context.applicationInfo.icon
+    }
+
+    /**
+     * The brand colour expo-notifications writes beside that icon (`color/notification_icon_color`,
+     * from app.json's `color`), or null where the build has none, which leaves the system tint.
+     */
+    @SuppressLint("DiscouragedApi")
+    private fun accent(context: Context): Int? {
+      val id = context.resources.getIdentifier("notification_icon_color", "color", context.packageName)
+      return if (id != 0) context.getColor(id) else null
+    }
+
     private fun build(context: Context, state: String): Notification {
       val manager = context.getSystemService(NotificationManager::class.java)
       if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && manager.getNotificationChannel(CHANNEL) == null) {
@@ -110,7 +137,8 @@ class PondNetworkService : Service() {
           if (connected) "Remote access is on, so you can reach your Pond from anywhere."
           else "Remote access is on. Looking for your Pond."
         )
-        .setSmallIcon(context.applicationInfo.icon)
+        .setSmallIcon(smallIcon(context))
+        .also { notice -> accent(context)?.let(notice::setColor) }
         // Not marked ongoing, so nothing here asks the platform to pin it.
         //
         // That is as far as an app can go. NotificationManagerService owns the flags on a
