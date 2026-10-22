@@ -21,6 +21,8 @@ const KEYS = {
   remoteOfferDismissed: '@goose/remote-offer-dismissed',
   /** When the Pond will drop remote access unless the phone is seen at home. Not a secret. */
   remoteLapsesAt: '@goose/remote-lapses-at',
+  /** The model each job had before its last change, by model id, so it can be switched back to. */
+  lastWorkingModels: '@goose/last-working-models',
 } as const;
 
 /**

@@ -13,6 +13,7 @@ import {
   pondModelId,
   recommendations,
   roleOf,
+  rollbackTarget,
   routeCategory,
   titleOf,
   tooBig,
@@ -51,6 +52,19 @@ describe('jobs', () => {
       model({ name: 'voice', category: 'tts' }),
     ];
     expect(candidatesFor(models, 'chat').map((m) => m.name)).toEqual(['here']);
+  });
+
+  it('goes back only to a model that is still on the Pond and not already doing the job', () => {
+    const models = [
+      model({ name: 'now', active: true }),
+      model({ name: 'before' }),
+      model({ name: 'gone', downloaded: false }),
+    ];
+    expect(rollbackTarget(models, 'chat', 'gguf:before')?.name).toBe('before');
+    expect(rollbackTarget(models, 'chat', 'gguf:gone')).toBeNull();
+    expect(rollbackTarget(models, 'chat', 'gguf:now')).toBeNull();
+    expect(rollbackTarget(models, 'asr', 'gguf:before')).toBeNull();
+    expect(rollbackTarget(models, 'chat', undefined)).toBeNull();
   });
 
   it('names a model by the Pond’s own category, not the bucket it came in', () => {

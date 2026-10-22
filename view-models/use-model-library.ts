@@ -9,6 +9,7 @@ import { useServer } from '@/providers/server-provider';
 import { ApiError, api } from '@/services/api-client';
 import { confirm, reject } from '@/services/haptics';
 import i18n from '@/services/i18n';
+import { Storage } from '@/services/storage';
 import type {
   DiskUsage,
   DownloadAction,
@@ -19,7 +20,7 @@ import type {
   ModelMemoryStatus,
   ModelRole,
 } from '@/services/types';
-import { isLive, roleOf, routeCategory } from '@/models/model-library';
+import { holderOf, isLive, roleOf, rollbackTarget, routeCategory } from '@/models/model-library';
 import { describeApiError } from './describe-error';
 import { useLive } from './use-live';
 
@@ -38,6 +39,8 @@ interface Library {
   /** The model a change is being made to, so its row can say so. */
   busy: string | null;
   notice: { tone: 'neutral' | 'danger'; text: string } | null;
+  /** The model each job had before its last change, by id: what a switch back goes to. */
+  lastWorking: Partial<Record<ModelRole, string>>;
 }
 
 const EMPTY: Library = {
@@ -50,11 +53,13 @@ const EMPTY: Library = {
   memory: null,
   busy: null,
   notice: null,
+  lastWorking: {},
 };
 
 let library: Library = EMPTY;
 const listeners = new Set<() => void>();
 let reads = 0;
+let lastWorkingRead: Promise<void> | null = null;
 
 function set(patch: Partial<Library>) {
   library = { ...library, ...patch };
@@ -66,7 +71,26 @@ function subscribe(listener: () => void) {
   return () => listeners.delete(listener);
 }
 
+/** Read what this phone remembered from earlier sessions, once. A change made since wins. */
+function readLastWorking(): Promise<void> {
+  lastWorkingRead ??= Storage.getJSON<Library['lastWorking']>('lastWorkingModels')
+    .then((saved) => {
+      if (saved) set({ lastWorking: { ...saved, ...library.lastWorking } });
+    })
+    .catch(() => {
+      // Nothing remembered: there is no switch back until the next change.
+    });
+  return lastWorkingRead;
+}
+
+function rememberLastWorking(role: ModelRole, id: string): void {
+  const lastWorking = { ...library.lastWorking, [role]: id };
+  set({ lastWorking });
+  Storage.setJSON('lastWorkingModels', lastWorking).catch((e) => console.warn('[models] could not save the last working model', e));
+}
+
 async function loadModels(loud: boolean): Promise<void> {
+  void readLastWorking();
   if (loud) set({ loading: true, error: null });
   const mine = ++reads;
   try {
@@ -103,6 +127,7 @@ function failure(e: unknown, fallback: string): string {
 async function activate(model: ModelEntry): Promise<boolean> {
   const role = roleOf(model);
   const previous = library.models;
+  const before = holderOf(previous, role);
   set({
     busy: model.id,
     notice: null,
@@ -112,6 +137,7 @@ async function activate(model: ModelEntry): Promise<boolean> {
     await api.activateModel(routeCategory(model), model.name, role);
     void confirm();
     set({ busy: null });
+    if (before && before.id !== model.id) rememberLastWorking(role, before.id);
     void loadModels(false);
     return true;
   } catch (e) {
@@ -119,6 +145,12 @@ async function activate(model: ModelEntry): Promise<boolean> {
     set({ busy: null, models: previous, notice: { tone: 'danger', text: failure(e, i18n.t('models.library.useFailed')) } });
     return false;
   }
+}
+
+/** Give a job back to the model it had before its last change. Doing it twice returns to where it started. */
+async function rollBack(role: ModelRole): Promise<boolean> {
+  const target = rollbackTarget(library.models, role, library.lastWorking[role]);
+  return target ? activate(target) : false;
 }
 
 async function download(model: ModelEntry, pictures: boolean): Promise<void> {
@@ -188,6 +220,7 @@ export interface UseModelLibrary extends Library {
   actions: {
     refresh: () => Promise<void>;
     activate: (model: ModelEntry) => Promise<boolean>;
+    rollBack: (role: ModelRole) => Promise<boolean>;
     download: (model: ModelEntry, pictures: boolean) => Promise<void>;
     addPictures: (model: ModelEntry) => Promise<void>;
     control: (modelId: string, action: DownloadAction) => Promise<void>;
@@ -200,6 +233,7 @@ export interface UseModelLibrary extends Library {
 const ACTIONS: UseModelLibrary['actions'] = {
   refresh: () => loadModels(true),
   activate,
+  rollBack,
   download,
   addPictures,
   control,
@@ -220,6 +254,7 @@ export function useModelLibrary(): UseModelLibrary {
 export function resetModelLibrary(): void {
   library = EMPTY;
   reads = 0;
+  lastWorkingRead = null;
   listeners.forEach((l) => l());
 }
 

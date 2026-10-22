@@ -50,6 +50,15 @@ export function candidatesFor(models: ModelEntry[], role: ModelRole): ModelEntry
   return models.filter((m) => roleOf(m) === role && isDownloaded(m) && m.available !== false);
 }
 
+/**
+ * The model a job can go back to: the one it had before its last change, while that model is
+ * still on the Pond, can run, and is not the one doing the job now.
+ */
+export function rollbackTarget(models: ModelEntry[], role: ModelRole, lastWorkingId: string | undefined): ModelEntry | null {
+  if (!lastWorkingId) return null;
+  return candidatesFor(models, role).find((m) => m.id === lastWorkingId && !m.active) ?? null;
+}
+
 /** The picture add-on a model offers, when it offers one. */
 export function picturesOf(model: Pick<ModelEntry, 'companions'>) {
   return model.companions?.find((c) => c.kind === 'pictures') ?? null;
