@@ -95,6 +95,16 @@ class PondPresenceService : Service() {
       return if (installed != 0) installed else context.applicationInfo.icon
     }
 
+    /**
+     * The brand colour expo-notifications writes beside that icon (`color/notification_icon_color`,
+     * from app.json's `color`), or null where the build has none, which leaves the system tint.
+     */
+    @SuppressLint("DiscouragedApi")
+    private fun accent(context: Context): Int? {
+      val id = context.resources.getIdentifier("notification_icon_color", "color", context.packageName)
+      return if (id != 0) context.getColor(id) else null
+    }
+
     private fun build(context: Context, texts: Texts): Notification {
       val manager = context.getSystemService(NotificationManager::class.java)
       if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -117,6 +127,7 @@ class PondPresenceService : Service() {
         .setContentTitle(texts.title)
         .setContentText(texts.body)
         .setSmallIcon(smallIcon(context))
+        .also { notice -> accent(context)?.let(notice::setColor) }
         .setOngoing(true)
         .setOnlyAlertOnce(true)
         .also { if (pending != null) it.setContentIntent(pending) }
