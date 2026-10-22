@@ -44,7 +44,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NAVBAR_DEFAULTS, NavbarBehaviour, type NavbarStage } from '@jarida/ink/headless';
-import { InkNavbar, InkNotice, useInkTheme } from '@jarida/ink/native';
+import { InkNavbar, InkNotice, InkSpinner, useInkTheme } from '@jarida/ink/native';
 
 import { ChatDock } from '@/components/patterns/chat-dock';
 import { GreetingCard } from '@/components/patterns/greeting-card';
@@ -56,6 +56,7 @@ import { GPressable } from '@/components/ui/g-pressable';
 import { useThemedStyles } from '@/hooks/use-themed-styles';
 import { useServer } from '@/providers/server-provider';
 import { api } from '@/services/api-client';
+import { NEW_DRAFT, draftFor, moveDraft, setDraft } from '@/services/chat-threads';
 import { selectionTick } from '@/services/haptics';
 import { AttachError, pickAttachments, withinTurnLimit, type Attachment, type AttachSource } from '@/services/media';
 import type { Message } from '@/models/chat';
@@ -111,7 +112,7 @@ export default function ChatScreen() {
   const styles = useThemedStyles(makeStyles);
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
-  const { data, error, actions } = useChat();
+  const { data, loading, error, actions } = useChat();
   const { online, hydrated } = useServer();
   const { messages, queued, streaming, status, turnSeed, sessionId, title } = data;
   const name = useGreetingName();
@@ -131,6 +132,20 @@ export default function ChatScreen() {
     openedRef.current = session;
     open(session, linkedTitle);
   }, [session, linkedTitle, open]);
+
+  // What is half-written stays with its conversation: leave and come back, or
+  // start another and return, and the composer holds it again. A conversation
+  // with no id yet writes into the new-conversation slot, and the draft moves
+  // with it the moment the Pond names it. `dock` remounts the composer when the
+  // screen moves to another conversation, so it starts from that one's draft.
+  const draftKey = useRef(session ?? NEW_DRAFT);
+  const [dock, setDock] = useState(() => ({ key: 0, draft: draftFor(session ?? NEW_DRAFT) }));
+  useEffect(() => {
+    if (!sessionId || draftKey.current === sessionId) return;
+    if (draftKey.current === NEW_DRAFT) moveDraft(NEW_DRAFT, sessionId);
+    draftKey.current = sessionId;
+  }, [sessionId]);
+  const onDraftChange = useCallback((text: string) => setDraft(draftKey.current, text), []);
 
   // This screen is outside the tabs, so it has no shared bar to follow. The
   // title bar reads the list's own scroll through Ink's state machine, and
@@ -212,6 +227,8 @@ export default function ChatScreen() {
     openedRef.current = null;
     behaviour.set('expanded');
     setStage('expanded');
+    draftKey.current = NEW_DRAFT;
+    setDock((d) => ({ key: d.key + 1, draft: draftFor(NEW_DRAFT) }));
     actions.newConversation();
   }, [actions, behaviour]);
 
@@ -300,6 +317,12 @@ export default function ChatScreen() {
               keyboardShouldPersistTaps="handled"
               contentContainerStyle={styles.listContent}
             />
+          ) : session && loading ? (
+            // An existing conversation being read for the first time is not a
+            // new one: the greeting card here would say "New chat" over it.
+            <View style={styles.reading}>
+              <InkSpinner label={t('chat.reading')} />
+            </View>
           ) : (
             <View style={styles.opening}>
               <GreetingCard
@@ -322,6 +345,9 @@ export default function ChatScreen() {
           />
         ) : (
           <ChatDock
+            key={dock.key}
+            initialDraft={dock.draft}
+            onDraftChange={onDraftChange}
             onSend={onSend}
             onVoice={() => setVoice(true)}
             onAttach={onAttach}
@@ -347,6 +373,8 @@ const makeStyles = (c: ThemeColors) =>
     },
 
     notice: { paddingHorizontal: Spacing.lg, paddingBottom: Spacing.sm },
+
+    reading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
 
     opening: {
       flex: 1,

@@ -22,7 +22,9 @@
  *
  * The dock holds its own draft and attachments. Lifting them into the screen
  * would re-render every message on each keystroke, and nothing above here
- * needs to know what is half-written.
+ * needs to know what is half-written. It starts from `initialDraft` and reports
+ * each edit through `onDraftChange`, so the screen can keep the draft with its
+ * conversation without re-rendering for it.
  */
 
 import React, { useCallback, useEffect, useState } from 'react';
@@ -60,12 +62,31 @@ export interface ChatDockProps {
   busy?: boolean;
   /** The home indicator, when no keyboard is covering it. */
   bottomInset?: number;
+  /** What was half-written here last time. Read once, when the dock mounts. */
+  initialDraft?: string;
+  /** Each edit to the draft, sending included. */
+  onDraftChange?: (text: string) => void;
 }
 
-export function ChatDock({ onSend, onVoice, onAttach, busy, bottomInset = 0 }: ChatDockProps) {
+export function ChatDock({
+  onSend,
+  onVoice,
+  onAttach,
+  busy,
+  bottomInset = 0,
+  initialDraft = '',
+  onDraftChange,
+}: ChatDockProps) {
   const theme = useInkTheme();
   const { t } = useTranslation();
-  const [draft, setDraft] = useState('');
+  const [draft, setDraftState] = useState(initialDraft);
+  const setDraft = useCallback(
+    (text: string) => {
+      setDraftState(text);
+      onDraftChange?.(text);
+    },
+    [onDraftChange],
+  );
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [menu, setMenu] = useState(false);
   const [keyboard, setKeyboard] = useState(false);
@@ -95,7 +116,7 @@ export function ChatDock({ onSend, onVoice, onAttach, busy, bottomInset = 0 }: C
     onSend(draft, attachments);
     setDraft('');
     setAttachments([]);
-  }, [attachments, draft, hasContent, onSend]);
+  }, [attachments, draft, hasContent, onSend, setDraft]);
 
   // The menu has already closed by the time it hands over a choice, so the
   // picker is presented from the screen rather than from the menu.

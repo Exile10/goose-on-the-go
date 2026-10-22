@@ -4,6 +4,7 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useR
 import { AppState } from 'react-native';
 import NetInfo from '@react-native-community/netinfo';
 import { forgetAllCards } from '@/services/card-cache';
+import { forgetAllThreads } from '@/services/chat-threads';
 import { Storage, purgeLegacyStorage } from '@/services/storage';
 import { SecureStorage } from '@/services/secure-storage';
 import { ApiError, api, PondApiClient, type HandshakeResponse, type SpokenCode } from '@/services/api-client';
@@ -248,6 +249,8 @@ export function ServerProvider({ children }: PropsWithChildren) {
     await Storage.remove('connectionProfile'); await Storage.remove('serverUrl');
     // The tool cards kept from its conversations are the household's too.
     await forgetAllCards().catch(() => undefined);
+    // So are the conversations and drafts held in memory.
+    forgetAllThreads();
     await manager.configure(null);
   }, [manager]);
 

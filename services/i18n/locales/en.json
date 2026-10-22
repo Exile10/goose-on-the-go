@@ -83,6 +83,7 @@
     "unqueue": "Remove queued message",
     "stillAnswering": "Goose is still answering",
     "newConversation": "New conversation",
+    "reading": "Reading this conversation",
     "starters": {
       "capabilities": "What can you do?",
       "memory": "What do you remember about me?",
