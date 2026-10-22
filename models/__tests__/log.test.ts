@@ -20,6 +20,7 @@ import {
   isProblem,
   logsToCsv,
   newestFirst,
+  logTimeOfDay,
   parsePondLogTime,
 } from '@/models/log';
 import type { ActivityEvent, ActivitySummary, EventCategory, LogEntry } from '@/services/types';
@@ -207,6 +208,17 @@ describe('the operational log', () => {
 
   it('leaves a timestamp that already carries a zone alone', () => {
     expect(parsePondLogTime('2026-10-05T09:00:00+03:00')).toBe('2026-10-05T09:00:00+03:00');
+  });
+
+  it('shows a log row’s time of day on the phone’s clock', () => {
+    const local = new Date('2026-10-05T09:04:05Z');
+    const two = (n: number) => String(n).padStart(2, '0');
+    const expected = `${two(local.getHours())}:${two(local.getMinutes())}:${two(local.getSeconds())}`;
+    expect(logTimeOfDay('2026-10-05 09:04:05')).toBe(expected);
+  });
+
+  it('leaves a time it cannot read as it came', () => {
+    expect(logTimeOfDay('soon')).toBe('soon');
   });
 });
 

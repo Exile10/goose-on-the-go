@@ -365,6 +365,14 @@ export function parsePondLogTime(timestamp: string): string {
   return m ? `${m[1]}T${m[2]}Z` : timestamp;
 }
 
+/** A log row's time of day on this phone's clock, "HH:MM:SS", as a live log shows it. */
+export function logTimeOfDay(timestamp: string): string {
+  const at = new Date(parsePondLogTime(timestamp));
+  if (Number.isNaN(at.getTime())) return timestamp;
+  const two = (n: number) => String(n).padStart(2, '0');
+  return `${two(at.getHours())}:${two(at.getMinutes())}:${two(at.getSeconds())}`;
+}
+
 const sqliteAgo = (minutes: number) =>
   new Date(Date.now() - minutes * 60_000).toISOString().slice(0, 19).replace('T', ' ');
 

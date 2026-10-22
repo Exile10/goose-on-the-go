@@ -12,10 +12,12 @@ import React from 'react';
 import { Redirect, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 
+import { LiveLogLines } from '@/components/patterns/live-log-lines';
 import { SettingsGroup, SettingsHeader, SettingsRow } from '@/components/settings/settings-list';
 import { SettingsScroll } from '@/components/settings/settings-scroll';
 import { holderOf, MODEL_ROLES, titleOf } from '@/models/model-library';
 import { selectionTick } from '@/services/haptics';
+import { useLiveLogs } from '@/view-models/use-live-logs';
 import { roleLabelKey, useModelLibrary } from '@/view-models/use-model-library';
 
 export default function DebugScreen() {
@@ -28,6 +30,8 @@ function DebugScreenContent() {
   const { t } = useTranslation();
   const router = useRouter();
   const lib = useModelLibrary();
+  const logs = useLiveLogs(true);
+  const lines = logs.data.entries;
 
   return (
     <SettingsScroll>
@@ -50,6 +54,22 @@ function DebugScreenContent() {
             />
           );
         })}
+      </SettingsGroup>
+
+      <SettingsGroup title={t('debug.logs.title')} footer={t('debug.logs.footer')}>
+        <SettingsRow
+          label={logs.paused ? t('debug.logs.resume') : t('debug.logs.pause')}
+          icon={logs.paused ? 'play' : 'pause'}
+          tile="slate"
+          action
+          onPress={() => {
+            void selectionTick();
+            logs.actions.setPaused(!logs.paused);
+          }}
+        />
+        {logs.error ? <SettingsRow label={logs.error} /> : null}
+        {!logs.error && lines.length === 0 ? <SettingsRow label={t('debug.logs.empty')} /> : null}
+        {lines.length > 0 ? <LiveLogLines entries={lines} /> : null}
       </SettingsGroup>
     </SettingsScroll>
   );

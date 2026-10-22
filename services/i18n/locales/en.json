@@ -2748,7 +2748,12 @@
       "none": "None"
     },
     "logs": {
-      "failed": "Could not read your Pond's log."
+      "failed": "Could not read your Pond's log.",
+      "title": "Live log",
+      "pause": "Pause",
+      "resume": "Resume",
+      "empty": "Nothing logged yet.",
+      "footer": "The newest 100 lines, read every 5 seconds while this screen is open."
     }
   }
 }
