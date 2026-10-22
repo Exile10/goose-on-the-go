@@ -2746,6 +2746,11 @@
     "models": {
       "title": "Models in use",
       "none": "None"
+    },
+    "timings": {
+      "title": "Command timings",
+      "none": "No conversations yet.",
+      "footer": "How long Goose took over its latest conversation. Tap it for each command: time to the first word, the whole answer and any tool it used."
     }
   }
 }
