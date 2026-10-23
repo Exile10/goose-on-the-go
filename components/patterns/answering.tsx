@@ -1,17 +1,19 @@
 /**
- * What the composer shows while Goose answers: a light behind the composer
- * that runs along the field's top border, and a reminder under the field that
- * fades once the answer is in.
+ * What the composer shows while Goose answers: a light behind the composer,
+ * and a reminder under the field that fades once the answer is in.
  *
  * The light sits behind the field and its buttons, so they stand in front of
- * it: its glow rims their edges and fills the gaps between them, and a faint
- * wash of it falls across their faces as it passes. The tapered streak on the
- * field's top border is the light itself. It replaces a spinner under the
- * reply, whose foot moves as words arrive; the composer stays put.
+ * it: its glow rims their edges and fills the gaps between them, a faint wash
+ * of it falls across their faces, and the field's top edge catches it as a
+ * tapered streak. It replaces a spinner under the reply, whose foot moves as
+ * words arrive; the composer stays put.
  *
- * It runs on the UI thread, because the JS thread is busiest exactly while a
- * reply streams. Reduced motion parks the light behind the middle of the field
- * and keeps it lit, which still says "working" without anything travelling.
+ * It appears behind the send button, where the message just left, and swings
+ * between the buttons like a pendulum, easing into each turn, so it never
+ * vanishes or jumps. A turn that follows straight on carries on from where the
+ * light already is. It runs on the UI thread, because the JS thread is busiest
+ * exactly while a reply streams. Reduced motion holds it, lit, behind the
+ * middle of the field.
  */
 
 import React, { useEffect, useId, useState } from 'react';
@@ -20,7 +22,6 @@ import { useTranslation } from 'react-i18next';
 import Animated, {
   Easing,
   cancelAnimation,
-  interpolate,
   useAnimatedProps,
   useAnimatedStyle,
   useSharedValue,
@@ -36,23 +37,21 @@ const AnimatedPath = Animated.createAnimatedComponent(Path);
 
 /** Room around the border for the streak's halo, which is wider than the line. */
 const PAD = 5;
-const SWEEP_MS = 1600;
-const REST_MS = 350;
+/** One swing, either way. */
+const LEG_MS = 1800;
 /** Long enough to read it twice once the answer has stopped moving. */
 const LINGER_MS = 4000;
 
 /**
  * The streak as layers sharing one centre, longest and thinnest first: it
  * tapers to a point at both ends and swells through the middle, which a single
- * stroke cannot draw. The last two are the halo around the swell.
+ * stroke cannot draw. The last is the halo around the swell.
  */
 const LAYERS = [
-  { share: 1, width: 1, opacity: 0.55 },
-  { share: 0.7, width: 1.75, opacity: 0.7 },
-  { share: 0.42, width: 2.5, opacity: 0.85 },
-  { share: 0.18, width: 3.25, opacity: 1 },
-  { share: 0.62, width: 6, opacity: 0.08 },
-  { share: 0.34, width: 10, opacity: 0.08 },
+  { share: 1, width: 1, opacity: 0.6 },
+  { share: 0.55, width: 2, opacity: 0.8 },
+  { share: 0.22, width: 3.25, opacity: 1 },
+  { share: 0.5, width: 9, opacity: 0.1 },
 ] as const;
 
 /**
@@ -64,7 +63,7 @@ const LAYERS = [
 const GLOW = { width: 2.3, height: 92, drop: 14, opacity: 0.55 };
 const WASH = { width: 1.7, height: 64, drop: 18, opacity: 0.22 };
 
-/** How far round each corner the line starts and ends, from the top: enough to curve, short of the sides. */
+/** How far round each corner the streak's path reaches, from the top: enough to curve, short of the sides. */
 const CORNER = (40 * Math.PI) / 180;
 
 /** Where the field sits in the composer row, which is the light's frame. */
@@ -100,32 +99,33 @@ function geometry(field: FieldBox, radius: number) {
 export function useAnsweringLight(active: boolean) {
   const reduced = useReduceMotion();
   const shown = useSharedValue(0);
-  const progress = useSharedValue(0.5);
+  // 0 is behind the attach button, 1 behind send; between, the streak's centre along the field's edge.
+  const progress = useSharedValue(1);
 
   useEffect(() => {
-    shown.set(withTiming(active ? 1 : 0, { duration: active ? 200 : 360 }));
+    shown.set(withTiming(active ? 1 : 0, { duration: active ? 280 : 420, easing: Easing.out(Easing.cubic) }));
   }, [active, shown]);
 
   useEffect(() => {
-    if (!active || reduced) {
-      cancelAnimation(progress);
-      if (reduced) progress.set(0.5);
+    cancelAnimation(progress);
+    if (!active) return;
+    if (reduced) {
+      progress.set(0.5);
       return;
     }
-    progress.set(0);
+    // A fresh turn starts behind send; one that follows straight on swings on from where the light is.
+    if (shown.get() < 0.05) progress.set(1);
+    const from = progress.get();
+    const to = from > 0.5 ? 0 : 1;
+    const swing = { easing: Easing.inOut(Easing.sin) };
     progress.set(
-      withRepeat(
-        withSequence(
-          withTiming(1, { duration: SWEEP_MS, easing: Easing.inOut(Easing.cubic) }),
-          withTiming(1, { duration: REST_MS }),
-          withTiming(0, { duration: 0 }),
-        ),
-        -1,
-        false,
+      withSequence(
+        withTiming(to, { ...swing, duration: LEG_MS * Math.abs(to - from) }),
+        withRepeat(withTiming(1 - to, { ...swing, duration: LEG_MS }), -1, true),
       ),
     );
     return () => cancelAnimation(progress);
-  }, [active, progress, reduced]);
+  }, [active, progress, reduced, shown]);
 
   return { active, reduced, shown, progress };
 }
@@ -181,15 +181,15 @@ function Pool({ light, field, radius, spec }: LightProps & { spec: typeof GLOW }
   const theme = useInkTheme();
   const id = svgId(useId());
   const { length, glint, origin } = geometry(field, radius);
-  const { progress, reduced } = light;
+  const { progress, shown, reduced } = light;
   const width = Math.round(glint * spec.width);
-  const style = useAnimatedStyle(() => {
-    const p = progress.get();
-    return {
-      opacity: reduced ? 1 : interpolate(p, [0, 0.04, 0.96, 1], [0, 1, 1, 0]),
-      transform: [{ translateX: origin + p * (length + glint) - glint / 2 - width / 2 }],
-    };
-  });
+  const style = useAnimatedStyle(() => ({
+    transform: [
+      { translateX: origin + progress.get() * (length + glint) - glint / 2 - width / 2 },
+      // It grows into place as it brightens and settles back as it goes, rather than only fading.
+      { scale: reduced ? 1 : 0.6 + 0.4 * shown.get() },
+    ],
+  }));
   const ink = theme.color.accentLine;
   return (
     <Animated.View
@@ -210,32 +210,20 @@ function Pool({ light, field, radius, spec }: LightProps & { spec: typeof GLOW }
   );
 }
 
-/** The light itself, on the field's top border; the field covers the half of it below the edge. */
+/** The light caught on the field's top edge; the field covers the half of it below the edge. */
 function Streak({ light, field, radius }: LightProps) {
   const theme = useInkTheme();
   const { d, length, glint } = geometry(field, radius);
-  const { progress, reduced } = light;
-  const width = field.width + PAD * 2;
-  const height = radius + PAD * 2;
-  // Faded at both ends, so it rises out of the field's left corner and sinks into its right.
-  const glow = useAnimatedStyle(() => ({ opacity: interpolate(progress.get(), [0, 0.06, 0.94, 1], [0, 1, 1, 0]) }));
-  const ink = theme.color.accentLine;
   return (
-    <View style={[styles.streak, { left: field.x - PAD, top: field.y - PAD, width, height }]}>
-      <Svg width={width} height={height} style={StyleSheet.absoluteFill}>
-        <Path d={d} fill="none" stroke={ink} strokeOpacity={reduced ? 0.9 : 0.4} strokeWidth={2} strokeLinecap="round" />
-        {reduced ? <Path d={d} fill="none" stroke={ink} strokeOpacity={0.16} strokeWidth={8} strokeLinecap="round" /> : null}
-      </Svg>
-      {reduced ? null : (
-        <Animated.View style={[StyleSheet.absoluteFill, glow]}>
-          <Svg width={width} height={height}>
-            {LAYERS.map((layer, i) => (
-              <Layer key={i} d={d} length={length} glint={glint} color={ink} progress={progress} {...layer} />
-            ))}
-          </Svg>
-        </Animated.View>
-      )}
-    </View>
+    <Svg
+      width={field.width + PAD * 2}
+      height={radius + PAD * 2}
+      style={[styles.streak, { left: field.x - PAD, top: field.y - PAD }]}
+    >
+      {LAYERS.map((layer, i) => (
+        <Layer key={i} d={d} length={length} glint={glint} color={theme.color.accentLine} progress={light.progress} {...layer} />
+      ))}
+    </Svg>
   );
 }
 
