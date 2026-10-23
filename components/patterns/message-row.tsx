@@ -2,9 +2,9 @@
  * MessageRow — one turn of the conversation.
  *
  * What a person said is a bubble, Ink's, with any pictures they sent above it.
- * What Goose said is not: it is the page's text, full width, the way
- * pond-desktop sets a reply — a bubble around every answer makes a long one
- * a box to scroll inside. Above the answer, what Goose did to reach it, as
+ * What Goose said is not: it is the page's text, full width, set from the
+ * markdown the model writes, the way pond-desktop sets a reply — a bubble
+ * around every answer makes a long one a box to scroll inside. Above the answer, what Goose did to reach it, as
  * tool cards in the order it did them; below it, the pages it read. While a
  * reply has no words yet, the thinking line holds its place. Once it has them,
  * the turn can still be running — the Pond can take another model pass after
@@ -26,6 +26,7 @@ import { Image } from 'expo-image';
 import { useTranslation } from 'react-i18next';
 import { InkBubble, InkSpinner, inkText, useInkTheme, type BubblePosition } from '@jarida/ink/native';
 
+import { Markdown } from '@/components/patterns/markdown';
 import { ThinkingQuips } from '@/components/patterns/thinking-quips';
 import { SourceChips, ToolCard } from '@/components/patterns/tool-card';
 import { GIcon } from '@/components/ui/g-icon';
@@ -129,7 +130,6 @@ export const MessageRow = React.memo(function MessageRow({
     );
   }
 
-  const text = inkText(theme, { size: 'md', leading: 'base' });
   const waiting = message.pending && !message.content;
   const unfinished = Boolean(message.pending && message.content);
   const note = inkText(theme, { role: 'mono', size: 'xs', color: theme.color.textTertiary });
@@ -143,11 +143,7 @@ export const MessageRow = React.memo(function MessageRow({
           ))}
         </View>
       ) : null}
-      {message.content ? (
-        <Text style={text.style} selectable>
-          {message.content}
-        </Text>
-      ) : null}
+      {message.content ? <Markdown source={message.content} /> : null}
       {waiting ? <ThinkingQuips status={status} seed={turnSeed} /> : null}
       {unfinished ? (
         <View style={styles.afterword}>
