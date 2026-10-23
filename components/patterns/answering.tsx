@@ -52,13 +52,18 @@ const LAYERS = [
   { share: 0.34, width: 10, opacity: 0.08 },
 ] as const;
 
-/** Up the left end, over the corner, along the top and down into the right end. */
+/** How far round each corner the line starts and ends, from the top: enough to curve, short of the sides. */
+const CORNER = (40 * Math.PI) / 180;
+
+/** Out of the left corner, along the top, and into the right corner. */
 function topBorder(width: number, radius: number) {
   const left = PAD;
   const right = width - PAD;
   const r = Math.min(radius, (right - left) / 2);
-  const d = `M ${left} ${PAD + r} A ${r} ${r} 0 0 1 ${left + r} ${PAD} L ${right - r} ${PAD} A ${r} ${r} 0 0 1 ${right} ${PAD + r}`;
-  return { d, length: Math.PI * r + (right - left - 2 * r) };
+  const dx = r * Math.sin(CORNER);
+  const y = PAD + r - r * Math.cos(CORNER);
+  const d = `M ${left + r - dx} ${y} A ${r} ${r} 0 0 1 ${left + r} ${PAD} L ${right - r} ${PAD} A ${r} ${r} 0 0 1 ${right - r + dx} ${y}`;
+  return { d, length: 2 * r * CORNER + (right - left - 2 * r) };
 }
 
 function Layer({
@@ -209,12 +214,12 @@ export function AnsweringNote({ active }: { active: boolean }) {
   );
 }
 
-/** What the note needs under the composer row: its line and a gap. */
-export const NOTE_ROOM = 18;
+/** The band under the composer row that the note is set in: its line, with air above and below. */
+export const NOTE_ROOM = 24;
 
 const styles = StyleSheet.create({
   // Over the field's top border and the dock's padding above it: it moves nothing and overlaps no message.
   edge: { position: 'absolute', top: -PAD, left: -PAD, right: -PAD },
-  note: { position: 'absolute', top: '100%', left: 0, right: 0, marginTop: 2, alignItems: 'center' },
+  note: { position: 'absolute', top: '100%', left: 0, right: 0, marginTop: 5, alignItems: 'center' },
   noteText: { textAlign: 'center' },
 });

@@ -125,8 +125,9 @@ export function ChatDock({ onSend, onVoice, onAttach, busy, bottomInset = 0 }: C
   // Clear of the keyboard by a full step, not half of one. Vendor keyboards
   // (Samsung's among them) draw a toolbar row of their own inside the height
   // they report, so 8px put the composer visually against that row rather than
-  // above it — the input read as part of the keyboard.
-  const foot = keyboard ? Spacing.lg : Math.max(bottomInset + Spacing.xs, NOTE_ROOM);
+  // above it — the input read as part of the keyboard. The note gets a band of
+  // its own on top, so it never sits on the home indicator or the keys.
+  const foot = (keyboard ? Spacing.lg : bottomInset + Spacing.xs) + NOTE_ROOM;
 
   return (
     <View pointerEvents="box-none" style={[styles.dock, { paddingBottom: foot }]}>

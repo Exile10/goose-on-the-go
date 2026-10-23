@@ -82,7 +82,7 @@
     "queued": "Queued",
     "unqueue": "Remove queued message",
     "stillAnswering": "Goose is still answering",
-    "mistakes": "Goose can make mistakes. Verify important information.",
+    "mistakes": "goose can make mistakes. Verify important information.",
     "newConversation": "New conversation",
     "starters": {
       "capabilities": "What can you do?",
