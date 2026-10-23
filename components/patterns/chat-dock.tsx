@@ -18,7 +18,9 @@
  * It stays live while Goose answers. A follow-up thought mid-reply is the
  * ordinary case, and a field that locked until the model finished made the
  * person hold it in their head; now send queues it behind the reply, and the
- * field says so before anything is typed.
+ * field says so before anything is typed. A glint running along the field's
+ * top border says the reply is still coming, and a reminder under it that
+ * Goose can be wrong fades once the reply is in (`answering.tsx`).
  *
  * The dock holds its own draft and attachments. Lifting them into the screen
  * would re-render every message on each keystroke, and nothing above here
@@ -32,6 +34,7 @@ import { useTranslation } from 'react-i18next';
 import { glassLift, hitSlop } from '@jarida/ink';
 import { InkEdge, inkText, useInkTheme } from '@jarida/ink/native';
 
+import { AnsweringEdge, AnsweringNote, NOTE_ROOM } from '@/components/patterns/answering';
 import { AttachMenu } from '@/components/patterns/attach-menu';
 import { GIcon } from '@/components/ui/g-icon';
 import { GPressable } from '@/components/ui/g-pressable';
@@ -123,7 +126,7 @@ export function ChatDock({ onSend, onVoice, onAttach, busy, bottomInset = 0 }: C
   // (Samsung's among them) draw a toolbar row of their own inside the height
   // they report, so 8px put the composer visually against that row rather than
   // above it — the input read as part of the keyboard.
-  const foot = keyboard ? Spacing.lg : bottomInset + Spacing.xs;
+  const foot = keyboard ? Spacing.lg : Math.max(bottomInset + Spacing.xs, NOTE_ROOM);
 
   return (
     <View pointerEvents="box-none" style={[styles.dock, { paddingBottom: foot }]}>
@@ -175,6 +178,7 @@ export function ChatDock({ onSend, onVoice, onAttach, busy, bottomInset = 0 }: C
         </GPressable>
 
         <View style={[styles.field, material]}>
+          <AnsweringEdge active={Boolean(busy)} radius={CONTROL / 2} />
           <TextInput
             style={[field.style, styles.input, { height: fieldHeight(draft ? lines : 0) }]}
             value={draft}
@@ -220,6 +224,7 @@ export function ChatDock({ onSend, onVoice, onAttach, busy, bottomInset = 0 }: C
             <GIcon name="mic" size={20} color={theme.color.text} />
           </GPressable>
         )}
+        <AnsweringNote active={Boolean(busy)} />
       </View>
 
       <AttachMenu

@@ -242,6 +242,7 @@ masked field; nothing here asks it to save one.
 | ToolCard, SourceChips | tool / tools | What Goose did on the way to its answer |
 | ThinkingQuips | status, seed | What shows before Goose has written anything |
 | ChatDock | onSend, onVoice, onAttach | The composer: attach, the field, speak or send |
+| AnsweringEdge, AnsweringNote | active (, radius) | While Goose answers: a glint running along the field's top border, over both corners, in place of a spinner; and the can-make-mistakes reminder under the composer, fading 4 s after the answer is in |
 | AttachMenu | open, onClose, onChoose | Camera, Photos or Files, from the composer |
 | VoiceDock | send, stop, onClose | Voice mode, in the composer's place |
 | VoiceOrb | state, level, size, onPress, accessibilityLabel | The voice control, and the face Goose talks with |
