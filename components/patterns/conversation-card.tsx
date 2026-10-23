@@ -37,7 +37,7 @@ import {
 import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
 import { alpha, hitSlop } from '@jarida/ink';
-import { InkEdge, InkEyebrow, InkSkeleton, inkText, useInkTheme } from '@jarida/ink/native';
+import { InkEdge, InkEyebrow, InkSkeleton, InkSpinner, inkText, useInkTheme } from '@jarida/ink/native';
 
 import { GIcon } from '@/components/ui/g-icon';
 import { GPressable } from '@/components/ui/g-pressable';
@@ -81,7 +81,27 @@ export function cardWords(card: HistoryCard, t: TFunction) {
   const count =
     card.messageCount > 0 ? t('chat.history.messages', { count: card.messageCount }) : '';
   const foot = [card.routine ? t('chat.history.routine') : '', count].filter(Boolean).join(' · ');
-  return { title, foot, label: [title, card.when, foot].filter(Boolean).join(', ') };
+  const answering = card.answering ? t('chat.history.answeringLabel') : '';
+  return { title, foot, label: [title, card.when, answering, foot].filter(Boolean).join(', ') };
+}
+
+/**
+ * Goose still answering in a conversation: the spinner a reply carries under
+ * it in the thread, and the word, in the foot's own type. The list's rows show
+ * it in place of the time.
+ */
+export function AnsweringMark() {
+  const theme = useInkTheme();
+  const text = useCardText();
+  const { t } = useTranslation();
+  return (
+    <View style={[local.answering, { gap: theme.space[2] }]}>
+      <InkSpinner label={t('chat.history.answeringLabel')} size={12} />
+      <Text style={[text.foot, { color: theme.color.textSecondary }]} numberOfLines={1}>
+        {t('chat.history.answering')}
+      </Text>
+    </View>
+  );
 }
 
 /**
@@ -348,6 +368,8 @@ export const ConversationCard = React.memo(function ConversationCard({
               onDelete={() => onDelete(card.id)}
               onKeep={onKeep}
             />
+          ) : card.answering ? (
+            <AnsweringMark />
           ) : foot ? (
             <Text style={text.foot} numberOfLines={1}>
               {foot}
@@ -415,4 +437,5 @@ const local = StyleSheet.create({
   },
   corner: { position: 'absolute' },
   ghost: { opacity: 0.7 },
+  answering: { flexDirection: 'row', alignItems: 'center' },
 });

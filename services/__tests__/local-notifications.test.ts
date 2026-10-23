@@ -77,6 +77,11 @@ describe('openTapped', () => {
     open.mockRestore();
   });
 
+  it('opens the conversation a finished reply names', () => {
+    tap({ id: 'reply-r1', category: 'reply', open: 'conversation', session_id: 's-1' });
+    expect(mockPush).toHaveBeenCalledWith({ pathname: '/conversation', params: { session: 's-1' } });
+  });
+
   it('acts on one tap once, however many times it is delivered', () => {
     tap({ open: 'devices' }, 'same');
     tap({ open: 'devices' }, 'same');
@@ -101,5 +106,20 @@ describe('presentLocally', () => {
       open: 'schedule',
       schedule_id: 'sched-1',
     });
+  });
+
+  it('keeps the conversation a reply notice opens, under the run it reports on', async () => {
+    await presentLocally({
+      id: 'reply-r1',
+      target: 'local',
+      category: 'reply',
+      title: 'Rain',
+      body: 'Not today.',
+      timestamp: '2026-10-23T10:00:00Z',
+      data: { open: 'conversation', session_id: 's-1' },
+    });
+    const request = mockSchedule.mock.calls[mockSchedule.mock.calls.length - 1][0];
+    expect(request.identifier).toBe('reply-r1');
+    expect(request.content.data).toEqual({ id: 'reply-r1', category: 'reply', open: 'conversation', session_id: 's-1' });
   });
 });

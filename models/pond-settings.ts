@@ -90,6 +90,7 @@ export type SpecialId =
   | 'primaryProfile'
   | 'theme'
   | 'haptics'
+  | 'replyNotices'
   | 'posture';
 
 export type SliderFormat = 'pace' | 'creativity' | 'fraction';

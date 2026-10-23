@@ -116,6 +116,8 @@
       "messages_one": "{{count}} message",
       "messages_other": "{{count}} messages",
       "routine": "Routine",
+      "answering": "Answering",
+      "answeringLabel": "Goose is answering",
       "openHint": "Opens the conversation",
       "delete": "Delete",
       "keep": "Keep",
@@ -158,6 +160,12 @@
     },
     "busy": "Your Pond is answering too much at once. Try again in a moment.",
     "lostConnection": "The connection dropped mid-answer. This is what your Pond saved.",
+    "notice": {
+      "answeredTitle": "Goose answered",
+      "answeredBody": "The answer is ready.",
+      "failedTitle": "Goose couldn't answer",
+      "failedBody": "Something went wrong before Goose finished answering."
+    },
     "dismiss": "Dismisses the message",
     "attachedPicture": "Attached picture {{index}}",
     "composer": {
@@ -429,6 +437,7 @@
       "soundQuality": "Sound quality",
       "wakeWord": "Wake word",
       "whileItAnswers": "While it answers",
+      "onThisPhone": "On this phone",
       "hearingItsName": "Hearing its name",
       "transcription": "Turning speech into text",
       "beforeAnswering": "Before answering",
@@ -482,6 +491,7 @@
       "quietHours": "Goose stays quiet between these times, even when it has news.",
       "retention": "Zero keeps things for good.",
       "haptics": "Small taps you feel when you flip a switch or finish something.",
+      "replyNotices": "Nothing extra while you are reading the conversation. Your phone's own settings can still silence these.",
       "engine": "Where Goose runs. Leave these alone unless you run models somewhere other than your Pond.",
       "cost": "What a cloud service would charge, so your Pond can show what it saved you."
     },
@@ -1195,6 +1205,10 @@
       "dark": "Dark"
     },
     "hapticsLabel": "Haptic feedback",
+    "replyNotices": {
+      "label": "Tell me when Goose answers",
+      "hint": "A notification when a reply finishes while you are on another screen or away from the app."
+    },
     "posture": {
       "hears": "listens",
       "hearsNothing": "hears nothing",

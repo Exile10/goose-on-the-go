@@ -29,11 +29,13 @@ import type { ServerNotification } from './notification-stream';
 
 /**
  * Android groups notifications by channel, and the channel — not the individual
- * notification — decides whether one may interrupt. Two channels, because a
- * security alert and a schedule result should not arrive the same way.
+ * notification — decides whether one may interrupt. A security alert and a
+ * schedule result should not arrive the same way, and replies get their own so
+ * the phone's settings can quiet them without quieting the rest.
  */
 const ALERT_CHANNEL = 'giap-alerts';
 const INFO_CHANNEL = 'giap-info';
+const REPLY_CHANNEL = 'giap-replies';
 
 /** Categories that warrant a heads-up rather than a quiet shade entry. */
 const URGENT = new Set(['alert', 'action_required']);
@@ -70,6 +72,15 @@ async function createChannels(Notifications: NotificationsModule): Promise<void>
     name: 'Updates',
     importance: Notifications.AndroidImportance.DEFAULT,
   });
+  await Notifications.setNotificationChannelAsync(REPLY_CHANNEL, {
+    name: 'Replies',
+    importance: Notifications.AndroidImportance.DEFAULT,
+  });
+}
+
+function channelFor(category: string): string {
+  if (URGENT.has(category)) return ALERT_CHANNEL;
+  return category === 'reply' ? REPLY_CHANNEL : INFO_CHANNEL;
 }
 
 /**
@@ -121,7 +132,7 @@ export async function presentLocally(notification: ServerNotification): Promise<
       // A bare `{ channelId }` is the immediate, channel-aware trigger.
       trigger:
         Platform.OS === 'android'
-          ? { channelId: URGENT.has(notification.category) ? ALERT_CHANNEL : INFO_CHANNEL }
+          ? { channelId: channelFor(notification.category) }
           : null, // iOS has no channels; null is immediate.
     });
   } catch (e) {
@@ -147,6 +158,7 @@ function actionData(data: unknown): Record<string, unknown> {
 function openData(data: unknown): Record<string, unknown> {
   const route = openRouteFromData(data);
   if (!route) return {};
+  if (route.open === 'conversation') return { open: route.open, session_id: route.sessionId };
   if (route.open !== 'schedule') return { open: route.open };
   return {
     open: route.open,
@@ -196,8 +208,8 @@ function openTapped(Notifications: NotificationsModule, response: NotificationRe
 
 /**
  * Open ride and directions links, the ride screen for a ride offer, and the
- * schedules, devices or chat screen the Pond names, when their notification is
- * tapped, including the tap that launched the app.
+ * schedules, devices, chat or conversation screen named, when their
+ * notification is tapped, including the tap that launched the app.
  * Returns the unsubscribe.
  */
 export function watchLinkTaps(): () => void {

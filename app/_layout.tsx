@@ -35,6 +35,7 @@ import '@/services/i18n';
 import { ServerProvider } from '@/providers/server-provider';
 import { ConfirmProvider } from '@/providers/confirm-provider';
 import { loadHapticsPreference } from '@/services/haptics';
+import { loadReplyNoticePreference } from '@/services/reply-notices';
 
 /**
  * Keep the splash up until the app can draw itself.
@@ -99,6 +100,7 @@ export default function RootLayout() {
       console.warn('[fonts] deferred fonts failed to load', e),
     );
     void loadHapticsPreference();
+    void loadReplyNoticePreference();
   }, []);
 
   if (!fontsLoaded && !fontError) {

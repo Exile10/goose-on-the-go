@@ -503,6 +503,12 @@ const announcements: SettingsPage = {
   titleKey: 'screens.settingsAnnouncements',
   descriptionKey: 'settings.page.announcements',
   sections: [
+    // Kept on the phone rather than the Pond: it is about this phone's notifications.
+    {
+      titleKey: 'settings.section.onThisPhone',
+      footerKey: 'settings.footer.replyNotices',
+      items: [{ kind: 'special', id: 'replyNotices' }],
+    },
     {
       titleKey: 'settings.section.speakingUp',
       items: [

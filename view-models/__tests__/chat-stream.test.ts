@@ -14,10 +14,10 @@ import { GREETINGS_PER_PERIOD, SUBTITLES, THINKING_QUIPS, WORKING_QUIPS, periodO
 import { bareToolName, humanizeTool, sourcesOf } from '@/constants/tools';
 import type { Message } from '@/models/chat';
 import type { SessionMessage } from '@/services/types';
+import { applyFrame, cardOf } from '@/services/chat-runs';
 import {
-  applyFrame,
-  cardOf,
   derivedTitle,
+  endsUnanswered,
   fromHistory,
   statusFor,
   titleFromThread,
@@ -292,5 +292,24 @@ describe('the quip and greeting catalogue', () => {
       'evening',
       'night',
     ]);
+  });
+});
+
+describe('endsUnanswered', () => {
+  const at = '2026-10-23T10:00:00Z';
+  const row = (role: SessionMessage['role'], id: string): SessionMessage => ({
+    id,
+    session_id: 's1',
+    role,
+    content: role,
+    created_at: at,
+  });
+
+  it('is true only where a turn can still be running: after a question with no answer yet', () => {
+    expect(endsUnanswered([row('user', '1')])).toBe(true);
+    // A turn saves its tool results as it goes and its answer only at the end.
+    expect(endsUnanswered([row('user', '1'), row('tool', '2')])).toBe(true);
+    expect(endsUnanswered([row('user', '1'), row('tool', '2'), row('assistant', '3')])).toBe(false);
+    expect(endsUnanswered([])).toBe(false);
   });
 });

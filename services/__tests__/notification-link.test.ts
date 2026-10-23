@@ -121,6 +121,12 @@ describe('openRouteFromData', () => {
     expect(openRouteFromData({ open: 'schedule', schedule_id: 'x'.repeat(129) })).toEqual({ open: 'schedule' });
   });
 
+  it('reads the conversation a finished reply names, and lands on the wall without one', () => {
+    expect(openRouteFromData({ open: 'conversation', session_id: RUN })).toEqual({ open: 'conversation', sessionId: RUN });
+    expect(openRouteFromData({ open: 'conversation', session_id: '../settings' })).toEqual({ open: 'chat' });
+    expect(openRouteFromData({ open: 'conversation' })).toEqual({ open: 'chat' });
+  });
+
   it('ignores a screen outside the allow-list, and data with no open', () => {
     expect(openRouteFromData({ open: 'settings-advanced' })).toBeNull();
     expect(openRouteFromData({ open: '/(stack)/developer' })).toBeNull();
@@ -134,6 +140,10 @@ describe('screenPath', () => {
   it('maps each route to its screen', () => {
     expect(screenPath({ open: 'devices' })).toBe('/(tabs)/devices');
     expect(screenPath({ open: 'chat' })).toBe('/(tabs)/chat');
+    expect(screenPath({ open: 'conversation', sessionId: 's-1' })).toEqual({
+      pathname: '/conversation',
+      params: { session: 's-1' },
+    });
   });
 
   it('opens the schedules list on the schedule the notification names', () => {
