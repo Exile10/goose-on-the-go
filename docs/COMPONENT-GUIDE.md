@@ -239,7 +239,7 @@ masked field; nothing here asks it to save one.
 | GreetingCard | name, prompts, onPick | The opening of a conversation that has not started |
 | MessageRow | message, position, status | One turn of the conversation |
 | Markdown | source | A reply's markdown in Ink's type: bold through `inkText`, emphasis as weight where a span cannot slant, code and tables scrolling sideways, only `http(s)` links opening |
-| ToolCard, SourceChips | tool / tools | What Goose did on the way to its answer |
+| ToolTrail | tools, done | Under an answer: the cards its tools drew, the pages it read (web search, Wikipedia, Wolfram) as Sources, then a chip per step whose raw answer opens below the row |
 | ThinkingQuips | status, seed | What shows before Goose has written anything |
 | ChatDock | onSend, onVoice, onAttach | The composer: attach, the field, speak or send |
 | AnsweringEdge, AnsweringNote | active (, radius) | While Goose answers: a glint running along the field's top border, over both corners, in place of a spinner; and the can-make-mistakes reminder under the composer, fading 4 s after the answer is in |

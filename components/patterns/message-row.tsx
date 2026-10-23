@@ -4,14 +4,14 @@
  * What a person said is a bubble, Ink's, with any pictures they sent above it.
  * What Goose said is not: it is the page's text, full width, set from the
  * markdown the model writes, the way pond-desktop sets a reply — a bubble
- * around every answer makes a long one a box to scroll inside. Above the answer, what Goose did to reach it, as
- * tool cards in the order it did them; below it, the pages it read. While a
- * reply has no words yet, the thinking line holds its place. Once it has them,
- * the turn can still be running — the Pond can take another model pass after
- * the words appear before it calls the turn done — so a small spinner stays
- * under them until it does, with the Pond's own status beside it when it gives
- * one. Without it, a message queued behind a finished-looking answer looks
- * stuck.
+ * around every answer makes a long one a box to scroll inside. Below the
+ * answer, what Goose did to reach it: the facts its tools drew, the pages it
+ * read, and a chip for each step. While a reply has no words yet, the thinking
+ * line holds its place. Once it has them, the turn can still be running — the
+ * Pond can take another model pass after the words appear before it calls the
+ * turn done — so the composer's glowing line keeps going until it does, with
+ * the Pond's own status under the words when it gives one. Without it, a
+ * message queued behind a finished-looking answer looks stuck.
  *
  * A message written while Goose was still answering sits at the foot of the
  * thread, where it will be asked, drawn as Ink's bubble in its sending state
@@ -24,11 +24,11 @@ import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Image } from 'expo-image';
 import { useTranslation } from 'react-i18next';
-import { InkBubble, InkSpinner, inkText, useInkTheme, type BubblePosition } from '@jarida/ink/native';
+import { InkBubble, inkText, useInkTheme, type BubblePosition } from '@jarida/ink/native';
 
 import { Markdown } from '@/components/patterns/markdown';
 import { ThinkingQuips } from '@/components/patterns/thinking-quips';
-import { SourceChips, ToolCard } from '@/components/patterns/tool-card';
+import { ToolTrail } from '@/components/patterns/tool-card';
 import { GIcon } from '@/components/ui/g-icon';
 import { GPressable } from '@/components/ui/g-pressable';
 import type { ChatImage, Message } from '@/models/chat';
@@ -110,7 +110,6 @@ export const MessageRow = React.memo(function MessageRow({
   onUnqueue,
 }: MessageRowProps) {
   const theme = useInkTheme();
-  const { t } = useTranslation();
 
   if (message.role === 'user') {
     return (
@@ -136,26 +135,14 @@ export const MessageRow = React.memo(function MessageRow({
 
   return (
     <View style={styles.theirs}>
-      {message.tools?.length ? (
-        <View style={styles.tools}>
-          {message.tools.map((tool) => (
-            <ToolCard key={tool.id} tool={tool} />
-          ))}
-        </View>
-      ) : null}
       {message.content ? <Markdown source={message.content} /> : null}
       {waiting ? <ThinkingQuips status={status} seed={turnSeed} /> : null}
-      {unfinished ? (
-        <View style={styles.afterword}>
-          <InkSpinner label={status ?? t('chat.stillAnswering')} size={12} />
-          {status ? (
-            <Text style={note.style} numberOfLines={1}>
-              {status}
-            </Text>
-          ) : null}
-        </View>
+      {unfinished && status ? (
+        <Text style={note.style} numberOfLines={1} accessibilityLiveRegion="polite">
+          {status}
+        </Text>
       ) : null}
-      {!message.pending ? <SourceChips tools={message.tools} /> : null}
+      {message.tools?.length ? <ToolTrail tools={message.tools} done={!message.pending} /> : null}
     </View>
   );
 });
@@ -163,8 +150,6 @@ export const MessageRow = React.memo(function MessageRow({
 const styles = StyleSheet.create({
   mine: { alignItems: 'flex-end', gap: 6, marginBottom: 10 },
   theirs: { gap: 10, marginBottom: 18, paddingRight: 8 },
-  tools: { gap: 8 },
-  afterword: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   pictures: { alignItems: 'flex-end' },
   // Ink's bubble dims to this while sending; its pictures match it.
   waiting: { opacity: 0.6 },

@@ -1,5 +1,5 @@
 /**
- * ToolCard — one thing Goose did on the way to its answer.
+ * ToolTrail — what Goose did on the way to its answer, under it.
  *
  * Two shapes. A tool whose answer is a fact a person wants to see — the
  * weather, the devices it found, the time, the article it read — draws that
@@ -8,7 +8,7 @@
  * running, and its raw answer one tap away, because that answer was written
  * for the model and is best kept out of the reader's way until asked for.
  *
- * Cards lie flat on a hairline. The answer below them is what the turn is
+ * It all lies flat on a hairline under the answer, which is what the turn is
  * for; a tool card wearing the plate would outrank it. A reopened conversation
  * has no card hints — the Pond strips them before saving — so its tools come
  * back as chips, with the text their card would have drawn from.
@@ -18,7 +18,7 @@ import React, { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import * as WebBrowser from 'expo-web-browser';
-import { InkEdge, InkEyebrow, InkSpinner, inkText, useInkTheme } from '@jarida/ink/native';
+import { InkEdge, InkEyebrow, inkText, useInkTheme } from '@jarida/ink/native';
 
 import { GIcon } from '@/components/ui/g-icon';
 import { GPressable } from '@/components/ui/g-pressable';
@@ -159,156 +159,192 @@ const CARDS: Record<string, React.ComponentType<{ data: Data }>> = {
   memory: Memories,
 };
 
-export const ToolCard = React.memo(function ToolCard({ tool }: { tool: ToolCall }) {
+/** A finished tool that asked to be drawn as a card this app knows how to draw. */
+const hasFact = (tool: ToolCall) => Boolean(tool.card && tool.status !== 'running' && CARDS[tool.card.type]);
+
+const expandable = (tool: ToolCall) => tool.status !== 'running' && bodyOf(tool.result).length > 0;
+
+const FactCard = React.memo(function FactCard({ tool }: { tool: ToolCall }) {
   const theme = useInkTheme();
-  const { t } = useTranslation();
-  const [open, setOpen] = useState(false);
-
-  const words = toolWords(tool.name);
-  const label = words ? t(words.label) : humanizeTool(tool.name);
-  const Card = tool.card ? CARDS[tool.card.type] : undefined;
-
-  if (Card && tool.card && tool.status !== 'running') {
-    return (
-      <InkEdge raised={false} budgeted={false} radius={theme.radius.lg} contentStyle={styles.card}>
-        <Card data={tool.card.data} />
-      </InkEdge>
-    );
-  }
-
-  const body = bodyOf(tool.result);
-  const expandable = tool.status !== 'running' && body.length > 0;
-  const chipText = inkText(theme, { role: 'mono', size: 'xs', weight: theme.weight.medium, color: theme.color.textSecondary });
-  const resultText = inkText(theme, { role: 'mono', size: 'xs', color: theme.color.textSecondary });
-
+  const Card = tool.card && tool.status !== 'running' ? CARDS[tool.card.type] : undefined;
+  if (!Card || !tool.card) return null;
   return (
-    <View style={styles.chipWrap}>
-      <GPressable
-        feedback="tint"
-        disabled={!expandable}
-        onPress={() => {
-          void selectionTick();
-          setOpen((o) => !o);
-        }}
-        accessibilityRole={expandable ? 'button' : 'text'}
-        accessibilityLabel={
-          tool.status === 'running'
-            ? t('chat.tools.runningLabel', { tool: label })
-            : tool.status === 'error'
-              ? t('chat.tools.failedLabel', { tool: label })
-              : label
-        }
-        accessibilityState={expandable ? { expanded: open } : undefined}
-        style={[
-          styles.chip,
-          {
-            borderColor: theme.color.lineStrong,
-            borderWidth: theme.edge.hairlineWidth,
-            borderRadius: theme.radius.md,
-          },
-        ]}
-      >
-        {tool.status === 'running' ? (
-          <InkSpinner label={label} size={12} />
-        ) : (
-          <GIcon
-            name={tool.status === 'error' ? 'warn' : toolIcon(tool.name)}
-            size={13}
-            color={tool.status === 'error' ? theme.color.dangerFg : theme.color.textSecondary}
-          />
-        )}
-        <Text style={chipText.style} numberOfLines={1}>
-          {label}
-        </Text>
-        {expandable ? (
-          <GIcon name={open ? 'chevron' : 'chevron-right'} size={12} color={theme.color.textTertiary} />
-        ) : null}
-      </GPressable>
-      {open && expandable ? (
-        <View
-          style={[
-            styles.result,
-            { borderColor: theme.color.line, borderWidth: theme.edge.hairlineWidth, borderRadius: theme.radius.md },
-          ]}
-        >
-          <Text style={resultText.style} selectable>
-            {body.length > RESULT_PREVIEW ? `${body.slice(0, RESULT_PREVIEW).trimEnd()}…` : body}
-          </Text>
-        </View>
-      ) : null}
-    </View>
+    <InkEdge raised={false} budgeted={false} radius={theme.radius.lg} contentStyle={styles.card}>
+      <Card data={tool.card.data} />
+    </InkEdge>
   );
 });
 
-/** The pages a reply read from, as chips under it: the first, and how many more. */
-export function SourceChips({ tools }: { tools: ToolCall[] | undefined }) {
+// A running tool is drawn dimmed, not spun: the composer's line already says the turn is alive.
+function ToolChip({ tool, open, onToggle }: { tool: ToolCall; open: boolean; onToggle: () => void }) {
+  const theme = useInkTheme();
+  const { t } = useTranslation();
+  const words = toolWords(tool.name);
+  const label = words ? t(words.label) : humanizeTool(tool.name);
+  const running = tool.status === 'running';
+  const failed = tool.status === 'error';
+  const canOpen = expandable(tool);
+  const ink = running ? theme.color.textTertiary : theme.color.textSecondary;
+  const text = inkText(theme, { role: 'mono', size: 'xs', weight: theme.weight.medium, color: ink });
+  return (
+    <GPressable
+      feedback="tint"
+      disabled={!canOpen}
+      onPress={() => {
+        void selectionTick();
+        onToggle();
+      }}
+      accessibilityRole={canOpen ? 'button' : 'text'}
+      accessibilityLabel={
+        running ? t('chat.tools.runningLabel', { tool: label }) : failed ? t('chat.tools.failedLabel', { tool: label }) : label
+      }
+      accessibilityState={canOpen ? { expanded: open } : undefined}
+      style={[
+        styles.chip,
+        {
+          borderColor: theme.color.lineStrong,
+          borderWidth: theme.edge.hairlineWidth,
+          borderRadius: theme.radius.md,
+          backgroundColor: open ? theme.color.neutralSoft : undefined,
+        },
+      ]}
+    >
+      <GIcon name={failed ? 'warn' : toolIcon(tool.name)} size={13} color={failed ? theme.color.dangerFg : ink} />
+      <Text style={text.style} numberOfLines={1}>
+        {label}
+      </Text>
+      {canOpen ? <GIcon name={open ? 'chevron' : 'chevron-right'} size={12} color={theme.color.textTertiary} /> : null}
+    </GPressable>
+  );
+}
+
+function ResultPanel({ tool }: { tool: ToolCall }) {
+  const theme = useInkTheme();
+  const body = bodyOf(tool.result);
+  const text = inkText(theme, { role: 'mono', size: 'xs', color: theme.color.textSecondary });
+  return (
+    <View
+      style={[
+        styles.result,
+        { borderColor: theme.color.line, borderWidth: theme.edge.hairlineWidth, borderRadius: theme.radius.md },
+      ]}
+    >
+      <Text style={text.style} selectable>
+        {body.length > RESULT_PREVIEW ? `${body.slice(0, RESULT_PREVIEW).trimEnd()}…` : body}
+      </Text>
+    </View>
+  );
+}
+
+/** Enough to judge where an answer came from without a search's whole first page. */
+const SOURCES_SHOWN = 3;
+
+/** The pages a reply read from, each one a tap away from the in-app browser. */
+function Sources({ tools }: { tools: ToolCall[] }) {
   const theme = useInkTheme();
   const { t } = useTranslation();
   const [all, setAll] = useState(false);
   const sources = sourcesOf(tools);
   if (sources.length === 0) return null;
-  const shown = all ? sources : sources.slice(0, 1);
-  const text = inkText(theme, { role: 'mono', size: 'xs', weight: theme.weight.medium, color: theme.color.textSecondary });
-  const chip = {
-    borderColor: theme.color.lineStrong,
-    borderWidth: theme.edge.hairlineWidth,
-    borderRadius: theme.radius.pill,
-    backgroundColor: theme.color.chrome,
-  };
+  const shown = all ? sources : sources.slice(0, SOURCES_SHOWN);
+  const title = inkText(theme, { size: 'base', weight: theme.weight.semibold, leading: 'snug' });
+  const site = inkText(theme, { role: 'mono', size: 'xs', color: theme.color.textTertiary });
+  const more = inkText(theme, { size: 'sm', weight: theme.weight.medium, color: theme.color.accentLine });
+  const rule = { borderTopWidth: theme.edge.hairlineWidth, borderTopColor: theme.color.line };
   return (
-    <View style={styles.sources}>
-      {shown.map((s) => (
+    <InkEdge raised={false} budgeted={false} radius={theme.radius.lg} contentStyle={styles.sourceCard}>
+      <View style={styles.sourceHead}>
+        <InkEyebrow>{t('chat.tools.sources')}</InkEyebrow>
+      </View>
+      {shown.map((s, i) => (
         <GPressable
           key={s.url}
           feedback="tint"
           onPress={() => void WebBrowser.openBrowserAsync(s.url)}
           accessibilityRole="link"
-          accessibilityLabel={t('chat.tools.openSource', { source: s.label })}
-          style={[styles.source, chip]}
+          accessibilityLabel={t('chat.tools.openSource', { source: s.title })}
+          style={[styles.source, i > 0 ? rule : null]}
         >
-          <GIcon name="globe" size={12} color={theme.color.textSecondary} />
-          <Text style={text.style} numberOfLines={1}>
-            {s.label}
-          </Text>
+          <View style={styles.sourceText}>
+            <Text style={title.style} numberOfLines={2}>
+              {s.title}
+            </Text>
+            {s.site !== s.title ? (
+              <Text style={site.style} numberOfLines={1}>
+                {s.site}
+              </Text>
+            ) : null}
+          </View>
+          <GIcon name="external" size={13} color={theme.color.textTertiary} />
         </GPressable>
       ))}
-      {!all && sources.length > 1 ? (
+      {!all && sources.length > SOURCES_SHOWN ? (
         <Pressable
-          onPress={() => setAll(true)}
+          onPress={() => {
+            void selectionTick();
+            setAll(true);
+          }}
           accessibilityRole="button"
-          accessibilityLabel={t('chat.tools.moreSources', { count: sources.length - 1 })}
-          style={[styles.source, chip]}
+          style={[styles.source, rule]}
         >
-          <Text style={text.style}>{`+${sources.length - 1}`}</Text>
+          <Text style={more.style}>{t('chat.tools.moreSources', { count: sources.length - SOURCES_SHOWN })}</Text>
         </Pressable>
       ) : null}
-    </View>
+    </InkEdge>
   );
 }
 
+/**
+ * Everything under an answer, most useful first: the facts a tool drew, the
+ * pages it read, then a chip for each step. A chip's raw answer opens below the
+ * row at full width, not inside the chip's own narrow column.
+ */
+export const ToolTrail = React.memo(function ToolTrail({ tools, done }: { tools: ToolCall[]; done: boolean }) {
+  const [openId, setOpenId] = useState<string | null>(null);
+  const chips = tools.filter((tool) => !hasFact(tool));
+  const open = chips.find((tool) => tool.id === openId && expandable(tool));
+  return (
+    <View style={styles.trail}>
+      {tools.map((tool) => (
+        <FactCard key={tool.id} tool={tool} />
+      ))}
+      {done ? <Sources tools={tools} /> : null}
+      {chips.length > 0 ? (
+        <View style={styles.chips}>
+          {chips.map((tool) => (
+            <ToolChip
+              key={tool.id}
+              tool={tool}
+              open={tool.id === open?.id}
+              onToggle={() => setOpenId((id) => (id === tool.id ? null : tool.id))}
+            />
+          ))}
+        </View>
+      ) : null}
+      {open ? <ResultPanel tool={open} /> : null}
+    </View>
+  );
+});
+
 const styles = StyleSheet.create({
+  trail: { gap: 8, marginTop: 2 },
   card: { padding: 14 },
   cardBody: { gap: 6 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   shrink: { flexShrink: 1 },
   dot: { width: 8, height: 8, borderRadius: 4 },
-  chipWrap: { alignSelf: 'flex-start', gap: 6, maxWidth: '100%' },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   chip: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    alignSelf: 'flex-start',
     paddingHorizontal: 9,
     paddingVertical: 5,
     maxWidth: '100%',
   },
   result: { padding: 10 },
-  sources: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  source: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-  },
+  sourceCard: { paddingVertical: 4 },
+  sourceHead: { paddingHorizontal: 14, paddingTop: 10, paddingBottom: 2 },
+  source: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 10 },
+  sourceText: { flex: 1, gap: 2 },
 });
