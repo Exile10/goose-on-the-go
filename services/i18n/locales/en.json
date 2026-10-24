@@ -82,6 +82,7 @@
     "queued": "Queued",
     "unqueue": "Remove queued message",
     "stillAnswering": "Goose is still answering",
+    "mistakes": "goose can make mistakes. Verify important information.",
     "newConversation": "New conversation",
     "starters": {
       "capabilities": "What can you do?",
@@ -207,6 +208,7 @@
       "toolGroup": "Tools ready",
       "weather": "Weather",
       "wikipedia": "Wikipedia",
+      "webSearch": "Web search",
       "computed": "Computed",
       "schedules": "Schedules",
       "createSchedule": "Create schedule",
@@ -232,6 +234,7 @@
       "doingWeather": "Checking the weather…",
       "doingToolGroup": "Getting the right tools out…",
       "doingLookup": "Reading up on it…",
+      "doingWebSearch": "Searching the web…",
       "doingCompute": "Working it out…",
       "doingSchedules": "Looking up your schedules…",
       "doingSaveMemory": "Saving that for later…",
@@ -251,6 +254,7 @@
       "recalled_other": "Recalled {{count}} memories",
       "runningLabel": "{{tool}}, running",
       "failedLabel": "{{tool}}, did not finish",
+      "sources": "Sources",
       "openSource": "Open {{source}}",
       "moreSources_one": "{{count}} more source",
       "moreSources_other": "{{count}} more sources"

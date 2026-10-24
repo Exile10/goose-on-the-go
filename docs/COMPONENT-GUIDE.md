@@ -238,9 +238,11 @@ masked field; nothing here asks it to save one.
 | WallDock, WallMenu, WallSelectionBar | — | The wall's search and compose, its view menu, and its selection actions |
 | GreetingCard | name, prompts, onPick | The opening of a conversation that has not started |
 | MessageRow | message, position, status | One turn of the conversation |
-| ToolCard, SourceChips | tool / tools | What Goose did on the way to its answer |
+| Markdown | source | A reply's markdown in Ink's type: bold through `inkText`, emphasis as weight where a span cannot slant, code and tables scrolling sideways, only `http(s)` links opening |
+| ToolTrail | tools, done | Under an answer: the cards its tools drew, the pages it read (web search, Wikipedia, Wolfram) as Sources, then a chip per step whose raw answer opens below the row |
 | ThinkingQuips | status, seed | What shows before Goose has written anything |
 | ChatDock | onSend, onVoice, onAttach | The composer: attach, the field, speak or send |
+| AnsweringLight, AnsweringWash, AnsweringNote | light, field, radius / active | While Goose answers, in place of a spinner: a light behind the composer running along the field's top border, rimming the field and its buttons and washing faintly over them (`useAnsweringLight` drives both); and the can-make-mistakes reminder in its own band under the composer, fading 4 s after the answer is in |
 | AttachMenu | open, onClose, onChoose | Camera, Photos or Files, from the composer |
 | VoiceDock | send, stop, onClose | Voice mode, in the composer's place |
 | VoiceOrb | state, level, size, onPress, accessibilityLabel | The voice control, and the face Goose talks with |
