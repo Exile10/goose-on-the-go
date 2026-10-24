@@ -252,9 +252,15 @@ up; a node that does not start within the budget is reported as unavailable. Hom
 Pond card says it is looking for the Pond while a reconnect is in progress,
 rather than "Pond unreachable" beside a banner saying it is reconnecting.
 
-Failures use coalesced, bounded recovery with stale-generation rejection and no
-background probes. NetInfo uses native reachability, never an external internet
-check or SSID collection. While connected remotely on Wi-Fi, six bounded LAN
+Failures use coalesced recovery with stale-generation rejection and no
+background probes. A Pond that does not answer is checked again after 1, 2, 4, 8
+and 16 s, then every 30 s for as long as the app is in front, each wait jittered
+by up to a quarter either way. The checks at 30 s are quiet: `disconnected` stays
+on screen until one succeeds. Until 2026-10-24 the checks stopped after the
+sixth, about a minute in, and a foregrounded app said "Pond is unavailable" for
+two hours after the Pond was back, until it was backgrounded and reopened.
+NetInfo uses native reachability, never an external internet check or SSID
+collection. While connected remotely on Wi-Fi, six bounded LAN
 rechecks can return to a local endpoint after a temporary outage without requiring
 another network event.
 
