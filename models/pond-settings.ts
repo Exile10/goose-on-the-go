@@ -261,6 +261,7 @@ export const SAMPLE_SETTINGS: PondSettings = {
   vision_fps: 2,
   vision_motion_threshold: 0.05,
   vision_classifier_model: '',
+  picture_support_download_enabled: false,
   matter_ws_url: 'ws://127.0.0.1:5580/giap',
   matter_ble_enabled: false,
   retention_event_log_days: 30,
