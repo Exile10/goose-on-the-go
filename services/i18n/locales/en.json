@@ -736,6 +736,10 @@
         "label": "Watch the camera",
         "hint": "Watch the camera for movement. Needs a camera attached to your Pond."
       },
+      "picture_support_download_enabled": {
+        "label": "Allow picture support downloads",
+        "hint": "Allow downloading vision encoder files (mmproj) for vision-capable models on budgeted devices."
+      },
       "vision_camera_url": {
         "label": "Camera address",
         "hint": "A network address, or a camera plugged into your Pond.",

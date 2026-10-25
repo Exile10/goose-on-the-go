@@ -479,6 +479,7 @@ const cameras: SettingsPage = {
       footerKey: 'settings.footer.restartCamera',
       items: [
         { kind: 'switch', key: 'vision_enabled', restart: true, labelKey: 'settings.field.vision_enabled.label', hintKey: 'settings.field.vision_enabled.hint' },
+        { kind: 'switch', key: 'picture_support_download_enabled', labelKey: 'settings.field.picture_support_download_enabled.label', hintKey: 'settings.field.picture_support_download_enabled.hint' },
         { kind: 'text', key: 'vision_camera_url', address: true, restart: true, labelKey: 'settings.field.vision_camera_url.label', hintKey: 'settings.field.vision_camera_url.hint', placeholderKey: 'settings.field.vision_camera_url.placeholder' },
         { kind: 'text', key: 'vision_camera_id', restart: true, labelKey: 'settings.field.vision_camera_id.label', hintKey: 'settings.field.vision_camera_id.hint', placeholderKey: 'settings.field.vision_camera_id.placeholder' },
         { kind: 'number', key: 'vision_fps', min: 1, max: 30, step: 1, unitKey: 'settings.unit.fps', restart: true, labelKey: 'settings.field.vision_fps.label', hintKey: 'settings.field.vision_fps.hint' },
