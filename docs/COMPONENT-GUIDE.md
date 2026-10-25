@@ -242,7 +242,7 @@ masked field; nothing here asks it to save one.
 | ToolTrail | tools, done | Under an answer: the cards its tools drew, the pages it read (web search, Wikipedia, Wolfram) as Sources, then a chip per step whose raw answer opens below the row |
 | ThinkingQuips | status, seed | What shows before Goose has written anything |
 | ChatDock | onSend, onVoice, onAttach | The composer: attach, the field, speak or send |
-| AnsweringLight, AnsweringWash, AnsweringNote | light, field, radius / active | While Goose answers, in place of a spinner: a light behind the composer running along the field's top border, rimming the field and its buttons and washing faintly over them (`useAnsweringLight` drives both); and the can-make-mistakes reminder in its own band under the composer, fading 4 s after the answer is in |
+| AnsweringLight, AnsweringWash, AnsweringNote | light, field, radius / note | While Goose answers, in place of a spinner: a light behind the composer running along the field's top border, rimming the field and its buttons and washing faintly over them (`useAnsweringLight` drives both); and the can-make-mistakes reminder, fading 4 s after the answer is in, in a band under the composer that opens with it and closes once it has faded (`useAnsweringNote`, whose `room` the dock pads by) |
 | AttachMenu | open, onClose, onChoose | Camera, Photos or Files, from the composer |
 | VoiceDock | send, stop, onClose | Voice mode, in the composer's place |
 | VoiceOrb | state, level, size, onPress, accessibilityLabel | The voice control, and the face Goose talks with |
