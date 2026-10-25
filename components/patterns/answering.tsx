@@ -261,12 +261,17 @@ export function AnsweringWash({ light, field, radius }: LightProps) {
   );
 }
 
-/** The reminder under the field: in as an answer starts, out a while after it ends. */
-export function AnsweringNote({ active }: { active: boolean }) {
-  const theme = useInkTheme();
-  const { t } = useTranslation();
+/** The band under the composer row that the note is set in: its line, with air above and below. */
+export const NOTE_ROOM = 24;
+
+/**
+ * The reminder's timing: in as an answer starts, out a while after it ends. The
+ * dock reads `room` too, so the band under the field is open only while the note
+ * is in it, and closes once the note has faded rather than under it.
+ */
+export function useAnsweringNote(active: boolean) {
   const [opacity] = useState(() => new RNAnimated.Value(0));
-  // Faded all the way out; until then a screen reader can still find it.
+  // Faded all the way out; until then a screen reader can still find it, and the band stays open.
   const [gone, setGone] = useState(true);
   const showing = active || !gone;
 
@@ -283,16 +288,25 @@ export function AnsweringNote({ active }: { active: boolean }) {
     return () => clearTimeout(timer);
   }, [active, opacity]);
 
-  const note = inkText(theme, { size: 'sm', leading: 'tight', color: theme.color.textTertiary });
+  return { opacity, showing, room: showing ? NOTE_ROOM : 0 };
+}
+
+export type AnsweringNoteState = ReturnType<typeof useAnsweringNote>;
+
+/** The reminder under the field, set in the band the dock opens for it. */
+export function AnsweringNote({ note }: { note: AnsweringNoteState }) {
+  const theme = useInkTheme();
+  const { t } = useTranslation();
+  const text = inkText(theme, { size: 'sm', leading: 'tight', color: theme.color.textTertiary });
   return (
     <View pointerEvents="none" style={styles.note}>
       <RNAnimated.Text
-        style={[note.style, styles.noteText, { opacity }]}
+        style={[text.style, styles.noteText, { opacity: note.opacity }]}
         numberOfLines={1}
         adjustsFontSizeToFit
         minimumFontScale={0.8}
-        accessibilityElementsHidden={!showing}
-        importantForAccessibility={showing ? 'yes' : 'no-hide-descendants'}
+        accessibilityElementsHidden={!note.showing}
+        importantForAccessibility={note.showing ? 'yes' : 'no-hide-descendants'}
         accessibilityLiveRegion="polite"
       >
         {t('chat.mistakes')}
@@ -300,9 +314,6 @@ export function AnsweringNote({ active }: { active: boolean }) {
     </View>
   );
 }
-
-/** The band under the composer row that the note is set in: its line, with air above and below. */
-export const NOTE_ROOM = 24;
 
 const styles = StyleSheet.create({
   pool: { position: 'absolute', left: 0 },
