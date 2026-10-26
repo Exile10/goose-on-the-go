@@ -4,10 +4,10 @@
  */
 
 import React, { useMemo, useState } from 'react';
-import { FlatList, Pressable, Text, TextInput, View } from 'react-native';
+import { FlatList, Pressable, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { InkSpinner } from '@jarida/ink/native';
+import { InkSearchField, InkSpinner } from '@jarida/ink/native';
 
 import { GIcon } from '@/components/ui/g-icon';
 import { Spacing } from '@/constants/spacing';
@@ -75,20 +75,13 @@ export function TimezonePickerScreen() {
         contentContainerStyle={padding}
         ListHeaderComponent={
           <>
-            <View style={styles.search}>
-              <GIcon name="search" size={18} color={colors.textTertiary} />
-              <TextInput
-                value={query}
-                onChangeText={setQuery}
-                placeholder={t('settings.timezone.search')}
-                placeholderTextColor={colors.textTertiary}
-                autoCapitalize="none"
-                autoCorrect={false}
-                returnKeyType="search"
-                accessibilityLabel={t('settings.timezone.search')}
-                style={styles.searchInput}
-              />
-            </View>
+            <InkSearchField
+              label={t('settings.timezone.search')}
+              value={query}
+              onChange={setQuery}
+              placeholder={t('settings.timezone.search')}
+              style={styles.search}
+            />
             {!query && phoneZone && phoneZone !== current ? (
               <SettingsGroup>
                 <SettingsRow label={t('settings.timezone.useDevice')} value={phoneZone} icon="device" tile="green" onPress={() => choose(phoneZone)} />
@@ -105,19 +98,7 @@ export function TimezonePickerScreen() {
 }
 
 const makeStyles = (c: SettingsColors, type: SettingsType, m: SettingsMetrics) => ({
-  search: {
-    flexDirection: 'row' as const,
-    alignItems: 'center' as const,
-    gap: Spacing.sm,
-    backgroundColor: c.group,
-    borderRadius: m.radius.md,
-    borderWidth: m.hairline,
-    borderColor: c.edge,
-    paddingHorizontal: Spacing.md,
-    minHeight: 44,
-    marginBottom: Spacing.lg,
-  },
-  searchInput: { ...type.body, flex: 1, paddingVertical: Spacing.sm },
+  search: { marginBottom: Spacing.lg },
   zone: {
     flexDirection: 'row' as const,
     alignItems: 'center' as const,

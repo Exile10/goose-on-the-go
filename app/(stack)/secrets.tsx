@@ -9,16 +9,14 @@
  */
 
 import React, { useCallback } from 'react';
-import { RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { InkButton, InkCard, InkNotice, InkSpinner, InkText, InkTitle, inkText, useInkTheme } from '@jarida/ink/native';
+import { InkButton, InkCard, InkInput, InkNotice, InkSpinner, InkText, InkTitle } from '@jarida/ink/native';
 
 import { GKeyboardView } from '@/components/ui/g-keyboard-view';
-import { Semantic } from '@/constants/colors';
 import type { ThemeColors } from '@/constants/colors';
-import { Radii } from '@/constants/radii';
 import { Spacing } from '@/constants/spacing';
-import { FontFamily, FontSize } from '@/constants/typography';
+import { FontSize, face } from '@/constants/typography';
 import { useThemedStyles } from '@/hooks/use-themed-styles';
 import { SECRET_KEY_MAX } from '@/models/secrets';
 import { useConfirm } from '@/providers/confirm-provider';
@@ -28,7 +26,6 @@ import { secretName, useSecrets, type SecretRow } from '@/view-models/use-secret
 export default function SecretsScreen() {
   const styles = useThemedStyles(makeStyles);
   const { t } = useTranslation();
-  const theme = useInkTheme();
   // Not `confirm`: that name is the success haptic here.
   const ask = useConfirm();
   const { data, loading, refreshing, saving, deleting, error, formError, notice, failed, actions } = useSecrets();
@@ -58,7 +55,6 @@ export default function SecretsScreen() {
 
   const handleRefresh = useCallback(() => void actions.refresh(), [actions]);
 
-  const errorText = inkText(theme, { size: 'sm', weight: theme.weight.medium, color: theme.color.dangerFg });
   const replacing = form?.kind === 'replace' ? data.keys.find((row) => row.key === form.key) ?? { key: form.key, labelKey: null } : null;
 
   return (
@@ -144,61 +140,50 @@ export default function SecretsScreen() {
             </InkTitle>
 
             {form.kind === 'add' ? (
-              <View style={styles.inputRow}>
-                <TextInput
-                  style={styles.input}
-                  value={data.draftKey}
-                  onChangeText={actions.setDraftKey}
-                  editable={!busy}
-                  maxLength={SECRET_KEY_MAX}
-                  accessibilityLabel={t('secrets.keyLabel')}
-                  placeholder={t('secrets.keyPlaceholder')}
-                  placeholderTextColor={theme.color.textTertiary}
-                  autoCapitalize="characters"
-                  autoCorrect={false}
-                  autoComplete="off"
-                  spellCheck={false}
-                  returnKeyType="next"
-                />
-              </View>
+              <InkInput
+                label={t('secrets.keyLabel')}
+                value={data.draftKey}
+                onChange={actions.setDraftKey}
+                disabled={busy}
+                placeholder={t('secrets.keyPlaceholder')}
+                inputProps={{
+                  maxLength: SECRET_KEY_MAX,
+                  autoCapitalize: 'characters',
+                  autoCorrect: false,
+                  autoComplete: 'off',
+                  spellCheck: false,
+                  returnKeyType: 'next',
+                }}
+              />
             ) : (
               <InkText size="sm" tone="secondary">
                 {t('secrets.replaceHelp')}
               </InkText>
             )}
 
-            <View style={[styles.inputRow, formError ? styles.inputRowInvalid : null]}>
-              <TextInput
-                style={styles.input}
-                value={data.draftValue}
-                onChangeText={actions.setDraftValue}
-                onSubmitEditing={() => void handleSave()}
-                secureTextEntry
-                editable={!busy}
-                accessibilityLabel={t('secrets.valueLabel')}
-                placeholder={form.kind === 'replace' ? t('secrets.valuePlaceholderReplace') : t('secrets.valuePlaceholder')}
-                placeholderTextColor={theme.color.textTertiary}
-                autoCapitalize="none"
-                autoCorrect={false}
-                autoComplete="off"
-                spellCheck={false}
-                textContentType="none"
-                importantForAutofill="no"
-                returnKeyType="done"
-              />
-            </View>
-
-            {formError ? (
-              <Text accessibilityRole="alert" style={errorText.style}>
-                {formError}
-              </Text>
-            ) : null}
+            <InkInput
+              label={t('secrets.valueLabel')}
+              type="password"
+              value={data.draftValue}
+              onChange={actions.setDraftValue}
+              onSubmit={() => void handleSave()}
+              disabled={busy}
+              invalid={formError ?? undefined}
+              placeholder={form.kind === 'replace' ? t('secrets.valuePlaceholderReplace') : t('secrets.valuePlaceholder')}
+              inputProps={{
+                autoComplete: 'off',
+                spellCheck: false,
+                textContentType: 'none',
+                importantForAutofill: 'no',
+                returnKeyType: 'done',
+              }}
+            />
 
             <View style={styles.actions}>
               <InkButton variant="quiet" onPress={actions.cancel} disabled={saving}>
                 {t('common.cancel')}
               </InkButton>
-              <InkButton variant="primary" onPress={() => void handleSave()} disabled={!data.canSave}>
+              <InkButton variant="primary" onPress={() => void handleSave()} disabled={!saving && !data.canSave} loading={saving}>
                 {saving ? t('secrets.saving') : t('common.save')}
               </InkButton>
             </View>
@@ -218,23 +203,7 @@ const makeStyles = (c: ThemeColors) =>
     row: { gap: Spacing.xs },
     rowText: { gap: Spacing.xs },
     rowActions: { flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', gap: Spacing.sm },
-    keyName: { fontFamily: FontFamily.mono, fontSize: FontSize.sm, color: c.textSecondary },
-    inputRow: {
-      backgroundColor: c.backgroundSecondary,
-      borderRadius: Radii.md,
-      borderWidth: 1,
-      borderColor: c.border,
-      paddingHorizontal: Spacing.md,
-      minHeight: 44,
-      justifyContent: 'center',
-    },
-    inputRowInvalid: { borderColor: Semantic.danger },
-    input: {
-      fontFamily: FontFamily.mono,
-      fontSize: FontSize.base,
-      color: c.text,
-      paddingVertical: Spacing.sm,
-    },
+    keyName: { ...face('mono', 'regular'), fontSize: FontSize.sm, color: c.textSecondary },
     actions: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: Spacing.sm },
     actionsEnd: { flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', gap: Spacing.sm },
   });

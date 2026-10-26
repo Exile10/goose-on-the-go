@@ -4,11 +4,11 @@
  */
 
 import React, { useCallback, useMemo, useState } from 'react';
-import { Alert, Keyboard, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { Alert, Keyboard, Pressable, ScrollView, Text, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { InkButton, InkEdge, InkTitle } from '@jarida/ink/native';
+import { InkButton, InkEdge, InkSearchField, InkTitle } from '@jarida/ink/native';
 
 import { IssueRows } from '@/components/settings/issue-page';
 import { PAGE_GUTTER } from '@/components/settings/settings-scroll';
@@ -178,27 +178,16 @@ export default function ProfileHub() {
       >
         <InkTitle style={styles.title}>{t('screens.settings')}</InkTitle>
 
-        <View style={styles.search}>
-          <GIcon name="search" size={18} color={colors.textTertiary} />
-          <TextInput
-            value={search.query}
-            onChangeText={search.setQuery}
-            placeholder={t('settings.search.placeholder')}
-            placeholderTextColor={colors.textTertiary}
-            autoCapitalize="none"
-            autoCorrect={false}
-            returnKeyType="search"
-            // The results are already on screen, so "Search" only puts the keyboard away.
-            onSubmitEditing={() => Keyboard.dismiss()}
-            accessibilityLabel={t('settings.search.label')}
-            style={styles.searchInput}
-          />
-          {search.query ? (
-            <Pressable onPress={search.clear} accessibilityRole="button" accessibilityLabel={t('settings.search.clear')} hitSlop={8}>
-              <GIcon name="x" size={18} color={colors.textTertiary} />
-            </Pressable>
-          ) : null}
-        </View>
+        <InkSearchField
+          label={t('settings.search.label')}
+          value={search.query}
+          // Clearing through the field resets the search the same way its own clear did.
+          onChange={(q) => (q ? search.setQuery(q) : search.clear())}
+          placeholder={t('settings.search.placeholder')}
+          // The results are already on screen, so "Search" only puts the keyboard away.
+          onSubmit={() => Keyboard.dismiss()}
+          style={styles.search}
+        />
 
         {search.result.mode === 'results' ? (
           <SearchResults results={search.result.results} query={search.query} onOpen={go} />
@@ -254,19 +243,7 @@ const makeStyles = (c: SettingsColors, type: SettingsType, m: SettingsMetrics) =
   safe: { flex: 1 },
   content: { paddingHorizontal: PAGE_GUTTER },
   title: { marginTop: Spacing.md, marginBottom: Spacing.lg },
-  search: {
-    flexDirection: 'row' as const,
-    alignItems: 'center' as const,
-    gap: Spacing.sm,
-    backgroundColor: c.group,
-    borderRadius: m.radius.md,
-    borderWidth: m.hairline,
-    borderColor: c.edge,
-    paddingHorizontal: Spacing.md,
-    minHeight: 44,
-    marginBottom: Spacing.lg,
-  },
-  searchInput: { ...type.body, flex: 1, paddingVertical: Spacing.sm },
+  search: { marginBottom: Spacing.lg },
   accountWrap: { marginBottom: Spacing.xl },
   account: {
     flexDirection: 'row' as const,

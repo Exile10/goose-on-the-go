@@ -10,17 +10,15 @@
  */
 
 import React, { useCallback } from 'react';
-import { RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { InkButton, InkCard, InkNotice, InkSpinner, InkText, InkTitle, inkText, useInkTheme } from '@jarida/ink/native';
+import { InkButton, InkCard, InkInput, InkNotice, InkSpinner, InkText, InkTitle } from '@jarida/ink/native';
 
 import { GKeyboardView } from '@/components/ui/g-keyboard-view';
 import { GPressable } from '@/components/ui/g-pressable';
-import { Semantic } from '@/constants/colors';
 import type { ThemeColors } from '@/constants/colors';
-import { Radii } from '@/constants/radii';
 import { Spacing } from '@/constants/spacing';
-import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
+import { FontSize, face } from '@/constants/typography';
 import { useThemedStyles } from '@/hooks/use-themed-styles';
 import { BRAVE_DASHBOARD_HOST, webSearchTone } from '@/models/web-search';
 import { useConfirm } from '@/providers/confirm-provider';
@@ -30,7 +28,6 @@ import { statusLabel, useWebSearch } from '@/view-models/use-web-search';
 export default function WebSearchScreen() {
   const styles = useThemedStyles(makeStyles);
   const { t } = useTranslation();
-  const theme = useInkTheme();
   // Not `confirm`: that name is the success haptic here.
   const ask = useConfirm();
   const { data, loading, refreshing, saving, removing, error, keyError, failed, unsupported, actions } = useWebSearch();
@@ -61,8 +58,6 @@ export default function WebSearchScreen() {
 
   const handleRefresh = useCallback(() => void actions.refresh(), [actions]);
 
-  const inputStyle = [styles.inputRow, keyError ? styles.inputRowInvalid : null];
-  const errorText = inkText(theme, { size: 'sm', weight: theme.weight.medium, color: theme.color.dangerFg });
 
   return (
     <GKeyboardView>
@@ -111,40 +106,31 @@ export default function WebSearchScreen() {
               {t('webSearch.help')}
             </InkText>
 
-            <View style={inputStyle}>
-              <TextInput
-                style={styles.input}
-                value={data.draft}
-                onChangeText={actions.setDraft}
-                onSubmitEditing={() => void handleSave()}
-                secureTextEntry
-                editable={!busy}
-                accessibilityLabel={t('webSearch.keyLabel')}
-                placeholder={data.configured ? t('webSearch.keyPlaceholderReplace') : t('webSearch.keyPlaceholder')}
-                placeholderTextColor={theme.color.textTertiary}
-                autoCapitalize="none"
-                autoCorrect={false}
-                autoComplete="off"
-                spellCheck={false}
-                textContentType="none"
-                importantForAutofill="no"
-                returnKeyType="done"
-              />
-            </View>
-
-            {keyError ? (
-              <Text accessibilityRole="alert" style={errorText.style}>
-                {keyError}
-              </Text>
-            ) : null}
+            <InkInput
+              label={t('webSearch.keyLabel')}
+              type="password"
+              value={data.draft}
+              onChange={actions.setDraft}
+              onSubmit={() => void handleSave()}
+              disabled={busy}
+              invalid={keyError ?? undefined}
+              placeholder={data.configured ? t('webSearch.keyPlaceholderReplace') : t('webSearch.keyPlaceholder')}
+              inputProps={{
+                autoComplete: 'off',
+                spellCheck: false,
+                textContentType: 'none',
+                importantForAutofill: 'no',
+                returnKeyType: 'done',
+              }}
+            />
 
             <View style={data.configured ? styles.actions : styles.actionsEnd}>
               {data.configured ? (
-                <InkButton variant="quiet" icon="trash" onPress={() => void handleRemove()} disabled={busy}>
+                <InkButton variant="quiet" icon="trash" onPress={() => void handleRemove()} disabled={saving} loading={removing}>
                   {removing ? t('webSearch.removing') : t('common.remove')}
                 </InkButton>
               ) : null}
-              <InkButton variant="primary" onPress={() => void handleSave()} disabled={!data.canSave}>
+              <InkButton variant="primary" onPress={() => void handleSave()} disabled={!saving && !data.canSave} loading={saving}>
                 {saving ? t('webSearch.checking') : t('webSearch.save')}
               </InkButton>
             </View>
@@ -167,27 +153,10 @@ const makeStyles = (c: ThemeColors) =>
     notice: { gap: Spacing.sm },
     card: { gap: Spacing.md },
     link: {
-      fontFamily: FontFamily.body,
+      ...face('body', 'semibold'),
       fontSize: FontSize.base,
-      fontWeight: FontWeight.semibold,
       color: c.textBrand,
       textDecorationLine: 'underline',
-    },
-    inputRow: {
-      backgroundColor: c.backgroundSecondary,
-      borderRadius: Radii.md,
-      borderWidth: 1,
-      borderColor: c.border,
-      paddingHorizontal: Spacing.md,
-      minHeight: 44,
-      justifyContent: 'center',
-    },
-    inputRowInvalid: { borderColor: Semantic.danger },
-    input: {
-      fontFamily: FontFamily.mono,
-      fontSize: FontSize.base,
-      color: c.text,
-      paddingVertical: Spacing.sm,
     },
     actions: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: Spacing.sm },
     actionsEnd: { flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', gap: Spacing.sm },
