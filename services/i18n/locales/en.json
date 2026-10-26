@@ -494,7 +494,6 @@
     },
     "link": {
       "whatItRemembers": "What Goose remembers",
-      "cameraEvents": "What the camera saw",
       "visionEvents": "Vision events",
       "faces": "Faces",
       "visionAutomations": "Vision automations"
@@ -1413,7 +1412,6 @@
     "ownerSetup": "Set up your Pond",
     "wakeWord": "Wake word",
     "scheduleDetail": "Schedule",
-    "cameraEvents": "What the camera saw",
     "faces": "Faces",
     "visionEvents": "Vision events",
     "visionAutomations": "Vision automations"
@@ -2371,32 +2369,6 @@
       "deleteFailed": "Could not forget that memory.",
       "keepNeedsUpdate": "Your Pond needs an update before it can change whether a memory is kept.",
       "forbidden": "Your Pond does not allow this phone to see or change memories."
-    }
-  },
-  "cameraEvents": {
-    "showing": "From the camera named {{camera}}.",
-    "unacknowledged_one": "{{count}} not acknowledged yet",
-    "unacknowledged_other": "{{count}} not acknowledged yet",
-    "loading": "Loading what the camera saw…",
-    "failed": "Could not load camera events from your Pond.",
-    "settingsFailed": "Could not read which camera your Pond watches.",
-    "emptyTitle": "Nothing seen yet",
-    "emptyBody": "When the camera notices something, it shows up here.",
-    "acknowledge": "Acknowledge",
-    "acknowledged": "Acknowledged",
-    "new": "New",
-    "detail": "{{camera}} · {{confidence}}",
-    "confidence": "{{percent}}% sure",
-    "type": {
-      "motion": "Movement",
-      "person": "A person",
-      "pet": "A pet",
-      "package": "A package",
-      "vehicle": "A vehicle",
-      "unknown": "Something"
-    },
-    "errors": {
-      "acknowledgeFailed": "Could not acknowledge that event. Try again."
     }
   },
   "devMode": {
