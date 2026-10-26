@@ -31,6 +31,8 @@ import type {
   ActivitySummary,
   ActivityWindow,
   CameraEvent,
+  CameraEventMetadata,
+  CameraInfo,
   CommissionDeviceRequest,
   CommissionDeviceResponse,
   CreateDeviceRequest,
@@ -103,6 +105,12 @@ import type {
   OnboardStatus,
   ProfilePrefs,
   WarmupStatus,
+  FaceOverview,
+  FacePerson,
+  FaceRegistration,
+  FaceThreshold,
+  VisionConfig,
+  VisionStatus,
 } from './types';
 import { MODEL_CATEGORIES } from './types';
 
@@ -264,6 +272,9 @@ const STREAM_IDLE_MS = 60_000;
 /** Transcription pads every clip to a 30s window, and the first speech call loads a model. */
 const VOICE_TIMEOUT_MS = 45_000;
 
+/** A face sample is detected, aligned and embedded on the Pond's own CPU before it answers. */
+const FACE_TIMEOUT_MS = 45_000;
+
 /**
  * Switching the speaking tier fetches its weights before the Pond answers, tens of megabytes. At the
  * default 15s a first switch on a fresh Pond was abandoned mid-download and reported as a failure.
@@ -361,6 +372,36 @@ function collection<T>(res: unknown, key: string): T[] {
   if (Array.isArray(res)) return res as T[];
   const value = (res as Record<string, unknown> | null | undefined)?.[key];
   return Array.isArray(value) ? (value as T[]) : [];
+}
+
+/**
+ * One camera event from the Pond, whichever build sent it. An older Pond sends no `snapshot_url`
+ * and no `acknowledged` on its stream, and a camera that posts its own events carries `metadata`
+ * as the JSON text it posted; all three read as what they are. Anything with no id or no kind is
+ * not an event.
+ */
+export function readCameraEvent(raw: unknown): CameraEvent | null {
+  const e = raw as Record<string, unknown> | null;
+  if (!e || typeof e.id !== 'number' || typeof e.event_type !== 'string') return null;
+  let metadata: unknown = e.metadata;
+  if (typeof metadata === 'string') {
+    try {
+      metadata = JSON.parse(metadata);
+    } catch {
+      metadata = null;
+    }
+  }
+  return {
+    id: e.id,
+    camera_id: typeof e.camera_id === 'string' ? e.camera_id : '',
+    event_type: e.event_type,
+    confidence: typeof e.confidence === 'number' ? e.confidence : null,
+    snapshot_path: typeof e.snapshot_path === 'string' ? e.snapshot_path : null,
+    snapshot_url: typeof e.snapshot_url === 'string' && e.snapshot_url ? e.snapshot_url : null,
+    metadata: metadata && typeof metadata === 'object' && !Array.isArray(metadata) ? (metadata as CameraEventMetadata) : null,
+    acknowledged: e.acknowledged === true,
+    created_at: typeof e.created_at === 'string' ? e.created_at : '',
+  };
 }
 
 /** Refresh responses that mean the Pond will not accept this refresh token. */
@@ -735,13 +776,15 @@ export class PondApiClient {
       if (refreshed?.accepted) res = await doFetch();
     }
     if (!res.ok) {
-      const detail = await errorDetail(res);
+      const body = await errorBody(res);
+      const detail = detailOf(body);
       if (res.status === 403 && detail === ONBOARDING_REQUIRED) this.onboardingRequired?.();
       throw new ApiError(
         `${init.method ?? 'GET'} ${path} → ${res.status}`,
         res.status,
         parseRetryAfter(res),
         detail,
+        body,
       );
     }
     return res;
@@ -1389,10 +1432,13 @@ export class PondApiClient {
   async listCameraEvents(cameraId: string, limit?: number): Promise<CameraEvent[]> {
     const qs = new URLSearchParams({ camera_id: cameraId });
     if (limit) qs.set('limit', String(limit));
-    const res = await this.request<{ events?: CameraEvent[] } | CameraEvent[]>(
+    const res = await this.request<{ events?: unknown[] } | unknown[]>(
       `/api/v1/camera/events?${qs.toString()}`,
     );
-    return collection<CameraEvent>(res, 'events');
+    return collection<unknown>(res, 'events').flatMap((raw) => {
+      const event = readCameraEvent(raw);
+      return event ? [event] : [];
+    });
   }
 
   /**
@@ -1403,6 +1449,178 @@ export class PondApiClient {
     return this.request<void>(`/api/v1/camera/events/${encodeURIComponent(String(id))}/acknowledge`, {
       method: 'PATCH',
     });
+  }
+
+  /**
+   * Events as the vision pipeline records them, one frame each. Resolves when the stream ends,
+   * whichever way; the caller decides whether to reopen it. `onOpen` is called once the Pond has
+   * accepted it. A frame that is not an event is dropped. With cameras off in Privacy the Pond
+   * answers 403 `cameras_disabled`, which an `ApiError` carries in `body`.
+   */
+  async streamVisionEvents(
+    onEvent: (event: CameraEvent) => void,
+    signal?: AbortSignal,
+    onOpen?: () => void,
+  ): Promise<void> {
+    const res = await this.open('/api/v1/vision/events/stream', {
+      headers: { Accept: 'text/event-stream' },
+      signal,
+    });
+    onOpen?.();
+    await readSse(
+      res,
+      (frame) => {
+        if (frame.event !== 'vision_event') return;
+        try {
+          const event = readCameraEvent(JSON.parse(frame.data));
+          if (event) onEvent(event);
+        } catch {
+          // A frame that is not JSON carries nothing to act on.
+        }
+      },
+      { idleMs: STREAM_IDLE_MS },
+    );
+  }
+
+  // ── Vision ──────────────────────────────────────────────────
+
+  /** What the pipeline is doing now: running, reconnecting, off, or held back by Privacy. */
+  visionStatus(): Promise<VisionStatus> {
+    return this.get<VisionStatus>('/api/v1/vision/status');
+  }
+
+  /** The bus as the pipeline holds it. The phone edits the same values through the settings. */
+  visionConfig(): Promise<VisionConfig> {
+    return this.get<VisionConfig>('/api/v1/vision/config');
+  }
+
+  updateVisionConfig(patch: Partial<Omit<VisionConfig, 'supported_signals' | 'active_cameras' | 'event_listener_count'>>): Promise<VisionConfig> {
+    return this.put<VisionConfig>('/api/v1/vision/config', patch);
+  }
+
+  /** The cameras the Pond knows. An older Pond calls `live` `is_live` and has no timestamp. */
+  async listCameras(): Promise<CameraInfo[]> {
+    const res = await this.get<{ cameras?: unknown[] }>('/api/v1/cameras');
+    return collection<Record<string, unknown>>(res, 'cameras').flatMap((raw) => {
+      if (typeof raw?.id !== 'string' || !raw.id) return [];
+      return [
+        {
+          id: raw.id,
+          live: raw.live === true || raw.is_live === true,
+          last_frame_at: typeof raw.last_frame_at === 'string' ? raw.last_frame_at : null,
+          snapshot_url: typeof raw.snapshot_url === 'string' ? raw.snapshot_url : null,
+          stream_url: typeof raw.stream_url === 'string' ? raw.stream_url : null,
+        },
+      ];
+    });
+  }
+
+  /** Where a camera's latest frame is. The Pond answers a JPEG, or 403 `cameras_disabled`. */
+  cameraSnapshotPath(cameraId: string): string {
+    return `/api/v1/camera/${encodeURIComponent(cameraId)}/snapshot`;
+  }
+
+  /**
+   * A picture the Pond serves, as a `data:` URI the image view can draw.
+   *
+   * It is read here, over the same pinned transport as every other request, instead of being
+   * handed to the image view as a URL and a header. Expo's image loader on iOS keeps its own
+   * session, which the Pond's pin does not reach, so a Pond with its own certificate would draw
+   * nothing there. Here the bearer travels in a header, never in the address, and only to the
+   * Pond this client is paired with: a path that is not the Pond's own API is refused.
+   */
+  async fetchImage(path: string, signal?: AbortSignal): Promise<string> {
+    if (!path.startsWith('/api/') || path.startsWith('//')) throw new Error('Invalid Pond API path');
+    const res = await this.open(path, {
+      headers: { Accept: 'image/*' },
+      signal: signal ?? timeoutSignal(REQUEST_TIMEOUT_MS),
+    });
+    const type = res.headers.get('Content-Type')?.split(';')[0].trim() || 'image/jpeg';
+    return `data:${type};base64,${toBase64(new Uint8Array(await res.arrayBuffer()))}`;
+  }
+
+  // ── Faces ───────────────────────────────────────────────────
+
+  /**
+   * Every household member, with how many samples of their face the pond holds. Without a face
+   * build the Pond still answers 200, with `available: false`.
+   */
+  async listFaces(): Promise<FaceOverview> {
+    const res = await this.get<{
+      available?: unknown;
+      default_threshold?: unknown;
+      people?: unknown[];
+    }>('/api/v1/faces');
+    const people = collection<Record<string, unknown>>(res, 'people').flatMap((raw): FacePerson[] => {
+      if (typeof raw?.profile_id !== 'string' || !raw.profile_id) return [];
+      return [
+        {
+          profile_id: raw.profile_id,
+          name: typeof raw.name === 'string' && raw.name.trim() ? raw.name : raw.profile_id,
+          enrollments: typeof raw.enrollments === 'number' ? raw.enrollments : 0,
+          threshold: typeof raw.threshold === 'number' ? raw.threshold : null,
+          last_enrolled_at: typeof raw.last_enrolled_at === 'string' ? raw.last_enrolled_at : null,
+        },
+      ];
+    });
+    return {
+      available: res?.available === true,
+      default_threshold: typeof res?.default_threshold === 'number' ? res.default_threshold : 0,
+      people,
+    };
+  }
+
+  /**
+   * Take one sample of a member's face from the Pond's own camera, which sees them in the light
+   * and from the angle recognition will. Refusals say why in `reason`: `no_frame` (the camera has
+   * shown nothing), `no_face` (a frame with nobody facing it), `cameras_disabled` (Privacy).
+   */
+  registerFaceFromCamera(profileId: string, cameraId?: string): Promise<FaceRegistration> {
+    return this.request<FaceRegistration>('/api/v1/faces/register-from-camera', {
+      method: 'POST',
+      body: JSON.stringify({ profile_id: profileId, ...(cameraId ? { camera_id: cameraId } : {}) }),
+      signal: timeoutSignal(FACE_TIMEOUT_MS),
+    });
+  }
+
+  /** One sample from a photo on this phone, a JPEG file. The Pond answers 422 for one it cannot use. */
+  async registerFacePhoto(profileId: string, fileUri: string): Promise<FaceRegistration> {
+    const form = new FormData();
+    form.append('profile_id', profileId);
+    form.append('image', new File(fileUri), 'face.jpg');
+    const res = await this.send(`${this.baseUrl}/api/v1/faces/register`, {
+      method: 'POST',
+      // No Content-Type: the runtime writes the multipart boundary itself.
+      headers: this.token ? { Authorization: `Bearer ${this.token}` } : {},
+      body: form,
+      signal: timeoutSignal(FACE_TIMEOUT_MS),
+    });
+    if (!res.ok) {
+      const body = await errorBody(res);
+      throw new ApiError(`POST /api/v1/faces/register → ${res.status}`, res.status, parseRetryAfter(res), detailOf(body), body);
+    }
+    return (await res.json()) as FaceRegistration;
+  }
+
+  getFaceThreshold(profileId: string): Promise<FaceThreshold> {
+    return this.get<FaceThreshold>(`/api/v1/faces/profile/${encodeURIComponent(profileId)}/threshold`);
+  }
+
+  /** A strictness for one person alone, 0 to 1; a higher one asks the face to match more closely. */
+  setFaceThreshold(profileId: string, threshold: number): Promise<FaceThreshold> {
+    return this.put<FaceThreshold>(`/api/v1/faces/profile/${encodeURIComponent(profileId)}/threshold`, { threshold });
+  }
+
+  /** Back to the pond's own strictness. */
+  clearFaceThreshold(profileId: string): Promise<FaceThreshold> {
+    return this.del<FaceThreshold>(`/api/v1/faces/profile/${encodeURIComponent(profileId)}/threshold`);
+  }
+
+  /** Forget every sample of a member's face. Their profile and memories stay. */
+  forgetFace(profileId: string): Promise<{ profile_id: string; face_embeddings_deleted: number }> {
+    return this.del<{ profile_id: string; face_embeddings_deleted: number }>(
+      `/api/v1/users/${encodeURIComponent(profileId)}/biometrics`,
+    );
   }
 
   // ── Logs and activity ───────────────────────────────────────

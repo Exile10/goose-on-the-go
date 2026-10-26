@@ -704,23 +704,134 @@ export interface RuleRequest {
 // rows live in `pond_logs.db`, and acknowledged ones are pruned after 14 days.
 
 /**
+ * What the pipeline noted beside the event. Every field is optional: a camera that posts its own
+ * events sends none of it, and a Pond without a face build never sets the face ones.
+ */
+export interface CameraEventMetadata {
+  /** How much of the picture changed, 0 to 1: the motion detector's own measure. */
+  changed_fraction?: number;
+  source?: string;
+  face_detected?: boolean;
+  /** A face was found and matched nobody. */
+  face_unknown?: boolean;
+  /** The household member's profile id, when the face matched one. */
+  identified_profile?: string;
+  /** How closely the face matched, 0 to 1; for an unknown face, its nearest candidate. */
+  face_confidence?: number;
+}
+
+/**
  * One thing a camera saw.
  *
  * `event_type` is the Pond's own free-form string; its documented values are
- * `motion`, `person`, `pet`, `package` and `vehicle`. `snapshot_path` is a file
- * path on the Pond itself: no route serves it, so the phone cannot show it.
+ * `motion`, `person`, `pet`, `package` and `vehicle`. `confidence` is the detector's score,
+ * except for plain `motion`, where it is the fraction of the picture that changed.
+ * `snapshot_path` is a file path on the Pond itself and is never shown: the picture is
+ * `snapshot_url`, and the client reads both as null on a Pond that sends neither.
  */
 export interface CameraEvent {
   id: number;
   camera_id: string;
   event_type: string;
-  /** The classifier's score from 0 to 1, or null for plain motion. */
   confidence: number | null;
   snapshot_path: string | null;
+  /** `/api/v1/camera/events/{id}/snapshot`, or null when the event kept no picture. */
+  snapshot_url: string | null;
+  metadata: CameraEventMetadata | null;
   acknowledged: boolean;
   /** RFC 3339. */
   created_at: string;
 }
+
+// ── Vision (`/api/v1/vision/*`, `/cameras`, `/faces`) ─────────
+//
+// goose-in-a-pond's `.ai/vision-finish-plan.md` is the contract these follow.
+
+/** Where the pond's vision pipeline stands, in the Pond's own words for it. */
+export type VisionState = 'off' | 'consent_off' | 'no_camera' | 'starting' | 'running' | 'reconnecting';
+
+/** `GET /vision/status`: what the pipeline is doing now, so nothing it does is invisible. */
+export interface VisionStatus {
+  /** The Privacy switch: false forbids the pipeline and every capture. */
+  cameras_enabled: boolean;
+  vision_enabled: boolean;
+  state: VisionState;
+  camera_id: string | null;
+  /** The camera's address with any credentials redacted. */
+  source: string | null;
+  source_kind: 'configured' | 'discovered' | null;
+  fps: number | null;
+  /** RFC 3339. */
+  last_frame_at: string | null;
+  last_event_at: string | null;
+  last_error: string | null;
+  restarts: number;
+  classifier: { available: boolean };
+  faces: { available: boolean; enrolled_people: number };
+  event_listeners: number;
+}
+
+/** One entry of `GET /cameras`. `live` means a frame arrived in the last 10 seconds. */
+export interface CameraInfo {
+  id: string;
+  live: boolean;
+  last_frame_at: string | null;
+  snapshot_url: string | null;
+  stream_url: string | null;
+}
+
+/** `GET /vision/config`: the vision bus as the pipeline holds it, in the Pond's own field names. */
+export interface VisionConfig {
+  vision_enabled: boolean;
+  vision_camera_id: string;
+  vision_fps: number;
+  vision_motion_threshold: number;
+  min_event_interval_secs: number;
+  classifier_confidence_threshold: number;
+  face_detection_enabled: boolean;
+  face_on_motion: boolean;
+  enabled_event_types: string[];
+  supported_signals: string[];
+  active_cameras: string[];
+  event_listener_count: number;
+}
+
+/** One household member as `GET /faces` lists them, whether or not the pond knows their face. */
+export interface FacePerson {
+  profile_id: string;
+  name: string;
+  /** How many face samples the pond holds for them. */
+  enrollments: number;
+  /** Their own strictness, or null when the pond's default applies. */
+  threshold: number | null;
+  last_enrolled_at: string | null;
+}
+
+/** `GET /faces`. `available` is false on a Pond with no face model, which still answers 200. */
+export interface FaceOverview {
+  available: boolean;
+  default_threshold: number;
+  people: FacePerson[];
+}
+
+/** The answer to registering a face sample: nothing of the face itself comes back. */
+export interface FaceRegistration {
+  id: number | string;
+  profile_id: string;
+  model_dims: number;
+  created_at: string;
+}
+
+/** `GET`/`PUT`/`DELETE /faces/profile/{id}/threshold`. */
+export interface FaceThreshold {
+  profile_id: string;
+  /** The override, or null when the pond's own applies. */
+  threshold: number | null;
+  global_threshold?: number;
+}
+
+/** Why the pond refused to take a sample from its camera, from the `reason` of the refusal. */
+export type FaceCaptureReason = 'no_frame' | 'no_face' | 'cameras_disabled';
 
 // ── Logs and activity ─────────────────────────────────────────
 
@@ -1186,6 +1297,14 @@ export interface PondSettings {
   vision_fps: number;
   vision_motion_threshold: number;
   vision_classifier_model: string;
+  /** Seconds after one event before the pond records another. Applied live. */
+  vision_event_cooldown_secs: number;
+  /** The least sure the detector may be for something to count, 0 to 1. Applied live. */
+  vision_classifier_confidence: number;
+  vision_face_recognition_enabled: boolean;
+  vision_face_on_motion: boolean;
+  /** Which kinds of event the pond records. Empty means every kind. */
+  vision_event_types: string[];
   picture_support_download_enabled: boolean;
   matter_ws_url: string;
   matter_ble_enabled: boolean;

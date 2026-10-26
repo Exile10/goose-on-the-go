@@ -42,6 +42,8 @@ function event(over: Partial<CameraEvent> = {}): CameraEvent {
     event_type: 'person',
     confidence: 0.94,
     snapshot_path: null,
+    snapshot_url: null,
+    metadata: null,
     acknowledged: false,
     created_at: '2026-10-19T08:00:01+00:00',
     ...over,
