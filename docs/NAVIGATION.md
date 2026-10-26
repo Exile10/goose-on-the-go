@@ -56,7 +56,7 @@ at the top leads to `ACCOUNT_ROUTE`, You and your household. Labels are
 |-------|------|
 | Connection | Remote access, Internet, Web search |
 | Goose | Assistant, Voice, Thinking, Models, Memory, Tools, Extensions |
-| Home | Your home, People, Cameras and smart home, Rooms and Ponds |
+| Home | Your home, People, Cameras and vision, Rooms and Ponds |
 | Notices and privacy | Announcements, Privacy |
 | Records | Memories, Conversations, Activity, Schedule |
 | This phone | Appearance, and Haptic feedback as a switch on the row |
@@ -85,20 +85,75 @@ sound quality, which would otherwise be most of the Voice page. Choosing a voice
 saves it, has the engine switch to it, and then plays the next of seven lines in
 it, the same line for every voice in turn.
 
-### Camera events
+### Cameras and vision
 
-`/(stack)/camera-events`, What the camera saw, is the first row on Cameras and
-smart home, above the controls that name the camera. It lists, newest first, the
-events the Pond recorded for the camera its settings name (`vision_camera_id`),
-over `view-models/use-camera-events.ts`, read every 30 s while it is in front.
-`GET /api/v1/camera/events` lists one camera per call and has no read across
-cameras, so an event posted under another `camera_id` does not show here, and
-renaming the camera shows the new name's events only. Each new event has an
-Acknowledge button (`PATCH /api/v1/camera/events/{id}/acknowledge`), and the
-list is read back after one lands. The Pond has no acknowledge-all and no
-delete, so neither does the screen; it prunes acknowledged events after 14
-days on its own. No picture is shown: `snapshot_path` is a file on the Pond
-that no route serves. Like Devices it always reads the real Pond.
+`/(stack)/settings-cameras` is a catalogue page with four things the others lack, all against the
+vision contract in goose-in-a-pond's `.ai/vision-finish-plan.md`.
+
+- **What the camera is doing, first.** `VisionStatusCard` (a bare special, drawn on its own raised
+  edge rather than as a row) says it in one sentence from `GET /vision/status` over the camera's
+  latest frame: watching at so many pictures a second, looking for a camera, reconnecting with how
+  long ago the stream dropped and why, switched off, or held back by Privacy, which links to
+  Privacy's own Cameras switch rather than carry a second one. The status is read every 5 s. The
+  frame is read about once a second, and only while the camera is running, this screen is in front
+  and the app is in the foreground (`useLive` with `LIVE_VIEW_POLL_MS`, the one poll allowed under
+  its 5 s floor; the Pond allows 600 requests a minute and this spends a tenth, on screen only).
+- **Three ways in**: Vision events (how many are unacknowledged), Faces (how many people the pond
+  knows by face) and Vision automations (how many camera rules). The counts are read only by this
+  page.
+- **What the pond watches for** is one switch per kind of event over `vision_event_types`, with the
+  last one left on locked (an empty list means every kind to the Pond), then the pause between
+  events and how sure the detector must be.
+- **Faces**: recognition on or off, and whether to look for a face in plain movement too.
+
+Every vision setting applies live except the detector (`vision_classifier_model`), which the
+contract leaves out of its live list and still says waits for a restart.
+
+Pictures are never handed to the image view as a URL. `PondApiClient.fetchImage` reads one over
+the pinned transport, the bearer in a header, and returns a `data:` URI; `services/pond-images.ts`
+keeps the last forty and reads three at a time. Expo's image loader on iOS has its own session,
+which the pin does not reach, so a Pond with its own certificate drew nothing there.
+
+`/(stack)/faces` lists every household member from `GET /faces`, with whether the pond knows them
+by face and how many samples it holds. A person opens a sheet: take a sample at the pond's own
+camera (the recommended way, since recognition happens there: the live frame and
+`POST /faces/register-from-camera`, with the 409 `no_frame`, 422 `no_face` and 403
+`cameras_disabled` refusals each said as a sentence), or from a photo on the phone (multipart
+`POST /faces/register`); how strictly a face must match, as a per-person override
+(`PUT`/`DELETE /faces/profile/{id}/threshold`) with a way back to the default; and forgetting the
+face (`DELETE /users/{id}/biometrics`, after a confirmation). The screen says first that face data
+stays on the pond. A pond with no face model shows why, and what to do, in place of controls.
+
+`/(stack)/vision-events`, Vision events, lists newest first the events the Pond recorded for the
+camera its settings name (`vision_camera_id`), over `view-models/use-vision-events.ts`.
+`GET /api/v1/camera/events` lists one camera per call and has no read across cameras, so an event
+posted under another `camera_id` does not show here, and renaming the camera shows the new name's
+events only. A row carries the event's picture (`snapshot_url`), who or what it was (a person by
+the name `GET /faces` gives their profile id, or "someone your Pond doesn't know"), and the one
+measure that matters: how sure the detector was, how much of the picture changed for plain
+movement (the Pond's `confidence` means that for movement), or how closely a face matched. Filters
+are chips on a hairline: all, people, faces, unknown faces, movement, pets, vehicles, packages,
+unacknowledged; they apply to the latest 100 events the Pond lists, because it filters none. New
+events arrive over `GET /vision/events/stream` while the screen is in front, with the 30 s poll
+as what is left when the stream is not open (before it connects, after it drops, on a Pond with
+no such route); a stream that opens reads the list once so nothing from the gap is lost. A row
+opens a sheet with the large picture, everything measured, Acknowledge
+(`PATCH /api/v1/camera/events/{id}/acknowledge`) and "Make an automation from this", which is the
+automation form prefilled to listen for the same kind of thing, opened inside that sheet because
+iOS drops a second modal presented over the first. The Pond has no acknowledge-all and no delete,
+so neither does the screen; it prunes acknowledged events after 14 days on its own. Like Devices
+it always reads the real Pond.
+
+`/(stack)/vision-automations` lists the rules whose source is a camera, narrowed from `/rules`,
+with starters to add in a tap (someone the pond does not know; a package; a named person arrives,
+so ask Goose to greet them; movement at night). A starter is built from the kinds the pond is
+watching for and the people it knows by face, so it is offered only when the pond would ever
+produce its signal, and it goes once it exists; when no starter about a person can be offered it
+says why. The form is the Schedule screen's one form: for a camera, what it listens for is chosen
+from the contract's signals (`motion`, `person`, `pet`, `vehicle`, `package`, `face_detected`,
+`face_recognized`, `face_unknown`, and `face:<profile_id>` for each household member, shown by
+name), the confidence condition is named for what it measures, and it is typed as a percent
+because the Pond compares a fraction.
 
 ### What needs attention
 
