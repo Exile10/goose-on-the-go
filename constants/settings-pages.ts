@@ -475,6 +475,7 @@ const cameras: SettingsPage = {
       items: [
         { kind: 'link', route: '/(stack)/camera-events', icon: 'eye', tile: 'slate', labelKey: 'settings.link.cameraEvents' },
         { kind: 'link', route: '/(stack)/faces', icon: 'face', tile: 'indigo', labelKey: 'settings.link.faces', summary: 'faces' },
+        { kind: 'link', route: '/(stack)/vision-automations', icon: 'bolt', tile: 'amber', labelKey: 'settings.link.visionAutomations', summary: 'visionAutomations' },
       ],
     },
     {

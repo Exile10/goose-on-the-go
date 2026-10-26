@@ -9,6 +9,11 @@
  * condition with an operator but no value, a time bound that is not HH:MM)
  * run here first.
  *
+ * A rule that listens to a camera is the same form with three things changed: what it listens
+ * for is chosen from the signals the Pond can match, one per household member by name, instead
+ * of typed; the confidence it compares is named for what it measures; and it is entered as a
+ * percent, since the Pond compares a fraction nobody types.
+ *
  * The form only exists while the sheet is open, so the device list it reads
  * is not polled behind a closed sheet, closing it clears what was typed, and
  * an edit opens on the rule as it is now.
@@ -33,9 +38,12 @@ import {
 
 import { sourceKey } from '@/components/patterns/automation-card';
 import { GSheetBody } from '@/components/ui/g-sheet-body';
+import { describeSignal, fractionFromPercent, measureOfSignal, percentText, type Measure } from '@/models/vision';
 import { confirm, reject } from '@/services/haptics';
+import type { TranslationKey } from '@/services/i18n';
 import type { Rule, RuleRequest, TriggerAction, TriggerCondition, TriggerSource } from '@/services/types';
 import { supports, useDevices } from '@/view-models/use-devices';
+import { useVisionSignals } from '@/view-models/use-vision-signals';
 import { Spacing } from '@/constants/spacing';
 
 type Op = NonNullable<TriggerCondition['op']>;
@@ -45,6 +53,8 @@ export interface AutomationFormSheetProps {
   onClose: () => void;
   /** The rule being edited, or absent for a new one. */
   rule?: Rule;
+  /** What a new rule starts as, such as one made from an event. Ignored for an edit. */
+  prefill?: RuleRequest;
   /** Resolves to why it was refused, or null once it is saved: created, or the edit stored. */
   onSubmit: (req: RuleRequest) => Promise<string | null>;
   /** Only for an edit. Resolves to why it was refused, or null once it is gone. */
@@ -54,7 +64,7 @@ export interface AutomationFormSheetProps {
 /** "HH:MM", 24-hour, as the Pond parses a time bound. */
 const TIME_BOUND = /^([01]\d|2[0-3]):[0-5]\d$/;
 
-export function AutomationFormSheet({ open, onClose, rule, onSubmit, onDelete }: AutomationFormSheetProps) {
+export function AutomationFormSheet({ open, onClose, rule, prefill, onSubmit, onDelete }: AutomationFormSheetProps) {
   const { t } = useTranslation();
   return (
     <InkSheet
@@ -62,7 +72,7 @@ export function AutomationFormSheet({ open, onClose, rule, onSubmit, onDelete }:
       onClose={onClose}
       title={rule ? t('schedule.form.editAutomationTitle') : t('schedule.form.automationTitle')}
     >
-      {open ? <AutomationForm onClose={onClose} rule={rule} onSubmit={onSubmit} onDelete={onDelete} /> : null}
+      {open ? <AutomationForm onClose={onClose} rule={rule} prefill={prefill} onSubmit={onSubmit} onDelete={onDelete} /> : null}
     </InkSheet>
   );
 }
@@ -70,11 +80,11 @@ export function AutomationFormSheet({ open, onClose, rule, onSubmit, onDelete }:
 const SOURCES: TriggerSource['kind'][] = ['sensor', 'camera', 'device'];
 
 /**
- * A device choice that scrolls in place. `InkSelect` lists its options in a
+ * A choice that scrolls in place. `InkSelect` lists its options in a
  * sheet that does not scroll, so with a dozen devices the first of them, and
  * "Any device" with them, ran off the top of the screen.
  */
-function DeviceList({
+function ChoiceList({
   label,
   value,
   options,
@@ -95,24 +105,86 @@ function DeviceList({
   );
 }
 
-function AutomationForm({ onClose, rule, onSubmit, onDelete }: Omit<AutomationFormSheetProps, 'open'>) {
+/** What the confidence a camera rule compares is called, by what it measures. */
+function conditionLabel(measure: Measure): TranslationKey {
+  switch (measure) {
+    case 'sure':
+      return 'visionAutomations.form.conditionDetector';
+    case 'match':
+      return 'visionAutomations.form.conditionFace';
+    case 'change':
+      return 'visionAutomations.form.conditionChange';
+  }
+}
+
+/** What a camera rule listens for: a signal chosen by name, and the camera when there are several. */
+function CameraFields({
+  signal,
+  onSignal,
+  cameraId,
+  onCamera,
+}: {
+  signal: string;
+  onSignal: (signal: string) => void;
+  cameraId: string;
+  onCamera: (id: string) => void;
+}) {
+  const { t } = useTranslation();
+  const { options, cameras, nameOf } = useVisionSignals();
+  // A signal this build has no name for, from an older rule, stays on screen rather than vanish.
+  const all = options.some((o) => o.value === signal) ? options : [...options, { value: signal, label: signal, hint: null }];
+  const camerasToChoose = [...new Set([...cameras, ...(cameraId ? [cameraId] : [])])];
+
+  return (
+    <>
+      <ChoiceList
+        label={t('visionAutomations.form.signal')}
+        value={signal}
+        options={all.map((o) => ({ value: o.value, label: o.label, description: o.hint ?? undefined }))}
+        onChange={onSignal}
+      />
+      {/* The list scrolls, so the choice may be out of sight: say it. */}
+      <InkText size="sm" tone="secondary">
+        {t('visionAutomations.form.fires', { subject: describeSignal(signal, nameOf) })}
+      </InkText>
+      {camerasToChoose.length > 1 ? (
+        <ChoiceList
+          label={t('visionAutomations.form.camera')}
+          value={cameraId}
+          options={[
+            { value: '', label: t('visionAutomations.form.anyCamera') },
+            ...camerasToChoose.map((id) => ({ value: id, label: id })),
+          ]}
+          onChange={onCamera}
+        />
+      ) : null}
+    </>
+  );
+}
+
+export function AutomationForm({ onClose, rule, prefill, onSubmit, onDelete }: Omit<AutomationFormSheetProps, 'open'>) {
   const { t } = useTranslation();
   const { data } = useDevices();
   const switchable = data.devices.filter((d) => supports(d, 'power'));
-  const first = rule?.actions[0];
+  // An edit opens on the rule; a new one on what it was prefilled with, or on nothing.
+  const base = rule ?? prefill;
+  const first = base?.actions[0];
   // Kept as they are; see the file comment.
   const rest = rule?.actions.slice(1) ?? [];
+  const startsOnCamera = base?.source.kind === 'camera';
 
-  const [name, setName] = useState(rule?.name ?? '');
-  const [sourceKind, setSourceKind] = useState<TriggerSource['kind']>(rule?.source.kind ?? 'sensor');
+  const [name, setName] = useState(base?.name ?? '');
+  const [sourceKind, setSourceKind] = useState<TriggerSource['kind']>(base?.source.kind ?? 'sensor');
   // '' is "any": the Pond matches every device or signal when the field is left out.
-  const [deviceId, setDeviceId] = useState(rule?.source.device_id ?? '');
-  const [signal, setSignal] = useState(rule?.source.signal ?? '');
-  const [op, setOp] = useState<Op | ''>(rule?.condition?.op ?? '');
-  const [value, setValue] = useState(rule?.condition?.value != null ? String(rule.condition.value) : '');
-  const [after, setAfter] = useState(rule?.condition?.after ?? '');
-  const [before, setBefore] = useState(rule?.condition?.before ?? '');
-  const [cooldown, setCooldown] = useState(String(rule?.cooldown_secs ?? 60));
+  const [deviceId, setDeviceId] = useState(base?.source.device_id ?? '');
+  const [signal, setSignal] = useState(base?.source.signal ?? '');
+  const [op, setOp] = useState<Op | ''>(base?.condition?.op ?? '');
+  const [value, setValue] = useState(
+    base?.condition?.value != null ? (startsOnCamera ? percentText(base.condition.value) : String(base.condition.value)) : '',
+  );
+  const [after, setAfter] = useState(base?.condition?.after ?? '');
+  const [before, setBefore] = useState(base?.condition?.before ?? '');
+  const [cooldown, setCooldown] = useState(String(base?.cooldown_secs ?? 60));
   const [actionType, setActionType] = useState<TriggerAction['type']>(first?.type ?? 'agent_prompt');
   const [prompt, setPrompt] = useState(first?.type === 'agent_prompt' ? first.prompt : '');
   const [targetId, setTargetId] = useState(first?.type === 'device_power' ? first.device_id : '');
@@ -121,6 +193,19 @@ function AutomationForm({ onClose, rule, onSubmit, onDelete }: Omit<AutomationFo
   const [notifyBody, setNotifyBody] = useState(first?.type === 'notify' ? first.body : '');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  const isCamera = sourceKind === 'camera';
+  const measure = measureOfSignal(signal);
+
+  /** What a signal, a device and a reading mean depends on the kind, so a new kind starts clean. */
+  const changeKind = (kind: TriggerSource['kind']) => {
+    if (kind === sourceKind) return;
+    setSourceKind(kind);
+    setDeviceId('');
+    setSignal('');
+    setOp('');
+    setValue('');
+  };
 
   const action = (): TriggerAction | null => {
     switch (actionType) {
@@ -137,15 +222,17 @@ function AutomationForm({ onClose, rule, onSubmit, onDelete }: Omit<AutomationFo
   const build = (): RuleRequest | string => {
     if (!name.trim()) return t('schedule.errors.nameRequired');
     // Many locales type a decimal comma, and `Number('21,5')` is NaN.
-    const reading = Number(value.trim().replace(',', '.'));
-    if (op && (!value.trim() || !Number.isFinite(reading))) return t('schedule.errors.valueRequired');
+    const typed = Number(value.trim().replace(',', '.'));
+    if (op && (!value.trim() || !Number.isFinite(typed))) return t('schedule.errors.valueRequired');
+    const reading = isCamera ? fractionFromPercent(typed) : typed;
+    if (op && reading === null) return t('visionAutomations.errors.percent');
     const wait = Number(cooldown);
     if (!/^\d+$/.test(cooldown.trim()) || !Number.isFinite(wait)) return t('schedule.errors.cooldownInvalid');
     if ([after, before].some((b) => b.trim() && !TIME_BOUND.test(b.trim()))) return t('schedule.errors.timeBound');
     const act = action();
     if (!act) return t('schedule.errors.actionIncomplete');
     const condition: TriggerCondition = {
-      ...(op ? { op, value: reading } : {}),
+      ...(op && reading !== null ? { op, value: reading } : {}),
       ...(after.trim() ? { after: after.trim() } : {}),
       ...(before.trim() ? { before: before.trim() } : {}),
     };
@@ -209,6 +296,24 @@ function AutomationForm({ onClose, rule, onSubmit, onDelete }: Omit<AutomationFo
     ...data.devices.map((d) => ({ value: d.id, label: d.name })),
   ];
 
+  // A rule that already compares "Exactly" keeps it; nobody is offered it for a confidence.
+  const cameraOps: { value: Op | ''; label: string }[] = [
+    { value: '', label: t('visionAutomations.form.anySure') },
+    { value: 'gte', label: t('schedule.form.opGte') },
+    { value: 'gt', label: t('schedule.form.opGt') },
+    { value: 'lte', label: t('schedule.form.opLte') },
+    { value: 'lt', label: t('schedule.form.opLt') },
+    ...(op === 'eq' ? [{ value: 'eq' as const, label: t('schedule.form.opEq') }] : []),
+  ];
+  const sensorOps: { value: Op | ''; label: string }[] = [
+    { value: '', label: t('schedule.form.noCondition') },
+    { value: 'gt', label: t('schedule.form.opGt') },
+    { value: 'gte', label: t('schedule.form.opGte') },
+    { value: 'lt', label: t('schedule.form.opLt') },
+    { value: 'lte', label: t('schedule.form.opLte') },
+    { value: 'eq', label: t('schedule.form.opEq') },
+  ];
+
   return (
     <GSheetBody>
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
@@ -226,43 +331,43 @@ function AutomationForm({ onClose, rule, onSubmit, onDelete }: Omit<AutomationFo
             label={t('schedule.form.source')}
             value={sourceKind}
             options={SOURCES.map((kind) => ({ value: kind, label: t(sourceKey(kind)) }))}
-            onChange={setSourceKind}
+            onChange={changeKind}
           />
         </InkFormField>
 
-        <DeviceList label={t('schedule.form.device')} value={deviceId} options={devices} onChange={setDeviceId} />
+        {isCamera ? (
+          <CameraFields signal={signal} onSignal={setSignal} cameraId={deviceId} onCamera={setDeviceId} />
+        ) : (
+          <>
+            <ChoiceList label={t('schedule.form.device')} value={deviceId} options={devices} onChange={setDeviceId} />
 
-        <InkFormField label={t('schedule.form.signal')}>
-          <InkInput
-            label={t('schedule.form.signal')}
-            placeholder={t('schedule.form.signalPlaceholder')}
-            value={signal}
-            onChange={setSignal}
-          />
-        </InkFormField>
+            <InkFormField label={t('schedule.form.signal')}>
+              <InkInput
+                label={t('schedule.form.signal')}
+                placeholder={t('schedule.form.signalPlaceholder')}
+                value={signal}
+                onChange={setSignal}
+              />
+            </InkFormField>
+          </>
+        )}
 
-        <InkFormField label={t('schedule.form.condition')}>
+        <InkFormField label={isCamera ? t(conditionLabel(measure)) : t('schedule.form.condition')}>
           <InkSelect<Op | ''>
-            label={t('schedule.form.condition')}
+            label={isCamera ? t(conditionLabel(measure)) : t('schedule.form.condition')}
             value={op}
-            options={[
-              { value: '', label: t('schedule.form.noCondition') },
-              { value: 'gt', label: t('schedule.form.opGt') },
-              { value: 'gte', label: t('schedule.form.opGte') },
-              { value: 'lt', label: t('schedule.form.opLt') },
-              { value: 'lte', label: t('schedule.form.opLte') },
-              { value: 'eq', label: t('schedule.form.opEq') },
-            ]}
+            options={isCamera ? cameraOps : sensorOps}
             onChange={setOp}
           />
         </InkFormField>
         {op ? (
-          <InkFormField label={t('schedule.form.value')}>
+          <InkFormField label={isCamera ? t('visionAutomations.form.percent') : t('schedule.form.value')}>
             {/* iOS's numeric keyboard is a decimal pad with no minus key, and a
-                threshold can be below zero. Android's numeric keyboard has one. */}
+                threshold can be below zero. Android's numeric keyboard has one. A percent
+                is never below zero, so a camera's takes the number pad. */}
             <InkInput
-              label={t('schedule.form.value')}
-              type={Platform.OS === 'ios' ? 'text' : 'number'}
+              label={isCamera ? t('visionAutomations.form.percent') : t('schedule.form.value')}
+              type={Platform.OS === 'ios' && !isCamera ? 'text' : 'number'}
               value={value}
               onChange={setValue}
             />
@@ -310,7 +415,7 @@ function AutomationForm({ onClose, rule, onSubmit, onDelete }: Omit<AutomationFo
         {actionType === 'device_power' ? (
           <>
             {/* Nothing is chosen until a device is pressed; the list needs no placeholder row. */}
-            <DeviceList
+            <ChoiceList
               label={t('schedule.form.targetDevice')}
               value={targetId}
               options={switchable.map((d) => ({ value: d.id, label: d.name }))}
