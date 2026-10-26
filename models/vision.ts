@@ -17,6 +17,7 @@ import type {
   Rule,
   RuleRequest,
   TriggerCondition,
+  VisionCapture,
   VisionStatus,
 } from '@/services/types';
 import { formatScheduleTime } from './schedule';
@@ -310,6 +311,12 @@ function secondsSince(iso: string | null, now: number): number | null {
   return Number.isNaN(at) ? null : (now - at) / 1000;
 }
 
+const CAPTURE_LINE: Record<VisionCapture, TranslationKey> = {
+  camera_jpeg: 'vision.detail.capture.camera_jpeg',
+  hardware: 'vision.detail.capture.hardware',
+  software: 'vision.detail.capture.software',
+};
+
 /** The status in words. `now` is when the status was read, so a dropped stream's age is honest. */
 export function describeVision(status: VisionStatus, now: number): VisionSentence {
   const camera = status.camera_id || i18n.t('visionEvents.type.unknown');
@@ -324,6 +331,7 @@ export function describeVision(status: VisionStatus, now: number): VisionSentenc
   if (status.last_event_at && formatScheduleTime(status.last_event_at)) {
     details.push(i18n.t('vision.detail.lastEvent', { when: formatScheduleTime(status.last_event_at) }));
   }
+  if (status.state === 'running' && status.capture) details.push(i18n.t(CAPTURE_LINE[status.capture]));
   if (status.restarts > 0) details.push(i18n.t('vision.detail.restarts', { count: status.restarts }));
   if (status.state === 'running' && !status.classifier.available) details.push(i18n.t('vision.detail.noDetector'));
 

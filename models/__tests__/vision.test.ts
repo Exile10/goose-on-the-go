@@ -260,6 +260,16 @@ describe('what the pipeline is doing', () => {
     );
   });
 
+  it('says how pictures reach the pipeline, and nothing for a Pond that does not report it', () => {
+    expect(describeVision(status({ capture: 'camera_jpeg' }), NOW).details).toContain(
+      'Pictures come straight from the camera, so a high rate costs little.',
+    );
+    expect(describeVision(status({ capture: 'hardware' }), NOW).details).toContain("Your Pond's video hardware decodes the stream.");
+    const older = describeVision(status(), NOW).details.join(' ');
+    expect(older).not.toMatch(/decodes|straight from the camera/);
+    expect(describeVision(status({ capture: 'software', state: 'reconnecting' }), NOW).details.join(' ')).not.toMatch(/decodes/);
+  });
+
   it('owns up to a missing detector, since everything it records is then plain movement', () => {
     expect(describeVision(status({ classifier: { available: false } }), NOW).details).toContain(
       'No detector is loaded, so everything it records is plain movement.',
