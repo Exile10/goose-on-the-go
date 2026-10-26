@@ -23,6 +23,7 @@ import {
   JetBrainsMono_700Bold,
 } from '@expo-google-fonts/jetbrains-mono';
 import { InkProvider } from '@jarida/ink/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ConnectionStatus } from '@/components/patterns/connection-status';
 import { NotificationsProvider } from '@/providers/notifications-provider';
@@ -123,9 +124,12 @@ export default function RootLayout() {
  */
 function ThemedApp() {
   const { isDark } = useTheme();
+  // Ink cannot measure the notch or the home indicator itself; told once here,
+  // every sheet, toast and bar clears them.
+  const insets = useSafeAreaInsets();
   return (
     <NavThemeProvider value={isDark ? DarkTheme : DefaultTheme}>
-      <InkProvider scheme={isDark ? 'dark' : 'light'} accent="Purple">
+      <InkProvider scheme={isDark ? 'dark' : 'light'} accent="Purple" insets={insets}>
         {/* Inside Ink because the dialog draws with its theme; around every screen so any of them
             can ask. */}
         <ConfirmProvider>
