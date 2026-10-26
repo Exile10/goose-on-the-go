@@ -469,6 +469,8 @@ const cameras: SettingsPage = {
   titleKey: 'screens.settingsCameras',
   descriptionKey: 'settings.page.cameras',
   sections: [
+    // What the camera is doing right now comes before anything that sets it.
+    { items: [{ kind: 'special', id: 'visionStatus' }] },
     {
       items: [
         { kind: 'link', route: '/(stack)/camera-events', icon: 'eye', tile: 'slate', labelKey: 'settings.link.cameraEvents' },
@@ -476,15 +478,32 @@ const cameras: SettingsPage = {
     },
     {
       titleKey: 'settings.section.camera',
-      footerKey: 'settings.footer.restartCamera',
       items: [
-        { kind: 'switch', key: 'vision_enabled', restart: true, labelKey: 'settings.field.vision_enabled.label', hintKey: 'settings.field.vision_enabled.hint' },
+        { kind: 'switch', key: 'vision_enabled', labelKey: 'settings.field.vision_enabled.label', hintKey: 'settings.field.vision_enabled.hint' },
         { kind: 'switch', key: 'picture_support_download_enabled', labelKey: 'settings.field.picture_support_download_enabled.label', hintKey: 'settings.field.picture_support_download_enabled.hint' },
-        { kind: 'text', key: 'vision_camera_url', address: true, restart: true, labelKey: 'settings.field.vision_camera_url.label', hintKey: 'settings.field.vision_camera_url.hint', placeholderKey: 'settings.field.vision_camera_url.placeholder' },
-        { kind: 'text', key: 'vision_camera_id', restart: true, labelKey: 'settings.field.vision_camera_id.label', hintKey: 'settings.field.vision_camera_id.hint', placeholderKey: 'settings.field.vision_camera_id.placeholder' },
-        { kind: 'number', key: 'vision_fps', min: 1, max: 30, step: 1, unitKey: 'settings.unit.fps', restart: true, labelKey: 'settings.field.vision_fps.label', hintKey: 'settings.field.vision_fps.hint' },
-        { kind: 'slider', key: 'vision_motion_threshold', min: 0, max: 1, step: 0.01, format: 'fraction', restart: true, labelKey: 'settings.field.vision_motion_threshold.label', hintKey: 'settings.field.vision_motion_threshold.hint' },
+        { kind: 'text', key: 'vision_camera_url', address: true, labelKey: 'settings.field.vision_camera_url.label', hintKey: 'settings.field.vision_camera_url.hint', placeholderKey: 'settings.field.vision_camera_url.placeholder' },
+        { kind: 'text', key: 'vision_camera_id', labelKey: 'settings.field.vision_camera_id.label', hintKey: 'settings.field.vision_camera_id.hint', placeholderKey: 'settings.field.vision_camera_id.placeholder' },
+        { kind: 'number', key: 'vision_fps', min: 1, max: 5, step: 1, unitKey: 'settings.unit.fps', labelKey: 'settings.field.vision_fps.label', hintKey: 'settings.field.vision_fps.hint' },
+        { kind: 'slider', key: 'vision_motion_threshold', min: 0.01, max: 0.5, step: 0.01, format: 'fraction', labelKey: 'settings.field.vision_motion_threshold.label', hintKey: 'settings.field.vision_motion_threshold.hint' },
+        // The contract's live list leaves the detector out, so a change still waits for a restart.
         { kind: 'text', key: 'vision_classifier_model', restart: true, labelKey: 'settings.field.vision_classifier_model.label', hintKey: 'settings.field.vision_classifier_model.hint', placeholderKey: 'settings.field.vision_classifier_model.placeholder' },
+      ],
+    },
+    {
+      titleKey: 'settings.section.watchesFor',
+      footerKey: 'settings.footer.watchesFor',
+      items: [
+        { kind: 'special', id: 'visionEventTypes' },
+        { kind: 'number', key: 'vision_event_cooldown_secs', min: 1, max: 3600, step: 1, unitKey: 'settings.unit.seconds', labelKey: 'settings.field.vision_event_cooldown_secs.label', hintKey: 'settings.field.vision_event_cooldown_secs.hint' },
+        { kind: 'slider', key: 'vision_classifier_confidence', min: 0.05, max: 0.99, step: 0.01, format: 'fraction', labelKey: 'settings.field.vision_classifier_confidence.label', hintKey: 'settings.field.vision_classifier_confidence.hint' },
+      ],
+    },
+    {
+      titleKey: 'settings.section.faces',
+      footerKey: 'settings.footer.faces',
+      items: [
+        { kind: 'switch', key: 'vision_face_recognition_enabled', labelKey: 'settings.field.vision_face_recognition_enabled.label', hintKey: 'settings.field.vision_face_recognition_enabled.hint' },
+        { kind: 'switch', key: 'vision_face_on_motion', labelKey: 'settings.field.vision_face_on_motion.label', hintKey: 'settings.field.vision_face_on_motion.hint' },
       ],
     },
     {
@@ -555,6 +574,7 @@ const privacy: SettingsPage = {
       titleKey: 'settings.section.sensors',
       items: [
         { kind: 'switch', key: 'mic_enabled', labelKey: 'settings.field.mic_enabled.label', hintKey: 'settings.field.mic_enabled.hint' },
+        { kind: 'switch', key: 'cameras_enabled', labelKey: 'settings.field.cameras_enabled.label', hintKey: 'settings.field.cameras_enabled.hint' },
         { kind: 'switch', key: 'context_ingest_enabled', labelKey: 'settings.field.context_ingest_enabled.label', hintKey: 'settings.field.context_ingest_enabled.hint' },
       ],
     },

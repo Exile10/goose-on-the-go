@@ -21,6 +21,13 @@ import { useFocusEffect } from 'expo-router';
 /** The floor on any poll's delay. A bug in a delay function cannot turn a poll into a flood. */
 export const MIN_POLL_MS = 5_000;
 
+/**
+ * The one poll that has to keep pace with a picture: a camera's live frame, about once a second.
+ * The Pond allows a phone 600 requests a minute, so this spends a tenth of it, and only while the
+ * picture is on screen. A caller asks for it by name, so no other poll lowers its own floor.
+ */
+export const LIVE_VIEW_POLL_MS = 1_000;
+
 export interface LiveLoop {
   start(): void;
   stop(): void;
@@ -33,7 +40,7 @@ export interface LiveLoop {
  * slows the poll instead of stacking requests behind it. `delayAfter` is asked after each read,
  * which is how a source backs off.
  */
-export function liveLoop(read: () => Promise<unknown>, delayAfter: () => number): LiveLoop {
+export function liveLoop(read: () => Promise<unknown>, delayAfter: () => number, floorMs = MIN_POLL_MS): LiveLoop {
   // Each start is a generation. A read still out when the loop stops, or restarts, belongs to an
   // old one and must not schedule another; without this a stop-start pair would run two chains.
   let generation = 0;
@@ -49,7 +56,7 @@ export function liveLoop(read: () => Promise<unknown>, delayAfter: () => number)
     }
     if (gen !== generation) return;
     const asked = delayAfter();
-    const wait = Number.isFinite(asked) && asked > MIN_POLL_MS ? asked : MIN_POLL_MS;
+    const wait = Number.isFinite(asked) && asked > floorMs ? asked : floorMs;
     timer = setTimeout(() => void tick(gen), wait);
   };
 
@@ -76,9 +83,15 @@ export function liveLoop(read: () => Promise<unknown>, delayAfter: () => number)
  *
  * `enabled` holds the loop off entirely -- a view-model passes whether the base URL and token
  * have arrived, since reading before they land calls the default address unauthenticated.
- * `delay` may be a function, asked after each read.
+ * `delay` may be a function, asked after each read. `floorMs` is `MIN_POLL_MS` unless the poll is
+ * a live picture, which passes `LIVE_VIEW_POLL_MS`.
  */
-export function useLive(read: () => Promise<unknown>, delay: number | (() => number), enabled = true): void {
+export function useLive(
+  read: () => Promise<unknown>,
+  delay: number | (() => number),
+  enabled = true,
+  floorMs = MIN_POLL_MS,
+): void {
   // The latest callbacks, without restarting the loop every render they change on.
   const readRef = useRef(read);
   const delayRef = useRef(delay);
@@ -96,6 +109,7 @@ export function useLive(read: () => Promise<unknown>, delay: number | (() => num
           const d = delayRef.current;
           return typeof d === 'function' ? d() : d;
         },
+        floorMs,
       );
       // Only a known background state holds it off: on an Android cold start AppState can read
       // 'unknown' while the screen is plainly on show.
@@ -108,6 +122,6 @@ export function useLive(read: () => Promise<unknown>, delay: number | (() => num
         sub.remove();
         loop.stop();
       };
-    }, [enabled]),
+    }, [enabled, floorMs]),
   );
 }

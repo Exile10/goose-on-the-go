@@ -1239,6 +1239,8 @@ export interface PondSettings {
 
   // Privacy and reach
   mic_enabled: boolean;
+  /** The consent switch: false forbids the vision pipeline and every camera capture. */
+  cameras_enabled: boolean;
   network_mode: string;
   mesh_enabled: boolean;
   security_policy_mode: string;

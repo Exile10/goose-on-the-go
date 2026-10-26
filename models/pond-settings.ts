@@ -90,7 +90,9 @@ export type SpecialId =
   | 'primaryProfile'
   | 'theme'
   | 'haptics'
-  | 'posture';
+  | 'posture'
+  | 'visionStatus'
+  | 'visionEventTypes';
 
 export type SliderFormat = 'pace' | 'creativity' | 'fraction';
 
@@ -111,6 +113,9 @@ export type SummaryId =
   | 'household'
   | 'people'
   | 'cameras'
+  | 'visionEvents'
+  | 'faces'
+  | 'visionAutomations'
   | 'announcements'
   | 'privacy'
   | 'retention'
@@ -213,6 +218,7 @@ export const SAMPLE_SETTINGS: PondSettings = {
   memory_consolidation_interval_hours: 24,
   memory_consolidation_batch_size: 50,
   mic_enabled: true,
+  cameras_enabled: true,
   network_mode: 'open',
   mesh_enabled: false,
   security_policy_mode: 'audit',
@@ -472,7 +478,7 @@ export function postureOf(s: PondSettings): Posture {
   const reach = s.network_mode === 'allowlist' || s.network_mode === 'offline' ? s.network_mode : 'open';
   return {
     listens: s.mic_enabled,
-    watches: s.vision_enabled,
+    watches: s.vision_enabled && s.cameras_enabled,
     remembers: s.memory_extraction_enabled,
     speaksFirst: s.unprompted_speech_enabled,
     reach,
