@@ -203,6 +203,7 @@ Android.
 | VoicePickerView | voices, current, pace, applying, problem, onChoose, onPace, preview, silentLine | The picker with no store behind it; owner setup drives it with `usePondVoiceSample`, which has the Pond say the sample on its own speaker (P4), and passes `null` on a Pond without that route |
 | VoicePicker | vm | pond-desktop's picker: `VoiceOrb` on an `InkStage` with the voice, its line and play; the accents as a sideways row of `InkChoice` pills; the best six voices as chips with "Show all"; the pace. Previews come from `useVoicePreview`, the line's loudness driving the face |
 | IssuePage, IssueRows, IssueDot | issue, ctx / issues / tone | One entry of `SETTINGS_ISSUES` as a page; the rows for the top of Settings; the dot the row and the You tab carry |
+| VisionStatusCard, visionEventTypeRows | — / settings, vm, t | Cameras and vision's two multi-field rows: what the camera is doing over its live frame, drawn on its own edge; and one switch per kind of event, the last one left on locked |
 
 ### Owner setup and first run (components/setup/)
 
@@ -248,3 +249,7 @@ masked field; nothing here asks it to save one.
 | VoiceOrb | state, level, size, onPress, accessibilityLabel | The voice control, and the face Goose talks with |
 | Goose | state, size, water | The Pond's bird, afloat |
 | ChromePuck, ChromePill | icon / label, onPress | One control floating over content: opaque `chrome`, not the bar's glass |
+| PondPicture | path, version, label, contentFit | A picture the Pond serves, read over the pinned transport and kept (`services/pond-images.ts`); a stand-in for one that was never kept or would not load |
+| CameraFrameView | frame, state, sentence, camera | The pond camera's latest frame in a fixed 16:9 box with what the camera is doing as a badge, and a stand-in when there is none |
+| VisionEventRow, VisionEventSheet | event, nameOf, onOpen / event, onAcknowledge, onCreateRule | One event as a flat row between hairlines, and in full: large picture, every measure, Acknowledge, and the automation form prefilled |
+| FaceSheet | person, defaultThreshold, onChanged, onForget, onStrictness | One household member's face: samples at the pond's camera or from a photo, strictness, forget |
