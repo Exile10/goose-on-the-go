@@ -17,7 +17,7 @@ import { useThemedStyles } from '@/hooks/use-themed-styles';
 import { selectionTick } from '@/services/haptics';
 import type { DiscoveredPond } from '@/services/discovery';
 import type { ThemeColors } from '@/constants/colors';
-import { FontFamily, FontSize } from '@/constants/typography';
+import { FontSize, face } from '@/constants/typography';
 import { Spacing } from '@/constants/spacing';
 
 export type DiscoveryPhase = 'searching' | 'found' | 'empty' | 'failed';
@@ -106,10 +106,10 @@ const makeStyles = (c: ThemeColors) =>
   StyleSheet.create({
     label: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
     trail: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs },
-    name: { fontFamily: FontFamily.body, fontSize: FontSize.base, color: c.text, flexShrink: 1 },
-    addr: { fontFamily: FontFamily.mono, fontSize: FontSize.xs, color: c.textTertiary },
+    name: { ...face('body', 'regular'), fontSize: FontSize.base, color: c.text, flexShrink: 1 },
+    addr: { ...face('mono', 'regular'), fontSize: FontSize.xs, color: c.textTertiary },
     scanning: {
-      fontFamily: FontFamily.body,
+      ...face('body', 'regular'),
       fontSize: FontSize.sm,
       color: c.textTertiary,
       paddingVertical: Spacing.lg,

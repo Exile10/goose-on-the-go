@@ -39,7 +39,7 @@ import { DeviceEditSheet } from '@/components/patterns/device-edit-sheet';
 import type { Device } from '@/services/types';
 import { Grey } from '@/constants/colors';
 import type { ThemeColors } from '@/constants/colors';
-import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
+import { FontSize, face } from '@/constants/typography';
 import { Spacing } from '@/constants/spacing';
 import { Radii } from '@/constants/radii';
 
@@ -299,7 +299,7 @@ const makeStyles = (c: ThemeColors) =>
       paddingBottom: Spacing.md,
     },
     subtitle: {
-      fontFamily: FontFamily.body,
+      ...face('body', 'regular'),
       fontSize: FontSize.sm,
       color: c.textTertiary,
       marginTop: Spacing.xs,
@@ -343,13 +343,12 @@ const makeStyles = (c: ThemeColors) =>
       justifyContent: 'center',
     },
     name: {
-      fontFamily: FontFamily.body,
+      ...face('body', 'semibold'),
       fontSize: FontSize.sm,
-      fontWeight: FontWeight.semibold,
       color: c.text,
     },
     detail: {
-      fontFamily: FontFamily.body,
+      ...face('body', 'regular'),
       fontSize: FontSize.xs,
       color: c.textSecondary,
     },

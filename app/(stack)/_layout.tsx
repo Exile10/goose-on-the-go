@@ -16,7 +16,7 @@ import { GPressable } from '@/components/ui/g-pressable';
 import { useTheme } from '@/providers/theme-provider';
 import { selectionTick } from '@/services/haptics';
 import { JaridaPurple } from '@/constants/colors';
-import { FontFamily } from '@/constants/typography';
+import { face } from '@/constants/typography';
 
 /**
  * A back control the navigator will not draw on its own.
@@ -59,8 +59,7 @@ export default function StackLayout() {
         headerTintColor: JaridaPurple[500],
         headerTitleStyle: {
           color: colors.text,
-          fontFamily: FontFamily.heading,
-          fontWeight: '700',
+          ...face('display', 'bold'),
         },
         headerShadowVisible: false,
         headerBackButtonDisplayMode: 'minimal',

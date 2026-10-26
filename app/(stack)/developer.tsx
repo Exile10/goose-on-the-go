@@ -19,7 +19,7 @@ import { GPressable } from '@/components/ui/g-pressable';
 import { ServerStatus } from '@/components/patterns/server-status';
 import { useServer, MIGRATION_SCREENS, type MigrationScreen } from '@/providers/server-provider';
 import { JaridaPurple, Brand } from '@/constants/colors';
-import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
+import { FontSize, face } from '@/constants/typography';
 import { Spacing } from '@/constants/spacing';
 import { Radii } from '@/constants/radii';
 import { Shadows } from '@/constants/shadows';
@@ -121,15 +121,14 @@ const makeStyles = (c: ThemeColors) =>
     content: { padding: Spacing.lg, paddingBottom: Spacing['3xl'] },
 
     sectionTitle: {
-      fontFamily: FontFamily.body,
+      ...face('body', 'semibold'),
       fontSize: FontSize.base,
-      fontWeight: FontWeight.semibold,
       color: c.text,
       marginBottom: Spacing.sm,
       marginTop: Spacing.lg,
     },
     sectionHint: {
-      fontFamily: FontFamily.body,
+      ...face('body', 'regular'),
       fontSize: FontSize.sm,
       color: c.textTertiary,
       marginBottom: Spacing.md,
@@ -137,7 +136,7 @@ const makeStyles = (c: ThemeColors) =>
       lineHeight: FontSize.sm * 1.5,
     },
     changeLink: {
-      fontFamily: FontFamily.body,
+      ...face('body', 'regular'),
       fontSize: FontSize.sm,
       color: c.textBrand,
       marginTop: Spacing.xs,
@@ -169,9 +168,8 @@ const makeStyles = (c: ThemeColors) =>
       borderRadius: Radii.md,
     },
     testButtonText: {
-      fontFamily: FontFamily.body,
+      ...face('body', 'semibold'),
       fontSize: FontSize.sm,
-      fontWeight: FontWeight.semibold,
       color: Brand.white,
     },
 
@@ -187,13 +185,12 @@ const makeStyles = (c: ThemeColors) =>
     },
     screenRowLeft: { flex: 1, marginRight: Spacing.md },
     screenLabel: {
-      fontFamily: FontFamily.body,
+      ...face('body', 'medium'),
       fontSize: FontSize.base,
-      fontWeight: FontWeight.medium,
       color: c.text,
     },
     screenModeText: {
-      fontFamily: FontFamily.body,
+      ...face('body', 'regular'),
       fontSize: FontSize.xs,
       color: c.textTertiary,
       marginTop: 2,

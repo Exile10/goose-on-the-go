@@ -17,7 +17,7 @@ import {
 import { GIcon } from '@/components/ui/g-icon';
 import { GPressable } from '@/components/ui/g-pressable';
 import { Grey, JaridaPurple } from '@/constants/colors';
-import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
+import { FontSize, face } from '@/constants/typography';
 import { Spacing } from '@/constants/spacing';
 import { Radii } from '@/constants/radii';
 import { APP_LICENSES, DATA_RIGHT_KEYS, PRIVACY_SECTIONS, type PrivacySection } from '@/constants/privacy';
@@ -116,13 +116,12 @@ const makeStyles = (c: ThemeColors) =>
     },
     sectionTitle: {
       flex: 1,
-      fontFamily: FontFamily.heading,
+      ...face('display', 'semibold'),
       fontSize: FontSize.base,
-      fontWeight: FontWeight.semibold,
       color: c.text,
     },
     sectionContent: {
-      fontFamily: FontFamily.body,
+      ...face('body', 'regular'),
       fontSize: FontSize.sm,
       color: c.textTertiary,
       lineHeight: FontSize.sm * 1.6,
@@ -151,7 +150,7 @@ const makeStyles = (c: ThemeColors) =>
     },
     rightText: {
       flex: 1,
-      fontFamily: FontFamily.body,
+      ...face('body', 'regular'),
       fontSize: FontSize.base,
       color: c.text,
     },
@@ -176,7 +175,7 @@ const makeStyles = (c: ThemeColors) =>
       paddingBottom: Spacing.sm,
     },
     licenseName: {
-      fontFamily: FontFamily.body,
+      ...face('body', 'regular'),
       fontSize: FontSize.base,
       color: c.text,
     },
@@ -187,7 +186,7 @@ const makeStyles = (c: ThemeColors) =>
       borderRadius: Radii.pill,
     },
     licenseText: {
-      fontFamily: FontFamily.mono,
+      ...face('mono', 'regular'),
       fontSize: FontSize.xs,
       color: c.textTertiary,
     },

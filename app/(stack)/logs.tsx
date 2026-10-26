@@ -68,11 +68,12 @@ import { useConversationTelemetry, useConversationTurns } from '@/view-models/us
 import { useLogExport } from '@/view-models/use-log-export';
 import { useProblems } from '@/view-models/use-problems';
 import { formatRelativeTime } from '@/view-models/use-recent-sessions';
-import { Grey, Semantic } from '@/constants/colors';
-import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
+import { Grey } from '@/constants/colors';
+import { FontSize, face } from '@/constants/typography';
 import { Spacing } from '@/constants/spacing';
 import { Radii } from '@/constants/radii';
 import { useThemedStyles } from '@/hooks/use-themed-styles';
+import { useTheme } from '@/providers/theme-provider';
 import type { ThemeColors } from '@/constants/colors';
 
 const EventRow = React.memo(function EventRow({
@@ -111,7 +112,8 @@ const EventRow = React.memo(function EventRow({
 /** A warning or error from the Pond's own log: what it said, where, and when. */
 const ProblemRow = React.memo(function ProblemRow({ item }: { item: LogEntry }) {
   const styles = useThemedStyles(makeStyles);
-  const color = item.level.toUpperCase() === 'ERROR' ? Semantic.danger : Semantic.warning;
+  const { colors } = useTheme();
+  const color = item.level.toUpperCase() === 'ERROR' ? colors.danger : colors.warning;
   return (
     <View style={styles.logRow}>
       <View style={styles.logIcon}>
@@ -384,13 +386,13 @@ const makeStyles = (c: ThemeColors) =>
   logIcon: { marginRight: Spacing.md, marginTop: 2 },
   logBody: { flex: 1 },
   logText: {
-    fontFamily: FontFamily.body,
+    ...face('body', 'regular'),
     fontSize: FontSize.base,
     lineHeight: FontSize.base * 1.5,
     color: c.text,
   },
   logDetail: {
-    fontFamily: FontFamily.body,
+    ...face('body', 'regular'),
     fontSize: FontSize.sm,
     color: c.textSecondary,
     marginTop: 2,
@@ -402,7 +404,7 @@ const makeStyles = (c: ThemeColors) =>
     marginTop: Spacing.xs,
   },
   logTime: {
-    fontFamily: FontFamily.mono,
+    ...face('mono', 'regular'),
     fontSize: FontSize.xs,
     color: Grey[400],
   },
@@ -413,9 +415,8 @@ const makeStyles = (c: ThemeColors) =>
     borderRadius: Radii.pill,
   },
   typeText: {
-    fontFamily: FontFamily.body,
+    ...face('body', 'bold'),
     fontSize: 10,
-    fontWeight: FontWeight.bold,
     color: c.textSecondary,
   },
   notice: { gap: Spacing.sm, marginBottom: Spacing.md },
@@ -436,14 +437,13 @@ const makeStyles = (c: ThemeColors) =>
     gap: Spacing.xs,
   },
   todayTotal: {
-    fontFamily: FontFamily.body,
+    ...face('body', 'semibold'),
     fontSize: FontSize.base,
-    fontWeight: FontWeight.semibold,
     color: c.text,
   },
   todayCounts: { flexDirection: 'row', flexWrap: 'wrap', columnGap: Spacing.md },
   todayCount: {
-    fontFamily: FontFamily.body,
+    ...face('body', 'regular'),
     fontSize: FontSize.sm,
     color: c.textSecondary,
   },
