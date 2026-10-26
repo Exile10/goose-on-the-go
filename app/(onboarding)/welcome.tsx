@@ -117,7 +117,7 @@ export default function Welcome() {
           </View>
 
           <View style={styles.path}>
-            <InkButton variant="primary" block icon="camera" disabled={phase.kind === 'claiming'} onPress={scanCard}>
+            <InkButton variant="primary" block icon="camera" loading={phase.kind === 'claiming'} onPress={scanCard}>
               {t('bleSetup.find.scanCard')}
             </InkButton>
 

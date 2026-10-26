@@ -132,7 +132,7 @@ function WhereStep({ setup }: { setup: UseOwnerSetup }) {
           onChange={(locationName) => actions.patch({ locationName, latitude: 0, longitude: 0 })}
         />
         <View style={styles.detect}>
-          <InkButton variant="quiet" icon="globe" disabled={place.busy} onPress={() => void actions.detectPlace()}>
+          <InkButton variant="quiet" icon="globe" loading={place.busy} onPress={() => void actions.detectPlace()}>
             {place.busy ? t('setup.locale.detecting') : t('setup.locale.detect')}
           </InkButton>
         </View>

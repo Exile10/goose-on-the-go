@@ -1820,7 +1820,8 @@
     "emoji": "Emoji",
     "emojiHint": "Shown beside their name",
     "empty": "No one here yet",
-    "emptyBody": "Add a person so Goose can tell your household apart."
+    "emptyBody": "Add a person so Goose can tell your household apart.",
+    "loading": "Reading who lives here"
   },
   "biometrics": {
     "enrolled": "Enrolled",
@@ -2271,7 +2272,8 @@
     "emptyTitle": "No conversations yet",
     "emptyMessage": "Start a chat to see it here.",
     "renameFailed": "Failed to rename conversation.",
-    "deleteFailed": "Failed to delete conversation."
+    "deleteFailed": "Failed to delete conversation.",
+    "loading": "Reading your conversations"
   },
   "scanErrors": {
     "matterCode": "That is a Matter device setup code, not a Pond pairing code. Use Devices, then Add device, to commission it. The pairing code is the one on your Pond dashboard.",
@@ -2479,7 +2481,6 @@
       "detectFailed": "Couldn't work that out. Type the nearest town instead.",
       "weather": "Live weather",
       "weatherBody": "Forecasts from Open-Meteo for the place above. No GPS needed.",
-      "zoneClear": "Clear",
       "fromPhone": "Filled in from this phone. Change anything that's wrong."
     },
     "personality": {

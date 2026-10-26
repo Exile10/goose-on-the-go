@@ -42,7 +42,7 @@ export function ModelStep({ setup }: { setup: UseOwnerSetup }) {
         return stalled ? (
           <View style={styles.block}>
             <InkNotice tone="warning">{t('setup.model.stalled', { name: titleOf(choice.model) })}</InkNotice>
-            <InkButton variant="primary" block icon="refresh" disabled={setup.saving} onPress={retry}>
+            <InkButton variant="primary" block icon="refresh" loading={setup.saving} onPress={retry}>
               {t('common.retry')}
             </InkButton>
             {others}
@@ -54,7 +54,7 @@ export function ModelStep({ setup }: { setup: UseOwnerSetup }) {
         return stalled ? (
           <View style={styles.block}>
             <InkNotice tone="warning">{t('setup.model.stalled', { name: titleOf(choice.model) })}</InkNotice>
-            <InkButton variant="primary" block icon="refresh" disabled={setup.saving} onPress={retry}>
+            <InkButton variant="primary" block icon="refresh" loading={setup.saving} onPress={retry}>
               {t('common.retry')}
             </InkButton>
           </View>

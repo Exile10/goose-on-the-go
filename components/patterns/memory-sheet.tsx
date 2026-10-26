@@ -93,7 +93,7 @@ export function MemorySheet({ open, editing, onClose, onSave, onReword, onSetKep
 
       {error ? <InkNotice tone="danger">{error}</InkNotice> : null}
 
-      <InkButton variant="primary" block disabled={submitting} onPress={submit}>
+      <InkButton variant="primary" block loading={submitting} onPress={submit}>
         {t('memories.form.save')}
       </InkButton>
     </InkSheet>

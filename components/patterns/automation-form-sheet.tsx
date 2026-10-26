@@ -449,7 +449,7 @@ export function AutomationForm({ onClose, rule, prefill, onSubmit, onDelete }: O
 
       {error ? <InkNotice tone="danger">{error}</InkNotice> : null}
 
-      <InkButton variant="primary" block disabled={submitting} onPress={submit}>
+      <InkButton variant="primary" block loading={submitting} onPress={submit}>
         {rule ? t('schedule.form.save') : t('schedule.form.create')}
       </InkButton>
       {rule && onDelete ? (

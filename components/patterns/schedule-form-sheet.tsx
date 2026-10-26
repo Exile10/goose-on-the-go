@@ -206,7 +206,7 @@ export function ScheduleFormSheet(props: ScheduleFormSheetProps) {
 
       {error ? <InkNotice tone="danger">{error}</InkNotice> : null}
 
-      <InkButton variant="primary" block disabled={submitting} onPress={submit}>
+      <InkButton variant="primary" block loading={submitting} onPress={submit}>
         {editing ? t('schedule.form.save') : t('schedule.form.create')}
       </InkButton>
     </InkSheet>

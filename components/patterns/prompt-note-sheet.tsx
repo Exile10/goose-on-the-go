@@ -85,7 +85,7 @@ export function PromptNoteSheet({ open, editing, onClose, onAdd, onEdit }: Promp
 
       {error ? <InkNotice tone="danger">{error}</InkNotice> : null}
 
-      <InkButton variant="primary" block disabled={submitting} onPress={submit}>
+      <InkButton variant="primary" block loading={submitting} onPress={submit}>
         {t('promptNotes.form.save')}
       </InkButton>
     </InkSheet>

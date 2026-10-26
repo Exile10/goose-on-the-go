@@ -75,7 +75,7 @@ export function DeviceEditSheet({ device, rooms, onClose, onSave }: DeviceEditSh
 
       {error ? <InkNotice tone="danger">{error}</InkNotice> : null}
 
-      <InkButton variant="primary" block disabled={submitting} onPress={submit}>
+      <InkButton variant="primary" block loading={submitting} onPress={submit}>
         {t('deviceEdit.save')}
       </InkButton>
     </InkSheet>

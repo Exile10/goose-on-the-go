@@ -89,7 +89,7 @@ export function RoomSheet({ devices, room, onClose, onSave }: RoomSheetProps) {
 
       {error ? <InkNotice tone="danger">{error}</InkNotice> : null}
 
-      <InkButton variant="primary" block disabled={submitting} onPress={submit}>
+      <InkButton variant="primary" block loading={submitting} onPress={submit}>
         {room === null ? t('rooms.create') : t('rooms.save')}
       </InkButton>
     </InkSheet>
