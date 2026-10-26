@@ -43,7 +43,6 @@ import { useOnboarding } from '@/view-models/use-onboarding';
 import { useSetupGate } from '@/view-models/use-setup-gate';
 import { useSettingsIssues } from '@/view-models/use-settings-issues';
 import { selectionTick } from '@/services/haptics';
-import { Semantic } from '@/constants/colors';
 import type { IconName } from '@/constants/icons';
 import type { TranslationKey } from '@/services/i18n';
 
@@ -123,12 +122,12 @@ function AppTabBar({ state, navigation }: TabBarProps) {
               color={d.name === current ? theme.color.text : theme.color.textSecondary}
             />
             {d.name === 'profile' && issueTone ? (
-              <View style={[styles.dot, { backgroundColor: issueTone === 'info' ? theme.color.accent : Semantic.danger }]} />
+              <View style={[styles.dot, { backgroundColor: issueTone === 'info' ? theme.color.accent : theme.color.danger }]} />
             ) : null}
           </View>
         ),
       })),
-    [current, theme.color.text, theme.color.textSecondary, theme.color.accent, issueTone, t],
+    [current, theme.color.text, theme.color.textSecondary, theme.color.accent, theme.color.danger, issueTone, t],
   );
 
   // The bar draws a dash over the selected destination in `accentLine`, and

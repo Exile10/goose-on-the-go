@@ -74,7 +74,8 @@ export function ConfirmDialog({ open, title, message, actions, onAction, onCance
           alignItems: 'center',
           justifyContent: 'center',
           padding: theme.space[6],
-          backgroundColor: 'rgba(23, 22, 22, 0.42)',
+          // Per scheme: the light value over a dark page dimmed it by almost nothing.
+          backgroundColor: theme.color.scrim,
         }}
       >
         {/* A press inside the panel must not reach the backdrop behind it. */}

@@ -10,9 +10,8 @@ import { View, Text, StyleSheet } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { useThemedStyles } from '@/hooks/use-themed-styles';
-import { Semantic } from '@/constants/colors';
 import type { ThemeColors } from '@/constants/colors';
-import { FontFamily, FontSize } from '@/constants/typography';
+import { FontSize, face } from '@/constants/typography';
 import { Spacing } from '@/constants/spacing';
 
 interface ServerStatusProps {
@@ -45,10 +44,10 @@ const makeStyles = (c: ThemeColors) =>
       gap: Spacing.xs,
     },
     dot: { width: 8, height: 8, borderRadius: 4 },
-    dotOnline: { backgroundColor: Semantic.success },
+    dotOnline: { backgroundColor: c.success },
     dotOffline: { backgroundColor: c.textTertiary },
     label: {
-      fontFamily: FontFamily.body,
+      ...face('body', 'regular'),
       fontSize: FontSize.xs,
       color: c.textSecondary,
     },
