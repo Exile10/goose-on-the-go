@@ -485,7 +485,7 @@ const cameras: SettingsPage = {
         { kind: 'switch', key: 'picture_support_download_enabled', labelKey: 'settings.field.picture_support_download_enabled.label', hintKey: 'settings.field.picture_support_download_enabled.hint' },
         { kind: 'text', key: 'vision_camera_url', address: true, labelKey: 'settings.field.vision_camera_url.label', hintKey: 'settings.field.vision_camera_url.hint', placeholderKey: 'settings.field.vision_camera_url.placeholder' },
         { kind: 'text', key: 'vision_camera_id', labelKey: 'settings.field.vision_camera_id.label', hintKey: 'settings.field.vision_camera_id.hint', placeholderKey: 'settings.field.vision_camera_id.placeholder' },
-        { kind: 'number', key: 'vision_fps', min: 1, max: 5, step: 1, unitKey: 'settings.unit.fps', labelKey: 'settings.field.vision_fps.label', hintKey: 'settings.field.vision_fps.hint' },
+        { kind: 'number', key: 'vision_fps', min: 1, max: 30, step: 1, stops: [1, 2, 3, 5, 10, 15, 24, 30], unitKey: 'settings.unit.fps', labelKey: 'settings.field.vision_fps.label', hintKey: 'settings.field.vision_fps.hint' },
         { kind: 'slider', key: 'vision_motion_threshold', min: 0.01, max: 0.5, step: 0.01, format: 'fraction', labelKey: 'settings.field.vision_motion_threshold.label', hintKey: 'settings.field.vision_motion_threshold.hint' },
         // The contract's live list leaves the detector out, so a change still waits for a restart.
         { kind: 'text', key: 'vision_classifier_model', restart: true, labelKey: 'settings.field.vision_classifier_model.label', hintKey: 'settings.field.vision_classifier_model.hint', placeholderKey: 'settings.field.vision_classifier_model.placeholder' },

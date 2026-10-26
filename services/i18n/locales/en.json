@@ -757,7 +757,7 @@
       },
       "vision_fps": {
         "label": "Pictures per second",
-        "hint": "From 1 to 5. Low on purpose, to leave room for thinking."
+        "hint": "From 1 to 30. More pictures catch quick movement sooner and use more of your Pond; 2 to 5 is enough to notice people."
       },
       "vision_motion_threshold": {
         "label": "Motion sensitivity",
@@ -2828,7 +2828,12 @@
       "lastEvent": "Last event {{when}}.",
       "restarts_one": "Restarted {{count}} time.",
       "restarts_other": "Restarted {{count}} times.",
-      "noDetector": "No detector is loaded, so everything it records is plain movement."
+      "noDetector": "No detector is loaded, so everything it records is plain movement.",
+      "capture": {
+        "camera_jpeg": "Pictures come straight from the camera, so a high rate costs little.",
+        "hardware": "Your Pond's video hardware decodes the stream.",
+        "software": "Your Pond's processor decodes every picture, so a high rate costs more."
+      }
     },
     "frame": {
       "alt": "The latest picture from {{camera}}",

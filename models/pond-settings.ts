@@ -56,6 +56,8 @@ export type SettingItem =
       min: number;
       max?: number;
       step: number;
+      /** Values − and + move between, for a wide range where most whole numbers are not worth a tap. */
+      stops?: readonly number[];
       unitKey?: TranslationKey;
     })
   | (ItemBase & {
@@ -318,6 +320,13 @@ export function parseSettingNumber(
   if (value < min) return { error: 'tooSmall' };
   if (max !== undefined && value > max) return { error: 'tooBig' };
   return { value };
+}
+
+/** The stop past `value` in the direction of `delta`; a value between stops lands on the nearer side. */
+export function nextStop(stops: readonly number[], value: number, delta: number): number {
+  const sorted = [...stops].sort((a, b) => a - b);
+  const found = delta > 0 ? sorted.find((s) => s > value) : [...sorted].reverse().find((s) => s < value);
+  return found ?? value;
 }
 
 // ── Clock times ───────────────────────────────────────────────

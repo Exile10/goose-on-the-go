@@ -769,7 +769,12 @@ export interface VisionStatus {
   classifier: { available: boolean };
   faces: { available: boolean; enrolled_people: number };
   event_listeners: number;
+  /** How pictures reach the pipeline; absent on a Pond older than the field. */
+  capture?: VisionCapture | null;
 }
+
+/** `camera_jpeg`: the camera's own JPEGs, `hardware`: the Pond's video decoder, `software`: decoded on the processor. */
+export type VisionCapture = 'camera_jpeg' | 'hardware' | 'software';
 
 /** One entry of `GET /cameras`. `live` means a frame arrived in the last 10 seconds. */
 export interface CameraInfo {

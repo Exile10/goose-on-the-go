@@ -143,6 +143,7 @@ function rowsFor(item: SettingItem, i: number, ctx: Context): ReactElement[] {
           min={item.min}
           max={item.max}
           step={item.step}
+          stops={item.stops}
           unit={item.unitKey ? t(item.unitKey) : undefined}
           onCommit={(next) => void update(item.key, next)}
         />,
