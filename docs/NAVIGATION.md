@@ -22,8 +22,8 @@ The bar is absolutely positioned, so a tab screen's own list has to clear it —
 `paddingBottom: useBottomBarInset()`, never a hardcoded spacer. Which stage the
 bar is in lives in `providers/chrome-provider.tsx`; see
 [`VIEW-LAYER.md`](VIEW-LAYER.md#the-bar-leaving) for the last stage, where the
-bar contracts to one control, and the patch that makes that work more than
-once.
+bar contracts to one control, and the fix in Ink that makes that work more
+than once.
 
 The Chat tab opens on the wall of conversations, `app/(tabs)/chat/index.tsx`,
 as pond-desktop's Chat does. A conversation is `app/conversation.tsx`, a
