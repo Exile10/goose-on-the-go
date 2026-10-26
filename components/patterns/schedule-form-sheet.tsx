@@ -9,7 +9,6 @@
  */
 
 import React, { useState } from 'react';
-import { ScrollView, StyleSheet } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import {
   InkButton,
@@ -25,7 +24,6 @@ import {
 } from '@jarida/ink/native';
 import type { CivilDate } from '@jarida/ink';
 
-import { GSheetBody } from '@/components/ui/g-sheet-body';
 import {
   createRequest,
   deviceTimeZone,
@@ -37,7 +35,6 @@ import {
 } from '@/models/schedule';
 import { confirm, reject } from '@/services/haptics';
 import type { CreateScheduleRequest, Schedule, UpdateScheduleRequest } from '@/services/types';
-import { Spacing } from '@/constants/spacing';
 
 export type ScheduleFormSheetProps = {
   open: boolean;
@@ -129,97 +126,89 @@ export function ScheduleFormSheet(props: ScheduleFormSheetProps) {
       onClose={onClose}
       title={editing ? t('schedule.form.editScheduleTitle') : t('schedule.form.scheduleTitle')}
     >
-      <GSheetBody>
-        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-          <InkFormField label={t('schedule.form.name')}>
+      <InkFormField label={t('schedule.form.name')}>
+        <InkInput
+          label={t('schedule.form.name')}
+          placeholder={t('schedule.form.schedulePlaceholder')}
+          value={draft.name}
+          onChange={set('name')}
+        />
+      </InkFormField>
+
+      <InkFormField label={t('schedule.form.timing')}>
+        <InkSegmented
+          label={t('schedule.form.timing')}
+          value={draft.timing}
+          options={[
+            { value: 'once', label: t('schedule.form.once') },
+            { value: 'repeat', label: t('schedule.form.repeat') },
+          ]}
+          onChange={set('timing')}
+        />
+      </InkFormField>
+
+      {draft.timing === 'once' ? (
+        <>
+          <InkFormField label={t('schedule.form.date')}>
+            <InkDatePicker
+              label={t('schedule.form.date')}
+              placeholder={t('schedule.form.datePlaceholder')}
+              value={draft.date}
+              onChange={set('date')}
+              today={today}
+              min={today}
+            />
+          </InkFormField>
+          <InkFormField label={t('schedule.form.time')}>
+            <InkTimePicker label={t('schedule.form.time')} value={draft.time} onChange={set('time')} />
+          </InkFormField>
+        </>
+      ) : (
+        <>
+          <InkFormField label={t('schedule.form.cron')}>
             <InkInput
-              label={t('schedule.form.name')}
-              placeholder={t('schedule.form.schedulePlaceholder')}
-              value={draft.name}
-              onChange={set('name')}
+              label={t('schedule.form.cron')}
+              placeholder="0 0 9 * * 1-5"
+              value={draft.cron}
+              onChange={set('cron')}
             />
           </InkFormField>
+          <InkText size="sm" tone="tertiary">{t('schedule.form.cronHint')}</InkText>
+        </>
+      )}
 
-          <InkFormField label={t('schedule.form.timing')}>
-            <InkSegmented
-              label={t('schedule.form.timing')}
-              value={draft.timing}
-              options={[
-                { value: 'once', label: t('schedule.form.once') },
-                { value: 'repeat', label: t('schedule.form.repeat') },
-              ]}
-              onChange={set('timing')}
-            />
-          </InkFormField>
+      {zones ? (
+        <InkFormField label={t('schedule.form.timezone')}>
+          <InkSegmented
+            label={t('schedule.form.timezone')}
+            value={draft.timezone}
+            options={zones.map((zone) => ({ value: zone, label: zone }))}
+            onChange={set('timezone')}
+          />
+        </InkFormField>
+      ) : null}
+      <InkText size="sm" tone="tertiary">{t('schedule.form.phoneZone', { zone: phoneZone })}</InkText>
 
-          {draft.timing === 'once' ? (
-            <>
-              <InkFormField label={t('schedule.form.date')}>
-                <InkDatePicker
-                  label={t('schedule.form.date')}
-                  placeholder={t('schedule.form.datePlaceholder')}
-                  value={draft.date}
-                  onChange={set('date')}
-                  today={today}
-                  min={today}
-                />
-              </InkFormField>
-              <InkFormField label={t('schedule.form.time')}>
-                <InkTimePicker label={t('schedule.form.time')} value={draft.time} onChange={set('time')} />
-              </InkFormField>
-            </>
-          ) : (
-            <>
-              <InkFormField label={t('schedule.form.cron')}>
-                <InkInput
-                  label={t('schedule.form.cron')}
-                  placeholder="0 0 9 * * 1-5"
-                  value={draft.cron}
-                  onChange={set('cron')}
-                />
-              </InkFormField>
-              <InkText size="sm" tone="tertiary">{t('schedule.form.cronHint')}</InkText>
-            </>
-          )}
+      {hasPrompt ? (
+        <InkFormField label={t('schedule.form.prompt')}>
+          <InkTextArea
+            label={t('schedule.form.prompt')}
+            placeholder={t('schedule.form.promptPlaceholder')}
+            value={draft.prompt}
+            onChange={set('prompt')}
+            rows={3}
+            maxRows={6}
+          />
+        </InkFormField>
+      ) : (
+        <InkText size="sm" tone="secondary">{t('schedule.detail.webhookNote')}</InkText>
+      )}
 
-          {zones ? (
-            <InkFormField label={t('schedule.form.timezone')}>
-              <InkSegmented
-                label={t('schedule.form.timezone')}
-                value={draft.timezone}
-                options={zones.map((zone) => ({ value: zone, label: zone }))}
-                onChange={set('timezone')}
-              />
-            </InkFormField>
-          ) : null}
-          <InkText size="sm" tone="tertiary">{t('schedule.form.phoneZone', { zone: phoneZone })}</InkText>
+      {error ? <InkNotice tone="danger">{error}</InkNotice> : null}
 
-          {hasPrompt ? (
-            <InkFormField label={t('schedule.form.prompt')}>
-              <InkTextArea
-                label={t('schedule.form.prompt')}
-                placeholder={t('schedule.form.promptPlaceholder')}
-                value={draft.prompt}
-                onChange={set('prompt')}
-                rows={3}
-                maxRows={6}
-              />
-            </InkFormField>
-          ) : (
-            <InkText size="sm" tone="secondary">{t('schedule.detail.webhookNote')}</InkText>
-          )}
-
-          {error ? <InkNotice tone="danger">{error}</InkNotice> : null}
-
-          <InkButton variant="primary" block disabled={submitting} onPress={submit}>
-            {editing ? t('schedule.form.save') : t('schedule.form.create')}
-          </InkButton>
-        </ScrollView>
-      </GSheetBody>
+      <InkButton variant="primary" block disabled={submitting} onPress={submit}>
+        {editing ? t('schedule.form.save') : t('schedule.form.create')}
+      </InkButton>
     </InkSheet>
   );
 }
-
-const styles = StyleSheet.create({
-  content: { gap: Spacing.lg, paddingBottom: Spacing['2xl'] },
-});

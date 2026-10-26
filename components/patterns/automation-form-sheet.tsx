@@ -20,7 +20,7 @@
  */
 
 import React, { useState } from 'react';
-import { Alert, Platform, ScrollView, StyleSheet, useWindowDimensions } from 'react-native';
+import { Alert, Platform, ScrollView, useWindowDimensions } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import {
   InkButton,
@@ -37,14 +37,12 @@ import {
 } from '@jarida/ink/native';
 
 import { sourceKey } from '@/components/patterns/automation-card';
-import { GSheetBody } from '@/components/ui/g-sheet-body';
 import { describeSignal, fractionFromPercent, measureOfSignal, percentText, type Measure } from '@/models/vision';
 import { confirm, reject } from '@/services/haptics';
 import type { TranslationKey } from '@/services/i18n';
 import type { Rule, RuleRequest, TriggerAction, TriggerCondition, TriggerSource } from '@/services/types';
 import { supports, useDevices } from '@/view-models/use-devices';
 import { useVisionSignals } from '@/view-models/use-vision-signals';
-import { Spacing } from '@/constants/spacing';
 
 type Op = NonNullable<TriggerCondition['op']>;
 
@@ -315,156 +313,150 @@ export function AutomationForm({ onClose, rule, prefill, onSubmit, onDelete }: O
   ];
 
   return (
-    <GSheetBody>
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        <InkFormField label={t('schedule.form.name')}>
-          <InkInput
-            label={t('schedule.form.name')}
-            placeholder={t('schedule.form.automationPlaceholder')}
-            value={name}
-            onChange={setName}
-          />
-        </InkFormField>
+    <>
+      <InkFormField label={t('schedule.form.name')}>
+        <InkInput
+          label={t('schedule.form.name')}
+          placeholder={t('schedule.form.automationPlaceholder')}
+          value={name}
+          onChange={setName}
+        />
+      </InkFormField>
 
-        <InkFormField label={t('schedule.form.source')}>
-          <InkSegmented
-            label={t('schedule.form.source')}
-            value={sourceKind}
-            options={SOURCES.map((kind) => ({ value: kind, label: t(sourceKey(kind)) }))}
-            onChange={changeKind}
-          />
-        </InkFormField>
+      <InkFormField label={t('schedule.form.source')}>
+        <InkSegmented
+          label={t('schedule.form.source')}
+          value={sourceKind}
+          options={SOURCES.map((kind) => ({ value: kind, label: t(sourceKey(kind)) }))}
+          onChange={changeKind}
+        />
+      </InkFormField>
 
-        {isCamera ? (
-          <CameraFields signal={signal} onSignal={setSignal} cameraId={deviceId} onCamera={setDeviceId} />
-        ) : (
-          <>
-            <ChoiceList label={t('schedule.form.device')} value={deviceId} options={devices} onChange={setDeviceId} />
+      {isCamera ? (
+        <CameraFields signal={signal} onSignal={setSignal} cameraId={deviceId} onCamera={setDeviceId} />
+      ) : (
+        <>
+          <ChoiceList label={t('schedule.form.device')} value={deviceId} options={devices} onChange={setDeviceId} />
 
-            <InkFormField label={t('schedule.form.signal')}>
-              <InkInput
-                label={t('schedule.form.signal')}
-                placeholder={t('schedule.form.signalPlaceholder')}
-                value={signal}
-                onChange={setSignal}
-              />
-            </InkFormField>
-          </>
-        )}
-
-        <InkFormField label={isCamera ? t(conditionLabel(measure)) : t('schedule.form.condition')}>
-          <InkSelect<Op | ''>
-            label={isCamera ? t(conditionLabel(measure)) : t('schedule.form.condition')}
-            value={op}
-            options={isCamera ? cameraOps : sensorOps}
-            onChange={setOp}
-          />
-        </InkFormField>
-        {op ? (
-          <InkFormField label={isCamera ? t('visionAutomations.form.percent') : t('schedule.form.value')}>
-            {/* iOS's numeric keyboard is a decimal pad with no minus key, and a
-                threshold can be below zero. Android's numeric keyboard has one. A percent
-                is never below zero, so a camera's takes the number pad. */}
+          <InkFormField label={t('schedule.form.signal')}>
             <InkInput
-              label={isCamera ? t('visionAutomations.form.percent') : t('schedule.form.value')}
-              type={Platform.OS === 'ios' && !isCamera ? 'text' : 'number'}
-              value={value}
-              onChange={setValue}
+              label={t('schedule.form.signal')}
+              placeholder={t('schedule.form.signalPlaceholder')}
+              value={signal}
+              onChange={setSignal}
             />
           </InkFormField>
-        ) : null}
+        </>
+      )}
 
-        <InkFormField label={t('schedule.form.after')}>
-          <InkInput label={t('schedule.form.after')} placeholder="18:30" value={after} onChange={setAfter} />
-        </InkFormField>
-        <InkFormField label={t('schedule.form.before')}>
-          <InkInput label={t('schedule.form.before')} placeholder="06:00" value={before} onChange={setBefore} />
-        </InkFormField>
-        <InkText size="sm" tone="tertiary">{t('schedule.form.timeBoundHint')}</InkText>
-
-        <InkFormField label={t('schedule.form.cooldown')}>
-          <InkInput label={t('schedule.form.cooldown')} type="number" value={cooldown} onChange={setCooldown} />
-        </InkFormField>
-
-        <InkFormField label={t('schedule.form.action')}>
-          <InkRadioGroup<TriggerAction['type']>
-            label={t('schedule.form.action')}
-            value={actionType}
-            options={[
-              { value: 'agent_prompt', label: t('schedule.form.actionPrompt') },
-              { value: 'device_power', label: t('schedule.form.actionPower') },
-              { value: 'notify', label: t('schedule.form.actionNotify') },
-            ]}
-            onChange={setActionType}
+      <InkFormField label={isCamera ? t(conditionLabel(measure)) : t('schedule.form.condition')}>
+        <InkSelect<Op | ''>
+          label={isCamera ? t(conditionLabel(measure)) : t('schedule.form.condition')}
+          value={op}
+          options={isCamera ? cameraOps : sensorOps}
+          onChange={setOp}
+        />
+      </InkFormField>
+      {op ? (
+        <InkFormField label={isCamera ? t('visionAutomations.form.percent') : t('schedule.form.value')}>
+          {/* iOS's numeric keyboard is a decimal pad with no minus key, and a
+              threshold can be below zero. Android's numeric keyboard has one. A percent
+              is never below zero, so a camera's takes the number pad. */}
+          <InkInput
+            label={isCamera ? t('visionAutomations.form.percent') : t('schedule.form.value')}
+            type={Platform.OS === 'ios' && !isCamera ? 'text' : 'number'}
+            value={value}
+            onChange={setValue}
           />
         </InkFormField>
+      ) : null}
 
-        {actionType === 'agent_prompt' ? (
-          <InkFormField label={t('schedule.form.prompt')}>
-            <InkTextArea
-              label={t('schedule.form.prompt')}
-              placeholder={t('schedule.form.promptPlaceholder')}
-              value={prompt}
-              onChange={setPrompt}
-              rows={3}
-              maxRows={6}
+      <InkFormField label={t('schedule.form.after')}>
+        <InkInput label={t('schedule.form.after')} placeholder="18:30" value={after} onChange={setAfter} />
+      </InkFormField>
+      <InkFormField label={t('schedule.form.before')}>
+        <InkInput label={t('schedule.form.before')} placeholder="06:00" value={before} onChange={setBefore} />
+      </InkFormField>
+      <InkText size="sm" tone="tertiary">{t('schedule.form.timeBoundHint')}</InkText>
+
+      <InkFormField label={t('schedule.form.cooldown')}>
+        <InkInput label={t('schedule.form.cooldown')} type="number" value={cooldown} onChange={setCooldown} />
+      </InkFormField>
+
+      <InkFormField label={t('schedule.form.action')}>
+        <InkRadioGroup<TriggerAction['type']>
+          label={t('schedule.form.action')}
+          value={actionType}
+          options={[
+            { value: 'agent_prompt', label: t('schedule.form.actionPrompt') },
+            { value: 'device_power', label: t('schedule.form.actionPower') },
+            { value: 'notify', label: t('schedule.form.actionNotify') },
+          ]}
+          onChange={setActionType}
+        />
+      </InkFormField>
+
+      {actionType === 'agent_prompt' ? (
+        <InkFormField label={t('schedule.form.prompt')}>
+          <InkTextArea
+            label={t('schedule.form.prompt')}
+            placeholder={t('schedule.form.promptPlaceholder')}
+            value={prompt}
+            onChange={setPrompt}
+            rows={3}
+            maxRows={6}
+          />
+        </InkFormField>
+      ) : null}
+
+      {actionType === 'device_power' ? (
+        <>
+          {/* Nothing is chosen until a device is pressed; the list needs no placeholder row. */}
+          <ChoiceList
+            label={t('schedule.form.targetDevice')}
+            value={targetId}
+            options={switchable.map((d) => ({ value: d.id, label: d.name }))}
+            onChange={setTargetId}
+          />
+          <InkFormField label={t('schedule.form.power')}>
+            <InkSegmented
+              label={t('schedule.form.power')}
+              value={turnOn}
+              options={[
+                { value: 'on', label: t('schedule.form.turnOn') },
+                { value: 'off', label: t('schedule.form.turnOff') },
+              ]}
+              onChange={setTurnOn}
             />
           </InkFormField>
-        ) : null}
+        </>
+      ) : null}
 
-        {actionType === 'device_power' ? (
-          <>
-            {/* Nothing is chosen until a device is pressed; the list needs no placeholder row. */}
-            <ChoiceList
-              label={t('schedule.form.targetDevice')}
-              value={targetId}
-              options={switchable.map((d) => ({ value: d.id, label: d.name }))}
-              onChange={setTargetId}
-            />
-            <InkFormField label={t('schedule.form.power')}>
-              <InkSegmented
-                label={t('schedule.form.power')}
-                value={turnOn}
-                options={[
-                  { value: 'on', label: t('schedule.form.turnOn') },
-                  { value: 'off', label: t('schedule.form.turnOff') },
-                ]}
-                onChange={setTurnOn}
-              />
-            </InkFormField>
-          </>
-        ) : null}
+      {actionType === 'notify' ? (
+        <>
+          <InkFormField label={t('schedule.form.notifyTitle')}>
+            <InkInput label={t('schedule.form.notifyTitle')} value={notifyTitle} onChange={setNotifyTitle} />
+          </InkFormField>
+          <InkFormField label={t('schedule.form.notifyBody')}>
+            <InkInput label={t('schedule.form.notifyBody')} value={notifyBody} onChange={setNotifyBody} />
+          </InkFormField>
+        </>
+      ) : null}
 
-        {actionType === 'notify' ? (
-          <>
-            <InkFormField label={t('schedule.form.notifyTitle')}>
-              <InkInput label={t('schedule.form.notifyTitle')} value={notifyTitle} onChange={setNotifyTitle} />
-            </InkFormField>
-            <InkFormField label={t('schedule.form.notifyBody')}>
-              <InkInput label={t('schedule.form.notifyBody')} value={notifyBody} onChange={setNotifyBody} />
-            </InkFormField>
-          </>
-        ) : null}
+      {rest.length > 0 ? (
+        <InkText size="sm" tone="tertiary">{t('schedule.form.moreActions', { count: rest.length })}</InkText>
+      ) : null}
 
-        {rest.length > 0 ? (
-          <InkText size="sm" tone="tertiary">{t('schedule.form.moreActions', { count: rest.length })}</InkText>
-        ) : null}
+      {error ? <InkNotice tone="danger">{error}</InkNotice> : null}
 
-        {error ? <InkNotice tone="danger">{error}</InkNotice> : null}
-
-        <InkButton variant="primary" block disabled={submitting} onPress={submit}>
-          {rule ? t('schedule.form.save') : t('schedule.form.create')}
+      <InkButton variant="primary" block disabled={submitting} onPress={submit}>
+        {rule ? t('schedule.form.save') : t('schedule.form.create')}
+      </InkButton>
+      {rule && onDelete ? (
+        <InkButton variant="danger" block icon="trash" disabled={submitting} onPress={confirmDelete}>
+          {t('schedule.form.delete')}
         </InkButton>
-        {rule && onDelete ? (
-          <InkButton variant="danger" block icon="trash" disabled={submitting} onPress={confirmDelete}>
-            {t('schedule.form.delete')}
-          </InkButton>
-        ) : null}
-      </ScrollView>
-    </GSheetBody>
+      ) : null}
+    </>
   );
 }
-
-const styles = StyleSheet.create({
-  content: { gap: Spacing.lg, paddingBottom: Spacing['2xl'] },
-});

@@ -7,11 +7,10 @@
  */
 
 import React, { useState } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { InkButton, InkChip, InkFormField, InkInput, InkNotice, InkSheet, InkText } from '@jarida/ink/native';
 
-import { GSheetBody } from '@/components/ui/g-sheet-body';
 import { confirm, reject } from '@/services/haptics';
 import type { Device } from '@/services/types';
 import { Spacing } from '@/constants/spacing';
@@ -55,39 +54,34 @@ export function DeviceEditSheet({ device, rooms, onClose, onSave }: DeviceEditSh
 
   return (
     <InkSheet open onClose={onClose} title={t('deviceEdit.title')}>
-      <GSheetBody>
-        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-          <InkFormField label={t('deviceEdit.name')}>
-            <InkInput value={name} onChange={setName} placeholder={t('deviceEdit.namePlaceholder')} />
-          </InkFormField>
+      <InkFormField label={t('deviceEdit.name')}>
+        <InkInput value={name} onChange={setName} placeholder={t('deviceEdit.namePlaceholder')} />
+      </InkFormField>
 
-          <InkFormField label={t('deviceEdit.room')}>
-            <InkInput value={room} onChange={setRoom} placeholder={t('deviceEdit.roomPlaceholder')} />
-          </InkFormField>
-          <View style={styles.chips}>
-            <InkChip selected={!room.trim()} onPress={() => setRoom('')}>
-              {t('devices.roomUnassigned')}
-            </InkChip>
-            {rooms.map((r) => (
-              <InkChip key={r} selected={room.trim() === r} onPress={() => setRoom(r)}>
-                {r}
-              </InkChip>
-            ))}
-          </View>
-          <InkText size="sm" tone="tertiary">{t('deviceEdit.roomHint')}</InkText>
+      <InkFormField label={t('deviceEdit.room')}>
+        <InkInput value={room} onChange={setRoom} placeholder={t('deviceEdit.roomPlaceholder')} />
+      </InkFormField>
+      <View style={styles.chips}>
+        <InkChip selected={!room.trim()} onPress={() => setRoom('')}>
+          {t('devices.roomUnassigned')}
+        </InkChip>
+        {rooms.map((r) => (
+          <InkChip key={r} selected={room.trim() === r} onPress={() => setRoom(r)}>
+            {r}
+          </InkChip>
+        ))}
+      </View>
+      <InkText size="sm" tone="tertiary">{t('deviceEdit.roomHint')}</InkText>
 
-          {error ? <InkNotice tone="danger">{error}</InkNotice> : null}
+      {error ? <InkNotice tone="danger">{error}</InkNotice> : null}
 
-          <InkButton variant="primary" block disabled={submitting} onPress={submit}>
-            {t('deviceEdit.save')}
-          </InkButton>
-        </ScrollView>
-      </GSheetBody>
+      <InkButton variant="primary" block disabled={submitting} onPress={submit}>
+        {t('deviceEdit.save')}
+      </InkButton>
     </InkSheet>
   );
 }
 
 const styles = StyleSheet.create({
-  content: { gap: Spacing.lg, paddingBottom: Spacing['2xl'] },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm },
 });

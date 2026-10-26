@@ -7,12 +7,11 @@
  */
 
 import React, { useState } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { InkButton, InkChip, InkFormField, InkNotice, InkSheet, InkText, InkTextArea } from '@jarida/ink/native';
 
 import { LabelledSwitch } from '@/components/patterns/labelled-switch';
-import { GSheetBody } from '@/components/ui/g-sheet-body';
 import { MEMORY_SEGMENTS, isKept, saveEdit, segmentLabel } from '@/models/memory';
 import { confirm, reject } from '@/services/haptics';
 import type { MemoryFragment, MemorySegment, SaveMemoryRequest } from '@/services/types';
@@ -63,49 +62,44 @@ export function MemorySheet({ open, editing, onClose, onSave, onReword, onSetKep
 
   return (
     <InkSheet open={open} onClose={onClose} title={editing ? t('memories.form.editTitle') : t('memories.form.newTitle')}>
-      <GSheetBody>
-        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-          <InkFormField label={t('memories.form.content')}>
-            <InkTextArea
-              label={t('memories.form.content')}
-              placeholder={t('memories.form.contentPlaceholder')}
-              value={content}
-              onChange={setContent}
-              rows={3}
-              maxRows={6}
-            />
+      <InkFormField label={t('memories.form.content')}>
+        <InkTextArea
+          label={t('memories.form.content')}
+          placeholder={t('memories.form.contentPlaceholder')}
+          value={content}
+          onChange={setContent}
+          rows={3}
+          maxRows={6}
+        />
+      </InkFormField>
+
+      {editing ? null : (
+        <>
+          <InkFormField label={t('memories.form.segment')}>
+            <View style={styles.chips}>
+              {MEMORY_SEGMENTS.map((s) => (
+                <InkChip key={s} selected={segment === s} onPress={() => setSegment(segment === s ? null : s)}>
+                  {segmentLabel(s)}
+                </InkChip>
+              ))}
+            </View>
           </InkFormField>
+          <InkText size="sm" tone="tertiary">{t('memories.form.segmentHint')}</InkText>
+        </>
+      )}
 
-          {editing ? null : (
-            <>
-              <InkFormField label={t('memories.form.segment')}>
-                <View style={styles.chips}>
-                  {MEMORY_SEGMENTS.map((s) => (
-                    <InkChip key={s} selected={segment === s} onPress={() => setSegment(segment === s ? null : s)}>
-                      {segmentLabel(s)}
-                    </InkChip>
-                  ))}
-                </View>
-              </InkFormField>
-              <InkText size="sm" tone="tertiary">{t('memories.form.segmentHint')}</InkText>
-            </>
-          )}
+      <LabelledSwitch label={t('memories.form.keep')} checked={keep} onChange={setKeep} />
+      <InkText size="sm" tone="tertiary">{t('memories.form.keepHint')}</InkText>
 
-          <LabelledSwitch label={t('memories.form.keep')} checked={keep} onChange={setKeep} />
-          <InkText size="sm" tone="tertiary">{t('memories.form.keepHint')}</InkText>
+      {error ? <InkNotice tone="danger">{error}</InkNotice> : null}
 
-          {error ? <InkNotice tone="danger">{error}</InkNotice> : null}
-
-          <InkButton variant="primary" block disabled={submitting} onPress={submit}>
-            {t('memories.form.save')}
-          </InkButton>
-        </ScrollView>
-      </GSheetBody>
+      <InkButton variant="primary" block disabled={submitting} onPress={submit}>
+        {t('memories.form.save')}
+      </InkButton>
     </InkSheet>
   );
 }
 
 const styles = StyleSheet.create({
-  content: { gap: Spacing.lg, paddingBottom: Spacing['2xl'] },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm },
 });
