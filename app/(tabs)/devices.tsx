@@ -153,6 +153,8 @@ export default function DevicesTab() {
         <Text style={styles.subtitle} numberOfLines={1}>
           {t('devices.count', { count: total })}
           {total > 0 ? ` · ${t('devices.online', { count: data.onlineCount })}` : ''}
+          {/* Only when the Pond has stopped answering: what is shown is its last word, and this is its age. */}
+          {data.staleFor ? ` · ${t('devices.updatedAgo', { ago: data.staleFor })}` : ''}
         </Text>
         {/* Add lives up here rather than under the grid, so it stays in reach
             however many devices there are. With none, the empty state below

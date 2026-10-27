@@ -20,6 +20,7 @@ import type {
   VisionCapture,
   VisionStatus,
 } from '@/services/types';
+import { ago } from './elapsed';
 import { formatScheduleTime } from './schedule';
 
 // ── The kinds of thing the pond records ───────────────────────
@@ -295,14 +296,6 @@ export interface VisionSentence {
   privacy: boolean;
   /** Further lines under it: which camera, the last event, restarts. */
   details: string[];
-}
-
-function ago(seconds: number): string {
-  const s = Math.max(0, Math.round(seconds));
-  if (s < 90) return i18n.t('vision.ago.seconds', { count: s });
-  const minutes = Math.round(s / 60);
-  if (minutes < 90) return i18n.t('vision.ago.minutes', { count: minutes });
-  return i18n.t('vision.ago.hours', { count: Math.round(minutes / 60) });
 }
 
 function secondsSince(iso: string | null, now: number): number | null {
