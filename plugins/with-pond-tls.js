@@ -37,7 +37,7 @@ function applyPondManifest(manifest) {
   return manifest;
 }
 
-module.exports = function withPondTls(config) {
+module.exports = function withPondTls(config, options = {}) {
   config = require('./with-pond-tls-ios')(config);
   config = withMainApplication(config, (mod) => {
     let source = mod.modResults.contents;
@@ -113,23 +113,31 @@ tasks.named('preBuild').configure { dependsOn 'verifyPondNetworkAbis' }
     for (const test of ['PondTlsTest.kt', 'PondProxyTest.kt']) {
       fs.copyFileSync(path.join(__dirname, 'pond-tls', test), path.join(tests, test));
     }
-    // POND_DEV_METRO_LAN=1 at prebuild lets a development build load its JavaScript from Metro
-    // over Wi-Fi rather than only through `adb reverse`. It opens cleartext for the debug
-    // variants' whole network stack, so any plain-HTTP request the app makes can leave the
-    // phone; Pond requests stay pinned because PondTls refuses a marked request that is not
-    // HTTPS. The main (release) config is written first and never reads the variable.
-    const metroLan = process.env.POND_DEV_METRO_LAN === '1';
-    if (metroLan) console.warn('[pond-tls] POND_DEV_METRO_LAN=1: debug builds permit cleartext to any host so Metro can serve over Wi-Fi; release is unaffected');
+    // allowDebugCleartext (or POND_DEV_METRO_LAN=1) lets a debug build connect to HTTP endpoints
+    // (such as Metro over Wi-Fi or local HTTP services) without requiring `adb reverse`.
+    // It opens cleartext for the debug variants' network stack; Pond requests stay pinned
+    // because PondTls refuses a marked request that is not HTTPS. The main (release) config
+    // is written without cleartext and ignores these switches.
+    const allowDebugCleartext = Boolean(
+      options?.allowDebugCleartext ??
+      options?.allowCleartextInDebug ??
+      config?.android?.usesCleartextTraffic ??
+      (process.env.POND_DEV_METRO_LAN === '1')
+    );
+    if (allowDebugCleartext) console.warn('[pond-tls] Debug builds permit cleartext to any host so Metro and local traffic can connect; release is unaffected');
     for (const variant of ['main', 'debug', 'debugOptimized']) {
       const dir = path.join(root, variant, 'res/xml');
       fs.mkdirSync(dir, { recursive: true });
       const debug = variant !== 'main';
       const local = debug ? '<domain-config cleartextTrafficPermitted="true"><domain>localhost</domain><domain>127.0.0.1</domain><domain>::1</domain></domain-config>' : '';
-      const cleartext = debug && metroLan ? 'true' : 'false';
+      const cleartext = debug && allowDebugCleartext ? 'true' : 'false';
       fs.writeFileSync(path.join(dir, 'pond_network_security.xml'), `<?xml version="1.0" encoding="utf-8"?><network-security-config><base-config cleartextTrafficPermitted="${cleartext}"><trust-anchors><certificates src="system" /></trust-anchors></base-config>${local}</network-security-config>\n`);
       if (variant !== 'main') {
         const manifest = path.join(root, variant, 'AndroidManifest.xml');
-        if (fs.existsSync(manifest)) fs.writeFileSync(manifest, fs.readFileSync(manifest, 'utf8').replace(/android:usesCleartextTraffic="true"/g, 'android:usesCleartextTraffic="false"'));
+        if (fs.existsSync(manifest)) {
+          const replacement = allowDebugCleartext ? 'android:usesCleartextTraffic="true"' : 'android:usesCleartextTraffic="false"';
+          fs.writeFileSync(manifest, fs.readFileSync(manifest, 'utf8').replace(/android:usesCleartextTraffic="(true|false)"/g, replacement));
+        }
       }
     }
     return mod;

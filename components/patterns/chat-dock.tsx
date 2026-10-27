@@ -18,7 +18,10 @@
  * It stays live while Goose answers. A follow-up thought mid-reply is the
  * ordinary case, and a field that locked until the model finished made the
  * person hold it in their head; now send queues it behind the reply, and the
- * field says so before anything is typed.
+ * field says so before anything is typed. A light behind the composer, running
+ * along the field's top border and lighting the field and its buttons from
+ * behind, says the reply is still coming, and a reminder under it that Goose
+ * can be wrong fades once the reply is in (`answering.tsx`).
  *
  * The dock holds its own draft and attachments. Lifting them into the screen
  * would re-render every message on each keystroke, and nothing above here
@@ -29,9 +32,18 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Keyboard, Platform, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { Image } from 'expo-image';
 import { useTranslation } from 'react-i18next';
+import Animated, { Easing, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { glassLift, hitSlop } from '@jarida/ink';
-import { InkEdge, inkText, useInkTheme } from '@jarida/ink/native';
+import { InkEdge, inkText, useInkTheme, useReduceMotion } from '@jarida/ink/native';
 
+import {
+  AnsweringLight,
+  AnsweringNote,
+  AnsweringWash,
+  useAnsweringLight,
+  useAnsweringNote,
+  type FieldBox,
+} from '@/components/patterns/answering';
 import { AttachMenu } from '@/components/patterns/attach-menu';
 import { GIcon } from '@/components/ui/g-icon';
 import { GPressable } from '@/components/ui/g-pressable';
@@ -73,6 +85,16 @@ export function ChatDock({ onSend, onVoice, onAttach, busy, bottomInset = 0 }: C
   // field on iOS grows as lines are added and keeps that height once they are
   // gone, so the dock stood two lines tall after every long message.
   const [lines, setLines] = useState(0);
+  // The light is drawn in the row, around the field, so it needs to know where the field is.
+  const [fieldBox, setFieldBox] = useState<FieldBox | null>(null);
+  const light = useAnsweringLight(Boolean(busy));
+  const note = useAnsweringNote(Boolean(busy));
+  const reduced = useReduceMotion();
+  // The note's band under the row, eased open and shut so the thread above slides rather than jumps.
+  const chin = useSharedValue(note.room);
+  useEffect(() => {
+    chin.set(reduced ? note.room : withTiming(note.room, { duration: 280, easing: Easing.out(Easing.cubic) }));
+  }, [chin, note.room, reduced]);
 
   // With the keyboard up the indicator is under it, and padding for it would
   // leave a gap between the dock and the keys.
@@ -122,11 +144,15 @@ export function ChatDock({ onSend, onVoice, onAttach, busy, bottomInset = 0 }: C
   // Clear of the keyboard by a full step, not half of one. Vendor keyboards
   // (Samsung's among them) draw a toolbar row of their own inside the height
   // they report, so 8px put the composer visually against that row rather than
-  // above it — the input read as part of the keyboard.
-  const foot = keyboard ? Spacing.lg : bottomInset + Spacing.xs;
+  // above it — the input read as part of the keyboard. The note gets a band of
+  // its own on top, so it never sits on the home indicator or the keys, and the
+  // band is there only while the note is, so an idle composer keeps no empty chin.
+  const base = keyboard ? Spacing.lg : bottomInset + Spacing.xs;
+  const foot = base + note.room;
+  const padded = useAnimatedStyle(() => ({ paddingBottom: base + chin.get() }));
 
   return (
-    <View pointerEvents="box-none" style={[styles.dock, { paddingBottom: foot }]}>
+    <Animated.View pointerEvents="box-none" style={[styles.dock, padded]}>
       {attachments.length > 0 ? (
         <View style={styles.strip}>
           {attachments.map((a) => (
@@ -153,6 +179,7 @@ export function ChatDock({ onSend, onVoice, onAttach, busy, bottomInset = 0 }: C
       ) : null}
 
       <View style={styles.row}>
+        {fieldBox ? <AnsweringLight light={light} field={fieldBox} radius={CONTROL / 2} /> : null}
         <GPressable
           feedback="lift"
           onPress={() => {
@@ -174,7 +201,7 @@ export function ChatDock({ onSend, onVoice, onAttach, busy, bottomInset = 0 }: C
           <GIcon name="plus" size={20} color={theme.color.text} />
         </GPressable>
 
-        <View style={[styles.field, material]}>
+        <View style={[styles.field, material]} onLayout={(e) => setFieldBox(e.nativeEvent.layout)}>
           <TextInput
             style={[field.style, styles.input, { height: fieldHeight(draft ? lines : 0) }]}
             value={draft}
@@ -220,6 +247,8 @@ export function ChatDock({ onSend, onVoice, onAttach, busy, bottomInset = 0 }: C
             <GIcon name="mic" size={20} color={theme.color.text} />
           </GPressable>
         )}
+        {fieldBox ? <AnsweringWash light={light} field={fieldBox} radius={CONTROL / 2} /> : null}
+        <AnsweringNote note={note} />
       </View>
 
       <AttachMenu
@@ -229,7 +258,7 @@ export function ChatDock({ onSend, onVoice, onAttach, busy, bottomInset = 0 }: C
         anchorBottom={foot + CONTROL}
         anchorLeft={Spacing.lg}
       />
-    </View>
+    </Animated.View>
   );
 }
 

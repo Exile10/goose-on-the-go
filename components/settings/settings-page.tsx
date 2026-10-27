@@ -47,6 +47,7 @@ import {
   WakeWordResetRow,
 } from './special-rows';
 import { SettingsScroll } from './settings-scroll';
+import { VisionStatusCard, visionEventTypeRows } from './vision-rows';
 import { VoicePicker } from './voice-picker';
 
 /** Footers that already say a change waits for a restart, so their rows need not say it again. */
@@ -54,11 +55,13 @@ const RESTART_FOOTERS = new Set<TranslationKey>([
   'settings.footer.restartVoice',
   'settings.footer.restartReview',
   'settings.footer.restartTools',
-  'settings.footer.restartCamera',
   'settings.footer.exactPosition',
   'settings.footer.embeddings',
   'settings.footer.wakeWord',
 ]);
+
+/** Specials that draw their own surface, so the page does not put them in a group. */
+const BARE_SPECIALS = new Set<SpecialId>(['visionStatus']);
 
 /** Settings that live on this phone, so the page works with no Pond at all. */
 const PHONE_PAGES = new Set<SettingsPageId>(['appearance']);
@@ -140,6 +143,7 @@ function rowsFor(item: SettingItem, i: number, ctx: Context): ReactElement[] {
           min={item.min}
           max={item.max}
           step={item.step}
+          stops={item.stops}
           unit={item.unitKey ? t(item.unitKey) : undefined}
           onCommit={(next) => void update(item.key, next)}
         />,
@@ -200,6 +204,10 @@ function specialRows(id: SpecialId, ctx: Context): ReactElement[] {
       return [<PrimaryProfileRow key={id} {...props} />];
     case 'posture':
       return [<PostureRow key={id} {...props} />];
+    case 'visionStatus':
+      return [<VisionStatusCard key={id} />];
+    case 'visionEventTypes':
+      return visionEventTypeRows({ ...props, t });
     case 'theme':
       return radioRows({
         name: 'theme',
@@ -232,7 +240,7 @@ export function SettingsPageScreen({ page: id }: { page: SettingsPageId }) {
   const theme = useTheme();
   const vm = usePondSettings();
   const summaryIds = useMemo(() => linkSummaries(id), [id]);
-  const extras = useSummaryExtras(summaryIds);
+  const extras = useSummaryExtras(summaryIds, vm.settings?.vision_camera_id ?? null);
   const [hapticsOn, setHapticsOn] = useState(hapticsEnabled);
   const phoneOnly = PHONE_PAGES.has(id);
   const settings = vm.settings;
@@ -272,6 +280,10 @@ export function SettingsPageScreen({ page: id }: { page: SettingsPageId }) {
     };
     body = page.sections.map((section, s) => {
       const sectionCtx = { ...ctx, restartNoted: !!section.footerKey && RESTART_FOOTERS.has(section.footerKey) };
+      // The camera's status card is the page's picture, and wears its own edge rather than sit as a row.
+      if (section.items.length === 1 && section.items[0].kind === 'special' && BARE_SPECIALS.has(section.items[0].id)) {
+        return <React.Fragment key={`bare-${s}`}>{rowsFor(section.items[0], 0, sectionCtx)}</React.Fragment>;
+      }
       const hasTiles = section.items.every((item) => item.kind === 'link' && !!item.icon);
       return (
         <SettingsGroup

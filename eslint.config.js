@@ -55,7 +55,8 @@ const TRANSLATED_SURFACE = ['app/**/*.tsx', 'components/**/*.tsx', 'view-models/
 module.exports = defineConfig([
   expoConfig,
   {
-    ignores: ['dist/*'],
+    // `._*`: macOS AppleDouble sidecars, which are binary. See metro.config.js.
+    ignores: ['dist/*', '**/._*'],
   },
   {
     files: TRANSLATED_SURFACE,

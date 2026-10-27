@@ -8,7 +8,7 @@ ignores both switches.
 |---|---|---|
 | Native code | This app's own, including PondTls | Expo Go's; no PondTls, no mDNS |
 | Pond connection | Pinned HTTPS, as in release | Plaintext HTTP to a debug Pond |
-| Switch | `POND_DEV_METRO_LAN=1` at prebuild (Android) | `EXPO_PUBLIC_POND_INSECURE_DEV=1` for Metro, `POND_DEV_INSECURE_LAN=1` on the Pond |
+| Switch | `allowDebugCleartext` in `app.json`, on by default (Android) | `EXPO_PUBLIC_POND_INSECURE_DEV=1` for Metro, `POND_DEV_INSECURE_LAN=1` on the Pond |
 | Rebuild native when | Native code or config plugins change | Never |
 | What it exposes | Metro's JavaScript bundle over Wi-Fi | Every Pond request, token and pairing |
 
@@ -22,7 +22,7 @@ by default (pass `--go` for Expo Go, below).
 Build and install once, on a phone or emulator:
 
 ```bash
-POND_DEV_METRO_LAN=1 npx expo prebuild --platform android --clean
+npx expo prebuild --platform android --clean
 npx expo run:android
 ```
 
@@ -30,13 +30,14 @@ After that, `npx expo start` and open the project from the dev client's launcher
 JavaScript reloads over Wi-Fi from Metro. Rebuild only when native code, a config
 plugin, or `app.json` changes.
 
-Why the variable: the Android network security config the `plugins/with-pond-tls.js`
+Why the switch: the Android network security config the `plugins/with-pond-tls.js`
 plugin writes permits cleartext only to `localhost`, `127.0.0.1` and `::1`, so
 without it Metro is reachable only through `adb reverse tcp:8081 tcp:8081` over USB.
-With `POND_DEV_METRO_LAN=1` set when prebuild runs, the `debug` and
-`debugOptimized` variants permit cleartext to any host. The `main` config, which
-release uses, is written without reading the variable and stays cleartext-off.
-Prebuild prints a warning when the variable is set.
+`app.json` passes the plugin `allowDebugCleartext: true`, so the `debug` and
+`debugOptimized` variants permit cleartext to any host without anyone setting a
+variable; `POND_DEV_METRO_LAN=1` still turns it on when the option is removed. The
+`main` config, which release uses, is written without reading either and stays
+cleartext-off. Prebuild prints a warning whenever debug cleartext is on.
 
 What that exposes: Metro serves the bundle unauthenticated and unencrypted, so
 anyone on the network can read the JavaScript and, by answering in Metro's place,

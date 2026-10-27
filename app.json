@@ -120,7 +120,12 @@
           "microphonePermission": "Goose On The Go uses the microphone when you talk to Goose. What you say goes to your own Pond, nowhere else."
         }
       ],
-      "./plugins/with-pond-tls",
+      [
+        "./plugins/with-pond-tls",
+        {
+          "allowDebugCleartext": true
+        }
+      ],
       "./plugins/with-pond-ble",
       "./plugins/with-release-signing",
       "expo-asset"

@@ -38,3 +38,14 @@ export function describeApiError(e: unknown): string | null {
   if (e.isRetryable) return i18n.t('errors.busy');
   return i18n.t('errors.generic');
 }
+
+/**
+ * The `reason` a Pond refusal carries beside its sentence, such as `cameras_disabled` or `no_face`.
+ * A caller matches it to say what to do next; the sentence is English, from the server, and not for
+ * display.
+ */
+export function refusalReason(e: unknown): string | null {
+  if (!(e instanceof ApiError)) return null;
+  const reason = (e.body as { reason?: unknown } | null)?.reason;
+  return typeof reason === 'string' && reason ? reason : null;
+}
