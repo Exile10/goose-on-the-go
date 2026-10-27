@@ -27,11 +27,10 @@ import {
   InkSwitch,
   InkText,
   InkTitle,
-  useInkTheme,
 } from '@jarida/ink/native';
 
 import { GIcon } from '@/components/ui/g-icon';
-import { GPressable } from '@/components/ui/g-pressable';
+import { GRoundButton } from '@/components/ui/g-round-button';
 import { useBottomBarInset, useChromeScroll } from '@/providers/chrome-provider';
 import { useThemedStyles } from '@/hooks/use-themed-styles';
 import { selectionTick, toggle } from '@/services/haptics';
@@ -102,7 +101,6 @@ const DeviceCard = React.memo(function DeviceCard({
 
 export default function DevicesTab() {
   const styles = useThemedStyles(makeStyles);
-  const theme = useInkTheme();
   const { t } = useTranslation();
   const router = useRouter();
   const { data, loading, error, actions } = useDevices();
@@ -161,52 +159,36 @@ export default function DevicesTab() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
-      {/* Title, count and actions each get their own line: squeezed into one
-          row at phone width, the count wrapped and both buttons shrank. */}
+      {/* Title and count on the left, the two actions as a matched pair of
+          round buttons on the right. Add lives up here rather than under the
+          grid, so it stays in reach however many devices there are; with none,
+          the empty state below carries it instead, and the screen still has a
+          single primary. Add used to be a full-width labelled bar beside a
+          small round Refresh, one row with two sizes for two actions of one
+          rank; now both are the same circle, Add filled as the primary. */}
       <View style={styles.header}>
-        <InkTitle level={1}>{t('devices.title')}</InkTitle>
-        <Text style={styles.subtitle} numberOfLines={1}>
-          {t('devices.count', { count: total })}
-          {total > 0 ? ` · ${t('devices.online', { count: data.onlineCount })}` : ''}
-        </Text>
-        {/* Add lives up here rather than under the grid, so it stays in reach
-            however many devices there are. With none, the empty state below
-            carries it instead, and the screen still has a single primary.
-            Refresh is a round glyph beside it rather than a second full-width
-            button: it is the lesser action, the list also refreshes on a pull
-            and on its own poll, and half the row was too much to spend on it. */}
+        <View style={styles.headerText}>
+          <InkTitle level={1}>{t('devices.title')}</InkTitle>
+          <Text style={styles.subtitle} numberOfLines={1}>
+            {t('devices.count', { count: total })}
+            {total > 0 ? ` · ${t('devices.online', { count: data.onlineCount })}` : ''}
+          </Text>
+        </View>
         <View style={styles.headerActions}>
-          {total > 0 ? (
-            <InkButton
-              variant="primary"
-              icon="plus"
-              block
-              style={styles.headerButton}
-              onPress={() => router.push('/(stack)/commission-device')}
-            >
-              {t('devices.addDevice')}
-            </InkButton>
-          ) : null}
-          <GPressable
-            feedback="lift"
+          <GRoundButton
+            icon="refresh"
+            label={t('devices.refreshList')}
             onPress={handleRefresh}
-            accessibilityRole="button"
-            accessibilityLabel={t('devices.refreshList')}
-            accessibilityState={{ busy: loading }}
-            style={[
-              styles.refresh,
-              {
-                width: theme.touch.tapMin,
-                height: theme.touch.tapMin,
-                borderRadius: theme.touch.tapMin / 2,
-                backgroundColor: theme.color.surface,
-                borderColor: theme.color.lineStrong,
-                borderWidth: theme.edge.hairlineWidth,
-              },
-            ]}
-          >
-            <GIcon name="refresh" size={20} color={theme.color.text} />
-          </GPressable>
+            busy={loading}
+          />
+          {total > 0 ? (
+            <GRoundButton
+              icon="plus"
+              tone="primary"
+              label={t('devices.addDevice')}
+              onPress={() => router.push('/(stack)/commission-device')}
+            />
+          ) : null}
         </View>
       </View>
 
@@ -324,26 +306,23 @@ const makeStyles = (c: ThemeColors) =>
     notice: { marginBottom: Spacing.md },
 
     header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: Spacing.md,
       paddingHorizontal: Spacing.lg,
       paddingTop: Spacing.lg,
       paddingBottom: Spacing.md,
     },
+    // Takes the width the buttons leave, and may shrink so the count line
+    // truncates rather than pushing the buttons off the row.
+    headerText: { flex: 1, minWidth: 0 },
     subtitle: {
       fontFamily: FontFamily.body,
       fontSize: FontSize.sm,
       color: c.textTertiary,
       marginTop: Spacing.xs,
     },
-    headerActions: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'flex-end',
-      gap: Spacing.sm,
-      marginTop: Spacing.md,
-    },
-    // Add takes whatever the round refresh leaves.
-    headerButton: { flex: 1 },
-    refresh: { alignItems: 'center', justifyContent: 'center' },
+    headerActions: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
 
     // Pins this ScrollView's own height to its content instead of letting it
     // compete for leftover flex space in the column layout below — without
