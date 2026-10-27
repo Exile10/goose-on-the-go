@@ -189,38 +189,130 @@ export function speakable(text: string): string {
 }
 
 /**
- * Split off the sentences a streaming reply has finished.
- *
- * Returns the complete ones and how far into `text` they reach, so the caller
- * can hand each to `/tts` as soon as it is whole instead of waiting for the
- * answer to end — synthesis only starts once it has a sentence, and a reply
- * spoken a sentence at a time starts speaking seconds sooner. `final` flushes
- * whatever is left when the turn is done.
+ * The Pond's Kokoro renders each `/tts` request whole, at about real time, so
+ * the first sound waits on the length of the first thing sent. These are the
+ * limits of the Pond's own voice loop (`split_speech_units` in pond-voice), and
+ * a cap on the first unit for when no clause mark comes.
  */
-export function takeSentences(
+const MIN_CLAUSE_WORDS = 3;
+const FIRST_UNIT_MAX_WORDS = 6;
+const MAX_UNIT_CHARS = 250;
+
+const TERMINALS = '.!?…';
+const CLAUSE_MARKS = ',;:—';
+const CLOSERS = `"')]”’`;
+
+/** pond-voice's list: a full stop after one of these, or after a single letter, ends no sentence. */
+const ABBREVIATIONS = new Set([
+  'dr', 'mr', 'mrs', 'ms', 'prof', 'st', 'jr', 'sr', 'vs', 'etc', 'approx', 'dept', 'govt', 'inc',
+  'ltd', 'corp', 'min', 'max', 'temp', 'est', 'jan', 'feb', 'mar', 'apr', 'jun', 'jul', 'aug',
+  'sep', 'sept', 'oct', 'nov', 'dec', 'e.g', 'i.e', 'u.s', 'a.m', 'p.m',
+]);
+
+/** Something a voice would say, as opposed to punctuation or markup alone. */
+const SAYABLE = /[^\s.,;:!?…—–'"“”‘’()[\]{}*_~#>|`-]/;
+
+function isAbbreviation(word: string): boolean {
+  const clean = word.replace(/^[^A-Za-z0-9]+/, '').toLowerCase();
+  return /^[a-z]$/.test(clean) || ABBREVIATIONS.has(clean);
+}
+
+/**
+ * Whether the run of terminals from `at` to `end`, after `word`, closes a
+ * sentence. It need not wait for the next token, except where that token could
+ * still make it a decimal ("25." then "3") or part of a link.
+ */
+function endsSentence(text: string, word: string, at: number, end: number): boolean {
+  const streaming = end >= text.length;
+  if (!streaming && !/\s/.test(text[end])) return false;
+  if (text[at] === '.' && end - at === 1) {
+    if (isAbbreviation(word)) return false;
+    if (streaming && /\d$/.test(word)) return false;
+  }
+  return !(streaming && /:\/\/|^www\./i.test(word));
+}
+
+/**
+ * Split off the parts of a streaming reply that are ready to be spoken.
+ *
+ * Returns them and how far into `text` they reach, so the caller can hand each
+ * to `/tts` while the reply is still being written. The first ends at a clause
+ * mark once it has three words, or after six words when none comes; later ones
+ * at a clause or a sentence. `final` flushes whatever is left when the turn is
+ * done.
+ */
+export function takeSpeechUnits(
   text: string,
   from: number,
   final = false,
-): { sentences: string[]; next: number } {
-  const sentences: string[] = [];
+): { units: string[]; next: number } {
+  const units: string[] = [];
   let start = from;
-  // A sentence ends at . ! ? or a line break, followed by space or the end —
-  // "3.5" and "e.g.x" do not end one.
-  const boundary = /[.!?…]+["')\]]*(?=\s|$)|\n+/g;
-  boundary.lastIndex = from;
-  for (let m = boundary.exec(text); m; m = boundary.exec(text)) {
-    const end = m.index + m[0].length;
-    // At the very end of a streaming text the boundary may be a decimal point
-    // or an abbreviation still being written; wait for what follows.
-    if (!final && end >= text.length) break;
-    const sentence = speakable(text.slice(start, end));
-    if (sentence.length > 0) sentences.push(sentence);
+  let first = !SAYABLE.test(speakable(text.slice(0, from)));
+  let words = 0;
+  let wordAt = -1;
+  // Inside a link or inline code; a clause cut there leaves speakable() half of it.
+  let nesting = 0;
+  let inCode = false;
+  let fenced = false;
+
+  const cut = (end: number) => {
+    const unit = speakable(text.slice(start, end));
+    if (SAYABLE.test(unit)) {
+      units.push(unit);
+      first = false;
+    }
     start = end;
+    words = 0;
+    wordAt = -1;
+    nesting = 0;
+    inCode = false;
+  };
+  // A word counts once something follows it: "sun" may yet become "sunny".
+  const wordsBefore = (i: number) =>
+    words + (wordAt >= 0 && SAYABLE.test(text.slice(wordAt, i)) ? 1 : 0);
+
+  for (let i = start; i < text.length; i += 1) {
+    const c = text[i];
+    // speakable() can only drop a code block it sees whole.
+    if (text.startsWith('```', i)) {
+      fenced = !fenced;
+      i += 2;
+      continue;
+    }
+    if (fenced) continue;
+
+    if (/\s/.test(c)) {
+      words = wordsBefore(i);
+      wordAt = -1;
+      if (c === '\n') cut(i + 1);
+      else if (
+        (first && words >= FIRST_UNIT_MAX_WORDS && nesting === 0 && !inCode) ||
+        i - start >= MAX_UNIT_CHARS
+      ) {
+        cut(i);
+      }
+      continue;
+    }
+    if (wordAt < 0) wordAt = i;
+
+    if (c === '[' || c === '(') nesting += 1;
+    else if ((c === ']' || c === ')') && nesting > 0) nesting -= 1;
+    else if (c === '`') inCode = !inCode;
+    else if (CLAUSE_MARKS.includes(c)) {
+      // Only before a space, so "1,000" and "7:30" are not clauses.
+      const spaced = /\s/.test(text[i + 1] ?? '');
+      if (spaced && wordsBefore(i) >= MIN_CLAUSE_WORDS && nesting === 0 && !inCode) cut(i + 1);
+    } else if (TERMINALS.includes(c)) {
+      let end = i;
+      while (end < text.length && TERMINALS.includes(text[end])) end += 1;
+      while (end < text.length && CLOSERS.includes(text[end])) end += 1;
+      if (endsSentence(text, text.slice(wordAt, i), i, end)) {
+        cut(end);
+        i = end - 1;
+      }
+    }
   }
-  if (final) {
-    const rest = speakable(text.slice(start));
-    if (rest.length > 0) sentences.push(rest);
-    start = text.length;
-  }
-  return { sentences, next: start };
+  if (final) cut(text.length);
+  return { units, next: start };
 }

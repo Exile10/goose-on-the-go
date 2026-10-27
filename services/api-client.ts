@@ -1167,8 +1167,8 @@ export class PondApiClient {
   }
 
   /**
-   * Text to speech: the whole sentence as a 24 kHz mono WAV. Synthesis finishes
-   * before the first byte, so speak a reply a sentence at a time. The first
+   * Text to speech: the whole text as a 24 kHz mono WAV. Synthesis finishes
+   * before the first byte, so speak a reply a clause at a time. The first
    * call after the Pond starts loads its voice model, which can take seconds.
    */
   async speak(text: string, signal?: AbortSignal): Promise<ArrayBuffer> {
