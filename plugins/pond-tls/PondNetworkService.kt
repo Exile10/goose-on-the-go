@@ -28,14 +28,23 @@ import android.os.IBinder
  * The notification is not a formality to satisfy the platform. It is the only outward sign
  * that the app is holding a connection open on the user's behalf, so it says what the
  * connection is actually doing and opens the app when tapped. A permanent notification
- * that reads "Goose is running" would be a cost with no return.
+ * that reads "Goose is running" would be a cost with no return. What it says comes from
+ * [RemoteNotice]: connecting, connected only once the Pond has answered, or unable to reach
+ * it, and [refresh] keeps it current as requests to the Pond succeed and fail.
  */
 class PondNetworkService : Service() {
   override fun onBind(intent: Intent?): IBinder? = null
 
   override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-    val state = intent?.getStringExtra(EXTRA_STATE) ?: STATE_CONNECTING
-    val notification = build(this, state)
+    nodeState = intent?.getStringExtra(EXTRA_STATE) ?: STATE_CONNECTING
+    // Set before the notice is built, so an answer recorded meanwhile reaches it through
+    // [refresh] rather than falling between the two.
+    running = this
+    val notification = synchronized(Companion) {
+      val notice = current()
+      shown = notice
+      build(this, notice)
+    }
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
       startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
     } else {
@@ -47,6 +56,7 @@ class PondNetworkService : Service() {
   }
 
   override fun onDestroy() {
+    running = null
     stopForeground(STOP_FOREGROUND_REMOVE)
     super.onDestroy()
   }
@@ -58,6 +68,39 @@ class PondNetworkService : Service() {
 
     const val STATE_RUNNING = "Running"
     const val STATE_CONNECTING = "Connecting"
+
+    /** The service while it holds the foreground, so [refresh] never posts a notice without it. */
+    @Volatile private var running: PondNetworkService? = null
+
+    /** The node state [PondNetwork] last handed over. */
+    @Volatile private var nodeState = STATE_CONNECTING
+
+    /** What the notification says now, so an unchanged notice is not re-posted. */
+    private var shown: RemoteNotice? = null
+
+    private fun current() = RemoteNotice.of(nodeState == STATE_RUNNING, PondNetwork.answers())
+
+    /**
+     * Re-post the notification if what it should say has changed: whether the Pond answers
+     * moves with every request, which is far more often than the node's state.
+     *
+     * A notify on the service's own id, which Android documents as the way to change a
+     * foreground service's notification, rather than another [start]: most of these changes
+     * happen with the app in the background, where Android 12 and later refuse a start. The
+     * channel is low importance and the notice alerts only once, so an update never sounds.
+     * Does nothing while the service is not running.
+     */
+    fun refresh() {
+      val service = running ?: return
+      val notice = synchronized(this) {
+        val next = current()
+        if (next == shown) return
+        shown = next
+        next
+      }
+      service.getSystemService(NotificationManager::class.java).notify(NOTIFICATION_ID, build(service, notice))
+      android.util.Log.i("PondNetwork", "kind=remote_notice state=${notice.name}")
+    }
 
     /**
      * Start or update the service.
@@ -112,7 +155,7 @@ class PondNetworkService : Service() {
       return if (id != 0) context.getColor(id) else null
     }
 
-    private fun build(context: Context, state: String): Notification {
+    private fun build(context: Context, notice: RemoteNotice): Notification {
       val manager = context.getSystemService(NotificationManager::class.java)
       if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && manager.getNotificationChannel(CHANNEL) == null) {
         // Low importance: this is a status line, not an interruption. It cannot be
@@ -128,17 +171,13 @@ class PondNetworkService : Service() {
       val pending = open?.let {
         PendingIntent.getActivity(context, 0, it, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
       }
-      val connected = state == STATE_RUNNING
       val builder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) Notification.Builder(context, CHANNEL)
                     else @Suppress("DEPRECATION") Notification.Builder(context)
       return builder
-        .setContentTitle(if (connected) "Connected to your Pond" else "Reconnecting to your Pond")
-        .setContentText(
-          if (connected) "Remote access is on, so you can reach your Pond from anywhere."
-          else "Remote access is on. Looking for your Pond."
-        )
+        .setContentTitle(notice.title)
+        .setContentText(notice.body)
         .setSmallIcon(smallIcon(context))
-        .also { notice -> accent(context)?.let(notice::setColor) }
+        .also { accent(context)?.let(it::setColor) }
         // Not marked ongoing, so nothing here asks the platform to pin it.
         //
         // That is as far as an app can go. NotificationManagerService owns the flags on a

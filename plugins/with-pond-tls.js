@@ -82,6 +82,7 @@ tasks.named('preBuild').configure { dependsOn 'verifyPondNetworkAbis' }
     fs.copyFileSync(path.join(__dirname, 'pond-tls/PondTls.kt'), path.join(java, 'PondTls.kt'));
     fs.copyFileSync(path.join(__dirname, 'pond-tls/PondNetwork.kt'), path.join(java, 'PondNetwork.kt'));
     fs.copyFileSync(path.join(__dirname, 'pond-tls/PondNetworkService.kt'), path.join(java, 'PondNetworkService.kt'));
+    fs.copyFileSync(path.join(__dirname, 'pond-tls/RemoteNotice.kt'), path.join(java, 'RemoteNotice.kt'));
     const assets = path.join(root, 'main/assets');
     fs.mkdirSync(assets, { recursive: true });
     fs.copyFileSync(path.join(mod.modRequest.projectRoot, 'native/pondnet/THIRD_PARTY_NOTICES.txt'), path.join(assets, 'pond-network-notices.txt'));
@@ -93,7 +94,7 @@ tasks.named('preBuild').configure { dependsOn 'verifyPondNetworkAbis' }
     fs.copyFileSync(archive, path.join(libs, 'pondnet.aar'));
     const tests = path.join(root, 'test/java/io/jarida/pondtls');
     fs.mkdirSync(tests, { recursive: true });
-    for (const test of ['PondTlsTest.kt', 'PondProxyTest.kt']) {
+    for (const test of ['PondTlsTest.kt', 'PondProxyTest.kt', 'RemoteNoticeTest.kt']) {
       fs.copyFileSync(path.join(__dirname, 'pond-tls', test), path.join(tests, test));
     }
     // POND_DEV_METRO_LAN=1 at prebuild lets a development build load its JavaScript from Metro

@@ -34,6 +34,25 @@ object PondNetwork {
   private var networkCallback: ConnectivityManager.NetworkCallback? = null
 
   /**
+   * Per pinned Pond origin, whether the last request to it got an answer: any HTTP response,
+   * since only the Pond can complete the pinned TLS handshake. Fed by [observe] from every
+   * request the app makes, and read by the remote-access notice ([RemoteNotice]).
+   */
+  private val answered = java.util.concurrent.ConcurrentHashMap<String, Boolean>()
+
+  /** What [answered] holds now, one entry per Pond origin that has been tried. */
+  fun answers(): Collection<Boolean> = answered.values.toList()
+
+  /**
+   * Record whether the Pond answered a request to [url]'s origin, and bring the remote-access
+   * notice up to date when that changes what it should say. Called by `PondTls` for pinned
+   * origins only; a call the app cancelled is not reported, since it says nothing about the Pond.
+   */
+  fun observe(url: HttpUrl, answer: Boolean) {
+    if (answered.put(origin(url), answer) != answer) PondNetworkService.refresh()
+  }
+
+  /**
    * The state last handed to the foreground service.
    *
    * `status()` is polled once a second during enrollment, and re-delivering an unchanged
@@ -181,6 +200,9 @@ object PondNetwork {
     if (proxyAddress != null) Mobile.setTargets(JSONArray(nextTargets).toString())
     origins = nextOrigins
     targets = nextTargets
+    // An origin no longer pinned is no longer the Pond; what it last did says nothing now.
+    val pinned = urls.map(::origin).toSet()
+    if (answered.keys.retainAll(pinned)) PondNetworkService.refresh()
   }
   @Synchronized fun stage(profile: String, control: String): String {
     require(profile.matches(Regex("[A-Za-z0-9_-]{1,100}")))
