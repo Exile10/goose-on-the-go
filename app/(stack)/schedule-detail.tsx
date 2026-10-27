@@ -13,7 +13,7 @@
  */
 
 import React, { useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import {
@@ -32,6 +32,7 @@ import { LabelledSwitch } from '@/components/patterns/labelled-switch';
 import { ScheduleFormSheet } from '@/components/patterns/schedule-form-sheet';
 import { useThemedStyles } from '@/hooks/use-themed-styles';
 import { deviceTimeZone, describeWhen, formatScheduleTime, isOneOff, linkedScheduleId, promptOf } from '@/models/schedule';
+import { useConfirm } from '@/providers/confirm-provider';
 import { useServer } from '@/providers/server-provider';
 import { toggle } from '@/services/haptics';
 import type { TranslationKey } from '@/services/i18n';
@@ -102,21 +103,17 @@ export default function ScheduleDetailScreen() {
   const { schedule, loading, missing, error, failed, notice, runs, actions } = useScheduleDetail(id);
   const [editing, setEditing] = useState(false);
   const [phoneZone] = useState(deviceTimeZone);
+  const ask = useConfirm();
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (!schedule) return;
-    Alert.alert(t('schedule.detail.deleteTitle'), t('schedule.detail.deleteBody', { name: schedule.label }), [
-      { text: t('common.cancel'), style: 'cancel' },
-      {
-        text: t('schedule.detail.delete'),
-        style: 'destructive',
-        onPress: () => {
-          void actions.remove().then((gone) => {
-            if (gone) router.back();
-          });
-        },
-      },
-    ]);
+    const yes = await ask({
+      title: t('schedule.detail.deleteTitle'),
+      message: t('schedule.detail.deleteBody', { name: schedule.label }),
+      confirmLabel: t('schedule.detail.delete'),
+      destructive: true,
+    });
+    if (yes && (await actions.remove())) router.back();
   };
 
   if (!schedule) {
@@ -225,7 +222,7 @@ export default function ScheduleDetailScreen() {
       </View>
 
       <View style={styles.dangerZone}>
-        <InkButton variant="danger" icon="trash" block onPress={confirmDelete}>
+        <InkButton variant="danger" icon="trash" block onPress={() => void confirmDelete()}>
           {t('schedule.detail.delete')}
         </InkButton>
       </View>

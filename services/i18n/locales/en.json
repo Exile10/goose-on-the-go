@@ -16,7 +16,8 @@
     "back": "Back",
     "scanAgain": "Scan again",
     "searchAgain": "Search again",
-    "goHome": "Go to Home"
+    "goHome": "Go to Home",
+    "ok": "OK"
   },
   "tabs": {
     "label": "Main navigation",
@@ -1456,7 +1457,7 @@
     "unpairing": "Unpairing...",
     "cancel": "Cancel",
     "unpairWarning": "This releases this phone’s access to your Pond, including its remote access. You will need to pair again at home to come back.",
-    "unpairFailed": "Could not unpair. Your Pond may be unreachable — try again when you are on its network.",
+    "unpairFailed": "This phone is still paired. Try again while you are on your Pond's home network.",
     "yourPond": "Your Pond",
     "pairedTo": "Paired to {{pond}}",
     "statDevices": "Devices",
@@ -1466,7 +1467,8 @@
     "appearance": "Appearance",
     "appearanceSystem": "System",
     "appearanceLight": "Light",
-    "appearanceDark": "Dark"
+    "appearanceDark": "Dark",
+    "unpairFailedTitle": "Could not unpair"
   },
   "models": {
     "serving": "Serving now",

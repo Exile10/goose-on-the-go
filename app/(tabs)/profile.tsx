@@ -4,7 +4,7 @@
  */
 
 import React, { useCallback, useMemo, useState } from 'react';
-import { Alert, Keyboard, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { Keyboard, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -28,11 +28,12 @@ import { ACCOUNT_ROUTE, PROFILE_NAV } from '@/constants/navigation';
 import { Spacing } from '@/constants/spacing';
 import type { SummaryId } from '@/models/pond-settings';
 import { useBottomBarInset, useChromeScroll } from '@/providers/chrome-provider';
-import { useConfirm } from '@/providers/confirm-provider';
+import { useConfirm, useInform } from '@/providers/confirm-provider';
 import { useServer } from '@/providers/server-provider';
 import { hostOf } from '@/services/discovery';
 import { hapticsEnabled, saveHapticsPreference, selectionTick } from '@/services/haptics';
 import { initialOf, useHousehold } from '@/view-models/use-household';
+import { logFailure } from '@/view-models/describe-error';
 import { usePondSettings } from '@/view-models/use-pond-settings';
 import { summarize, useSummaryExtras } from '@/view-models/use-settings-extras';
 import { useSettingsIssues } from '@/view-models/use-settings-issues';
@@ -116,6 +117,7 @@ export default function ProfileHub() {
   const router = useRouter();
   const { unpair } = useServer();
   const confirm = useConfirm();
+  const inform = useInform();
   const [unpairing, setUnpairing] = useState(false);
   const [hapticsOn, setHapticsOn] = useState(hapticsEnabled);
   const chrome = useChromeScroll();
@@ -162,9 +164,12 @@ export default function ProfileHub() {
     if (!yes) return;
     setUnpairing(true);
     void unpair()
-      .catch(() => Alert.alert(t('common.unpair'), t('profile.unpairFailed')))
+      .catch((e: unknown) => {
+        logFailure('profile', 'unpair failed', e);
+        void inform({ title: t('profile.unpairFailedTitle'), message: t('profile.unpairFailed') });
+      })
       .finally(() => setUnpairing(false));
-  }, [confirm, unpair, t]);
+  }, [confirm, inform, unpair, t]);
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: colors.page }]} edges={['top']}>

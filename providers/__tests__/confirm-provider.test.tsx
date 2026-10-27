@@ -14,7 +14,7 @@ import { act, create, type ReactTestInstance, type ReactTestRenderer } from 'rea
 import { InkButton } from '@jarida/ink/native';
 
 import { caution } from '@/services/haptics';
-import { ConfirmProvider, useChoice, useConfirm, type ChooseFn, type ConfirmFn } from '../confirm-provider';
+import { ConfirmProvider, useChoice, useConfirm, useInform, type ChooseFn, type ConfirmFn, type InformFn } from '../confirm-provider';
 
 jest.mock('@/services/haptics', () => ({ caution: jest.fn(async () => undefined) }));
 
@@ -24,13 +24,15 @@ interface Mounted {
   tree: ReactTestRenderer;
   confirm: ConfirmFn;
   choose: ChooseFn;
+  inform: InformFn;
 }
 
 async function mount(): Promise<Mounted> {
-  const hooks: { confirm?: ConfirmFn; choose?: ChooseFn } = {};
+  const hooks: { confirm?: ConfirmFn; choose?: ChooseFn; inform?: InformFn } = {};
   const Probe = () => {
     hooks.confirm = useConfirm();
     hooks.choose = useChoice();
+    hooks.inform = useInform();
     return null;
   };
   let tree!: ReactTestRenderer;
@@ -41,7 +43,7 @@ async function mount(): Promise<Mounted> {
       </ConfirmProvider>,
     );
   });
-  return { tree, confirm: hooks.confirm!, choose: hooks.choose! };
+  return { tree, confirm: hooks.confirm!, choose: hooks.choose!, inform: hooks.inform! };
 }
 
 const REMOVE = { title: 'Forget this memory?', message: 'Goose will no longer know it.', confirmLabel: 'Forget', destructive: true };
@@ -181,6 +183,31 @@ describe('choose', () => {
     });
     expect(button(tree, 'With pictures').props.variant).toBe('primary');
     expect(button(tree, 'Text only').props.variant).toBe('quiet');
+  });
+});
+
+describe('inform', () => {
+  // What replaced `Alert.alert` for a failed unpair: the platform's dialog in the platform's theme,
+  // on a screen drawn in the app's.
+  const FAILED = { title: 'Unpair', message: 'Could not unpair. Try again on the home network.' };
+
+  it('says what happened with one button, OK, and nothing to cancel', async () => {
+    const { tree, inform } = await mount();
+    await act(async () => {
+      void inform(FAILED);
+    });
+    expect(modal(tree).props.visible).toBe(true);
+    expect(tree.root.findAll((n) => n.props.children === FAILED.message).length).toBeGreaterThan(0);
+    const buttons = tree.root.findAll((n) => n.type === InkButton).map((n) => n.props.children);
+    expect(buttons).toEqual(['OK']);
+    expect(caution).not.toHaveBeenCalled();
+  });
+
+  it('settles once it is put away, by its button or by back', async () => {
+    const { tree, inform } = await mount();
+    await expect(answered(tree, () => inform(FAILED), () => button(tree, 'OK').props.onPress())).resolves.toBeUndefined();
+    expect(modal(tree).props.visible).toBe(false);
+    await expect(answered(tree, () => inform(FAILED), () => modal(tree).props.onRequestClose())).resolves.toBeUndefined();
   });
 });
 
