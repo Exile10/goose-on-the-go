@@ -2248,7 +2248,7 @@
   },
   "errors": {
     "busy": "Your Pond is busy. Try again in a moment.",
-    "generic": "Your Pond could not complete that request.",
+    "generic": "Your Pond could not finish that. Try again in a moment.",
     "deviceGone": "That device is no longer registered with your Pond.",
     "bridgedEndpoint": "Your Pond will not remove a bridged endpoint on its own.",
     "noModelCatalogue": "This Pond does not expose a model catalogue.",
@@ -2258,6 +2258,12 @@
     "deviceNotSaved": "Your Pond did not save that change. Try again.",
     "someDevicesNotSaved_one": "{{count}} of {{total}} devices was not moved. {{reason}}",
     "someDevicesNotSaved_other": "{{count}} of {{total}} devices were not moved. {{reason}}"
+  },
+  "contentState": {
+    "waitingTitle": "Waiting for your Pond",
+    "waitingBody": "This fills in as soon as your Pond is back.",
+    "failedTitle": "This did not load",
+    "failedBody": "Your Pond had trouble answering. Try again in a moment."
   },
   "sessions": {
     "justNow": "Just now",

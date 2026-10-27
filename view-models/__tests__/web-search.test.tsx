@@ -302,8 +302,8 @@ describe('saving a key', () => {
     ['a busy Pond', refusal(503), 'Your Pond is busy. Try again in a moment.'],
     ['a rate limit', refusal(429), 'Your Pond is busy. Try again in a moment.'],
     // The connection banner says a 401 already, and an action just taken must still not be silent.
-    ['a refused session', refusal(401), 'Your Pond could not complete that request.'],
-    ['no answer at all', new TypeError('Network request failed'), 'Your Pond could not complete that request.'],
+    ['a refused session', refusal(401), 'Your Pond could not finish that. Try again in a moment.'],
+    ['no answer at all', new TypeError('Network request failed'), 'Your Pond could not finish that. Try again in a moment.'],
   ])('says so, in words, on %s', async (_name, failure, sentence) => {
     web.setWebSearchKey.mockRejectedValue(failure);
     const m = await mount();

@@ -23,6 +23,29 @@ export type ConnectionState =
   | 'trust' | 'unpaired' | 'upgrade' | 'reconnecting'
   | 'local' | 'remote' | 'disconnected' | 'revoked';
 
+/**
+ * Whether the connection indicator has something to say in `state`. A working connection is not
+ * one of them: the indicator appears when there is something to act on, and is the control that
+ * acts on it.
+ *
+ * Screens read the same answer. While it is true the indicator owns the news that the Pond cannot
+ * be used, so a screen whose content did not arrive says only that it will fill in, and never
+ * repeats why (see `models/content-state.ts`).
+ */
+export function connectionNeedsAttention(state: ConnectionState): boolean {
+  return state !== 'local' && state !== 'remote';
+}
+
+/**
+ * Whether the indicator's action in `state` is pairing rather than another attempt to connect.
+ *
+ * `revoked` belongs here: the Pond is reachable and has stopped recognising this phone, so a retry
+ * -- which probes endpoints without a token -- would report success and change nothing.
+ */
+export function connectionActionIsPairing(state: ConnectionState): boolean {
+  return state === 'unpaired' || state === 'upgrade' || state === 'revoked';
+}
+
 /** Screens that are themselves the pairing the banner would send someone to. */
 const PAIRING_SCREENS = ['pond-pairing', 'connect-desktop'];
 

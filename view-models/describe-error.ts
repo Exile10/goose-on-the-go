@@ -49,3 +49,20 @@ export function refusalReason(e: unknown): string | null {
   const reason = (e.body as { reason?: unknown } | null)?.reason;
   return typeof reason === 'string' && reason ? reason : null;
 }
+
+/**
+ * What kind of failure `e` was, for a log line and never for a screen: `http_<status>` for a
+ * refusal, `busy_<status>` for one worth retrying, `network` for a request that got no answer.
+ */
+export function failureKind(e: unknown): string {
+  if (e instanceof ApiError) return `${e.isRetryable ? 'busy' : 'http'}_${e.status}`;
+  return 'network';
+}
+
+/**
+ * The engineer's half of a failure the reader is told about in words: one warn line, tagged with
+ * where it happened and `kind=`, so the status code and cause are in the log rather than on screen.
+ */
+export function logFailure(scope: string, what: string, e: unknown): void {
+  console.warn(`[${scope}] ${what} kind=${failureKind(e)}`);
+}

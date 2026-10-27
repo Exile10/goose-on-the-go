@@ -257,7 +257,7 @@ describe('strictness', () => {
       refused = await m.vm.actions.setStrictness(person(), 2);
     });
 
-    expect(refused).toBe('Your Pond could not complete that request.');
+    expect(refused).toBe('Your Pond could not finish that. Try again in a moment.');
   });
 });
 

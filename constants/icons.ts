@@ -12,7 +12,7 @@
 
 import {
   Activity, Archive, ArrowRight, AudioLines, Bell, Bluetooth, Bot, Boxes, Brain, Calendar, Camera,
-  Check, ChevronDown, ChevronLeft, ChevronRight, ChevronsUpDown, CircleCheck, Clock, Cloud, Copy, Cpu,
+  Check, ChevronDown, ChevronLeft, ChevronRight, ChevronsUpDown, CircleCheck, Clock, Cloud, CloudAlert, CloudOff, Copy, Cpu,
   Download, Ear, Eye, EyeOff, HardDrive, Info, Palette, SlidersHorizontal,
   Ellipsis, ExternalLink, File, Filter, Folder, Frame, Globe, House, Image,
   Key, Keyboard, Lightbulb, Link, ListFilter, Lock, MessageCircle, MessageSquareText, Mic, Minus,
@@ -43,6 +43,8 @@ export const ICONS = {
   'chevron-right': ChevronRight,
   'chevron-left': ChevronLeft,
   cloud: Cloud,
+  'cloud-alert': CloudAlert,
+  'cloud-off': CloudOff,
   compose: SquarePen,
   copy: Copy,
   cpu: Cpu,
