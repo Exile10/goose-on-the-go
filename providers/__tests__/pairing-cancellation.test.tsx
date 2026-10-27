@@ -11,6 +11,8 @@ jest.mock('@react-native-community/netinfo', () => ({
 jest.mock('@/services/storage', () => ({ Storage: { set: jest.fn(), remove: jest.fn(), getJSON: jest.fn(async () => null), setJSON: jest.fn() }, purgeLegacyStorage: jest.fn() }));
 // Signing out also forgets the tool cards; that store is not what these tests are about.
 jest.mock('@/services/card-cache', () => ({ forgetAllCards: jest.fn(async () => undefined) }));
+// Signing out resets the push registration memo; nothing here registers one.
+jest.mock('@/services/push-token', () => ({ forgetPushRegistration: jest.fn() }));
 jest.mock('@/services/secure-storage', () => ({ SecureStorage: { set: jest.fn(), remove: jest.fn(), getJSON: jest.fn(async () => null), setJSON: jest.fn() } }));
 jest.mock('@/services/paired-profile', () => ({
   loadPairedProfile: jest.fn(async () => ({ saved: null, upgrade: false })), commitPairedProfile: jest.fn(),

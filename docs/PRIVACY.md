@@ -171,6 +171,10 @@ to each store, so this section matches it]
 - **Turn it off later.** Signing out releases this phone's access to your Pond, including
   its remote access. You pair again at home to come back. Turning remote access off also
   erases the map of your home network that your phone kept to reconnect quickly.
+- **Remove a Pond you cannot reach.** If your Pond does not answer when you sign out, you
+  can remove it from this phone instead. The phone forgets the Pond and everything it kept
+  from your household; the Pond still lists the phone until you remove it on the Pond's
+  dashboard.
 - **Your data is on your own hardware.** Deleting it is something you do on your Pond, not
   something you ask us for. We do not hold a copy.
 

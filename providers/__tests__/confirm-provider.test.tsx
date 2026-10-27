@@ -182,6 +182,25 @@ describe('choose', () => {
     expect(button(tree, 'With pictures').props.variant).toBe('primary');
     expect(button(tree, 'Text only').props.variant).toBe('quiet');
   });
+
+  // Unpairing from an unreachable Pond offers "Remove from this phone" beside "Try again": the
+  // answer that cannot be undone has to look like it, wherever it sits, and warn like a confirm.
+  it('paints a destructive option red and warns by touch', async () => {
+    const { tree, choose } = await mount();
+    await answered(
+      tree,
+      () => choose({ title: 'Remove?', message: 'Gone.', options: [{ label: 'Remove', value: 'forget', destructive: true }, { label: 'Try again', value: 'retry' }] }),
+      () => {
+        expect(button(tree, 'Remove').props.variant).toBe('danger');
+        expect(button(tree, 'Try again').props.variant).toBe('quiet');
+        button(tree, 'Cancel').props.onPress();
+      },
+    );
+    expect(caution).toHaveBeenCalledTimes(1);
+
+    await answered(tree, () => choose(DOWNLOAD), () => button(tree, 'Cancel').props.onPress());
+    expect(caution).toHaveBeenCalledTimes(1);
+  });
 });
 
 it('refuses to be used outside its provider', () => {

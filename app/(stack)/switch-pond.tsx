@@ -4,6 +4,12 @@
  * A household can run more than one — a desktop and a box in a cupboard — and
  * the app has always been able to reach only whichever it last paired with.
  * The list is the same component first run uses, so the two cannot drift.
+ *
+ * None of it needs the current Pond to answer: this is where an offline home card sends someone.
+ * A Pond that is new or was reset has not joined this network, so it is not on the list; it is set
+ * up over Bluetooth or from its card, which is first run's screen, and that screen works over a
+ * pairing that is still stored. Until 2026-10-27 nothing here led to it, and first run itself only
+ * opens when nothing is paired, so a phone whose Pond had gone could not set up its replacement.
  */
 
 import React, { useCallback } from 'react';
@@ -93,6 +99,21 @@ export default function SwitchPond() {
             {t('onboarding.manual')}
           </InkButton>
         </View>
+
+        <View style={styles.setUp}>
+          <InkText tone="secondary">{t('pond.setUpNewBody')}</InkText>
+          <InkButton
+            variant="quiet"
+            block
+            icon="server"
+            onPress={() => {
+              void selectionTick();
+              router.push('/(onboarding)/welcome');
+            }}
+          >
+            {t('pond.setUpNew')}
+          </InkButton>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -105,4 +126,5 @@ const makeStyles = (c: ThemeColors) =>
     intro: { marginTop: Spacing.md, marginBottom: Spacing.lg, maxWidth: 420 },
     notice: { marginTop: Spacing.md },
     actions: { marginTop: Spacing.lg, gap: Spacing.sm },
+    setUp: { marginTop: Spacing.xl, gap: Spacing.sm },
   });

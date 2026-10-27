@@ -699,7 +699,9 @@ export class PondApiClient {
     });
     if (!response.ok) throw new ApiError('Pond revocation failed', response.status, parseRetryAfter(response));
     const result = await response.json();
-    if (result?.revoked !== true) throw new Error('Pond revocation was not acknowledged');
+    // An ApiError, not a bare Error: the Pond answered, which is what tells unpairing this apart
+    // from a Pond that could not be reached at all.
+    if (result?.revoked !== true) throw new ApiError('Pond revocation was not acknowledged', response.status, null);
     this.token = null;
     this.refreshToken = null;
   }

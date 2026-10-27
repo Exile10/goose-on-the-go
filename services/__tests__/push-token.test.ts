@@ -133,6 +133,21 @@ describe('registerPushToken', () => {
   });
 });
 
+describe('forgetPushRegistration', () => {
+  // A sign-out followed by pairing another Pond, in the same process: the native token has not
+  // changed, and without this the new Pond was never sent it.
+  it('lets the next Pond be sent the same token', async () => {
+    const { registerPushToken, forgetPushRegistration } = loadModule();
+
+    await registerPushToken();
+    expect(mockRequest).toHaveBeenCalledTimes(1);
+
+    forgetPushRegistration();
+    await expect(registerPushToken()).resolves.toBe('token-abc');
+    expect(mockRequest).toHaveBeenCalledTimes(2);
+  });
+});
+
 describe('watchPushTokenRotation', () => {
   /**
    * THE regression. `getDevicePushTokenAsync` emits to this listener, so a

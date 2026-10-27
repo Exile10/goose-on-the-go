@@ -44,7 +44,9 @@
     "switch": "Switch Pond",
     "switchBody": "Ponds advertising on this network. The one you are using is marked.",
     "onThisNetwork": "On this network",
-    "discoveryFailed": "Discovery could not run. You can still enter an address by hand."
+    "discoveryFailed": "Discovery could not run. You can still enter an address by hand.",
+    "setUpNew": "Set up a new Pond",
+    "setUpNewBody": "A new or reset Pond is not on this network yet. Set it up over Bluetooth or with its setup card. The Pond you use now does not have to be reachable."
   },
   "home": {
     "conversations": "Conversations",
@@ -1456,7 +1458,13 @@
     "unpairing": "Unpairing...",
     "cancel": "Cancel",
     "unpairWarning": "This releases this phone’s access to your Pond, including its remote access. You will need to pair again at home to come back.",
-    "unpairFailed": "Could not unpair. Your Pond may be unreachable — try again when you are on its network.",
+    "unpairUnreachableTitle": "Your Pond didn't answer",
+    "unpairUnreachableBody": "This phone could not reach your Pond to release it. If the Pond is off or this phone is away from its network, try again when you are back. If the Pond has been reset or replaced, or is gone for good, remove it from this phone instead: this phone forgets the Pond, its address and everything it kept from your household. The Pond will still list this phone until you remove it from the Pond's dashboard.",
+    "unpairRefusedTitle": "Your Pond didn't release this phone",
+    "unpairRefusedBody": "Your Pond answered but could not release this phone just now. You can try again, or remove the Pond from this phone only: this phone forgets the Pond, its address and everything it kept from your household. The Pond will still list this phone until you remove it from the Pond's dashboard.",
+    "removeFromPhone": "Remove from this phone",
+    "removeFailedTitle": "Could not remove the Pond",
+    "removeFailedBody": "This phone could not clear everything it keeps for this Pond. Try again, and if it keeps failing, restart the app and try once more.",
     "yourPond": "Your Pond",
     "pairedTo": "Paired to {{pond}}",
     "statDevices": "Devices",
