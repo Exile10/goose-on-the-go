@@ -69,9 +69,10 @@ import type { Message } from '@/models/chat';
 import type { ThemeColors } from '@/constants/colors';
 import { Spacing } from '@/constants/spacing';
 import {
-  FOLLOW_WITHIN_PT,
   HIDDEN,
   afterScroll,
+  holdPlace,
+  isBackInThread,
   footKey,
   hasUnseen,
   type LatestButton,
@@ -159,6 +160,9 @@ export default function ChatScreen() {
   // the last message. When it moves behind a reader back in the thread, the
   // arrow carries a dot.
   const [latest, setLatest] = useState<LatestButton>(HIDDEN);
+  // Whether the reader is back in the thread, the only time the list holds
+  // their place (see `holdPlace`).
+  const [back, setBack] = useState(false);
   const foot = footKey(queued[queued.length - 1] ?? messages[messages.length - 1]);
   const onScroll = useCallback(
     (e: NativeSyntheticEvent<NativeScrollEvent>) => {
@@ -166,6 +170,7 @@ export default function ChatScreen() {
       const next = behaviour.scrolled(contentOffset.y);
       setStage(next === 'collapsed' ? 'condensed' : next);
       setLatest((state) => afterScroll(state, contentOffset.y, layoutMeasurement.height, foot));
+      setBack(isBackInThread(contentOffset.y));
     },
     [behaviour, foot],
   );
@@ -174,6 +179,9 @@ export default function ChatScreen() {
   const reduceMotion = useReduceMotion();
   const scrollToFoot = useCallback(() => {
     setLatest(HIDDEN);
+    // Before the scroll event says so: a message sent now lands in the next
+    // render, which must not still be holding the place the reader just left.
+    setBack(false);
     listRef.current?.scrollToOffset({ offset: 0, animated: !reduceMotion });
   }, [reduceMotion]);
   const toLatest = useCallback(() => {
@@ -251,6 +259,7 @@ export default function ChatScreen() {
     behaviour.set('expanded');
     setStage('expanded');
     setLatest(HIDDEN);
+    setBack(false);
     actions.newConversation();
   }, [actions, behaviour]);
 
@@ -339,12 +348,7 @@ export default function ChatScreen() {
               keyboardDismissMode="interactive"
               keyboardShouldPersistTaps="handled"
               contentContainerStyle={styles.listContent}
-              // Holds what a reader back in the thread is reading where it is
-              // while the foot grows, and carries along one who is at it.
-              maintainVisibleContentPosition={{
-                minIndexForVisible: 0,
-                autoscrollToTopThreshold: FOLLOW_WITHIN_PT,
-              }}
+              maintainVisibleContentPosition={holdPlace(back)}
             />
           ) : (
             <View style={styles.opening}>

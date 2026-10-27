@@ -5,12 +5,15 @@
 
 import type { Message } from '@/models/chat';
 import {
+  FOLLOW_WITHIN_PT,
   HIDDEN,
   HIDE_WITHIN_SCREENS,
   SHOW_AFTER_SCREENS,
   afterScroll,
   footKey,
   hasUnseen,
+  holdPlace,
+  isBackInThread,
   type LatestButton,
 } from '@/view-models/latest-button';
 
@@ -91,5 +94,21 @@ describe('footKey', () => {
   it('holds still when nothing at the foot changed, and is empty for an empty thread', () => {
     expect(footKey(message())).toBe(footKey(message({ timestamp: 99 })));
     expect(footKey(undefined)).toBe('');
+  });
+});
+
+describe('holding the reader\'s place', () => {
+  it('counts a reader within a few lines of the foot as following the thread', () => {
+    expect(isBackInThread(0)).toBe(false);
+    expect(isBackInThread(FOLLOW_WITHIN_PT)).toBe(false);
+    expect(isBackInThread(FOLLOW_WITHIN_PT + 1)).toBe(true);
+  });
+
+  it('holds the place only for a reader back in the thread', () => {
+    expect(holdPlace(true)).toEqual({ minIndexForVisible: 0 });
+  });
+
+  it('does not hold the place at the foot, so a message just sent stays in view', () => {
+    expect(holdPlace(false)).toBeUndefined();
   });
 });

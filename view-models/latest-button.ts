@@ -45,6 +45,24 @@ export const HIDE_WITHIN_SCREENS = 0.5;
  */
 export const FOLLOW_WITHIN_PT = 64;
 
+/** Whether a reader at `offset` (the inverted list's) has gone back in the thread. */
+export function isBackInThread(offset: number): boolean {
+  return offset > FOLLOW_WITHIN_PT;
+}
+
+/**
+ * The list's `maintainVisibleContentPosition`: only while the reader is back in
+ * the thread. Held at the foot as well, a message added there moved the list by
+ * its own height to keep the row before it still, so the message the reader had
+ * just sent sat below the list with only its top edge showing (A57, 2026-10-27);
+ * `autoscrollToTopThreshold` did not bring it back on Android's inverted list. At
+ * the foot an inverted list stays on the newest row by itself, so it needs no
+ * holding there.
+ */
+export function holdPlace(back: boolean): { minIndexForVisible: number } | undefined {
+  return back ? { minIndexForVisible: 0 } : undefined;
+}
+
 export interface LatestButton {
   visible: boolean;
   /**
