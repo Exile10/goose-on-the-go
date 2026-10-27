@@ -249,6 +249,30 @@ The third is this app's rule, not expo-router's. The stack sets `headerShown: tr
 
 Backup and Restore were removed rather than wired (#64): the Pond exposes no backup API, and a screen reporting a backup that never ran is worse than no screen. Biometrics went for the same reason: it showed face recognition as enrolled from a hardcoded state and "enrolled" voice recognition on a two-second timer, with no call to the Pond -- which has no voice biometrics at all. Photos and Videos and Upload for Analysis went too: they showed analyses of household photos that never ran, and the Pond exposes no image analysis. Their hub group, Media and data, went with them rather than stay as an empty heading.
 
+## Notification taps (2026-10-27)
+
+A Pond notification can name the screen a tap opens, as `open` in its `data` (the Pond's
+`OpenScreen`, in pond-core `mcp/ports/notification.rs`, and its `docs/architecture/notifications.md`).
+`openRouteFromData` in `services/notification-link.ts` accepts six values and `screenPath` maps
+them:
+
+| `open` | Screen | Sent for |
+|---|---|---|
+| `schedule` (with `schedule_id`, `run_id`) | `/(stack)/schedule`, going on to that schedule | a schedule result |
+| `devices` | `/(tabs)/devices` | pairing, a Matter device, and a device removed |
+| `chat` | `/(tabs)/chat` | a suggestion |
+| `models` | `/(stack)/models` | a model download finished or failed, the disk running low or recovering, a start with speech or voice down |
+| `extensions` | `/(stack)/extensions` | a start where a saved extension failed |
+| `remote_access` | `/(stack)/remote-access` | remote access stopped, needs signing in, or works again |
+
+The hint is the Pond's name, not the route's: `remote_access` is accepted, `remote-access` is
+not. Any other value, a non-string, or no `open` at all is ignored, and the tap opens the app
+where it was, so a newer Pond's hint is inert on an older app rather than an unmatched route.
+The hint is checked when the notification is shown (`presentLocally` stores only a checked
+hint) and again when it is tapped. A link or a ride offer in the same notification takes
+precedence over the screen. `typedRoutes` is on, so a `screenPath` target that is not a route
+fails `tsc`.
+
 ## Voice
 
 There is no separate listening overlay. Voice mode belongs to the conversation:

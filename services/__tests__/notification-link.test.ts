@@ -114,6 +114,12 @@ describe('openRouteFromData', () => {
     expect(openRouteFromData({ open: 'chat', proposal_id: 'p-1', rationale: 'why' })).toEqual({ open: 'chat' });
   });
 
+  it('reads the models, extensions and remote access routes the Pond names', () => {
+    expect(openRouteFromData({ open: 'models', kind: 'disk_low' })).toEqual({ open: 'models' });
+    expect(openRouteFromData({ open: 'extensions' })).toEqual({ open: 'extensions' });
+    expect(openRouteFromData({ open: 'remote_access' })).toEqual({ open: 'remote_access' });
+  });
+
   it('keeps the schedule screen but drops an id that is not a Pond id', () => {
     expect(openRouteFromData({ open: 'schedule', schedule_id: '../settings', run_id: 7 })).toEqual({
       open: 'schedule',
@@ -124,6 +130,9 @@ describe('openRouteFromData', () => {
   it('ignores a screen outside the allow-list, and data with no open', () => {
     expect(openRouteFromData({ open: 'settings-advanced' })).toBeNull();
     expect(openRouteFromData({ open: '/(stack)/developer' })).toBeNull();
+    // The app's route name is not the Pond's hint; only `remote_access` is.
+    expect(openRouteFromData({ open: 'remote-access' })).toBeNull();
+    expect(openRouteFromData({ open: 'Models' })).toBeNull();
     expect(openRouteFromData({ open: ['chat'] })).toBeNull();
     expect(openRouteFromData({ action: 'open_url' })).toBeNull();
     expect(openRouteFromData(null)).toBeNull();
@@ -134,6 +143,9 @@ describe('screenPath', () => {
   it('maps each route to its screen', () => {
     expect(screenPath({ open: 'devices' })).toBe('/(tabs)/devices');
     expect(screenPath({ open: 'chat' })).toBe('/(tabs)/chat');
+    expect(screenPath({ open: 'models' })).toBe('/(stack)/models');
+    expect(screenPath({ open: 'extensions' })).toBe('/(stack)/extensions');
+    expect(screenPath({ open: 'remote_access' })).toBe('/(stack)/remote-access');
   });
 
   it('opens the schedules list on the schedule the notification names', () => {
