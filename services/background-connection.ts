@@ -80,11 +80,71 @@ export function onStayConnectedChange(listener: (on: boolean) => void): () => vo
   return () => { settingListeners.delete(listener); };
 }
 
+// --- What the notice says --------------------------------------------------
+
+/**
+ * Where the stream to the Pond stands, which is what the ongoing notification reports.
+ *
+ * - `connecting`: a stream is being opened, or the connection manager is still looking for
+ *   the Pond.
+ * - `connected`: the Pond has accepted the stream, so its notices arrive as it sends them.
+ * - `unreachable`: the stream dropped and is retrying with its backoff, or no endpoint
+ *   answers. Notices wait on the Pond, or come through the push wake-up.
+ *
+ * The notification used to say "Connected" from the moment the service started, whether or
+ * not any Pond was reachable, which on 2026-10-27 read as a working connection on a phone
+ * with no Pond in reach.
+ */
+export type PresenceState = 'connecting' | 'connected' | 'unreachable';
+
+/** The notice's title and body for `state`. Only `connected` promises prompt delivery. */
+export function presenceNotice(state: PresenceState): { title: string; body: string } {
+  switch (state) {
+    case 'connected':
+      return { title: i18n.t('notifications.background.connected.title'), body: i18n.t('notifications.background.connected.body') };
+    case 'unreachable':
+      return { title: i18n.t('notifications.background.unreachable.title'), body: i18n.t('notifications.background.unreachable.body') };
+    case 'connecting':
+      return { title: i18n.t('notifications.background.connecting.title'), body: i18n.t('notifications.background.connecting.body') };
+  }
+}
+
+let linkState: PresenceState = 'connecting';
+
+/** Where the stream stands now. */
+export function presenceState(): PresenceState {
+  return linkState;
+}
+
+function setLinkState(next: PresenceState): void {
+  if (next === linkState) return;
+  linkState = next;
+  console.info('[presence] link state', { kind: 'background_connection', state: next });
+  void refreshPresenceNotice();
+}
+
+/**
+ * The connection manager has no endpoint for the stream. With a stream open, the stream
+ * reports its own state as it retries; without one, this is the only word on it.
+ * `searching` is the manager still probing, as opposed to having given up for now.
+ */
+export function noteNoEndpoint(searching: boolean): void {
+  if (stream) return;
+  setLinkState(searching ? 'connecting' : 'unreachable');
+}
+
 // --- The service -----------------------------------------------------------
 
 interface PresenceBridge {
   start: (title: string, body: string, channelName: string, channelDescription: string) => Promise<boolean>;
+  update: (title: string, body: string, channelName: string, channelDescription: string) => Promise<boolean>;
   stop: () => Promise<boolean>;
+}
+
+/** The four strings the native side shows, for the current state. */
+function noticeArgs(): [string, string, string, string] {
+  const { title, body } = presenceNotice(linkState);
+  return [title, body, i18n.t('notifications.background.channel'), i18n.t('notifications.background.channelDescription')];
 }
 
 function bridge(): PresenceBridge | null {
@@ -107,12 +167,7 @@ export async function startPresenceService(): Promise<boolean> {
   const native = bridge();
   if (!native) return false;
   try {
-    await native.start(
-      i18n.t('notifications.background.title'),
-      i18n.t('notifications.background.body'),
-      i18n.t('notifications.background.channel'),
-      i18n.t('notifications.background.channelDescription'),
-    );
+    await native.start(...noticeArgs());
     if (!serviceRunning) console.info('[presence] service started', { kind: 'background_connection' });
     serviceRunning = true;
     return true;
@@ -120,6 +175,23 @@ export async function startPresenceService(): Promise<boolean> {
     console.warn('[presence] service refused', { kind: 'background_connection', error: String(e) });
     serviceRunning = false;
     return false;
+  }
+}
+
+/**
+ * Re-post the running service's notification with the current state's text. A notify on the
+ * service's own id, not another start: Android 12 and later refuse a foreground-service start
+ * from the background, which is where most state changes happen. The channel is low
+ * importance and the notice only alerts once, so an update never sounds or pops up.
+ */
+async function refreshPresenceNotice(): Promise<void> {
+  const native = bridge();
+  if (!native || !serviceRunning) return;
+  try {
+    const posted = await native.update(...noticeArgs());
+    if (!posted) console.warn('[presence] notice not updated: service not running', { kind: 'background_connection', state: linkState });
+  } catch (e) {
+    console.warn('[presence] notice could not be updated', { kind: 'background_connection', state: linkState, error: String(e) });
   }
 }
 
@@ -160,9 +232,16 @@ export function connectLink(target: LinkTarget): void {
   if (stream && key === streamKey) return;
   stream?.stop();
   streamKey = key;
+  // A stream replacing one that was up (a rotated token, the app returning to the front) keeps
+  // saying connected until it either connects or drops, rather than flickering to connecting.
+  if (linkState !== 'connected') setLinkState('connecting');
   const opened = new NotificationStream({
     ...target,
-    onDisconnect: () => owner?.onDisconnect(),
+    onConnect: () => { if (stream === opened) setLinkState('connected'); },
+    onDisconnect: () => {
+      if (stream === opened) setLinkState('unreachable');
+      owner?.onDisconnect();
+    },
     onAuthFailure: () => {
       // The stream has stopped itself; forgetting it lets the same target be connected again.
       if (stream === opened) disconnectLink();

@@ -39,6 +39,11 @@ interface StreamOptions {
   token: string;
   onNotification: (n: ServerNotification) => void;
   deduplicator?: NotificationDeduplicator;
+  /**
+   * Called once per connection, when the Pond accepts the stream (200 and its headers have
+   * arrived). Until then nothing is being delivered, whatever the caller hopes.
+   */
+  onConnect?: () => void;
   /** Called when the stream drops and a reconnect is scheduled. */
   onDisconnect?: () => void;
   /**
@@ -132,6 +137,15 @@ export class NotificationStream {
     this.xhr = xhr;
     let consumed = 0;
     let partial = '';
+    let accepted = false;
+    // Headers first where the platform reports them, the first read otherwise: a Pond that
+    // has accepted the stream may send nothing for a while, and the owner should not have to
+    // wait for a notice to learn the connection is up.
+    const acceptOnce = () => {
+      if (accepted || xhr.status !== 200) return;
+      accepted = true;
+      this.opts.onConnect?.();
+    };
 
     xhr.open('GET', url);
     xhr.setRequestHeader('Accept', 'text/event-stream');
@@ -139,7 +153,10 @@ export class NotificationStream {
     if (!isInsecureDevOrigin(baseUrl)) xhr.setRequestHeader('X-Pond-Transport', '1');
     xhr.setRequestHeader('Authorization', `Bearer ${token}`);
 
+    // 2 is HEADERS_RECEIVED; the status is known from then on.
+    xhr.onreadystatechange = () => { if (xhr.readyState >= 2) acceptOnce(); };
     xhr.onprogress = () => {
+      acceptOnce();
       // A streaming read means the connection is healthy — reset backoff.
       this.backoffMs = INITIAL_BACKOFF_MS;
       const text = xhr.responseText;

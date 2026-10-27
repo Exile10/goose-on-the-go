@@ -37,6 +37,7 @@ import {
   connectLink,
   disconnectLink,
   loadStayConnectedPreference,
+  noteNoEndpoint,
   onStayConnectedChange,
   setLinkOwner,
   shouldHoldStream,
@@ -68,7 +69,7 @@ const NotificationsContext = createContext<NotificationsContextValue | null>(nul
 const AUTH_RETRY_MS = 30_000;
 
 export function NotificationsProvider({ children }: PropsWithChildren) {
-  const { serverUrl, token, online, paired, recover, revoke } = useServer();
+  const { serverUrl, token, online, paired, recover, revoke, connectionState } = useServer();
   const [notifications, setNotifications] = useState<ServerNotification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [stayConnected, setStayConnected] = useState(stayConnectedEnabled);
@@ -100,6 +101,12 @@ export function NotificationsProvider({ children }: PropsWithChildren) {
       void stopPresenceService();
     }
   }, [paired, stayConnected, active]);
+
+  // With no endpoint there is no stream to report on, so the background notice hears it from
+  // the connection manager: still looking, or found nothing.
+  useEffect(() => {
+    if (!serverUrl || !online) noteNoEndpoint(connectionState === 'reconnecting');
+  }, [serverUrl, online, connectionState]);
 
   const hold = shouldHoldStream({ platform: Platform.OS, paired, enabled: stayConnected, active });
 

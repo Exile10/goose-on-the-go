@@ -97,6 +97,30 @@ The service type is **remoteMessaging** (`FOREGROUND_SERVICE_REMOTE_MESSAGING`).
 the other candidate and is what `PondNetworkService` uses, but from Android 15 a `dataSync`
 service is limited to six hours in any 24, which does not fit a connection meant to stay open.
 
+### What the ongoing notification says
+
+It follows the stream rather than the service, so it never claims a connection that does not
+exist. `presenceNotice` in `services/background-connection.ts` maps the state to the text, and
+the state moves as the stream does:
+
+- **Connecting to your Pond**: a stream is being opened, or the connection manager is still
+  looking for the Pond (`reconnecting`). This is what the service starts with.
+- **Connected to your Pond**: the Pond accepted the stream, a 200 with its headers in
+  (`NotificationStream`'s `onConnect`). Only this state says notices arrive straight away.
+- **Can't reach your Pond**: the stream dropped and is backing off, or there is no stream and
+  the connection manager found no endpoint (`disconnected`, reported through
+  `noteNoEndpoint`). The text says the Pond keeps its notices, which it does: they are flushed on
+  the next connection, or fetched by the push wake-up.
+
+A stream that replaces one that was up (a rotated token, the app coming back to the front) keeps
+the notice at connected until it connects or drops, rather than flickering through connecting.
+A change of state re-posts the notification with `notify` on the service's own id
+(`PondPresenceModule.update`), not with another foreground-service start, because Android 12 and
+later refuse that from the background, where most changes happen. The channel is low importance
+and the notification alerts only once, so an update never sounds; an unchanged state re-posts
+nothing. Before 2026-10-27 the notice read "Connected to your Pond" from the moment the service
+started, whether or not any Pond was in reach.
+
 The notification can be swiped away on Android 13 and later; the service keeps running when it is.
 With remote access also on, the phone shows two ongoing notifications, one per service.
 
@@ -123,6 +147,10 @@ stream runs only while the app is open, and background delivery is the push wake
   presents and acknowledges, ignores non-wake payloads, survives failures and a stalled Pond, and
   a notice delivered by the stream is not shown again by the wake-up.
 - `services/__tests__/background-connection.test.ts`: the service and stream decisions.
+- `services/__tests__/presence-notice.test.ts`: the state-to-text mapping, and that the notice
+  moves with the stream and re-posts only on a change.
+- `services/__tests__/https-notification-stream.test.ts`: `onConnect` fires once, on a 200, and
+  never for a refusal.
 - `services/__tests__/api-routes.test.ts`: both pending shapes and the ack route.
 - `plugins/__tests__/with-pond-presence.test.ts`: the manifest declaration.
 - On a device: background the app, send a notice, and check it arrives with the ongoing

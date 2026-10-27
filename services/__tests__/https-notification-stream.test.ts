@@ -100,3 +100,36 @@ it('treats 401 as a dead token and 403 as a refusal to retry with backoff', asyn
     jest.useRealTimers();
   }
 });
+
+// The background notice says "connected" on this signal, so it must mean the Pond accepted
+// the stream: a 200 with headers in, once per connection, and never for a refusal.
+it('reports a connection once the Pond accepts the stream, and never for a refusal', async () => {
+  const connected = jest.fn();
+  const stream = new NotificationStream({ baseUrl: 'https://pond.local:4443', token: 'secret', deviceId: 'phone', onNotification: jest.fn(), onConnect: connected });
+  stream.start(); await Promise.resolve();
+  const xhr = FakeXHR.instances[FakeXHR.instances.length - 1] as FakeXHR & { readyState: number; onreadystatechange: () => void };
+  xhr.readyState = 1; xhr.onreadystatechange();
+  expect(connected).not.toHaveBeenCalled();
+  xhr.readyState = 2; xhr.onreadystatechange();
+  expect(connected).toHaveBeenCalledTimes(1);
+  xhr.responseText = ': keep-alive\n\n'; xhr.onprogress();
+  expect(connected).toHaveBeenCalledTimes(1);
+  stream.stop();
+
+  const refused = new NotificationStream({ baseUrl: 'https://pond.local:4443', token: 'secret', deviceId: 'phone', onNotification: jest.fn(), onConnect: connected, onAuthFailure: jest.fn() });
+  refused.start(); await Promise.resolve();
+  const denied = FakeXHR.instances[FakeXHR.instances.length - 1] as FakeXHR & { readyState: number; onreadystatechange: () => void };
+  denied.status = 401; denied.readyState = 2; denied.onreadystatechange(); denied.onprogress();
+  expect(connected).toHaveBeenCalledTimes(1);
+  refused.stop();
+});
+
+it('reports a connection on the first read where no header event came', async () => {
+  const connected = jest.fn();
+  const stream = new NotificationStream({ baseUrl: 'https://pond.local:4443', token: 'secret', deviceId: 'phone', onNotification: jest.fn(), onConnect: connected });
+  stream.start(); await Promise.resolve();
+  const xhr = FakeXHR.instances[FakeXHR.instances.length - 1];
+  xhr.responseText = ': keep-alive\n\n'; xhr.onprogress();
+  expect(connected).toHaveBeenCalledTimes(1);
+  stream.stop();
+});

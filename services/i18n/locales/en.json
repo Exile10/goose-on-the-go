@@ -2747,8 +2747,18 @@
   },
   "notifications": {
     "background": {
-      "title": "Connected to your Pond",
-      "body": "Notices from your Pond arrive here straight away. You can turn this off in Settings.",
+      "connecting": {
+        "title": "Connecting to your Pond",
+        "body": "Notices from your Pond arrive here once this phone reaches it. You can turn this off in Settings."
+      },
+      "connected": {
+        "title": "Connected to your Pond",
+        "body": "Notices from your Pond arrive here straight away. You can turn this off in Settings."
+      },
+      "unreachable": {
+        "title": "Can't reach your Pond",
+        "body": "Your Pond keeps its notices until this phone reaches it again. You can turn this off in Settings."
+      },
       "channel": "Background connection",
       "channelDescription": "Shown while this phone keeps a connection to your Pond open in the background."
     }

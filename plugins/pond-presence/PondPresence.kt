@@ -35,6 +35,9 @@ import com.facebook.react.uimanager.ViewManager
  * any 24, which is the wrong shape for a connection meant to stay open.
  *
  * Every user-visible string comes from JavaScript, so it is translated with the rest of the app.
+ * JavaScript also decides what the notice says: whether the stream is connecting, connected,
+ * or cannot reach the Pond (`presenceNotice` in `services/background-connection.ts`), and
+ * re-posts it through [PondPresenceModule.update] as that changes.
  */
 class PondPresenceService : Service() {
   override fun onBind(intent: Intent?): IBinder? = null
@@ -46,12 +49,14 @@ class PondPresenceService : Service() {
     } else {
       startForeground(NOTIFICATION_ID, notification)
     }
+    running = true
     // Not sticky: a service recreated by the system after the process died has no JavaScript
     // stream behind it, and its notification would claim a connection that does not exist.
     return START_NOT_STICKY
   }
 
   override fun onDestroy() {
+    running = false
     stopForeground(STOP_FOREGROUND_REMOVE)
     super.onDestroy()
   }
@@ -82,6 +87,25 @@ class PondPresenceService : Service() {
     private const val EXTRA_CHANNEL_NAME = "channelName"
     private const val EXTRA_CHANNEL_DESCRIPTION = "channelDescription"
     private const val NOTIFICATION_ICON = "notification_icon"
+
+    /**
+     * Whether the service holds the foreground, so [update] never posts an ongoing notice with
+     * no service behind it. Written on the main thread, read from the bridge's.
+     */
+    @Volatile private var running = false
+
+    /**
+     * Re-post the running service's notification with new text: a notify on the same id,
+     * which Android documents as the way to change a foreground service's notification. A
+     * second startForegroundService would do it too, but Android 12 and later refuse that from
+     * the background, which is where the connection mostly changes. Returns false, posting
+     * nothing, when the service is not running.
+     */
+    fun update(context: Context, texts: Texts): Boolean {
+      if (!running) return false
+      context.getSystemService(NotificationManager::class.java).notify(NOTIFICATION_ID, build(context, texts))
+      return true
+    }
 
     /**
      * The silhouette expo-notifications installs from app.json's `icon` (prebuild writes it as
@@ -158,6 +182,19 @@ class PondPresenceModule(private val context: ReactApplicationContext) : ReactCo
       promise.resolve(true)
     } catch (error: Exception) {
       promise.reject("E_PRESENCE_START", error.javaClass.simpleName, error)
+    }
+  }
+
+  /**
+   * Change what the running service's notification says, as the connection to the Pond comes
+   * and goes. Resolves false when the service is not running; JavaScript logs that.
+   */
+  @ReactMethod
+  fun update(title: String, body: String, channelName: String, channelDescription: String, promise: Promise) {
+    try {
+      promise.resolve(PondPresenceService.update(context, PondPresenceService.Texts(title, body, channelName, channelDescription)))
+    } catch (error: Exception) {
+      promise.reject("E_PRESENCE_UPDATE", error.javaClass.simpleName, error)
     }
   }
 
