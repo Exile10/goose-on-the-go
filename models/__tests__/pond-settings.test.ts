@@ -9,6 +9,7 @@ import {
   describeVoice,
   formatClock,
   formatRetentionOverrides,
+  nextStop,
   pageKeys,
   paceWord,
   parseClock,
@@ -104,6 +105,25 @@ describe('reading the record', () => {
   it('shows a decimal the Pond widened as the one that was meant', () => {
     expect(tidyNumber(0.699999988079071)).toBe(0.7);
     expect(tidyNumber(4096)).toBe(4096);
+  });
+});
+
+describe('stepping between stops', () => {
+  const stops = [1, 2, 3, 5, 10, 15, 24, 30];
+
+  it('moves to the next stop either way', () => {
+    expect(nextStop(stops, 5, 1)).toBe(10);
+    expect(nextStop(stops, 5, -1)).toBe(3);
+  });
+
+  it('lands on a stop from a value between two', () => {
+    expect(nextStop(stops, 4, 1)).toBe(5);
+    expect(nextStop(stops, 4, -1)).toBe(3);
+  });
+
+  it('stays put past either end', () => {
+    expect(nextStop(stops, 30, 1)).toBe(30);
+    expect(nextStop(stops, 1, -1)).toBe(1);
   });
 });
 

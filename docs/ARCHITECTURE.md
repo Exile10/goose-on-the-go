@@ -82,6 +82,8 @@ its token is dead: it stops and the owner refreshes. A 403 is the Pond declining
 to serve the stream yet (before onboarding, for one), so the stream retries with
 its usual backoff, up to 30 s, and logs the reason. Treating a 403 as a dead token
 looped refresh and a loud reconnect about ten times a second (2026-10-05).
+`services/pond-images.ts` — the pictures the Pond serves (event snapshots), each read once over the
+pinned transport as a `data:` URI and kept, forty at most, three read at a time; dropped on sign-out.
 `services/storage.ts` — typed AsyncStorage wrapper, with key families
 (`storageFamily`) for records that grow with use, one key per record.
 `services/card-cache.ts` — the tool cards the phone was shown, by conversation

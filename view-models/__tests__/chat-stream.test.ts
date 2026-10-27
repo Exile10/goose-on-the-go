@@ -265,7 +265,48 @@ describe('tool names and sources', () => {
       { id: '2', name: 'k', args: '{}', status: 'ok', result: 'Pi is 3.14\n\nSource: https://www.wolframalpha.com/input?i=pi' },
       { id: '3', name: 'k', args: '{}', status: 'ok', result: 'x\n\nSource: https://en.wikipedia.org/wiki/Nairobi' },
     ]);
-    expect(sources.map((s) => s.label)).toEqual(['Wikipedia', 'Wolfram Alpha']);
+    expect(sources.map((s) => s.site)).toEqual(['Wikipedia', 'Wolfram Alpha']);
+  });
+
+  it('lists a web search by page, titled, and never a link that is not the web', () => {
+    const sources = sourcesOf([
+      {
+        id: '1',
+        name: 'giap-knowledge__search_web',
+        args: '{}',
+        status: 'ok',
+        card: {
+          type: 'search',
+          data: {
+            query: 'museum hours',
+            results: [
+              { title: 'Opening hours', url: 'https://www.museums.or.ke/visit', domain: 'museums.or.ke' },
+              { title: '', url: 'https://example.com/a' },
+              { title: 'Sneaky', url: 'javascript:alert(1)' },
+              null,
+              { title: 'Opening hours again', url: 'https://www.museums.or.ke/visit' },
+            ],
+          },
+        },
+      },
+    ]);
+    expect(sources).toEqual([
+      { title: 'Opening hours', site: 'museums.or.ke', url: 'https://www.museums.or.ke/visit' },
+      { title: 'example.com', site: 'example.com', url: 'https://example.com/a' },
+    ]);
+  });
+
+  it('titles a live Wikipedia source with its article', () => {
+    const [source] = sourcesOf([
+      {
+        id: '1',
+        name: 'k',
+        args: '{}',
+        status: 'ok',
+        card: { type: 'knowledge', data: { title: 'Nairobi', source_url: 'https://en.wikipedia.org/wiki/Nairobi' } },
+      },
+    ]);
+    expect(source).toEqual({ title: 'Nairobi', site: 'Wikipedia', url: 'https://en.wikipedia.org/wiki/Nairobi' });
   });
 });
 

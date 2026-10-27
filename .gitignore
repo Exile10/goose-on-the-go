@@ -63,3 +63,7 @@ app-example
 
 # Python native integration harness bytecode
 __pycache__/
+
+# macOS AppleDouble sidecars -- see the note in metro.config.js. A checkout on
+# exFAT or FAT32 grows one beside every file that carries an extended attribute.
+._*

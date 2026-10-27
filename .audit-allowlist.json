@@ -3,17 +3,17 @@
   "$policy": "Exceptions are deferrals, not pardons. An entry is only justified when the advisory cannot be fixed without a breaking upgrade AND the exposure does not reach a shipped build or a user's device. Anything reachable from the app bundle gets fixed, not listed.",
   "allow": [
     {
-      "advisory": "GHSA-vfj7-8cjw-p6xm",
-      "package": "braces",
-      "severity": "high",
-      "reason": "Stack exhaustion on crafted brace patterns. Reached only through micromatch, which Metro (@expo/metro-file-map, metro-file-map), Jest (@jest/core, jest-config, jest-haste-map and others) and patch-package (find-yarn-workspace-root) use to match file globs written in this repo's own configuration. All of that runs on a developer's machine or in CI; none of it is part of a release build. The range is <=3.0.3 and 3.0.3 is the latest release, so there is no fixed version to move to.",
-      "reviewBy": "2026-12-31"
-    },
-    {
       "advisory": "GHSA-86w9-cpqp-85rv",
       "package": "node-forge",
       "severity": "high",
       "reason": "RSA PKCS#1 v1.5 signature verification flaw. Reached only through @expo/code-signing-certificates, which the Expo CLI uses to generate and check expo-updates code-signing certificates on a developer's machine. This app ships no node-forge: it is not imported by app code and is not in the bundle. The range is <=1.4.0 and 1.4.0 is the latest release, so there is no fixed version to move to.",
+      "reviewBy": "2026-12-31"
+    },
+    {
+      "advisory": "GHSA-mrhx-c7xc-m3w5",
+      "package": "zod",
+      "severity": "high",
+      "reason": "Memory exhaustion when validating an oversized array against a schema with no length limit. The repo's own zod, which eslint-plugin-react-hooks uses, is on 4.6.7 and patched. What remains is the zod 3.25.76 nested under @expo/cli, which validates the CLI's own config and API responses on a developer's machine or in CI; the app does not import zod and it is not in the bundle. The fix is 4.6.6, a major version away from the 3.x API @expo/cli is written against, and 3.25.76 is the last 3.x release, so this waits for Expo to move to zod 4.",
       "reviewBy": "2026-12-31"
     }
   ]

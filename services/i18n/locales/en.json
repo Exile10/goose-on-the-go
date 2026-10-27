@@ -82,6 +82,7 @@
     "queued": "Queued",
     "unqueue": "Remove queued message",
     "stillAnswering": "Goose is still answering",
+    "mistakes": "goose can make mistakes. Verify important information.",
     "newConversation": "New conversation",
     "starters": {
       "capabilities": "What can you do?",
@@ -207,6 +208,7 @@
       "toolGroup": "Tools ready",
       "weather": "Weather",
       "wikipedia": "Wikipedia",
+      "webSearch": "Web search",
       "computed": "Computed",
       "schedules": "Schedules",
       "createSchedule": "Create schedule",
@@ -232,6 +234,7 @@
       "doingWeather": "Checking the weather…",
       "doingToolGroup": "Getting the right tools out…",
       "doingLookup": "Reading up on it…",
+      "doingWebSearch": "Searching the web…",
       "doingCompute": "Working it out…",
       "doingSchedules": "Looking up your schedules…",
       "doingSaveMemory": "Saving that for later…",
@@ -251,6 +254,7 @@
       "recalled_other": "Recalled {{count}} memories",
       "runningLabel": "{{tool}}, running",
       "failedLabel": "{{tool}}, did not finish",
+      "sources": "Sources",
       "openSource": "Open {{source}}",
       "moreSources_one": "{{count}} more source",
       "moreSources_other": "{{count}} more sources"
@@ -412,7 +416,7 @@
       "internet": "How much of the internet your Pond may reach.",
       "home": "Where your home is, so the time and the weather are right.",
       "household": "Who this Pond belongs to, and what it calls you.",
-      "cameras": "The camera your Pond watches, and the controller for your smart devices.",
+      "cameras": "What your Pond's camera sees, who it knows by face, and what it does about it. Smart home controls are at the bottom.",
       "announcements": "When Goose may speak without being asked, and when it stays quiet.",
       "privacy": "What your Pond may sense, and what it keeps about itself.",
       "retention": "How long your Pond keeps things before it deletes them.",
@@ -465,7 +469,9 @@
       "stepsAndTime": "Steps and time",
       "longConversations": "Long conversations",
       "engine": "Engine",
-      "costComparison": "Cost comparison"
+      "costComparison": "Cost comparison",
+      "watchesFor": "What your Pond watches for",
+      "faces": "Faces"
     },
     "footer": {
       "standingInstructions": "Added to everything Goose already knows, in every conversation.",
@@ -479,17 +485,20 @@
       "mesh": "Turning this off takes effect when your Pond restarts.",
       "location": "Save a place name and your Pond looks up where it is.",
       "exactPosition": "Typing a position yourself keeps the one you typed. Takes effect when your Pond restarts.",
-      "restartCamera": "A change here takes effect when your Pond restarts.",
       "quietHours": "Goose stays quiet between these times, even when it has news.",
       "retention": "Zero keeps things for good.",
       "haptics": "Small taps you feel when you flip a switch or finish something.",
       "engine": "Where Goose runs. Leave these alone unless you run models somewhere other than your Pond.",
       "cost": "What a cloud service would charge, so your Pond can show what it saved you.",
+      "watchesFor": "Your Pond records only the kinds you leave on. The pause and how sure it must be apply to all of them.",
+      "faces": "Face data stays on your Pond. It is never sent to the cloud.",
       "stayConnected": "Keeps a connection to your Pond open after you leave the app, so notices arrive straight away. Android shows an ongoing notification while it is on, and it uses some battery. With it off, your Pond still wakes the phone with a push, which can arrive later when the phone is idle."
     },
     "link": {
       "whatItRemembers": "What Goose remembers",
-      "cameraEvents": "What the camera saw"
+      "visionEvents": "Vision events",
+      "faces": "Faces",
+      "visionAutomations": "Vision automations"
     },
     "unit": {
       "ms": "ms",
@@ -732,11 +741,15 @@
       },
       "vision_enabled": {
         "label": "Watch the camera",
-        "hint": "Watch the camera for movement. Needs a camera attached to your Pond."
+        "hint": "Look through the camera and note what happens. Needs a camera your Pond can reach."
+      },
+      "picture_support_download_enabled": {
+        "label": "Allow picture support downloads",
+        "hint": "Allow downloading vision encoder files (mmproj) for vision-capable models on budgeted devices."
       },
       "vision_camera_url": {
         "label": "Camera address",
-        "hint": "A network address, or a camera plugged into your Pond.",
+        "hint": "A network address, or a camera plugged into your Pond. Leave it empty and your Pond looks for one itself.",
         "placeholder": "rtsp://… or /dev/video0"
       },
       "vision_camera_id": {
@@ -746,11 +759,11 @@
       },
       "vision_fps": {
         "label": "Pictures per second",
-        "hint": "Low on purpose, to leave room for thinking."
+        "hint": "From 1 to 30. More pictures catch quick movement sooner and use more of your Pond; 2 to 5 is enough to notice people."
       },
       "vision_motion_threshold": {
         "label": "Motion sensitivity",
-        "hint": "How much of the picture must change to count as movement."
+        "hint": "How much of the picture must change to count as movement. A lower number notices smaller movements."
       },
       "vision_classifier_model": {
         "label": "Detector",
@@ -879,6 +892,26 @@
       },
       "cloud_output_price_per_million": {
         "label": "Writing price"
+      },
+      "cameras_enabled": {
+        "label": "Cameras",
+        "hint": "Lets your Pond use its camera at all. Off means no watching, no pictures and no face recognition, whatever is set under Cameras and vision."
+      },
+      "vision_event_cooldown_secs": {
+        "label": "Pause between events",
+        "hint": "After your Pond records something it waits this long before recording anything else, whatever it is."
+      },
+      "vision_classifier_confidence": {
+        "label": "How sure before it counts",
+        "hint": "Something the detector is less sure about than this is treated as plain movement."
+      },
+      "vision_face_recognition_enabled": {
+        "label": "Recognise faces",
+        "hint": "When someone is seen, your Pond checks whether it knows their face."
+      },
+      "vision_face_on_motion": {
+        "label": "Look for faces in plain movement too",
+        "hint": "Check for a face even when the detector saw only movement. A face found turns the event into a person."
       }
     },
     "option": {
@@ -1230,7 +1263,17 @@
       "forever": "Forever",
       "wakeWord": "“{{word}}”",
       "noModel": "None chosen",
-      "needsKey": "Needs a key"
+      "needsKey": "Needs a key",
+      "eventsNew_one": "{{count}} new",
+      "eventsNew_other": "{{count}} new",
+      "eventsNone": "None new",
+      "facesKnown_one": "{{count}} known",
+      "facesKnown_other": "{{count}} known",
+      "facesNone": "Nobody yet",
+      "facesUnavailable": "Not available",
+      "rules_one": "{{count}} rule",
+      "rules_other": "{{count}} rules",
+      "rulesNone": "None yet"
     },
     "menu": {
       "connection": "Connection",
@@ -1281,6 +1324,42 @@
       "results_one": "{{count}} setting found",
       "results_other": "{{count}} settings found"
     },
+    "visionTypes": {
+      "needsRecognition": "Needs Recognise faces, below.",
+      "keepOne": "Your Pond keeps at least one kind on.",
+      "motion": {
+        "label": "Movement",
+        "hint": "Anything moving in the picture."
+      },
+      "person": {
+        "label": "People",
+        "hint": "The detector sees a person."
+      },
+      "pet": {
+        "label": "Pets",
+        "hint": "The detector sees a pet."
+      },
+      "vehicle": {
+        "label": "Vehicles",
+        "hint": "The detector sees a vehicle."
+      },
+      "package": {
+        "label": "Packages",
+        "hint": "The detector sees a package."
+      },
+      "face_detected": {
+        "label": "Any face",
+        "hint": "A face is found, whoever it is."
+      },
+      "face_recognized": {
+        "label": "Faces it knows",
+        "hint": "A face matches someone in Faces."
+      },
+      "face_unknown": {
+        "label": "Faces it doesn't know",
+        "hint": "A face matches nobody."
+      }
+    },
     "stayConnected": {
       "label": "Stay connected in the background",
       "ios": "iPhone does not let apps hold a connection open in the background. Your Pond wakes this phone with a push instead, and iOS decides how soon that arrives."
@@ -1322,7 +1401,7 @@
     "settingsInternet": "Internet",
     "settingsHome": "Your home",
     "settingsHousehold": "You and your household",
-    "settingsCameras": "Cameras and smart home",
+    "settingsCameras": "Cameras and vision",
     "settingsAnnouncements": "Announcements",
     "suggestions": "Suggestions",
     "settingsPrivacy": "Privacy",
@@ -1339,7 +1418,9 @@
     "ownerSetup": "Set up your Pond",
     "wakeWord": "Wake word",
     "scheduleDetail": "Schedule",
-    "cameraEvents": "What the camera saw",
+    "faces": "Faces",
+    "visionEvents": "Vision events",
+    "visionAutomations": "Vision automations",
     "settingsPhoneNotifications": "Notifications"
   },
   "nav": {
@@ -2297,32 +2378,6 @@
       "forbidden": "Your Pond does not allow this phone to see or change memories."
     }
   },
-  "cameraEvents": {
-    "showing": "From the camera named {{camera}}.",
-    "unacknowledged_one": "{{count}} not acknowledged yet",
-    "unacknowledged_other": "{{count}} not acknowledged yet",
-    "loading": "Loading what the camera saw…",
-    "failed": "Could not load camera events from your Pond.",
-    "settingsFailed": "Could not read which camera your Pond watches.",
-    "emptyTitle": "Nothing seen yet",
-    "emptyBody": "When the camera notices something, it shows up here.",
-    "acknowledge": "Acknowledge",
-    "acknowledged": "Acknowledged",
-    "new": "New",
-    "detail": "{{camera}} · {{confidence}}",
-    "confidence": "{{percent}}% sure",
-    "type": {
-      "motion": "Movement",
-      "person": "A person",
-      "pet": "A pet",
-      "package": "A package",
-      "vehicle": "A vehicle",
-      "unknown": "Something"
-    },
-    "errors": {
-      "acknowledgeFailed": "Could not acknowledge that event. Try again."
-    }
-  },
   "devMode": {
     "addressHint": "Development mode: a plain http:// address on this network is accepted and is not encrypted."
   },
@@ -2743,6 +2798,317 @@
       "saveFailed": "Couldn't save the note. Try again.",
       "deleteFailed": "Couldn't delete the note. It's back in the list.",
       "unavailable": "This Pond can't keep notes. Update it to add them here."
+    }
+  },
+  "vision": {
+    "failed": "Could not read what your Pond's camera is doing.",
+    "openPrivacy": "Open Privacy",
+    "state": {
+      "running": "Live",
+      "starting": "Starting",
+      "reconnecting": "Reconnecting",
+      "noCamera": "No camera",
+      "off": "Off",
+      "consentOff": "Off in Privacy"
+    },
+    "sentence": {
+      "running_one": "Watching {{camera}}, {{count}} picture a second.",
+      "running_other": "Watching {{camera}}, {{count}} pictures a second.",
+      "runningNoRate": "Watching {{camera}}.",
+      "starting": "Starting up. Waiting for {{camera}} to show its first picture.",
+      "noCamera": "Looking for a camera. None is set up, and your Pond has not found one plugged in.",
+      "reconnecting": "Reconnecting. The stream dropped {{ago}} ago.",
+      "reconnectingWhy": "Reconnecting. The stream dropped {{ago}} ago: {{error}}",
+      "reconnectingFirst": "Reconnecting. {{camera}} has not shown a picture yet.",
+      "reconnectingFirstWhy": "Reconnecting. {{camera}} has not shown a picture yet: {{error}}",
+      "off": "Switched off. Your Pond is not watching the camera.",
+      "consentOff": "The camera is off in Privacy, so your Pond is not looking."
+    },
+    "ago": {
+      "seconds": "{{count}} s",
+      "minutes": "{{count}} min",
+      "hours": "{{count}} h"
+    },
+    "detail": {
+      "discovered": "Camera: {{source}}, found by your Pond.",
+      "configured": "Camera: {{source}}.",
+      "lastEvent": "Last event {{when}}.",
+      "restarts_one": "Restarted {{count}} time.",
+      "restarts_other": "Restarted {{count}} times.",
+      "noDetector": "No detector is loaded, so everything it records is plain movement.",
+      "capture": {
+        "camera_jpeg": "Pictures come straight from the camera, so a high rate costs little.",
+        "hardware": "Your Pond's video hardware decodes the stream.",
+        "software": "Your Pond's processor decodes every picture, so a high rate costs more."
+      }
+    },
+    "frame": {
+      "alt": "The latest picture from {{camera}}",
+      "waiting": "Waiting for a picture",
+      "idle": "No picture while the camera is not running",
+      "stale": "The last picture did not arrive. Trying again."
+    }
+  },
+  "faces": {
+    "intro": "Your Pond can learn who is who from their face, so Goose can greet people by name and automations can tell them apart.",
+    "privacy": "Face data stays on your Pond. It is never sent to the cloud.",
+    "loading": "Reading who your Pond knows",
+    "failed": "Could not read the faces your Pond knows.",
+    "recognitionOff": "Face recognition is switched off, so your Pond is not looking for faces right now. You can still add samples.",
+    "switchOn": "Switch it on",
+    "unavailableTitle": "Face recognition isn't set up on your Pond",
+    "unavailableBody": "Your Pond was built without it, or its face model is not installed yet. Until then it can still tell that a person or movement is there, just not who. Ask whoever set up your Pond to add a face model, or follow the setup guide.",
+    "emptyTitle": "No one in your household yet",
+    "emptyBody": "Add the people who live here first. Then your Pond can learn their faces.",
+    "addPerson": "Add a person",
+    "person": {
+      "known": "Known by face",
+      "notKnown": "Not known by face yet",
+      "samples_one": "{{count}} sample",
+      "samples_other": "{{count}} samples",
+      "noSamples": "No samples"
+    },
+    "sheet": {
+      "cameraTitle": "At your Pond's camera",
+      "recommended": "Recommended",
+      "cameraBody": "Recognition happens at that camera, so a sample taken there matches best. Have {{name}} look at it from about an arm's length, in the light they are usually seen in.",
+      "capture": "Take a sample",
+      "capturing": "Taking a sample",
+      "cameraDown": "Your Pond's camera isn't showing a picture right now.",
+      "openCameras": "Open Cameras and vision",
+      "photoTitle": "From a photo on this phone",
+      "photoBody": "Use a clear photo taken facing the camera. It works, but a sample from your Pond's own camera usually matches better.",
+      "choosePhoto": "Choose a photo",
+      "takePhoto": "Take a photo",
+      "sendingPhoto": "Sending the photo to your Pond",
+      "samples": {
+        "none": "No samples yet. Take 3 to 5 for a reliable match.",
+        "few_one": "{{count}} sample so far. Take a few more, turning their head a little each time.",
+        "few_other": "{{count}} samples so far. Take a few more, turning their head a little each time.",
+        "enough": "{{count}} samples. That is enough to recognise them; a few more in different light make it steadier.",
+        "plenty": "{{count}} samples."
+      },
+      "added_one": "Sample added. {{name}} now has {{count}} sample.",
+      "added_other": "Sample added. {{name}} now has {{count}} samples."
+    },
+    "error": {
+      "noFrame": "Your Pond's camera has not shown it a picture yet. Check that the camera is on, then try again in a moment.",
+      "noFace": "Your Pond's camera can't see a face. Have them face the camera, about an arm's length away and in good light, then try again.",
+      "camerasOff": "Cameras are switched off in Privacy, so your Pond can't take a picture.",
+      "unknownPerson": "Your Pond doesn't have that person any more. Go back and refresh the list.",
+      "unavailable": "Face recognition isn't set up on your Pond.",
+      "badPhoto": "Your Pond could not find a usable face in that photo. Use a clear one, taken facing the camera in good light.",
+      "failed": "Your Pond could not take that sample. Try again in a moment.",
+      "photoFailed": "Your Pond could not use that photo. Try again in a moment."
+    },
+    "strictness": {
+      "title": "Strictness",
+      "body": "How closely a face has to match before your Pond says it is {{name}}. Stricter means fewer wrong matches and more misses; more forgiving means the opposite.",
+      "readout": "Needs a {{percent}}% match",
+      "default": "Your Pond's default: {{percent}}%",
+      "own": "Set for {{name}}. The default is {{percent}}%.",
+      "reset": "Use the default",
+      "forgiving": "More forgiving",
+      "strict": "Stricter",
+      "failed": "Your Pond could not save that. Try again."
+    },
+    "forget": {
+      "row": "Forget this face",
+      "nothing": "Nothing to forget yet",
+      "title": "Forget {{name}}'s face?",
+      "body_one": "Your Pond deletes the {{count}} sample it holds, so it will not recognise {{name}} until you teach it again. Their profile and memories stay.",
+      "body_other": "Your Pond deletes the {{count}} samples it holds, so it will not recognise {{name}} until you teach it again. Their profile and memories stay.",
+      "confirm": "Forget face",
+      "done": "{{name}}'s face is forgotten.",
+      "failed": "Your Pond could not forget that face. Try again."
+    }
+  },
+  "visionEvents": {
+    "showing": "From the camera named {{camera}}.",
+    "live": "Live. New events appear as they happen.",
+    "polling": "Checking every 30 seconds.",
+    "privacyOff": "Cameras are off in Privacy, so no new events will arrive.",
+    "unacknowledged_one": "{{count}} not acknowledged yet",
+    "unacknowledged_other": "{{count}} not acknowledged yet",
+    "loading": "Loading what the camera saw…",
+    "failed": "Could not load vision events from your Pond.",
+    "settingsFailed": "Could not read which camera your Pond watches.",
+    "emptyTitle": "Nothing seen yet",
+    "emptyBody": "When the camera notices something, it shows up here.",
+    "noMatchTitle": "Nothing matches",
+    "noMatchBody": "None of the latest {{count}} events fit this filter.",
+    "showAll": "Show everything",
+    "acknowledge": "Acknowledge",
+    "acknowledged": "Acknowledged",
+    "new": "New",
+    "confidence": "{{percent}}% sure",
+    "changed": "{{percent}}% of the picture changed",
+    "faceMatch": "Face match {{percent}}%",
+    "faceClosest": "Closest match {{percent}}%",
+    "meta": "{{camera}} · {{when}}",
+    "filter": {
+      "label": "Show",
+      "all": "All",
+      "people": "People",
+      "faces": "Faces",
+      "unknownFaces": "Unknown faces",
+      "motion": "Movement",
+      "pets": "Pets",
+      "vehicles": "Vehicles",
+      "packages": "Packages",
+      "unacknowledged": "Unacknowledged"
+    },
+    "type": {
+      "motion": "Movement",
+      "person": "A person",
+      "pet": "A pet",
+      "package": "A package",
+      "vehicle": "A vehicle",
+      "face_detected": "A face",
+      "face_recognized": "A face it knows",
+      "face_unknown": "A face it doesn't know",
+      "unknown": "Something"
+    },
+    "title": {
+      "known": "{{name}} was seen",
+      "knownGone": "Someone your Pond recognised",
+      "unknownFace": "Someone your Pond doesn't know",
+      "face": "A face was seen"
+    },
+    "sheet": {
+      "title": "What the camera saw",
+      "pictureAlt": "The picture from this event",
+      "noPicture": "This event kept no picture.",
+      "detected": "Detected",
+      "detector": "Detector confidence",
+      "face": "Face",
+      "faceKnown": "Recognised as {{name}}",
+      "faceKnownGone": "Recognised",
+      "faceUnknown": "Not recognised",
+      "faceMatch": "Face match",
+      "faceClosest": "Closest match",
+      "change": "Picture change",
+      "camera": "Camera",
+      "when": "When",
+      "makeAutomation": "Make an automation from this",
+      "percent": "{{percent}}%",
+      "automationAdded": "Automation added. It is listed under Vision automations.",
+      "back": "Back to the event"
+    },
+    "errors": {
+      "acknowledgeFailed": "Could not acknowledge that event. Try again."
+    }
+  },
+  "visionAutomations": {
+    "intro": "Rules that act on what the camera sees. Add one of these in a tap, or build your own.",
+    "startersTitle": "Start with one of these",
+    "yoursTitle": "Your vision automations",
+    "add": "Add",
+    "adding": "Adding",
+    "new": "New vision automation",
+    "loading": "Reading your Pond's automations",
+    "failed": "Could not load your automations.",
+    "emptyTitle": "No vision automations yet",
+    "emptyBody": "An automation has Goose or your phone react when the camera sees something. Add one above, or build your own.",
+    "addFailed": "Your Pond could not add that one. Try again in a moment.",
+    "starter": {
+      "unknownFace": {
+        "title": "Tell me when someone your Pond doesn't know is seen",
+        "detail": "A notice on this phone when a face matches nobody in Faces.",
+        "name": "Unknown face",
+        "notifyTitle": "Someone I don't know",
+        "notifyBody": "The camera saw a face that does not match anyone in your household."
+      },
+      "package": {
+        "title": "Tell me when a package arrives",
+        "detail": "A notice on this phone when the camera sees a package.",
+        "name": "Package arrived",
+        "notifyTitle": "A package",
+        "notifyBody": "The camera saw a package."
+      },
+      "greet": {
+        "title": "When {{name}} arrives, ask Goose to greet them",
+        "detail": "Goose says hello when the camera recognises {{name}}, at most once every half hour.",
+        "name": "Greet {{name}}",
+        "prompt": "{{name}} has just been seen by the camera. Greet {{name}} by name, in a sentence or two."
+      },
+      "night": {
+        "title": "Tell me about movement at night",
+        "detail": "A notice on this phone for movement between 22:00 and 06:00.",
+        "name": "Movement at night",
+        "notifyTitle": "Movement at night",
+        "notifyBody": "The camera saw movement between 22:00 and 06:00."
+      }
+    },
+    "peopleBlocked": {
+      "recognitionOff": "Starters for people need face recognition, which is switched off.",
+      "unavailable": "Starters for people need face recognition, which isn't set up on your Pond.",
+      "nobody": "Starters for people appear once your Pond knows someone by face.",
+      "typeOff": "Starters for people need “Faces it knows” switched on under What your Pond watches for.",
+      "openFaces": "Open Faces",
+      "openCameras": "Open Cameras and vision"
+    },
+    "signal": {
+      "any": "the camera sees anything",
+      "motion": "movement is seen",
+      "person": "a person is seen",
+      "pet": "a pet is seen",
+      "vehicle": "a vehicle is seen",
+      "package": "a package is seen",
+      "face_detected": "a face is seen",
+      "face_recognized": "someone your Pond knows is seen",
+      "face_unknown": "someone your Pond doesn't know is seen",
+      "someone": "{{name}} is seen",
+      "someoneUnnamed": "a specific person is seen"
+    },
+    "pick": {
+      "any": "Anything the camera sees",
+      "motion": "Movement",
+      "person": "A person",
+      "pet": "A pet",
+      "vehicle": "A vehicle",
+      "package": "A package",
+      "face_detected": "Any face",
+      "face_recognized": "A face it knows",
+      "face_unknown": "A face it doesn't know",
+      "notWatched": "Not being watched for right now. Turn it on in Cameras and vision.",
+      "personHint": "When their face is recognised",
+      "personHintNone": "Your Pond doesn't know their face yet"
+    },
+    "form": {
+      "signal": "When the camera sees",
+      "camera": "Which camera",
+      "anyCamera": "Any camera",
+      "conditionDetector": "How sure the detector is",
+      "conditionFace": "How closely the face matches",
+      "conditionChange": "How much of the picture changed",
+      "anySure": "Any",
+      "percent": "Percent, 0 to 100",
+      "fires": "It will run when {{subject}}."
+    },
+    "op": {
+      "gte": "at least",
+      "gt": "more than",
+      "lt": "less than",
+      "lte": "at most",
+      "eq": "exactly"
+    },
+    "compare": "{{op}} {{percent}}% {{what}}",
+    "what": {
+      "sure": "sure",
+      "match": "match",
+      "change": "of the picture changed"
+    },
+    "window": {
+      "between": "between {{after}} and {{before}}",
+      "after": "after {{time}}",
+      "before": "before {{time}}"
+    },
+    "fromEvent": {
+      "body": "Seen by {{camera}}."
+    },
+    "errors": {
+      "percent": "Use a number from 0 to 100."
     }
   },
   "notifications": {

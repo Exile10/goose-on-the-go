@@ -41,6 +41,27 @@ export interface UseRules {
   };
 }
 
+/**
+ * Add a rule from a screen that has no list of them to keep, such as the event it was made from.
+ * Resolves to why the Pond refused it, or null once it exists. On mock it keeps nothing.
+ */
+export function useCreateRule(): (req: RuleRequest) => Promise<string | null> {
+  const { isScreenReal } = useServer();
+  const real = isScreenReal('schedule');
+  return useCallback(
+    async (req) => {
+      if (!real) return null;
+      try {
+        await api.createRule(req);
+        return null;
+      } catch (e) {
+        return describeScheduleError(e) ?? i18n.t('schedule.errors.createFailed');
+      }
+    },
+    [real],
+  );
+}
+
 export function useRules(): UseRules {
   const { hydrated, isScreenReal } = useServer();
   const real = isScreenReal('schedule');

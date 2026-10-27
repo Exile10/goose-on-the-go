@@ -30,6 +30,7 @@ const TOOLS: Record<string, ToolWords> = {
   enable_tool_group: { label: 'chat.tools.toolGroup', doing: 'chat.tools.doingToolGroup', icon: 'skills' },
   get_current_weather: { label: 'chat.tools.weather', doing: 'chat.tools.doingWeather', icon: 'sun' },
   get_wikipedia_article: { label: 'chat.tools.wikipedia', doing: 'chat.tools.doingLookup', icon: 'globe' },
+  search_web: { label: 'chat.tools.webSearch', doing: 'chat.tools.doingWebSearch', icon: 'search' },
   compute_answer: { label: 'chat.tools.computed', doing: 'chat.tools.doingCompute', icon: 'sparkle' },
   list_schedules: { label: 'chat.tools.schedules', doing: 'chat.tools.doingSchedules', icon: 'schedule' },
   create_schedule: { label: 'chat.tools.createSchedule', icon: 'schedule' },
@@ -77,31 +78,55 @@ export function toolIcon(name: string): IconName {
 
 const str = (v: unknown) => (typeof v === 'string' ? v : '');
 
+/** A page a reply read from, as the list under the answer shows it. */
+export interface Source {
+  /** The page's own title when the tool gave one, otherwise its site. */
+  title: string;
+  /** The site as a person names it: "Wikipedia", not `en.wikipedia.org`. */
+  site: string;
+  url: string;
+}
+
+// Read off the text rather than through `URL`, whose getters React Native has not always had.
+const WEB_HOST = /^https?:\/\/([^/?#:\s]+)/i;
+
+/** Null for anything that is not a web page, which a source is never allowed to open. */
+function siteOf(url: string): string | null {
+  const host = WEB_HOST.exec(url)?.[1]?.toLowerCase().replace(/^www\./, '');
+  if (!host) return null;
+  // eslint-disable-next-line i18next/no-literal-string -- a product name
+  if (/(^|\.)wikipedia\.org$/.test(host)) return 'Wikipedia';
+  // eslint-disable-next-line i18next/no-literal-string -- a product name
+  if (/(^|\.)wolframalpha\.com$/.test(host)) return 'Wolfram Alpha';
+  return host;
+}
+
 /**
- * The pages a turn's tools read from, for the chips under the answer.
+ * The pages a turn's tools read from, in the order it read them, once each.
  *
- * Only Wikipedia and Wolfram name their source. Live, it is on the card; in a
- * saved turn it survives only as a closing `Source: <url>` line in the result.
+ * A web search lists its pages on its card. Wikipedia and Wolfram name one
+ * source: live, on the card; in a saved turn whose card this phone never kept,
+ * only as a closing `Source: <url>` line in the result.
  */
-export function sourcesOf(tools: ToolCall[] | undefined): { label: string; url: string }[] {
-  const out: { label: string; url: string }[] = [];
+export function sourcesOf(tools: ToolCall[] | undefined): Source[] {
+  const out: Source[] = [];
+  const add = (url: string, title: string) => {
+    const site = siteOf(url);
+    if (!site || out.some((s) => s.url === url)) return;
+    out.push({ url, site, title: title || site });
+  };
   for (const tool of tools ?? []) {
-    const fromCard = tool.card ? str(tool.card.data.source_url) : '';
+    const data = tool.card?.data;
+    if (tool.card?.type === 'search') {
+      for (const hit of Array.isArray(data?.results) ? data.results : []) {
+        if (hit && typeof hit === 'object') add(str(hit.url).trim(), str(hit.title).trim());
+      }
+      continue;
+    }
+    const fromCard = data ? str(data.source_url) : '';
     const fromText = /Source:\s*(https?:\/\/\S+)\s*$/i.exec(tool.result ?? '')?.[1] ?? '';
     const url = fromCard || fromText;
-    if (!url || out.some((s) => s.url === url)) continue;
-    let label = url;
-    try {
-      const host = new URL(url).hostname.replace(/^www\./, '');
-      label = /(^|\.)wikipedia\.org$/.test(host)
-        ? 'Wikipedia'
-        : /(^|\.)wolframalpha\.com$/.test(host)
-          ? 'Wolfram Alpha'
-          : host;
-    } catch {
-      // Not a URL a browser would open either; show it as written.
-    }
-    out.push({ label, url });
+    if (url) add(url, data ? str(data.title) || str(data.primary_title) : '');
   }
   return out;
 }
