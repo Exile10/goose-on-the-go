@@ -4,6 +4,7 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useR
 import { AppState } from 'react-native';
 import NetInfo from '@react-native-community/netinfo';
 import { forgetAllCards } from '@/services/card-cache';
+import { forgetPondImages } from '@/services/pond-images';
 import { forgetAllThreads } from '@/services/chat-threads';
 import { Storage, purgeLegacyStorage } from '@/services/storage';
 import { SecureStorage } from '@/services/secure-storage';
@@ -249,6 +250,8 @@ export function ServerProvider({ children }: PropsWithChildren) {
     await Storage.remove('connectionProfile'); await Storage.remove('serverUrl');
     // The tool cards kept from its conversations are the household's too.
     await forgetAllCards().catch(() => undefined);
+    // So are the pictures its cameras showed, held in memory while their list scrolled.
+    forgetPondImages();
     // So are the conversations and drafts held in memory.
     forgetAllThreads();
     await manager.configure(null);

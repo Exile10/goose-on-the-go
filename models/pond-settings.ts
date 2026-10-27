@@ -56,6 +56,8 @@ export type SettingItem =
       min: number;
       max?: number;
       step: number;
+      /** Values − and + move between, for a wide range where most whole numbers are not worth a tap. */
+      stops?: readonly number[];
       unitKey?: TranslationKey;
     })
   | (ItemBase & {
@@ -90,7 +92,9 @@ export type SpecialId =
   | 'primaryProfile'
   | 'theme'
   | 'haptics'
-  | 'posture';
+  | 'posture'
+  | 'visionStatus'
+  | 'visionEventTypes';
 
 export type SliderFormat = 'pace' | 'creativity' | 'fraction';
 
@@ -111,6 +115,9 @@ export type SummaryId =
   | 'household'
   | 'people'
   | 'cameras'
+  | 'visionEvents'
+  | 'faces'
+  | 'visionAutomations'
   | 'announcements'
   | 'privacy'
   | 'retention'
@@ -213,6 +220,7 @@ export const SAMPLE_SETTINGS: PondSettings = {
   memory_consolidation_interval_hours: 24,
   memory_consolidation_batch_size: 50,
   mic_enabled: true,
+  cameras_enabled: true,
   network_mode: 'open',
   mesh_enabled: false,
   security_policy_mode: 'audit',
@@ -261,6 +269,12 @@ export const SAMPLE_SETTINGS: PondSettings = {
   vision_fps: 2,
   vision_motion_threshold: 0.05,
   vision_classifier_model: '',
+  vision_event_cooldown_secs: 10,
+  vision_classifier_confidence: 0.5,
+  vision_face_recognition_enabled: true,
+  vision_face_on_motion: true,
+  vision_event_types: ['motion', 'person', 'pet', 'vehicle', 'package', 'face_detected', 'face_recognized', 'face_unknown'],
+  picture_support_download_enabled: false,
   matter_ws_url: 'ws://127.0.0.1:5580/giap',
   matter_ble_enabled: false,
   retention_event_log_days: 30,
@@ -306,6 +320,13 @@ export function parseSettingNumber(
   if (value < min) return { error: 'tooSmall' };
   if (max !== undefined && value > max) return { error: 'tooBig' };
   return { value };
+}
+
+/** The stop past `value` in the direction of `delta`; a value between stops lands on the nearer side. */
+export function nextStop(stops: readonly number[], value: number, delta: number): number {
+  const sorted = [...stops].sort((a, b) => a - b);
+  const found = delta > 0 ? sorted.find((s) => s > value) : [...sorted].reverse().find((s) => s < value);
+  return found ?? value;
 }
 
 // ── Clock times ───────────────────────────────────────────────
@@ -466,7 +487,7 @@ export function postureOf(s: PondSettings): Posture {
   const reach = s.network_mode === 'allowlist' || s.network_mode === 'offline' ? s.network_mode : 'open';
   return {
     listens: s.mic_enabled,
-    watches: s.vision_enabled,
+    watches: s.vision_enabled && s.cameras_enabled,
     remembers: s.memory_extraction_enabled,
     speaksFirst: s.unprompted_speech_enabled,
     reach,

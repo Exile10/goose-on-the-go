@@ -7,7 +7,7 @@
  * budget in seconds and locked this phone out of `/handshake`. Each rule below is one of the
  * things that keeps a poll a poll.
  */
-import { MIN_POLL_MS, liveLoop } from '../use-live';
+import { LIVE_VIEW_POLL_MS, MIN_POLL_MS, liveLoop } from '../use-live';
 
 beforeEach(() => jest.useFakeTimers());
 afterEach(() => jest.useRealTimers());
@@ -123,4 +123,32 @@ it('reads at once when restarted, as a screen returned to should', async () => {
   loop.start();
   await jest.advanceTimersByTimeAsync(0);
   expect(calls.n).toBe(2);
+});
+
+// A live picture keeps pace with the camera, and says so by name; nothing else lowers the floor.
+it('reads a live picture about once a second when asked for the live-view floor', async () => {
+  const { calls, read } = counter();
+  const loop = liveLoop(read, () => LIVE_VIEW_POLL_MS, LIVE_VIEW_POLL_MS);
+  loop.start();
+  await jest.advanceTimersByTimeAsync(0);
+  await jest.advanceTimersByTimeAsync(LIVE_VIEW_POLL_MS * 3);
+  expect(calls.n).toBe(4);
+  loop.stop();
+});
+
+it('keeps a lowered floor as a floor, so a bad delay is still no flood', async () => {
+  for (const bad of [0, -1, Number.NaN]) {
+    const { calls, read } = counter();
+    const loop = liveLoop(read, () => bad, LIVE_VIEW_POLL_MS);
+    loop.start();
+    await jest.advanceTimersByTimeAsync(LIVE_VIEW_POLL_MS - 1);
+    expect(calls.n).toBe(1);
+    await jest.advanceTimersByTimeAsync(1);
+    expect(calls.n).toBe(2);
+    loop.stop();
+  }
+});
+
+it('asks for the lowered floor by a name no other poll uses', () => {
+  expect(LIVE_VIEW_POLL_MS).toBeLessThan(MIN_POLL_MS);
 });

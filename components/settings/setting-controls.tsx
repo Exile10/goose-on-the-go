@@ -13,6 +13,7 @@ import { GIcon } from '@/components/ui/g-icon';
 import { Spacing } from '@/constants/spacing';
 import {
   formatClock,
+  nextStop,
   paceWord,
   parseClock,
   parseSettingNumber,
@@ -255,6 +256,7 @@ export function NumberRow({
   min,
   max,
   step,
+  stops,
   unit,
   onCommit,
   ...row
@@ -263,13 +265,14 @@ export function NumberRow({
   min: number;
   max?: number;
   step: number;
+  stops?: readonly number[];
   unit?: string;
   onCommit: (next: number) => void;
 }) {
   const { t } = useTranslation();
   const styles = useSettingsStyles(makeStyles);
   const colors = useSettingsColors();
-  const stepper = Number.isInteger(step) && max !== undefined && max - min <= 50;
+  const stepper = Boolean(stops?.length) || (Number.isInteger(step) && max !== undefined && max - min <= 50);
   const shown = String(tidyNumber(value));
   const [draft, setDraft] = useState<string | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
@@ -315,7 +318,8 @@ export function NumberRow({
 
   if (stepper) {
     const bump = (delta: number) => {
-      const next = Math.min(max ?? Infinity, Math.max(min, value + delta));
+      const target = stops?.length ? nextStop(stops, value, delta) : value + delta;
+      const next = Math.min(max ?? Infinity, Math.max(min, target));
       if (next === value) return;
       void selectionTick();
       onCommit(next);

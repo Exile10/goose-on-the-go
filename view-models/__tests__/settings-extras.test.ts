@@ -17,7 +17,17 @@ import {
 } from '@/view-models/use-settings-extras';
 
 const t = i18n.t as unknown as TFunction;
-const extras: Extras = { remoteEnabled: false, webSearch: 'ok', chatModel: 'qwen3-4b', extensions: 2, people: 3, theme: 'system' };
+const extras: Extras = {
+  remoteEnabled: false,
+  webSearch: 'ok',
+  chatModel: 'qwen3-4b',
+  extensions: 2,
+  people: 3,
+  visionNew: 2,
+  facesKnown: 1,
+  visionRules: 4,
+  theme: 'system',
+};
 
 describe('menu values', () => {
   it('says how each setting stands', () => {
@@ -30,6 +40,29 @@ describe('menu values', () => {
     expect(summarize('people', SAMPLE_SETTINGS, extras, t)).toBe('3 people');
     expect(summarize('privacy', { ...SAMPLE_SETTINGS, mic_enabled: false }, extras, t)).toBe('Microphone off');
     expect(summarize('appearance', SAMPLE_SETTINGS, extras, t)).toBe('Match this phone');
+  });
+
+  it('says how the vision pages stand', () => {
+    expect(summarize('visionEvents', SAMPLE_SETTINGS, extras, t)).toBe('2 new');
+    expect(summarize('visionEvents', SAMPLE_SETTINGS, { ...extras, visionNew: 0 }, t)).toBe('None new');
+    expect(summarize('faces', SAMPLE_SETTINGS, extras, t)).toBe('1 known');
+    expect(summarize('faces', SAMPLE_SETTINGS, { ...extras, facesKnown: 0 }, t)).toBe('Nobody yet');
+    expect(summarize('faces', SAMPLE_SETTINGS, { ...extras, facesKnown: 'unavailable' }, t)).toBe('Not available');
+    expect(summarize('visionAutomations', SAMPLE_SETTINGS, extras, t)).toBe('4 rules');
+    expect(summarize('visionAutomations', SAMPLE_SETTINGS, { ...extras, visionRules: 1 }, t)).toBe('1 rule');
+    expect(summarize('visionAutomations', SAMPLE_SETTINGS, { ...extras, visionRules: 0 }, t)).toBe('None yet');
+  });
+
+  it('shows nothing for a vision count it has not read, rather than a guess', () => {
+    expect(summarize('visionEvents', SAMPLE_SETTINGS, { ...extras, visionNew: null }, t)).toBeNull();
+    expect(summarize('faces', SAMPLE_SETTINGS, { ...extras, facesKnown: null }, t)).toBeNull();
+    expect(summarize('visionAutomations', SAMPLE_SETTINGS, { ...extras, visionRules: null }, t)).toBeNull();
+  });
+
+  it('reads the cameras row as off while Privacy holds the camera, whatever the camera setting says', () => {
+    expect(summarize('cameras', { ...SAMPLE_SETTINGS, vision_enabled: true, cameras_enabled: true }, extras, t)).toBe('On');
+    expect(summarize('cameras', { ...SAMPLE_SETTINGS, vision_enabled: true, cameras_enabled: false }, extras, t)).toBe('Off');
+    expect(summarize('cameras', { ...SAMPLE_SETTINGS, vision_enabled: false, cameras_enabled: true }, extras, t)).toBe('Off');
   });
 
   it('names quiet hours only when Goose may speak up', () => {

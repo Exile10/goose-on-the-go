@@ -15,6 +15,7 @@ import { InkBadge, InkCard, InkText } from '@jarida/ink/native';
 import { LabelledSwitch } from '@/components/patterns/labelled-switch';
 import { GPressable } from '@/components/ui/g-pressable';
 import { formatScheduleTime } from '@/models/schedule';
+import { describeCameraTrigger } from '@/models/vision';
 import { toggle } from '@/services/haptics';
 import type { TranslationKey } from '@/services/i18n';
 import type { Rule, TriggerCondition, TriggerSource } from '@/services/types';
@@ -24,7 +25,13 @@ export interface AutomationCardProps {
   rule: Rule;
   onOpen: (rule: Rule) => void;
   onSetPaused: (rule: Rule, paused: boolean) => void;
+  /** A household member's name from a face signal's profile id, for a rule that listens to a camera. */
+  nameOf?: (profileId: string) => string | null;
+  /** False draws the card on a hairline, for a list in which every card raised would leave none standing out. */
+  raised?: boolean;
 }
+
+const NO_NAMES = () => null;
 
 /** Comparison symbols read the same in every language. */
 function opSymbol(op: NonNullable<TriggerCondition['op']>): string {
@@ -53,17 +60,26 @@ export function sourceKey(kind: TriggerSource['kind']): TranslationKey {
   }
 }
 
-export const AutomationCard = React.memo(function AutomationCard({ rule, onOpen, onSetPaused }: AutomationCardProps) {
+export const AutomationCard = React.memo(function AutomationCard({
+  rule,
+  onOpen,
+  onSetPaused,
+  nameOf = NO_NAMES,
+  raised = true,
+}: AutomationCardProps) {
   const { t } = useTranslation();
   const subject = rule.source.signal ?? rule.source.device_id ?? t(sourceKey(rule.source.kind));
   const { op, value } = rule.condition ?? {};
+  // A camera's signal is a kind of thing and its confidence a fraction, so it reads as a sentence.
   const trigger =
-    op && value != null
-      ? t('schedule.card.whenCompared', { subject, op: opSymbol(op), value })
-      : t('schedule.card.when', { subject });
+    rule.source.kind === 'camera'
+      ? describeCameraTrigger(rule, nameOf)
+      : op && value != null
+        ? t('schedule.card.whenCompared', { subject, op: opSymbol(op), value })
+        : t('schedule.card.when', { subject });
 
   return (
-    <InkCard style={rule.paused ? styles.paused : undefined}>
+    <InkCard raised={raised} style={rule.paused ? styles.paused : undefined}>
       <GPressable onPress={() => onOpen(rule)} accessibilityRole="button">
         <View style={styles.top}>
           <View style={styles.title}>

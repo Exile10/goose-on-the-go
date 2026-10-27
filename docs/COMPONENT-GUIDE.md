@@ -203,6 +203,7 @@ Android.
 | VoicePickerView | voices, current, pace, applying, problem, onChoose, onPace, preview, silentLine | The picker with no store behind it; owner setup drives it with `usePondVoiceSample`, which has the Pond say the sample on its own speaker (P4), and passes `null` on a Pond without that route |
 | VoicePicker | vm | pond-desktop's picker: `VoiceOrb` on an `InkStage` with the voice, its line and play; the accents as a sideways row of `InkChoice` pills; the best six voices as chips with "Show all"; the pace. Previews come from `useVoicePreview`, the line's loudness driving the face |
 | IssuePage, IssueRows, IssueDot | issue, ctx / issues / tone | One entry of `SETTINGS_ISSUES` as a page; the rows for the top of Settings; the dot the row and the You tab carry |
+| VisionStatusCard, visionEventTypeRows | — / settings, vm, t | Cameras and vision's two multi-field rows: what the camera is doing over its live frame, drawn on its own edge; and one switch per kind of event, the last one left on locked |
 
 ### Owner setup and first run (components/setup/)
 
@@ -238,11 +239,17 @@ masked field; nothing here asks it to save one.
 | WallDock, WallMenu, WallSelectionBar | — | The wall's search and compose, its view menu, and its selection actions |
 | GreetingCard | name, prompts, onPick | The opening of a conversation that has not started |
 | MessageRow | message, position, status | One turn of the conversation |
-| ToolCard, SourceChips | tool / tools | What Goose did on the way to its answer |
+| Markdown | source | A reply's markdown in Ink's type: bold through `inkText`, emphasis as weight where a span cannot slant, code and tables scrolling sideways, only `http(s)` links opening |
+| ToolTrail | tools, done | Under an answer: the cards its tools drew, the pages it read (web search, Wikipedia, Wolfram) as Sources, then a chip per step whose raw answer opens below the row |
 | ThinkingQuips | status, seed | What shows before Goose has written anything |
 | ChatDock | onSend, onVoice, onAttach | The composer: attach, the field, speak or send |
+| AnsweringLight, AnsweringWash, AnsweringNote | light, field, radius / note | While Goose answers, in place of a spinner: a light behind the composer running along the field's top border, rimming the field and its buttons and washing faintly over them (`useAnsweringLight` drives both); and the can-make-mistakes reminder, fading 4 s after the answer is in, in a band under the composer that opens with it and closes once it has faded (`useAnsweringNote`, whose `room` the dock pads by) |
 | AttachMenu | open, onClose, onChoose | Camera, Photos or Files, from the composer |
 | VoiceDock | send, stop, onClose | Voice mode, in the composer's place |
 | VoiceOrb | state, level, size, onPress, accessibilityLabel | The voice control, and the face Goose talks with |
 | Goose | state, size, water | The Pond's bird, afloat |
 | ChromePuck, ChromePill | icon / label, onPress | One control floating over content: opaque `chrome`, not the bar's glass |
+| PondPicture | path, version, label, contentFit | A picture the Pond serves, read over the pinned transport and kept (`services/pond-images.ts`); a stand-in for one that was never kept or would not load |
+| CameraFrameView | frame, state, sentence, camera | The pond camera's latest frame in a fixed 16:9 box with what the camera is doing as a badge, and a stand-in when there is none |
+| VisionEventRow, VisionEventSheet | event, nameOf, onOpen / event, onAcknowledge, onCreateRule | One event as a flat row between hairlines, and in full: large picture, every measure, Acknowledge, and the automation form prefilled |
+| FaceSheet | person, defaultThreshold, onChanged, onForget, onStrictness | One household member's face: samples at the pond's camera or from a photo, strictness, forget |

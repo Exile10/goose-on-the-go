@@ -3,7 +3,7 @@
  * lists some controls choose from. Each read is made only by a page that shows it.
  */
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { TFunction } from 'i18next';
 
 import { useServer } from '@/providers/server-provider';
@@ -11,6 +11,8 @@ import { useTheme } from '@/providers/theme-provider';
 import { ApiError, api } from '@/services/api-client';
 import i18n from '@/services/i18n';
 import type { ModelEntry, PondSettings, Profile, WebSearchStatus, ZoneChoice } from '@/services/types';
+import { knownByFace } from '@/models/faces';
+import { cameraRules, unacknowledgedCount } from '@/models/vision';
 import {
   describeVoice,
   providerOf,
@@ -92,6 +94,12 @@ export interface Extras {
   chatModel: string | null;
   extensions: number | null;
   people: number | null;
+  /** Events nobody has acknowledged, among the latest the Pond lists. */
+  visionNew: number | null;
+  /** How many people the pond knows by face, or that it has no face model. */
+  facesKnown: number | 'unavailable' | null;
+  /** How many automations listen to a camera. */
+  visionRules: number | null;
   theme: 'system' | 'light' | 'dark';
 }
 
@@ -112,6 +120,16 @@ export function summarize(id: SummaryId, s: PondSettings | null, x: Extras, t: T
       return x.extensions === null ? null : t('settings.summary.extensions', { count: x.extensions });
     case 'people':
       return x.people === null ? null : t('settings.summary.people', { count: x.people });
+    case 'visionEvents':
+      if (x.visionNew === null) return null;
+      return x.visionNew === 0 ? t('settings.summary.eventsNone') : t('settings.summary.eventsNew', { count: x.visionNew });
+    case 'faces':
+      if (x.facesKnown === null) return null;
+      if (x.facesKnown === 'unavailable') return t('settings.summary.facesUnavailable');
+      return x.facesKnown === 0 ? t('settings.summary.facesNone') : t('settings.summary.facesKnown', { count: x.facesKnown });
+    case 'visionAutomations':
+      if (x.visionRules === null) return null;
+      return x.visionRules === 0 ? t('settings.summary.rulesNone') : t('settings.summary.rules', { count: x.visionRules });
     case 'appearance':
       return t(themeKey(x.theme));
     default:
@@ -138,7 +156,7 @@ export function summarize(id: SummaryId, s: PondSettings | null, x: Extras, t: T
     case 'household':
       return s.user_name || null;
     case 'cameras':
-      return onOff(s.vision_enabled);
+      return onOff(s.vision_enabled && s.cameras_enabled);
     case 'announcements':
       return s.unprompted_speech_enabled
         ? t('settings.summary.quiet', { start: s.quiet_hours_start, end: s.quiet_hours_end })
@@ -168,8 +186,13 @@ export function chatModelTitle(roles: unknown): string | null {
   return null;
 }
 
-/** Reads made only for the rows a page shows. */
-export function useSummaryExtras(ids: readonly SummaryId[]): Extras {
+/**
+ * Reads made only for the rows a page shows.
+ *
+ * @param cameraId The camera whose events the Vision events row counts: the Pond lists one camera
+ *   per read, and the settings name it. Null until they are known.
+ */
+export function useSummaryExtras(ids: readonly SummaryId[], cameraId: string | null = null): Extras {
   const { hydrated, remoteEnabled, isScreenReal } = useServer();
   const { preference } = useTheme();
   const real = isScreenReal('settings');
@@ -179,6 +202,9 @@ export function useSummaryExtras(ids: readonly SummaryId[]): Extras {
   const [chatModel, setChatModel] = useState<string | null>(null);
   const [extensions, setExtensions] = useState<number | null>(null);
   const [people, setPeople] = useState<number | null>(null);
+  const [visionNew, setVisionNew] = useState<number | null>(null);
+  const [facesKnown, setFacesKnown] = useState<Extras['facesKnown']>(null);
+  const [visionRules, setVisionRules] = useState<number | null>(null);
 
   const read = useCallback(async () => {
     if (!real) return;
@@ -194,10 +220,31 @@ export function useSummaryExtras(ids: readonly SummaryId[]): Extras {
     if (want.has('models')) jobs.push(api.activeModelRoles().then((r) => setChatModel(chatModelTitle(r)), () => undefined));
     if (want.has('extensions')) jobs.push(api.listExtensions().then((l) => setExtensions(l.length), () => undefined));
     if (want.has('people')) jobs.push(api.listProfiles().then((l) => setPeople(l.length), () => undefined));
+    if (want.has('visionEvents') && cameraId) {
+      jobs.push(api.listCameraEvents(cameraId, 100).then((l) => setVisionNew(unacknowledgedCount(l)), () => undefined));
+    }
+    if (want.has('faces')) {
+      jobs.push(
+        api.listFaces().then(
+          (o) => setFacesKnown(o.available ? knownByFace(o.people) : 'unavailable'),
+          () => undefined,
+        ),
+      );
+    }
+    if (want.has('visionAutomations')) {
+      jobs.push(api.listRules().then((l) => setVisionRules(cameraRules(l).length), () => undefined));
+    }
     await Promise.all(jobs);
-  }, [real, webReal, want]);
+  }, [real, webReal, want, cameraId]);
 
   useLive(read, EXTRAS_MS, hydrated && real);
+
+  // The camera is named by the settings, which arrive after the first read: count its events when
+  // they do, rather than leave the row blank until the next minute.
+  const countsEvents = want.has('visionEvents');
+  useEffect(() => {
+    if (hydrated && real && countsEvents && cameraId) void read();
+  }, [hydrated, real, countsEvents, cameraId, read]);
 
   return {
     remoteEnabled,
@@ -205,6 +252,9 @@ export function useSummaryExtras(ids: readonly SummaryId[]): Extras {
     chatModel: real ? chatModel : null,
     extensions: real ? extensions : 0,
     people: real ? people : 1,
+    visionNew: real ? visionNew : 0,
+    facesKnown: real ? facesKnown : 0,
+    visionRules: real ? visionRules : 0,
     theme: preference,
   };
 }
