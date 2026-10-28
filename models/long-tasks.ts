@@ -6,7 +6,9 @@ import type { ToolCall } from '@/models/chat';
 import type {
   DeepResearchAvailability,
   LongTask,
+  LongTaskAhead,
   LongTaskArtifact,
+  LongTaskQueuePlace,
   LongTaskReportWire,
   ReportFormat,
   LongTaskState,
@@ -44,6 +46,36 @@ export function pollDelay(state: LongTaskState): number | null {
   return state === 'planning' || state === 'running' ? LONG_TASK_ACTIVE_MS : LONG_TASK_WAITING_MS;
 }
 
+/** An open task with another ahead of it in the one line the Pond works through. An older Pond does not say, so nothing waits. */
+export function isWaiting(task: Pick<LongTask, 'state' | 'queue'>): boolean {
+  return !isEnded(task.state) && (task.queue?.position ?? 1) > 1;
+}
+
+export function isOwnAhead(ahead: LongTaskAhead): ahead is Extract<LongTaskAhead, { id: string }> {
+  return 'id' in ahead;
+}
+
+/** A task the member may keep going or stop, at its place in the line. */
+export interface QueueChoice {
+  id: string;
+  goal: string;
+  position: number;
+  isThis: boolean;
+}
+
+/**
+ * The member's own tasks ahead of this one, then this one. None when only other members' tasks are
+ * ahead, since there is then nothing of theirs to choose between.
+ */
+export function queueChoices(task: Pick<LongTask, 'id' | 'goal' | 'state' | 'queue'>): QueueChoice[] {
+  const queue = task.queue;
+  if (!queue || !isWaiting(task)) return [];
+  const ahead = queue.ahead.flatMap((entry, index) =>
+    isOwnAhead(entry) ? [{ id: entry.id, goal: entry.goal, position: index + 1, isThis: false }] : [],
+  );
+  return ahead.length > 0 ? [...ahead, { id: task.id, goal: task.goal, position: queue.position, isThis: true }] : [];
+}
+
 export function resultArtifact(task: LongTask): LongTaskArtifact | null {
   if (!task.result_artifact_id) return null;
   return task.artifacts.find((a) => a.id === task.result_artifact_id) ?? null;
@@ -59,6 +91,24 @@ export function progressOf(steps: readonly LongTaskStep[]): { done: number; tota
 
 const text = (v: unknown) => (typeof v === 'string' ? v : '');
 const textOrNull = (v: unknown) => (typeof v === 'string' && v !== '' ? v : null);
+const isPlace = (v: unknown): v is number => typeof v === 'number' && Number.isInteger(v) && v >= 1;
+
+/** Anything not plainly a task this member reaches is a place only, so a malformed entry never names one. */
+function readAhead(item: unknown): LongTaskAhead {
+  const a = item as Record<string, unknown> | null;
+  if (a && typeof a === 'object' && a.another_member !== true && typeof a.id === 'string' && TASK_STATES.includes(a.state as LongTaskState)) {
+    return { id: a.id, goal: text(a.goal), state: a.state as LongTaskState };
+  }
+  return { another_member: true };
+}
+
+/** Absent stays absent (an older Pond); a place that cannot be read is no place, so nothing waits. */
+function readQueue(raw: unknown): LongTaskQueuePlace | null | undefined {
+  if (raw === undefined) return undefined;
+  const q = raw as Record<string, unknown> | null;
+  if (!q || typeof q !== 'object' || !isPlace(q.position) || !isPlace(q.of)) return null;
+  return { position: q.position, of: q.of, ahead: (Array.isArray(q.ahead) ? q.ahead : []).map(readAhead) };
+}
 
 /**
  * A task as the Pond sent it, or null for a body that is not one. A state this phone does not know
@@ -109,6 +159,7 @@ export function readLongTask(raw: unknown): LongTask | null {
     steps,
     artifacts,
     result_artifact_id: textOrNull(t.result_artifact_id),
+    queue: readQueue(t.queue),
   };
 }
 

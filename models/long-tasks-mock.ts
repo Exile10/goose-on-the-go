@@ -1,5 +1,6 @@
 // An in-memory Pond for long tasks, for the chat on mock: a task plans, runs three steps and finishes
-// with a result, on the clock read at each call, and Stop ends it as the real cancel route does.
+// with a result, on the clock read at each call, and Stop ends it as the real cancel route does. One
+// slot works them in the order they were asked for, so a second task waits its turn, as on the Pond.
 
 import { ApiError } from '@/services/api-client';
 import { REPORT_FILES } from '@/models/long-tasks';
@@ -8,7 +9,9 @@ import type {
   LongTask,
   LongTaskArtifactBody,
   LongTaskKind,
+  LongTaskQueuePlace,
   LongTaskReportWire,
+  LongTaskState,
   LongTaskStep,
   LongTaskStepState,
   ReportFormat,
@@ -84,23 +87,70 @@ const REPORT_SECTIONS = `## Day 1: Saturday
 interface Entry {
   goal: string;
   kind: LongTaskKind;
-  startedAt: number;
+  askedAt: number;
   cancelledAt: number | null;
+  /** Holds a place in the line; this member can neither read nor stop it, as on the Pond. */
+  anotherMember: boolean;
 }
+
+const RUN_MS = MOCK_PLANNING_MS + PLAN.length * MOCK_STEP_MS;
 
 export function createMockLongTasks(now: () => number = Date.now) {
   const tasks = new Map<string, Entry>();
   let next = 1;
   const iso = (ms: number) => new Date(ms).toISOString();
 
-  const view = (id: string): LongTask => {
-    const entry = tasks.get(id);
-    if (!entry) throw new ApiError(`mock /api/v1/long-tasks/${id} → 404`, 404, null, 'there is no such task');
+  /** When the one slot reaches each task: once every task asked before it has finished or been stopped. */
+  const turns = (): Map<string, number> => {
+    const out = new Map<string, number>();
+    let free = -Infinity;
+    for (const [id, entry] of tasks) {
+      const turn = Math.max(entry.askedAt, free);
+      out.set(id, turn);
+      free = Math.max(free, Math.min(entry.cancelledAt ?? Infinity, turn + RUN_MS));
+    }
+    return out;
+  };
+
+  const progress = (entry: Entry, turn: number) => {
     const t = entry.cancelledAt ?? now();
-    const elapsed = t - entry.startedAt;
+    const elapsed = t - turn;
     const planned = elapsed >= MOCK_PLANNING_MS;
     const index = planned ? Math.floor((elapsed - MOCK_PLANNING_MS) / MOCK_STEP_MS) : -1;
     const finished = planned && index >= PLAN.length;
+    // A task waiting its turn is planning on the Pond too: it has not been given a plan yet.
+    const state: LongTaskState = entry.cancelledAt ? 'cancelled' : finished ? 'completed' : planned ? 'running' : 'planning';
+    return { t, planned, index, finished, state };
+  };
+
+  const placeOf = (id: string, when: Map<string, number>): LongTaskQueuePlace | null => {
+    const line = [...tasks].filter(([other, entry]) => {
+      const state = progress(entry, when.get(other)!).state;
+      return state === 'planning' || state === 'running';
+    });
+    const index = line.findIndex(([other]) => other === id);
+    if (index < 0) return null;
+    return {
+      position: index + 1,
+      of: line.length,
+      ahead: line.slice(0, index).map(([other, entry]) =>
+        entry.anotherMember ? { another_member: true as const } : { id: other, goal: entry.goal, state: progress(entry, when.get(other)!).state },
+      ),
+    };
+  };
+
+  /** The task as this member reaches it; another member's is a 404, as the Pond answers it. */
+  const reachable = (id: string): Entry => {
+    const entry = tasks.get(id);
+    if (!entry || entry.anotherMember) throw new ApiError(`mock /api/v1/long-tasks/${id} → 404`, 404, null, 'there is no such task');
+    return entry;
+  };
+
+  const view = (id: string): LongTask => {
+    const entry = reachable(id);
+    const when = turns();
+    const turn = when.get(id)!;
+    const { t, planned, index, finished, state } = progress(entry, turn);
     const stepState = (i: number): LongTaskStepState => {
       if (i < index) return 'completed';
       if (entry.cancelledAt) return 'skipped';
@@ -116,14 +166,14 @@ export function createMockLongTasks(now: () => number = Date.now) {
           failure: null,
         }))
       : [];
-    const endedAt = entry.cancelledAt ?? (finished ? entry.startedAt + MOCK_PLANNING_MS + PLAN.length * MOCK_STEP_MS : null);
+    const endedAt = entry.cancelledAt ?? (finished ? turn + RUN_MS : null);
     return {
       id,
       kind: entry.kind,
       goal: entry.goal,
-      state: entry.cancelledAt ? 'cancelled' : finished ? 'completed' : planned ? 'running' : 'planning',
+      state,
       origin_session_id: 'mock-session',
-      created_at: iso(entry.startedAt),
+      created_at: iso(entry.askedAt),
       updated_at: iso(t),
       finished_at: endedAt === null ? null : iso(endedAt),
       steps,
@@ -131,14 +181,18 @@ export function createMockLongTasks(now: () => number = Date.now) {
         ? [{ id: `${id}-result`, task_id: id, step_key: 'check', kind: 'draft', title: 'Weekend plan', summary: 'Two nights by the beach, by train, for about KES 18,000.', tokens: 120, created_at: iso(endedAt ?? t) }]
         : [],
       result_artifact_id: finished ? `${id}-result` : null,
+      queue: placeOf(id, when),
     };
   };
 
   const created = {
-    /** What the mock chat calls when asked for a long task; the id goes in its `task_start` answer. */
-    start(goal: string, kind: LongTaskKind = 'general'): string {
+    /**
+     * What the mock chat calls when asked for a long task; the id goes in its `task_start` answer.
+     * `anotherMember` asks it for someone else in the household, for a line this member cannot see into.
+     */
+    start(goal: string, kind: LongTaskKind = 'general', { anotherMember = false }: { anotherMember?: boolean } = {}): string {
       const id = `00000000-0000-4000-8000-${String(next++).padStart(12, '0')}`;
-      tasks.set(id, { goal, kind, startedAt: now(), cancelledAt: null });
+      tasks.set(id, { goal, kind, askedAt: now(), cancelledAt: null, anotherMember });
       return id;
     },
     researchAvailability: async (): Promise<DeepResearchAvailability> => ({ available: true }),
@@ -179,7 +233,7 @@ export function createMockLongTasks(now: () => number = Date.now) {
       if (task.state === 'completed' || task.state === 'failed' || task.state === 'cancelled') {
         throw new ApiError('mock cancel → 409', 409, null, `the task has already ${task.state}`);
       }
-      tasks.get(id)!.cancelledAt = now();
+      reachable(id).cancelledAt = now();
     },
   };
   return created;

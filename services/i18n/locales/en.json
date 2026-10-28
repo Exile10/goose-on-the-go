@@ -384,7 +384,42 @@
       "loadFailed": "Could not read this task from your Pond.",
       "gone": "This task is no longer on your Pond.",
       "loading": "Reading the task from your Pond",
-      "researchEyebrow": "Deep research"
+      "researchEyebrow": "Deep research",
+      "queue": {
+        "waiting": "Waiting its turn: {{place}}",
+        "workingNow": "Working now",
+        "inLine": "{{ordinal}} in line",
+        "ordinal": {
+          "one": "{{n}}st",
+          "two": "{{n}}nd",
+          "few": "{{n}}rd",
+          "other": "{{n}}th"
+        },
+        "ahead": "Ahead of this one: {{who}}.",
+        "aheadBoth": "{{yours}} and {{others}}",
+        "aheadYours": "{{count}} of your tasks",
+        "aheadOthers_one": "{{count}} for another member",
+        "aheadOthers_other": "{{count}} for other members",
+        "hint": "The pond works through these one at a time. Choose which keep going; a task you stop finishes the step it is on.",
+        "thisOne": "{{goal}} (this one)",
+        "choiceLabel": "{{goal}}, {{place}}",
+        "keep": "Keep going",
+        "stop": "Stop",
+        "allKeep": "Everything here keeps going.",
+        "apply_one": "Stop {{count}} task",
+        "apply_other": "Stop {{count}} tasks",
+        "applying": "Stopping...",
+        "stopped_one": "Stopped {{count}} task.",
+        "stopped_other": "Stopped {{count}} tasks.",
+        "failed": "Could not stop {{failures}}. Try again.",
+        "failure": "{{goal}}: {{reason}}",
+        "reason": {
+          "gone": "your Pond no longer has it",
+          "busy": "your Pond is busy",
+          "unreachable": "your Pond did not answer",
+          "refused": "your Pond refused"
+        }
+      }
     },
     "research": {
       "menu": "Deep research",
