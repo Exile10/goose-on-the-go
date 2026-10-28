@@ -137,7 +137,7 @@ describe("the member's own tasks ahead", () => {
     const { tree } = await draw(task(LINE));
     const text = words(tree);
     expect(text).toContain('Ahead of this one: 2 of your tasks and 1 for another member.');
-    expect(text).toContain('The pond works through these one at a time. Choose which keep going; a task you stop finishes the step it is on.');
+    expect(text).toContain('Your Pond works through these one at a time. Choose which keep going; a task you stop finishes the step it is on.');
     expect(text).toContain('Everything here keeps going.');
     expect(groups(tree).map((g) => g.props.accessibilityLabel)).toEqual([
       'Plan a weekend away, Working now',
