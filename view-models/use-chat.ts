@@ -40,6 +40,7 @@ import { cardsFor, rememberCard, type CardsByCall } from '@/services/card-cache'
 import { composeMessage, type Attachment } from '@/services/media';
 import { StreamStalledError } from '@/services/sse';
 import type { ChatFrame, SessionMessage } from '@/services/types';
+import { describeApiError, logFailure } from '@/view-models/describe-error';
 import { createTurnQueue } from '@/view-models/turn-queue';
 
 /** How much of a long conversation is worth reading back on open. */
@@ -74,15 +75,22 @@ function isDrop(e: unknown): boolean {
   return e instanceof TypeError || (e instanceof Error && /network|connection|socket/i.test(e.message));
 }
 
+/**
+ * What the reader is told about a turn that failed. Never the failure's own text: an ApiError's
+ * message is the route and status (`POST /api/v1/agent/chat/stream → 500`) and a dropped
+ * connection's is the platform's ("Network request failed"), and both used to land on screen.
+ * They go to the log instead.
+ */
 function describe(e: unknown, t: TFunction): string {
+  logFailure('chat', 'turn failed', e);
   if (e instanceof ApiError) {
     if (e.status === 503) return t('chat.busy');
     if (e.status === 413) return t('chat.composer.tooLarge');
     if (e.status === 415) return t('chat.composer.unsupported');
-    return e.message;
+    return describeApiError(e) ?? t('chat.failed');
   }
   if (isAbort(e)) return t('chat.timedOut');
-  return e instanceof Error ? e.message : t('chat.failed');
+  return t('chat.failed');
 }
 
 /** A tool row's `content` is a JSON blob around the result; this is the result. */

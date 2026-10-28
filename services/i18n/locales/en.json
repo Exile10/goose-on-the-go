@@ -98,8 +98,6 @@
     "stopListening": "Stop listening",
     "speak": "Speak to Goose",
     "send": "Send",
-    "offline": "Pond unreachable",
-    "offlineBody": "Goose answers from your Pond, so this needs it reachable.",
     "thinking": "Goose is thinking",
     "timedOut": "Goose took too long to answer. Your Pond may still be loading the model — try again in a moment.",
     "failed": "That message did not get through.",
@@ -107,7 +105,6 @@
       "title": "Conversations",
       "subtitle_one": "{{count}} on your Pond, and nowhere else.",
       "subtitle_other": "{{count}} on your Pond, and nowhere else.",
-      "subtitleEmpty": "Nothing here yet.",
       "back": "All conversations",
       "untitled": "Untitled",
       "yesterday": "Yesterday",
@@ -155,9 +152,7 @@
       "done": "Done",
       "noChats": "No chats yet",
       "noRoutines": "No routines yet",
-      "noneBody": "Choose All to see every conversation.",
-      "failed": "Could not load your conversations.",
-      "offlineBody": "Your conversations live on your Pond, so this needs it reachable."
+      "noneBody": "Choose All to see every conversation."
     },
     "busy": "Your Pond is answering too much at once. Try again in a moment.",
     "lostConnection": "The connection dropped mid-answer. This is what your Pond saved.",

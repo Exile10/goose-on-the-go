@@ -28,6 +28,7 @@ import { api } from '@/services/api-client';
 import { forgetCards } from '@/services/card-cache';
 import { Storage } from '@/services/storage';
 import { matchesQuery } from '@/utils/search';
+import { describeApiError, logFailure } from '@/view-models/describe-error';
 import type { SessionSummary } from '@/services/types';
 
 /** How much conversation a card has to show, which is how tall it gets. */
@@ -388,6 +389,12 @@ export interface UseChatHistory {
   loading: boolean;
   /** A pull-to-refresh is in flight. */
   refreshing: boolean;
+  /** No read of the list has worked yet and the last one failed: the wall is unknown, not empty. */
+  failed: boolean;
+  /**
+   * Words for a refused delete, or for the failed read when there are any beyond the shared ones.
+   * Never a status code.
+   */
   error: string | null;
   actions: {
     /** `quiet` keeps what is on screen until the answer lands. */
@@ -414,10 +421,12 @@ export function useChatHistory(): UseChatHistory {
   const { t, i18n } = useTranslation();
   const [sessions, setSessions] = useState<SessionSummary[] | null>(null);
   const [refreshing, setRefreshing] = useState(false);
-  // Two, because they end differently: a load error ends when a load works,
+  // Two, because they end differently: a load failure ends when a load works,
   // and a refused delete ends when the reader moves on — not when the re-read
-  // that follows it succeeds a moment later.
-  const [loadError, setLoadError] = useState<string | null>(null);
+  // that follows it succeeds a moment later. A failed re-read after the wall
+  // has loaded keeps the wall, so only a list that never arrived counts.
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [loadReason, setLoadReason] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<HistoryFilter>('all');
@@ -455,6 +464,8 @@ export function useChatHistory(): UseChatHistory {
   // request answers both: the Pond runs several queries per session to build
   // this, so a second copy of it is not free.
   const inFlight = useRef<Promise<void> | null>(null);
+  // Whether a list has ever arrived; see `refresh`.
+  const arrived = useRef(false);
 
   // Sets nothing until the answer lands, so the effect below can call it
   // without rendering twice. The spinner a pull wants is `pull`'s business.
@@ -465,9 +476,13 @@ export function useChatHistory(): UseChatHistory {
       try {
         const next = await api.listSessions();
         setSessions(next);
-        setLoadError(null);
-      } catch {
-        setLoadError(t('chat.history.failed'));
+        arrived.current = true;
+        setLoadFailed(false);
+        setLoadReason(null);
+      } catch (e) {
+        logFailure('history', 'read failed', e);
+        setLoadFailed(true);
+        setLoadReason(describeApiError(e));
       } finally {
         setRefreshing(false);
         inFlight.current = null;
@@ -475,7 +490,7 @@ export function useChatHistory(): UseChatHistory {
     })();
     inFlight.current = run;
     return run;
-  }, [hydrated, t]);
+  }, [hydrated]);
 
   // A read that must start after now. Joining one already in flight could
   // hand back a list the Pond built before the change it is meant to show.
@@ -490,6 +505,10 @@ export function useChatHistory(): UseChatHistory {
     (mode: 'pull' | 'quiet' = 'quiet') => {
       setActionError(null);
       if (mode === 'pull' && hydrated) setRefreshing(true);
+      // Asking again after a wall that never arrived goes back to the loading ghosts, so Try again
+      // visibly does something rather than leaving the failure up until the answer lands.
+      // A ref, not `sessions`: the screen re-runs its focus effect whenever this changes identity.
+      if (!arrived.current) setLoadFailed(false);
       return load();
     },
     [hydrated, load],
@@ -509,7 +528,8 @@ export function useChatHistory(): UseChatHistory {
         // The cards this phone kept for it go with it.
         void forgetCards([id]);
         return true;
-      } catch {
+      } catch (e) {
+        logFailure('history', 'delete failed', e);
         setActionError(t('chat.history.deleteFailed'));
         return false;
       } finally {
@@ -578,9 +598,10 @@ export function useChatHistory(): UseChatHistory {
 
   return {
     data: { cards, sections, total: all.length, query, filter, view: view ?? 'grid' },
-    loading: (sessions === null && loadError === null) || view === null,
+    loading: (sessions === null && !loadFailed) || view === null,
     refreshing,
-    error: actionError ?? loadError,
+    failed: loadFailed && sessions === null,
+    error: actionError ?? (sessions === null ? loadReason : null),
     actions: { refresh, setQuery, setFilter, setView, remove, removeMany },
   };
 }

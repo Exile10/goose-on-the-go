@@ -112,7 +112,7 @@ export default function ChatScreen() {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const { data, error, actions } = useChat();
-  const { online, hydrated } = useServer();
+  const { hydrated } = useServer();
   const { messages, queued, streaming, status, turnSeed, sessionId, title } = data;
   const name = useGreetingName();
   const suggestions = useSuggestions(sessionId);
@@ -265,12 +265,6 @@ export default function ChatScreen() {
             },
           ]}
         />
-
-        {!online && hydrated ? (
-          <View style={styles.notice}>
-            <InkNotice tone="warning">{t('chat.offlineBody')}</InkNotice>
-          </View>
-        ) : null}
 
         {shown ? (
           <GPressable
