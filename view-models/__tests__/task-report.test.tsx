@@ -243,6 +243,6 @@ describe('the pieces it is built from', () => {
   });
 
   it('names the composer that builds plans', () => {
-    expect(builtInName('long-task-composer')).toBe('Long-task composer');
+    expect(builtInName('long-task-composer')).toBe('Nestmaker Goose');
   });
 });

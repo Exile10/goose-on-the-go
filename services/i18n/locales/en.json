@@ -3201,11 +3201,11 @@
     "builtIn": "Built-in agents",
     "builtInIntro": "Your Pond's own helpers for long tasks. You cannot edit or delete them, but you can ask for them to be rebuilt.",
     "builtInName": {
-      "planner": "Long-task planner",
-      "worker": "Long-task worker",
-      "verifier": "Long-task verifier",
+      "planner": "Point Gander",
+      "worker": "Forager Gosling",
+      "verifier": "Sentinel Goose",
       "assistant": "Assistant",
-      "composer": "Long-task composer"
+      "composer": "Nestmaker Goose"
     },
     "suggested": {
       "title": "Suggested for this Pond",
