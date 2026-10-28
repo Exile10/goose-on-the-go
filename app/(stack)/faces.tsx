@@ -19,6 +19,7 @@ import { InkButton, InkEmptyState, InkNotice, InkSpinner, InkText } from '@jarid
 import { ContentUnavailable } from '@/components/patterns/content-unavailable';
 import { isUnavailable } from '@/models/content-state';
 import { useContentState } from '@/view-models/use-content-state';
+import { usePullToRefresh } from '@/view-models/use-pull-to-refresh';
 import { FaceSheet } from '@/components/patterns/face-sheet';
 import { SettingsGroup, SettingsHeader, SettingsRow } from '@/components/settings/settings-list';
 import { SettingsScroll } from '@/components/settings/settings-scroll';
@@ -39,16 +40,9 @@ export default function FacesScreen() {
   const state = useContentState({ loading, failed, hasContent: data.people.length > 0 });
   const settings = usePondSettings();
   const [openId, setOpenId] = useState<string | null>(null);
-  const [refreshing, setRefreshing] = useState(false);
 
   const open = useMemo(() => data.people.find((p) => p.profile_id === openId) ?? null, [data.people, openId]);
   const recognitionOff = settings.settings !== null && !settings.settings.vision_face_recognition_enabled;
-
-  const refresh = useCallback(async () => {
-    setRefreshing(true);
-    await actions.refresh();
-    setRefreshing(false);
-  }, [actions]);
 
   // Left for Cameras and vision from inside the sheet: the sheet is closed first, since a page
   // pushed under an open modal is not seen until it is dismissed.
@@ -58,9 +52,10 @@ export default function FacesScreen() {
   }, [router]);
 
   const quietRefresh = useCallback(() => actions.refresh(), [actions]);
+  const pull = usePullToRefresh(quietRefresh);
 
   return (
-    <SettingsScroll refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void refresh()} />}>
+    <SettingsScroll refreshControl={<RefreshControl {...pull} />}>
       <SettingsHeader icon="face" tile="indigo" title={t('screens.faces')} description={t('faces.intro')} />
 
       <View style={styles.privacy}>

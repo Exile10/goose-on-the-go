@@ -12,8 +12,8 @@
  * same wrapped row as Edit it read as a stray.
  */
 
-import React, { useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useCallback, useState } from 'react';
+import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import {
@@ -31,6 +31,7 @@ import type { InkTone } from '@jarida/ink';
 import { ContentUnavailable } from '@/components/patterns/content-unavailable';
 import { isUnavailable } from '@/models/content-state';
 import { useContentState } from '@/view-models/use-content-state';
+import { usePullToRefresh } from '@/view-models/use-pull-to-refresh';
 import { LabelledSwitch } from '@/components/patterns/labelled-switch';
 import { ScheduleFormSheet } from '@/components/patterns/schedule-form-sheet';
 import { useThemedStyles } from '@/hooks/use-themed-styles';
@@ -110,6 +111,12 @@ export default function ScheduleDetailScreen() {
     failed: runs.failed || runs.error !== null,
     hasContent: runs.data.runs.length > 0,
   });
+  // A pull reads both halves of the page: the schedule and its recent runs.
+  const reloadAll = useCallback(() => {
+    actions.refreshRuns();
+    return actions.refresh();
+  }, [actions]);
+  const pull = usePullToRefresh(reloadAll);
   const [editing, setEditing] = useState(false);
   const [phoneZone] = useState(deviceTimeZone);
   const ask = useConfirm();
@@ -127,7 +134,7 @@ export default function ScheduleDetailScreen() {
 
   if (!schedule) {
     return (
-      <ScrollView style={styles.container} contentContainerStyle={styles.scroll}>
+      <ScrollView style={styles.container} contentContainerStyle={styles.scroll} refreshControl={<RefreshControl {...pull} />}>
         {loading ? <InkSpinner label={t('schedule.detail.loading')} /> : null}
         {isUnavailable(state) ? (
           <ContentUnavailable state={state} reason={error} onRetry={actions.refresh} />
@@ -144,7 +151,7 @@ export default function ScheduleDetailScreen() {
   const oneOff = isOneOff(schedule);
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.scroll}>
+    <ScrollView style={styles.container} contentContainerStyle={styles.scroll} refreshControl={<RefreshControl {...pull} />}>
       <View style={styles.gap}>
         <InkText size="xl" weight="semibold">{schedule.label}</InkText>
         {schedule.currently_running ? <InkBadge tone="brand">{t('schedule.card.running')}</InkBadge> : null}

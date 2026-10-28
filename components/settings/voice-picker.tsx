@@ -12,6 +12,7 @@ import { InkButton, InkChoice, InkEyebrow, InkField, InkNotice, InkSpinner, InkS
 import { ContentUnavailable } from '@/components/patterns/content-unavailable';
 import { isUnavailable } from '@/models/content-state';
 import { useContentState } from '@/view-models/use-content-state';
+import { useReloadOnPull } from '@/view-models/use-pull-to-refresh';
 import { VoiceOrb } from '@/components/patterns/voice-orb';
 import { GIcon } from '@/components/ui/g-icon';
 import { Spacing } from '@/constants/spacing';
@@ -85,6 +86,8 @@ function faceState(state: PreviewState, applying: boolean): VoiceState {
 export function VoicePicker({ vm }: { vm: UsePondSettings }) {
   const { t } = useTranslation();
   const models = useModelChoices();
+  // The page's pull reads the settings; the voices are this section's own read.
+  useReloadOnPull(models.refresh);
   const preview = useVoicePreview();
   const settings = vm.settings;
   const voices = useMemo(() => voiceChoices(models.items), [models.items]);

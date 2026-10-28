@@ -13,6 +13,7 @@ import { InkButton, InkEmptyState, InkNotice, InkSpinner, InkText } from '@jarid
 import { ContentUnavailable } from '@/components/patterns/content-unavailable';
 import { isUnavailable } from '@/models/content-state';
 import { useContentState } from '@/view-models/use-content-state';
+import { useReloadOnPull } from '@/view-models/use-pull-to-refresh';
 import { ScheduleCard } from '@/components/patterns/schedule-card';
 import { ScheduleFormSheet } from '@/components/patterns/schedule-form-sheet';
 import { deviceTimeZone } from '@/models/schedule';
@@ -27,6 +28,8 @@ export function ScheduleTab() {
   const { isScreenReal } = useServer();
   const real = isScreenReal('schedule');
   const { data, loading, error, failed, actions } = useSchedules();
+  // The scroll, and so the pull, is the Schedule screen's.
+  useReloadOnPull(actions.refresh);
   // A refused refresh with the list still on screen is said above it; a list that never arrived is
   // said once, in its place.
   const state = useContentState({ loading, failed: failed || error !== null, hasContent: data.schedules.length > 0 });

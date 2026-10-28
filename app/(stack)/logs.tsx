@@ -28,13 +28,7 @@
  */
 
 import React, { useState, useCallback, useMemo } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  FlatList,
-  ScrollView,
-} from 'react-native';
+import { FlatList, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { useTranslation } from 'react-i18next';
 import {
@@ -66,6 +60,7 @@ import { ContentUnavailable } from '@/components/patterns/content-unavailable';
 import { isUnavailable } from '@/models/content-state';
 import { describeActivityError, useActivity } from '@/view-models/use-activity';
 import { useContentState } from '@/view-models/use-content-state';
+import { usePullToRefresh } from '@/view-models/use-pull-to-refresh';
 import { useActivitySummary } from '@/view-models/use-activity-summary';
 import { useConversationTelemetry, useConversationTurns } from '@/view-models/use-conversation-telemetry';
 import { useLogExport } from '@/view-models/use-log-export';
@@ -202,6 +197,12 @@ export default function ActivityScreen() {
   const shownCount = showingProblems ? problems.data.problems.length : data.events.length;
   const state = useContentState({ loading, failed: failed || error !== null, hasContent: shownCount > 0 });
   const unavailable = isUnavailable(state);
+  // The feed's pull also reads today's summary above it; the problems tab is its one list.
+  const reloadShown = useCallback(
+    () => (showingProblems ? actions.refresh() : Promise.all([actions.refresh(), activitySummary.actions.refresh()])),
+    [actions, activitySummary.actions, showingProblems],
+  );
+  const pull = usePullToRefresh(reloadShown);
 
   const renderItem = useCallback(
     ({ item }: { item: ActivityEvent }) => <EventRow item={item} showType={activeTab === 'all'} />,
@@ -283,6 +284,7 @@ export default function ActivityScreen() {
           renderItem={renderProblem}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
+          refreshControl={<RefreshControl {...pull} />}
           ListHeaderComponent={header}
           ListEmptyComponent={
             unavailable ? (
@@ -303,6 +305,7 @@ export default function ActivityScreen() {
           maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
+          refreshControl={<RefreshControl {...pull} />}
           ListHeaderComponent={header}
           // A list that failed to load is unknown, not empty.
           ListEmptyComponent={

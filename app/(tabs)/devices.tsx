@@ -13,7 +13,7 @@
  */
 
 import React, { useCallback, useMemo, useState } from 'react';
-import { StyleSheet, ScrollView, Text, View } from 'react-native';
+import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -39,6 +39,7 @@ import { ContentUnavailable } from '@/components/patterns/content-unavailable';
 import { DeviceEditSheet } from '@/components/patterns/device-edit-sheet';
 import { isUnavailable } from '@/models/content-state';
 import { useContentState } from '@/view-models/use-content-state';
+import { usePullToRefresh } from '@/view-models/use-pull-to-refresh';
 import type { Device } from '@/services/types';
 import { Grey } from '@/constants/colors';
 import type { ThemeColors } from '@/constants/colors';
@@ -124,11 +125,6 @@ export default function DevicesTab() {
     [actions],
   );
 
-  const handleRefresh = useCallback(() => {
-    void selectionTick();
-    void actions.refresh();
-  }, [actions]);
-
   const handleEdit = useCallback((device: Device) => {
     void selectionTick();
     setEditing(device);
@@ -147,6 +143,7 @@ export default function DevicesTab() {
   const total = data.devices.length;
   const state = useContentState({ loading, failed, hasContent: total > 0 });
   const unavailable = isUnavailable(state);
+  const pull = usePullToRefresh(actions.refresh);
   const nothingReachable = total > 0 && data.onlineCount === 0;
 
   return (
@@ -161,9 +158,10 @@ export default function DevicesTab() {
         </Text>
         {/* Add lives up here rather than under the grid, so it stays in reach
             however many devices there are. With none, the empty state below
-            carries it instead, and the screen still has a single primary. */}
-        <View style={styles.headerActions}>
-          {total > 0 ? (
+            carries it instead, and the screen still has a single primary.
+            Reading the devices again is a pull on the grid, as on every screen. */}
+        {total > 0 ? (
+          <View style={styles.headerActions}>
             <InkButton
               variant="primary"
               icon="plus"
@@ -173,17 +171,8 @@ export default function DevicesTab() {
             >
               {t('devices.addDevice')}
             </InkButton>
-          ) : null}
-          <InkButton
-            variant="quiet"
-            icon="refresh"
-            block={total > 0}
-            style={total > 0 ? styles.headerButton : null}
-            onPress={handleRefresh}
-          >
-            {t('common.refresh')}
-          </InkButton>
-        </View>
+          </View>
+        ) : null}
       </View>
 
       {/* Room tabs, derived from the rooms devices are actually in. The
@@ -215,6 +204,7 @@ export default function DevicesTab() {
         {...chrome}
         contentContainerStyle={[styles.scroll, { paddingBottom: bottomInset }]}
         showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl {...pull} />}
       >
         {/* The controller can take minutes to come up on first use, and nothing
             can be commissioned until it has. Say so rather than failing later. */}

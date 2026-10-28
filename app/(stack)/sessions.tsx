@@ -12,6 +12,7 @@ import { useRouter } from 'expo-router';
 import { GIcon } from '@/components/ui/g-icon';
 import { GPressable } from '@/components/ui/g-pressable';
 import type { SessionSummary } from '@/services/types';
+import { usePullToRefresh } from '@/view-models/use-pull-to-refresh';
 import { useSessions } from '@/view-models/use-sessions';
 import { Semantic, type ThemeColors } from '@/constants/colors';
 import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
@@ -88,6 +89,7 @@ const SessionRow = React.memo(function SessionRow({
 export default function SessionsScreen() {
   const styles = useThemedStyles(makeStyles);
   const { data, loading, actions } = useSessions();
+  const pull = usePullToRefresh(actions.refresh);
   const router = useRouter();
   const confirm = useConfirm();
 
@@ -143,8 +145,7 @@ export default function SessionsScreen() {
       data={data.sessions}
       keyExtractor={(item) => item.id}
       renderItem={renderItem}
-      refreshing={loading}
-      onRefresh={actions.refresh}
+      {...pull}
       ListEmptyComponent={
         <View style={styles.empty}>
           <Text style={styles.emptyTitle}>{i18n.t('sessions.emptyTitle')}</Text>

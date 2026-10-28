@@ -18,7 +18,7 @@ import {
   InkText,
   InkTitle,
 } from '@jarida/ink/native';
-import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -36,6 +36,7 @@ import { PondGettingReady } from '@/components/patterns/pond-getting-ready';
 import { RemoteAccessOffer } from '@/components/patterns/remote-access-offer';
 import { isUnavailable } from '@/models/content-state';
 import { useContentState } from '@/view-models/use-content-state';
+import { usePullToRefresh } from '@/view-models/use-pull-to-refresh';
 import { useRecentSessions } from '@/view-models/use-recent-sessions';
 import { supports, useDevices } from '@/view-models/use-devices';
 import { initialOf, useMember } from '@/view-models/use-household';
@@ -283,6 +284,12 @@ export default function HomeScreen() {
     hasContent: recent.data.sessions.length > 0,
   });
   const devicesState = useContentState({ loading: devices.loading, failed: devices.failed, hasContent: shown.length > 0 });
+  // Home's pull reads both of the Pond's lists on it: recent conversations and the devices.
+  const reloadHome = useCallback(
+    () => Promise.all([recent.actions.refresh(), devices.actions.refresh()]),
+    [recent.actions, devices.actions],
+  );
+  const pull = usePullToRefresh(reloadHome);
 
   // Only badges with a source. The online count is the list the grid below
   // shows, so the two cannot disagree, and it is not shown while that list is
@@ -296,6 +303,7 @@ export default function HomeScreen() {
         {...chrome}
         contentContainerStyle={[styles.scroll, { paddingBottom: bottomInset }]}
         showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl {...pull} />}
       >
         <View style={styles.greetingRow}>
           <View style={styles.greetingText}>

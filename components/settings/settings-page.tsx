@@ -2,7 +2,8 @@
  * Draws one page of `SETTINGS_PAGES`: its header, then each section as a group of rows.
  */
 
-import React, { useMemo, useState, type ReactElement } from 'react';
+import React, { useCallback, useMemo, useState, type ReactElement } from 'react';
+import { RefreshControl } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
@@ -11,6 +12,7 @@ import { InkSpinner } from '@jarida/ink/native';
 import { ContentUnavailable } from '@/components/patterns/content-unavailable';
 import { isUnavailable } from '@/models/content-state';
 import { useContentState } from '@/view-models/use-content-state';
+import { PullSectionsProvider, usePullSections, usePullToRefresh } from '@/view-models/use-pull-to-refresh';
 import { SETTINGS_PAGES } from '@/constants/settings-pages';
 import type { TranslationKey } from '@/services/i18n';
 import {
@@ -246,6 +248,11 @@ export function SettingsPageScreen({ page: id }: { page: SettingsPageId }) {
   const phoneOnly = PHONE_PAGES.has(id);
   const settings = vm.settings;
   const state = useContentState({ loading: !vm.failed, failed: vm.failed, hasContent: settings !== null });
+  // A pull reads the settings and every section on the page that reads its own (the camera's
+  // status, the voices).
+  const { registry, reload: reloadSections } = usePullSections();
+  const reloadPage = useCallback(() => Promise.all([vm.actions.refresh(), reloadSections()]), [vm.actions, reloadSections]);
+  const pull = usePullToRefresh(reloadPage);
 
   const go = (route: string) => {
     void selectionTick();
@@ -296,9 +303,9 @@ export function SettingsPageScreen({ page: id }: { page: SettingsPageId }) {
   }
 
   return (
-    <SettingsScroll typing>
+    <SettingsScroll typing refreshControl={<RefreshControl {...pull} />}>
       <SettingsHeader icon={page.icon} tile={page.tile} title={t(page.titleKey)} description={t(page.descriptionKey)} />
-      {body}
+      <PullSectionsProvider value={registry}>{body}</PullSectionsProvider>
     </SettingsScroll>
   );
 }

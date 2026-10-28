@@ -4,6 +4,7 @@
  */
 
 import React from 'react';
+import { RefreshControl } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 
@@ -25,6 +26,7 @@ import { useChoice, useConfirm } from '@/providers/confirm-provider';
 import { tap } from '@/services/haptics';
 import { formatContextWindow } from '@/view-models/use-models';
 import { roleLabelKey, useModelLibrary } from '@/view-models/use-model-library';
+import { usePullToRefresh } from '@/view-models/use-pull-to-refresh';
 
 export default function ModelScreen() {
   const { t } = useTranslation();
@@ -33,11 +35,12 @@ export default function ModelScreen() {
   const choose = useChoice();
   const { id } = useLocalSearchParams<{ id?: string }>();
   const lib = useModelLibrary();
+  const pull = usePullToRefresh(lib.actions.refresh);
   const model = lib.models.find((m) => m.id === id);
 
   if (!model) {
     return (
-      <SettingsScroll>
+      <SettingsScroll refreshControl={<RefreshControl {...pull} />}>
         <SettingsMessage>{lib.loaded ? t('models.library.empty') : t('settings.loading')}</SettingsMessage>
       </SettingsScroll>
     );
@@ -73,7 +76,7 @@ export default function ModelScreen() {
   ].filter((f) => !!f.value);
 
   return (
-    <SettingsScroll>
+    <SettingsScroll refreshControl={<RefreshControl {...pull} />}>
       <SettingsHeader icon="models" tile="purple" title={titleOf(model)} description={model.recommended?.reason || model.description || job} />
       {lib.notice ? <SettingsNotice tone={lib.notice.tone === 'danger' ? 'danger' : 'neutral'}>{lib.notice.text}</SettingsNotice> : null}
 

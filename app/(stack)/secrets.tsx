@@ -16,6 +16,7 @@ import { InkButton, InkCard, InkNotice, InkSpinner, InkText, InkTitle, inkText, 
 import { ContentUnavailable } from '@/components/patterns/content-unavailable';
 import { isUnavailable } from '@/models/content-state';
 import { useContentState } from '@/view-models/use-content-state';
+import { usePullToRefresh } from '@/view-models/use-pull-to-refresh';
 import { GKeyboardView } from '@/components/ui/g-keyboard-view';
 import { Semantic } from '@/constants/colors';
 import type { ThemeColors } from '@/constants/colors';
@@ -34,7 +35,8 @@ export default function SecretsScreen() {
   const theme = useInkTheme();
   // Not `confirm`: that name is the success haptic here.
   const ask = useConfirm();
-  const { data, loading, refreshing, saving, deleting, error, formError, notice, failed, actions } = useSecrets();
+  const { data, loading, saving, deleting, error, formError, notice, failed, actions } = useSecrets();
+  const pull = usePullToRefresh(actions.refresh);
 
   const busy = saving || deleting !== null;
   // The page is a form over what the Pond holds, so it has content once a read has worked.
@@ -62,8 +64,6 @@ export default function SecretsScreen() {
     [actions, ask, t],
   );
 
-  const handleRefresh = useCallback(() => void actions.refresh(), [actions]);
-
   const errorText = inkText(theme, { size: 'sm', weight: theme.weight.medium, color: theme.color.dangerFg });
   const replacing = form?.kind === 'replace' ? data.keys.find((row) => row.key === form.key) ?? { key: form.key, labelKey: null } : null;
 
@@ -74,7 +74,7 @@ export default function SecretsScreen() {
         contentContainerStyle={styles.scroll}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
+        refreshControl={<RefreshControl {...pull} />}
       >
         <InkText size="sm" tone="secondary">
           {t('secrets.intro')}
@@ -88,7 +88,7 @@ export default function SecretsScreen() {
         </View>
 
         {unavailable ? (
-          <ContentUnavailable state={state} reason={error} onRetry={handleRefresh} />
+          <ContentUnavailable state={state} reason={error} onRetry={actions.refresh} />
         ) : error ? (
           <InkNotice tone="danger">{error}</InkNotice>
         ) : null}

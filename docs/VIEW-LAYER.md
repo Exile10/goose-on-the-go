@@ -393,19 +393,50 @@ connection for it). Each state has one owner, and nothing says a thing twice.
 |---|---|---|
 | `ready` | There is content, from this read or an earlier one | The screen. A later read that fails keeps it on screen and is logged |
 | `loading` | Nothing yet, a read in flight | The screen's spinner or ghosts |
-| `unreachable` | Nothing to show, and the connection indicator is up | The indicator says why and offers the action. The screen shows `ContentUnavailable` in its waiting form: no cause, no button |
-| `failed` | Nothing to show, the connection is fine, the read failed | `ContentUnavailable`: a title, one sentence, Try again |
+| `unreachable` | Nothing to show, and the connection indicator is up | The indicator says why. The screen shows `ContentUnavailable` in its waiting form: no cause, no button |
+| `failed` | Nothing to show, the connection is fine, the read failed | `ContentUnavailable`: a title, one sentence, and "Pull down to try again" |
 | `empty` | The read worked and found nothing | The screen's own `InkEmptyState`, never styled as a failure |
 
 **Connectivity is said once**, by `ConnectionStatus` at the top of the app. It
-is quiet -- a hairline strip on the secondary surface -- and carries its action
-as a labelled control: Try again where another attempt can help, Pair where only
-pairing can (`connectionActionIsPairing`). Screens do not add their own "your
-Pond is unreachable" notice. Home's Pond card, which is a status card, drops
-its reachability title and badge while the indicator is up.
+is quiet -- a hairline strip on the secondary surface, an icon and a sentence --
+and it is not a retry button. Its only control is Pair, where only pairing can
+help (`connectionActionIsPairing`). It has no "Checking" state of its own: a
+pull's spinner shows the attempt, and the attempt turns the strip to
+"Reconnecting" once it outlasts the grace period. Screens do not add their own
+"your Pond is unreachable" notice. Home's Pond card, which is a status card,
+drops its reachability title and badge while the indicator is up.
+
+**Trying again is a pull, everywhere.** Every screen of Pond content carries a
+`RefreshControl` fed by `usePullToRefresh(reload)`
+(`view-models/use-pull-to-refresh.ts`), and no screen holds a `refreshing` flag
+of its own. A pull first asks the connection manager to look for the Pond when
+the strip is up for a reason another attempt can help (not for an unpaired,
+outdated or revoked phone, where a token-less probe would report success and
+change nothing), then runs the screen's `reload`. The spinner stays until both
+settle; a second pull meanwhile is ignored; a reload that throws is logged
+(`[pull-to-refresh] refresh failed kind=...`) and the spinner still goes. A
+screen with several reads passes one `reload` that makes them all (Home reads
+recent conversations and devices). A section that reads its own content inside
+a scroll another component owns -- the Schedules and Automations tabs, the
+camera status card and the voice list on a settings page, the account row on
+the You tab -- registers its read with `useReloadOnPull`, and the screen wraps
+it in `PullSectionsProvider` with the registry from `usePullSections`, so the
+pull reaches it. No screen adds a Refresh or Try again button beside the pull;
+Devices' header Refresh went for that reason.
+
+A screen reader cannot easily pull to refresh, so both places that used to
+carry Try again keep it as an accessibility action instead: the strip's
+sentence (while another attempt can help) and the failed form's hint each have
+an `activate` action labelled Try again. TalkBack and VoiceOver read them as
+actionable, and a double tap runs the same retry. A sighted tap does nothing.
 
 **`ContentUnavailable`** (`components/patterns/content-unavailable.tsx`) goes
-in place of the content, never above it. It takes the view-model's sentence as
+in place of the content, never above it, and always inside the scrollable that
+carries the screen's `RefreshControl` -- a `ListEmptyComponent`, or a child of
+the `ScrollView` -- or the hint under it promises a pull there is nothing to
+pull. Where it is the whole screen, put it in a `ScrollView` whose
+`contentContainerStyle` has `flexGrow: 1` so it can centre and still be pulled
+(the wake word screen does this). It takes the view-model's sentence as
 `reason` when that sentence says something specific (busy, a feature the Pond
 is too old for), and the shared one otherwise. When the connection comes back
 it reads again by itself, and keeps its waiting form until that read settles,

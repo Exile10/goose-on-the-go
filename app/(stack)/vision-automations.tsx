@@ -9,7 +9,7 @@
  */
 
 import React, { useCallback, useState } from 'react';
-import { Text, View } from 'react-native';
+import { RefreshControl, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { InkButton, InkEmptyState, InkNotice, InkSpinner, InkText } from '@jarida/ink/native';
@@ -17,6 +17,7 @@ import { InkButton, InkEmptyState, InkNotice, InkSpinner, InkText } from '@jarid
 import { ContentUnavailable } from '@/components/patterns/content-unavailable';
 import { isUnavailable } from '@/models/content-state';
 import { useContentState } from '@/view-models/use-content-state';
+import { usePullToRefresh } from '@/view-models/use-pull-to-refresh';
 import { AutomationCard } from '@/components/patterns/automation-card';
 import { AutomationFormSheet } from '@/components/patterns/automation-form-sheet';
 import { SettingsGroup, SettingsHeader, SettingsRow } from '@/components/settings/settings-list';
@@ -51,6 +52,7 @@ export default function VisionAutomationsScreen() {
   const { data, loading, error, failed, adding, addError, actions } = useVisionAutomations();
   const state = useContentState({ loading, failed: failed || error !== null, hasContent: data.rules.length > 0 });
   const unavailable = isUnavailable(state);
+  const pull = usePullToRefresh(actions.refresh);
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState<Rule | null>(null);
 
@@ -79,7 +81,7 @@ export default function VisionAutomationsScreen() {
   ) : null;
 
   return (
-    <SettingsScroll>
+    <SettingsScroll refreshControl={<RefreshControl {...pull} />}>
       <SettingsHeader icon="bolt" tile="amber" title={t('screens.visionAutomations')} description={t('visionAutomations.intro')} />
 
       <View style={styles.actions}>

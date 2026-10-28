@@ -12,6 +12,7 @@ import { InkSpinner } from '@jarida/ink/native';
 import { ContentUnavailable } from '@/components/patterns/content-unavailable';
 import { isUnavailable } from '@/models/content-state';
 import { useContentState } from '@/view-models/use-content-state';
+import { usePullToRefresh } from '@/view-models/use-pull-to-refresh';
 import { DownloadRow, ModelRow } from '@/components/settings/model-rows';
 import { SettingsGroup, SettingsHeader, SettingsRow, TILE_INSET } from '@/components/settings/settings-list';
 import { SettingsNotice, SettingsScroll } from '@/components/settings/settings-scroll';
@@ -53,6 +54,7 @@ export default function ModelsScreen() {
   const lib = useModelLibrary();
   const state = useContentState({ loading: !lib.readFailed, failed: lib.readFailed, hasContent: lib.loaded });
   const { settings } = usePondSettings();
+  const pull = usePullToRefresh(lib.actions.refresh);
 
   const downloads = useMemo(() => downloadsByModel(lib.downloads).filter((d) => d.status !== 'done' && d.status !== 'cancelled'), [lib.downloads]);
   const onPond = useMemo(() => lib.models.filter(isDownloaded), [lib.models]);
@@ -78,7 +80,7 @@ export default function ModelsScreen() {
   const budget = formatMegabytes(lib.memory?.budget_mb);
 
   return (
-    <SettingsScroll refreshControl={<RefreshControl refreshing={lib.loading && lib.loaded} onRefresh={() => void lib.actions.refresh()} />}>
+    <SettingsScroll refreshControl={<RefreshControl {...pull} />}>
       <SettingsHeader
         icon="models"
         tile="purple"

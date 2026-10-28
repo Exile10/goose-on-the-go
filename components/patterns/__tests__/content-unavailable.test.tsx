@@ -2,8 +2,9 @@
  * The view a screen shows in place of content that did not arrive, rendered in both schemes.
  *
  * What it must never do is the thing it replaced: say the Pond is unreachable a second time under
- * the connection indicator, offer a second retry for the connection, or put a status code or an
- * exception's text in front of a reader. And it must be the same calm view in light and dark,
+ * the connection indicator, offer a button for what the screen's pull to refresh does, or put a
+ * status code or an exception's text in front of a reader. A screen reader, which cannot easily
+ * pull, gets the same retry as an accessibility action on the hint. And it must be the same calm view in light and dark,
  * with the icon in the theme's secondary text colour rather than a red that shouts.
  */
 
@@ -18,7 +19,7 @@ import { ContentUnavailable, type ContentUnavailableProps } from '../content-una
 
 // The app registers lucide's glyphs, which jest cannot load. The names are what is under test.
 const Glyph = () => null;
-registerIcons({ 'cloud-off': Glyph, 'cloud-alert': Glyph, refresh: Glyph });
+registerIcons({ 'cloud-off': Glyph, 'cloud-alert': Glyph });
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -48,11 +49,16 @@ function words(tree: ReactTestRenderer): string[] {
     .filter((child): child is string => typeof child === 'string');
 }
 
-function retryButtons(tree: ReactTestRenderer) {
+function buttons(tree: ReactTestRenderer) {
   return tree.root.findAllByType(InkButton);
 }
 
-/** The state's own icon, which comes before the one inside Try again. */
+/** The pull hint, which is also the screen reader's way to try again. */
+function hints(tree: ReactTestRenderer) {
+  return tree.root.findAll((n) => typeof n.type !== 'string' && Array.isArray(n.props.accessibilityActions));
+}
+
+/** The state's icon. */
 function iconOf(tree: ReactTestRenderer) {
   return tree.root.findAllByType(InkIcon)[0].props;
 }
@@ -69,20 +75,29 @@ describe.each<Scheme>(['light', 'dark'])('ContentUnavailable in %s', (scheme) =>
     expect(words(tree)).toEqual(['Waiting for your Pond', 'This fills in as soon as your Pond is back.']);
     // The connection indicator owns the cause and the action for it.
     expect(words(tree).join(' ')).not.toMatch(/unreachable|unavailable|offline/i);
-    expect(retryButtons(tree)).toHaveLength(0);
+    expect(buttons(tree)).toHaveLength(0);
+    expect(hints(tree)).toHaveLength(0);
     expect(iconOf(tree)).toMatchObject({ name: 'cloud-off', tone: 'neutral' });
   });
 
-  it('gives a failed read a title, one sentence and Try again', () => {
+  it('gives a failed read a title, one sentence and the pull hint, with no button', () => {
+    const tree = render({ state: 'failed', onRetry: jest.fn() }, scheme);
+    expect(words(tree)).toEqual(['This did not load', 'Your Pond had trouble answering.', 'Pull down to try again']);
+    expect(buttons(tree)).toHaveLength(0);
+    expect(iconOf(tree)).toMatchObject({ name: 'cloud-alert', tone: 'neutral' });
+  });
+
+  it('lets a screen reader try again from the hint, since it cannot easily pull', () => {
     const onRetry = jest.fn();
     const tree = render({ state: 'failed', onRetry }, scheme);
-    expect(words(tree)).toEqual([
-      'This did not load',
-      'Your Pond had trouble answering. Try again in a moment.',
-      'Try again',
-    ]);
-    expect(iconOf(tree)).toMatchObject({ name: 'cloud-alert', tone: 'neutral' });
-    act(() => retryButtons(tree)[0].props.onPress());
+    const [hint] = hints(tree);
+    expect(hint.props).toMatchObject({
+      accessible: true,
+      accessibilityRole: 'button',
+      accessibilityLabel: 'Pull down to try again',
+      accessibilityActions: [{ name: 'activate', label: 'Try again' }],
+    });
+    act(() => hint.props.onAccessibilityAction({ nativeEvent: { actionName: 'activate' } }));
     expect(onRetry).toHaveBeenCalledTimes(1);
   });
 
@@ -101,7 +116,7 @@ describe('ContentUnavailable follows the scheme', () => {
   it('draws its words in the theme rather than a fixed colour', () => {
     const light = render({ state: 'failed', onRetry: jest.fn() }, 'light');
     const dark = render({ state: 'failed', onRetry: jest.fn() }, 'dark');
-    for (const text of ['This did not load', 'Your Pond had trouble answering. Try again in a moment.']) {
+    for (const text of ['This did not load', 'Your Pond had trouble answering.']) {
       expect(colourOf(light, text)).toBeTruthy();
       expect(colourOf(light, text)).not.toBe(colourOf(dark, text));
     }
@@ -118,12 +133,12 @@ describe('ContentUnavailable when the connection comes back', () => {
     act(() => tree.update(view({ state: 'failed', onRetry }, 'light')));
     expect(onRetry).toHaveBeenCalledTimes(1);
     expect(words(tree)[0]).toBe('Waiting for your Pond');
-    expect(retryButtons(tree)).toHaveLength(0);
+    expect(hints(tree)).toHaveLength(0);
 
     // The read failed too: now it is this screen's news.
     await act(async () => settle());
     expect(words(tree)[0]).toBe('This did not load');
-    expect(retryButtons(tree)).toHaveLength(1);
+    expect(hints(tree)).toHaveLength(1);
   });
 
   it('does not read again on its own for a failure that was never an outage', () => {

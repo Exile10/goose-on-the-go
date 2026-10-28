@@ -17,6 +17,7 @@ import { InkButton, InkCard, InkNotice, InkSpinner, InkText, InkTitle, inkText, 
 import { ContentUnavailable } from '@/components/patterns/content-unavailable';
 import { isUnavailable } from '@/models/content-state';
 import { useContentState } from '@/view-models/use-content-state';
+import { usePullToRefresh } from '@/view-models/use-pull-to-refresh';
 import { GKeyboardView } from '@/components/ui/g-keyboard-view';
 import { GPressable } from '@/components/ui/g-pressable';
 import { Semantic } from '@/constants/colors';
@@ -36,7 +37,8 @@ export default function WebSearchScreen() {
   const theme = useInkTheme();
   // Not `confirm`: that name is the success haptic here.
   const ask = useConfirm();
-  const { data, loading, refreshing, saving, removing, error, keyError, failed, unsupported, actions } = useWebSearch();
+  const { data, loading, saving, removing, error, keyError, failed, unsupported, actions } = useWebSearch();
+  const pull = usePullToRefresh(actions.refresh);
 
   const busy = saving || removing;
   // The page is a form over the Pond's search setting, so it has content once a read has worked.
@@ -65,8 +67,6 @@ export default function WebSearchScreen() {
     actions.openDashboard();
   }, [actions]);
 
-  const handleRefresh = useCallback(() => void actions.refresh(), [actions]);
-
   const inputStyle = [styles.inputRow, keyError ? styles.inputRowInvalid : null];
   const errorText = inkText(theme, { size: 'sm', weight: theme.weight.medium, color: theme.color.dangerFg });
 
@@ -77,7 +77,7 @@ export default function WebSearchScreen() {
         contentContainerStyle={styles.scroll}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
+        refreshControl={<RefreshControl {...pull} />}
       >
         {loading ? <InkSpinner label={t('webSearch.loading')} /> : null}
 
@@ -89,7 +89,7 @@ export default function WebSearchScreen() {
         ) : null}
 
         {unavailable ? (
-          <ContentUnavailable state={state} reason={error} onRetry={handleRefresh} />
+          <ContentUnavailable state={state} reason={error} onRetry={actions.refresh} />
         ) : error ? (
           <InkNotice tone="danger">{error}</InkNotice>
         ) : null}

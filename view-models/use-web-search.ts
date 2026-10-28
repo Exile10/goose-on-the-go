@@ -107,8 +107,6 @@ export interface UseWebSearch {
   };
   /** The first read is out and nothing is known yet. */
   loading: boolean;
-  /** A read somebody asked for is out, over a status already on screen. */
-  refreshing: boolean;
   saving: boolean;
   removing: boolean;
   /** A read or a removal failed, in words. Null also when the connection banner already said it. */
@@ -284,7 +282,6 @@ export function useWebSearch(): UseWebSearch {
       canSave: draft.trim().length > 0 && !saving && !removing,
     },
     loading: reading && state === null,
-    refreshing: reading && state !== null,
     saving,
     removing,
     error,

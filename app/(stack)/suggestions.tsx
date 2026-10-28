@@ -7,13 +7,14 @@
  */
 
 import React from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { InkButton, InkCard, InkEmptyState, InkNotice, InkSpinner, InkText } from '@jarida/ink/native';
 
 import { ContentUnavailable } from '@/components/patterns/content-unavailable';
 import { isUnavailable } from '@/models/content-state';
 import { useContentState } from '@/view-models/use-content-state';
+import { usePullToRefresh } from '@/view-models/use-pull-to-refresh';
 import { useProposals } from '@/view-models/use-proposals';
 import { useThemedStyles } from '@/hooks/use-themed-styles';
 import type { ThemeColors } from '@/constants/colors';
@@ -26,10 +27,16 @@ export default function SuggestionsScreen() {
   // A refused refresh with the list still on screen is said above it; a list that never arrived is
   // said once, in its place.
   const state = useContentState({ loading, failed: failed || error !== null, hasContent: data.rows.length > 0 });
+  const pull = usePullToRefresh(actions.refresh);
   const unavailable = isUnavailable(state);
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.scroll}
+      showsVerticalScrollIndicator={false}
+      refreshControl={<RefreshControl {...pull} />}
+    >
       <InkText size="sm" tone="secondary">{t('proposals.intro')}</InkText>
 
       {loading ? <InkSpinner label={t('proposals.list.loading')} /> : null}

@@ -6,13 +6,14 @@
  */
 
 import React, { useCallback } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { InkButton, InkCard, InkEmptyState, InkNotice, InkSpinner, InkText } from '@jarida/ink/native';
 
 import { ContentUnavailable } from '@/components/patterns/content-unavailable';
 import { isUnavailable } from '@/models/content-state';
 import { useContentState } from '@/view-models/use-content-state';
+import { usePullToRefresh } from '@/view-models/use-pull-to-refresh';
 import { useConfirm } from '@/providers/confirm-provider';
 import { useReminders, type ReminderRow } from '@/view-models/use-reminders';
 import { useThemedStyles } from '@/hooks/use-themed-styles';
@@ -27,6 +28,7 @@ export default function RemindersScreen() {
   // A refused refresh with the list still on screen is said above it; a list that never arrived is
   // said once, in its place.
   const state = useContentState({ loading, failed: failed || error !== null, hasContent: data.rows.length > 0 });
+  const pull = usePullToRefresh(actions.refresh);
   const unavailable = isUnavailable(state);
 
   const { dismiss } = actions;
@@ -44,7 +46,12 @@ export default function RemindersScreen() {
   );
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.scroll}
+      showsVerticalScrollIndicator={false}
+      refreshControl={<RefreshControl {...pull} />}
+    >
       <InkText size="sm" tone="secondary">{t('reminders.intro')}</InkText>
 
       {loading ? <InkSpinner label={t('reminders.list.loading')} /> : null}

@@ -2250,7 +2250,8 @@
     "waitingTitle": "Waiting for your Pond",
     "waitingBody": "This fills in as soon as your Pond is back.",
     "failedTitle": "This did not load",
-    "failedBody": "Your Pond had trouble answering. Try again in a moment."
+    "failedBody": "Your Pond had trouble answering.",
+    "pullHint": "Pull down to try again"
   },
   "sessions": {
     "justNow": "Just now",

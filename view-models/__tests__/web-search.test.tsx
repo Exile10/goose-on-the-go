@@ -545,7 +545,7 @@ describe('when the read does not go to plan', () => {
     await m.unmount();
   });
 
-  it('marks a pull to refresh over a status already on screen, rather than a first load', async () => {
+  it('keeps a status already on screen while it is read again, rather than going back to loading', async () => {
     web.webSearchState.mockResolvedValueOnce(stored('ok'));
     const m = await mount();
     const again = deferred<WebSearchState>();
@@ -556,14 +556,13 @@ describe('when the read does not go to plan', () => {
       reading = m.vm.actions.refresh();
     });
 
-    expect(m.vm.refreshing).toBe(true);
     expect(m.vm.loading).toBe(false);
 
     await act(async () => {
       again.resolve(stored('ok'));
       await reading;
     });
-    expect(m.vm.refreshing).toBe(false);
+    expect(m.vm.loading).toBe(false);
     await m.unmount();
   });
 });

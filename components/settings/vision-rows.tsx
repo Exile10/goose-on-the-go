@@ -13,6 +13,7 @@ import { InkEdge, InkSkeleton } from '@jarida/ink/native';
 import { ContentUnavailable } from '@/components/patterns/content-unavailable';
 import { isUnavailable } from '@/models/content-state';
 import { useContentState } from '@/view-models/use-content-state';
+import { useReloadOnPull } from '@/view-models/use-pull-to-refresh';
 import { CameraFrameView } from '@/components/patterns/camera-frame-view';
 import { GIcon } from '@/components/ui/g-icon';
 import { Spacing } from '@/constants/spacing';
@@ -37,6 +38,8 @@ export function VisionStatusCard() {
   const colors = useSettingsColors();
   const m = useSettingsMetrics();
   const { data, loading, error, failed, unsupported, actions } = useVisionStatus(true);
+  // The page's pull reads the camera's status too.
+  useReloadOnPull(actions.refresh);
   const state = useContentState({ loading: false, failed, hasContent: !failed });
 
   // A Pond that cannot say what its camera is doing has nothing to show here.

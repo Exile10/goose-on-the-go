@@ -50,8 +50,6 @@ export interface UseSecrets {
   };
   /** The first read is out and nothing is known yet. */
   loading: boolean;
-  /** A read somebody asked for is out, over a list already on screen. */
-  refreshing: boolean;
   saving: boolean;
   /** The key a deletion is out for, or null. */
   deleting: string | null;
@@ -262,7 +260,6 @@ export function useSecrets(): UseSecrets {
   return {
     data: { keys: keys ?? [], form, draftKey, draftValue, canSave },
     loading: reading && keys === null,
-    refreshing: reading && keys !== null,
     saving,
     deleting,
     error,

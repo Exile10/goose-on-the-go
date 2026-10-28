@@ -7,13 +7,14 @@
  */
 
 import React, { useCallback, useState } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { InkButton, InkChip, InkEmptyState, InkNotice, InkSpinner, InkText } from '@jarida/ink/native';
 
 import { ContentUnavailable } from '@/components/patterns/content-unavailable';
 import { isUnavailable } from '@/models/content-state';
 import { useContentState } from '@/view-models/use-content-state';
+import { usePullToRefresh } from '@/view-models/use-pull-to-refresh';
 import { ConsolidationCard } from '@/components/patterns/consolidation-card';
 import { MemoryCard } from '@/components/patterns/memory-card';
 import { MemorySheet } from '@/components/patterns/memory-sheet';
@@ -34,6 +35,7 @@ export default function MemoriesScreen() {
   // A refused refresh with the list still on screen is said above it; a list that never arrived is
   // said once, in its place.
   const state = useContentState({ loading, failed: failed || error !== null, hasContent: data.memories.length > 0 });
+  const pull = usePullToRefresh(actions.refresh);
   const unavailable = isUnavailable(state);
   const consolidation = useConsolidation(actions.refresh);
   const [filter, setFilter] = useState<MemorySegment | null>(null);
@@ -73,6 +75,7 @@ export default function MemoriesScreen() {
       contentContainerStyle={styles.scroll}
       showsVerticalScrollIndicator={false}
       keyboardShouldPersistTaps="handled"
+      refreshControl={<RefreshControl {...pull} />}
     >
       <ConsolidationCard
         progress={consolidation.progress}

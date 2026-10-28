@@ -30,7 +30,6 @@ const IDLE_DOWNLOADS_MS = 15_000;
 interface Library {
   models: ModelEntry[];
   loaded: boolean;
-  loading: boolean;
   /** The first read, or the last one somebody asked for, failed. */
   readFailed: boolean;
   /** Words for that failure, when there are any beyond the shared ones. */
@@ -46,7 +45,6 @@ interface Library {
 const EMPTY: Library = {
   models: [],
   loaded: false,
-  loading: true,
   readFailed: false,
   error: null,
   downloads: [],
@@ -71,7 +69,7 @@ function subscribe(listener: () => void) {
 }
 
 async function loadModels(loud: boolean): Promise<void> {
-  if (loud) set({ loading: true, readFailed: false, error: null });
+  if (loud) set({ readFailed: false, error: null });
   const mine = ++reads;
   try {
     const [models, memory, disk] = await Promise.all([
@@ -80,13 +78,12 @@ async function loadModels(loud: boolean): Promise<void> {
       api.diskUsage().catch(() => library.disk),
     ]);
     if (mine !== reads) return;
-    set({ models, memory, disk, loaded: true, loading: false, readFailed: false, error: null });
+    set({ models, memory, disk, loaded: true, readFailed: false, error: null });
   } catch (e) {
     if (mine !== reads) return;
     const said = loud || !library.loaded;
     logFailure('models', said ? 'read failed' : 'refresh failed; showing the last list', e);
-    if (said) set({ loading: false, readFailed: true, error: describeApiError(e) });
-    else set({ loading: false });
+    if (said) set({ readFailed: true, error: describeApiError(e) });
   }
 }
 

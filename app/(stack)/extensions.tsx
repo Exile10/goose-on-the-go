@@ -10,7 +10,7 @@ import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import React, { useCallback, useState } from 'react';
 import { InkButton, InkEmptyState, InkNotice, InkSegmented, InkSpinner, InkSwitch, InkText, InkTitle } from '@jarida/ink/native';
-import { View, Text, StyleSheet, ScrollView, TextInput } from 'react-native';
+import { RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { GIcon } from '@/components/ui/g-icon';
 import { GKeyboardView } from '@/components/ui/g-keyboard-view';
@@ -26,6 +26,7 @@ import type { Extension, MarketplaceExtension } from '@/services/types';
 import { ContentUnavailable } from '@/components/patterns/content-unavailable';
 import { isUnavailable } from '@/models/content-state';
 import { useContentState } from '@/view-models/use-content-state';
+import { usePullToRefresh } from '@/view-models/use-pull-to-refresh';
 import { credentialFields, useExtensions } from '@/view-models/use-extensions';
 
 const STATUS_COLORS: Record<string, string> = {
@@ -332,6 +333,7 @@ export default function ExtensionsScreen() {
     hasContent: data.installed.length > 0 || data.available.length > 0,
   });
   const unavailable = isUnavailable(state);
+  const pull = usePullToRefresh(actions.refresh);
 
   return (
     <GKeyboardView>
@@ -339,6 +341,7 @@ export default function ExtensionsScreen() {
         style={styles.container}
         contentContainerStyle={styles.scroll}
         showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl {...pull} />}
       >
         {state === 'loading' ? (
           <InkSpinner label={t('extensions.loading')} />

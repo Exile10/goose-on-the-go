@@ -4,6 +4,7 @@
  */
 
 import React from 'react';
+import { RefreshControl } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 
@@ -14,6 +15,7 @@ import { candidatesFor, formatMegabytes, MODEL_ROLES, titleOf } from '@/models/m
 import { selectionTick } from '@/services/haptics';
 import type { ModelRole } from '@/services/types';
 import { roleAboutKey, roleLabelKey, useModelLibrary } from '@/view-models/use-model-library';
+import { usePullToRefresh } from '@/view-models/use-pull-to-refresh';
 
 export default function ModelRoleScreen() {
   const { t } = useTranslation();
@@ -21,10 +23,11 @@ export default function ModelRoleScreen() {
   const params = useLocalSearchParams<{ role?: string }>();
   const role: ModelRole = MODEL_ROLES.includes(params.role as ModelRole) ? (params.role as ModelRole) : 'chat';
   const lib = useModelLibrary();
+  const pull = usePullToRefresh(lib.actions.refresh);
   const candidates = candidatesFor(lib.models, role);
 
   return (
-    <SettingsScroll>
+    <SettingsScroll refreshControl={<RefreshControl {...pull} />}>
       <SettingsHeader icon="models" tile="purple" title={t(roleLabelKey(role))} description={t(roleAboutKey(role))} />
       {lib.notice ? <SettingsNotice tone={lib.notice.tone === 'danger' ? 'danger' : 'neutral'}>{lib.notice.text}</SettingsNotice> : null}
       <SettingsGroup>

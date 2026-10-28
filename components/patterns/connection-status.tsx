@@ -68,7 +68,7 @@ function stateIcon(state: ConnectionState): IconName {
 }
 
 /**
- * The app's one statement that the Pond cannot be used, and the control that acts on it.
+ * The app's one statement that the Pond cannot be used.
  *
  * Screens do not repeat it: while it is up, content that did not arrive shows only that it will
  * fill in (`ContentUnavailable`), and Home's Pond card drops its own reachability title. That is
@@ -78,9 +78,18 @@ function stateIcon(state: ConnectionState): IconName {
  * A working connection says nothing (`connectionNeedsAttention`). The strip sits above the
  * navigator, over the notification bar, and pushes every screen down, so paying that permanently
  * to report "Connected locally" spent the status bar on news that nothing is wrong. It is quiet when
- * it does appear -- the secondary surface and a hairline, not a coloured slab -- and its action is a
- * labelled control rather than the whole strip being tappable with nothing to say so: Try again
- * where another attempt can help, Pair where only pairing can.
+ * it does appear -- the secondary surface and a hairline, not a coloured slab.
+ *
+ * It carries no Try again. Another attempt is a downward swipe on the screen underneath, as it is
+ * in most apps (`usePullToRefresh`), which looks for the Pond and reads the screen again in one
+ * gesture. The only button left is Pair, where only pairing can help (`connectionActionIsPairing`):
+ * that is a different action, not a refresh. There is no "Checking" either: the pull's own spinner
+ * shows the attempt where the finger is, and the attempt itself turns the strip to "Reconnecting"
+ * once it has run past the grace period, so a third word for it would say the same thing again.
+ *
+ * A screen reader cannot easily pull to refresh, so where another attempt can help the strip
+ * carries it as an accessibility action: TalkBack and VoiceOver read the sentence, the hint says to
+ * pull down, and a double tap tries again. A sighted tap on the strip does nothing.
  */
 export function ConnectionStatus() {
   const { connectionState, recover, hydrated } = useServer();
@@ -90,41 +99,30 @@ export function ConnectionStatus() {
   const router = useRouter();
   const segments = useSegments();
   const insets = useSafeAreaInsets();
-  const [checking, setChecking] = useState(false);
-  const pairing = connectionActionIsPairing(connectionState);
-
-  const act = async () => {
-    if (pairing) {
-      router.push('/(stack)/pond-pairing');
-      return;
-    }
-    setChecking(true);
-    try {
-      await recover();
-    } finally {
-      setChecking(false);
-    }
-  };
 
   // Before the saved pairing has loaded, the state is a placeholder, not news.
   if (!hydrated || !connectionNeedsAttention(connectionState) || bannerHiddenOn(segments)) return null;
-  // A reconnect is already the attempt Try again would make, so it offers nothing to press.
-  const action = connectionState === 'reconnecting' ? null : pairing ? t('connection.actionPair') : checking ? t('pond.checking') : t('common.retry');
+  const pairing = connectionActionIsPairing(connectionState);
+  // A reconnect is already the attempt a pull would make, so it offers nothing to trigger.
+  const retryable = !pairing && connectionState !== 'reconnecting';
+  const label = stateLabel(t, connectionState);
   const banner = (
     <View style={[styles.container, { paddingTop: insets.top + Spacing.sm }]}>
-      <GIcon name={stateIcon(connectionState)} size={16} color={colors.textSecondary} />
-      <Text accessibilityLiveRegion="polite" style={styles.text}>
-        {stateLabel(t, connectionState)}
-      </Text>
-      {action ? (
-        <Pressable
-          accessibilityRole="button"
-          accessibilityState={{ busy: checking }}
-          disabled={checking}
-          hitSlop={Spacing.md}
-          onPress={() => void act()}
-        >
-          <Text style={[styles.action, checking && styles.actionBusy]}>{action}</Text>
+      <View
+        style={styles.statement}
+        accessible
+        accessibilityLiveRegion="polite"
+        accessibilityLabel={label}
+        accessibilityHint={retryable ? t('contentState.pullHint') : undefined}
+        accessibilityActions={retryable ? [{ name: 'activate', label: t('common.retry') }] : undefined}
+        onAccessibilityAction={retryable ? () => void recover() : undefined}
+      >
+        <GIcon name={stateIcon(connectionState)} size={16} color={colors.textSecondary} />
+        <Text style={styles.text}>{label}</Text>
+      </View>
+      {pairing ? (
+        <Pressable accessibilityRole="button" hitSlop={Spacing.md} onPress={() => router.push('/(stack)/pond-pairing')}>
+          <Text style={styles.action}>{t('connection.actionPair')}</Text>
         </Pressable>
       ) : null}
     </View>
@@ -152,7 +150,7 @@ const makeStyles = (c: ThemeColors) =>
       borderBottomWidth: StyleSheet.hairlineWidth,
       borderBottomColor: c.border,
     },
+    statement: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
     text: { flex: 1, color: c.text, fontSize: FontSize.sm },
     action: { color: c.textBrand, fontSize: FontSize.sm, fontWeight: FontWeight.semibold },
-    actionBusy: { color: c.textTertiary },
   });

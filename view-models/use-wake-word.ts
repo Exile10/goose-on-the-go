@@ -19,7 +19,7 @@ export interface UseWakeWord {
   saving: boolean;
   failed: boolean;
   error: string | null;
-  actions: { patch: (change: Partial<WakeChoice>) => void; save: () => Promise<void>; reload: () => void };
+  actions: { patch: (change: Partial<WakeChoice>) => void; save: () => Promise<void>; reload: () => Promise<void> };
 }
 
 export function useWakeWord(): UseWakeWord {
@@ -53,6 +53,6 @@ export function useWakeWord(): UseWakeWord {
     saving: !!pond.saving.voice_wake_word,
     failed: pond.failed,
     error: pond.fieldErrors.voice_wake_word ?? null,
-    actions: { patch, save, reload: () => void refresh() },
+    actions: { patch, save, reload: refresh },
   };
 }

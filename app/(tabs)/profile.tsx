@@ -4,7 +4,7 @@
  */
 
 import React, { useCallback, useMemo, useState } from 'react';
-import { Keyboard, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { Keyboard, Pressable, RefreshControl, ScrollView, Text, TextInput, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -35,6 +35,7 @@ import { hapticsEnabled, saveHapticsPreference, selectionTick } from '@/services
 import { initialOf, useHousehold } from '@/view-models/use-household';
 import { logFailure } from '@/view-models/describe-error';
 import { usePondSettings } from '@/view-models/use-pond-settings';
+import { PullSectionsProvider, useReloadOnPull, usePullSections, usePullToRefresh } from '@/view-models/use-pull-to-refresh';
 import { summarize, useSummaryExtras } from '@/view-models/use-settings-extras';
 import { useSettingsIssues } from '@/view-models/use-settings-issues';
 import { useSettingsSearch, type SettingsSearchEntry } from '@/view-models/use-settings-search';
@@ -47,7 +48,9 @@ function AccountRow({ onPress }: { onPress: () => void }) {
   const { t } = useTranslation();
   const styles = useSettingsStyles(makeStyles);
   const colors = useSettingsColors();
-  const { data: household } = useHousehold();
+  const { data: household, actions: householdActions } = useHousehold();
+  // The hub's pull reads who this is and what the Pond holds, too.
+  useReloadOnPull(householdActions.refresh);
   const { serverUrl } = useServer();
   const { member, pondName, counts } = household;
   const [pressed, setPressed] = useState(false);
@@ -122,7 +125,13 @@ export default function ProfileHub() {
   const [hapticsOn, setHapticsOn] = useState(hapticsEnabled);
   const chrome = useChromeScroll();
   const bottomInset = useBottomBarInset();
-  const { settings } = usePondSettings();
+  const { settings, actions: settingsActions } = usePondSettings();
+  const { registry, reload: reloadSections } = usePullSections();
+  const reloadHub = useCallback(
+    () => Promise.all([settingsActions.refresh(), reloadSections()]),
+    [settingsActions, reloadSections],
+  );
+  const pull = usePullToRefresh(reloadHub);
   const issues = useSettingsIssues();
   const extras = useSummaryExtras(SUMMARY_IDS);
   const search = useSettingsSearch();
@@ -180,6 +189,7 @@ export default function ProfileHub() {
         // A result can be tapped while the keyboard is still up, and a scroll puts it away.
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
+        refreshControl={<RefreshControl {...pull} />}
       >
         <InkTitle style={styles.title}>{t('screens.settings')}</InkTitle>
 
@@ -211,7 +221,9 @@ export default function ProfileHub() {
           <>
           <IssueRows issues={issues} />
 
-          <AccountRow onPress={() => go(ACCOUNT_ROUTE)} />
+          <PullSectionsProvider value={registry}>
+            <AccountRow onPress={() => go(ACCOUNT_ROUTE)} />
+          </PullSectionsProvider>
 
           {PROFILE_NAV.map((group) => (
             <View key={group.groupKey} accessibilityLabel={t(group.groupKey)}>

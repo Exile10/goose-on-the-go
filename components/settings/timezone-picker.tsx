@@ -3,8 +3,8 @@
  * The phone's zone is offered first, since it is nearly always the answer.
  */
 
-import React, { useMemo, useState } from 'react';
-import { FlatList, Pressable, Text, TextInput, View } from 'react-native';
+import React, { useCallback, useMemo, useState } from 'react';
+import { FlatList, Pressable, RefreshControl, Text, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { InkSpinner } from '@jarida/ink/native';
@@ -12,6 +12,7 @@ import { InkSpinner } from '@jarida/ink/native';
 import { ContentUnavailable } from '@/components/patterns/content-unavailable';
 import { isUnavailable } from '@/models/content-state';
 import { useContentState } from '@/view-models/use-content-state';
+import { usePullToRefresh } from '@/view-models/use-pull-to-refresh';
 import { GIcon } from '@/components/ui/g-icon';
 import { Spacing } from '@/constants/spacing';
 import { selectionTick } from '@/services/haptics';
@@ -35,6 +36,10 @@ export function TimezonePickerScreen() {
   const current = vm.settings?.timezone ?? '';
   const phoneZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const matches = useMemo(() => searchZones(zones.items, query), [zones.items, query]);
+  // The zone list and the zone the Pond is set to are two reads; a pull makes both.
+  const { refresh: refreshZones } = zones;
+  const reloadZones = useCallback(() => Promise.all([refreshZones(), vm.actions.refresh()]), [refreshZones, vm.actions]);
+  const pull = usePullToRefresh(reloadZones);
 
   const choose = (zone: string) => {
     void selectionTick();
@@ -77,6 +82,7 @@ export function TimezonePickerScreen() {
         keyboardDismissMode="on-drag"
         initialNumToRender={24}
         contentContainerStyle={padding}
+        refreshControl={<RefreshControl {...pull} />}
         ListHeaderComponent={
           <>
             <View style={styles.search}>

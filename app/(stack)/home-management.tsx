@@ -8,6 +8,7 @@
  */
 
 import React, { useCallback, useState } from 'react';
+import { RefreshControl } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { InkSpinner } from '@jarida/ink/native';
@@ -15,6 +16,7 @@ import { InkSpinner } from '@jarida/ink/native';
 import { ContentUnavailable } from '@/components/patterns/content-unavailable';
 import { isUnavailable } from '@/models/content-state';
 import { useContentState } from '@/view-models/use-content-state';
+import { usePullToRefresh } from '@/view-models/use-pull-to-refresh';
 import { RoomSheet } from '@/components/patterns/room-sheet';
 import { SettingsGroup, SettingsMessage, SettingsRow, TILE_INSET } from '@/components/settings/settings-list';
 import { SettingsNotice, SettingsScroll } from '@/components/settings/settings-scroll';
@@ -44,6 +46,7 @@ export default function HomeManagementScreen() {
   const { devices, rooms } = data;
   const state = useContentState({ loading, failed, hasContent: devices.length > 0 });
   const unavailable = isUnavailable(state);
+  const pull = usePullToRefresh(actions.refresh);
 
   // Not `confirm`: that name is the success haptic here.
   const ask = useConfirm();
@@ -78,7 +81,7 @@ export default function HomeManagementScreen() {
         : t('connection.offline');
 
   return (
-    <SettingsScroll>
+    <SettingsScroll refreshControl={<RefreshControl {...pull} />}>
       {!unavailable && error ? <SettingsNotice tone="danger">{error}</SettingsNotice> : null}
       {actionError ? <SettingsNotice tone="danger">{actionError}</SettingsNotice> : null}
 

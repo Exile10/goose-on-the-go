@@ -22,6 +22,7 @@ import { EVENT_FILTERS, filterLabel } from '@/models/vision';
 import { selectionTick } from '@/services/haptics';
 import type { CameraEvent } from '@/services/types';
 import { useContentState } from '@/view-models/use-content-state';
+import { usePullToRefresh } from '@/view-models/use-pull-to-refresh';
 import { useCreateRule } from '@/view-models/use-rules';
 import { useFaces } from '@/view-models/use-faces';
 import { usePondSettings } from '@/view-models/use-pond-settings';
@@ -47,7 +48,6 @@ export default function VisionEventsScreen() {
   const { nameOf } = useFaces();
   const createRule = useCreateRule();
   const [openId, setOpenId] = useState<number | null>(null);
-  const [refreshing, setRefreshing] = useState(false);
   // Without the settings there is no camera to ask about, so their failure is this screen's.
   const settingsState = useContentState({ loading: !settings.failed, failed: settings.failed, hasContent: false });
   const state = useContentState({ loading, failed: failed || error !== null, hasContent: data.events.length > 0 });
@@ -57,15 +57,12 @@ export default function VisionEventsScreen() {
   const onOpen = useCallback((event: CameraEvent) => setOpenId(event.id), []);
   const closeSheet = useCallback(() => setOpenId(null), []);
 
-  const refresh = useCallback(async () => {
-    setRefreshing(true);
-    await actions.refresh();
-    setRefreshing(false);
-  }, [actions]);
+  // Before there is a camera the page is the settings that name it, so a pull reads those.
+  const pull = usePullToRefresh(cameraId === null ? settings.actions.refresh : actions.refresh);
 
   if (cameraId === null) {
     return (
-      <ScrollView style={styles.container} contentContainerStyle={styles.scroll}>
+      <ScrollView style={styles.container} contentContainerStyle={styles.scroll} refreshControl={<RefreshControl {...pull} />}>
         {isUnavailable(settingsState) ? (
           <ContentUnavailable state={settingsState} reason={settings.error} onRetry={settings.actions.refresh} />
         ) : (
@@ -159,7 +156,7 @@ export default function VisionEventsScreen() {
         ListEmptyComponent={empty}
         contentContainerStyle={styles.scroll}
         showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void refresh()} />}
+        refreshControl={<RefreshControl {...pull} />}
         windowSize={7}
         initialNumToRender={8}
         // A name arriving redraws the rows that were waiting for it.

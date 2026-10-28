@@ -11,6 +11,7 @@ import { InkButton, InkEmptyState, InkNotice, InkSpinner, InkText } from '@jarid
 import { ContentUnavailable } from '@/components/patterns/content-unavailable';
 import { isUnavailable } from '@/models/content-state';
 import { useContentState } from '@/view-models/use-content-state';
+import { useReloadOnPull } from '@/view-models/use-pull-to-refresh';
 import { AutomationCard } from '@/components/patterns/automation-card';
 import { AutomationFormSheet } from '@/components/patterns/automation-form-sheet';
 import type { Rule } from '@/services/types';
@@ -20,6 +21,8 @@ import { Spacing } from '@/constants/spacing';
 export function AutomationsTab() {
   const { t } = useTranslation();
   const { data, loading, error, failed, actions } = useRules();
+  // The scroll, and so the pull, is the Schedule screen's.
+  useReloadOnPull(actions.refresh);
   // A refused refresh with the list still on screen is said above it; a list that never arrived is
   // said once, in its place.
   const state = useContentState({ loading, failed: failed || error !== null, hasContent: data.rules.length > 0 });

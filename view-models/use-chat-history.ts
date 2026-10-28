@@ -387,8 +387,6 @@ export interface UseChatHistory {
    * later refresh keeps the old wall up instead.
    */
   loading: boolean;
-  /** A pull-to-refresh is in flight. */
-  refreshing: boolean;
   /** No read of the list has worked yet and the last one failed: the wall is unknown, not empty. */
   failed: boolean;
   /**
@@ -397,8 +395,8 @@ export interface UseChatHistory {
    */
   error: string | null;
   actions: {
-    /** `quiet` keeps what is on screen until the answer lands. */
-    refresh: (mode?: 'pull' | 'quiet') => Promise<void>;
+    /** Keeps what is on screen until the answer lands. */
+    refresh: () => Promise<void>;
     setQuery: (query: string) => void;
     setFilter: (filter: HistoryFilter) => void;
     /**
@@ -420,7 +418,6 @@ export interface UseChatHistory {
 export function useChatHistory(): UseChatHistory {
   const { t, i18n } = useTranslation();
   const [sessions, setSessions] = useState<SessionSummary[] | null>(null);
-  const [refreshing, setRefreshing] = useState(false);
   // Two, because they end differently: a load failure ends when a load works,
   // and a refused delete ends when the reader moves on — not when the re-read
   // that follows it succeeds a moment later. A failed re-read after the wall
@@ -468,7 +465,7 @@ export function useChatHistory(): UseChatHistory {
   const arrived = useRef(false);
 
   // Sets nothing until the answer lands, so the effect below can call it
-  // without rendering twice. The spinner a pull wants is `pull`'s business.
+  // without rendering twice. The spinner a pull wants is the screen's `usePullToRefresh`.
   const load = useCallback(() => {
     if (!hydrated) return Promise.resolve();
     if (inFlight.current) return inFlight.current;
@@ -484,7 +481,6 @@ export function useChatHistory(): UseChatHistory {
         setLoadFailed(true);
         setLoadReason(describeApiError(e));
       } finally {
-        setRefreshing(false);
         inFlight.current = null;
       }
     })();
@@ -501,18 +497,14 @@ export function useChatHistory(): UseChatHistory {
 
   // What the screen calls: on focus, and on a pull. Either is the reader
   // moving on, so a failed delete stops being news here and not before.
-  const refresh = useCallback(
-    (mode: 'pull' | 'quiet' = 'quiet') => {
-      setActionError(null);
-      if (mode === 'pull' && hydrated) setRefreshing(true);
-      // Asking again after a wall that never arrived goes back to the loading ghosts, so Try again
-      // visibly does something rather than leaving the failure up until the answer lands.
-      // A ref, not `sessions`: the screen re-runs its focus effect whenever this changes identity.
-      if (!arrived.current) setLoadFailed(false);
-      return load();
-    },
-    [hydrated, load],
-  );
+  const refresh = useCallback(() => {
+    setActionError(null);
+    // Asking again after a wall that never arrived goes back to the loading ghosts, so a pull
+    // visibly does something rather than leaving the failure up until the answer lands.
+    // A ref, not `sessions`: the screen re-runs its focus effect whenever this changes identity.
+    if (!arrived.current) setLoadFailed(false);
+    return load();
+  }, [load]);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -599,7 +591,6 @@ export function useChatHistory(): UseChatHistory {
   return {
     data: { cards, sections, total: all.length, query, filter, view: view ?? 'grid' },
     loading: (sessions === null && !loadFailed) || view === null,
-    refreshing,
     failed: loadFailed && sessions === null,
     error: actionError ?? (sessions === null ? loadReason : null),
     actions: { refresh, setQuery, setFilter, setView, remove, removeMany },

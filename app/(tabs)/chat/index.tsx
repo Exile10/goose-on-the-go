@@ -58,6 +58,7 @@ import type { ThemeColors } from '@/constants/colors';
 import { Spacing } from '@/constants/spacing';
 import { isUnavailable } from '@/models/content-state';
 import { useContentState } from '@/view-models/use-content-state';
+import { usePullToRefresh } from '@/view-models/use-pull-to-refresh';
 import {
   useChatHistory,
   type HistoryFilter,
@@ -262,6 +263,7 @@ export default function ConversationsScreen() {
   }, [confirmingMany, selecting, stopSelecting]);
 
   const state = useContentState({ loading: history.loading, failed: history.failed, hasContent: total > 0 });
+  const pull = usePullToRefresh(refresh);
   const unavailable = isUnavailable(state);
   // A count, or nothing. "Nothing here yet" above a list that failed to load was a claim nobody
   // made, and above an empty one it said what the empty state below already says.
@@ -317,8 +319,7 @@ export default function ConversationsScreen() {
     onDelete: deleteCard,
     onKeep: keep,
     onToggle: toggleSelected,
-    refreshing: history.refreshing,
-    onRefresh: () => void refresh('pull'),
+    ...pull,
     onScroll: chrome.onScroll,
     scrollEventThrottle: chrome.scrollEventThrottle,
     bottomInset: barInset + DOCK_GAP + PUCK_SIZE + Spacing.lg,
