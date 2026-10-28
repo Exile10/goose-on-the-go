@@ -1413,3 +1413,132 @@ export interface CalibrationTake {
   target_count: number;
   complete: boolean;
 }
+
+/**
+ * A row of `GET /api/v1/recipes`. An agent is a recipe whose YAML has a `giap_role` block
+ * (goose-in-a-pond PAI-6 section 9); the others are plain recipes and are not shown as agents.
+ */
+export interface AgentRecipe {
+  /** The key `PUT` and `DELETE /recipes/{id}` take. */
+  id: string;
+  /** Unique; other agents name it to hand work to it, and its prefill is listed under it. */
+  name: string;
+  description?: string;
+  yaml: string;
+  /** Absent on older rows, which are on. */
+  active?: boolean;
+  created_at?: string;
+  /** The YAML's own `title`, parsed by the Pond; may be empty. */
+  title?: string;
+  /** The member whose paired device first saved it, or null when no member did. */
+  owner_profile_id?: string | null;
+}
+
+/** One problem `POST /recipes/validate` found, at its field's path, such as `giap_role.instructions`. */
+export interface RecipeFieldError {
+  path: string;
+  message: string;
+}
+
+/** `POST /api/v1/recipes/validate`: a 200 whether or not the block is acceptable. */
+export interface RecipeValidation {
+  ok: boolean;
+  role: { name: string; tool_groups: string[]; preamble_chars: number } | null;
+  errors: RecipeFieldError[];
+}
+
+/** A shipped agent template `GET /api/v1/agents/suggestions` offers because this Pond can run it. */
+export interface AgentSuggestion {
+  /** The key the enable and dismiss routes take. */
+  template: string;
+  title: string;
+  description: string;
+  /** Why it fits this Pond, in the Pond's words. */
+  why: string;
+  /** What it uses that this Pond has, such as presence or a camera. */
+  needs: string[];
+  /** When it would run, such as "Every weekday at 7:00". */
+  activations_summary: string;
+}
+
+export type PrefillKind = 'default' | 'member';
+
+/**
+ * Where an agent's saved prefill stands. `idle` is one put away after `retention_days` unused; its
+ * next run compiles it again.
+ */
+export type PrefillStatus = 'ready' | 'building' | 'queued' | 'idle' | 'not_built' | 'failed';
+
+export interface AgentPrefill {
+  agent: string;
+  kind: PrefillKind;
+  status: PrefillStatus;
+  compiled_at: string | null;
+  last_used_at: string | null;
+}
+
+/** The pass the Pond is running, if any: `current` is the agent being compiled now. */
+export interface PrefillBuilding {
+  active: boolean;
+  current: string | null;
+  done: number;
+  total: number;
+}
+
+/** `GET /api/v1/agents/prefills`. */
+export interface AgentPrefills {
+  building: PrefillBuilding;
+  retention_days: number;
+  agents: AgentPrefill[];
+}
+
+/** Where a long task is (pond-core `LongTaskState`). The last three are the ends it cannot leave. */
+export type LongTaskState = 'planning' | 'running' | 'awaiting_approval' | 'paused' | 'completed' | 'failed' | 'cancelled';
+
+export type LongTaskStepState = 'pending' | 'running' | 'completed' | 'failed' | 'skipped' | 'awaiting_approval';
+
+export interface LongTaskStep {
+  key: string;
+  /** The agent doing it, by name: a built-in such as `long-task-worker`, or a household agent. */
+  role: string;
+  state: LongTaskStepState;
+  attempts: number;
+  summary: string | null;
+  failure: string | null;
+}
+
+/** What a step wrote, without its body; `GET .../artifacts/{id}` has the body. */
+export interface LongTaskArtifact {
+  id: string;
+  task_id: string;
+  step_key: string | null;
+  kind: string;
+  title: string;
+  summary: string;
+  tokens: number;
+  created_at: string;
+}
+
+/** `GET /api/v1/long-tasks/{id}`. */
+export interface LongTask {
+  id: string;
+  goal: string;
+  state: LongTaskState;
+  origin_session_id: string | null;
+  created_at: string;
+  updated_at: string;
+  finished_at: string | null;
+  steps: LongTaskStep[];
+  artifacts: LongTaskArtifact[];
+  /** The artifact that answers the goal, once there is one. */
+  result_artifact_id: string | null;
+}
+
+/** `GET /api/v1/long-tasks/{id}/artifacts/{artifact_id}`: `body` is markdown. */
+export interface LongTaskArtifactBody {
+  id: string;
+  title: string;
+  kind: string;
+  summary: string;
+  body: string;
+}

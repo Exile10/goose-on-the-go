@@ -127,6 +127,17 @@ describe('describeCron', () => {
     expect(describeCron('0 0 9 * * 1,3')).toBe('Every Monday, Wednesday at 09:00');
   });
 
+  /** Agents' schedules are written with day names, as pond-desktop writes them. */
+  it('reads days written as names', () => {
+    expect(describeCron('0 0 7 * * MON-FRI')).toBe('Weekdays at 07:00');
+    expect(describeCron('0 0 10 * * SAT,SUN')).toBe('Weekends at 10:00');
+    expect(describeCron('0 0 10 * * SAT-SUN')).toBe('Weekends at 10:00');
+    expect(describeCron('0 0 9 * * MON')).toBe('Every Monday at 09:00');
+    expect(describeCron('0 30 18 * * mon,WED')).toBe('Every Monday, Wednesday at 18:30');
+    expect(describeCron('0 0 7 * * FRI-MON')).toBeNull();
+    expect(describeCron('0 0 7 * * MONDAY')).toBeNull();
+  });
+
   it('reads daily, weekday and weekend crons', () => {
     expect(describeCron('0 0 7 * * *')).toBe('Every day at 07:00');
     expect(describeCron('0 0 7 * * 1-5')).toBe('Weekdays at 07:00');
@@ -151,7 +162,6 @@ describe('describeCron', () => {
   it('says nothing for a shape it does not read', () => {
     expect(describeCron('0 9 * * 1-5')).toBeNull(); // five fields
     expect(describeCron('*/10 * * * * *')).toBeNull(); // seconds step
-    expect(describeCron('0 0 9 * * MON')).toBeNull(); // weekday name
     expect(describeCron('0 0 9-17 * * *')).toBeNull(); // hour range
     expect(describeCron('0 0 9 1 * 1')).toBeNull(); // day of month and weekday together
     expect(describeCron('@once')).toBeNull();

@@ -3,6 +3,8 @@ import { File } from 'expo-file-system';
 import { assertPondTrust, PondTrustError, pondTrustFailed } from './pond-trust';
 import { isInsecureDevOrigin, isLocalPairingUrl, normalizePondUrl } from '@/models/connection';
 import { readWebSearch } from '@/models/web-search';
+import { readPrefills } from '@/models/agents';
+import { readLongTask } from '@/models/long-tasks';
 /**
  * PondApiClient — HTTP client for goose-in-a-pond.
  *
@@ -24,6 +26,12 @@ import { randomBytes } from './secure-random';
 import { timeoutSignal } from './http';
 import { readSse, type SseEvent } from './sse';
 import type {
+  LongTask,
+  LongTaskArtifactBody,
+  AgentPrefills,
+  AgentRecipe,
+  AgentSuggestion,
+  RecipeValidation,
   ActivityPurge,
   RidePoint,
   RideQuote,
@@ -2007,6 +2015,97 @@ export class PondApiClient {
   /** Cancel a booked ride. The ride company may charge a cancellation fee. */
   cancelRide(id: string): Promise<void> {
     return this.post<void>(`/api/v1/rides/${encodeURIComponent(id)}/cancel`, {});
+  }
+
+  /**
+   * Every recipe the Pond holds, agents and plain recipes alike. A body that is not a list throws
+   * rather than passing for an empty one, which would tell somebody their agents were gone.
+   */
+  async listRecipes(): Promise<AgentRecipe[]> {
+    const res = await this.get<unknown>('/api/v1/recipes');
+    if (!Array.isArray(res)) throw new Error('The Pond answered the recipe listing with something unexpected');
+    return res.filter(
+      (r): r is AgentRecipe =>
+        !!r && typeof r === 'object' && typeof r.id === 'string' && typeof r.name === 'string' && typeof r.yaml === 'string',
+    );
+  }
+
+  /** The Pond makes the member whose paired device sends it the owner. A name already taken is replaced. */
+  createRecipe(req: { name: string; description: string; yaml: string }): Promise<AgentRecipe> {
+    return this.post<AgentRecipe>('/api/v1/recipes', req);
+  }
+
+  /** A 422 when a copy of a shipped agent would widen its tools. */
+  updateRecipe(id: string, patch: { description?: string; yaml?: string; active?: boolean }): Promise<AgentRecipe> {
+    return this.put<AgentRecipe>(`/api/v1/recipes/${encodeURIComponent(id)}`, patch);
+  }
+
+  /** `DELETE /recipes/{id}`, a 204. Its schedules and events stop with it. */
+  deleteRecipe(id: string): Promise<void> {
+    return this.del<void>(`/api/v1/recipes/${encodeURIComponent(id)}`);
+  }
+
+  /** Checks an agent's `giap_role` block without saving; a refused block is a 200 naming each field. */
+  validateRecipe(yaml: string, name?: string): Promise<RecipeValidation> {
+    return this.post<RecipeValidation>('/api/v1/recipes/validate', name ? { yaml, name } : { yaml });
+  }
+
+  /** The shipped agents this Pond can run for this member, less those declined or already on. */
+  async listAgentSuggestions(): Promise<AgentSuggestion[]> {
+    const res = await this.get<AgentSuggestion[] | { suggestions?: AgentSuggestion[] }>('/api/v1/agents/suggestions');
+    return collection<AgentSuggestion>(res, 'suggestions');
+  }
+
+  /** Copies the template into this member's recipes: a 201 with the recipe, a 409 if it is already on. */
+  async enableAgentSuggestion(template: string): Promise<AgentRecipe> {
+    const res = await this.post<AgentRecipe | { recipe: AgentRecipe }>(
+      `/api/v1/agents/suggestions/${encodeURIComponent(template)}/enable`,
+      {},
+    );
+    return res && typeof res === 'object' && 'recipe' in res ? res.recipe : res;
+  }
+
+  /** A 204; the card stays hidden for this member for good. */
+  dismissAgentSuggestion(template: string): Promise<void> {
+    return this.post<void>(`/api/v1/agents/suggestions/${encodeURIComponent(template)}/dismiss`, {});
+  }
+
+  /** Each agent's saved prefill and the compile pass running now, if any. A 404 is a Pond that predates them. */
+  async agentPrefills(): Promise<AgentPrefills> {
+    const state = readPrefills(await this.get<unknown>('/api/v1/agents/prefills'));
+    if (!state) throw new Error('The Pond answered the prefill listing with something unexpected');
+    return state;
+  }
+
+  /** A 202: the snapshot is thrown away now and compiled again at the Pond's next quiet moment. */
+  rebuildAgentPrefill(name: string): Promise<void> {
+    return this.post<void>(`/api/v1/agents/${encodeURIComponent(name)}/prefill/rebuild`, {});
+  }
+
+  /** A 202, for every agent at once. */
+  rebuildAllPrefills(): Promise<void> {
+    return this.post<void>('/api/v1/agents/prefills/rebuild', {});
+  }
+
+  /** One long task, its steps and its artifacts. A 404 is a task this member does not reach, or none. */
+  async longTask(id: string): Promise<LongTask> {
+    const task = readLongTask(await this.get<unknown>(`/api/v1/long-tasks/${encodeURIComponent(id)}`));
+    if (!task) throw new Error('The Pond answered the long task with something unexpected');
+    return task;
+  }
+
+  /** One artifact's whole body, for reading a task's result. */
+  async longTaskArtifact(taskId: string, artifactId: string): Promise<LongTaskArtifactBody> {
+    const res = await this.get<Partial<LongTaskArtifactBody> | null>(
+      `/api/v1/long-tasks/${encodeURIComponent(taskId)}/artifacts/${encodeURIComponent(artifactId)}`,
+    );
+    if (!res || typeof res.body !== 'string') throw new Error('The Pond answered the artifact with something unexpected');
+    return { id: res.id ?? artifactId, title: res.title ?? '', kind: res.kind ?? '', summary: res.summary ?? '', body: res.body };
+  }
+
+  /** Stops a task; a step under way finishes first. A 409 once it has already ended. */
+  cancelLongTask(id: string): Promise<void> {
+    return this.post<void>(`/api/v1/long-tasks/${encodeURIComponent(id)}/cancel`, {});
   }
 
   // ── Verb helpers ────────────────────────────────────────────

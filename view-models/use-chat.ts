@@ -41,6 +41,8 @@ import { composeMessage, type Attachment } from '@/services/media';
 import { StreamStalledError } from '@/services/sse';
 import type { ChatFrame, SessionMessage } from '@/services/types';
 import { createTurnQueue } from '@/view-models/turn-queue';
+import { MOCK_TASK_REPLY } from '@/models/long-tasks-mock';
+import { mockTaskStart } from '@/view-models/use-long-task';
 
 /** How much of a long conversation is worth reading back on open. */
 const HISTORY_LIMIT = 100;
@@ -486,9 +488,13 @@ export function useChat(): UseChat {
 
       if (!isScreenRealRef.current('chat')) {
         await new Promise((resolve) => setTimeout(resolve, 700));
-        const content = `Working on it. (${trimmed.length} characters received — this is a mock response.)`;
+        // Asking the mock for a long task starts one in the mock Pond, so its chat card can be seen.
+        const tools = /\blong task\b/i.test(trimmed) ? [mockTaskStart(trimmed)] : undefined;
+        const content = tools
+          ? MOCK_TASK_REPLY
+          : `Working on it. (${trimmed.length} characters received — this is a mock response.)`;
         setMessages((m) =>
-          m.map((x) => (x.id === replyId ? { ...x, content, pending: false } : x)),
+          m.map((x) => (x.id === replyId ? { ...x, content, tools, pending: false } : x)),
         );
         setStreaming(false);
         return content;

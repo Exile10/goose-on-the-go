@@ -20,10 +20,12 @@ import { useTranslation } from 'react-i18next';
 import * as WebBrowser from 'expo-web-browser';
 import { InkEdge, InkEyebrow, inkText, useInkTheme } from '@jarida/ink/native';
 
+import { LongTaskCard } from '@/components/patterns/long-task-card';
 import { GIcon } from '@/components/ui/g-icon';
 import { GPressable } from '@/components/ui/g-pressable';
 import { humanizeTool, sourcesOf, toolIcon, toolWords } from '@/constants/tools';
 import type { ToolCall } from '@/models/chat';
+import { startedTaskId } from '@/models/long-tasks';
 import { selectionTick } from '@/services/haptics';
 
 /** How much of a raw tool answer a chip shows when opened: the desktop's 300. */
@@ -301,10 +303,18 @@ function Sources({ tools }: { tools: ToolCall[] }) {
  */
 export const ToolTrail = React.memo(function ToolTrail({ tools, done }: { tools: ToolCall[]; done: boolean }) {
   const [openId, setOpenId] = useState<string | null>(null);
-  const chips = tools.filter((tool) => !hasFact(tool));
+  // A long task the turn started is followed live in place of its chip.
+  const tasks = tools.flatMap((tool) => {
+    const taskId = startedTaskId(tool);
+    return taskId ? [{ call: tool.id, taskId }] : [];
+  });
+  const chips = tools.filter((tool) => !hasFact(tool) && !tasks.some((task) => task.call === tool.id));
   const open = chips.find((tool) => tool.id === openId && expandable(tool));
   return (
     <View style={styles.trail}>
+      {tasks.map((task) => (
+        <LongTaskCard key={task.call} taskId={task.taskId} />
+      ))}
       {tools.map((tool) => (
         <FactCard key={tool.id} tool={tool} />
       ))}

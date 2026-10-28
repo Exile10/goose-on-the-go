@@ -68,6 +68,15 @@ describe('resolveScreenReal', () => {
     expect(resolveScreenReal('logs', release)).toBe(true);
   });
 
+  /**
+   * The agents mock shows a made-up household's agents and compiles that never ran. A release build
+   * on a Pond without the prefill routes says so instead.
+   */
+  it('sends agents to the Pond in a release build', () => {
+    const release = { isDev: false, screenModes: DEFAULT_SCREEN_MODES, defaults: DEFAULT_SCREEN_MODES };
+    expect(resolveScreenReal('agents', release)).toBe(true);
+  });
+
   // Alternating real and mock, with every toggle set the other way, so an
   // answer that reads the wrong record, or neither, cannot pass.
   const defaults = modes((_, i) => i % 2 === 0);

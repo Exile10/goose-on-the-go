@@ -48,6 +48,7 @@ export const PROFILE_NAV: NavGroup[] = [
       { id: 'models', labelKey: 'screens.models', icon: 'models', tile: 'purple', route: '/(stack)/models', summary: 'models' },
       { id: 'memory', labelKey: 'screens.settingsMemory', icon: 'memory', tile: 'teal', route: '/(stack)/settings-memory', summary: 'memory' },
       { id: 'tools', labelKey: 'screens.settingsTools', icon: 'skills', tile: 'orange', route: '/(stack)/settings-tools', summary: 'tools' },
+      { id: 'agents', labelKey: 'screens.agents', icon: 'agent', tile: 'indigo', route: '/(stack)/agents' },
       { id: 'extensions', labelKey: 'screens.extensions', icon: 'link', tile: 'orange', route: '/(stack)/extensions', summary: 'extensions' },
     ],
   },
