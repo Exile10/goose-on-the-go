@@ -14,7 +14,7 @@ import { useConfirm } from '@/providers/confirm-provider';
 import { confirm, reject, tap } from '@/services/haptics';
 import type { LongTaskStep } from '@/services/types';
 import { builtInName } from '@/view-models/agent-words';
-import { progressLine, stepStateLabel, taskStateIcon, taskStateLabel, taskStateNote } from '@/view-models/long-task-words';
+import { progressLine, stepStateLabel, taskEyebrow, taskStateIcon, taskStateLabel, taskStateNote } from '@/view-models/long-task-words';
 import { useLongTask } from '@/view-models/use-long-task';
 
 function Step({ step, first }: { step: LongTaskStep; first: boolean }) {
@@ -41,7 +41,7 @@ function Step({ step, first }: { step: LongTaskStep; first: boolean }) {
   );
 }
 
-export const LongTaskCard = React.memo(function LongTaskCard({ taskId }: { taskId: string }) {
+export const LongTaskCard = React.memo(function LongTaskCard({ taskId, callId }: { taskId: string; callId: string }) {
   const theme = useInkTheme();
   const { t } = useTranslation();
   const ask = useConfirm();
@@ -70,7 +70,7 @@ export const LongTaskCard = React.memo(function LongTaskCard({ taskId }: { taskI
 
   return (
     <InkEdge raised={false} budgeted={false} radius={theme.radius.lg} contentStyle={styles.card}>
-      <InkEyebrow>{t('chat.longTask.eyebrow')}</InkEyebrow>
+      <InkEyebrow>{taskEyebrow(task?.kind ?? null, callId)}</InkEyebrow>
 
       {gone ? <Text style={quiet.style}>{t('chat.longTask.gone')}</Text> : null}
       {!task && !gone && !error ? <InkSpinner label={t('chat.longTask.loading')} size={16} /> : null}

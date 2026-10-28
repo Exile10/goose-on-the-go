@@ -3,7 +3,14 @@
 
 import { bareToolName } from '@/constants/tools';
 import type { ToolCall } from '@/models/chat';
-import type { LongTask, LongTaskArtifact, LongTaskState, LongTaskStep, LongTaskStepState } from '@/services/types';
+import type {
+  DeepResearchAvailability,
+  LongTask,
+  LongTaskArtifact,
+  LongTaskState,
+  LongTaskStep,
+  LongTaskStepState,
+} from '@/services/types';
 
 const TASK_STATES: readonly LongTaskState[] = ['planning', 'running', 'awaiting_approval', 'paused', 'completed', 'failed', 'cancelled'];
 const STEP_STATES: readonly LongTaskStepState[] = ['pending', 'running', 'completed', 'failed', 'skipped', 'awaiting_approval'];
@@ -90,6 +97,7 @@ export function readLongTask(raw: unknown): LongTask | null {
   });
   return {
     id: t.id,
+    kind: t.kind === 'research' ? 'research' : 'general',
     goal: text(t.goal),
     state: t.state as LongTaskState,
     origin_session_id: textOrNull(t.origin_session_id),
@@ -100,4 +108,22 @@ export function readLongTask(raw: unknown): LongTask | null {
     artifacts,
     result_artifact_id: textOrNull(t.result_artifact_id),
   };
+}
+
+/** Null for a body that is not the answer, which the composer reads as "do not offer it". */
+export function readResearchAvailability(raw: unknown): DeepResearchAvailability | null {
+  const r = raw as Record<string, unknown> | null;
+  if (!r || typeof r !== 'object' || typeof r.available !== 'boolean') return null;
+  if (r.available) return { available: true };
+  return r.reason === 'off' || r.reason === 'unidentified' ? { available: false, reason: r.reason } : null;
+}
+
+/** What the composer's menu offers: nothing, the item, or the item greyed with why. */
+export type ResearchOffer = 'hidden' | 'available' | 'unidentified';
+
+/** `null` is a Pond that predates research, or an answer that could not be read: either way, hidden. */
+export function researchOffer(availability: DeepResearchAvailability | null): ResearchOffer {
+  if (!availability) return 'hidden';
+  if (availability.available) return 'available';
+  return availability.reason === 'unidentified' ? 'unidentified' : 'hidden';
 }

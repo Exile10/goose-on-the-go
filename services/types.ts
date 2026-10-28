@@ -205,6 +205,8 @@ export interface ChatStreamRequest {
   voice_mode?: boolean;
   /** Keep the turn running if the connection drops, so it can be reattached. */
   resumable?: boolean;
+  /** The message is a research question: the Pond starts a long task on it, then acknowledges. */
+  deep_research?: boolean;
 }
 
 /**
@@ -1519,9 +1521,13 @@ export interface LongTaskArtifact {
   created_at: string;
 }
 
+/** `research` is one a person asked for as deep research; an older Pond sends no kind. */
+export type LongTaskKind = 'general' | 'research';
+
 /** `GET /api/v1/long-tasks/{id}`. */
 export interface LongTask {
   id: string;
+  kind: LongTaskKind;
   goal: string;
   state: LongTaskState;
   origin_session_id: string | null;
@@ -1542,3 +1548,9 @@ export interface LongTaskArtifactBody {
   summary: string;
   body: string;
 }
+
+/**
+ * `GET /api/v1/long-tasks/deep-research`: whether this member may ask for research. `off` is the
+ * household's long tasks switched off; `unidentified` is a caller the Pond does not know as a member.
+ */
+export type DeepResearchAvailability = { available: true } | { available: false; reason: 'off' | 'unidentified' };

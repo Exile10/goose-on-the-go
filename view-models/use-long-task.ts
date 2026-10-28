@@ -10,12 +10,13 @@ import { useServer } from '@/providers/server-provider';
 import { ApiError, api } from '@/services/api-client';
 import i18n from '@/services/i18n';
 import { endedTask, keepEndedTask, keepResultBody, resultBody } from '@/services/long-task-cache';
-import type { LongTask, LongTaskArtifactBody } from '@/services/types';
+import type { LongTask, LongTaskArtifactBody, LongTaskKind } from '@/services/types';
 import { describeApiError } from './describe-error';
 import { useLive } from './use-live';
 
 /** Calls `api` at call time, so a test's mock of the client is the one used. */
 export const POND_LONG_TASKS: LongTasksSource = {
+  researchAvailability: () => api.deepResearchAvailability(),
   task: (id) => api.longTask(id),
   artifact: (taskId, artifactId) => api.longTaskArtifact(taskId, artifactId),
   cancel: (id) => api.cancelLongTask(id),
@@ -35,10 +36,11 @@ export function useLongTasksSource(): LongTasksSource {
   return isScreenReal('chat') ? POND_LONG_TASKS : mockLongTasks();
 }
 
-/** The `task_start` call the mock chat shows when asked for a long task, with a task to follow. */
-export function mockTaskStart(goal: string): ToolCall {
-  const id = mockLongTasks().start(goal);
-  return { id: `mock-call-${id}`, name: 'giap-tasks__task_start', args: JSON.stringify({ goal }), status: 'ok', result: mockStartResult(id) };
+/** The mock chat's `task_start` call, with a task to follow; research takes the Pond's `deep-research-` id. */
+export function mockTaskStart(goal: string, kind: LongTaskKind = 'general'): ToolCall {
+  const id = mockLongTasks().start(goal, kind);
+  const call = kind === 'research' ? `deep-research-${id}` : `mock-call-${id}`;
+  return { id: call, name: 'giap-tasks__task_start', args: JSON.stringify({ goal }), status: 'ok', result: mockStartResult(id) };
 }
 
 /** For tests: the next `mockLongTasks()` starts empty. */

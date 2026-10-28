@@ -341,6 +341,18 @@ voice mode. What is worth knowing:
     reopening the conversation asks nothing.
   - On mock chat, a message that says "long task" starts one in the mock
     Pond (`models/long-tasks-mock.ts`).
+- **Deep research starts from the plus menu.**
+  - Whether it is offered comes from `GET /long-tasks/deep-research`, asked
+    once per dock and per Pond (`use-deep-research.ts`).
+  - The Pond's answer decides the row. A 404 or "off" leaves it out.
+    "unidentified" shows it greyed, with one line saying why.
+  - Choosing it puts a removable "Deep research" chip over the field. The
+    next message goes with `deep_research: true`, then the mode ends; it
+    also ends if the conversation changes.
+  - Research takes a question on its own, so the picture sources wait while
+    it is on, and it cannot be chosen with pictures waiting.
+  - The Pond answers with the same `task_start` frames a model call makes,
+    so the long-task card follows it, named "Deep research".
 - **The title bar names the conversation.** It shows the title the wall or
   Home passed with the link, and the Pond's own after every reply. A new
   conversation shows, from its first question, the title the Pond will store

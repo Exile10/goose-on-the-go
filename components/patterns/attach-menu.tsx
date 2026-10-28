@@ -1,5 +1,6 @@
 /**
- * AttachMenu — Camera, Photos or Files, from the composer's plus.
+ * AttachMenu — Camera, Photos or Files, from the composer's plus, and Deep research when the Pond
+ * offers it.
  *
  * It grows up out of the button that opened it, scaled from that corner, and
  * shrinks back into it: the rule the wall's menu follows from its puck, so
@@ -20,7 +21,7 @@
  */
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Animated, Modal, Platform, Pressable, StyleSheet } from 'react-native';
+import { Animated, Modal, Platform, Pressable, StyleSheet, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { glassLift } from '@jarida/ink';
 import { InkText, useInkTheme, useReduceMotion } from '@jarida/ink/native';
@@ -30,6 +31,7 @@ import { GPressable } from '@/components/ui/g-pressable';
 import type { IconName } from '@/constants/icons';
 import type { TranslationKey } from '@/services/i18n';
 import type { AttachSource } from '@/services/media';
+import type { ResearchItem } from '@/view-models/use-deep-research';
 
 /** Response 0.3s, critically damped: a menu appearing carried no momentum. */
 const SPRING = { stiffness: 420, damping: 41, mass: 1 } as const;
@@ -52,13 +54,28 @@ export interface AttachMenuProps {
   onClose: () => void;
   /** A source was chosen. Called once the menu has closed, never while it is leaving. */
   onChoose: (source: AttachSource) => void;
+  /** The research row, as `researchItem` works it out; absent, the menu offers only sources. */
+  research?: ResearchItem;
+  /** Research mode is on, which takes a question alone, so the sources wait. */
+  researching?: boolean;
+  /** Research was chosen; called once the menu has closed, so the field can take the focus. */
+  onResearch?: () => void;
   /** Where the plus button's top edge is, measured up from the screen's foot. */
   anchorBottom: number;
   /** The plus button's left edge. */
   anchorLeft: number;
 }
 
-export function AttachMenu({ open, onClose, onChoose, anchorBottom, anchorLeft }: AttachMenuProps) {
+export function AttachMenu({
+  open,
+  onClose,
+  onChoose,
+  research,
+  researching = false,
+  onResearch,
+  anchorBottom,
+  anchorLeft,
+}: AttachMenuProps) {
   const theme = useInkTheme();
   const reduced = useReduceMotion();
   const { t } = useTranslation();
@@ -87,12 +104,13 @@ export function AttachMenu({ open, onClose, onChoose, anchorBottom, anchorLeft }
   }, [open, reduced, progress]);
 
   // The choice, held until the menu has gone; see the header.
-  const chosen = useRef<AttachSource | null>(null);
+  const chosen = useRef<AttachSource | 'research' | null>(null);
   const release = useCallback(() => {
     const source = chosen.current;
     chosen.current = null;
-    if (source) onChoose(source);
-  }, [onChoose]);
+    if (source === 'research') onResearch?.();
+    else if (source) onChoose(source);
+  }, [onChoose, onResearch]);
 
   const shown = open || exiting;
   useEffect(() => {
@@ -142,12 +160,14 @@ export function AttachMenu({ open, onClose, onChoose, anchorBottom, anchorLeft }
           <GPressable
             key={s.source}
             feedback="tint"
+            disabled={researching}
             onPress={() => {
               chosen.current = s.source;
               onClose();
             }}
             accessibilityRole="button"
-            style={[styles.row, { borderRadius: theme.radius.md }]}
+            accessibilityState={{ disabled: researching }}
+            style={[styles.row, { borderRadius: theme.radius.md }, researching ? styles.dim : null]}
           >
             <GIcon name={s.icon} size={20} color={theme.color.text} />
             <InkText size="md" weight="medium">
@@ -155,6 +175,40 @@ export function AttachMenu({ open, onClose, onChoose, anchorBottom, anchorLeft }
             </InkText>
           </GPressable>
         ))}
+        {researching ? (
+          <View style={styles.note}>
+            <InkText size="sm" tone="secondary">
+              {t('chat.research.attachOff')}
+            </InkText>
+          </View>
+        ) : null}
+        {research?.shown ? (
+          <>
+            <View style={[styles.rule, { backgroundColor: theme.color.line, height: theme.edge.hairlineWidth }]} />
+            <GPressable
+              feedback="tint"
+              disabled={research.disabled || researching}
+              onPress={() => {
+                chosen.current = 'research';
+                onClose();
+              }}
+              accessibilityRole="button"
+              accessibilityState={{ disabled: research.disabled || researching }}
+              accessibilityHint={research.noteKey ? t(research.noteKey) : t('chat.research.menuHint')}
+              style={[styles.row, styles.tall, { borderRadius: theme.radius.md }, research.disabled ? styles.dim : null]}
+            >
+              <GIcon name="search" size={20} color={theme.color.text} />
+              <View style={styles.words}>
+                <InkText size="md" weight="medium">
+                  {t('chat.research.menu')}
+                </InkText>
+                <InkText size="sm" tone="secondary">
+                  {research.noteKey ? t(research.noteKey) : t('chat.research.menuHint')}
+                </InkText>
+              </View>
+            </GPressable>
+          </>
+        ) : null}
       </Animated.View>
     </Modal>
   );
@@ -163,7 +217,7 @@ export function AttachMenu({ open, onClose, onChoose, anchorBottom, anchorLeft }
 const styles = StyleSheet.create({
   panel: {
     position: 'absolute',
-    width: 232,
+    width: 264,
     padding: 6,
     // The corner it grows from is the plus button's.
     transformOrigin: 'bottom left',
@@ -175,4 +229,9 @@ const styles = StyleSheet.create({
     minHeight: 48,
     paddingHorizontal: 12,
   },
+  tall: { paddingVertical: 10, alignItems: 'flex-start' },
+  words: { flex: 1, gap: 2 },
+  dim: { opacity: 0.45 },
+  note: { paddingHorizontal: 12, paddingBottom: 8 },
+  rule: { marginVertical: 4, marginHorizontal: 12 },
 });

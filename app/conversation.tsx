@@ -62,6 +62,7 @@ import type { Message } from '@/models/chat';
 import type { ThemeColors } from '@/constants/colors';
 import { Spacing } from '@/constants/spacing';
 import { positionsFor, useChat } from '@/view-models/use-chat';
+import { useResearchOffer } from '@/view-models/use-deep-research';
 import { useGreetingName } from '@/view-models/use-greeting';
 import { useSuggestions, type OfferedPrompt } from '@/view-models/use-suggestions';
 import type { BubblePosition } from '@jarida/ink/native';
@@ -116,6 +117,7 @@ export default function ChatScreen() {
   const { messages, queued, streaming, status, turnSeed, sessionId, title } = data;
   const name = useGreetingName();
   const suggestions = useSuggestions(sessionId);
+  const research = useResearchOffer();
   const [voice, setVoice] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -188,13 +190,13 @@ export default function ChatScreen() {
   );
 
   const onSend = useCallback(
-    (text: string, attachments: Attachment[]) => {
+    (text: string, attachments: Attachment[], options?: { research?: boolean }) => {
       if (!withinTurnLimit(attachments)) {
         setNotice(t('chat.composer.turnTooLarge'));
         return;
       }
       setNotice(null);
-      void actions.send(text, attachments);
+      void actions.send(text, attachments, options);
     },
     [actions, t],
   );
@@ -327,6 +329,8 @@ export default function ChatScreen() {
             onAttach={onAttach}
             busy={streaming}
             bottomInset={insets.bottom}
+            research={research}
+            conversation={sessionId}
           />
         )}
       </GKeyboardView>

@@ -206,3 +206,19 @@ describe('long tasks', () => {
     await expect(paired().cancelLongTask('t1')).rejects.toMatchObject({ status: 409 });
   });
 });
+
+describe('deep research', () => {
+  it('asks whether this member may ask for research, and reads the answer', async () => {
+    const seen: Seen[] = [];
+    recordInto(seen, '{"available":false,"reason":"unidentified"}');
+    expect(await paired().deepResearchAvailability()).toEqual({ available: false, reason: 'unidentified' });
+    expect(seen[0]).toMatchObject({ url: `${BASE}/long-tasks/deep-research`, method: undefined, authorization: 'Bearer session-token' });
+  });
+
+  it('refuses an answer it cannot read, and passes on the 404 of an older Pond', async () => {
+    recordInto([], '{"status":"ok"}');
+    await expect(paired().deepResearchAvailability()).rejects.toThrow('unexpected');
+    recordInto([], '', 404);
+    await expect(paired().deepResearchAvailability()).rejects.toMatchObject({ status: 404 });
+  });
+});

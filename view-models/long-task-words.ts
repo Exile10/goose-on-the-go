@@ -4,7 +4,7 @@
 import type { IconName } from '@/constants/icons';
 import { progressOf } from '@/models/long-tasks';
 import i18n from '@/services/i18n';
-import type { LongTaskState, LongTaskStep, LongTaskStepState } from '@/services/types';
+import type { LongTaskKind, LongTaskState, LongTaskStep, LongTaskStepState } from '@/services/types';
 
 export function taskStateLabel(state: LongTaskState): string {
   switch (state) {
@@ -75,4 +75,10 @@ export function progressLine(steps: readonly LongTaskStep[]): string {
   return skipped > 0
     ? i18n.t('chat.longTask.progressSkipped', { done, total, skipped })
     : i18n.t('chat.longTask.progress', { done, total });
+}
+
+/** "Deep research" for a task asked for as research; until it is read, the call's id says which. */
+export function taskEyebrow(kind: LongTaskKind | null, callId: string): string {
+  const research = kind ? kind === 'research' : callId.startsWith('deep-research-');
+  return research ? i18n.t('chat.longTask.researchEyebrow') : i18n.t('chat.longTask.eyebrow');
 }
