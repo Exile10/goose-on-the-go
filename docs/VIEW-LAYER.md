@@ -383,6 +383,52 @@ The root stack draws no header for it (`headerShown: false` in
 `app/_layout.tsx`); the screen draws Ink's navbar, which carries its own way
 back to the wall.
 
+## Failure, offline and empty
+
+Every screen whose content comes from the Pond is in one of five states, chosen
+by `contentState` in `models/content-state.ts` (`useContentState` reads the
+connection for it). Each state has one owner, and nothing says a thing twice.
+
+| State | When | Who says it |
+|---|---|---|
+| `ready` | There is content, from this read or an earlier one | The screen. A later read that fails keeps it on screen and is logged |
+| `loading` | Nothing yet, a read in flight | The screen's spinner or ghosts |
+| `unreachable` | Nothing to show, and the connection indicator is up | The indicator says why and offers the action. The screen shows `ContentUnavailable` in its waiting form: no cause, no button |
+| `failed` | Nothing to show, the connection is fine, the read failed | `ContentUnavailable`: a title, one sentence, Try again |
+| `empty` | The read worked and found nothing | The screen's own `InkEmptyState`, never styled as a failure |
+
+**Connectivity is said once**, by `ConnectionStatus` at the top of the app. It
+is quiet -- a hairline strip on the secondary surface -- and carries its action
+as a labelled control: Try again where another attempt can help, Pair where only
+pairing can (`connectionActionIsPairing`). Screens do not add their own "your
+Pond is unreachable" notice. Home's Pond card, which is a status card, drops
+its reachability title and badge while the indicator is up.
+
+**`ContentUnavailable`** (`components/patterns/content-unavailable.tsx`) goes
+in place of the content, never above it. It takes the view-model's sentence as
+`reason` when that sentence says something specific (busy, a feature the Pond
+is too old for), and the shared one otherwise. When the connection comes back
+it reads again by itself, and keeps its waiting form until that read settles,
+so nobody sees "did not load" for content already on its way. `compact` fits it
+into one section of a longer screen.
+
+**A view-model reports a failed read as a flag** (`failed`, or `readFailed` in
+a store), never by whether it has a sentence for it. `describeApiError` returns
+null for a request that got no answer, so a screen that took "no error text" to
+mean "loaded" drew a failure as an empty list -- which is how Devices said "No
+devices yet" with the Pond down.
+
+**A failed action** -- a save, a delete -- is not a failed screen. It is said
+where the action was taken: inline beside it with `InkNotice`, or in the app's
+own dialog (`useConfirm` / `useInform` in `providers/confirm-provider.tsx`).
+Never `Alert.alert`, which draws the platform's dialog in the platform's
+theme rather than the app's.
+
+**Technical detail is for the log.** A status code, a route or an exception's
+text never reaches a reader. `describeApiError` turns a failure into words or
+into nothing (when the indicator already covers it), and `logFailure` writes the
+engineer's half: `[scope] what kind=http_500`.
+
 ## Shared surfaces
 
 `components/patterns/pond-list.tsx` draws the Ponds on the network. First run and

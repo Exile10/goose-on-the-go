@@ -228,7 +228,8 @@ masked field; nothing here asks it to save one.
 | Component | Props | Description |
 |-----------|-------|-------------|
 | ServerStatus | online, label | Whether the Pond is reachable, as a dot and a word |
-| ConnectionStatus | — | The connection banner; sends an unpaired or revoked phone to pairing. Silent until the saved pairing has loaded (`hydrated`), shows reconnecting only after 1.5 s (`RECONNECT_GRACE_MS`), and stays off first run, the pairing wizard and the scanner (`bannerHiddenOn`), which are the pairing it would offer |
+| ConnectionStatus | — | The connection banner, and the app's only statement that the Pond cannot be used: an icon, a sentence and a labelled action -- Try again, or Pair for an unpaired, outdated or revoked phone (`connectionActionIsPairing`). Silent until the saved pairing has loaded (`hydrated`), shows reconnecting only after 1.5 s (`RECONNECT_GRACE_MS`), and stays off first run, the pairing wizard and the scanner (`bannerHiddenOn`), which are the pairing it would offer |
+| ContentUnavailable | state, reason?, onRetry, compact? | In place of content that did not arrive: a quiet waiting line while the banner is up, or a title, a sentence and Try again when the read failed. Chosen by `useContentState`; see "Failure, offline and empty" in [VIEW-LAYER.md](./VIEW-LAYER.md) |
 | RemoteAccessOffer | — | Home's dismissible offer of remote access to a Pond paired without it |
 | PondList | title, ponds, phase, onSelect | The Ponds on this network, shared by first run and Switch Pond; an unclaimed one is badged "Not set up" with its card id |
 | PondGettingReady | — | Home's card for a Pond just set up, until Goose can answer; mounted only then, so Home reads no models otherwise |
