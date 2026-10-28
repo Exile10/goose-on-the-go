@@ -180,6 +180,12 @@ export interface SessionMessage {
   thinking?: string[];
   /** `true` liked, `false` disliked, absent/null no vote. */
   liked?: boolean | null;
+  /**
+   * A `tool` row holding only the stub of a result the Pond does not keep. The
+   * Pond puts the marker inside the JSON in `content`; this is the other place
+   * a client accepts it.
+   */
+  transient?: boolean;
 }
 
 /**
@@ -226,6 +232,12 @@ export interface ChatFrame {
   input?: unknown;
   /** `tool_result`: a card hint, live only — history keeps just the text. */
   ui?: { card_type?: string; data?: Record<string, unknown> };
+  /**
+   * `tool_result`: the result is the turn's only. History keeps a stub in its
+   * place (Brave's terms allow search results only transient storage), so the
+   * phone must not keep its card either.
+   */
+  transient?: boolean;
   run_id?: string;
   session_id?: string;
   epoch?: number | string;

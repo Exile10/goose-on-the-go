@@ -11,7 +11,9 @@
  * back.
  *
  * It cannot conjure a card it never saw. A turn from before this, or one that
- * streamed to another device, still shows its result text.
+ * streamed to another device, still shows its result text. Nor does it keep a
+ * card the Pond marks transient: Brave's terms allow search results only
+ * transient storage, so the Pond keeps a stub and so does the phone.
  *
  * The cards are the household's — who is home, what Goose remembers — so they
  * go with their conversation when it is deleted, all at once when the phone
@@ -99,6 +101,20 @@ export function forgetCards(sessionIds: string[]): Promise<void> {
   if (sessionIds.length === 0) return Promise.resolve();
   for (const id of sessionIds) recent.delete(id);
   return queueWrite(() => family.remove(sessionIds));
+}
+
+/** Drop single calls' cards, such as one kept before the Pond marked its result transient. */
+export function forgetCalls(sessionId: string, callIds: string[]): Promise<void> {
+  if (callIds.length === 0) return Promise.resolve();
+  const mine = recent.get(sessionId);
+  if (mine) for (const id of callIds) delete mine[id];
+  return queueWrite(async () => {
+    const kept = await family.getJSON<Kept>(sessionId);
+    if (!kept || !callIds.some((id) => id in kept.cards)) return;
+    const cards = { ...kept.cards };
+    for (const id of callIds) delete cards[id];
+    await family.setJSON<Kept>(sessionId, { ...kept, cards });
+  });
 }
 
 /** Drop every card: a phone that signs out keeps nothing of the household. */

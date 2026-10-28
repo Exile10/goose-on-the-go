@@ -13,6 +13,8 @@
  * app, and a tool it has never heard of still did something worth showing.
  */
 
+import type { TFunction } from 'i18next';
+
 import type { IconName } from '@/constants/icons';
 import type { ToolCall } from '@/models/chat';
 import type { TranslationKey } from '@/services/i18n';
@@ -101,12 +103,72 @@ function siteOf(url: string): string | null {
   return host;
 }
 
+/** A page or a place on a web search card, ready to draw. */
+export interface SearchEntry {
+  title: string;
+  /** Null unless the address is a web page, so the entry draws as plain text. */
+  url: string | null;
+  site: string;
+  snippet: string;
+}
+
+export interface SearchCard {
+  query: string;
+  pages: SearchEntry[];
+  places: SearchEntry[];
+}
+
+function searchEntries(raw: unknown, titleKey: 'title' | 'name'): SearchEntry[] {
+  if (!Array.isArray(raw)) return [];
+  const out: SearchEntry[] = [];
+  for (const entry of raw as unknown[]) {
+    if (!entry || typeof entry !== 'object') continue;
+    const e = entry as Record<string, unknown>;
+    const address = str(e.url).trim();
+    const site = siteOf(address);
+    const url = site ? address : null;
+    const domain = str(e.domain).trim() || site || '';
+    const title = str(e[titleKey]).trim() || (titleKey === 'title' ? domain : '');
+    if (!title) continue;
+    out.push({ title, url, site: domain, snippet: str(e.snippet).trim() });
+  }
+  return out;
+}
+
+/**
+ * The card `search_web` draws, read defensively: a partial one draws what it
+ * has. A place's address may be empty, and neither a page nor a place is a
+ * link unless its address is http(s), as on the desktop's `SearchCard`.
+ */
+export function readSearch(data: Record<string, unknown>): SearchCard {
+  return {
+    query: str(data.query).trim(),
+    pages: searchEntries(data.results, 'title'),
+    places: searchEntries(data.places, 'name'),
+  };
+}
+
+const KEPT_SOURCES = /\bSources:\s*(.+?)\.?\s*$/s;
+
+/**
+ * The quiet line a saved turn shows for a result the Pond kept only as a stub,
+ * as the desktop's `keptLine` words it. The sources are the stub's domains,
+ * and the rest is this app's own words, so it reads in the app's language.
+ */
+export function keptLine(tool: ToolCall, t: TFunction): string {
+  const words = toolWords(tool.name);
+  const label = words ? t(words.label) : humanizeTool(tool.name);
+  const sources = KEPT_SOURCES.exec(tool.kept ?? '')?.[1]?.trim().slice(0, 200);
+  return sources ? t('chat.tools.notKeptSources', { tool: label, sources }) : t('chat.tools.notKept', { tool: label });
+}
+
 /**
  * The pages a turn's tools read from, in the order it read them, once each.
  *
- * A web search lists its pages on its card. Wikipedia and Wolfram name one
- * source: live, on the card; in a saved turn whose card this phone never kept,
- * only as a closing `Source: <url>` line in the result.
+ * A web search draws its pages on its own card, so they are not listed again.
+ * Wikipedia and Wolfram name one source: live, on the card; in a saved turn
+ * whose card this phone never kept, only as a closing `Source: <url>` line in
+ * the result.
  */
 export function sourcesOf(tools: ToolCall[] | undefined): Source[] {
   const out: Source[] = [];
@@ -117,12 +179,7 @@ export function sourcesOf(tools: ToolCall[] | undefined): Source[] {
   };
   for (const tool of tools ?? []) {
     const data = tool.card?.data;
-    if (tool.card?.type === 'search') {
-      for (const hit of Array.isArray(data?.results) ? data.results : []) {
-        if (hit && typeof hit === 'object') add(str(hit.url).trim(), str(hit.title).trim());
-      }
-      continue;
-    }
+    if (tool.card?.type === 'search') continue;
     const fromCard = data ? str(data.source_url) : '';
     const fromText = /Source:\s*(https?:\/\/\S+)\s*$/i.exec(tool.result ?? '')?.[1] ?? '';
     const url = fromCard || fromText;

@@ -38,6 +38,11 @@ export interface ToolCall {
    * only when this phone kept it (`services/card-cache.ts`).
    */
   card?: CardHint;
+  /**
+   * In a saved turn, the stub the Pond keeps in place of a result it may not
+   * store, such as Brave's search results. A quiet line, never a result to open.
+   */
+  kept?: string;
 }
 
 /**

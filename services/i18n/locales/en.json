@@ -257,7 +257,12 @@
       "sources": "Sources",
       "openSource": "Open {{source}}",
       "moreSources_one": "{{count}} more source",
-      "moreSources_other": "{{count}} more sources"
+      "moreSources_other": "{{count}} more sources",
+      "nearbyPlaces": "Nearby places",
+      "pages": "Pages",
+      "noPages": "No pages came back for this search.",
+      "notKept": "{{tool}}: results aren't kept after the turn.",
+      "notKeptSources": "{{tool}}: results aren't kept after the turn. Sources: {{sources}}."
     },
     "quips": {
       "thinking": {
