@@ -7,13 +7,14 @@ import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { InkButton, InkEdge, InkEyebrow, InkSpinner, inkText, useInkTheme } from '@jarida/ink/native';
 
+import { LongTaskQueue } from '@/components/patterns/long-task-queue';
 import { GIcon } from '@/components/ui/g-icon';
 import { isEnded, resultArtifact } from '@/models/long-tasks';
 import { useConfirm } from '@/providers/confirm-provider';
 import { confirm, reject, tap } from '@/services/haptics';
 import type { LongTaskStep } from '@/services/types';
 import { builtInName } from '@/view-models/agent-words';
-import { progressLine, stepStateLabel, taskEyebrow, taskStateIcon, taskStateLabel, taskStateNote } from '@/view-models/long-task-words';
+import { progressLine, stepStateLabel, taskEyebrow, taskIcon, taskLabel, taskStateNote } from '@/view-models/long-task-words';
 import { useLongTask } from '@/view-models/use-long-task';
 
 function Step({ step, first }: { step: LongTaskStep; first: boolean }) {
@@ -88,11 +89,12 @@ export const LongTaskCard = React.memo(function LongTaskCard({ taskId, callId }:
           <Text style={goal.style}>{task.goal}</Text>
           {/* Polite, so a state that changes while the card is on screen is announced. */}
           <View style={styles.row} accessibilityLiveRegion="polite">
-            <GIcon name={taskStateIcon(task.state)} size={15} color={task.state === 'failed' ? theme.color.dangerFg : theme.color.text} />
-            <Text style={line.style}>{taskStateLabel(task.state)}</Text>
+            <GIcon name={taskIcon(task)} size={15} color={task.state === 'failed' ? theme.color.dangerFg : theme.color.text} />
+            <Text style={line.style}>{taskLabel(task)}</Text>
             <Text style={[quiet.style, styles.shrink]}>{progressLine(task.steps)}</Text>
           </View>
           {note ? <Text style={quiet.style}>{note}</Text> : null}
+          <LongTaskQueue task={task} refresh={actions.refresh} />
 
           {task.steps.length > 0 ? (
             <View>

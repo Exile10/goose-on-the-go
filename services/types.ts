@@ -1538,6 +1538,18 @@ export interface LongTask {
   artifacts: LongTaskArtifact[];
   /** The artifact that answers the goal, once there is one. */
   result_artifact_id: string | null;
+  /** Where an open task waits; `null` once it has ended, and absent from an older Pond. */
+  queue?: LongTaskQueuePlace | null;
+}
+
+/** A task ahead in the line: one this member reaches (their own or the household's), or only a place another member holds. */
+export type LongTaskAhead = { id: string; goal: string; state: LongTaskState } | { another_member: true };
+
+/** One slot works the household's long tasks in the order they were asked for; position 1 is the one under way. */
+export interface LongTaskQueuePlace {
+  position: number;
+  of: number;
+  ahead: LongTaskAhead[];
 }
 
 /** `GET /api/v1/long-tasks/{id}/artifacts/{artifact_id}`: `body` is markdown. */

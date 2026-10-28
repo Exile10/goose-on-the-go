@@ -62,6 +62,8 @@ export interface UseLongTask {
   notice: string | null;
   actions: {
     retry: () => Promise<void>;
+    /** Reads the task now, so a change made from this card shows without waiting for the poll. */
+    refresh: () => Promise<void>;
     /** Resolves to whether the Pond stopped it. */
     stop: () => Promise<boolean>;
   };
@@ -123,5 +125,5 @@ export function useLongTask(taskId: string): UseLongTask {
     }
   }, [read, source, stopping, taskId]);
 
-  return { task, error, gone, stopping, stopError, notice, actions: { retry: read, stop } };
+  return { task, error, gone, stopping, stopError, notice, actions: { retry: read, refresh: read, stop } };
 }

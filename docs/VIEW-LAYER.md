@@ -340,7 +340,19 @@ voice mode. What is worth knowing:
     are kept in memory (`services/long-task-cache.ts`) until sign-out, so
     reopening the conversation asks nothing.
   - On mock chat, a message that says "long task" starts one in the mock
-    Pond (`models/long-tasks-mock.ts`).
+    Pond (`models/long-tasks-mock.ts`). The mock works them one at a time,
+    as the Pond does, so a second one waits its turn.
+  - The Pond works long tasks one at a time, in the order they were asked
+    for, and each task's `queue` says where an open one waits. A task behind
+    others reads "Waiting its turn: 2nd in line" and says who is ahead,
+    without naming another member's task (`long-task-queue.tsx`).
+  - When some of the member's own tasks are ahead, the card lists them and
+    this one, each with Keep going or Stop, all kept going until changed.
+    One Stop button stops exactly the picked tasks, then reads this task
+    again. A 409 counts as stopped, and a task that could not be stopped
+    stays picked, so trying again is one press.
+  - Nothing shows at the front of the line, once the task has ended, or
+    from an older Pond that sends no `queue`.
 - **A long task's report is read on its own page** (`/(stack)/task-report`).
   - It is the whole report from `GET /long-tasks/{id}/report`, cut at its
     headings so a row of section chips can jump between them.
