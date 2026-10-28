@@ -1,5 +1,5 @@
-// Each path and method, names as one encoded segment, and listings that are not one refused rather than
-// read as empty. The prefill routes were written ahead of the Pond, so their shape is pinned here.
+// The agents and long-task routes as the pond's feat/long-running-tasks serves them: each path and
+// method, names as one encoded segment, and a body of the wrong shape refused rather than read as empty.
 
 import { ApiError, PondApiClient } from '@/services/api-client';
 
@@ -159,5 +159,50 @@ describe('prefills', () => {
       ['POST', `${BASE}/agents/trip%2Fplanner/prefill/rebuild`],
       ['POST', `${BASE}/agents/prefills/rebuild`],
     ]);
+  });
+});
+
+describe('long tasks', () => {
+  const TASK = {
+    id: 't 1',
+    goal: 'Plan a weekend away',
+    state: 'running',
+    origin_session_id: 's1',
+    created_at: '2026-10-28T09:00:00Z',
+    updated_at: '2026-10-28T09:01:00Z',
+    finished_at: null,
+    steps: [{ key: 'a', role: 'long-task-worker', state: 'running', attempts: 1, summary: null, failure: null }],
+    artifacts: [],
+    result_artifact_id: null,
+  };
+
+  it('reads one task by id with the paired token', async () => {
+    const seen: Seen[] = [];
+    recordInto(seen, JSON.stringify(TASK));
+    const task = await paired().longTask('t 1');
+    expect(seen[0]).toMatchObject({ url: `${BASE}/long-tasks/t%201`, method: undefined, authorization: 'Bearer session-token' });
+    expect(task.steps[0].role).toBe('long-task-worker');
+  });
+
+  it('refuses a body that is not a task', async () => {
+    recordInto([], '{"error":"there is no such task"}');
+    await expect(paired().longTask('t1')).rejects.toThrow('unexpected');
+  });
+
+  it('reads one artifact body, and stops a task, each by its own path', async () => {
+    const seen: Seen[] = [];
+    recordInto(seen, '{"id":"a1","title":"Plan","kind":"draft","summary":"S","body":"## Plan"}');
+    const body = await paired().longTaskArtifact('t1', 'a/1');
+    expect(body.body).toBe('## Plan');
+    await paired().cancelLongTask('t1');
+    expect(seen.map((s) => [s.method, s.url])).toEqual([
+      [undefined, `${BASE}/long-tasks/t1/artifacts/a%2F1`],
+      ['POST', `${BASE}/long-tasks/t1/cancel`],
+    ]);
+  });
+
+  it('reaches the caller with the 409 of a task that has already ended', async () => {
+    recordInto([], '{"error":"the task has already completed"}', 409);
+    await expect(paired().cancelLongTask('t1')).rejects.toMatchObject({ status: 409 });
   });
 });

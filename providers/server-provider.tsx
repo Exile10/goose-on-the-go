@@ -5,6 +5,7 @@ import { AppState } from 'react-native';
 import NetInfo from '@react-native-community/netinfo';
 import { forgetAllCards } from '@/services/card-cache';
 import { forgetPondImages } from '@/services/pond-images';
+import { forgetLongTasks } from '@/services/long-task-cache';
 import { Storage, purgeLegacyStorage } from '@/services/storage';
 import { SecureStorage } from '@/services/secure-storage';
 import { ApiError, api, PondApiClient, type HandshakeResponse, type SpokenCode } from '@/services/api-client';
@@ -254,6 +255,7 @@ export function ServerProvider({ children }: PropsWithChildren) {
     await forgetAllCards().catch(() => undefined);
     // So are the pictures its cameras showed, held in memory while their list scrolled.
     forgetPondImages();
+    forgetLongTasks();
     await manager.configure(null);
   }, [manager]);
 

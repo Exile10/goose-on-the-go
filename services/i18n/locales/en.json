@@ -257,7 +257,12 @@
       "sources": "Sources",
       "openSource": "Open {{source}}",
       "moreSources_one": "{{count}} more source",
-      "moreSources_other": "{{count}} more sources"
+      "moreSources_other": "{{count}} more sources",
+      "taskStart": "Long task",
+      "doingTaskStart": "Starting a long task",
+      "taskStatus": "Long task",
+      "doingTaskStatus": "Checking a long task",
+      "taskCancel": "Stopped a long task"
     },
     "quips": {
       "thinking": {
@@ -338,7 +343,48 @@
     "poweredBy": "Powered by Goose 2",
     "returnToSend": "Return to send",
     "you": "You",
-    "pond": "Pond"
+    "pond": "Pond",
+    "longTask": {
+      "eyebrow": "Long task",
+      "state": {
+        "planning": "Planning its steps",
+        "running": "Working on it",
+        "awaitingApproval": "Waiting for a decision",
+        "paused": "Paused",
+        "completed": "Finished",
+        "failed": "Couldn't finish",
+        "cancelled": "Stopped"
+      },
+      "note": {
+        "awaitingApproval": "A step is waiting for someone to approve it before it goes on.",
+        "paused": "Nothing runs while it is paused. It carries on from where it stopped."
+      },
+      "step": {
+        "pending": "Not started",
+        "running": "Working on it",
+        "completed": "Done",
+        "failed": "Couldn't finish",
+        "skipped": "Skipped",
+        "awaitingApproval": "Waiting for approval"
+      },
+      "progress": "{{done}} of {{total}} steps done",
+      "progressSkipped": "{{done}} of {{total}} steps done, {{skipped}} skipped",
+      "noPlan": "No plan yet.",
+      "result": "Result",
+      "readResult": "Read the result",
+      "resultLoading": "Reading the result",
+      "resultFailed": "Could not read the result. Try again in a moment.",
+      "noResult": "It finished without saving a result.",
+      "stop": "Stop",
+      "stopping": "Stopping...",
+      "stopConfirmTitle": "Stop this task?",
+      "stopConfirmBody": "A step under way finishes first, then nothing more runs. A stopped task cannot be carried on.",
+      "stopFailed": "Your Pond could not stop it. Try again in a moment.",
+      "alreadyEnded": "It had already ended.",
+      "loadFailed": "Could not read this task from your Pond.",
+      "gone": "This task is no longer on your Pond.",
+      "loading": "Reading the task from your Pond"
+    }
   },
   "devices": {
     "title": "Devices",

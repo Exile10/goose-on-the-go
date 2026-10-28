@@ -1491,3 +1491,54 @@ export interface AgentPrefills {
   retention_days: number;
   agents: AgentPrefill[];
 }
+
+/** Where a long task is (pond-core `LongTaskState`). The last three are the ends it cannot leave. */
+export type LongTaskState = 'planning' | 'running' | 'awaiting_approval' | 'paused' | 'completed' | 'failed' | 'cancelled';
+
+export type LongTaskStepState = 'pending' | 'running' | 'completed' | 'failed' | 'skipped' | 'awaiting_approval';
+
+export interface LongTaskStep {
+  key: string;
+  /** The agent doing it, by name: a built-in such as `long-task-worker`, or a household agent. */
+  role: string;
+  state: LongTaskStepState;
+  attempts: number;
+  summary: string | null;
+  failure: string | null;
+}
+
+/** What a step wrote, without its body; `GET .../artifacts/{id}` has the body. */
+export interface LongTaskArtifact {
+  id: string;
+  task_id: string;
+  step_key: string | null;
+  kind: string;
+  title: string;
+  summary: string;
+  tokens: number;
+  created_at: string;
+}
+
+/** `GET /api/v1/long-tasks/{id}`. */
+export interface LongTask {
+  id: string;
+  goal: string;
+  state: LongTaskState;
+  origin_session_id: string | null;
+  created_at: string;
+  updated_at: string;
+  finished_at: string | null;
+  steps: LongTaskStep[];
+  artifacts: LongTaskArtifact[];
+  /** The artifact that answers the goal, once there is one. */
+  result_artifact_id: string | null;
+}
+
+/** `GET /api/v1/long-tasks/{id}/artifacts/{artifact_id}`: `body` is markdown. */
+export interface LongTaskArtifactBody {
+  id: string;
+  title: string;
+  kind: string;
+  summary: string;
+  body: string;
+}
