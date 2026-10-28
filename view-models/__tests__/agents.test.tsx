@@ -5,6 +5,7 @@ import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 
 import { ApiError, api } from '@/services/api-client';
 import type { AgentPrefills, AgentRecipe, AgentSuggestion } from '@/services/types';
+import { builtInName } from '@/view-models/agent-words';
 import { resetMockAgents } from '@/view-models/agents-source';
 import { useAgents, type UseAgents } from '@/view-models/use-agents';
 
@@ -145,6 +146,24 @@ describe('the list', () => {
     expect(m.vm.data.buildingName).toBe('Morning brief');
     await m.unmount();
   });
+
+  it('names a built-in helper being compiled by its goose name', async () => {
+    pond.agentPrefills.mockResolvedValue({ ...PREFILLS, building: { active: true, current: 'long-task-planner', done: 0, total: 2 } });
+    const m = await mount();
+    expect(m.vm.data.buildingName).toBe('Point Gander');
+    await m.unmount();
+  });
+});
+
+it('gives the shipped helpers goose names by the ids the Pond routes on, and leaves other names alone', () => {
+  expect(['long-task-planner', 'long-task-worker', 'long-task-verifier', 'long-task-composer', 'assistant', 'trip-planner'].map(builtInName)).toEqual([
+    'Point Gander',
+    'Forager Gosling',
+    'Sentinel Goose',
+    'Nestmaker Goose',
+    'Assistant',
+    'trip-planner',
+  ]);
 });
 
 describe('rebuilding', () => {
@@ -253,7 +272,7 @@ it('runs against the in-memory Pond on mock, sending nothing to the real one', a
   server.real = false;
   const m = await mount();
   expect(m.vm.data.agents.length).toBeGreaterThan(0);
-  expect(m.vm.data.builtIn.length).toBe(3);
+  expect(m.vm.data.builtIn.length).toBe(4);
   expect(pond.listRecipes).not.toHaveBeenCalled();
   expect(pond.agentPrefills).not.toHaveBeenCalled();
   await m.unmount();

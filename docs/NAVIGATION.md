@@ -184,8 +184,9 @@ Pond). Activation names the model's own category (`pond_category`, such as
 PAI-6 section 9): every recipe whose YAML has a `giap_role` block, with where its start-up copy (its
 prefill) stands. Below them are the Pond's suggestions (`GET /agents/suggestions`), each saying why it fits,
 when it would run, and that nothing runs until it is turned on; Turn on copies the template into this
-member's recipes and the Pond builds its copy then. The built-in long-task planner, worker and
-verifier have a prefill and no recipe, so they show only their status and Rebuild. Rebuild all asks first,
+member's recipes and the Pond builds its copy then. The built-in long-task helpers, shown by their goose
+names (Point Gander plans, Forager Gosling works, Sentinel Goose checks, Nestmaker Goose composes), have a
+prefill and no recipe, so they show only their status and Rebuild. Rebuild all asks first,
 because every agent is slower until its copy is back. The words are pond-desktop's (`prefillWords.ts`).
 
 An agent opens `/(stack)/agent?name=…`; with no `name` it is a new one. The phone edits what a person
