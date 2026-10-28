@@ -1,4 +1,4 @@
-// One card for the compile pass, so Home and the Agents screen cannot describe it differently.
+// One card for the Pond's build of start-up copies, so Home and the Agents screen describe it alike.
 
 import React from 'react';
 import { StyleSheet, View } from 'react-native';

@@ -1,5 +1,5 @@
-// The household's agents, the Pond's suggestions, and where each compiled prefill stands. Compile all
-// again asks first, because it slows every agent's next run until its copy is back.
+// The household's agents, the Pond's suggestions, and where each start-up copy (prefill) stands. Rebuild
+// all asks first, because every agent is slower until its copy is back.
 
 import React, { useCallback } from 'react';
 import { Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
@@ -33,8 +33,10 @@ function AgentBadges({ row }: { row: AgentRow }) {
 }
 
 /** How an agent's prefill stands, in the row's value slot, so a screen reader hears it with the name. */
-function statusOf(prefill: AgentPrefill | null, reported: boolean, t: TFunction): string | null {
-  if (!reported) return null;
+function statusOf(row: AgentRow, reported: boolean, t: TFunction): string | null {
+  const prefill = row.prefill;
+  // The Pond keeps no copy for a paused agent, and its Paused badge already says why.
+  if (!reported || (prefill === null && row.paused)) return null;
   return prefill ? prefillLabel(prefill.status) : t('agents.prefill.status.unknown');
 }
 
@@ -219,7 +221,7 @@ export default function AgentsScreen() {
                 key={row.id}
                 label={row.title}
                 description={row.purpose || t('agents.noPurpose')}
-                value={statusOf(row.prefill, data.prefillsReported, t)}
+                value={statusOf(row, data.prefillsReported, t)}
                 error={row.prefill?.status === 'failed' ? t('agents.prefill.failedRow') : null}
                 accessory="next"
                 onPress={() => open(row.name)}

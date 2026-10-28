@@ -46,7 +46,7 @@ const PREFILLS: AgentPrefills = {
   building: { active: false, current: null, done: 0, total: 0 },
   retention_days: 14,
   agents: [
-    { agent: 'planner', kind: 'default', status: 'ready', compiled_at: null, last_used_at: null },
+    { agent: 'long-task-planner', kind: 'default', status: 'ready', compiled_at: null, last_used_at: null },
     { agent: 'morning-brief', kind: 'member', status: 'idle', compiled_at: null, last_used_at: null },
   ],
 };
@@ -104,7 +104,7 @@ describe('the list', () => {
     expect(m.vm.data.agents.map((a) => [a.name, a.title, a.startsByItself, a.prefill?.status])).toEqual([
       ['morning-brief', 'Morning brief', true, 'idle'],
     ]);
-    expect(m.vm.data.builtIn.map((p) => p.agent)).toEqual(['planner']);
+    expect(m.vm.data.builtIn.map((p) => p.agent)).toEqual(['long-task-planner']);
     expect(m.vm.data.suggestions).toEqual([GATE]);
     expect(m.vm.data.prefillsReported).toBe(true);
     expect(pond.listRecipes).toHaveBeenCalledTimes(1);
@@ -158,7 +158,7 @@ describe('rebuilding', () => {
     expect(pond.rebuildAgentPrefill).toHaveBeenCalledTimes(1);
     expect(pond.rebuildAgentPrefill).toHaveBeenCalledWith('morning-brief');
     expect(pond.agentPrefills).toHaveBeenCalledTimes(2);
-    expect(m.vm.notice).toBe("Morning brief will be compiled again at your Pond's next quiet moment.");
+    expect(m.vm.notice).toBe("Morning brief will be rebuilt at your Pond's next quiet moment.");
     await m.unmount();
   });
 
@@ -169,7 +169,7 @@ describe('rebuilding', () => {
     });
     expect(pond.rebuildAllPrefills).toHaveBeenCalledTimes(1);
     expect(pond.rebuildAgentPrefill).not.toHaveBeenCalled();
-    expect(m.vm.notice).toBe("Every agent will be compiled again at your Pond's next quiet moment.");
+    expect(m.vm.notice).toBe("Every agent will be rebuilt at your Pond's next quiet moment.");
     await m.unmount();
   });
 

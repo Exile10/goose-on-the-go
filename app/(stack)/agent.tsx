@@ -167,6 +167,7 @@ export default function AgentScreen() {
       : t('agents.editor.runsAsked');
   const kept = form.toolGroups.filter((g) => !AGENT_TOOL_GROUPS.some((known) => known.name === g));
   const times = data.prefill ? prefillTimes(data.prefill) : null;
+  const paused = data.agent?.active === false;
   const busy = saving || deleting;
 
   return (
@@ -293,11 +294,13 @@ export default function AgentScreen() {
       {data.agent && data.prefillsReported ? (
         <SettingsGroup title={t('agents.editor.copyTitle')} footer={canRebuild(data.prefill) ? t('agents.prefill.rebuildHint') : null}>
           <SettingsRow
-            label={data.prefill ? prefillLabel(data.prefill.status) : t('agents.prefill.status.unknown')}
+            label={data.prefill ? prefillLabel(data.prefill.status) : paused ? t('agents.paused') : t('agents.prefill.status.unknown')}
             description={
               data.prefill
                 ? prefillDetail(data.prefill.status, data.retentionDays ?? DEFAULT_RETENTION_DAYS)
-                : t('agents.prefill.detail.unknown')
+                : paused
+                  ? t('agents.prefill.paused')
+                  : t('agents.prefill.detail.unknown')
             }
             destructive={data.prefill?.status === 'failed'}
           />

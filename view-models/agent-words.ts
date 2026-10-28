@@ -151,10 +151,12 @@ export function prefillTimes(prefill: AgentPrefill, now = new Date()): { compile
   };
 }
 
+// The Pond's role names (long_task_roles.rs), and `assistant`, which its own start-up build reports.
 const BUILT_IN: Readonly<Record<string, TranslationKey>> = {
-  planner: 'agents.builtInName.planner',
-  worker: 'agents.builtInName.worker',
-  verifier: 'agents.builtInName.verifier',
+  'long-task-planner': 'agents.builtInName.planner',
+  'long-task-worker': 'agents.builtInName.worker',
+  'long-task-verifier': 'agents.builtInName.verifier',
+  assistant: 'agents.builtInName.assistant',
 };
 
 /** A shipped agent's name in words; one the phone does not know keeps the Pond's own name. */

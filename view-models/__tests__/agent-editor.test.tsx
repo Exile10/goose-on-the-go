@@ -150,7 +150,7 @@ describe('saving a change', () => {
     expect(role.activations).toEqual(['delegated', { schedule: { cron: '0 0 7 * * MON-FRI', brief: 'Go.' } }]);
     expect(role.hooks).toEqual({ after: ['notify_owner'] });
     expect(m.vm.data.dirty).toBe(false);
-    expect(m.vm.notice).toBe('Saved. Your Pond compiles it again at its next quiet moment.');
+    expect(m.vm.notice).toBe('Saved. Your Pond rebuilds its start-up copy at its next quiet moment.');
     await m.unmount();
   });
 
@@ -234,7 +234,7 @@ describe('a new agent', () => {
     expect(role.activations).toEqual(['delegated', 'task_step']);
     expect(m.vm.data.nameLocked).toBe(true);
     expect(m.vm.data.dirty).toBe(false);
-    expect(m.vm.notice).toBe('Plant minder is added. Your Pond compiles it at its next quiet moment.');
+    expect(m.vm.notice).toBe('Plant minder is added. Your Pond builds its start-up copy at its next quiet moment.');
     await m.unmount();
   });
 
@@ -291,7 +291,7 @@ describe('deleting and rebuilding', () => {
     });
     expect(pond.rebuildAgentPrefill).toHaveBeenCalledTimes(1);
     expect(pond.rebuildAgentPrefill).toHaveBeenCalledWith('morning-brief');
-    expect(m.vm.notice).toBe("Morning brief will be compiled again at your Pond's next quiet moment.");
+    expect(m.vm.notice).toBe("Morning brief will be rebuilt at your Pond's next quiet moment.");
     await m.unmount();
   });
 });

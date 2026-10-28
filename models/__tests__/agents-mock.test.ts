@@ -19,7 +19,7 @@ it('starts with agents, built-in helpers and suggestions to show, and nothing co
   expect((await pond.listRecipes()).map((r) => r.name)).toEqual(['morning-brief', 'trip-planner', 'welcome-back']);
   const listing = await pond.prefills();
   expect(listing.building.active).toBe(false);
-  expect(listing.agents.filter((p) => p.kind === 'default').map((p) => p.agent)).toEqual(['planner', 'worker', 'verifier']);
+  expect(listing.agents.filter((p) => p.kind === 'default').map((p) => p.agent)).toEqual(['long-task-planner', 'long-task-worker', 'long-task-verifier']);
   expect((await pond.listSuggestions()).length).toBeGreaterThan(0);
 });
 

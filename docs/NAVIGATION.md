@@ -181,12 +181,12 @@ Pond). Activation names the model's own category (`pond_category`, such as
 ### Agents
 
 `/(stack)/agents` lists the household's agents, the helpers the Pond hands one job each (goose-in-a-pond
-PAI-6 section 9): every recipe whose YAML has a `giap_role` block, with where its compiled prefill
-stands. Below them are the Pond's suggestions (`GET /agents/suggestions`), each saying why it fits,
+PAI-6 section 9): every recipe whose YAML has a `giap_role` block, with where its start-up copy (its
+prefill) stands. Below them are the Pond's suggestions (`GET /agents/suggestions`), each saying why it fits,
 when it would run, and that nothing runs until it is turned on; Turn on copies the template into this
-member's recipes and the Pond compiles it then. The built-in planner, worker and verifier have a
-prefill and no recipe, so they show only their status and Compile again. Compile all again asks
-first, because every agent's next run starts slower until its copy is back.
+member's recipes and the Pond builds its copy then. The built-in long-task planner, worker and
+verifier have a prefill and no recipe, so they show only their status and Rebuild. Rebuild all asks first,
+because every agent is slower until its copy is back. The words are pond-desktop's (`prefillWords.ts`).
 
 An agent opens `/(stack)/agent?name=…`; with no `name` it is a new one. The phone edits what a person
 writes (name, one line, instructions, steps per run, tools, personal data) and says the rest in
@@ -198,7 +198,7 @@ problem under the field its path names, or listed with its path; a Pond without 
 written. A new agent's name is checked against the names already taken, because the Pond replaces
 a recipe saved under a taken name. Leaving with unsaved changes asks first.
 
-Home shows Getting agents ready while the Pond runs a compile pass (`GET /agents/prefills`,
+Home shows Getting agents ready while the Pond builds start-up copies (`GET /agents/prefills`,
 `building`): every 30 s while none runs, every 5 s while one does, and never again for a Pond that
 answers 404. The agents screens read it every 15 s, 5 s during a pass.
 

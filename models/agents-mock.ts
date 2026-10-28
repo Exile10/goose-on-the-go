@@ -191,9 +191,9 @@ export function createMockAgents(now: () => number = Date.now): AgentsSource {
       compiled_at: compiledAgo === null ? null : iso(born - compiledAgo),
       last_used_at: usedAgo === null ? null : iso(born - usedAgo),
     });
-  seed('planner', 'default', 'ready', 2 * HOUR, DAY);
-  seed('worker', 'default', 'ready', 2 * HOUR, DAY);
-  seed('verifier', 'default', 'ready', 2 * HOUR, DAY);
+  seed('long-task-planner', 'default', 'ready', 2 * HOUR, DAY);
+  seed('long-task-worker', 'default', 'ready', 2 * HOUR, DAY);
+  seed('long-task-verifier', 'default', 'ready', 2 * HOUR, DAY);
   seed('morning-brief', 'member', 'ready', 2 * HOUR, 3 * HOUR);
   seed('trip-planner', 'member', 'idle', null, 20 * DAY);
   seed('welcome-back', 'member', 'failed', null, null);
