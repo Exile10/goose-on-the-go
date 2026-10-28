@@ -100,7 +100,8 @@ object PondNetwork {
     if (context.applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE != 0) {
       installDiagnostics()
     }
-    pushResolvers()
+    val manager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+    pushResolvers(manager.activeNetwork?.let { manager.getLinkProperties(it) })
     Mobile.setInterfaceProvider(object : InterfaceProvider {
       override fun getInterfaces(): String {
         val result = JSONArray()
@@ -127,17 +128,36 @@ object PondNetwork {
   }
   private fun observeNetwork() {
     val manager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+    // Every callback describes the network it names, and that is the one used.
+    // `activeNetwork` lags a switch: on leaving Wi-Fi for mobile data it still
+    // answered with Wi-Fi, so the node was told its old interface and the home
+    // router's resolvers, never re-bound, and stayed unreachable until Wi-Fi came
+    // back (A57, 2026-10-28). Callbacks for one registration arrive in order on a
+    // single thread, so `current` needs no lock.
     val callback = object : ConnectivityManager.NetworkCallback() {
-      override fun onAvailable(network: Network) { changed() }
-      override fun onLost(network: Network) { changed() }
-      override fun onLinkPropertiesChanged(network: Network, properties: LinkProperties) { changed() }
-      override fun onCapabilitiesChanged(network: Network, capabilities: NetworkCapabilities) { changed() }
-      private fun changed() {
+      private var current: Network? = null
+      override fun onAvailable(network: Network) {
+        current = network
+        changed(manager.getLinkProperties(network))
+      }
+      override fun onLost(network: Network) {
+        // Only the default network going away with no successor reaches here;
+        // a switch arrives as onAvailable for the new one.
+        if (network != current) return
+        current = null
+        changed(null)
+      }
+      override fun onLinkPropertiesChanged(network: Network, properties: LinkProperties) {
+        if (network == current) changed(properties)
+      }
+      override fun onCapabilitiesChanged(network: Network, capabilities: NetworkCapabilities) {
+        if (network == current) changed(manager.getLinkProperties(network))
+      }
+      private fun changed(properties: LinkProperties?) {
         // This callback never enters PondNetwork's lock: Go may call the native
         // interface getter while starting/stopping the node on another thread.
-        val name = manager.activeNetwork?.let { manager.getLinkProperties(it)?.interfaceName } ?: ""
-        pushResolvers()
-        Mobile.networkChanged(name)
+        pushResolvers(properties)
+        Mobile.networkChanged(properties?.interfaceName ?: "")
       }
     }
     manager.registerDefaultNetworkCallback(callback)
@@ -145,15 +165,6 @@ object PondNetwork {
     val name = manager.activeNetwork?.let { manager.getLinkProperties(it)?.interfaceName } ?: ""
     Mobile.networkChanged(name)
   }
-  /**
-   * Hand the node the resolvers the OS reports for the active network.
-   *
-   * The platform resolver does not answer for the embedded node: a lookup of the
-   * coordinator hangs and then falls through to Tailscale's bootstrap DNS, which
-   * cannot answer for a self-hosted coordinator and discloses its hostname while
-   * asking. These are pushed rather than fetched on demand, because a lookup must
-   * not wait on a call back into Java.
-   */
   /**
    * Route tailscale's backend logging to logcat.
    *
@@ -177,9 +188,18 @@ object PondNetwork {
     })
   }
 
-  private fun pushResolvers() {
-    val manager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-    val servers = manager.activeNetwork?.let { manager.getLinkProperties(it) }?.dnsServers.orEmpty()
+  /**
+   * Hand the node the resolvers the OS reports for a network: `properties` of
+   * the default network, or null when there is none.
+   *
+   * The platform resolver does not answer for the embedded node: a lookup of the
+   * coordinator hangs and then falls through to Tailscale's bootstrap DNS, which
+   * cannot answer for a self-hosted coordinator and discloses its hostname while
+   * asking. These are pushed rather than fetched on demand, because a lookup must
+   * not wait on a call back into Java.
+   */
+  private fun pushResolvers(properties: LinkProperties?) {
+    val servers = properties?.dnsServers.orEmpty()
     val result = JSONArray()
     val seen = mutableSetOf<String>()
     // Keep the order the OS gave: on a home network the server it lists first is
