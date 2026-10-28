@@ -17,6 +17,7 @@ import type { CivilDate, CivilTime } from '@jarida/ink';
 
 import i18n from '@/services/i18n';
 import type { TranslationKey } from '@/services/i18n';
+import { decodeEntities, parseReply, type MarkedToken, type Token } from '@/services/markdown';
 import type { CreateScheduleRequest, Rule, Schedule, UpdateScheduleRequest } from '@/services/types';
 
 /** A sensor rule, which `GET /schedules` returns alongside the timed schedules. */
@@ -107,6 +108,94 @@ export function formatScheduleTime(iso: string, now = new Date()): string {
 
 function startOfDay(d: Date): number {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+}
+
+// A run, as its row reads it.
+
+/**
+ * How long a run took, the way a person says it: "850 ms", "59 s", "2 min 9 s",
+ * "1 h 5 min". The Pond sends milliseconds, and "128820 ms" is a number to be
+ * worked out rather than read. Below a second the milliseconds are the only
+ * figure there is; from a second up they are noise, so they round away.
+ */
+export function formatRunDuration(ms: number): string {
+  const whole = Math.max(0, Math.round(ms));
+  if (whole < 1000) return i18n.t('schedule.runs.durationMs', { ms: whole });
+  const seconds = Math.round(whole / 1000);
+  if (seconds < 60) return i18n.t('schedule.runs.durationSeconds', { s: seconds });
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) {
+    const s = seconds % 60;
+    return s === 0
+      ? i18n.t('schedule.runs.durationMinutes', { m: minutes })
+      : i18n.t('schedule.runs.durationMinutesSeconds', { m: minutes, s });
+  }
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  return m === 0
+    ? i18n.t('schedule.runs.durationHours', { h })
+    : i18n.t('schedule.runs.durationHoursMinutes', { h, m });
+}
+
+/** Lines a collapsed run shows: enough to tell one answer from the next. */
+export const RUN_PREVIEW_LINES = 3;
+/** Characters a collapsed run shows, so three long lines cannot wrap into six. */
+export const RUN_PREVIEW_CHARS = 160;
+
+/** The words of inline markdown, with its markers gone. */
+function inlinePlain(tokens: Token[] | undefined): string {
+  return (tokens ?? [])
+    .map((token) => {
+      const t = token as MarkedToken;
+      if (t.type === 'br') return ' ';
+      if ('tokens' in t && t.tokens) return inlinePlain(t.tokens);
+      return 'text' in t ? decodeEntities(t.text) : '';
+    })
+    .join('');
+}
+
+/** One line per paragraph, heading, list item or code line, with no markdown left in any. */
+function blockPlain(tokens: Token[]): string[] {
+  return tokens.flatMap((token) => {
+    const t = token as MarkedToken;
+    switch (t.type) {
+      case 'space':
+      case 'hr':
+        return [];
+      case 'list':
+        return t.items.flatMap((item) => blockPlain(item.tokens));
+      case 'blockquote':
+        return blockPlain(t.tokens);
+      case 'code':
+        return t.text.split('\n');
+      case 'table':
+        return [t.header, ...t.rows].map((row) => row.map((cell) => inlinePlain(cell.tokens)).join('  '));
+      case 'html':
+        return [t.text.replace(/<[^>]*>/g, '')];
+      default:
+        return 'tokens' in t && t.tokens ? [inlinePlain(t.tokens)] : 'text' in t ? [decodeEntities(t.text)] : [];
+    }
+  });
+}
+
+/**
+ * A run's output cut to a few plain lines for its collapsed row. The agent
+ * writes markdown, and a row is too small to draw it, so the markers are taken
+ * out rather than shown: `**Weather in Nairobi:**` reads as the words alone.
+ * `truncated` says whether anything was left out, which is what makes the row
+ * worth opening; a short answer is already all there.
+ */
+export function runPreview(source: string): { text: string; truncated: boolean } {
+  const lines = blockPlain(parseReply(source))
+    .map((line) => line.replace(/\s+/g, ' ').trim())
+    .filter((line) => line.length > 0);
+  let text = lines.slice(0, RUN_PREVIEW_LINES).join('\n');
+  let truncated = lines.length > RUN_PREVIEW_LINES;
+  if (text.length > RUN_PREVIEW_CHARS) {
+    text = text.slice(0, RUN_PREVIEW_CHARS).trimEnd();
+    truncated = true;
+  }
+  return { text: truncated ? `${text}…` : text, truncated };
 }
 
 // ── Cron in words ────────────────────────────────────────────────────────────

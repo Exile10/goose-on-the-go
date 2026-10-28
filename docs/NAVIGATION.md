@@ -196,7 +196,12 @@ Schedule (`/(stack)/schedule`) has two tabs over the Pond's scheduler:
 Schedules (`/schedules`) and Automations (`/rules`). A schedule's card opens
 `schedule-detail?id=…`: what it runs, when in words and as its cron, its zone,
 next and last run, its recent runs with what each said or why it failed, and
-edit, on/off, Run now and delete. An automation's card opens its edit sheet,
+edit, on/off, Run now and delete. A run shows three plain lines of its output
+with the markdown taken out (`runPreview`) and how long it took in words
+(`formatRunDuration`, both in `models/schedule.ts`); a run with more than that
+opens in place to all of it, drawn by the chat's markdown renderer, and each
+run opens and closes on its own (`components/patterns/schedule-run-row.tsx`).
+An automation's card opens its edit sheet,
 which also deletes it. Opened with `?schedule_id=…`, as a schedule notification
 does, the list goes straight on to that schedule's screen, with the list left
 beneath it for Back. Both tabs are behind the Developer toggle (`schedule`, real
