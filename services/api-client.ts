@@ -4,6 +4,7 @@ import { assertPondTrust, PondTrustError, pondTrustFailed } from './pond-trust';
 import { isInsecureDevOrigin, isLocalPairingUrl, normalizePondUrl } from '@/models/connection';
 import { readWebSearch } from '@/models/web-search';
 import { readPrefills } from '@/models/agents';
+import { readLongTask } from '@/models/long-tasks';
 /**
  * PondApiClient — HTTP client for goose-in-a-pond.
  *
@@ -25,6 +26,8 @@ import { randomBytes } from './secure-random';
 import { timeoutSignal } from './http';
 import { readSse, type SseEvent } from './sse';
 import type {
+  LongTask,
+  LongTaskArtifactBody,
   AgentPrefills,
   AgentRecipe,
   AgentSuggestion,
@@ -2082,6 +2085,27 @@ export class PondApiClient {
   /** A 202, for every agent at once. */
   rebuildAllPrefills(): Promise<void> {
     return this.post<void>('/api/v1/agents/prefills/rebuild', {});
+  }
+
+  /** One long task, its steps and its artifacts. A 404 is a task this member does not reach, or none. */
+  async longTask(id: string): Promise<LongTask> {
+    const task = readLongTask(await this.get<unknown>(`/api/v1/long-tasks/${encodeURIComponent(id)}`));
+    if (!task) throw new Error('The Pond answered the long task with something unexpected');
+    return task;
+  }
+
+  /** One artifact's whole body, for reading a task's result. */
+  async longTaskArtifact(taskId: string, artifactId: string): Promise<LongTaskArtifactBody> {
+    const res = await this.get<Partial<LongTaskArtifactBody> | null>(
+      `/api/v1/long-tasks/${encodeURIComponent(taskId)}/artifacts/${encodeURIComponent(artifactId)}`,
+    );
+    if (!res || typeof res.body !== 'string') throw new Error('The Pond answered the artifact with something unexpected');
+    return { id: res.id ?? artifactId, title: res.title ?? '', kind: res.kind ?? '', summary: res.summary ?? '', body: res.body };
+  }
+
+  /** Stops a task; a step under way finishes first. A 409 once it has already ended. */
+  cancelLongTask(id: string): Promise<void> {
+    return this.post<void>(`/api/v1/long-tasks/${encodeURIComponent(id)}/cancel`, {});
   }
 
   // ── Verb helpers ────────────────────────────────────────────

@@ -327,6 +327,20 @@ voice mode. What is worth knowing:
   restore and shows its result chip. Kept cards go with their conversation,
   and all of them on sign-out. Friendly names are pond-desktop's, kept in
   `constants/tools.ts`, because the Pond has none of its own.
+- **A long task is followed where it started.** The assistant can start one
+  with `giap-tasks__task_start`, and it runs later, outside the turn. Its
+  answer reads "Started task <id>", and the chat draws `long-task-card.tsx`
+  there in place of the chip. The card shows the goal, the state in the
+  Pond's own words, each step with its agent and summary, and the result
+  with Read the result. It also has Stop, behind a confirmation, because a
+  stopped task cannot be carried on.
+  - It reads `GET /long-tasks/{id}` every 5 s while the task plans or runs,
+    and every 30 s while it waits for a decision or is paused.
+  - It never reads an ended task again. Ended tasks and their result bodies
+    are kept in memory (`services/long-task-cache.ts`) until sign-out, so
+    reopening the conversation asks nothing.
+  - On mock chat, a message that says "long task" starts one in the mock
+    Pond (`models/long-tasks-mock.ts`).
 - **The title bar names the conversation.** It shows the title the wall or
   Home passed with the link, and the Pond's own after every reply. A new
   conversation shows, from its first question, the title the Pond will store
