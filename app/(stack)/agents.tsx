@@ -27,7 +27,12 @@ function AgentBadges({ row }: { row: AgentRow }) {
   if (!row.paused && !row.startsByItself) return null;
   return (
     <View style={styles.badges}>
-      {row.paused ? <InkBadge>{t('agents.paused')}</InkBadge> : <InkBadge>{t('agents.startsByItself')}</InkBadge>}
+      {/* Uppercased here as well as by Ink's style: Android measures the text before its transform and wraps it. */}
+      {row.paused ? (
+        <InkBadge>{t('agents.paused').toLocaleUpperCase()}</InkBadge>
+      ) : (
+        <InkBadge>{t('agents.startsByItself').toLocaleUpperCase()}</InkBadge>
+      )}
     </View>
   );
 }
