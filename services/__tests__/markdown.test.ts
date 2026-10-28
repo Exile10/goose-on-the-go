@@ -1,4 +1,4 @@
-import { decodeEntities, parseReply, webLink, type Tokens } from '../markdown';
+import { decodeEntities, htmlAsText, isMapLink, parseReply, webLink, type Tokens } from '../markdown';
 
 describe('parseReply', () => {
   it('reads a fence still being streamed as code to the end, not as prose', () => {
@@ -34,5 +34,30 @@ describe('decodeEntities', () => {
 
   it('leaves anything else alone', () => {
     expect(decodeEntities('&copy; & &amp')).toBe('&copy; & &amp');
+  });
+});
+
+describe('isMapLink', () => {
+  it.each([
+    'https://www.openstreetmap.org/search?query=Fort%20Jesus',
+    'https://osm.org/go/xyz',
+    'https://maps.apple.com/?q=Mombasa',
+    'https://www.google.com/maps/search/Mombasa',
+  ])('hands %s to the maps app', (url) => {
+    expect(isMapLink(url)).toBe(true);
+  });
+
+  it.each(['https://openstreetmap.org.evil.test/x', 'https://www.google.com/search?q=maps', 'https://user@openstreetmap.org.x.test', 'geo:0,0'])(
+    'keeps %s in the in-app browser',
+    (url) => {
+      expect(isMapLink(url)).toBe(false);
+    },
+  );
+});
+
+describe('htmlAsText', () => {
+  it('keeps HTML as its own text, and only a line break as a break', () => {
+    expect(htmlAsText('<script>alert(1)</script>')).toBe('<script>alert(1)</script>');
+    expect(htmlAsText('<br/>')).toBe('\n');
   });
 });

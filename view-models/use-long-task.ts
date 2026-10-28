@@ -9,8 +9,8 @@ import type { ToolCall } from '@/models/chat';
 import { useServer } from '@/providers/server-provider';
 import { ApiError, api } from '@/services/api-client';
 import i18n from '@/services/i18n';
-import { endedTask, keepEndedTask, keepResultBody, resultBody } from '@/services/long-task-cache';
-import type { LongTask, LongTaskArtifactBody, LongTaskKind } from '@/services/types';
+import { endedTask, keepEndedTask } from '@/services/long-task-cache';
+import type { LongTask, LongTaskKind } from '@/services/types';
 import { describeApiError } from './describe-error';
 import { useLive } from './use-live';
 
@@ -18,6 +18,8 @@ import { useLive } from './use-live';
 export const POND_LONG_TASKS: LongTasksSource = {
   researchAvailability: () => api.deepResearchAvailability(),
   task: (id) => api.longTask(id),
+  report: (id) => api.longTaskReport(id),
+  export: (id, format) => api.longTaskExport(id, format),
   artifact: (taskId, artifactId) => api.longTaskArtifact(taskId, artifactId),
   cancel: (id) => api.cancelLongTask(id),
 };
@@ -48,13 +50,6 @@ export function resetMockLongTasks(): void {
   mock = null;
 }
 
-export interface ResultView {
-  open: boolean;
-  loading: boolean;
-  body: LongTaskArtifactBody | null;
-  error: string | null;
-}
-
 export interface UseLongTask {
   task: LongTask | null;
   /** The first read failed and nothing is known; with a retry. */
@@ -65,17 +60,12 @@ export interface UseLongTask {
   stopError: string | null;
   /** Said once a Stop finds the task already over. */
   notice: string | null;
-  result: ResultView;
   actions: {
     retry: () => Promise<void>;
     /** Resolves to whether the Pond stopped it. */
     stop: () => Promise<boolean>;
-    openResult: () => Promise<void>;
-    closeResult: () => void;
   };
 }
-
-const CLOSED: ResultView = { open: false, loading: false, body: null, error: null };
 
 function statusOf(e: unknown): number | 'network' | 'shape' {
   if (e instanceof ApiError) return e.status;
@@ -91,7 +81,6 @@ export function useLongTask(taskId: string): UseLongTask {
   const [stopping, setStopping] = useState(false);
   const [stopError, setStopError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const [result, setResult] = useState<ResultView>(CLOSED);
   const latest = useRef<LongTask | null>(task);
 
   const read = useCallback(async () => {
@@ -134,23 +123,5 @@ export function useLongTask(taskId: string): UseLongTask {
     }
   }, [read, source, stopping, taskId]);
 
-  const openResult = useCallback(async () => {
-    const artifactId = latest.current?.result_artifact_id;
-    if (!artifactId) return;
-    const known = resultBody(artifactId);
-    setResult({ open: true, loading: known === null, body: known, error: null });
-    if (known) return;
-    try {
-      const body = await source.artifact(taskId, artifactId);
-      keepResultBody(body);
-      setResult((r) => (r.open ? { open: true, loading: false, body, error: null } : r));
-    } catch (e) {
-      console.warn('[long-task] result read failed', { status: statusOf(e) });
-      setResult((r) => (r.open ? { open: true, loading: false, body: null, error: i18n.t('chat.longTask.resultFailed') } : r));
-    }
-  }, [source, taskId]);
-
-  const closeResult = useCallback(() => setResult(CLOSED), []);
-
-  return { task, error, gone, stopping, stopError, notice, result, actions: { retry: read, stop, openResult, closeResult } };
+  return { task, error, gone, stopping, stopError, notice, actions: { retry: read, stop } };
 }

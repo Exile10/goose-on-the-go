@@ -396,6 +396,26 @@
       "noAttachments": "Research takes a question on its own. Remove the pictures and files first.",
       "attachOff": "Research takes a question on its own, so pictures and files wait until it is sent.",
       "refusedOff": "Your Pond has research switched off, so it did not take the question."
+    },
+    "report": {
+      "loading": "Reading the report from your Pond",
+      "failed": "Could not read the report from your Pond.",
+      "gone": "This report is no longer on your Pond.",
+      "empty": "It finished without saving a result.",
+      "notFinished": "This is what it has so far. The rest arrives as it works.",
+      "olderPond": "Your Pond sent only the result, so this can't be shared from here yet.",
+      "sections": "Jump to a section",
+      "top": "Top",
+      "share": "Share",
+      "sharing": "Getting the file ready...",
+      "shareTitle": "Share this report",
+      "shareBody": "Choose how to share it. Each opens your phone's share sheet.",
+      "asDocument": "As a document",
+      "asPage": "As a web page",
+      "toCalendar": "Add to calendar",
+      "shareFailed": "Could not get the file from your Pond. Try again in a moment.",
+      "shareUnavailable": "This phone has no share sheet to hand the file to.",
+      "noDates": "This report has no dated events for a calendar."
     }
   },
   "devices": {
@@ -1475,7 +1495,8 @@
     "visionAutomations": "Vision automations",
     "agents": "Agents",
     "agent": "Agent",
-    "newAgent": "New agent"
+    "newAgent": "New agent",
+    "taskReport": "Report"
   },
   "nav": {
     "goose": "Goose",
@@ -3183,7 +3204,8 @@
       "planner": "Long-task planner",
       "worker": "Long-task worker",
       "verifier": "Long-task verifier",
-      "assistant": "Assistant"
+      "assistant": "Assistant",
+      "composer": "Long-task composer"
     },
     "suggested": {
       "title": "Suggested for this Pond",

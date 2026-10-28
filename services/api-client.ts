@@ -4,7 +4,7 @@ import { assertPondTrust, PondTrustError, pondTrustFailed } from './pond-trust';
 import { isInsecureDevOrigin, isLocalPairingUrl, normalizePondUrl } from '@/models/connection';
 import { readWebSearch } from '@/models/web-search';
 import { readPrefills } from '@/models/agents';
-import { readLongTask, readResearchAvailability } from '@/models/long-tasks';
+import { readLongTask, readLongTaskReport, readResearchAvailability, reportFileName } from '@/models/long-tasks';
 /**
  * PondApiClient — HTTP client for goose-in-a-pond.
  *
@@ -27,6 +27,8 @@ import { timeoutSignal } from './http';
 import { readSse, type SseEvent } from './sse';
 import type {
   DeepResearchAvailability,
+  LongTaskReportWire,
+  ReportFormat,
   LongTask,
   LongTaskArtifactBody,
   AgentPrefills,
@@ -2109,6 +2111,21 @@ export class PondApiClient {
     const answer = readResearchAvailability(await this.get<unknown>('/api/v1/long-tasks/deep-research'));
     if (!answer) throw new Error('The Pond answered the research check with something unexpected');
     return answer;
+  }
+
+  /** The whole report, as long as its plan made it. A 404 is an unknown task, or a Pond without the route. */
+  async longTaskReport(id: string): Promise<LongTaskReportWire> {
+    const report = readLongTaskReport(await this.get<unknown>(`/api/v1/long-tasks/${encodeURIComponent(id)}/report`));
+    if (!report) throw new Error('The Pond answered the report with something unexpected');
+    return report;
+  }
+
+  /** The report as a file to keep. `ics` is a 404 when the plan saved no dated events. */
+  async longTaskExport(id: string, format: ReportFormat): Promise<{ name: string; body: string }> {
+    const res = await this.open(`/api/v1/long-tasks/${encodeURIComponent(id)}/export?format=${format}`, {
+      signal: timeoutSignal(REQUEST_TIMEOUT_MS),
+    });
+    return { name: reportFileName(res.headers.get('Content-Disposition'), format), body: await res.text() };
   }
 
   /** Stops a task; a step under way finishes first. A 409 once it has already ended. */

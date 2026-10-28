@@ -7,6 +7,8 @@ import type {
   DeepResearchAvailability,
   LongTask,
   LongTaskArtifact,
+  LongTaskReportWire,
+  ReportFormat,
   LongTaskState,
   LongTaskStep,
   LongTaskStepState,
@@ -126,4 +128,71 @@ export function researchOffer(availability: DeepResearchAvailability | null): Re
   if (!availability) return 'hidden';
   if (availability.available) return 'available';
   return availability.reason === 'unidentified' ? 'unidentified' : 'hidden';
+}
+
+/** Null for a body that is not a report; a missing count reads as none. */
+export function readLongTaskReport(raw: unknown): LongTaskReportWire | null {
+  const r = raw as Record<string, unknown> | null;
+  if (!r || typeof r !== 'object' || typeof r.id !== 'string' || typeof r.markdown !== 'string') return null;
+  const count = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) && v > 0 ? Math.floor(v) : 0);
+  const sources = (Array.isArray(r.sources) ? r.sources : []).flatMap((item) => {
+    const s = item as Record<string, unknown> | null;
+    return s && typeof s.url === 'string' ? [{ title: typeof s.title === 'string' ? s.title : s.url, url: s.url }] : [];
+  });
+  return {
+    id: r.id,
+    title: text(r.title),
+    state: TASK_STATES.includes(r.state as LongTaskState) ? (r.state as LongTaskState) : 'completed',
+    kind: r.kind === 'research' ? 'research' : 'general',
+    markdown: r.markdown,
+    sections: count(r.sections),
+    sources,
+    calendar_events: count(r.calendar_events),
+  };
+}
+
+/** Each export's type and extension, as the Pond serves them; the share sheet is told the same. */
+export const REPORT_FILES: Readonly<Record<ReportFormat, { mimeType: string; extension: string; uti: string }>> = {
+  markdown: { mimeType: 'text/markdown', extension: 'md', uti: 'net.daringfireball.markdown' },
+  html: { mimeType: 'text/html', extension: 'html', uti: 'public.html' },
+  ics: { mimeType: 'text/calendar', extension: 'ics', uti: 'public.calendar-event' },
+};
+
+/**
+ * The file name to share under: the Pond's `Content-Disposition` name when it is a plain one with
+ * this format's extension, else `report.<ext>`. Nothing from the header reaches a path unchecked.
+ */
+export function reportFileName(disposition: string | null, format: ReportFormat): string {
+  const { extension } = REPORT_FILES[format];
+  const named = /filename="?([^";]+)"?/i.exec(disposition ?? '')?.[1]?.trim() ?? '';
+  const stem = named.endsWith(`.${extension}`) ? named.slice(0, -(extension.length + 1)) : '';
+  return /^[A-Za-z0-9][A-Za-z0-9_-]{0,79}$/.test(stem) ? `${stem}.${extension}` : `report.${extension}`;
+}
+
+export interface ReportSection {
+  /** Empty for what comes before the first section: the report's title and summary. */
+  title: string;
+  markdown: string;
+}
+
+/**
+ * The report cut at its section headings (`#` after the title, and `##`), so the reading screen can
+ * jump between them. A heading inside a code fence is not one.
+ */
+export function reportSections(markdown: string): ReportSection[] {
+  const out: ReportSection[] = [{ title: '', markdown: '' }];
+  let fenced = false;
+  let seenTitle = false;
+  for (const line of markdown.split('\n')) {
+    if (/^\s*(```|~~~)/.test(line)) fenced = !fenced;
+    const heading = fenced ? null : /^(#{1,2})\s+(.+?)\s*#*\s*$/.exec(line);
+    const isTitle = heading?.[1] === '#' && !seenTitle;
+    if (heading && !isTitle) {
+      out.push({ title: heading[2].replace(/[*_`]/g, ''), markdown: `${line}\n` });
+      continue;
+    }
+    if (heading) seenTitle = true;
+    out[out.length - 1].markdown += `${line}\n`;
+  }
+  return out.filter((s) => s.title !== '' || s.markdown.trim() !== '');
 }

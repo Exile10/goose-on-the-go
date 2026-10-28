@@ -341,6 +341,18 @@ voice mode. What is worth knowing:
     reopening the conversation asks nothing.
   - On mock chat, a message that says "long task" starts one in the mock
     Pond (`models/long-tasks-mock.ts`).
+- **A long task's report is read on its own page** (`/(stack)/task-report`).
+  - It is the whole report from `GET /long-tasks/{id}/report`, cut at its
+    headings so a row of section chips can jump between them.
+  - A Pond without the route shows the result artifact instead, with
+    nothing to share.
+  - Share fetches `/export` with the bearer token, writes it to the cache
+    under the Pond's file name, and opens the share sheet. It offers a
+    document, a web page, and "Add to calendar" only when the plan has
+    dated events.
+  - The reply renderer shows any HTML the model wrote as text, links only
+    web addresses (a map link opens where the phone opens maps), and shows
+    a picture's description instead of fetching it.
 - **Deep research starts from the plus menu.**
   - Whether it is offered comes from `GET /long-tasks/deep-research`, asked
     once per dock and per Pond (`use-deep-research.ts`).

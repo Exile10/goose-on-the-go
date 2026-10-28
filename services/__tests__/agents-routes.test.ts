@@ -11,11 +11,11 @@ function setFetch(impl: unknown) {
   Object.defineProperty(globalThis, 'fetch', { value: impl, configurable: true, writable: true });
 }
 
-function reply(body: string, status = 200) {
+function reply(body: string, status = 200, headers: Record<string, string> = {}) {
   return {
     ok: status >= 200 && status < 300,
     status,
-    headers: { get: () => null },
+    headers: { get: (name: string) => headers[name.toLowerCase()] ?? null },
     text: async () => body,
     json: async () => JSON.parse(body),
   };
@@ -28,7 +28,7 @@ interface Seen {
   authorization: string | null;
 }
 
-function recordInto(seen: Seen[], body: string, status = 200) {
+function recordInto(seen: Seen[], body: string, status = 200, headers: Record<string, string> = {}) {
   setFetch(async (url: string, init?: { method?: string; body?: string; headers?: Headers }) => {
     seen.push({
       url,
@@ -36,7 +36,7 @@ function recordInto(seen: Seen[], body: string, status = 200) {
       body: init?.body ? JSON.parse(init.body) : undefined,
       authorization: init?.headers?.get('Authorization') ?? null,
     });
-    return reply(body, status);
+    return reply(body, status, headers);
   });
 }
 
@@ -220,5 +220,31 @@ describe('deep research', () => {
     await expect(paired().deepResearchAvailability()).rejects.toThrow('unexpected');
     recordInto([], '', 404);
     await expect(paired().deepResearchAvailability()).rejects.toMatchObject({ status: 404 });
+  });
+});
+
+describe('a long task report', () => {
+  it('reads the whole report with the paired token', async () => {
+    const seen: Seen[] = [];
+    recordInto(
+      seen,
+      JSON.stringify({ id: 't1', title: 'T', state: 'completed', kind: 'research', markdown: '# T\n', sections: 3, sources: [], calendar_events: 2 }),
+    );
+    const report = await paired().longTaskReport('t1');
+    expect(seen[0]).toMatchObject({ url: `${BASE}/long-tasks/t1/report`, method: undefined, authorization: 'Bearer session-token' });
+    expect(report).toMatchObject({ kind: 'research', sections: 3, calendar_events: 2 });
+  });
+
+  it('exports each format by its query, under the name the Pond gives it', async () => {
+    const seen: Seen[] = [];
+    recordInto(seen, 'BEGIN:VCALENDAR', 200, { 'content-disposition': 'attachment; filename="a-weekend-in-mombasa.ics"' });
+    const file = await paired().longTaskExport('t1', 'ics');
+    expect(seen[0]).toMatchObject({ url: `${BASE}/long-tasks/t1/export?format=ics`, authorization: 'Bearer session-token' });
+    expect(file).toEqual({ name: 'a-weekend-in-mombasa.ics', body: 'BEGIN:VCALENDAR' });
+  });
+
+  it('reaches the caller with the 404 of a calendar export with no dates', async () => {
+    recordInto([], '{"error":"this report has no dated events for a calendar"}', 404);
+    await expect(paired().longTaskExport('t1', 'ics')).rejects.toMatchObject({ status: 404 });
   });
 });

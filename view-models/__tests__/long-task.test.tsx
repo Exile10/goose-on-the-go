@@ -19,7 +19,7 @@ jest.mock('expo-router', () => ({
 jest.mock('@/providers/server-provider', () => ({ useServer: () => ({ hydrated: true, online: true, isScreenReal: () => true }) }));
 jest.mock('@/services/api-client', () => {
   const actual = jest.requireActual('@/services/api-client');
-  return { ...actual, api: { longTask: jest.fn(), longTaskArtifact: jest.fn(), cancelLongTask: jest.fn() } };
+  return { ...actual, api: { longTask: jest.fn(), cancelLongTask: jest.fn() } };
 });
 
 const pond = jest.mocked(api);
@@ -185,43 +185,6 @@ describe('stopping a task', () => {
     });
     expect(m.vm.stopError).toBe('Your Pond is busy. Try again in a moment.');
     expect(m.vm.task?.state).toBe('running');
-    await m.unmount();
-  });
-});
-
-describe('reading the result', () => {
-  const finished = task('completed', {
-    result_artifact_id: 'art1',
-    artifacts: [{ id: 'art1', task_id: ID, step_key: 'c', kind: 'draft', title: 'Weekend plan', summary: 'By train.', tokens: 10, created_at: '' }],
-  });
-
-  it('reads the body once, and opens it from memory after that', async () => {
-    pond.longTask.mockResolvedValue(finished);
-    pond.longTaskArtifact.mockResolvedValue({ id: 'art1', title: 'Weekend plan', kind: 'draft', summary: 'By train.', body: '## Plan' });
-    const m = await mount();
-    await act(async () => {
-      await m.vm.actions.openResult();
-    });
-    expect(pond.longTaskArtifact).toHaveBeenCalledWith(ID, 'art1');
-    expect(m.vm.result).toMatchObject({ open: true, loading: false, body: { body: '## Plan' } });
-
-    await act(async () => m.vm.actions.closeResult());
-    await act(async () => {
-      await m.vm.actions.openResult();
-    });
-    expect(pond.longTaskArtifact).toHaveBeenCalledTimes(1);
-    expect(m.vm.result.body?.body).toBe('## Plan');
-    await m.unmount();
-  });
-
-  it('says it could not read the result, in the sheet', async () => {
-    pond.longTask.mockResolvedValue(finished);
-    pond.longTaskArtifact.mockRejectedValue(new ApiError('GET → 500', 500, null));
-    const m = await mount();
-    await act(async () => {
-      await m.vm.actions.openResult();
-    });
-    expect(m.vm.result).toMatchObject({ open: true, loading: false, body: null, error: 'Could not read the result. Try again in a moment.' });
     await m.unmount();
   });
 });
