@@ -181,7 +181,7 @@ describe('reading', () => {
     const m = await mount('camera-1');
 
     expect(m.vm.failed).toBe(true);
-    expect(m.vm.error).toBe('Your Pond is busy. Try again in a moment.');
+    expect(m.vm.error).toBe('Your Pond is busy right now.');
     expect(m.vm.data.events).toEqual([]);
     await m.unmount();
   });
@@ -204,7 +204,7 @@ describe('reading', () => {
 
     await act(async () => m.vm.actions.refresh());
 
-    expect(m.vm.error).toBe('Your Pond is busy. Try again in a moment.');
+    expect(m.vm.error).toBe('Your Pond is busy right now.');
     expect(m.vm.failed).toBe(false);
     expect(m.vm.data.events).toHaveLength(1);
     await m.unmount();

@@ -189,7 +189,7 @@ describe('adding a secret', () => {
     });
 
     expect(saved).toBe(false);
-    expect(m.vm.formError).toBe('Your Pond is busy. Try again in a moment.');
+    expect(m.vm.formError).toBe('Your Pond is busy right now.');
     expect(m.vm.data.form).toEqual({ kind: 'add' });
     expect(m.vm.data.draftKey).toBe('NEW_KEY');
     expect(m.vm.data.draftValue).toBe('');

@@ -135,7 +135,7 @@ describe('the status', () => {
 
     expect(m.vm.failed).toBe(true);
     expect(m.vm.data.sentence).toBeNull();
-    expect(m.vm.error).toBe('Your Pond is busy. Try again in a moment.');
+    expect(m.vm.error).toBe('Your Pond is busy right now.');
   });
 
   it('keeps the last status when a later quiet read fails', async () => {

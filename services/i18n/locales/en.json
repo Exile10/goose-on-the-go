@@ -1649,7 +1649,7 @@
       "exporting": "Preparing the log",
       "noShare": "This phone can't share files from Goose.",
       "noLog": "Your Pond isn't keeping a log, so there's nothing to export.",
-      "failed": "Couldn't export the log. Check your Pond is reachable, then try again."
+      "failed": "Couldn't export the log. Check that your Pond is reachable."
     },
     "clear": {
       "button": "Clear activity",
@@ -1659,7 +1659,7 @@
       "confirm": "Clear activity",
       "done_one": "Cleared {{count}} event.",
       "done_other": "Cleared {{count}} events.",
-      "failed": "Couldn't clear activity. Check your Pond is reachable, then try again."
+      "failed": "Couldn't clear activity. Check that your Pond is reachable."
     }
   },
   "pairing": {
@@ -2109,12 +2109,12 @@
       "valueRequired": "A condition needs a number to compare against.",
       "actionIncomplete": "Finish the action: it is missing something it needs.",
       "cooldownInvalid": "The wait has to be a whole number of seconds.",
-      "createFailed": "Your Pond could not create it. Try again in a moment.",
+      "createFailed": "Your Pond could not create it.",
       "gone": "That one is no longer on your Pond.",
       "noScheduler": "Your Pond is running without its scheduler, so it cannot keep schedules.",
       "timeBound": "Use a 24-hour time such as 18:30.",
-      "saveFailed": "Your Pond could not save the change. Try again in a moment.",
-      "deleteFailed": "Your Pond could not delete it. Try again in a moment."
+      "saveFailed": "Your Pond could not save the change.",
+      "deleteFailed": "Your Pond could not delete it."
     },
     "cron": {
       "everyDay": "Every day at {{time}}",
@@ -2235,8 +2235,8 @@
     "devOnly": "This screen is dev-only. It isn’t linked from Settings in production builds."
   },
   "errors": {
-    "busy": "Your Pond is busy. Try again in a moment.",
-    "generic": "Your Pond could not finish that. Try again in a moment.",
+    "busy": "Your Pond is busy right now.",
+    "generic": "Your Pond could not finish that.",
     "deviceGone": "That device is no longer registered with your Pond.",
     "bridgedEndpoint": "Your Pond will not remove a bridged endpoint on its own.",
     "noModelCatalogue": "This Pond does not expose a model catalogue.",
@@ -2989,7 +2989,7 @@
     "loading": "Reading your Pond's automations",
     "emptyTitle": "No vision automations yet",
     "emptyBody": "An automation has Goose or your phone react when the camera sees something. Add one above, or build your own.",
-    "addFailed": "Your Pond could not add that one. Try again in a moment.",
+    "addFailed": "Your Pond could not add that one.",
     "starter": {
       "unknownFace": {
         "title": "Tell me when someone your Pond doesn't know is seen",
