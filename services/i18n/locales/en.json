@@ -1060,7 +1060,6 @@
     },
     "restartNote": "Takes effect when your Pond restarts.",
     "saveFailed": "Could not save that change.",
-    "loadFailed": "Could not read your Pond's settings.",
     "offline": "Connect to your Pond to change its settings.",
     "notSet": "Not set",
     "number": {
@@ -1164,7 +1163,6 @@
       "hint": "So schedules land at the right hour.",
       "search": "Search time zones",
       "useDevice": "Use this phone's time zone",
-      "loadFailed": "Could not load the time zones.",
       "none": "No time zone matches."
     },
     "location": {
@@ -1471,7 +1469,6 @@
     "noneActive": "No model is assigned to a role yet",
     "empty": "No models on this Pond",
     "emptyBody": "Download one from the Pond dashboard and it will show up here.",
-    "failed": "Models unavailable",
     "notDownloaded": "Not on this Pond yet",
     "active": "Active",
     "context": "Context",
@@ -2786,7 +2783,6 @@
     }
   },
   "vision": {
-    "failed": "Could not read what your Pond's camera is doing.",
     "openPrivacy": "Open Privacy",
     "state": {
       "running": "Live",

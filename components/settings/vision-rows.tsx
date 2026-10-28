@@ -8,8 +8,11 @@ import { Pressable, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
-import { InkButton, InkEdge, InkSkeleton } from '@jarida/ink/native';
+import { InkEdge, InkSkeleton } from '@jarida/ink/native';
 
+import { ContentUnavailable } from '@/components/patterns/content-unavailable';
+import { isUnavailable } from '@/models/content-state';
+import { useContentState } from '@/view-models/use-content-state';
 import { CameraFrameView } from '@/components/patterns/camera-frame-view';
 import { GIcon } from '@/components/ui/g-icon';
 import { Spacing } from '@/constants/spacing';
@@ -20,7 +23,6 @@ import type { PondSettings } from '@/services/types';
 import type { UsePondSettings } from '@/view-models/use-pond-settings';
 import { useVisionStatus } from '@/view-models/use-vision-status';
 import { SwitchRow } from './setting-controls';
-import { SettingsMessage } from './settings-list';
 import { useSettingsColors, useSettingsMetrics, useSettingsStyles, type SettingsColors, type SettingsMetrics, type SettingsType } from './settings-theme';
 
 /**
@@ -35,17 +37,15 @@ export function VisionStatusCard() {
   const colors = useSettingsColors();
   const m = useSettingsMetrics();
   const { data, loading, error, failed, unsupported, actions } = useVisionStatus(true);
+  const state = useContentState({ loading: false, failed, hasContent: !failed });
 
   // A Pond that cannot say what its camera is doing has nothing to show here.
   if (unsupported) return null;
 
-  if (failed) {
+  if (isUnavailable(state)) {
     return (
       <View style={styles.wrap}>
-        <SettingsMessage tone="danger">{error ?? t('vision.failed')}</SettingsMessage>
-        <InkButton variant="quiet" icon="refresh" onPress={() => void actions.refresh()}>
-          {t('common.retry')}
-        </InkButton>
+        <ContentUnavailable compact state={state} reason={error} onRetry={actions.refresh} />
       </View>
     );
   }

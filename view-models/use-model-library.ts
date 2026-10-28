@@ -20,7 +20,7 @@ import type {
   ModelRole,
 } from '@/services/types';
 import { isLive, roleOf, routeCategory } from '@/models/model-library';
-import { describeApiError } from './describe-error';
+import { describeApiError, logFailure } from './describe-error';
 import { useLive } from './use-live';
 
 const LIBRARY_MS = 60_000;
@@ -31,6 +31,9 @@ interface Library {
   models: ModelEntry[];
   loaded: boolean;
   loading: boolean;
+  /** The first read, or the last one somebody asked for, failed. */
+  readFailed: boolean;
+  /** Words for that failure, when there are any beyond the shared ones. */
   error: string | null;
   downloads: DownloadEntry[];
   disk: DiskUsage | null;
@@ -44,6 +47,7 @@ const EMPTY: Library = {
   models: [],
   loaded: false,
   loading: true,
+  readFailed: false,
   error: null,
   downloads: [],
   disk: null,
@@ -67,7 +71,7 @@ function subscribe(listener: () => void) {
 }
 
 async function loadModels(loud: boolean): Promise<void> {
-  if (loud) set({ loading: true, error: null });
+  if (loud) set({ loading: true, readFailed: false, error: null });
   const mine = ++reads;
   try {
     const [models, memory, disk] = await Promise.all([
@@ -76,10 +80,13 @@ async function loadModels(loud: boolean): Promise<void> {
       api.diskUsage().catch(() => library.disk),
     ]);
     if (mine !== reads) return;
-    set({ models, memory, disk, loaded: true, loading: false, error: null });
+    set({ models, memory, disk, loaded: true, loading: false, readFailed: false, error: null });
   } catch (e) {
     if (mine !== reads) return;
-    set({ loading: false, error: loud || !library.loaded ? describeApiError(e) ?? i18n.t('models.failed') : library.error });
+    const said = loud || !library.loaded;
+    logFailure('models', said ? 'read failed' : 'refresh failed; showing the last list', e);
+    if (said) set({ loading: false, readFailed: true, error: describeApiError(e) });
+    else set({ loading: false });
   }
 }
 
@@ -254,7 +261,8 @@ export function useModelSearch(): UseModelSearch {
     try {
       setResults(await api.searchModels(q));
     } catch (e) {
-      setError(describeApiError(e) ?? (e instanceof Error ? e.message : i18n.t('models.library.searchFailed')));
+      logFailure('models', 'search failed', e);
+      setError(describeApiError(e) ?? i18n.t('models.library.searchFailed'));
     } finally {
       setSearching(false);
     }
@@ -266,7 +274,8 @@ export function useModelSearch(): UseModelSearch {
       const items = await api.modelFiles(repo);
       setFiles({ repo, items, loading: false, error: null });
     } catch (e) {
-      setFiles({ repo, items: [], loading: false, error: describeApiError(e) ?? (e instanceof Error ? e.message : i18n.t('models.library.searchFailed')) });
+      logFailure('models', 'file list failed', e);
+      setFiles({ repo, items: [], loading: false, error: describeApiError(e) ?? i18n.t('models.library.searchFailed') });
     }
   }, []);
 

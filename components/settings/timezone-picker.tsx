@@ -9,6 +9,9 @@ import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { InkSpinner } from '@jarida/ink/native';
 
+import { ContentUnavailable } from '@/components/patterns/content-unavailable';
+import { isUnavailable } from '@/models/content-state';
+import { useContentState } from '@/view-models/use-content-state';
 import { GIcon } from '@/components/ui/g-icon';
 import { Spacing } from '@/constants/spacing';
 import { selectionTick } from '@/services/haptics';
@@ -27,6 +30,7 @@ export function TimezonePickerScreen() {
   const styles = useSettingsStyles(makeStyles);
   const vm = usePondSettings();
   const zones = useTimeZones();
+  const zonesState = useContentState({ loading: zones.loading, failed: zones.error !== null, hasContent: zones.items.length > 0 });
   const [query, setQuery] = useState('');
   const current = vm.settings?.timezone ?? '';
   const phoneZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -95,7 +99,9 @@ export function TimezonePickerScreen() {
               </SettingsGroup>
             ) : null}
             {zones.loading ? <InkSpinner label={t('settings.loading')} /> : null}
-            {zones.error && zones.items.length === 0 ? <SettingsMessage tone="danger">{t('settings.timezone.loadFailed')}</SettingsMessage> : null}
+            {isUnavailable(zonesState) ? (
+              <ContentUnavailable compact state={zonesState} reason={zones.error} onRetry={zones.refresh} />
+            ) : null}
           </>
         }
         ListEmptyComponent={!zones.loading && zones.items.length > 0 ? <SettingsMessage>{t('settings.timezone.none')}</SettingsMessage> : null}

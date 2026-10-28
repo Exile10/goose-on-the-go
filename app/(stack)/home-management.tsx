@@ -12,6 +12,9 @@ import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { InkSpinner } from '@jarida/ink/native';
 
+import { ContentUnavailable } from '@/components/patterns/content-unavailable';
+import { isUnavailable } from '@/models/content-state';
+import { useContentState } from '@/view-models/use-content-state';
 import { RoomSheet } from '@/components/patterns/room-sheet';
 import { SettingsGroup, SettingsMessage, SettingsRow, TILE_INSET } from '@/components/settings/settings-list';
 import { SettingsNotice, SettingsScroll } from '@/components/settings/settings-scroll';
@@ -33,12 +36,14 @@ export default function HomeManagementScreen() {
   const { t } = useTranslation();
   const router = useRouter();
   const colors = useSettingsColors();
-  const { data, loading, error, actions } = useDevices();
+  const { data, loading, failed, error, actions } = useDevices();
   const { settings } = usePondSettings();
   const { paired, serverUrl, connectionState } = useServer();
   const [sheet, setSheet] = useState<Sheet>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const { devices, rooms } = data;
+  const state = useContentState({ loading, failed, hasContent: devices.length > 0 });
+  const unavailable = isUnavailable(state);
 
   // Not `confirm`: that name is the success haptic here.
   const ask = useConfirm();
@@ -74,12 +79,13 @@ export default function HomeManagementScreen() {
 
   return (
     <SettingsScroll>
-      {error ? <SettingsNotice tone="danger">{error}</SettingsNotice> : null}
+      {!unavailable && error ? <SettingsNotice tone="danger">{error}</SettingsNotice> : null}
       {actionError ? <SettingsNotice tone="danger">{actionError}</SettingsNotice> : null}
 
-      {loading && devices.length === 0 ? <InkSpinner label={t('pond.checking')} /> : null}
-      {/* A list that failed to load is unknown, not empty, and the notice above says so. */}
-      {!loading && !error && devices.length === 0 ? <SettingsMessage>{t('rooms.noDevices')}</SettingsMessage> : null}
+      {state === 'loading' ? <InkSpinner label={t('pond.checking')} /> : null}
+      {/* A list that failed to load is unknown, not empty. */}
+      {unavailable ? <ContentUnavailable state={state} reason={error} onRetry={actions.refresh} /> : null}
+      {state === 'empty' ? <SettingsMessage>{t('rooms.noDevices')}</SettingsMessage> : null}
 
       {devices.length > 0 ? (
         <SettingsGroup title={t('sections.rooms')} inset={TILE_INSET} footer={t('rooms.footer')}>

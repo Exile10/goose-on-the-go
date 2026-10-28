@@ -9,6 +9,9 @@ import { Pressable, ScrollView, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { InkButton, InkChoice, InkEyebrow, InkField, InkNotice, InkSpinner, InkStage, useInkTheme } from '@jarida/ink/native';
 
+import { ContentUnavailable } from '@/components/patterns/content-unavailable';
+import { isUnavailable } from '@/models/content-state';
+import { useContentState } from '@/view-models/use-content-state';
 import { VoiceOrb } from '@/components/patterns/voice-orb';
 import { GIcon } from '@/components/ui/g-icon';
 import { Spacing } from '@/constants/spacing';
@@ -85,11 +88,21 @@ export function VoicePicker({ vm }: { vm: UsePondSettings }) {
   const preview = useVoicePreview();
   const settings = vm.settings;
   const voices = useMemo(() => voiceChoices(models.items), [models.items]);
+  const settingsState = useContentState({ loading: !vm.failed, failed: vm.failed, hasContent: settings !== null });
+  const voicesState = useContentState({
+    loading: models.loading,
+    failed: models.error !== null,
+    hasContent: voices.length > 0,
+  });
 
-  if (!settings || (models.loading && voices.length === 0)) {
-    return vm.failed ? <SettingsMessage tone="danger">{vm.error}</SettingsMessage> : <InkSpinner label={t('settings.loading')} />;
+  if (isUnavailable(settingsState)) {
+    return <ContentUnavailable compact state={settingsState} reason={vm.error} onRetry={vm.actions.refresh} />;
   }
-  if (voices.length === 0) return <SettingsMessage>{models.error ?? t('settings.voice.noVoices')}</SettingsMessage>;
+  if (!settings || voicesState === 'loading') return <InkSpinner label={t('settings.loading')} />;
+  if (isUnavailable(voicesState)) {
+    return <ContentUnavailable compact state={voicesState} reason={models.error} onRetry={models.refresh} />;
+  }
+  if (voices.length === 0) return <SettingsMessage>{t('settings.voice.noVoices')}</SettingsMessage>;
 
   return (
     <VoicePickerView

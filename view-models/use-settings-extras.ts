@@ -23,7 +23,7 @@ import {
   zoneCity,
   type SummaryId,
 } from '@/models/pond-settings';
-import { describeApiError } from './describe-error';
+import { describeApiError, logFailure } from './describe-error';
 import { useLive } from './use-live';
 
 const EXTRAS_MS = 60_000;
@@ -266,7 +266,10 @@ const LLM_CATEGORIES = new Set(['gguf', 'litert', 'llamafile', 'ollama']);
 export interface Choices<T> {
   items: T[];
   loading: boolean;
+  /** The last read failed. Words for it; the list keeps whatever an earlier read found. */
   error: string | null;
+  /** Reads the choices again now, rather than at the next poll. */
+  refresh: () => Promise<void>;
 }
 
 function useChoices<T>(read: () => Promise<T[]>, sample: T[], enabled: boolean): Choices<T> {
@@ -282,6 +285,7 @@ function useChoices<T>(read: () => Promise<T[]>, sample: T[], enabled: boolean):
       setItems(await read());
       setError(null);
     } catch (e) {
+      logFailure('settings', 'choices read failed', e);
       setError(describeApiError(e) ?? i18n.t('errors.generic'));
     } finally {
       setLoading(false);
@@ -289,7 +293,9 @@ function useChoices<T>(read: () => Promise<T[]>, sample: T[], enabled: boolean):
   }, [real, enabled, read]);
 
   useLive(load, EXTRAS_MS, hydrated && real && enabled);
-  return real ? { items, loading: loading && enabled, error } : { items: sample, loading: false, error: null };
+  return real
+    ? { items, loading: loading && enabled, error, refresh: load }
+    : { items: sample, loading: false, error: null, refresh: load };
 }
 
 const readModels = () => api.listModels();

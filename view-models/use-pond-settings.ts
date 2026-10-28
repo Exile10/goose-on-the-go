@@ -11,7 +11,7 @@ import { reject } from '@/services/haptics';
 import i18n from '@/services/i18n';
 import type { PondSettingKey, PondSettings } from '@/services/types';
 import { SAMPLE_SETTINGS, readSettings } from '@/models/pond-settings';
-import { describeApiError } from './describe-error';
+import { describeApiError, logFailure } from './describe-error';
 import { useLive } from './use-live';
 
 /** Settings change from other screens too, but rarely; a minute keeps the menu honest. */
@@ -25,6 +25,9 @@ interface Store {
   source: Source | null;
   settings: PondSettings | null;
   loading: boolean;
+  /** The last read somebody asked for, or the first, failed. */
+  readFailed: boolean;
+  /** Words for that failure, when there are any beyond the shared ones. */
   error: string | null;
   saving: KeyFlags;
   fieldErrors: KeyMessages;
@@ -35,6 +38,7 @@ const EMPTY: Store = {
   source: null,
   settings: null,
   loading: false,
+  readFailed: false,
   error: null,
   saving: {},
   fieldErrors: {},
@@ -80,17 +84,19 @@ async function load(source: Source, loud: boolean): Promise<void> {
     return;
   }
   if (store.source !== 'real') setStore({ ...EMPTY, source: 'real', loading: true });
-  else if (loud) setStore({ loading: true, error: null });
+  else if (loud) setStore({ loading: true, readFailed: false, error: null });
   const mine = ++reads;
   try {
     const answer = readSettings(await api.getSettings());
     if (mine !== reads || store.source !== 'real') return;
-    setStore({ settings: adopt(answer), loading: false, error: null });
+    setStore({ settings: adopt(answer), loading: false, readFailed: false, error: null });
   } catch (e) {
     if (mine !== reads || store.source !== 'real') return;
     // A quiet poll that fails keeps the last record; a read somebody asked for says why.
-    const error = loud || !store.settings ? describeApiError(e) ?? i18n.t('settings.loadFailed') : store.error;
-    setStore({ loading: false, error });
+    const said = loud || !store.settings;
+    logFailure('settings', said ? 'read failed' : 'refresh failed; showing the last record', e);
+    if (said) setStore({ loading: false, readFailed: true, error: describeApiError(e) });
+    else setStore({ loading: false });
   }
 }
 
@@ -191,7 +197,7 @@ export function usePondSettings(): UsePondSettings {
     settings: current.settings,
     loading: current.loading,
     error: current.error,
-    failed: !current.settings && !!current.error,
+    failed: !current.settings && current.readFailed,
     saving: current.saving,
     fieldErrors: current.fieldErrors,
     voice: current.voice,
