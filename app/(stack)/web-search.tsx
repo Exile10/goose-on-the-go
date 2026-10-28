@@ -5,14 +5,25 @@
  * last made of it, and take it away; it can never show it, because the Pond never sends it back.
  * The field is masked and write-only, and empties the moment the Pond has the key.
  *
- * The same content as pond-desktop's `WebSearchPanel` (small-model-tools.md section 8.5), so a
- * key set on either reads the same on both.
+ * The same content as pond-desktop's `WebSearchPanel` (small-model-tools.md sections 8.5 and
+ * 8.10.5), so a key or the Nearby places switch set on either reads the same on both.
  */
 
 import React, { useCallback } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { InkButton, InkCard, InkNotice, InkSpinner, InkText, InkTitle, inkText, useInkTheme } from '@jarida/ink/native';
+import { useRouter } from 'expo-router';
+import {
+  InkButton,
+  InkCard,
+  InkNotice,
+  InkSpinner,
+  InkSwitch,
+  InkText,
+  InkTitle,
+  inkText,
+  useInkTheme,
+} from '@jarida/ink/native';
 
 import { GKeyboardView } from '@/components/ui/g-keyboard-view';
 import { GPressable } from '@/components/ui/g-pressable';
@@ -22,10 +33,10 @@ import { Radii } from '@/constants/radii';
 import { Spacing } from '@/constants/spacing';
 import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
 import { useThemedStyles } from '@/hooks/use-themed-styles';
-import { BRAVE_DASHBOARD_HOST, webSearchTone } from '@/models/web-search';
+import { BRAVE_DASHBOARD_HOST, townSent, webSearchTone } from '@/models/web-search';
 import { useConfirm } from '@/providers/confirm-provider';
-import { confirm, reject, tap } from '@/services/haptics';
-import { statusLabel, useWebSearch } from '@/view-models/use-web-search';
+import { confirm, reject, tap, toggle } from '@/services/haptics';
+import { nearbyNote, statusLabel, useWebSearch } from '@/view-models/use-web-search';
 
 export default function WebSearchScreen() {
   const styles = useThemedStyles(makeStyles);
@@ -33,7 +44,9 @@ export default function WebSearchScreen() {
   const theme = useInkTheme();
   // Not `confirm`: that name is the success haptic here.
   const ask = useConfirm();
-  const { data, loading, refreshing, saving, removing, error, keyError, failed, unsupported, actions } = useWebSearch();
+  const router = useRouter();
+  const { data, loading, refreshing, saving, removing, error, keyError, nearbyError, failed, unsupported, actions } =
+    useWebSearch();
 
   const busy = saving || removing;
 
@@ -60,6 +73,21 @@ export default function WebSearchScreen() {
   }, [actions]);
 
   const handleRefresh = useCallback(() => void actions.refresh(), [actions]);
+
+  const handleNearby = useCallback(
+    async (next: boolean) => {
+      void toggle();
+      if (!(await actions.setNearby(next))) void reject();
+    },
+    [actions],
+  );
+
+  const handleSetLocation = useCallback(() => {
+    void tap();
+    router.push('/(stack)/settings-home');
+  }, [router]);
+
+  const town = townSent(data.nearby);
 
   const inputStyle = [styles.inputRow, keyError ? styles.inputRowInvalid : null];
   const errorText = inkText(theme, { size: 'sm', weight: theme.weight.medium, color: theme.color.dangerFg });
@@ -151,9 +179,40 @@ export default function WebSearchScreen() {
           </InkCard>
         ) : null}
 
+        {!unsupported && (data.nearby || data.nearbyUnsupported) ? (
+          <InkCard contentStyle={styles.card}>
+            <View style={styles.switchRow}>
+              <View style={styles.switchWords}>
+                <InkTitle level={3}>{t('webSearch.nearby.label')}</InkTitle>
+              </View>
+              <InkSwitch
+                label={t('webSearch.nearby.label')}
+                checked={data.nearby?.enabled ?? false}
+                onChange={(next) => void handleNearby(next)}
+                disabled={!data.canToggleNearby}
+              />
+            </View>
+            <InkText size="sm" tone="secondary">
+              {nearbyNote(data.nearby, t)}
+            </InkText>
+            {nearbyError ? (
+              <Text accessibilityRole="alert" style={errorText.style}>
+                {nearbyError}
+              </Text>
+            ) : null}
+            {data.nearby && !data.nearby.town ? (
+              <View style={styles.actionsStart}>
+                <InkButton variant="quiet" icon="home" onPress={handleSetLocation}>
+                  {t('webSearch.nearby.setLocation')}
+                </InkButton>
+              </View>
+            ) : null}
+          </InkCard>
+        ) : null}
+
         {/* Always on screen, whatever has loaded: what leaves the home is the thing to know first. */}
         <InkText size="sm" tone="secondary">
-          {t('webSearch.privacy')}
+          {town ? `${t('webSearch.privacy')} ${t('webSearch.townSentence', { town })}` : t('webSearch.privacy')}
         </InkText>
       </ScrollView>
     </GKeyboardView>
@@ -191,4 +250,7 @@ const makeStyles = (c: ThemeColors) =>
     },
     actions: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: Spacing.sm },
     actionsEnd: { flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', gap: Spacing.sm },
+    actionsStart: { flexDirection: 'row', justifyContent: 'flex-start' },
+    switchRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: Spacing.md },
+    switchWords: { flexShrink: 1 },
   });

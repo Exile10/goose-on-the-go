@@ -16,7 +16,7 @@ import * as WebBrowser from 'expo-web-browser';
 import { BRAVE_DASHBOARD_URL } from '@/models/web-search';
 import { ApiError, api } from '@/services/api-client';
 import type { WebSearchState, WebSearchStatus } from '@/services/types';
-import { statusLabel, useWebSearch, type UseWebSearch } from '@/view-models/use-web-search';
+import { nearbyNote, statusLabel, useWebSearch, type UseWebSearch } from '@/view-models/use-web-search';
 
 jest.mock('@/services/pond-trust', () => ({ assertPondTrust: jest.fn().mockResolvedValue(undefined) }));
 jest.mock('expo-web-browser', () => ({ openBrowserAsync: jest.fn(async () => ({ type: 'opened' })) }));
@@ -24,7 +24,12 @@ jest.mock('@/services/api-client', () => {
   const actual = jest.requireActual('@/services/api-client');
   return {
     ...actual,
-    api: { webSearchState: jest.fn(), setWebSearchKey: jest.fn(), removeWebSearchKey: jest.fn() },
+    api: {
+      webSearchState: jest.fn(),
+      setWebSearchKey: jest.fn(),
+      removeWebSearchKey: jest.fn(),
+      updateSettings: jest.fn(),
+    },
   };
 });
 
@@ -53,6 +58,10 @@ const web = jest.mocked(api);
 
 const stored = (status: WebSearchStatus): WebSearchState => ({ provider: 'brave', configured: true, status });
 const OFF: WebSearchState = { provider: 'brave', configured: false, status: 'not_configured' };
+const withNearby = (enabled: boolean, town: string | null, state: WebSearchState = OFF): WebSearchState => ({
+  ...state,
+  local_results: { enabled, town },
+});
 const refusal = (status: number, detail: string | null = null) =>
   new ApiError(`PUT /api/v1/web-search/key → ${status}`, status, null, detail);
 
@@ -640,6 +649,224 @@ describe('the Developer toggle on mock', () => {
     expect(m.vm.keyError).toBe('Brave did not accept this key.');
     expect(m.vm.data.configured).toBe(false);
     expect(m.vm.data.draft).toBe('invalid');
+    await m.unmount();
+  });
+});
+
+describe('nearby places', () => {
+  /** The copy is the hand-off's, pinned in full: it says exactly what leaves the house. */
+  it('reads the switch and the town from the Pond, and says what the town is before it is turned', async () => {
+    web.webSearchState.mockResolvedValue(withNearby(false, 'Nairobi'));
+    const m = await mount();
+
+    expect(m.vm.data.nearby).toEqual({ enabled: false, town: 'Nairobi' });
+    expect(m.vm.data.canToggleNearby).toBe(true);
+    expect(nearbyNote(m.vm.data.nearby, i18n.t)).toBe(
+      'Sends your town (Nairobi) to Brave with each search, so it can find places near you. Your exact location is never sent.',
+    );
+    await m.unmount();
+  });
+
+  it('saves only its own setting through the settings route, and shows it on', async () => {
+    web.webSearchState.mockResolvedValue(withNearby(false, 'Nairobi'));
+    web.updateSettings.mockResolvedValue({ web_search_local_results: true } as never);
+    const m = await mount();
+
+    let kept!: boolean;
+    await act(async () => {
+      kept = await m.vm.actions.setNearby(true);
+    });
+
+    expect(kept).toBe(true);
+    expect(web.updateSettings).toHaveBeenCalledTimes(1);
+    expect(web.updateSettings).toHaveBeenCalledWith({ web_search_local_results: true });
+    expect(m.vm.data.nearby).toEqual({ enabled: true, town: 'Nairobi' });
+    expect(m.vm.nearbyError).toBeNull();
+    await m.unmount();
+  });
+
+  it('cannot turn on with no town, and says to set the location first', async () => {
+    web.webSearchState.mockResolvedValue(withNearby(false, null));
+    const m = await mount();
+
+    expect(m.vm.data.canToggleNearby).toBe(false);
+    let kept!: boolean;
+    await act(async () => {
+      kept = await m.vm.actions.setNearby(true);
+    });
+
+    expect(kept).toBe(false);
+    expect(web.updateSettings).not.toHaveBeenCalled();
+    expect(m.vm.data.nearby?.enabled).toBe(false);
+    expect(nearbyNote(m.vm.data.nearby, i18n.t)).toBe(
+      'Needs your location first. Set it under Your home, then come back to turn this on.',
+    );
+    await m.unmount();
+  });
+
+  it('can still be turned off when it was left on with no town, and says no town is sent', async () => {
+    web.webSearchState.mockResolvedValue(withNearby(true, null));
+    web.updateSettings.mockResolvedValue({ web_search_local_results: false } as never);
+    const m = await mount();
+
+    expect(nearbyNote(m.vm.data.nearby, i18n.t)).toBe(
+      'Your location is not set, so no town is sent. Set it under Your home.',
+    );
+    expect(m.vm.data.canToggleNearby).toBe(true);
+    await act(async () => {
+      await m.vm.actions.setNearby(false);
+    });
+
+    expect(web.updateSettings).toHaveBeenCalledWith({ web_search_local_results: false });
+    expect(m.vm.data.nearby?.enabled).toBe(false);
+    await m.unmount();
+  });
+
+  it('keeps the switch off, and says why, on a Pond that predates nearby places', async () => {
+    web.webSearchState.mockResolvedValue(stored('ok'));
+    const m = await mount();
+
+    expect(m.vm.data.nearby).toBeNull();
+    expect(m.vm.data.nearbyUnsupported).toBe(true);
+    expect(m.vm.data.canToggleNearby).toBe(false);
+    expect(nearbyNote(m.vm.data.nearby, i18n.t)).toBe(
+      'This Pond cannot look for nearby places yet. Update it, then open this screen again.',
+    );
+    let kept!: boolean;
+    await act(async () => {
+      kept = await m.vm.actions.setNearby(true);
+    });
+    expect(kept).toBe(false);
+    expect(web.updateSettings).not.toHaveBeenCalled();
+    await m.unmount();
+  });
+
+  it('is neither on nor unsupported before the Pond has answered', async () => {
+    web.webSearchState.mockReturnValue(deferred<WebSearchState>().promise);
+    const m = await mount();
+
+    expect(m.vm.data.nearby).toBeNull();
+    expect(m.vm.data.nearbyUnsupported).toBe(false);
+    await m.unmount();
+  });
+
+  it('goes back, and says so, when the Pond does not save it', async () => {
+    web.webSearchState.mockResolvedValue(withNearby(false, 'Nairobi'));
+    web.updateSettings.mockRejectedValue(new ApiError('PUT /api/v1/settings → 500', 500, null, null));
+    const m = await mount();
+
+    let kept!: boolean;
+    await act(async () => {
+      kept = await m.vm.actions.setNearby(true);
+    });
+
+    expect(kept).toBe(false);
+    expect(m.vm.data.nearby?.enabled).toBe(false);
+    expect(m.vm.nearbyError).toBe('Could not save this setting. Try again in a moment.');
+    await m.unmount();
+  });
+
+  it('shows the change while it saves, and takes no second one meanwhile', async () => {
+    web.webSearchState.mockResolvedValue(withNearby(false, 'Nairobi'));
+    const pending = deferred<never>();
+    web.updateSettings.mockReturnValue(pending.promise);
+    const m = await mount();
+
+    let first!: Promise<boolean>;
+    await act(async () => {
+      first = m.vm.actions.setNearby(true);
+    });
+    expect(m.vm.data.nearby?.enabled).toBe(true);
+    expect(m.vm.nearbySaving).toBe(true);
+    expect(m.vm.data.canToggleNearby).toBe(false);
+
+    await act(async () => {
+      await m.vm.actions.setNearby(false);
+    });
+    expect(web.updateSettings).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      pending.resolve({ web_search_local_results: true } as never);
+      await first;
+    });
+    expect(m.vm.data.nearby?.enabled).toBe(true);
+    expect(m.vm.nearbySaving).toBe(false);
+    await m.unmount();
+  });
+
+  it('shows what the Pond stored when it answers otherwise, and the change as made when it does not say', async () => {
+    web.webSearchState.mockResolvedValue(withNearby(false, 'Nairobi'));
+    web.updateSettings.mockResolvedValueOnce({ web_search_local_results: false } as never);
+    const m = await mount();
+
+    let kept!: boolean;
+    await act(async () => {
+      kept = await m.vm.actions.setNearby(true);
+    });
+    expect(kept).toBe(false);
+    expect(m.vm.data.nearby?.enabled).toBe(false);
+
+    // `request` hands back undefined for an empty body.
+    web.updateSettings.mockResolvedValueOnce(undefined as never);
+    await act(async () => {
+      kept = await m.vm.actions.setNearby(true);
+    });
+    expect(kept).toBe(true);
+    expect(m.vm.data.nearby?.enabled).toBe(true);
+    await m.unmount();
+  });
+
+  it('does not let a read that started before the change undo it', async () => {
+    const slow = deferred<WebSearchState>();
+    web.webSearchState.mockResolvedValueOnce(withNearby(false, 'Nairobi')).mockReturnValueOnce(slow.promise);
+    web.updateSettings.mockResolvedValue({ web_search_local_results: true } as never);
+    const m = await mount();
+
+    let reading!: Promise<void>;
+    await act(async () => {
+      reading = m.vm.actions.refresh();
+    });
+    await act(async () => {
+      await m.vm.actions.setNearby(true);
+    });
+    await act(async () => {
+      slow.resolve(withNearby(false, 'Nairobi'));
+      await reading;
+    });
+
+    expect(m.vm.data.nearby?.enabled).toBe(true);
+    await m.unmount();
+  });
+
+  it('is left alone when the key is saved or removed', async () => {
+    web.webSearchState.mockResolvedValue(withNearby(true, 'Nairobi', stored('ok')));
+    web.setWebSearchKey.mockResolvedValue({ configured: true, status: 'ok' });
+    web.removeWebSearchKey.mockResolvedValue(undefined);
+    const m = await mount();
+
+    await type(m, 'BSA-key');
+    await act(async () => {
+      await m.vm.actions.save();
+    });
+    expect(m.vm.data.nearby).toEqual({ enabled: true, town: 'Nairobi' });
+
+    await act(async () => {
+      await m.vm.actions.remove();
+    });
+    expect(m.vm.data.nearby).toEqual({ enabled: true, town: 'Nairobi' });
+    await m.unmount();
+  });
+
+  it('turns on and off on mock without reaching the Pond', async () => {
+    server.real = false;
+    const m = await mount();
+
+    expect(m.vm.data.nearby).toEqual({ enabled: false, town: 'Nairobi' });
+    await act(async () => {
+      await m.vm.actions.setNearby(true);
+    });
+    expect(m.vm.data.nearby?.enabled).toBe(true);
+    expect(web.updateSettings).not.toHaveBeenCalled();
     await m.unmount();
   });
 });

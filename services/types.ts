@@ -1032,11 +1032,21 @@ export interface OAuthProvider {
  */
 export type WebSearchStatus = 'ok' | 'not_configured' | 'rejected' | 'quota' | 'unverified';
 
-/** `GET /api/v1/web-search`. */
+/**
+ * Nearby places: whether each search sends the household's town to Brave, and the town it would
+ * send, which is null while no place name is set. Never coordinates.
+ */
+export interface WebSearchLocalResults {
+  enabled: boolean;
+  town: string | null;
+}
+
+/** `GET /api/v1/web-search`. `local_results` is absent from a Pond that predates nearby places. */
 export interface WebSearchState {
   provider: 'brave';
   configured: boolean;
   status: WebSearchStatus;
+  local_results?: WebSearchLocalResults;
 }
 
 /**
@@ -1265,6 +1275,8 @@ export interface PondSettings {
   ext_context_enabled: boolean;
   tool_selection_mode: string;
   searxng_url: string | null;
+  /** Nearby places in web search. Off by default; absent from a Pond that predates it. */
+  web_search_local_results?: boolean;
 
   // Automations
   schedule_max_concurrent: number;
