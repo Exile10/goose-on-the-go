@@ -38,6 +38,8 @@ export interface UseScheduleDetail {
   runs: UseScheduleRuns;
   actions: {
     refresh: () => Promise<void>;
+    /** Reads the run history again, for a history that failed to load. */
+    refreshRuns: () => void;
     /** Resolves to why the Pond refused it, or null once saved. An empty change sends nothing. */
     update: (req: UpdateScheduleRequest) => Promise<string | null>;
     setPaused: (paused: boolean) => Promise<void>;
@@ -128,6 +130,7 @@ export function useScheduleDetail(id: string): UseScheduleDetail {
   );
 
   const refresh = useCallback(() => load(true), [load]);
+  const refreshRuns = useCallback(() => setRunsVersion((v) => v + 1), []);
 
   const delay = useCallback(
     () => (scheduleRef.current?.currently_running ? SCHEDULES_ACTIVE_MS : SCHEDULES_IDLE_MS),
@@ -240,6 +243,6 @@ export function useScheduleDetail(id: string): UseScheduleDetail {
     failed,
     notice,
     runs,
-    actions: { refresh, update, setPaused, runNow, remove },
+    actions: { refresh, refreshRuns, update, setPaused, runNow, remove },
   };
 }

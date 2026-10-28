@@ -28,6 +28,9 @@ import {
 } from '@jarida/ink/native';
 import type { InkTone } from '@jarida/ink';
 
+import { ContentUnavailable } from '@/components/patterns/content-unavailable';
+import { isUnavailable } from '@/models/content-state';
+import { useContentState } from '@/view-models/use-content-state';
 import { LabelledSwitch } from '@/components/patterns/labelled-switch';
 import { ScheduleFormSheet } from '@/components/patterns/schedule-form-sheet';
 import { useThemedStyles } from '@/hooks/use-themed-styles';
@@ -101,6 +104,12 @@ export default function ScheduleDetailScreen() {
   const params = useLocalSearchParams<{ id?: string }>();
   const id = linkedScheduleId(params.id) ?? '';
   const { schedule, loading, missing, error, failed, notice, runs, actions } = useScheduleDetail(id);
+  const state = useContentState({ loading, failed: failed || error !== null, hasContent: schedule !== null });
+  const runsState = useContentState({
+    loading: runs.loading,
+    failed: runs.failed || runs.error !== null,
+    hasContent: runs.data.runs.length > 0,
+  });
   const [editing, setEditing] = useState(false);
   const [phoneZone] = useState(deviceTimeZone);
   const ask = useConfirm();
@@ -120,15 +129,10 @@ export default function ScheduleDetailScreen() {
     return (
       <ScrollView style={styles.container} contentContainerStyle={styles.scroll}>
         {loading ? <InkSpinner label={t('schedule.detail.loading')} /> : null}
-        {error || failed ? (
-          <View style={styles.gap}>
-            <InkNotice tone="danger">{error ?? t('schedule.detail.failed')}</InkNotice>
-            <InkButton variant="quiet" icon="refresh" onPress={actions.refresh}>
-              {t('common.retry')}
-            </InkButton>
-          </View>
+        {isUnavailable(state) ? (
+          <ContentUnavailable state={state} reason={error} onRetry={actions.refresh} />
         ) : null}
-        {!loading && !error && !failed && (missing || !id) ? (
+        {state === 'empty' && (missing || !id) ? (
           <InkNotice tone="warning">{t('schedule.errors.gone')}</InkNotice>
         ) : null}
       </ScrollView>
@@ -210,10 +214,10 @@ export default function ScheduleDetailScreen() {
       <View style={styles.gap}>
         <InkText weight="semibold">{t('schedule.runs.title')}</InkText>
         {runs.loading ? <InkSpinner label={t('schedule.runs.title')} /> : null}
-        {runs.error || runs.failed ? (
-          <InkNotice tone="danger">{runs.error ?? t('schedule.runs.failed')}</InkNotice>
+        {isUnavailable(runsState) ? (
+          <ContentUnavailable compact state={runsState} reason={runs.error} onRetry={actions.refreshRuns} />
         ) : null}
-        {!runs.loading && !runs.error && !runs.failed && runs.data.runs.length === 0 ? (
+        {runsState === 'empty' ? (
           <InkText tone="secondary">{t('schedule.runs.none')}</InkText>
         ) : null}
         {runs.data.runs.map((run) => (

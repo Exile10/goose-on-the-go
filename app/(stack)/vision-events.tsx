@@ -14,11 +14,14 @@ import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { InkButton, InkChip, InkEmptyState, InkNotice, InkSpinner, InkText, useInkTheme } from '@jarida/ink/native';
 
+import { ContentUnavailable } from '@/components/patterns/content-unavailable';
 import { VisionEventRow } from '@/components/patterns/vision-event-row';
 import { VisionEventSheet } from '@/components/patterns/vision-event-sheet';
+import { isUnavailable } from '@/models/content-state';
 import { EVENT_FILTERS, filterLabel } from '@/models/vision';
 import { selectionTick } from '@/services/haptics';
 import type { CameraEvent } from '@/services/types';
+import { useContentState } from '@/view-models/use-content-state';
 import { useCreateRule } from '@/view-models/use-rules';
 import { useFaces } from '@/view-models/use-faces';
 import { usePondSettings } from '@/view-models/use-pond-settings';
@@ -45,6 +48,10 @@ export default function VisionEventsScreen() {
   const createRule = useCreateRule();
   const [openId, setOpenId] = useState<number | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  // Without the settings there is no camera to ask about, so their failure is this screen's.
+  const settingsState = useContentState({ loading: !settings.failed, failed: settings.failed, hasContent: false });
+  const state = useContentState({ loading, failed: failed || error !== null, hasContent: data.events.length > 0 });
+  const unavailable = isUnavailable(state);
 
   const open = useMemo(() => data.events.find((e) => e.id === openId) ?? null, [data.events, openId]);
   const onOpen = useCallback((event: CameraEvent) => setOpenId(event.id), []);
@@ -56,17 +63,11 @@ export default function VisionEventsScreen() {
     setRefreshing(false);
   }, [actions]);
 
-  // Without the settings there is no camera to ask about, so their failure is this screen's.
   if (cameraId === null) {
     return (
       <ScrollView style={styles.container} contentContainerStyle={styles.scroll}>
-        {settings.failed ? (
-          <View style={styles.notice}>
-            <InkNotice tone="danger">{settings.error ?? t('visionEvents.settingsFailed')}</InkNotice>
-            <InkButton variant="quiet" icon="refresh" onPress={settings.actions.refresh}>
-              {t('common.retry')}
-            </InkButton>
-          </View>
+        {isUnavailable(settingsState) ? (
+          <ContentUnavailable state={settingsState} reason={settings.error} onRetry={settings.actions.refresh} />
         ) : (
           <InkSpinner label={t('visionEvents.loading')} />
         )}
@@ -119,21 +120,17 @@ export default function VisionEventsScreen() {
         ))}
       </ScrollView>
 
-      {/* A failed read with no sentence of its own still leaves the list unknown. */}
-      {error || failed ? (
-        <View style={styles.notice}>
-          <InkNotice tone="danger">{error ?? t('visionEvents.failed')}</InkNotice>
-          <InkButton variant="quiet" icon="refresh" onPress={actions.refresh}>
-            {t('common.retry')}
-          </InkButton>
-        </View>
-      ) : null}
+      {/* A refused refresh above the list it left in place; a list that never arrived is said once,
+          in its place below. */}
+      {!unavailable && error ? <InkNotice tone="danger">{error}</InkNotice> : null}
     </View>
   );
 
   const empty = loading ? (
     <InkSpinner label={t('visionEvents.loading')} />
-  ) : error || failed ? null : data.events.length === 0 ? (
+  ) : unavailable ? (
+    <ContentUnavailable state={state} reason={error} onRetry={actions.refresh} />
+  ) : data.events.length === 0 ? (
     <InkEmptyState icon="camera" title={t('visionEvents.emptyTitle')}>
       <InkText>{t('visionEvents.emptyBody')}</InkText>
     </InkEmptyState>

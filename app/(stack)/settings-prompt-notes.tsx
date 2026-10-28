@@ -11,6 +11,9 @@ import { ScrollView, StyleSheet, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { InkButton, InkCard, InkEmptyState, InkNotice, InkSpinner, InkText } from '@jarida/ink/native';
 
+import { ContentUnavailable } from '@/components/patterns/content-unavailable';
+import { isUnavailable } from '@/models/content-state';
+import { useContentState } from '@/view-models/use-content-state';
 import { LabelledSwitch } from '@/components/patterns/labelled-switch';
 import { PromptNoteSheet } from '@/components/patterns/prompt-note-sheet';
 import { noteName } from '@/models/prompt-extras';
@@ -26,6 +29,10 @@ export default function AssistantNotesScreen() {
   const styles = useThemedStyles(makeStyles);
   const confirm = useConfirm();
   const { data, loading, error, failed, actions } = usePromptExtras();
+  // A refused refresh with the list still on screen is said above it; a list that never arrived is
+  // said once, in its place.
+  const state = useContentState({ loading, failed: failed || error !== null, hasContent: data.extras.length > 0 });
+  const unavailable = isUnavailable(state);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [editing, setEditing] = useState<PromptExtra | null>(null);
   // A new key per opening gives the sheet a fresh form each time.
@@ -69,17 +76,13 @@ export default function AssistantNotesScreen() {
 
       {loading ? <InkSpinner label={t('promptNotes.loading')} /> : null}
 
-      {/* A failed read with no sentence of its own still leaves the list unknown. */}
-      {error || failed ? (
-        <View style={styles.notice}>
-          <InkNotice tone="danger">{error ?? t('promptNotes.failed')}</InkNotice>
-          <InkButton variant="quiet" icon="refresh" onPress={actions.refresh}>
-            {t('common.retry')}
-          </InkButton>
-        </View>
+      {unavailable ? (
+        <ContentUnavailable state={state} reason={error} onRetry={actions.refresh} />
+      ) : error ? (
+        <InkNotice tone="danger">{error}</InkNotice>
       ) : null}
 
-      {!loading && !failed && data.extras.length === 0 ? (
+      {state === 'empty' ? (
         <InkEmptyState icon="prompts" title={t('promptNotes.emptyTitle')}>
           <InkText>{t('promptNotes.emptyBody')}</InkText>
         </InkEmptyState>
@@ -124,7 +127,6 @@ const makeStyles = (c: ThemeColors) =>
     container: { flex: 1, backgroundColor: c.background },
     scroll: { padding: Spacing.lg, gap: Spacing.md, paddingBottom: Spacing['4xl'] },
     header: { flexDirection: 'row', justifyContent: 'flex-end' },
-    notice: { gap: Spacing.sm },
     footer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: Spacing.sm },
     actions: { flexDirection: 'row', gap: Spacing.xs },
   });

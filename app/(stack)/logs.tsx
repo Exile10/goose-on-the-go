@@ -62,7 +62,10 @@ import {
   parsePondLogTime,
   type ActivityFilter,
 } from '@/models/log';
+import { ContentUnavailable } from '@/components/patterns/content-unavailable';
+import { isUnavailable } from '@/models/content-state';
 import { describeActivityError, useActivity } from '@/view-models/use-activity';
+import { useContentState } from '@/view-models/use-content-state';
 import { useActivitySummary } from '@/view-models/use-activity-summary';
 import { useConversationTelemetry, useConversationTurns } from '@/view-models/use-conversation-telemetry';
 import { useLogExport } from '@/view-models/use-log-export';
@@ -196,6 +199,9 @@ export default function ActivityScreen() {
   const { loading, error, actions } = showingProblems ? problems : activity;
   const failed = showingProblems ? problems.failed : activity.failed;
   const data = activity.data;
+  const shownCount = showingProblems ? problems.data.problems.length : data.events.length;
+  const state = useContentState({ loading, failed: failed || error !== null, hasContent: shownCount > 0 });
+  const unavailable = isUnavailable(state);
 
   const renderItem = useCallback(
     ({ item }: { item: ActivityEvent }) => <EventRow item={item} showType={activeTab === 'all'} />,
@@ -226,15 +232,9 @@ export default function ActivityScreen() {
       {!showingProblems && latest ? <TelemetryCard latest={latest} onOpen={openTurns} /> : null}
       {!showingProblems && clearResult ? <InkNotice tone={clearResult.tone}>{clearResult.text}</InkNotice> : null}
       {loading ? <InkSpinner label={t('activity.loading')} /> : null}
-      {/* A failed read with nothing to add still says so: the connection banner gives the cause. */}
-      {error || failed ? (
-        <View style={styles.notice}>
-          <InkNotice tone="danger">{error ?? (showingProblems ? t('activity.problemsFailed') : t('activity.failed'))}</InkNotice>
-          <InkButton variant="quiet" icon="refresh" onPress={actions.refresh}>
-            {t('common.retry')}
-          </InkButton>
-        </View>
-      ) : null}
+      {/* A refused refresh above the list it left in place. A list that never arrived is said
+          once, in the list's own place below. */}
+      {!unavailable && error ? <InkNotice tone="danger">{error}</InkNotice> : null}
     </>
   );
 
@@ -285,7 +285,9 @@ export default function ActivityScreen() {
           showsVerticalScrollIndicator={false}
           ListHeaderComponent={header}
           ListEmptyComponent={
-            !loading && !error && !failed ? (
+            unavailable ? (
+              <ContentUnavailable state={state} reason={error} onRetry={actions.refresh} />
+            ) : state === 'empty' ? (
               <InkEmptyState icon="check" title={t('activity.noProblems')}>
                 <InkText>{t('activity.noProblemsBody')}</InkText>
               </InkEmptyState>
@@ -304,7 +306,9 @@ export default function ActivityScreen() {
           ListHeaderComponent={header}
           // A list that failed to load is unknown, not empty.
           ListEmptyComponent={
-            !loading && !error && !failed ? (
+            unavailable ? (
+              <ContentUnavailable state={state} reason={error} onRetry={actions.refresh} />
+            ) : state === 'empty' ? (
               <InkEmptyState icon="logs" title={t('activity.empty')}>
                 <InkText>{t('activity.emptyBody')}</InkText>
               </InkEmptyState>

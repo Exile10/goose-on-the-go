@@ -1607,8 +1607,6 @@
     "empty": "Nothing here yet",
     "emptyBody": "What Goose does around the house shows up here.",
     "loading": "Reading your Pond's activity",
-    "failed": "Could not read your Pond's activity.",
-    "problemsFailed": "Could not read your Pond's problems.",
     "setupRequired": "Finish setting up your Pond to see its activity.",
     "forbidden": "Your Pond did not let this phone read its activity.",
     "event": {
@@ -1834,7 +1832,6 @@
     "installing": "Installing…",
     "noneTitle": "No extensions yet",
     "noneBody": "Your Pond has no extensions installed, and none to add.",
-    "loadFailed": "Your Pond could not be reached for its extension list.",
     "status": {
       "connected": "Connected",
       "error": "Error",
@@ -1861,7 +1858,6 @@
       "quota": "This month's free searches are used up",
       "unverified": "Saved, not yet checked"
     },
-    "loadFailed": "Your Pond could not be reached for its web search status.",
     "unsupported": "This Pond does not offer web search yet. Update it to turn web search on.",
     "getKey": "Get a free key at {{site}}",
     "getKeyHint": "Opens Brave's dashboard in a browser",
@@ -1880,7 +1876,6 @@
   "secrets": {
     "intro": "Keys, tokens and client IDs your Pond uses for outside services. Your Pond never sends a value back, so a value can be replaced but not shown.",
     "loading": "Reading the secrets your Pond holds…",
-    "loadFailed": "Your Pond could not be reached for its secrets.",
     "storedTitle": "Stored on your Pond",
     "empty": "Your Pond holds no secrets yet.",
     "add": "Add a secret",
@@ -2043,15 +2038,12 @@
       "noRulesBody": "An automation has Goose act when a sensor or device reports something.",
       "polling": "Live updates are paused. This list refreshes every 30 seconds.",
       "rulesNote": "Automations run when a reading matches, so they have no Run now.",
-      "schedulesFailed": "Could not load your schedules.",
-      "rulesFailed": "Could not load your automations.",
       "deleteAutomationTitle": "Delete this automation?",
       "deleteAutomationBody": "“{{name}}” will be removed from your Pond and will stop reacting."
     },
     "runs": {
       "title": "Recent runs",
       "none": "This schedule has not run yet.",
-      "failed": "Could not load this schedule's runs.",
       "statusRunning": "Running",
       "statusCompleted": "Done",
       "statusFailed": "Failed",
@@ -2144,7 +2136,6 @@
     },
     "detail": {
       "loading": "Reading this schedule from your Pond",
-      "failed": "Could not load this schedule.",
       "prompt": "Prompt",
       "webhook": "Calls a webhook",
       "webhookNote": "This schedule calls a webhook. Its address can only be changed on the Pond itself.",
@@ -2325,7 +2316,6 @@
       "add": "Add memory",
       "all": "All",
       "loading": "Loading memories…",
-      "failed": "Could not load memories from your Pond.",
       "emptyTitle": "No memories yet",
       "emptyBody": "Goose learns from your conversations, or you can add something it should know."
     },
@@ -2720,7 +2710,6 @@
     "dismissBody": "It leaves the list for good. The Pond cannot bring it back.",
     "list": {
       "loading": "Loading reminders",
-      "failed": "Could not load reminders.",
       "emptyTitle": "No reminders",
       "emptyBody": "When a conversation mentions something with a date, the Pond keeps it here."
     },
@@ -2741,7 +2730,6 @@
     "declined": "Declined. It is off your list.",
     "list": {
       "loading": "Loading suggestions",
-      "failed": "Could not load suggestions.",
       "emptyTitle": "No suggestions",
       "emptyBody": "When the Pond notices something it could help with, it asks here first."
     },
@@ -2764,7 +2752,6 @@
     "everyTurn": "Every note that is on is read again on every turn, so long notes slow down the small model on your Pond. Keep each one to a sentence or two.",
     "add": "Add a note",
     "loading": "Loading notes",
-    "failed": "Couldn't load the notes from your Pond.",
     "emptyTitle": "No notes yet",
     "emptyBody": "Add one to have Goose follow it in every conversation.",
     "deleteTitle": "Delete \"{{name}}\"?",
@@ -2851,7 +2838,6 @@
     "intro": "Your Pond can learn who is who from their face, so Goose can greet people by name and automations can tell them apart.",
     "privacy": "Face data stays on your Pond. It is never sent to the cloud.",
     "loading": "Reading who your Pond knows",
-    "failed": "Could not read the faces your Pond knows.",
     "recognitionOff": "Face recognition is switched off, so your Pond is not looking for faces right now. You can still add samples.",
     "switchOn": "Switch it on",
     "unavailableTitle": "Face recognition isn't set up on your Pond",
@@ -2929,8 +2915,6 @@
     "unacknowledged_one": "{{count}} not acknowledged yet",
     "unacknowledged_other": "{{count}} not acknowledged yet",
     "loading": "Loading what the camera saw…",
-    "failed": "Could not load vision events from your Pond.",
-    "settingsFailed": "Could not read which camera your Pond watches.",
     "emptyTitle": "Nothing seen yet",
     "emptyBody": "When the camera notices something, it shows up here.",
     "noMatchTitle": "Nothing matches",
@@ -3005,7 +2989,6 @@
     "adding": "Adding",
     "new": "New vision automation",
     "loading": "Reading your Pond's automations",
-    "failed": "Could not load your automations.",
     "emptyTitle": "No vision automations yet",
     "emptyBody": "An automation has Goose or your phone react when the camera sees something. Add one above, or build your own.",
     "addFailed": "Your Pond could not add that one. Try again in a moment.",

@@ -10,6 +10,9 @@ import { ScrollView, StyleSheet, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { InkButton, InkCard, InkEmptyState, InkNotice, InkSpinner, InkText } from '@jarida/ink/native';
 
+import { ContentUnavailable } from '@/components/patterns/content-unavailable';
+import { isUnavailable } from '@/models/content-state';
+import { useContentState } from '@/view-models/use-content-state';
 import { useConfirm } from '@/providers/confirm-provider';
 import { useReminders, type ReminderRow } from '@/view-models/use-reminders';
 import { useThemedStyles } from '@/hooks/use-themed-styles';
@@ -21,6 +24,10 @@ export default function RemindersScreen() {
   const styles = useThemedStyles(makeStyles);
   const confirm = useConfirm();
   const { data, loading, error, failed, dismissing, actionError, actions } = useReminders();
+  // A refused refresh with the list still on screen is said above it; a list that never arrived is
+  // said once, in its place.
+  const state = useContentState({ loading, failed: failed || error !== null, hasContent: data.rows.length > 0 });
+  const unavailable = isUnavailable(state);
 
   const { dismiss } = actions;
   const confirmDismiss = useCallback(
@@ -44,17 +51,13 @@ export default function RemindersScreen() {
 
       {actionError ? <InkNotice tone="danger">{actionError}</InkNotice> : null}
 
-      {/* A failed read with no sentence of its own still leaves the list unknown. */}
-      {error || failed ? (
-        <View style={styles.notice}>
-          <InkNotice tone="danger">{error ?? t('reminders.list.failed')}</InkNotice>
-          <InkButton variant="quiet" icon="refresh" onPress={actions.refresh}>
-            {t('common.retry')}
-          </InkButton>
-        </View>
+      {unavailable ? (
+        <ContentUnavailable state={state} reason={error} onRetry={actions.refresh} />
+      ) : error ? (
+        <InkNotice tone="danger">{error}</InkNotice>
       ) : null}
 
-      {!loading && !error && !failed && data.rows.length === 0 ? (
+      {state === 'empty' ? (
         <InkEmptyState icon="calendar" title={t('reminders.list.emptyTitle')}>
           <InkText>{t('reminders.list.emptyBody')}</InkText>
         </InkEmptyState>
@@ -85,6 +88,5 @@ const makeStyles = (c: ThemeColors) =>
   StyleSheet.create({
     container: { flex: 1, backgroundColor: c.background },
     scroll: { padding: Spacing.lg, gap: Spacing.md, paddingBottom: Spacing['4xl'] },
-    notice: { gap: Spacing.sm },
     footer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: Spacing.sm },
   });

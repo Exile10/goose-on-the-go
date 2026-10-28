@@ -35,7 +35,10 @@ import { useThemedStyles } from '@/hooks/use-themed-styles';
 import { selectionTick, toggle } from '@/services/haptics';
 import { deviceStyle } from '@/constants/device-style';
 import { ALL_ROOMS, UNASSIGNED_ROOM, roomLabel, supports, useDevices } from '@/view-models/use-devices';
+import { ContentUnavailable } from '@/components/patterns/content-unavailable';
 import { DeviceEditSheet } from '@/components/patterns/device-edit-sheet';
+import { isUnavailable } from '@/models/content-state';
+import { useContentState } from '@/view-models/use-content-state';
 import type { Device } from '@/services/types';
 import { Grey } from '@/constants/colors';
 import type { ThemeColors } from '@/constants/colors';
@@ -102,7 +105,7 @@ export default function DevicesTab() {
   const styles = useThemedStyles(makeStyles);
   const { t } = useTranslation();
   const router = useRouter();
-  const { data, loading, error, actions } = useDevices();
+  const { data, loading, failed, error, actions } = useDevices();
   const [activeRoom, setActiveRoom] = useState(ALL_ROOMS);
   const [editing, setEditing] = useState<Device | null>(null);
   const chrome = useChromeScroll();
@@ -142,6 +145,8 @@ export default function DevicesTab() {
   }, []);
 
   const total = data.devices.length;
+  const state = useContentState({ loading, failed, hasContent: total > 0 });
+  const unavailable = isUnavailable(state);
   const nothingReachable = total > 0 && data.onlineCount === 0;
 
   return (
@@ -230,15 +235,18 @@ export default function DevicesTab() {
 
         {loading ? <InkSpinner label={t('pond.checking')} /> : null}
 
-        {error ? (
+        {/* A change the Pond refused, said above the grid it happened on. A list that did not
+            load is said once, in place of the grid. */}
+        {!unavailable && error ? (
           <View style={styles.notice}>
             <InkNotice tone="danger">{error}</InkNotice>
           </View>
         ) : null}
 
-        {/* A list that failed to load is unknown, not empty: the notice above
-            says so, and "No devices yet" would be a claim nobody made. */}
-        {!loading && !error && total === 0 ? (
+        {/* A list that failed to load is unknown, not empty: "No devices yet" would be a claim
+            nobody made. */}
+        {unavailable ? <ContentUnavailable state={state} reason={error} onRetry={actions.refresh} /> : null}
+        {state === 'empty' ? (
           <InkEmptyState
             icon="device"
             title={t('devices.noneTitle')}

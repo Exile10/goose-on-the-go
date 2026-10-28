@@ -13,7 +13,6 @@ import { InkButton, InkEmptyState, InkNotice, InkSegmented, InkSpinner, InkSwitc
 import { View, Text, StyleSheet, ScrollView, TextInput } from 'react-native';
 
 import { GIcon } from '@/components/ui/g-icon';
-import { GPressable } from '@/components/ui/g-pressable';
 import { GKeyboardView } from '@/components/ui/g-keyboard-view';
 import { isIconName } from '@/constants/icons';
 import { Grey, JaridaPurple, Semantic } from '@/constants/colors';
@@ -24,6 +23,9 @@ import { useThemedStyles } from '@/hooks/use-themed-styles';
 import { useConfirm } from '@/providers/confirm-provider';
 import type { ThemeColors } from '@/constants/colors';
 import type { Extension, MarketplaceExtension } from '@/services/types';
+import { ContentUnavailable } from '@/components/patterns/content-unavailable';
+import { isUnavailable } from '@/models/content-state';
+import { useContentState } from '@/view-models/use-content-state';
 import { credentialFields, useExtensions } from '@/view-models/use-extensions';
 
 const STATUS_COLORS: Record<string, string> = {
@@ -322,8 +324,14 @@ export default function ExtensionsScreen() {
     [actions, form, runInstall],
   );
 
-  // A first read that failed is not an empty Pond: say so, and offer the read again.
-  const nothing = !loading && !error && !failed && data.installed.length === 0 && data.available.length === 0;
+  // A first read that failed is not an empty Pond. `error` here is a refused install or toggle as
+  // often as a read, so only `failed` decides that the list never arrived.
+  const state = useContentState({
+    loading,
+    failed,
+    hasContent: data.installed.length > 0 || data.available.length > 0,
+  });
+  const unavailable = isUnavailable(state);
 
   return (
     <GKeyboardView>
@@ -332,26 +340,19 @@ export default function ExtensionsScreen() {
         contentContainerStyle={styles.scroll}
         showsVerticalScrollIndicator={false}
       >
-        {loading && data.installed.length === 0 && data.available.length === 0 ? (
+        {state === 'loading' ? (
           <InkSpinner label={t('extensions.loading')} />
         ) : null}
 
-        {error ? (
+        {!unavailable && error ? (
           <View style={styles.notice}>
             <InkNotice tone="danger">{error}</InkNotice>
           </View>
         ) : null}
 
-        {failed && !error && !loading ? (
-          <View style={styles.notice}>
-            <InkNotice tone="danger">{t('extensions.loadFailed')}</InkNotice>
-            <GPressable onPress={() => void actions.refresh()} hitSlop={8}>
-              <InkText>{t('common.retry')}</InkText>
-            </GPressable>
-          </View>
-        ) : null}
+        {unavailable ? <ContentUnavailable state={state} reason={error} onRetry={actions.refresh} /> : null}
 
-        {nothing ? (
+        {state === 'empty' ? (
           <InkEmptyState icon="package" title={t('extensions.noneTitle')}>
             <InkText>{t('extensions.noneBody')}</InkText>
           </InkEmptyState>

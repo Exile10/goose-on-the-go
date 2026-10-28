@@ -14,6 +14,9 @@ import { RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'r
 import { useTranslation } from 'react-i18next';
 import { InkButton, InkCard, InkNotice, InkSpinner, InkText, InkTitle, inkText, useInkTheme } from '@jarida/ink/native';
 
+import { ContentUnavailable } from '@/components/patterns/content-unavailable';
+import { isUnavailable } from '@/models/content-state';
+import { useContentState } from '@/view-models/use-content-state';
 import { GKeyboardView } from '@/components/ui/g-keyboard-view';
 import { GPressable } from '@/components/ui/g-pressable';
 import { Semantic } from '@/constants/colors';
@@ -36,6 +39,9 @@ export default function WebSearchScreen() {
   const { data, loading, refreshing, saving, removing, error, keyError, failed, unsupported, actions } = useWebSearch();
 
   const busy = saving || removing;
+  // The page is a form over the Pond's search setting, so it has content once a read has worked.
+  const state = useContentState({ loading, failed, hasContent: !loading && !failed });
+  const unavailable = isUnavailable(state);
 
   const handleSave = useCallback(async () => {
     const saved = await actions.save();
@@ -82,15 +88,10 @@ export default function WebSearchScreen() {
           </View>
         ) : null}
 
-        {error ? <InkNotice tone="danger">{error}</InkNotice> : null}
-
-        {failed && !error ? (
-          <View style={styles.notice}>
-            <InkNotice tone="danger">{t('webSearch.loadFailed')}</InkNotice>
-            <InkButton variant="quiet" icon="refresh" onPress={handleRefresh}>
-              {t('common.retry')}
-            </InkButton>
-          </View>
+        {unavailable ? (
+          <ContentUnavailable state={state} reason={error} onRetry={handleRefresh} />
+        ) : error ? (
+          <InkNotice tone="danger">{error}</InkNotice>
         ) : null}
 
         {unsupported ? <InkNotice tone="warning">{t('webSearch.unsupported')}</InkNotice> : null}
@@ -164,7 +165,6 @@ const makeStyles = (c: ThemeColors) =>
   StyleSheet.create({
     container: { flex: 1, backgroundColor: c.background },
     scroll: { padding: Spacing.lg, gap: Spacing.lg, paddingBottom: Spacing['3xl'] },
-    notice: { gap: Spacing.sm },
     card: { gap: Spacing.md },
     link: {
       fontFamily: FontFamily.body,

@@ -7,8 +7,11 @@ import React from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { InkButton, InkEmptyState, InkNotice, InkSpinner, InkText } from '@jarida/ink/native';
+import { InkButton, InkNotice, InkSpinner, InkText } from '@jarida/ink/native';
 
+import { ContentUnavailable } from '@/components/patterns/content-unavailable';
+import { isUnavailable } from '@/models/content-state';
+import { useContentState } from '@/view-models/use-content-state';
 import { WakeStep } from '@/components/setup/wake-step';
 import { GKeyboardView } from '@/components/ui/g-keyboard-view';
 import type { ThemeColors } from '@/constants/colors';
@@ -22,6 +25,7 @@ export default function WakeWordScreen() {
   const { t } = useTranslation();
   const wake = useWakeWord();
   const { draft, saved, valid, changed, justSaved } = wake.data;
+  const state = useContentState({ loading: wake.loading, failed: wake.failed, hasContent: !wake.loading && !wake.failed });
 
   if (wake.loading) {
     return (
@@ -30,20 +34,10 @@ export default function WakeWordScreen() {
       </SafeAreaView>
     );
   }
-  if (wake.failed) {
+  if (isUnavailable(state)) {
     return (
       <SafeAreaView style={[styles.safe, styles.center]} edges={['bottom']}>
-        <InkEmptyState
-          icon="wifi"
-          title={t('setup.loadFailed')}
-          action={
-            <InkButton variant="primary" icon="refresh" onPress={wake.actions.reload}>
-              {t('common.retry')}
-            </InkButton>
-          }
-        >
-          {t('setup.loadFailedBody')}
-        </InkEmptyState>
+        <ContentUnavailable state={state} onRetry={wake.actions.reload} />
       </SafeAreaView>
     );
   }

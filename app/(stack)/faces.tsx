@@ -16,8 +16,11 @@ import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { InkButton, InkEmptyState, InkNotice, InkSpinner, InkText } from '@jarida/ink/native';
 
+import { ContentUnavailable } from '@/components/patterns/content-unavailable';
+import { isUnavailable } from '@/models/content-state';
+import { useContentState } from '@/view-models/use-content-state';
 import { FaceSheet } from '@/components/patterns/face-sheet';
-import { SettingsGroup, SettingsHeader, SettingsMessage, SettingsRow } from '@/components/settings/settings-list';
+import { SettingsGroup, SettingsHeader, SettingsRow } from '@/components/settings/settings-list';
 import { SettingsScroll } from '@/components/settings/settings-scroll';
 import { useSettingsColors, useSettingsStyles, type SettingsType } from '@/components/settings/settings-theme';
 import { GIcon } from '@/components/ui/g-icon';
@@ -33,6 +36,7 @@ export default function FacesScreen() {
   const styles = useSettingsStyles(makeStyles);
   const colors = useSettingsColors();
   const { data, loading, error, failed, actions } = useFaces();
+  const state = useContentState({ loading, failed, hasContent: data.people.length > 0 });
   const settings = usePondSettings();
   const [openId, setOpenId] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -79,14 +83,7 @@ export default function FacesScreen() {
 
       {loading && data.people.length === 0 ? <InkSpinner label={t('faces.loading')} /> : null}
 
-      {failed ? (
-        <View style={styles.notice}>
-          <SettingsMessage tone="danger">{error ?? t('faces.failed')}</SettingsMessage>
-          <InkButton variant="quiet" icon="refresh" onPress={() => void quietRefresh()}>
-            {t('common.retry')}
-          </InkButton>
-        </View>
-      ) : null}
+      {isUnavailable(state) ? <ContentUnavailable state={state} reason={error} onRetry={quietRefresh} /> : null}
 
       {!loading && !failed && !data.available ? (
         <InkEmptyState icon="face" title={t('faces.unavailableTitle')}>

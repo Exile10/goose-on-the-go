@@ -11,6 +11,9 @@ import { ScrollView, StyleSheet, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { InkButton, InkCard, InkEmptyState, InkNotice, InkSpinner, InkText } from '@jarida/ink/native';
 
+import { ContentUnavailable } from '@/components/patterns/content-unavailable';
+import { isUnavailable } from '@/models/content-state';
+import { useContentState } from '@/view-models/use-content-state';
 import { useProposals } from '@/view-models/use-proposals';
 import { useThemedStyles } from '@/hooks/use-themed-styles';
 import type { ThemeColors } from '@/constants/colors';
@@ -20,6 +23,10 @@ export default function SuggestionsScreen() {
   const { t } = useTranslation();
   const styles = useThemedStyles(makeStyles);
   const { data, loading, error, failed, deciding, outcome, actions } = useProposals();
+  // A refused refresh with the list still on screen is said above it; a list that never arrived is
+  // said once, in its place.
+  const state = useContentState({ loading, failed: failed || error !== null, hasContent: data.rows.length > 0 });
+  const unavailable = isUnavailable(state);
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
@@ -29,17 +36,13 @@ export default function SuggestionsScreen() {
 
       {outcome ? <InkNotice tone={outcome.tone}>{outcome.text}</InkNotice> : null}
 
-      {/* A failed read with no sentence of its own still leaves the list unknown. */}
-      {error || failed ? (
-        <View style={styles.notice}>
-          <InkNotice tone="danger">{error ?? t('proposals.list.failed')}</InkNotice>
-          <InkButton variant="quiet" icon="refresh" onPress={actions.refresh}>
-            {t('common.retry')}
-          </InkButton>
-        </View>
+      {unavailable ? (
+        <ContentUnavailable state={state} reason={error} onRetry={actions.refresh} />
+      ) : error ? (
+        <InkNotice tone="danger">{error}</InkNotice>
       ) : null}
 
-      {!loading && !error && !failed && data.rows.length === 0 ? (
+      {state === 'empty' ? (
         <InkEmptyState icon="light" title={t('proposals.list.emptyTitle')}>
           <InkText>{t('proposals.list.emptyBody')}</InkText>
         </InkEmptyState>
@@ -82,7 +85,6 @@ const makeStyles = (c: ThemeColors) =>
   StyleSheet.create({
     container: { flex: 1, backgroundColor: c.background },
     scroll: { padding: Spacing.lg, gap: Spacing.md, paddingBottom: Spacing['4xl'] },
-    notice: { gap: Spacing.sm },
     body: { gap: Spacing.sm },
     actions: { flexDirection: 'row', justifyContent: 'flex-end', gap: Spacing.sm },
   });
