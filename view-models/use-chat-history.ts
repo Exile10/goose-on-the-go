@@ -26,6 +26,7 @@ import { useTranslation } from 'react-i18next';
 import { useServer } from '@/providers/server-provider';
 import { api } from '@/services/api-client';
 import { forgetCards } from '@/services/card-cache';
+import { showSnackbar } from '@/services/snackbar';
 import { Storage } from '@/services/storage';
 import { matchesQuery } from '@/utils/search';
 import { describeApiError, logFailure } from '@/view-models/describe-error';
@@ -390,8 +391,8 @@ export interface UseChatHistory {
   /** No read of the list has worked yet and the last one failed: the wall is unknown, not empty. */
   failed: boolean;
   /**
-   * Words for a refused delete, or for the failed read when there are any beyond the shared ones.
-   * Never a status code.
+   * Words for the failed read when there are any beyond the shared ones. Never a status code. A
+   * refused delete is said in the snackbar, with Try again.
    */
   error: string | null;
   actions: {
@@ -424,7 +425,11 @@ export function useChatHistory(): UseChatHistory {
   // has loaded keeps the wall, so only a list that never arrived counts.
   const [loadFailed, setLoadFailed] = useState(false);
   const [loadReason, setLoadReason] = useState<string | null>(null);
-  const [actionError, setActionError] = useState<string | null>(null);
+  // What the snackbar's Try again calls: the current deletes, set below once they are made.
+  const retry = useRef<Pick<UseChatHistory['actions'], 'remove' | 'removeMany'>>({
+    remove: async () => false,
+    removeMany: async () => ({ deleted: [], failed: [] }),
+  });
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<HistoryFilter>('all');
   // Null until the stored layout has been read back. The screen keeps its
@@ -495,10 +500,8 @@ export function useChatHistory(): UseChatHistory {
     [load],
   );
 
-  // What the screen calls: on focus, and on a pull. Either is the reader
-  // moving on, so a failed delete stops being news here and not before.
+  // What the screen calls: on focus, and on a pull.
   const refresh = useCallback(() => {
-    setActionError(null);
     // Asking again after a wall that never arrived goes back to the loading ghosts, so a pull
     // visibly does something rather than leaving the failure up until the answer lands.
     // A ref, not `sessions`: the screen re-runs its focus effect whenever this changes identity.
@@ -513,7 +516,6 @@ export function useChatHistory(): UseChatHistory {
 
   const remove = useCallback(
     async (id: string) => {
-      setActionError(null);
       setSessions((all) => all?.filter((s) => s.id !== id) ?? all);
       try {
         await api.deleteSession(id);
@@ -522,11 +524,14 @@ export function useChatHistory(): UseChatHistory {
         return true;
       } catch (e) {
         logFailure('history', 'delete failed', e);
-        setActionError(t('chat.history.deleteFailed'));
+        showSnackbar({
+          message: t('chat.history.deleteFailed'),
+          tone: 'danger',
+          action: { label: t('common.retry'), onPress: () => void retry.current.remove(id) },
+        });
         return false;
       } finally {
-        // Whatever the Pond did, the wall should say what it now holds. The
-        // re-read clears only a load error, so a refusal stays on screen.
+        // Whatever the Pond did, the wall should say what it now holds.
         void resync();
       }
     },
@@ -536,7 +541,6 @@ export function useChatHistory(): UseChatHistory {
   const removeMany = useCallback(
     async (ids: string[]) => {
       if (ids.length === 0) return { deleted: [], failed: [] };
-      setActionError(null);
       const doomed = new Set(ids);
       setSessions((all) => all?.filter((s) => !doomed.has(s.id)) ?? all);
       const { fulfilled, rejected } = await settleEach(
@@ -546,16 +550,24 @@ export function useChatHistory(): UseChatHistory {
       );
       void forgetCards(fulfilled);
       if (rejected.length > 0) {
-        setActionError(t('chat.history.deleteManyFailed', { count: rejected.length }));
+        console.warn('[history] some deletes refused', { refused: rejected.length, of: ids.length });
+        // Try again sends only the ones the Pond refused.
+        showSnackbar({
+          message: t('chat.history.deleteManyFailed', { count: rejected.length }),
+          tone: 'danger',
+          action: { label: t('common.retry'), onPress: () => void retry.current.removeMany(rejected) },
+        });
       }
       // One re-read for the lot, once the last has settled rather than after
-      // each. It brings back whatever the Pond refused, and clears only a load
-      // error, so the refusal stays on screen.
+      // each. It brings back whatever the Pond refused.
       void resync();
       return { deleted: fulfilled, failed: rejected };
     },
     [resync, t],
   );
+  useEffect(() => {
+    retry.current = { remove, removeMany };
+  }, [remove, removeMany]);
 
   // Shaped once per answer rather than per keystroke: the "when" labels and the
   // weights do not change while someone types. The moment they were written at
@@ -592,7 +604,7 @@ export function useChatHistory(): UseChatHistory {
     data: { cards, sections, total: all.length, query, filter, view: view ?? 'grid' },
     loading: (sessions === null && !loadFailed) || view === null,
     failed: loadFailed && sessions === null,
-    error: actionError ?? (sessions === null ? loadReason : null),
+    error: sessions === null ? loadReason : null,
     actions: { refresh, setQuery, setFilter, setView, remove, removeMany },
   };
 }

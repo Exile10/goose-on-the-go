@@ -15,6 +15,7 @@ import * as WebBrowser from 'expo-web-browser';
 
 import { BRAVE_DASHBOARD_URL } from '@/models/web-search';
 import { ApiError, api } from '@/services/api-client';
+import { currentSnackbar, resetSnackbar } from '@/services/snackbar';
 import type { WebSearchState, WebSearchStatus } from '@/services/types';
 import { statusLabel, useWebSearch, type UseWebSearch } from '@/view-models/use-web-search';
 
@@ -103,6 +104,7 @@ beforeAll(() => {
 
 beforeEach(() => {
   jest.resetAllMocks();
+  resetSnackbar();
   jest.mocked(WebBrowser.openBrowserAsync).mockResolvedValue({ type: 'opened' } as never);
   server.hydrated = true;
   server.real = true;
@@ -427,7 +429,11 @@ describe('removing the key', () => {
     expect(removed).toBe(false);
     expect(m.vm.data.configured).toBe(true);
     expect(m.vm.data.status).toBe('ok');
-    expect(m.vm.error).toBe('Your Pond is busy. Try again in a moment.');
+    // The page loaded; only the removal failed, so the page is not drawn as failed.
+    expect(m.vm.error).toBeNull();
+    expect(currentSnackbar()).toMatchObject({ tone: 'danger', message: 'Your Pond is busy. Try again in a moment.' });
+    await act(async () => currentSnackbar()?.action?.onPress());
+    expect(web.removeWebSearchKey).toHaveBeenCalledTimes(2);
     await m.unmount();
   });
 

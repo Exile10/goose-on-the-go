@@ -12,6 +12,7 @@ import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 
 import { inPondOrder, keyFromName, newNote, nextSortOrder, noteName } from '@/models/prompt-extras';
 import { ApiError, api } from '@/services/api-client';
+import { currentSnackbar, resetSnackbar } from '@/services/snackbar';
 import type { PromptExtra } from '@/services/types';
 import { describePromptExtraError, usePromptExtras, type UsePromptExtras } from '@/view-models/use-prompt-extras';
 
@@ -83,6 +84,7 @@ beforeAll(() => {
 });
 
 beforeEach(() => {
+  resetSnackbar();
   jest.resetAllMocks();
   server.hydrated = true;
   server.real = true;
@@ -246,7 +248,7 @@ describe('switching and deleting', () => {
 
     expect(pond.savePromptExtra).toHaveBeenCalledWith({ ...old, active: false });
     expect(m.vm.data.extras[0].active).toBe(false);
-    expect(m.vm.error).toBeNull();
+    expect(currentSnackbar()).toBeNull();
     await m.unmount();
   });
 
@@ -259,7 +261,12 @@ describe('switching and deleting', () => {
     await act(async () => m.vm.actions.setActive(old, false));
 
     expect(m.vm.data.extras[0].active).toBe(true);
-    expect(m.vm.error).not.toBeNull();
+    expect(m.vm.error).toBeNull();
+    expect(currentSnackbar()?.tone).toBe('danger');
+
+    pond.savePromptExtra.mockResolvedValue();
+    await act(async () => currentSnackbar()?.action?.onPress());
+    expect(m.vm.data.extras[0].active).toBe(false);
     await m.unmount();
   });
 
@@ -285,7 +292,8 @@ describe('switching and deleting', () => {
     await act(async () => m.vm.actions.remove(old));
 
     expect(m.vm.data.extras.map((e) => e.key)).toEqual(['language', 'tone']);
-    expect(m.vm.error).not.toBeNull();
+    expect(m.vm.error).toBeNull();
+    expect(currentSnackbar()).toMatchObject({ tone: 'danger', action: { label: 'Try again' } });
     await m.unmount();
   });
 });

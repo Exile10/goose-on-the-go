@@ -225,8 +225,8 @@ export default function DevicesTab() {
 
         {loading ? <InkSpinner label={t('pond.checking')} /> : null}
 
-        {/* A change the Pond refused, said above the grid it happened on. A list that did not
-            load is said once, in place of the grid. */}
+        {/* A pull that failed with the grid already on screen. A list that did not load is said
+            once, in place of the grid; a switch the Pond refused is said in the snackbar. */}
         {!unavailable && error ? (
           <View style={styles.notice}>
             <InkNotice tone="danger">{error}</InkNotice>

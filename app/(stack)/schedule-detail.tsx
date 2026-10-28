@@ -104,7 +104,7 @@ export default function ScheduleDetailScreen() {
   const real = isScreenReal('schedule');
   const params = useLocalSearchParams<{ id?: string }>();
   const id = linkedScheduleId(params.id) ?? '';
-  const { schedule, loading, missing, error, failed, notice, runs, actions } = useScheduleDetail(id);
+  const { schedule, loading, missing, error, failed, runs, actions } = useScheduleDetail(id);
   const state = useContentState({ loading, failed: failed || error !== null, hasContent: schedule !== null });
   const runsState = useContentState({
     loading: runs.loading,
@@ -157,8 +157,8 @@ export default function ScheduleDetailScreen() {
         {schedule.currently_running ? <InkBadge tone="brand">{t('schedule.card.running')}</InkBadge> : null}
       </View>
 
-      {notice === 'saved' ? <InkNotice tone="success">{t('schedule.detail.saved')}</InkNotice> : null}
-      {notice === 'runStarted' ? <InkNotice tone="success">{t('schedule.detail.runStarted')}</InkNotice> : null}
+      {/* A pull that failed with the schedule already on screen. What a change came to is said in
+          the snackbar, not here. */}
       {error ? <InkNotice tone="danger">{error}</InkNotice> : null}
 
       <InkCard>

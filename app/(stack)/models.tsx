@@ -15,7 +15,7 @@ import { useContentState } from '@/view-models/use-content-state';
 import { usePullToRefresh } from '@/view-models/use-pull-to-refresh';
 import { DownloadRow, ModelRow } from '@/components/settings/model-rows';
 import { SettingsGroup, SettingsHeader, SettingsRow, TILE_INSET } from '@/components/settings/settings-list';
-import { SettingsNotice, SettingsScroll } from '@/components/settings/settings-scroll';
+import { SettingsScroll } from '@/components/settings/settings-scroll';
 import { voiceName } from '@/components/settings/special-rows';
 import {
   downloadsByModel,
@@ -89,10 +89,6 @@ export default function ModelsScreen() {
           .filter(Boolean)
           .join(' ')}
       />
-
-      {lib.notice ? (
-        <SettingsNotice tone={lib.notice.tone === 'danger' ? 'danger' : 'neutral'}>{lib.notice.text}</SettingsNotice>
-      ) : null}
 
       {!lib.loaded ? (
         isUnavailable(state) ? (

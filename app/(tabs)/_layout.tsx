@@ -18,7 +18,7 @@
  */
 
 import React, { useCallback, useMemo, useState } from 'react';
-import { Redirect, Tabs } from 'expo-router';
+import { Redirect, Tabs, useIsFocused } from 'expo-router';
 import { BlurView } from 'expo-blur';
 import { useTranslation } from 'react-i18next';
 import { alpha } from '@jarida/ink';
@@ -39,6 +39,7 @@ import {
   useChromeStage,
 } from '@/providers/chrome-provider';
 import { useServer } from '@/providers/server-provider';
+import { useSnackbarClearance } from '@/providers/snackbar-provider';
 import { useOnboarding } from '@/view-models/use-onboarding';
 import { useSetupGate } from '@/view-models/use-setup-gate';
 import { useSettingsIssues } from '@/view-models/use-settings-issues';
@@ -104,6 +105,10 @@ function AppTabBar({ state, navigation }: TabBarProps) {
   // Settings lists what needs attention, so its tab says when something does.
   const issueTone = useSettingsIssues()[0]?.tone ?? null;
   const [height, setHeight] = useState(0);
+  // A message about an action sits above the bar, but only while the tabs are in front: a screen
+  // pushed over them has no bar under it.
+  const focused = useIsFocused();
+  useSnackbarClearance(focused ? height : 0);
 
   const items = useMemo<InkNavDestination[]>(
     () =>

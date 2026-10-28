@@ -17,7 +17,8 @@
     "scanAgain": "Scan again",
     "searchAgain": "Search again",
     "goHome": "Go to Home",
-    "ok": "OK"
+    "ok": "OK",
+    "dismissHint": "Dismisses the message."
   },
   "tabs": {
     "label": "Main navigation",
@@ -2719,7 +2720,7 @@
     },
     "errors": {
       "gone": "That reminder was already gone, so the list has been refreshed.",
-      "dismissFailed": "Could not dismiss that reminder. Try again."
+      "dismissFailed": "Could not dismiss that reminder."
     }
   },
   "proposals": {
@@ -2742,7 +2743,7 @@
       "unaddressed": "The Pond cannot tell which household member this phone belongs to, so it cannot show suggestions meant for one person. Pair this phone to a member from the Pond to see yours.",
       "gone": "That suggestion has expired or was already decided, so the list has been refreshed.",
       "conflict": "The Pond would not record that decision. The list has been refreshed.",
-      "decideFailed": "Could not save that decision. Try again."
+      "decideFailed": "Could not save that decision."
     }
   },
   "promptNotes": {
@@ -2975,7 +2976,7 @@
       "back": "Back to the event"
     },
     "errors": {
-      "acknowledgeFailed": "Could not acknowledge that event. Try again."
+      "acknowledgeFailed": "Could not acknowledge that event."
     }
   },
   "visionAutomations": {

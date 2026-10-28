@@ -25,6 +25,7 @@ import { GIcon } from '@/components/ui/g-icon';
 import { GPressable } from '@/components/ui/g-pressable';
 import { useConfirm } from '@/providers/confirm-provider';
 import { useServer } from '@/providers/server-provider';
+import { useSnackbar } from '@/providers/snackbar-provider';
 import { hostOf } from '@/services/discovery';
 import { confirm, reject } from '@/services/haptics';
 import { usePondSettings } from '@/view-models/use-pond-settings';
@@ -42,7 +43,7 @@ export default function HomeManagementScreen() {
   const { settings } = usePondSettings();
   const { paired, serverUrl, connectionState } = useServer();
   const [sheet, setSheet] = useState<Sheet>(null);
-  const [actionError, setActionError] = useState<string | null>(null);
+  const snackbar = useSnackbar();
   const { devices, rooms } = data;
   const state = useContentState({ loading, failed, hasContent: devices.length > 0 });
   const unavailable = isUnavailable(state);
@@ -60,16 +61,19 @@ export default function HomeManagementScreen() {
         destructive: true,
       });
       if (!yes) return;
-      setActionError(null);
-      const refused = await actions.edit(unassignRoom(devices, room.name));
-      if (refused) {
-        void reject();
-        setActionError(refused);
-      } else {
-        void confirm();
-      }
+      // Try again sends the same edits: the household already agreed to them.
+      const send = async (edits: Parameters<typeof actions.edit>[0]) => {
+        const refused = await actions.edit(edits);
+        if (refused) {
+          void reject();
+          snackbar.show({ message: refused, tone: 'danger', action: { label: t('common.retry'), onPress: () => void send(edits) } });
+        } else {
+          void confirm();
+        }
+      };
+      await send(unassignRoom(devices, room.name));
     },
-    [actions, ask, devices, t],
+    [actions, ask, devices, snackbar, t],
   );
 
   const pondName = settings?.home_name?.trim() || t('profile.yourPond');
@@ -83,7 +87,6 @@ export default function HomeManagementScreen() {
   return (
     <SettingsScroll refreshControl={<RefreshControl {...pull} />}>
       {!unavailable && error ? <SettingsNotice tone="danger">{error}</SettingsNotice> : null}
-      {actionError ? <SettingsNotice tone="danger">{actionError}</SettingsNotice> : null}
 
       {state === 'loading' ? <InkSpinner label={t('pond.checking')} /> : null}
       {/* A list that failed to load is unknown, not empty. */}

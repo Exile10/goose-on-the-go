@@ -18,14 +18,13 @@ import { GKeyboardView } from '@/components/ui/g-keyboard-view';
 import type { ThemeColors } from '@/constants/colors';
 import { Spacing } from '@/constants/spacing';
 import { useThemedStyles } from '@/hooks/use-themed-styles';
-import { wakePhrase } from '@/models/owner-setup';
 import { useWakeWord } from '@/view-models/use-wake-word';
 
 export default function WakeWordScreen() {
   const styles = useThemedStyles(makeStyles);
   const { t } = useTranslation();
   const wake = useWakeWord();
-  const { draft, saved, valid, changed, justSaved } = wake.data;
+  const { draft, saved, valid, changed } = wake.data;
   const state = useContentState({ loading: wake.loading, failed: wake.failed, hasContent: !wake.loading && !wake.failed });
   // Reading the settings again keeps the draft: edits are held apart from what the Pond has.
   const pull = usePullToRefresh(wake.actions.reload);
@@ -57,9 +56,8 @@ export default function WakeWordScreen() {
           showsVerticalScrollIndicator={false}
           refreshControl={<RefreshControl {...pull} />}
         >
-          {saved && !justSaved ? <InkText tone="secondary">{t('setup.wake.current', { phrase: saved })}</InkText> : null}
+          {saved ? <InkText tone="secondary">{t('setup.wake.current', { phrase: saved })}</InkText> : null}
           <WakeStep draft={draft} patch={wake.actions.patch} />
-          {justSaved ? <InkNotice tone="success">{t('setup.wake.saved', { phrase: wakePhrase(draft) })}</InkNotice> : null}
           {wake.error ? <InkNotice tone="danger">{wake.error}</InkNotice> : null}
         </ScrollView>
         <View style={styles.foot}>

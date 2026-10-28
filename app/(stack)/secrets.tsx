@@ -35,7 +35,7 @@ export default function SecretsScreen() {
   const theme = useInkTheme();
   // Not `confirm`: that name is the success haptic here.
   const ask = useConfirm();
-  const { data, loading, saving, deleting, error, formError, notice, failed, actions } = useSecrets();
+  const { data, loading, saving, deleting, error, formError, failed, actions } = useSecrets();
   const pull = usePullToRefresh(actions.refresh);
 
   const busy = saving || deleting !== null;
@@ -81,11 +81,6 @@ export default function SecretsScreen() {
         </InkText>
 
         {loading ? <InkSpinner label={t('secrets.loading')} /> : null}
-
-        {/* Polite, so a save or a deletion is announced as the line appears. */}
-        <View accessibilityLiveRegion="polite">
-          {notice ? <InkNotice tone="success">{notice}</InkNotice> : null}
-        </View>
 
         {unavailable ? (
           <ContentUnavailable state={state} reason={error} onRetry={actions.refresh} />

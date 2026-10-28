@@ -325,8 +325,8 @@ export default function ExtensionsScreen() {
     [actions, form, runInstall],
   );
 
-  // A first read that failed is not an empty Pond. `error` here is a refused install or toggle as
-  // often as a read, so only `failed` decides that the list never arrived.
+  // A first read that failed is not an empty Pond: only `failed` decides that the list never
+  // arrived. `error` with a list on screen is a pull that failed, said above the list.
   const state = useContentState({
     loading,
     failed,

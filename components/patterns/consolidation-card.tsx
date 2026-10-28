@@ -16,14 +16,12 @@ import { Spacing } from '@/constants/spacing';
 
 export interface ConsolidationCardProps {
   progress: ConsolidationProgress;
-  /** Why the last Stop did not reach the Pond, or null. */
-  stopError: string | null;
   available: boolean;
   onStart: () => void;
   onStop: () => void;
 }
 
-export function ConsolidationCard({ progress, stopError, available, onStart, onStop }: ConsolidationCardProps) {
+export function ConsolidationCard({ progress, available, onStart, onStop }: ConsolidationCardProps) {
   const { t } = useTranslation();
   const running = progress.status === 'running';
 
@@ -52,7 +50,6 @@ export function ConsolidationCard({ progress, stopError, available, onStart, onS
         {progress.status === 'failed' ? (
           <InkNotice tone="danger">{progress.message ?? t('memories.consolidate.failed')}</InkNotice>
         ) : null}
-        {stopError ? <InkNotice tone="danger">{stopError}</InkNotice> : null}
         {available ? null : <InkText size="sm" tone="tertiary">{t('memories.consolidate.mock')}</InkText>}
 
         {running ? (

@@ -449,16 +449,61 @@ null for a request that got no answer, so a screen that took "no error text" to
 mean "loaded" drew a failure as an empty list -- which is how Devices said "No
 devices yet" with the Pond down.
 
-**A failed action** -- a save, a delete -- is not a failed screen. It is said
-where the action was taken: inline beside it with `InkNotice`, or in the app's
-own dialog (`useConfirm` / `useInform` in `providers/confirm-provider.tsx`).
-Never `Alert.alert`, which draws the platform's dialog in the platform's
-theme rather than the app's.
+**A failed action** -- a save, a delete -- is not a failed screen. A view-model
+keeps `error` and `failed` for its reads only; what an action came to is said
+as "Feedback for actions" below has it. Never `Alert.alert`, which draws the
+platform's dialog in the platform's theme rather than the app's.
 
 **Technical detail is for the log.** A status code, a route or an exception's
 text never reaches a reader. `describeApiError` turns a failure into words or
 into nothing (when the indicator already covers it), and `logFailure` writes the
 engineer's half: `[scope] what kind=http_500`.
+
+## Feedback for actions
+
+What a tap came to -- saved, started, refused -- is not a fact about the page,
+so it does not become a box in the page that stays there. Four homes, chosen by
+what the sentence is about:
+
+| The sentence is about | Where it goes |
+|---|---|
+| An action the user just took that worked: saved, run started, deleted, download started | The snackbar, neutral |
+| An action the user just took that failed: a switch the Pond refused, a delete, a run | The snackbar, danger, with Try again when sending the same request again is meaningful and cheap |
+| A field, or a form still open | Inline, beside the field or the form's button, so the typed values and the reason stay together |
+| A standing condition: a feature off or unavailable, a setup state, a warning about what an option does, a page that did not load | Inline (`InkNotice`, or `ContentUnavailable` for content) |
+
+The app's own dialog (`useConfirm` / `useInform`) is for a question before an
+action, or a failure the user must read before going on; a screen that chose a
+dialog keeps it.
+
+**The snackbar** is `providers/snackbar-provider.tsx`, mounted once inside
+`InkProvider`. A component asks with `useSnackbar().show(...)`; a view-model or
+a module-level store calls `showSnackbar(...)` from `services/snackbar.ts`
+directly, since a store cannot call a hook.
+
+    show({ message, tone?: 'neutral' | 'danger', action?: { label, onPress } })
+
+It follows Material 3's snackbar and the HIG. One at a time: a new message
+replaces the one showing. It goes by itself after about 4 s (longer for a long
+sentence, by Ink's `readingTime`), at least 8 s when it carries an action, and
+not at all while a screen reader is on and it carries an action. A tap or the
+screen reader's escape puts it away. It is announced once
+(`announceForAccessibility`), sits above the safe area, the tab bar (which
+reports its height with `useSnackbarClearance` while it is in front) and the
+keyboard, and appears without a slide under Reduce Motion. An inverse surface
+for neutral, the danger fill for danger; no border, no icon. The message is
+one short sentence from the catalogue: a status code or a route belongs to
+`logFailure` and `console.warn`, which every failure site still writes.
+
+Try again calls the action as it is now, not the closure the failure was
+caught in: a hook keeps a ref to its current action, set in an effect, and the
+snackbar's `onPress` reads the ref. (A hook cannot name its own `useCallback`
+inside it; the React lint rejects that.)
+
+**One limit:** the snackbar draws under a `Modal`, so anything said while an
+`InkSheet` stays open stays in the sheet (the face sheet's samples, the event
+sheet's "automation added"). A sheet that closes on success can use the
+snackbar, because the sheet is gone by the time it shows.
 
 ## Shared surfaces
 

@@ -17,6 +17,7 @@ import { AppState } from 'react-native';
 import { useServer } from '@/providers/server-provider';
 import { ApiError, api } from '@/services/api-client';
 import i18n from '@/services/i18n';
+import { showSnackbar } from '@/services/snackbar';
 import type { CreateScheduleRequest, Schedule } from '@/services/types';
 import { SAMPLE_SCHEDULES, isRule, timedSchedules } from '@/models/schedule';
 import { describeApiError } from './describe-error';
@@ -41,6 +42,10 @@ export interface UseSchedules {
     live: 'stream' | 'poll';
   };
   loading: boolean;
+  /**
+   * Why the last read failed. A refused pause, resume or run is said in the snackbar, with Try
+   * again, since it is about the card just touched rather than the list.
+   */
   error: string | null;
   /**
    * A load failed and nothing has loaded from this source yet, so the list is
@@ -232,6 +237,12 @@ export function useSchedules(): UseSchedules {
     [real],
   );
 
+  // What the snackbar's Try again calls: the current pause and run, set below once made.
+  const retry = useRef<{
+    setPaused: (schedule: Schedule, paused: boolean) => Promise<void>;
+    runNow: (schedule: Schedule) => Promise<void>;
+  }>({ setPaused: async () => {}, runNow: async () => {} });
+
   /** Optimistic, and put back if the Pond refuses: a switch that lies is worse than a slow one. */
   const setPaused = useCallback(
     async (schedule: Schedule, paused: boolean) => {
@@ -243,7 +254,12 @@ export function useSchedules(): UseSchedules {
       } catch (e) {
         changes.current += 1;
         setAll((current) => current.map((s) => (s.id === schedule.id ? { ...s, paused: schedule.paused } : s)));
-        setError(describeScheduleError(e));
+        console.warn('[schedules] pause refused', e instanceof ApiError ? e.status : 'network');
+        showSnackbar({
+          message: describeScheduleError(e) ?? i18n.t('schedule.errors.saveFailed'),
+          tone: 'danger',
+          action: { label: i18n.t('common.retry'), onPress: () => void retry.current.setPaused(schedule, paused) },
+        });
       }
     },
     [real],
@@ -259,7 +275,6 @@ export function useSchedules(): UseSchedules {
     async (schedule: Schedule) => {
       if (!real || starting.current.has(schedule.id)) return;
       starting.current.add(schedule.id);
-      setError(null);
       // A poll that began before the tap would read it as idle and put the card
       // back, and so would one that began before the Pond took the request.
       changes.current += 1;
@@ -272,13 +287,21 @@ export function useSchedules(): UseSchedules {
         setAll((current) =>
           current.map((s) => (s.id === schedule.id ? { ...s, currently_running: schedule.currently_running } : s)),
         );
-        setError(describeScheduleError(e));
+        console.warn('[schedules] run now refused', e instanceof ApiError ? e.status : 'network');
+        showSnackbar({
+          message: describeScheduleError(e) ?? i18n.t('schedule.errors.saveFailed'),
+          tone: 'danger',
+          action: { label: i18n.t('common.retry'), onPress: () => void retry.current.runNow(schedule) },
+        });
       } finally {
         starting.current.delete(schedule.id);
       }
     },
     [real],
   );
+  useEffect(() => {
+    retry.current = { setPaused, runNow };
+  }, [setPaused, runNow]);
 
   return {
     data: { schedules: timedSchedules(all), live },

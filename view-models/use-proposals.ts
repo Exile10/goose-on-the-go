@@ -15,11 +15,12 @@
  */
 
 import { bytesToHex } from '@noble/hashes/utils.js';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { useServer } from '@/providers/server-provider';
 import { ApiError, ONBOARDING_REQUIRED, api } from '@/services/api-client';
 import i18n from '@/services/i18n';
+import { showSnackbar } from '@/services/snackbar';
 import { randomBytes } from '@/services/secure-random';
 import type { Proposal, ProposalDecision } from '@/services/types';
 import { describeApiError } from './describe-error';
@@ -77,8 +78,6 @@ export interface UseProposals {
   failed: boolean;
   /** The id a decision is in flight for. */
   deciding: string | null;
-  /** What the last decision came to: a confirmation or a refusal, for the screen to show. */
-  outcome: { tone: 'success' | 'danger'; text: string } | null;
   actions: {
     refresh: () => Promise<void>;
     decide: (id: string, decision: ProposalDecision) => Promise<void>;
@@ -93,7 +92,6 @@ export function useProposals(): UseProposals {
   const [error, setError] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
   const [deciding, setDeciding] = useState<string | null>(null);
-  const [outcome, setOutcome] = useState<UseProposals['outcome']>(null);
 
   // Whether a read has ever succeeded. After one, a failed poll keeps what is on screen.
   const loaded = useRef(false);
@@ -124,20 +122,24 @@ export function useProposals(): UseProposals {
   useLive(() => load(false), PROPOSALS_MS, hydrated);
   const refresh = useCallback(() => load(true), [load]);
 
+  // What Try again calls: the current `decide`, set below once it is made.
+  const retry = useRef<(id: string, decision: ProposalDecision) => Promise<void>>(async () => {});
+
   const decide = useCallback(
     async (id: string, decision: ProposalDecision) => {
       setDeciding(id);
-      setOutcome(null);
       try {
         await api.decideProposal(id, session, decision);
         console.info('[proposals] decided', id, decision);
-        setOutcome({
-          tone: 'success',
-          text: decision === 'approve' ? i18n.t('proposals.accepted') : i18n.t('proposals.declined'),
-        });
+        showSnackbar({ message: decision === 'approve' ? i18n.t('proposals.accepted') : i18n.t('proposals.declined') });
       } catch (e) {
         console.warn('[proposals] decision failed', decision, e instanceof ApiError ? e.status : 'network');
-        setOutcome({ tone: 'danger', text: decisionFailure(e) });
+        showSnackbar({
+          message: decisionFailure(e),
+          tone: 'danger',
+          // Gone and already-decided stay that way however often it is sent; anything else may not.
+          action: retriable(e) ? { label: i18n.t('common.retry'), onPress: () => void retry.current(id, decision) } : undefined,
+        });
       } finally {
         setDeciding(null);
       }
@@ -146,9 +148,17 @@ export function useProposals(): UseProposals {
     [load, session],
   );
 
+  useEffect(() => {
+    retry.current = decide;
+  }, [decide]);
+
   const rows = proposals.map((p) => toProposalRow(p, i18n.language));
 
-  return { data: { rows }, loading, error, failed, deciding, outcome, actions: { refresh, decide } };
+  return { data: { rows }, loading, error, failed, deciding, actions: { refresh, decide } };
+}
+
+function retriable(e: unknown): boolean {
+  return !(e instanceof ApiError && (e.status === 404 || e.status === 409));
 }
 
 /** A decision always says something when it fails; the list refresh then shows what is left. */

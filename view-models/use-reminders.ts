@@ -8,11 +8,12 @@
  * may have turned it into a proposal).
  */
 
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { useServer } from '@/providers/server-provider';
 import { ApiError, api } from '@/services/api-client';
 import i18n from '@/services/i18n';
+import { showSnackbar } from '@/services/snackbar';
 import type { Reminder } from '@/services/types';
 import { describeApiError } from './describe-error';
 import { relativeWhen } from './use-chat-history';
@@ -50,10 +51,8 @@ export interface UseReminders {
   error: string | null;
   /** The first read failed and nothing has loaded, so an empty list says nothing. */
   failed: boolean;
-  /** The id a dismissal is in flight for, so its button can show it. */
+  /** The id a dismissal is in flight for, so its button can show it. A refusal is a snackbar. */
   dismissing: string | null;
-  /** What the last dismissal came to, when it did not simply succeed. */
-  actionError: string | null;
   actions: {
     refresh: () => Promise<void>;
     dismiss: (id: string) => Promise<void>;
@@ -67,7 +66,8 @@ export function useReminders(): UseReminders {
   const [error, setError] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
   const [dismissing, setDismissing] = useState<string | null>(null);
-  const [actionError, setActionError] = useState<string | null>(null);
+  // What the snackbar's Try again calls: the current `dismiss`, set below once it is made.
+  const retry = useRef<(id: string) => Promise<void>>(async () => {});
 
   // Whether a read has ever succeeded. After one, a failed poll keeps what is on screen.
   const loaded = useRef(false);
@@ -98,19 +98,23 @@ export function useReminders(): UseReminders {
   const dismiss = useCallback(
     async (id: string) => {
       setDismissing(id);
-      setActionError(null);
       try {
         await api.dismissReminder(id);
         console.info('[reminders] dismissed', id);
       } catch (e) {
         console.warn('[reminders] dismiss failed', e instanceof ApiError ? e.status : 'network');
         // A 404 is the Pond saying nothing is waiting under that id for this phone: it went
-        // another way first. The refresh below takes it off; the sentence says why it vanished.
-        setActionError(
-          e instanceof ApiError && e.status === 404
-            ? i18n.t('reminders.errors.gone')
-            : describeApiError(e) ?? i18n.t('reminders.errors.dismissFailed'),
-        );
+        // another way first. The refresh below takes it off; the sentence says why it vanished,
+        // and there is nothing to try again.
+        if (e instanceof ApiError && e.status === 404) {
+          showSnackbar({ message: i18n.t('reminders.errors.gone') });
+        } else {
+          showSnackbar({
+            message: describeApiError(e) ?? i18n.t('reminders.errors.dismissFailed'),
+            tone: 'danger',
+            action: { label: i18n.t('common.retry'), onPress: () => void retry.current(id) },
+          });
+        }
       } finally {
         setDismissing(null);
       }
@@ -118,9 +122,12 @@ export function useReminders(): UseReminders {
     },
     [load],
   );
+  useEffect(() => {
+    retry.current = dismiss;
+  }, [dismiss]);
 
   const now = new Date();
   const rows = reminders.map((r) => toReminderRow(r, now, i18n.language));
 
-  return { data: { rows }, loading, error, failed, dismissing, actionError, actions: { refresh, dismiss } };
+  return { data: { rows }, loading, error, failed, dismissing, actions: { refresh, dismiss } };
 }

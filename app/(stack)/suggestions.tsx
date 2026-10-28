@@ -23,7 +23,7 @@ import { Spacing } from '@/constants/spacing';
 export default function SuggestionsScreen() {
   const { t } = useTranslation();
   const styles = useThemedStyles(makeStyles);
-  const { data, loading, error, failed, deciding, outcome, actions } = useProposals();
+  const { data, loading, error, failed, deciding, actions } = useProposals();
   // A refused refresh with the list still on screen is said above it; a list that never arrived is
   // said once, in its place.
   const state = useContentState({ loading, failed: failed || error !== null, hasContent: data.rows.length > 0 });
@@ -40,8 +40,6 @@ export default function SuggestionsScreen() {
       <InkText size="sm" tone="secondary">{t('proposals.intro')}</InkText>
 
       {loading ? <InkSpinner label={t('proposals.list.loading')} /> : null}
-
-      {outcome ? <InkNotice tone={outcome.tone}>{outcome.text}</InkNotice> : null}
 
       {unavailable ? (
         <ContentUnavailable state={state} reason={error} onRetry={actions.refresh} />

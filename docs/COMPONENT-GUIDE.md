@@ -136,6 +136,18 @@ response ink's own controls already have.
 6. **Add navigation entry** in `constants/navigation.ts` if it should appear in the Profile hub,
    with `labelKey` a `TranslationKey`. See [NAVIGATION.md](./NAVIGATION.md#every-route-has-to-lead-somewhere).
 
+## Feedback for actions
+
+What a tap came to goes in the snackbar, not in a notice that stays on the
+page: `useSnackbar().show({ message, tone, action })` from
+`providers/snackbar-provider.tsx` in a component, `showSnackbar` from
+`services/snackbar.ts` in a view-model or store. Confirmations are neutral;
+failures are danger, with a Try again action when sending the request again
+is cheap. A field's error, a form still open, and a standing condition stay
+inline with `InkNotice`; content that did not load is `ContentUnavailable`. The
+full rule, and the snackbar's timing, placement and accessibility, are in
+"Feedback for actions" in [VIEW-LAYER.md](./VIEW-LAYER.md).
+
 ## Existing Components
 
 ### Primitives (@jarida/ink/native)
@@ -150,7 +162,7 @@ See ink's own docs for full prop lists; these are the ones the app leans on.
 | InkRow, InkGroup | Settings-style rows and the group that titles them (the Profile hub) |
 | InkChoice, InkSegmented | Filters and segmented choices |
 | InkSwitch | Toggle switch |
-| InkNotice, InkEmptyState, InkSpinner, InkSkeleton | Status, empty and loading states |
+| InkNotice, InkEmptyState, InkSpinner, InkSkeleton | Standing conditions, field and form errors, empty and loading states. Not for what an action came to: that is the snackbar |
 | InkBadge, InkBubble | Badges; chat bubbles |
 | InkIcon | Ink's icon slot, resolving from the same registry as `GIcon` |
 | InkBottomBar, InkNavbar | The tab bar and screen title bars |

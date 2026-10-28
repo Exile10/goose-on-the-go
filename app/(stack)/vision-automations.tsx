@@ -12,7 +12,7 @@ import React, { useCallback, useState } from 'react';
 import { RefreshControl, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { InkButton, InkEmptyState, InkNotice, InkSpinner, InkText } from '@jarida/ink/native';
+import { InkButton, InkEmptyState, InkSpinner, InkText } from '@jarida/ink/native';
 
 import { ContentUnavailable } from '@/components/patterns/content-unavailable';
 import { isUnavailable } from '@/models/content-state';
@@ -49,7 +49,7 @@ export default function VisionAutomationsScreen() {
   const { t } = useTranslation();
   const router = useRouter();
   const styles = useSettingsStyles(makeStyles);
-  const { data, loading, error, failed, adding, addError, actions } = useVisionAutomations();
+  const { data, loading, error, failed, adding, actions } = useVisionAutomations();
   const state = useContentState({ loading, failed: failed || error !== null, hasContent: data.rules.length > 0 });
   const unavailable = isUnavailable(state);
   const pull = usePullToRefresh(actions.refresh);
@@ -89,12 +89,6 @@ export default function VisionAutomationsScreen() {
           {t('visionAutomations.new')}
         </InkButton>
       </View>
-
-      {addError ? (
-        <View style={styles.block}>
-          <InkNotice tone="danger">{addError}</InkNotice>
-        </View>
-      ) : null}
 
       {data.starters.length > 0 || blockedNote ? (
         <SettingsGroup title={t('visionAutomations.startersTitle')} footer={blockedNote}>
@@ -166,7 +160,6 @@ export default function VisionAutomationsScreen() {
 
 const makeStyles = (_c: unknown, type: SettingsType) => ({
   actions: { flexDirection: 'row' as const, justifyContent: 'flex-start' as const, marginBottom: Spacing.xl },
-  block: { gap: Spacing.sm, marginBottom: Spacing.xl },
   list: { gap: Spacing.md },
   footer: { gap: Spacing.xs, alignItems: 'flex-start' as const, marginTop: Spacing.sm },
   title: type.eyebrow,

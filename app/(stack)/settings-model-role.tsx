@@ -10,7 +10,7 @@ import { useTranslation } from 'react-i18next';
 
 import { RadioRow } from '@/components/settings/setting-controls';
 import { SettingsGroup, SettingsHeader, SettingsRow, TILE_INSET } from '@/components/settings/settings-list';
-import { SettingsNotice, SettingsScroll } from '@/components/settings/settings-scroll';
+import { SettingsScroll } from '@/components/settings/settings-scroll';
 import { candidatesFor, formatMegabytes, MODEL_ROLES, titleOf } from '@/models/model-library';
 import { selectionTick } from '@/services/haptics';
 import type { ModelRole } from '@/services/types';
@@ -29,7 +29,6 @@ export default function ModelRoleScreen() {
   return (
     <SettingsScroll refreshControl={<RefreshControl {...pull} />}>
       <SettingsHeader icon="models" tile="purple" title={t(roleLabelKey(role))} description={t(roleAboutKey(role))} />
-      {lib.notice ? <SettingsNotice tone={lib.notice.tone === 'danger' ? 'danger' : 'neutral'}>{lib.notice.text}</SettingsNotice> : null}
       <SettingsGroup>
         {candidates.length === 0 ? <SettingsRow label={t('models.library.noCandidates')} /> : null}
         {candidates.map((m) => (

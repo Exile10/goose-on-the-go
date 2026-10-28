@@ -13,6 +13,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useServer } from '@/providers/server-provider';
 import { ApiError, ONBOARDING_REQUIRED, api } from '@/services/api-client';
 import i18n from '@/services/i18n';
+import { showSnackbar } from '@/services/snackbar';
 import type { MemoryFragment, SaveMemoryRequest } from '@/services/types';
 import { SAMPLE_MEMORIES, unkeptTier } from '@/models/memory';
 import { describeApiError } from './describe-error';
@@ -24,6 +25,7 @@ export const MEMORIES_MS = 60_000;
 export interface UseMemories {
   data: { memories: MemoryFragment[] };
   loading: boolean;
+  /** Why the last read failed. A refused forget is said in the snackbar, with Try again. */
   error: string | null;
   /** A load failed and nothing has loaded yet: unknown, not empty. See useSchedules. */
   failed: boolean;
@@ -171,6 +173,9 @@ export function useMemories(): UseMemories {
     [real, reread],
   );
 
+  // What the snackbar's Try again calls: the current `remove`, set below once it is made.
+  const retryRemove = useRef<(memory: MemoryFragment) => Promise<void>>(async () => {});
+
   const remove = useCallback(
     async (memory: MemoryFragment) => {
       changes.current += 1;
@@ -182,11 +187,19 @@ export function useMemories(): UseMemories {
       } catch (e) {
         changes.current += 1;
         setMemories((current) => [memory, ...current.filter((m) => m.id !== memory.id)]);
-        setError(describeMemoryError(e) ?? i18n.t('memories.errors.deleteFailed'));
+        console.warn('[memories] forget refused', e instanceof ApiError ? e.status : 'network');
+        showSnackbar({
+          message: describeMemoryError(e) ?? i18n.t('memories.errors.deleteFailed'),
+          tone: 'danger',
+          action: { label: i18n.t('common.retry'), onPress: () => void retryRemove.current(memory) },
+        });
       }
     },
     [real, reread],
   );
+  useEffect(() => {
+    retryRemove.current = remove;
+  }, [remove]);
 
   return { data: { memories }, loading, error, failed, actions: { refresh, save, reword, setKept, remove } };
 }

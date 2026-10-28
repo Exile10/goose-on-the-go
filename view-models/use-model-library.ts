@@ -9,6 +9,7 @@ import { useServer } from '@/providers/server-provider';
 import { ApiError, api } from '@/services/api-client';
 import { confirm, reject } from '@/services/haptics';
 import i18n from '@/services/i18n';
+import { showSnackbar } from '@/services/snackbar';
 import type {
   DiskUsage,
   DownloadAction,
@@ -39,7 +40,6 @@ interface Library {
   memory: ModelMemoryStatus | null;
   /** The model a change is being made to, so its row can say so. */
   busy: string | null;
-  notice: { tone: 'neutral' | 'danger'; text: string } | null;
 }
 
 const EMPTY: Library = {
@@ -51,7 +51,6 @@ const EMPTY: Library = {
   disk: null,
   memory: null,
   busy: null,
-  notice: null,
 };
 
 let library: Library = EMPTY;
@@ -104,12 +103,25 @@ function failure(e: unknown, fallback: string): string {
   return describeApiError(e) ?? fallback;
 }
 
+/**
+ * Say that a change did not take, at the foot of the screen, with Try again when trying again is
+ * the same request. Every Models page and the setup step share this store, so the message has to
+ * live outside any one of them; the engineer's half goes to the log.
+ */
+function refused(scope: string, e: unknown, text: string, retry?: () => void): void {
+  logFailure('models', `${scope} failed`, e);
+  showSnackbar({
+    message: text,
+    tone: 'danger',
+    action: retry ? { label: i18n.t('common.retry'), onPress: retry } : undefined,
+  });
+}
+
 async function activate(model: ModelEntry): Promise<boolean> {
   const role = roleOf(model);
   const previous = library.models;
   set({
     busy: model.id,
-    notice: null,
     models: previous.map((m) => (roleOf(m) === role ? { ...m, active: m.id === model.id } : m)),
   });
   try {
@@ -120,32 +132,35 @@ async function activate(model: ModelEntry): Promise<boolean> {
     return true;
   } catch (e) {
     void reject();
-    set({ busy: null, models: previous, notice: { tone: 'danger', text: failure(e, i18n.t('models.library.useFailed')) } });
+    set({ busy: null, models: previous });
+    refused('activate', e, failure(e, i18n.t('models.library.useFailed')), () => void activate(model));
     return false;
   }
 }
 
 async function download(model: ModelEntry, pictures: boolean): Promise<void> {
-  set({ busy: model.id, notice: null });
+  set({ busy: model.id });
   try {
     await api.downloadModel(routeCategory(model), model.name, pictures);
     set({ busy: null });
     await loadDownloads();
   } catch (e) {
     void reject();
-    set({ busy: null, notice: { tone: 'danger', text: failure(e, i18n.t('models.library.downloadFailed')) } });
+    set({ busy: null });
+    refused('download', e, failure(e, i18n.t('models.library.downloadFailed')), () => void download(model, pictures));
   }
 }
 
 async function addPictures(model: ModelEntry): Promise<void> {
-  set({ busy: model.id, notice: null });
+  set({ busy: model.id });
   try {
     await api.addPictureSupport(routeCategory(model), model.name);
     set({ busy: null });
     await loadDownloads();
   } catch (e) {
     void reject();
-    set({ busy: null, notice: { tone: 'danger', text: failure(e, i18n.t('models.library.downloadFailed')) } });
+    set({ busy: null });
+    refused('add_pictures', e, failure(e, i18n.t('models.library.downloadFailed')), () => void addPictures(model));
   }
 }
 
@@ -155,12 +170,12 @@ async function control(modelId: string, action: DownloadAction): Promise<void> {
     await loadDownloads();
   } catch (e) {
     void reject();
-    set({ notice: { tone: 'danger', text: failure(e, i18n.t('models.library.controlFailed')) } });
+    refused(`download_${action}`, e, failure(e, i18n.t('models.library.controlFailed')), () => void control(modelId, action));
   }
 }
 
 async function remove(model: ModelEntry): Promise<boolean> {
-  set({ busy: model.id, notice: null });
+  set({ busy: model.id });
   try {
     await api.deleteModel(routeCategory(model), model.name);
     void confirm();
@@ -169,21 +184,22 @@ async function remove(model: ModelEntry): Promise<boolean> {
     return true;
   } catch (e) {
     void reject();
-    const text = e instanceof ApiError && e.status === 409 ? i18n.t('models.library.inUse') : failure(e, i18n.t('models.library.deleteFailed'));
-    set({ busy: null, notice: { tone: 'danger', text } });
+    set({ busy: null });
+    // A model in use stays in use however often the same request is sent, so that one has no Try again.
+    if (e instanceof ApiError && e.status === 409) refused('delete', e, i18n.t('models.library.inUse'));
+    else refused('delete', e, failure(e, i18n.t('models.library.deleteFailed')), () => void remove(model));
     return false;
   }
 }
 
 async function downloadFile(file: HfModelFile, pictures: boolean): Promise<boolean> {
-  set({ notice: null });
   try {
     await api.downloadModelFile(file, pictures);
     await loadDownloads();
     return true;
   } catch (e) {
     void reject();
-    set({ notice: { tone: 'danger', text: failure(e, i18n.t('models.library.downloadFailed')) } });
+    refused('download_file', e, failure(e, i18n.t('models.library.downloadFailed')), () => void downloadFile(file, pictures));
     return false;
   }
 }
@@ -197,7 +213,6 @@ export interface UseModelLibrary extends Library {
     control: (modelId: string, action: DownloadAction) => Promise<void>;
     remove: (model: ModelEntry) => Promise<boolean>;
     downloadFile: (file: HfModelFile, pictures: boolean) => Promise<boolean>;
-    dismissNotice: () => void;
   };
 }
 
@@ -209,7 +224,6 @@ const ACTIONS: UseModelLibrary['actions'] = {
   control,
   remove,
   downloadFile,
-  dismissNotice: () => set({ notice: null }),
 };
 
 export function useModelLibrary(): UseModelLibrary {

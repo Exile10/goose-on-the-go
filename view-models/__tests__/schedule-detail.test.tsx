@@ -9,6 +9,7 @@ import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 
 import { ApiError, api } from '@/services/api-client';
 import i18n from '@/services/i18n';
+import { currentSnackbar, resetSnackbar } from '@/services/snackbar';
 import type { Schedule, ScheduleRun } from '@/services/types';
 import { useScheduleDetail, type UseScheduleDetail } from '@/view-models/use-schedule-detail';
 
@@ -104,6 +105,7 @@ beforeAll(() => {
 
 beforeEach(() => {
   jest.resetAllMocks();
+  resetSnackbar();
   server.hydrated = true;
   server.real = true;
   poll = null;
@@ -173,7 +175,7 @@ describe('editing it', () => {
     expect(pond.updateSchedule).toHaveBeenCalledWith('daily-brief', { name: 'Morning Brief' });
     expect(refused).toBeNull();
     expect(m.vm.schedule).toEqual(saved);
-    expect(m.vm.notice).toBe('saved');
+    expect(currentSnackbar()).toMatchObject({ message: i18n.t('schedule.detail.saved'), tone: 'neutral' });
   });
 
   it('sends nothing for an edit that changed nothing', async () => {
@@ -194,7 +196,8 @@ describe('editing it', () => {
     });
     expect(refused).toBe('invalid cron expression');
     expect(m.vm.schedule).toEqual(BRIEF);
-    expect(m.vm.notice).toBeNull();
+    // The form says it, beside the fields it is about; the snackbar does not say it again.
+    expect(currentSnackbar()).toBeNull();
   });
 
   it('still says something when the refusal has no sentence of its own', async () => {
@@ -217,7 +220,39 @@ describe('the other actions', () => {
     });
     expect(pond.pauseSchedule).toHaveBeenCalledWith('daily-brief');
     expect(m.vm.schedule?.paused).toBe(false);
-    expect(m.vm.error).toBe(i18n.t('schedule.errors.gone'));
+    // A refused change is not a failed page: the schedule stays, and the refusal is a snackbar.
+    expect(m.vm.error).toBeNull();
+    expect(currentSnackbar()).toMatchObject({ message: i18n.t('schedule.errors.gone'), tone: 'danger' });
+  });
+
+  it('tries the pause again from the snackbar', async () => {
+    pond.pauseSchedule.mockRejectedValueOnce(new ApiError('x', 503, null)).mockResolvedValueOnce();
+    const m = await mount();
+    await act(async () => {
+      await m.vm.actions.setPaused(true);
+    });
+    expect(m.vm.schedule?.paused).toBe(false);
+    pond.listSchedules.mockResolvedValue([{ ...BRIEF, paused: true }]);
+    await act(async () => {
+      currentSnackbar()?.action?.onPress();
+    });
+    expect(pond.pauseSchedule).toHaveBeenCalledTimes(2);
+    expect(m.vm.schedule?.paused).toBe(true);
+  });
+
+  it('says so, with Try again, when the Pond refuses a run', async () => {
+    pond.runScheduleNow.mockRejectedValue(new ApiError('x', 500, null));
+    const m = await mount();
+    await act(async () => {
+      await m.vm.actions.runNow();
+    });
+    expect(m.vm.schedule?.currently_running).toBe(false);
+    expect(currentSnackbar()).toMatchObject({ message: i18n.t('errors.busy'), tone: 'danger' });
+    expect(currentSnackbar()?.action?.label).toBe(i18n.t('common.retry'));
+    await act(async () => {
+      currentSnackbar()?.action?.onPress();
+    });
+    expect(pond.runScheduleNow).toHaveBeenCalledTimes(2);
   });
 
   it('runs it now, once per tap that the Pond has answered', async () => {
@@ -228,7 +263,7 @@ describe('the other actions', () => {
     });
     expect(pond.runScheduleNow).toHaveBeenCalledTimes(1);
     expect(m.vm.schedule?.currently_running).toBe(true);
-    expect(m.vm.notice).toBe('runStarted');
+    expect(currentSnackbar()).toMatchObject({ message: i18n.t('schedule.detail.runStarted'), tone: 'neutral' });
   });
 
   it('deletes it', async () => {
@@ -252,7 +287,8 @@ describe('the other actions', () => {
     });
     expect(gone).toBe(false);
     expect(m.vm.schedule).toEqual(BRIEF);
-    expect(m.vm.error).toBe(i18n.t('errors.busy'));
+    expect(m.vm.error).toBeNull();
+    expect(currentSnackbar()).toMatchObject({ message: i18n.t('errors.busy'), tone: 'danger' });
   });
 });
 

@@ -7,6 +7,7 @@ import React from 'react';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 
 import { ApiError, api } from '@/services/api-client';
+import { currentSnackbar, resetSnackbar } from '@/services/snackbar';
 import type { Proposal } from '@/services/types';
 import { describeProposalError, toProposalRow, useProposals, type UseProposals } from '@/view-models/use-proposals';
 
@@ -76,6 +77,7 @@ beforeAll(() => {
 });
 
 beforeEach(() => {
+  resetSnackbar();
   jest.resetAllMocks();
   jest.spyOn(console, 'warn').mockImplementation(() => {});
   jest.spyOn(console, 'info').mockImplementation(() => {});
@@ -155,7 +157,7 @@ describe('deciding', () => {
     await act(async () => m.vm.actions.decide('p1', 'approve'));
 
     expect(pond.decideProposal).toHaveBeenCalledWith('p1', label, 'approve');
-    expect(m.vm.outcome).toEqual({ tone: 'success', text: 'Accepted. The Pond has noted it; nothing was run.' });
+    expect(currentSnackbar()).toMatchObject({ tone: 'neutral', message: 'Accepted. The Pond has noted it; nothing was run.' });
     expect(pond.listProposals).toHaveBeenCalledTimes(2);
     expect(m.vm.data.rows).toEqual([]);
     expect(m.vm.deciding).toBeNull();
@@ -169,23 +171,24 @@ describe('deciding', () => {
     await act(async () => m.vm.actions.decide('p1', 'reject'));
 
     expect(pond.decideProposal).toHaveBeenCalledWith('p1', expect.any(String), 'reject');
-    expect(m.vm.outcome?.tone).toBe('success');
+    expect(currentSnackbar()?.tone).toBe('neutral');
     await m.unmount();
   });
 
-  it.each<[number, RegExp]>([
-    [404, /expired or was already decided/],
-    [409, /would not record that decision/],
-    [403, /cannot tell which household member/],
-  ])('reports a %i visibly and still refreshes', async (status, sentence) => {
+  it.each<[number, RegExp, boolean]>([
+    [404, /expired or was already decided/, false],
+    [409, /would not record that decision/, false],
+    [403, /cannot tell which household member/, true],
+  ])('reports a %i visibly and still refreshes', async (status, sentence, retriable) => {
     pond.listProposals.mockResolvedValue([proposal()]);
     pond.decideProposal.mockRejectedValue(new ApiError(`POST → ${status}`, status, null));
     const m = await mount();
 
     await act(async () => m.vm.actions.decide('p1', 'approve'));
 
-    expect(m.vm.outcome?.tone).toBe('danger');
-    expect(m.vm.outcome?.text).toMatch(sentence);
+    expect(currentSnackbar()?.tone).toBe('danger');
+    expect(currentSnackbar()?.message).toMatch(sentence);
+    expect(currentSnackbar()?.action !== undefined).toBe(retriable);
     expect(pond.listProposals).toHaveBeenCalledTimes(2);
     await m.unmount();
   });
@@ -197,7 +200,9 @@ describe('deciding', () => {
 
     await act(async () => m.vm.actions.decide('p1', 'reject'));
 
-    expect(m.vm.outcome).toEqual({ tone: 'danger', text: 'Could not save that decision. Try again.' });
+    expect(currentSnackbar()).toMatchObject({ tone: 'danger', message: 'Could not save that decision.' });
+    await act(async () => currentSnackbar()?.action?.onPress());
+    expect(pond.decideProposal).toHaveBeenCalledTimes(2);
     await m.unmount();
   });
 });

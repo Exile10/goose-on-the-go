@@ -10,7 +10,7 @@ import { useTranslation } from 'react-i18next';
 
 import { askToDownload, DownloadRow } from '@/components/settings/model-rows';
 import { SettingsGroup, SettingsHeader, SettingsMessage, SettingsRow } from '@/components/settings/settings-list';
-import { SettingsNotice, SettingsScroll } from '@/components/settings/settings-scroll';
+import { SettingsScroll } from '@/components/settings/settings-scroll';
 import {
   downloadsByModel,
   formatBytes,
@@ -78,7 +78,6 @@ export default function ModelScreen() {
   return (
     <SettingsScroll refreshControl={<RefreshControl {...pull} />}>
       <SettingsHeader icon="models" tile="purple" title={titleOf(model)} description={model.recommended?.reason || model.description || job} />
-      {lib.notice ? <SettingsNotice tone={lib.notice.tone === 'danger' ? 'danger' : 'neutral'}>{lib.notice.text}</SettingsNotice> : null}
 
       {download ? (
         <SettingsGroup title={t('models.library.section.downloading')}>

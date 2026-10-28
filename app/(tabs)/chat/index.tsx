@@ -32,7 +32,6 @@ import { useTranslation } from 'react-i18next';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   InkEmptyState,
-  InkNotice,
   InkText,
   InkTitle,
   useReduceMotion,
@@ -279,9 +278,6 @@ export default function ConversationsScreen() {
           </InkText>
         ) : null}
       </View>
-      {/* A refused delete, said where it happened. A list that did not load is said once, in
-          place of the wall, and an unreachable Pond once, by the connection indicator. */}
-      {!unavailable && history.error ? <InkNotice tone="danger">{history.error}</InkNotice> : null}
     </View>
   );
 

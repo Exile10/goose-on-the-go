@@ -15,6 +15,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useServer } from '@/providers/server-provider';
 import { ApiError, api } from '@/services/api-client';
 import i18n from '@/services/i18n';
+import { showSnackbar } from '@/services/snackbar';
 import type { Rule, RuleRequest } from '@/services/types';
 import { SAMPLE_RULES } from '@/models/schedule';
 import { describeScheduleError } from './use-schedules';
@@ -26,6 +27,7 @@ export const RULES_MS = 30_000;
 export interface UseRules {
   data: { rules: Rule[] };
   loading: boolean;
+  /** Why the last read failed. A refused pause or resume is said in the snackbar, with Try again. */
   error: string | null;
   /** A load failed and nothing has loaded yet: unknown, not empty. See useSchedules. */
   failed: boolean;
@@ -182,6 +184,9 @@ export function useRules(): UseRules {
     [real],
   );
 
+  // What the snackbar's Try again calls: the current `setPaused`, set below once it is made.
+  const retryPause = useRef<(rule: Rule, paused: boolean) => Promise<void>>(async () => {});
+
   const setPaused = useCallback(
     async (rule: Rule, paused: boolean) => {
       changes.current += 1;
@@ -192,11 +197,20 @@ export function useRules(): UseRules {
       } catch (e) {
         changes.current += 1;
         setRules((current) => current.map((r) => (r.id === rule.id ? { ...r, paused: rule.paused } : r)));
-        setError(describeScheduleError(e));
+        console.warn('[rules] pause refused', e instanceof ApiError ? e.status : 'network');
+        // The switch has gone back; say why rather than let it look like a missed tap.
+        showSnackbar({
+          message: describeScheduleError(e) ?? i18n.t('schedule.errors.saveFailed'),
+          tone: 'danger',
+          action: { label: i18n.t('common.retry'), onPress: () => void retryPause.current(rule, paused) },
+        });
       }
     },
     [real],
   );
+  useEffect(() => {
+    retryPause.current = setPaused;
+  }, [setPaused]);
 
   return { data: { rules }, loading, error, failed, actions: { refresh, create, update, remove, setPaused } };
 }

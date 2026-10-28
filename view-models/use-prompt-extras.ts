@@ -15,6 +15,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useServer } from '@/providers/server-provider';
 import { ApiError, api } from '@/services/api-client';
 import i18n from '@/services/i18n';
+import { showSnackbar } from '@/services/snackbar';
 import type { PromptExtra } from '@/services/types';
 import { SAMPLE_PROMPT_EXTRAS, inPondOrder, newNote, problemKey } from '@/models/prompt-extras';
 import { describeApiError } from './describe-error';
@@ -26,7 +27,7 @@ export const PROMPT_EXTRAS_MS = 60_000;
 export interface UsePromptExtras {
   data: { extras: PromptExtra[] };
   loading: boolean;
-  /** Why the last read, switch or removal failed, for the screen to show. */
+  /** Why the last read failed, for the screen to show. A refused switch or removal is a snackbar. */
   error: string | null;
   /** A load failed and nothing has loaded yet: unknown, not empty. See useSchedules. */
   failed: boolean;
@@ -36,9 +37,9 @@ export interface UsePromptExtras {
     add: (name: string, text: string) => Promise<string | null>;
     /** Resolves to why the new words were not saved, or null once the Pond has them. */
     edit: (extra: PromptExtra, text: string) => Promise<string | null>;
-    /** A refusal leaves the note as it was and says why in `error`. */
+    /** A refusal leaves the note as it was and says why in the snackbar, with Try again. */
     setActive: (extra: PromptExtra, active: boolean) => Promise<void>;
-    /** A refusal puts the note back and says why in `error`. */
+    /** A refusal puts the note back and says why in the snackbar, with Try again. */
     remove: (extra: PromptExtra) => Promise<void>;
   };
 }
@@ -142,18 +143,29 @@ export function usePromptExtras(): UsePromptExtras {
     [put],
   );
 
+  // What the snackbar's Try again calls: the current switch and removal, set below once made.
+  const retry = useRef<Pick<UsePromptExtras['actions'], 'setActive' | 'remove'>>({
+    setActive: async () => {},
+    remove: async () => {},
+  });
+
   const setActive = useCallback(
     async (extra: PromptExtra, active: boolean) => {
-      setError(null);
       const refused = await put({ ...extra, active });
-      if (refused) setError(refused);
+      if (refused) {
+        console.warn('[prompt-extras] switch refused', extra.key);
+        showSnackbar({
+          message: refused,
+          tone: 'danger',
+          action: { label: i18n.t('common.retry'), onPress: () => void retry.current.setActive(extra, active) },
+        });
+      }
     },
     [put],
   );
 
   const remove = useCallback(
     async (extra: PromptExtra) => {
-      setError(null);
       changes.current += 1;
       setExtras((current) => current.filter((e) => e.key !== extra.key));
       if (!real) return;
@@ -162,11 +174,19 @@ export function usePromptExtras(): UsePromptExtras {
       } catch (e) {
         changes.current += 1;
         setExtras((current) => inPondOrder([...current.filter((e2) => e2.key !== extra.key), extra]));
-        setError(describePromptExtraError(e) ?? i18n.t('promptNotes.errors.deleteFailed'));
+        console.warn('[prompt-extras] delete refused', e instanceof ApiError ? e.status : 'network');
+        showSnackbar({
+          message: describePromptExtraError(e) ?? i18n.t('promptNotes.errors.deleteFailed'),
+          tone: 'danger',
+          action: { label: i18n.t('common.retry'), onPress: () => void retry.current.remove(extra) },
+        });
       }
     },
     [real],
   );
+  useEffect(() => {
+    retry.current = { setActive, remove };
+  }, [setActive, remove]);
 
   return { data: { extras }, loading, error, failed, actions: { refresh, add, edit, setActive, remove } };
 }

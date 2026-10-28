@@ -21,6 +21,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useServer } from '@/providers/server-provider';
 import { ApiError, api } from '@/services/api-client';
 import i18n from '@/services/i18n';
+import { showSnackbar } from '@/services/snackbar';
 import type { CameraEvent } from '@/services/types';
 import { matchesFilter, unacknowledgedCount, type EventFilter } from '@/models/vision';
 import { describeApiError, refusalReason } from './describe-error';
@@ -219,6 +220,9 @@ export function useVisionEvents(cameraId: string | null): UseVisionEvents {
     };
   }, [hydrated, cameraId, active, load]);
 
+  // What the snackbar's Try again calls: the current `acknowledge`, set below once it is made.
+  const retryAcknowledge = useRef<(event: CameraEvent) => Promise<void>>(async () => {});
+
   const acknowledge = useCallback(
     async (event: CameraEvent) => {
       setAcknowledging((current) => new Set(current).add(event.id));
@@ -230,7 +234,11 @@ export function useVisionEvents(cameraId: string | null): UseVisionEvents {
         done = true;
       } catch (e) {
         console.warn('[vision-events] acknowledge failed', event.id, e instanceof ApiError ? e.status : 'network');
-        setError(describeApiError(e) ?? i18n.t('visionEvents.errors.acknowledgeFailed'));
+        showSnackbar({
+          message: describeApiError(e) ?? i18n.t('visionEvents.errors.acknowledgeFailed'),
+          tone: 'danger',
+          action: { label: i18n.t('common.retry'), onPress: () => void retryAcknowledge.current(event) },
+        });
       } finally {
         setAcknowledging((current) => {
           const next = new Set(current);
@@ -239,11 +247,14 @@ export function useVisionEvents(cameraId: string | null): UseVisionEvents {
         });
       }
       // Read back what the Pond now holds, including anything the camera saw meanwhile. Not after
-      // a refusal: a successful read clears the error, and the refusal would vanish unread.
+      // a refusal: nothing changed on the Pond to read.
       if (done) await load(false);
     },
     [load],
   );
+  useEffect(() => {
+    retryAcknowledge.current = acknowledge;
+  }, [acknowledge]);
 
   return {
     data: {

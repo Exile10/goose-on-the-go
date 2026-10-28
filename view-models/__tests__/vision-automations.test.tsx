@@ -7,6 +7,7 @@
 import React from 'react';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 
+import { currentSnackbar, resetSnackbar } from '@/services/snackbar';
 import type { FacePerson, PondSettings, Rule } from '@/services/types';
 import { SAMPLE_SETTINGS } from '@/models/pond-settings';
 import { useVisionAutomations, type UseVisionAutomations } from '@/view-models/use-vision-automations';
@@ -66,6 +67,7 @@ beforeAll(() => {
 });
 
 beforeEach(() => {
+  resetSnackbar();
   jest.clearAllMocks();
   mockRules.data.rules = [];
   mockRules.loading = false;
@@ -179,7 +181,7 @@ describe('adding a starter', () => {
 
     expect(mockRules.actions.create).toHaveBeenCalledWith(starter.request);
     expect(added).toBe(true);
-    expect(m.vm.addError).toBeNull();
+    expect(currentSnackbar()).toBeNull();
     expect(m.vm.adding.size).toBe(0);
   });
 
@@ -212,6 +214,10 @@ describe('adding a starter', () => {
     });
 
     expect(added).toBe(false);
-    expect(m.vm.addError).toBe('The scheduler is not running.');
+    expect(currentSnackbar()).toMatchObject({ tone: 'danger', message: 'The scheduler is not running.' });
+
+    mockRules.actions.create.mockResolvedValue(null);
+    await act(async () => currentSnackbar()?.action?.onPress());
+    expect(mockRules.actions.create).toHaveBeenCalledTimes(2);
   });
 });

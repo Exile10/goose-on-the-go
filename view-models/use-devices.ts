@@ -7,7 +7,7 @@
  * a broken switch.
  */
 
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { useServer } from '@/providers/server-provider';
 import { ApiError, api, type PondApiClient } from '@/services/api-client';
@@ -15,6 +15,7 @@ import type { Device, DeviceStatePatch, MatterStatus, UpdateDeviceRequest } from
 import { describeApiError, logFailure } from './describe-error';
 import { useLive } from './use-live';
 import i18n from '@/services/i18n';
+import { showSnackbar } from '@/services/snackbar';
 
 /**
  * Read a device's power state out of `get_device_state`'s text.
@@ -217,6 +218,10 @@ export interface UseDevices {
   loading: boolean;
   /** No read of the list has worked yet and the last one failed: the list is unknown, not empty. */
   failed: boolean;
+  /**
+   * Why the last read or commission failed. A refused switch or removal is said in the snackbar,
+   * with Try again, since it is about the card just touched rather than the list.
+   */
   error: string | null;
   actions: {
     refresh: () => Promise<void>;
@@ -368,6 +373,12 @@ export function useDevices(): UseDevices {
 
   const refresh = useCallback(() => load(true), [load]);
 
+  // What the snackbar's Try again calls: the current switch and removal, set below once made.
+  const retry = useRef<Pick<UseDevices['actions'], 'setState' | 'remove'>>({
+    setState: async () => {},
+    remove: async () => {},
+  });
+
   /**
    * Apply a patch optimistically, then reconcile against the server.
    *
@@ -399,7 +410,13 @@ export function useDevices(): UseDevices {
         }
       } catch (e) {
         setPowerById(previous);
-        setError(describeDeviceError(e));
+        logFailure('devices', 'state change refused', e);
+        // The switch has gone back; say why rather than let it look like a missed tap.
+        showSnackbar({
+          message: describeDeviceError(e) ?? i18n.t('errors.deviceNotSaved'),
+          tone: 'danger',
+          action: { label: i18n.t('common.retry'), onPress: () => void retry.current.setState(device, patch) },
+        });
       }
     },
     [powerById],
@@ -430,7 +447,12 @@ export function useDevices(): UseDevices {
         await api.deleteDevice(device.id);
       } catch (e) {
         setDevices(previous);
-        setError(describeDeviceError(e));
+        logFailure('devices', 'remove refused', e);
+        showSnackbar({
+          message: describeDeviceError(e) ?? i18n.t('errors.generic'),
+          tone: 'danger',
+          action: { label: i18n.t('common.retry'), onPress: () => void retry.current.remove(device) },
+        });
       } finally {
         // Again once the server has answered: a poll that began while the delete was still out
         // read a list the server had not yet changed.
@@ -439,6 +461,10 @@ export function useDevices(): UseDevices {
     },
     [devices],
   );
+
+  useEffect(() => {
+    retry.current = { setState, remove };
+  }, [setState, remove]);
 
   const edit = useCallback(async (edits: DeviceEdit[]) => {
     if (edits.length === 0) return null;

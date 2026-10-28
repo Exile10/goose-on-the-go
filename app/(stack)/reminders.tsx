@@ -24,7 +24,7 @@ export default function RemindersScreen() {
   const { t } = useTranslation();
   const styles = useThemedStyles(makeStyles);
   const confirm = useConfirm();
-  const { data, loading, error, failed, dismissing, actionError, actions } = useReminders();
+  const { data, loading, error, failed, dismissing, actions } = useReminders();
   // A refused refresh with the list still on screen is said above it; a list that never arrived is
   // said once, in its place.
   const state = useContentState({ loading, failed: failed || error !== null, hasContent: data.rows.length > 0 });
@@ -55,8 +55,6 @@ export default function RemindersScreen() {
       <InkText size="sm" tone="secondary">{t('reminders.intro')}</InkText>
 
       {loading ? <InkSpinner label={t('reminders.list.loading')} /> : null}
-
-      {actionError ? <InkNotice tone="danger">{actionError}</InkNotice> : null}
 
       {unavailable ? (
         <ContentUnavailable state={state} reason={error} onRetry={actions.refresh} />
