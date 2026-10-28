@@ -400,7 +400,7 @@
         "aheadYours": "{{count}} of your tasks",
         "aheadOthers_one": "{{count}} for another member",
         "aheadOthers_other": "{{count}} for other members",
-        "hint": "The pond works through these one at a time. Choose which keep going; a task you stop finishes the step it is on.",
+        "hint": "Your Pond works through these one at a time. Choose which keep going; a task you stop finishes the step it is on.",
         "thisOne": "{{goal}} (this one)",
         "choiceLabel": "{{goal}}, {{place}}",
         "keep": "Keep going",
