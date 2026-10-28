@@ -28,13 +28,13 @@
  * needs to know what is half-written.
  */
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Keyboard, Platform, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { Image } from 'expo-image';
 import { useTranslation } from 'react-i18next';
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { glassLift, hitSlop } from '@jarida/ink';
-import { InkEdge, inkText, useInkTheme, useReduceMotion } from '@jarida/ink/native';
+import { InkChip, InkEdge, inkText, useInkTheme, useReduceMotion } from '@jarida/ink/native';
 
 import {
   AnsweringLight,
@@ -49,6 +49,8 @@ import { GIcon } from '@/components/ui/g-icon';
 import { GPressable } from '@/components/ui/g-pressable';
 import { selectionTick, tap } from '@/services/haptics';
 import type { Attachment, AttachSource } from '@/services/media';
+import type { ResearchOffer } from '@/models/long-tasks';
+import { researchItem, useResearchMode } from '@/view-models/use-deep-research';
 import { Spacing } from '@/constants/spacing';
 
 /** The controls' diameter, and the field's height on one line: the touch floor. */
@@ -63,7 +65,7 @@ function fieldHeight(content: number): number {
 export const MAX_ATTACHMENTS = 4;
 
 export interface ChatDockProps {
-  onSend: (text: string, attachments: Attachment[]) => void;
+  onSend: (text: string, attachments: Attachment[], options?: { research?: boolean }) => void;
   /** Open voice mode. */
   onVoice: () => void;
   /** Ask for pictures or a file. Resolves with what was chosen, or nothing. */
@@ -72,15 +74,29 @@ export interface ChatDockProps {
   busy?: boolean;
   /** The home indicator, when no keyboard is covering it. */
   bottomInset?: number;
+  /** Whether the plus menu offers deep research, as the Pond answered once. */
+  research?: ResearchOffer;
+  /** The conversation on screen; research mode ends when it changes. */
+  conversation?: string | null;
 }
 
-export function ChatDock({ onSend, onVoice, onAttach, busy, bottomInset = 0 }: ChatDockProps) {
+export function ChatDock({
+  onSend,
+  onVoice,
+  onAttach,
+  busy,
+  bottomInset = 0,
+  research = 'hidden',
+  conversation = null,
+}: ChatDockProps) {
   const theme = useInkTheme();
   const { t } = useTranslation();
   const [draft, setDraft] = useState('');
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [menu, setMenu] = useState(false);
   const [keyboard, setKeyboard] = useState(false);
+  const mode = useResearchMode(conversation);
+  const input = useRef<TextInput>(null);
   // The field's height follows its text both ways. Left to itself a multiline
   // field on iOS grows as lines are added and keeps that height once they are
   // gone, so the dock stood two lines tall after every long message.
@@ -109,15 +125,28 @@ export function ChatDock({ onSend, onVoice, onAttach, busy, bottomInset = 0 }: C
     };
   }, []);
 
+  // A Pond that stops offering research, or a different Pond, ends the mode it no longer backs.
+  const { clear: clearResearch } = mode;
+  useEffect(() => {
+    if (research !== 'available') clearResearch();
+  }, [research, clearResearch]);
+
   const hasContent = draft.trim().length > 0 || attachments.length > 0;
 
   const handleSend = useCallback(() => {
     if (!hasContent) return;
     void tap();
-    onSend(draft, attachments);
+    const asResearch = mode.take();
+    onSend(draft, attachments, asResearch ? { research: true } : undefined);
     setDraft('');
     setAttachments([]);
-  }, [attachments, draft, hasContent, onSend]);
+  }, [attachments, draft, hasContent, mode, onSend]);
+
+  const startResearch = useCallback(() => {
+    if (!mode.start(attachments.length)) return;
+    void selectionTick();
+    input.current?.focus();
+  }, [attachments.length, mode]);
 
   // The menu has already closed by the time it hands over a choice, so the
   // picker is presented from the screen rather than from the menu.
@@ -141,6 +170,7 @@ export function ChatDock({ onSend, onVoice, onAttach, busy, bottomInset = 0 }: C
     borderWidth: theme.edge.hairlineWidth,
   };
   const field = inkText(theme, { size: 'md' });
+  const placeholder = mode.on ? t('chat.research.placeholder') : busy ? t('chat.queuePlaceholder') : t('chat.placeholder');
   // Clear of the keyboard by a full step, not half of one. Vendor keyboards
   // (Samsung's among them) draw a toolbar row of their own inside the height
   // they report, so 8px put the composer visually against that row rather than
@@ -153,6 +183,14 @@ export function ChatDock({ onSend, onVoice, onAttach, busy, bottomInset = 0 }: C
 
   return (
     <Animated.View pointerEvents="box-none" style={[styles.dock, padded]}>
+      {mode.on ? (
+        <View style={styles.strip}>
+          <InkChip icon="search" onRemove={mode.clear}>
+            {t('chat.research.chip')}
+          </InkChip>
+        </View>
+      ) : null}
+
       {attachments.length > 0 ? (
         <View style={styles.strip}>
           {attachments.map((a) => (
@@ -203,15 +241,16 @@ export function ChatDock({ onSend, onVoice, onAttach, busy, bottomInset = 0 }: C
 
         <View style={[styles.field, material]} onLayout={(e) => setFieldBox(e.nativeEvent.layout)}>
           <TextInput
+            ref={input}
             style={[field.style, styles.input, { height: fieldHeight(draft ? lines : 0) }]}
             value={draft}
             onChangeText={setDraft}
             onContentSizeChange={(e) => setLines(e.nativeEvent.contentSize.height)}
-            placeholder={busy ? t('chat.queuePlaceholder') : t('chat.placeholder')}
+            placeholder={placeholder}
             placeholderTextColor={theme.color.textTertiary}
             multiline
             maxLength={4000}
-            accessibilityLabel={busy ? t('chat.queuePlaceholder') : t('chat.placeholder')}
+            accessibilityLabel={placeholder}
           />
         </View>
 
@@ -255,6 +294,9 @@ export function ChatDock({ onSend, onVoice, onAttach, busy, bottomInset = 0 }: C
         open={menu}
         onClose={() => setMenu(false)}
         onChoose={choose}
+        research={researchItem(research, attachments.length)}
+        researching={mode.on}
+        onResearch={startResearch}
         anchorBottom={foot + CONTROL}
         anchorLeft={Spacing.lg}
       />

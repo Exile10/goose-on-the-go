@@ -313,7 +313,7 @@ export const ToolTrail = React.memo(function ToolTrail({ tools, done }: { tools:
   return (
     <View style={styles.trail}>
       {tasks.map((task) => (
-        <LongTaskCard key={task.call} taskId={task.taskId} />
+        <LongTaskCard key={task.call} taskId={task.taskId} callId={task.call} />
       ))}
       {tools.map((tool) => (
         <FactCard key={tool.id} tool={tool} />

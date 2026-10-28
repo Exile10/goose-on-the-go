@@ -39,9 +39,10 @@ import { ApiError, api } from '@/services/api-client';
 import { cardsFor, rememberCard, type CardsByCall } from '@/services/card-cache';
 import { composeMessage, type Attachment } from '@/services/media';
 import { StreamStalledError } from '@/services/sse';
-import type { ChatFrame, SessionMessage } from '@/services/types';
+import type { ChatFrame, ChatStreamRequest, SessionMessage } from '@/services/types';
 import { createTurnQueue } from '@/view-models/turn-queue';
-import { MOCK_TASK_REPLY } from '@/models/long-tasks-mock';
+import { MOCK_RESEARCH_REPLY, MOCK_TASK_REPLY } from '@/models/long-tasks-mock';
+import { researchRefusal } from '@/view-models/use-deep-research';
 import { mockTaskStart } from '@/view-models/use-long-task';
 
 /** How much of a long conversation is worth reading back on open. */
@@ -76,7 +77,11 @@ function isDrop(e: unknown): boolean {
   return e instanceof TypeError || (e instanceof Error && /network|connection|socket/i.test(e.message));
 }
 
-function describe(e: unknown, t: TFunction): string {
+/** What the screen says about a turn that failed; exported so a refusal's words can be checked. */
+export function describeTurnError(e: unknown, t: TFunction): string {
+  const research = researchRefusal(e);
+  if (research === 'off') return t('chat.research.refusedOff');
+  if (research === 'unidentified') return t('chat.research.unidentified');
   if (e instanceof ApiError) {
     if (e.status === 503) return t('chat.busy');
     if (e.status === 413) return t('chat.composer.tooLarge');
@@ -293,6 +298,8 @@ export function statusFor(frame: ChatFrame, t: TFunction): string | null {
 export interface SendOptions {
   /** Spoken rather than read: a shorter answer, no reasoning passage. */
   voice?: boolean;
+  /** A research question: the Pond starts a long task on it rather than answering in the turn. */
+  research?: boolean;
   /** The reply so far, each time it grows — voice mode speaks it as it comes. */
   onText?: (text: string) => void;
 }
@@ -337,6 +344,24 @@ export interface UseChat {
      */
     open: (sessionId: string, title?: string) => void;
     dismissError: () => void;
+  };
+}
+
+/** What `/chat/stream` is sent for a turn; `deep_research` only when it is research, as older Ponds expect. */
+export function streamBody(
+  text: string,
+  attachments: Attachment[],
+  options: SendOptions,
+  sessionId: string | null,
+): ChatStreamRequest {
+  const images = attachments.filter((a) => a.kind === 'image' && a.base64);
+  return {
+    message: composeMessage(text, attachments),
+    ...(sessionId ? { session_id: sessionId } : {}),
+    ...(images.length ? { images: images.map((a) => ({ data: a.base64 as string, mime_type: a.mimeType })) } : {}),
+    voice_mode: Boolean(options.voice),
+    resumable: true,
+    ...(options.research ? { deep_research: true } : {}),
   };
 }
 
@@ -456,7 +481,7 @@ export function useChat(): UseChat {
           const [rows, cards] = await Promise.all([api.listSessionMessages(id, HISTORY_LIMIT), cardsFor(id)]);
           setMessages(fromHistory(rows, cards));
         } catch (e) {
-          setError(describe(e, t));
+          setError(describeTurnError(e, t));
         } finally {
           setLoading(false);
         }
@@ -468,7 +493,6 @@ export function useChat(): UseChat {
   const runTurn = useCallback(
     async (turn: Turn) => {
       const { text: trimmed, attachments, options } = turn;
-      const images = attachments.filter((a) => a.kind === 'image' && a.base64);
       const replyId = nextLocalId();
       let reply: Message = {
         id: replyId,
@@ -488,11 +512,17 @@ export function useChat(): UseChat {
 
       if (!isScreenRealRef.current('chat')) {
         await new Promise((resolve) => setTimeout(resolve, 700));
-        // Asking the mock for a long task starts one in the mock Pond, so its chat card can be seen.
-        const tools = /\blong task\b/i.test(trimmed) ? [mockTaskStart(trimmed)] : undefined;
-        const content = tools
-          ? MOCK_TASK_REPLY
-          : `Working on it. (${trimmed.length} characters received — this is a mock response.)`;
+        // Research, or a message asking for a long task, starts one in the mock Pond, so its card can be seen.
+        const tools = options.research
+          ? [mockTaskStart(trimmed, 'research')]
+          : /\blong task\b/i.test(trimmed)
+            ? [mockTaskStart(trimmed)]
+            : undefined;
+        const content = options.research
+          ? MOCK_RESEARCH_REPLY
+          : tools
+            ? MOCK_TASK_REPLY
+            : `Working on it. (${trimmed.length} characters received — this is a mock response.)`;
         setMessages((m) =>
           m.map((x) => (x.id === replyId ? { ...x, content, tools, pending: false } : x)),
         );
@@ -569,15 +599,7 @@ export function useChat(): UseChat {
         schedule();
       };
 
-      const body = {
-        message: composeMessage(trimmed, attachments),
-        ...(sessionRef.current ? { session_id: sessionRef.current } : {}),
-        ...(images.length
-          ? { images: images.map((a) => ({ data: a.base64 as string, mime_type: a.mimeType })) }
-          : {}),
-        voice_mode: Boolean(options.voice),
-        resumable: true,
-      };
+      const body = streamBody(trimmed, attachments, options, sessionRef.current);
 
       let lost = false;
       try {
@@ -610,7 +632,7 @@ export function useChat(): UseChat {
           if (id) open(id);
         }
       } catch (e) {
-        if (!isAbort(e) || !controller.signal.aborted) setError(describe(e, t));
+        if (!isAbort(e) || !controller.signal.aborted) setError(describeTurnError(e, t));
         if (!reply.content && !reply.tools?.length) {
           // Nothing arrived: the reply was never started, so it is not shown.
           setMessages((m) => m.filter((x) => x.id !== replyId));

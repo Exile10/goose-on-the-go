@@ -2,10 +2,11 @@
 // with a result, on the clock read at each call, and Stop ends it as the real cancel route does.
 
 import { ApiError } from '@/services/api-client';
-import type { LongTask, LongTaskArtifactBody, LongTaskStep, LongTaskStepState } from '@/services/types';
+import type { DeepResearchAvailability, LongTask, LongTaskArtifactBody, LongTaskKind, LongTaskStep, LongTaskStepState } from '@/services/types';
 
-/** The routes the chat's long-task card uses, so the real Pond and this one run the same code. */
+/** The routes the chat's long-task card and research use, so the real Pond and this one run the same code. */
 export interface LongTasksSource {
+  researchAvailability(): Promise<DeepResearchAvailability>;
   task(id: string): Promise<LongTask>;
   artifact(taskId: string, artifactId: string): Promise<LongTaskArtifactBody>;
   cancel(id: string): Promise<void>;
@@ -18,6 +19,9 @@ export const MOCK_STEP_MS = 6_000;
 export function mockStartResult(id: string): string {
   return `Started task ${id}. The pond works on it while the household is quiet and tells the person on their phone when it is done.`;
 }
+
+/** What the mock chat says when asked for research, after the task it started. */
+export const MOCK_RESEARCH_REPLY = "I've started researching that. I'll let you know on this phone when the findings are ready.";
 
 /** What the mock chat says when asked for a long task, beside the `task_start` call it shows. */
 export const MOCK_TASK_REPLY = "I've started that as a long task. I'll let you know on this phone when it's done.";
@@ -37,6 +41,7 @@ const RESULT_BODY = `## A weekend in Mombasa
 
 interface Entry {
   goal: string;
+  kind: LongTaskKind;
   startedAt: number;
   cancelledAt: number | null;
 }
@@ -72,6 +77,7 @@ export function createMockLongTasks(now: () => number = Date.now) {
     const endedAt = entry.cancelledAt ?? (finished ? entry.startedAt + MOCK_PLANNING_MS + PLAN.length * MOCK_STEP_MS : null);
     return {
       id,
+      kind: entry.kind,
       goal: entry.goal,
       state: entry.cancelledAt ? 'cancelled' : finished ? 'completed' : planned ? 'running' : 'planning',
       origin_session_id: 'mock-session',
@@ -88,11 +94,12 @@ export function createMockLongTasks(now: () => number = Date.now) {
 
   return {
     /** What the mock chat calls when asked for a long task; the id goes in its `task_start` answer. */
-    start(goal: string): string {
+    start(goal: string, kind: LongTaskKind = 'general'): string {
       const id = `00000000-0000-4000-8000-${String(next++).padStart(12, '0')}`;
-      tasks.set(id, { goal, startedAt: now(), cancelledAt: null });
+      tasks.set(id, { goal, kind, startedAt: now(), cancelledAt: null });
       return id;
     },
+    researchAvailability: async (): Promise<DeepResearchAvailability> => ({ available: true }),
     task: async (id: string) => view(id),
     artifact: async (taskId: string, artifactId: string) => {
       const task = view(taskId);

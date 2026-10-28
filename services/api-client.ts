@@ -4,7 +4,7 @@ import { assertPondTrust, PondTrustError, pondTrustFailed } from './pond-trust';
 import { isInsecureDevOrigin, isLocalPairingUrl, normalizePondUrl } from '@/models/connection';
 import { readWebSearch } from '@/models/web-search';
 import { readPrefills } from '@/models/agents';
-import { readLongTask } from '@/models/long-tasks';
+import { readLongTask, readResearchAvailability } from '@/models/long-tasks';
 /**
  * PondApiClient — HTTP client for goose-in-a-pond.
  *
@@ -26,6 +26,7 @@ import { randomBytes } from './secure-random';
 import { timeoutSignal } from './http';
 import { readSse, type SseEvent } from './sse';
 import type {
+  DeepResearchAvailability,
   LongTask,
   LongTaskArtifactBody,
   AgentPrefills,
@@ -2101,6 +2102,13 @@ export class PondApiClient {
     );
     if (!res || typeof res.body !== 'string') throw new Error('The Pond answered the artifact with something unexpected');
     return { id: res.id ?? artifactId, title: res.title ?? '', kind: res.kind ?? '', summary: res.summary ?? '', body: res.body };
+  }
+
+  /** Whether this member may ask for deep research. A 404 is a Pond that predates it. */
+  async deepResearchAvailability(): Promise<DeepResearchAvailability> {
+    const answer = readResearchAvailability(await this.get<unknown>('/api/v1/long-tasks/deep-research'));
+    if (!answer) throw new Error('The Pond answered the research check with something unexpected');
+    return answer;
   }
 
   /** Stops a task; a step under way finishes first. A 409 once it has already ended. */

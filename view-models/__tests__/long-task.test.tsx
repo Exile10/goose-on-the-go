@@ -30,6 +30,7 @@ const ID = 'task-0001-aaaa';
 function task(state: LongTaskState, over: Partial<LongTask> = {}): LongTask {
   return {
     id: ID,
+    kind: 'general',
     goal: 'Plan a weekend away',
     state,
     origin_session_id: 's1',
