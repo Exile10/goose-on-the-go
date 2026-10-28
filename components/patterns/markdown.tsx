@@ -8,12 +8,12 @@
  */
 
 import React, { useMemo } from 'react';
-import { Platform, ScrollView, StyleSheet, Text, View, type TextStyle } from 'react-native';
+import { Linking, Platform, ScrollView, StyleSheet, Text, View, type TextStyle } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 import { inkText, useInkTheme, type InkTextSpec } from '@jarida/ink/native';
 
 import { GIcon } from '@/components/ui/g-icon';
-import { decodeEntities, parseReply, webLink, type MarkedToken, type Token, type Tokens } from '@/services/markdown';
+import { decodeEntities, htmlAsText, isMapLink, parseReply, webLink, type MarkedToken, type Token, type Tokens } from '@/services/markdown';
 
 type Theme = ReturnType<typeof useInkTheme>;
 type Role = NonNullable<InkTextSpec['role']>;
@@ -52,11 +52,13 @@ function face(theme: Theme, span: Span): TextStyle {
 function link(href: string, children: React.ReactNode, place: Place, key: number) {
   const url = webLink(href);
   if (!url) return <React.Fragment key={key}>{children}</React.Fragment>;
+  // A map opens where the phone opens maps; the rest in the in-app browser, beside the reply.
+  const open = () => void (isMapLink(url) ? Linking.openURL(url) : WebBrowser.openBrowserAsync(url));
   return (
     <Text
       key={key}
       accessibilityRole="link"
-      onPress={() => void WebBrowser.openBrowserAsync(url)}
+      onPress={open}
       style={[styles.link, { color: place.theme.color.accentLine }]}
     >
       {children}
@@ -117,7 +119,7 @@ function inline(token: MarkedToken, place: Place, span: Span, key: number): Reac
     case 'br':
       return '\n';
     case 'html':
-      return /^<br\s*\/?>$/i.test(token.text.trim()) ? '\n' : null;
+      return htmlAsText(token.text);
     case 'checkbox':
       return null;
     default:
@@ -298,7 +300,7 @@ function block(token: MarkedToken, place: Place, key: number): React.ReactNode {
     case 'hr':
       return <View key={key} style={[styles.rule, { height: theme.edge.hairlineWidth, backgroundColor: theme.color.line }]} />;
     case 'html': {
-      const text = token.text.replace(/<[^>]*>/g, '').trim();
+      const text = htmlAsText(token.text).trim();
       return text ? paragraph(undefined, text, place, key) : null;
     }
     default:

@@ -1554,3 +1554,21 @@ export interface LongTaskArtifactBody {
  * household's long tasks switched off; `unidentified` is a caller the Pond does not know as a member.
  */
 export type DeepResearchAvailability = { available: true } | { available: false; reason: 'off' | 'unidentified' };
+
+/**
+ * `GET /api/v1/long-tasks/{id}/report`: the whole report as one markdown document, the summary and
+ * every drafted section in plan order, then its sources. `sections` and `calendar_events` are counts.
+ */
+export interface LongTaskReportWire {
+  id: string;
+  title: string;
+  state: LongTaskState;
+  kind: LongTaskKind;
+  markdown: string;
+  sections: number;
+  sources: { title: string; url: string }[];
+  calendar_events: number;
+}
+
+/** What `GET /long-tasks/{id}/export` gives: Markdown, a self-contained page, or a calendar file. */
+export type ReportFormat = 'markdown' | 'html' | 'ics';

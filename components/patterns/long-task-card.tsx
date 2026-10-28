@@ -2,13 +2,12 @@
 // sits. It lies flat on a hairline, like the other tool cards, so it never outranks the answer.
 
 import React, { useCallback } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
+import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { InkButton, InkEdge, InkEyebrow, InkSheet, InkSpinner, inkText, useInkTheme } from '@jarida/ink/native';
+import { InkButton, InkEdge, InkEyebrow, InkSpinner, inkText, useInkTheme } from '@jarida/ink/native';
 
-import { Markdown } from '@/components/patterns/markdown';
 import { GIcon } from '@/components/ui/g-icon';
-import { GSheetBody } from '@/components/ui/g-sheet-body';
 import { isEnded, resultArtifact } from '@/models/long-tasks';
 import { useConfirm } from '@/providers/confirm-provider';
 import { confirm, reject, tap } from '@/services/haptics';
@@ -45,7 +44,8 @@ export const LongTaskCard = React.memo(function LongTaskCard({ taskId, callId }:
   const theme = useInkTheme();
   const { t } = useTranslation();
   const ask = useConfirm();
-  const { task, error, gone, stopping, stopError, notice, result, actions } = useLongTask(taskId);
+  const { task, error, gone, stopping, stopError, notice, actions } = useLongTask(taskId);
+  const router = useRouter();
 
   const stop = useCallback(async () => {
     const yes = await ask({
@@ -106,14 +106,18 @@ export const LongTaskCard = React.memo(function LongTaskCard({ taskId, callId }:
             <View style={styles.result}>
               <InkEyebrow>{t('chat.longTask.result')}</InkEyebrow>
               <Text style={line.style}>{answer.title}</Text>
-              {answer.summary ? <Text style={quiet.style}>{answer.summary}</Text> : null}
+              {answer.summary ? (
+                <Text style={quiet.style} numberOfLines={3}>
+                  {answer.summary}
+                </Text>
+              ) : null}
               <View style={styles.actions}>
                 <InkButton
                   variant="quiet"
                   icon="file"
                   onPress={() => {
                     void tap();
-                    void actions.openResult();
+                    router.push({ pathname: '/(stack)/task-report', params: { id: taskId } } as never);
                   }}
                 >
                   {t('chat.longTask.readResult')}
@@ -140,15 +144,6 @@ export const LongTaskCard = React.memo(function LongTaskCard({ taskId, callId }:
         </>
       ) : null}
 
-      <InkSheet open={result.open} onClose={actions.closeResult} title={result.body?.title || answer?.title || t('chat.longTask.result')}>
-        <GSheetBody>
-          <ScrollView contentContainerStyle={styles.sheet}>
-            {result.loading ? <InkSpinner label={t('chat.longTask.resultLoading')} /> : null}
-            {result.error ? <Text style={danger.style}>{result.error}</Text> : null}
-            {result.body ? <Markdown source={result.body.body} /> : null}
-          </ScrollView>
-        </GSheetBody>
-      </InkSheet>
     </InkEdge>
   );
 });
@@ -162,5 +157,4 @@ const styles = StyleSheet.create({
   stepHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
   result: { gap: 4 },
   actions: { flexDirection: 'row', justifyContent: 'flex-start', gap: 8 },
-  sheet: { padding: 16, gap: 12 },
 });

@@ -106,6 +106,7 @@ export default function StackLayout() {
       <Stack.Screen name="reminders" options={{ title: t('screens.reminders') }} />
       <Stack.Screen name="ride" options={{ title: t('screens.ride') }} />
       <Stack.Screen name="agents" options={{ title: t('screens.agents') }} />
+      <Stack.Screen name="task-report" options={{ title: t('screens.taskReport') }} />
       <Stack.Screen name="agent" options={{ title: t('screens.agent') }} />
       <Stack.Screen name="extensions" options={{ title: t('screens.extensions') }} />
       <Stack.Screen name="web-search" options={{ title: t('screens.webSearch') }} />

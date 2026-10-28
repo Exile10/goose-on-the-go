@@ -1,11 +1,11 @@
-// Ended long tasks and their results, in memory: an ended task cannot change, so reopening its
-// conversation asks the Pond nothing. Dropped on sign-out with the rest of the household's data.
+// Ended long tasks and their reports, in memory: an ended task cannot change, so reopening its
+// conversation or its report asks the Pond nothing. Dropped on sign-out with the household's data.
 
-import type { LongTask, LongTaskArtifactBody } from './types';
+import type { LongTask } from './types';
 
 const KEPT = 50;
 const tasks = new Map<string, LongTask>();
-const bodies = new Map<string, LongTaskArtifactBody>();
+const reports = new Map<string, unknown>();
 
 function keep<T>(map: Map<string, T>, key: string, value: T): void {
   map.delete(key);
@@ -21,15 +21,16 @@ export function keepEndedTask(task: LongTask): void {
   keep(tasks, task.id, task);
 }
 
-export function resultBody(artifactId: string): LongTaskArtifactBody | null {
-  return bodies.get(artifactId) ?? null;
+/** An ended task's report as its screen shows it; the screen owns the shape. */
+export function endedReport<T>(id: string): T | null {
+  return (reports.get(id) as T | undefined) ?? null;
 }
 
-export function keepResultBody(body: LongTaskArtifactBody): void {
-  keep(bodies, body.id, body);
+export function keepEndedReport<T>(id: string, report: T): void {
+  keep(reports, id, report);
 }
 
 export function forgetLongTasks(): void {
   tasks.clear();
-  bodies.clear();
+  reports.clear();
 }

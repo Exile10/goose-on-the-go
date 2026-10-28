@@ -27,3 +27,19 @@ export function webLink(href: string | null | undefined): string | null {
   const url = href?.trim() ?? '';
   return /^https?:\/\/\S+$/i.test(url) ? url : null;
 }
+
+const MAP_HOSTS = /^(www\.)?(openstreetmap\.org|osm\.org|maps\.apple\.com|maps\.google\.com)$/i;
+
+/** A web link to a map, which the phone hands to its maps app or browser rather than the in-app one. */
+export function isMapLink(url: string): boolean {
+  // Parsed by hand: React Native's URL has long lacked `hostname`.
+  const parts = /^https?:\/\/([^/?#:@]+)(?::\d+)?(\/[^?#]*)?/i.exec(url);
+  if (!parts) return false;
+  const [, host, path = '/'] = parts;
+  return MAP_HOSTS.test(host) || (/^(www\.)?google\.com$/i.test(host) && path.startsWith('/maps'));
+}
+
+/** HTML the model wrote is shown as the text it is, never drawn; only a line break keeps its meaning. */
+export function htmlAsText(raw: string): string {
+  return /^<br\s*\/?>$/i.test(raw.trim()) ? '\n' : raw;
+}

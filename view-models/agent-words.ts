@@ -156,6 +156,7 @@ const BUILT_IN: Readonly<Record<string, TranslationKey>> = {
   'long-task-planner': 'agents.builtInName.planner',
   'long-task-worker': 'agents.builtInName.worker',
   'long-task-verifier': 'agents.builtInName.verifier',
+  'long-task-composer': 'agents.builtInName.composer',
   assistant: 'agents.builtInName.assistant',
 };
 

@@ -2,12 +2,24 @@
 // with a result, on the clock read at each call, and Stop ends it as the real cancel route does.
 
 import { ApiError } from '@/services/api-client';
-import type { DeepResearchAvailability, LongTask, LongTaskArtifactBody, LongTaskKind, LongTaskStep, LongTaskStepState } from '@/services/types';
+import { REPORT_FILES } from '@/models/long-tasks';
+import type {
+  DeepResearchAvailability,
+  LongTask,
+  LongTaskArtifactBody,
+  LongTaskKind,
+  LongTaskReportWire,
+  LongTaskStep,
+  LongTaskStepState,
+  ReportFormat,
+} from '@/services/types';
 
 /** The routes the chat's long-task card and research use, so the real Pond and this one run the same code. */
 export interface LongTasksSource {
   researchAvailability(): Promise<DeepResearchAvailability>;
   task(id: string): Promise<LongTask>;
+  report(id: string): Promise<LongTaskReportWire>;
+  export(id: string, format: ReportFormat): Promise<{ name: string; body: string }>;
   artifact(taskId: string, artifactId: string): Promise<LongTaskArtifactBody>;
   cancel(id: string): Promise<void>;
 }
@@ -37,6 +49,36 @@ const RESULT_BODY = `## A weekend in Mombasa
 - **Getting there:** the Madaraka Express leaves Nairobi at 08:00 and arrives at 14:00.
 - **Staying:** two nights by Nyali beach, about KES 18,000 in all.
 - **Seeing:** Fort Jesus on Saturday morning, the old town in the afternoon.
+`;
+
+/** What the mock's composer would draft for a plan: days, times, a table, a checklist and map links. */
+const REPORT_SECTIONS = `## Day 1: Saturday
+
+- 08:00 Madaraka Express from Nairobi Terminus
+- 14:00 Arrive in Mombasa, check in by Nyali beach
+- 17:00 Walk to [Fort Jesus](https://www.openstreetmap.org/search?query=Fort%20Jesus%20Mombasa)
+
+## Day 2: Sunday
+
+- 09:00 Old Town walk, starting at the [Old Port](https://www.openstreetmap.org/search?query=Old%20Port%20Mombasa)
+- 15:30 Train back to Nairobi
+
+## Meals
+
+| Day | Breakfast | Lunch | Dinner |
+| --- | --- | --- | --- |
+| Saturday | On the train | Biryani in Old Town | Grilled fish at the beach |
+| Sunday | Mandazi and chai | Packed lunch | At home |
+
+## Packing
+
+- [x] Train tickets
+- [ ] Sunscreen
+- [ ] ~~Rain jacket~~ Light cardigan
+
+## Sources
+
+- [Madaraka Express timetable](https://metickets.krc.co.ke)
 `;
 
 interface Entry {
@@ -92,7 +134,7 @@ export function createMockLongTasks(now: () => number = Date.now) {
     };
   };
 
-  return {
+  const created = {
     /** What the mock chat calls when asked for a long task; the id goes in its `task_start` answer. */
     start(goal: string, kind: LongTaskKind = 'general'): string {
       const id = `00000000-0000-4000-8000-${String(next++).padStart(12, '0')}`;
@@ -101,6 +143,32 @@ export function createMockLongTasks(now: () => number = Date.now) {
     },
     researchAvailability: async (): Promise<DeepResearchAvailability> => ({ available: true }),
     task: async (id: string) => view(id),
+    report: async (id: string): Promise<LongTaskReportWire> => {
+      const task = view(id);
+      const title = task.goal.length > 80 ? `${task.goal.slice(0, 77)}...` : task.goal;
+      const done = task.state === 'completed';
+      return {
+        id,
+        title,
+        state: task.state,
+        kind: task.kind,
+        markdown: `# ${title}\n\nTwo nights by the beach, by train, for about KES 18,000.\n\n${done ? REPORT_SECTIONS : ''}`,
+        sections: done ? 4 : 0,
+        sources: done ? [{ title: 'Madaraka Express timetable', url: 'https://metickets.krc.co.ke' }] : [],
+        calendar_events: done ? 4 : 0,
+      };
+    },
+    export: async (id: string, format: ReportFormat) => {
+      const report = await created.report(id);
+      if (format === 'ics' && report.calendar_events === 0) throw new ApiError('mock export → 404', 404, null, 'this report has no dated events for a calendar');
+      const body =
+        format === 'html'
+          ? `<!doctype html><title>${report.title.replace(/[<&>"]/g, '')}</title><pre>${report.markdown.replace(/[<&>]/g, '')}</pre>`
+          : format === 'ics'
+            ? 'BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Mock Pond//EN\r\nEND:VCALENDAR\r\n'
+            : report.markdown;
+      return { name: `weekend-plan.${REPORT_FILES[format].extension}`, body };
+    },
     artifact: async (taskId: string, artifactId: string) => {
       const task = view(taskId);
       if (task.result_artifact_id !== artifactId) throw new ApiError('mock artifact → 404', 404, null, 'there is no such artifact in this task');
@@ -114,6 +182,7 @@ export function createMockLongTasks(now: () => number = Date.now) {
       tasks.get(id)!.cancelledAt = now();
     },
   };
+  return created;
 }
 
 export type MockLongTasks = ReturnType<typeof createMockLongTasks>;
