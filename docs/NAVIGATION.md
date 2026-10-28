@@ -55,7 +55,7 @@ at the top leads to `ACCOUNT_ROUTE`, You and your household. Labels are
 | Group | Rows |
 |-------|------|
 | Connection | Remote access, Internet, Web search |
-| Goose | Assistant, Voice, Thinking, Models, Memory, Tools, Extensions |
+| Goose | Assistant, Voice, Thinking, Models, Memory, Tools, Agents, Extensions |
 | Home | Your home, People, Cameras and vision, Rooms and Ponds |
 | Notices and privacy | Announcements, Privacy |
 | Records | Memories, Conversations, Activity, Schedule |
@@ -177,6 +177,37 @@ and memory it costs. A job opens `settings-model-role`, a model opens
 `settings-model-catalog` and `settings-model-search` (Hugging Face, through the
 Pond). Activation names the model's own category (`pond_category`, such as
 `tts_kokoro`) and its role; the Pond refuses one without a role.
+
+### Agents
+
+`/(stack)/agents` lists the household's agents, the helpers the Pond hands one job each (goose-in-a-pond
+PAI-6 section 9): every recipe whose YAML has a `giap_role` block, with where its start-up copy (its
+prefill) stands. Below them are the Pond's suggestions (`GET /agents/suggestions`), each saying why it fits,
+when it would run, and that nothing runs until it is turned on; Turn on copies the template into this
+member's recipes and the Pond builds its copy then. The built-in long-task planner, worker and
+verifier have a prefill and no recipe, so they show only their status and Rebuild. Rebuild all asks first,
+because every agent is slower until its copy is back. The words are pond-desktop's (`prefillWords.ts`).
+
+An agent opens `/(stack)/agent?name=…`; with no `name` it is a new one. The phone edits what a person
+writes (name, one line, instructions, steps per run, tools, personal data) and says the rest in
+pond-desktop's words: when it runs, its hooks, sharing. The YAML is read and written with a copy of
+the desktop's reader (`models/agent-yaml.ts`), and whatever the form has no field for is written
+back as it was read, so a save here never drops a schedule set on the dashboard. A new agent runs
+only when asked (`delegated`, `task_step`). Save asks `POST /recipes/validate` first and shows each
+problem under the field its path names, or listed with its path; a Pond without the route saves as
+written. A new agent's name is checked against the names already taken, because the Pond replaces
+a recipe saved under a taken name. Leaving with unsaved changes asks first.
+
+Home shows Getting agents ready while the Pond builds start-up copies (`GET /agents/prefills`,
+`building`): every 30 s while none runs, every 5 s while one does, and never again for a Pond that
+answers 404. The agents screens read it every 15 s, 5 s during a pass.
+
+Every agents route goes through `view-models/agents-source.ts`, which picks the Pond or the
+in-memory one in `models/agents-mock.ts` by the Developer toggle `agents` (real by default). The mock
+queues a compile on save, rebuild and turn-on, waits for a quiet moment and compiles one agent at a
+time, so every state the screens draw can be reached without a Pond. The prefill routes were written
+against the contract before the Pond served them; on a Pond without them the screens say so and
+everything else works.
 
 Conversations is the rename-and-delete list of what the Pond holds. The Chat
 tab's wall is the way into a conversation; this is the way to tidy them, and it

@@ -5,6 +5,7 @@ import { AppState } from 'react-native';
 import NetInfo from '@react-native-community/netinfo';
 import { forgetAllCards } from '@/services/card-cache';
 import { forgetPondImages } from '@/services/pond-images';
+import { forgetLongTasks } from '@/services/long-task-cache';
 import { Storage, purgeLegacyStorage } from '@/services/storage';
 import { SecureStorage } from '@/services/secure-storage';
 import { ApiError, api, PondApiClient, type HandshakeResponse, type SpokenCode } from '@/services/api-client';
@@ -95,6 +96,7 @@ export const MIGRATION_SCREENS = [
   'logs',
   'webSearch',
   'settings',
+  'agents',
 ] as const;
 
 export type MigrationScreen = (typeof MIGRATION_SCREENS)[number];
@@ -132,7 +134,9 @@ export type ScreenModes = Record<MigrationScreen, boolean>;
 // and the consolidation stream and its stop) was checked against the Pond's routes and serde types,
 // and a paired phone's token reaches all of them. On mock, a release build showed four sample
 // memories as the household's, and "Tidy up now" could never run, since nothing could flip it.
-const REAL_BY_DEFAULT: readonly MigrationScreen[] = ['chat', 'logs', 'webSearch', 'settings', 'schedule', 'memory'];
+// `agents` starts real as `webSearch` does, ahead of a Pond that serves all of it: on a Pond without
+// the prefill routes the screens say so, where the mock would show a made-up household's agents.
+const REAL_BY_DEFAULT: readonly MigrationScreen[] = ['chat', 'logs', 'webSearch', 'settings', 'schedule', 'memory', 'agents'];
 
 export const DEFAULT_SCREEN_MODES: ScreenModes = MIGRATION_SCREENS.reduce(
   (acc, screen) => ({ ...acc, [screen]: REAL_BY_DEFAULT.includes(screen) }),
@@ -251,6 +255,7 @@ export function ServerProvider({ children }: PropsWithChildren) {
     await forgetAllCards().catch(() => undefined);
     // So are the pictures its cameras showed, held in memory while their list scrolled.
     forgetPondImages();
+    forgetLongTasks();
     await manager.configure(null);
   }, [manager]);
 

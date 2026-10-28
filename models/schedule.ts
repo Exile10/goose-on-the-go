@@ -123,19 +123,28 @@ function twoDigits(n: number): string {
   return String(n).padStart(2, '0');
 }
 
+const DAY_NAMES = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
+
+/** A weekday as a number or a name; `SUN` ending a range is 7, so `SAT-SUN` reads as the weekend. */
+function weekdayNumber(token: string, ending: boolean): number | null {
+  if (/^\d$/.test(token)) return Number(token);
+  const named = DAY_NAMES.indexOf(token.toUpperCase());
+  if (named === -1) return null;
+  return named === 0 && ending ? 7 : named;
+}
+
 /**
- * The weekdays a cron's weekday field names, 0 for Sunday, or null for a shape
- * this does not read (names such as `MON`, steps, `L`, `#`). `7` is Sunday too,
- * as croner reads it.
+ * 0 for Sunday, or null for a shape this does not read (steps, `L`, `#`); `7` is Sunday too, as croner
+ * reads it. Names are read because agents' schedules are written with them (`MON-FRI`).
  */
 function weekdays(field: string): Set<number> | null {
   const days = new Set<number>();
   for (const part of field.split(',')) {
-    const range = /^(\d)(?:-(\d))?$/.exec(part);
+    const range = /^(\d|[A-Za-z]{3})(?:-(\d|[A-Za-z]{3}))?$/.exec(part);
     if (!range) return null;
-    const from = Number(range[1]);
-    const to = range[2] == null ? from : Number(range[2]);
-    if (from > 7 || to > 7 || to < from) return null;
+    const from = weekdayNumber(range[1], false);
+    const to = range[2] == null ? from : weekdayNumber(range[2], true);
+    if (from === null || to === null || from > 7 || to > 7 || to < from) return null;
     for (let d = from; d <= to; d++) days.add(d % 7);
   }
   return days;
