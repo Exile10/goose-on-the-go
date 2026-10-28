@@ -21,18 +21,16 @@ import type { AgentPrefill, AgentSuggestion } from '@/services/types';
 import { builtInName, prefillDetail, prefillLabel } from '@/view-models/agent-words';
 import { useAgents } from '@/view-models/use-agents';
 
+// Android measures letter-spaced text a little narrow, so a badge of several words wrapped at a space.
+const oneLine = (words: string) => words.replace(/ /g, '\u00A0');
+
 /** What the value slot cannot say: a paused agent, and one that starts with nobody asking. */
 function AgentBadges({ row }: { row: AgentRow }) {
   const { t } = useTranslation();
   if (!row.paused && !row.startsByItself) return null;
   return (
     <View style={styles.badges}>
-      {/* Uppercased here as well as by Ink's style: Android measures the text before its transform and wraps it. */}
-      {row.paused ? (
-        <InkBadge>{t('agents.paused').toLocaleUpperCase()}</InkBadge>
-      ) : (
-        <InkBadge>{t('agents.startsByItself').toLocaleUpperCase()}</InkBadge>
-      )}
+      {row.paused ? <InkBadge>{oneLine(t('agents.paused'))}</InkBadge> : <InkBadge>{oneLine(t('agents.startsByItself'))}</InkBadge>}
     </View>
   );
 }
