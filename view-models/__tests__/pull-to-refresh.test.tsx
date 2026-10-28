@@ -16,10 +16,10 @@ import {
   type PullToRefresh,
 } from '@/view-models/use-pull-to-refresh';
 
-const mockServer: { hydrated: boolean; connectionState: ConnectionState; recover: jest.Mock } = {
+const mockServer: { hydrated: boolean; connectionState: ConnectionState; retryNow: jest.Mock } = {
   hydrated: true,
   connectionState: 'local',
-  recover: jest.fn(),
+  retryNow: jest.fn(),
 };
 jest.mock('@/providers/server-provider', () => ({
   useServer: () => mockServer,
@@ -56,7 +56,7 @@ async function mount(reload: () => unknown): Promise<{ readonly pull: PullToRefr
 beforeEach(() => {
   mockServer.hydrated = true;
   mockServer.connectionState = 'local';
-  mockServer.recover = jest.fn().mockResolvedValue('https://pond.local:4443');
+  mockServer.retryNow = jest.fn().mockResolvedValue('https://pond.local:4443');
 });
 
 afterEach(async () => {
@@ -71,7 +71,7 @@ describe('usePullToRefresh', () => {
     const reload = jest.fn().mockResolvedValue(undefined);
     const m = await mount(reload);
     await act(async () => m.pull.onRefresh());
-    expect(mockServer.recover).not.toHaveBeenCalled();
+    expect(mockServer.retryNow).not.toHaveBeenCalled();
     expect(reload).toHaveBeenCalledTimes(1);
   });
 
@@ -80,8 +80,8 @@ describe('usePullToRefresh', () => {
     async (state) => {
       mockServer.connectionState = state;
       const order: string[] = [];
-      mockServer.recover.mockImplementation(async () => {
-        order.push('recover');
+      mockServer.retryNow.mockImplementation(async () => {
+        order.push('retry');
         return null;
       });
       const reload = jest.fn(async () => {
@@ -89,7 +89,7 @@ describe('usePullToRefresh', () => {
       });
       const m = await mount(reload);
       await act(async () => m.pull.onRefresh());
-      expect(order).toEqual(['recover', 'reload']);
+      expect(order).toEqual(['retry', 'reload']);
     },
   );
 
@@ -100,7 +100,7 @@ describe('usePullToRefresh', () => {
       const reload = jest.fn();
       const m = await mount(reload);
       await act(async () => m.pull.onRefresh());
-      expect(mockServer.recover).not.toHaveBeenCalled();
+      expect(mockServer.retryNow).not.toHaveBeenCalled();
       expect(reload).toHaveBeenCalledTimes(1);
     },
   );
@@ -110,7 +110,7 @@ describe('usePullToRefresh', () => {
     mockServer.connectionState = 'disconnected';
     const m = await mount(jest.fn());
     await act(async () => m.pull.onRefresh());
-    expect(mockServer.recover).not.toHaveBeenCalled();
+    expect(mockServer.retryNow).not.toHaveBeenCalled();
   });
 
   it('holds the spinner until the reload settles, and ignores a second pull meanwhile', async () => {
@@ -148,7 +148,7 @@ describe('usePullToRefresh', () => {
   it('still reads the screen again when the connection check itself throws', async () => {
     jest.spyOn(console, 'warn').mockImplementation(() => undefined);
     mockServer.connectionState = 'disconnected';
-    mockServer.recover.mockRejectedValue(new Error('probe crashed'));
+    mockServer.retryNow.mockRejectedValue(new Error('probe crashed'));
     const reload = jest.fn();
     const m = await mount(reload);
     await act(async () => m.pull.onRefresh());

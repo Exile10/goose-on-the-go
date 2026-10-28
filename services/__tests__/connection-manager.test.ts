@@ -278,3 +278,38 @@ it('reports the Pond unavailable when its own node never comes up', async () => 
   expect(manager.current.state).toBe('disconnected');
   manager.environment(false, false);
 });
+
+/**
+ * A pull to refresh during the back-off after a failed attempt showed a spinner and probed
+ * nothing, because `recover` waits out `retryAfter`. Someone who pulls asked for an attempt.
+ */
+it('tries again at once when asked, inside the automatic back-off', async () => {
+  jest.useFakeTimers();
+  const { deps, manager } = fixture();
+  deps.probe.mockResolvedValue(false);
+  await manager.configure(profile, pin);
+  await manager.recover();
+  const probes = deps.probe.mock.calls.length;
+  expect(await manager.recover()).toBeNull();
+  expect(deps.probe).toHaveBeenCalledTimes(probes);
+  deps.probe.mockResolvedValue(true);
+  expect(await manager.retryNow()).toBe(profile.localUrls[0]);
+  expect(manager.current.state).toBe('local');
+  manager.environment(false, false);
+});
+it('shares an attempt already in flight rather than starting another', async () => {
+  const { deps, manager } = fixture();
+  await manager.configure(profile, pin);
+  const automatic = manager.recover();
+  expect(manager.retryNow()).toBe(automatic);
+  await automatic;
+  expect(deps.probe).toHaveBeenCalledTimes(1);
+  manager.environment(false, false);
+});
+it('does not try for a phone the Pond has refused', async () => {
+  const { deps, manager } = fixture();
+  await manager.configure(profile, pin);
+  manager.revoke();
+  expect(await manager.retryNow()).toBeNull();
+  expect(deps.probe).not.toHaveBeenCalled();
+});

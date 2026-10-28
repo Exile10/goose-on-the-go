@@ -13,10 +13,10 @@ import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import type { ConnectionState } from '@/models/connection';
 import { ConnectionStatus } from '../connection-status';
 
-const mockServer: { hydrated: boolean; connectionState: ConnectionState; recover: jest.Mock } = {
+const mockServer: { hydrated: boolean; connectionState: ConnectionState; retryNow: jest.Mock } = {
   hydrated: true,
   connectionState: 'disconnected',
-  recover: jest.fn(),
+  retryNow: jest.fn(),
 };
 const mockPush = jest.fn();
 
@@ -61,7 +61,7 @@ function statement(tree: ReactTestRenderer) {
 
 beforeEach(() => {
   mockServer.hydrated = true;
-  mockServer.recover = jest.fn().mockResolvedValue(null);
+  mockServer.retryNow = jest.fn().mockResolvedValue(null);
   mockPush.mockClear();
 });
 
@@ -92,7 +92,7 @@ describe('ConnectionStatus', () => {
       accessibilityActions: [{ name: 'activate', label: 'Try again' }],
     });
     act(() => node.props.onAccessibilityAction({ nativeEvent: { actionName: 'activate' } }));
-    expect(mockServer.recover).toHaveBeenCalledTimes(1);
+    expect(mockServer.retryNow).toHaveBeenCalledTimes(1);
   });
 
   it('says nothing while the connection works', () => {

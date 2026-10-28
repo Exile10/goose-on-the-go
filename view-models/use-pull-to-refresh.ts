@@ -27,7 +27,7 @@ export interface PullToRefresh {
 
 /** `reload` reads the screen's content again; it may return a promise, which the spinner waits on. */
 export function usePullToRefresh(reload: () => unknown): PullToRefresh {
-  const { hydrated, connectionState, recover } = useServer();
+  const { hydrated, connectionState, retryNow } = useServer();
   const [refreshing, setRefreshing] = useState(false);
   const inFlight = useRef(false);
   const retryConnection = hydrated && connectionNeedsAttention(connectionState) && !connectionActionIsPairing(connectionState);
@@ -40,7 +40,7 @@ export function usePullToRefresh(reload: () => unknown): PullToRefresh {
       // A connection check that throws is no reason to skip the read: the read is what was asked for.
       if (retryConnection) {
         try {
-          await recover();
+          await retryNow();
         } catch (e) {
           logFailure('pull-to-refresh', 'connection check failed', e);
         }
@@ -54,7 +54,7 @@ export function usePullToRefresh(reload: () => unknown): PullToRefresh {
         setRefreshing(false);
       }
     })();
-  }, [recover, reload, retryConnection]);
+  }, [retryNow, reload, retryConnection]);
 
   return { refreshing, onRefresh };
 }

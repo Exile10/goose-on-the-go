@@ -92,7 +92,7 @@ function stateIcon(state: ConnectionState): IconName {
  * pull down, and a double tap tries again. A sighted tap on the strip does nothing.
  */
 export function ConnectionStatus() {
-  const { connectionState, recover, hydrated } = useServer();
+  const { connectionState, retryNow, hydrated } = useServer();
   const styles = useThemedStyles(makeStyles);
   const { colors } = useTheme();
   const { t } = useTranslation();
@@ -115,7 +115,7 @@ export function ConnectionStatus() {
         accessibilityLabel={label}
         accessibilityHint={retryable ? t('contentState.pullHint') : undefined}
         accessibilityActions={retryable ? [{ name: 'activate', label: t('common.retry') }] : undefined}
-        onAccessibilityAction={retryable ? () => void recover() : undefined}
+        onAccessibilityAction={retryable ? () => void retryNow() : undefined}
       >
         <GIcon name={stateIcon(connectionState)} size={16} color={colors.textSecondary} />
         <Text style={styles.text}>{label}</Text>
