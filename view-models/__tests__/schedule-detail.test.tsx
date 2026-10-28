@@ -176,7 +176,7 @@ describe('editing it', () => {
     expect(pond.updateSchedule).toHaveBeenCalledWith('daily-brief', { name: 'Morning Brief' });
     expect(refused).toBeNull();
     expect(m.vm.schedule).toEqual(saved);
-    expect(currentSnackbar()).toMatchObject({ message: i18n.t('schedule.detail.saved'), tone: 'neutral' });
+    expect(currentSnackbar()).toMatchObject({ message: i18n.t('schedule.detail.saved'), tone: 'success' });
   });
 
   it('sends nothing for an edit that changed nothing', async () => {
@@ -264,7 +264,7 @@ describe('the other actions', () => {
     });
     expect(pond.runScheduleNow).toHaveBeenCalledTimes(1);
     expect(m.vm.schedule?.currently_running).toBe(true);
-    expect(currentSnackbar()).toMatchObject({ message: i18n.t('schedule.detail.runStarted'), tone: 'neutral' });
+    expect(currentSnackbar()).toMatchObject({ message: i18n.t('schedule.detail.runStarted'), tone: 'success' });
   });
 
   it('runs a missed run when asked to, and reads the schedule again', async () => {

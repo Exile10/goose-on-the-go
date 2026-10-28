@@ -157,7 +157,7 @@ describe('adding a secret', () => {
     expect(pond.setSecret).toHaveBeenCalledWith('NEW_KEY', VALUE);
     expect(m.vm.data.keys.map((r) => r.key)).toEqual(['MY_KEY', 'NEW_KEY', 'SPOTIFY_CLIENT_ID']);
     expect(m.vm.data.form).toBeNull();
-    expect(currentSnackbar()).toMatchObject({ tone: 'neutral', message: 'NEW_KEY is saved on your Pond.' });
+    expect(currentSnackbar()).toMatchObject({ tone: 'success', message: 'NEW_KEY is saved on your Pond.' });
     await m.unmount();
   });
 
@@ -298,7 +298,7 @@ describe('replacing a value', () => {
     });
 
     expect(pond.setSecret).toHaveBeenCalledWith('SPOTIFY_CLIENT_ID', VALUE);
-    expect(currentSnackbar()).toMatchObject({ tone: 'neutral', message: 'Spotify client ID is saved on your Pond.' });
+    expect(currentSnackbar()).toMatchObject({ tone: 'success', message: 'Spotify client ID is saved on your Pond.' });
     expect(everything(m.vm)).not.toContain(VALUE);
     await m.unmount();
   });
@@ -343,7 +343,7 @@ describe('deleting a secret', () => {
     expect(gone).toBe(true);
     expect(pond.deleteSecret).toHaveBeenCalledWith('MY_KEY');
     expect(m.vm.data.keys.map((r) => r.key)).toEqual(['SPOTIFY_CLIENT_ID']);
-    expect(currentSnackbar()).toMatchObject({ tone: 'neutral', message: 'MY_KEY is deleted from your Pond.' });
+    expect(currentSnackbar()).toMatchObject({ tone: 'success', message: 'MY_KEY is deleted from your Pond.' });
     await m.unmount();
   });
 

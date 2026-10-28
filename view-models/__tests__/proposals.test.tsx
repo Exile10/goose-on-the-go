@@ -157,7 +157,7 @@ describe('deciding', () => {
     await act(async () => m.vm.actions.decide('p1', 'approve'));
 
     expect(pond.decideProposal).toHaveBeenCalledWith('p1', label, 'approve');
-    expect(currentSnackbar()).toMatchObject({ tone: 'neutral', message: 'Accepted. The Pond has noted it; nothing was run.' });
+    expect(currentSnackbar()).toMatchObject({ tone: 'success', message: 'Accepted. The Pond has noted it; nothing was run.' });
     expect(pond.listProposals).toHaveBeenCalledTimes(2);
     expect(m.vm.data.rows).toEqual([]);
     expect(m.vm.deciding).toBeNull();
@@ -171,7 +171,7 @@ describe('deciding', () => {
     await act(async () => m.vm.actions.decide('p1', 'reject'));
 
     expect(pond.decideProposal).toHaveBeenCalledWith('p1', expect.any(String), 'reject');
-    expect(currentSnackbar()?.tone).toBe('neutral');
+    expect(currentSnackbar()?.tone).toBe('success');
     await m.unmount();
   });
 

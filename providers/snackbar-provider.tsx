@@ -18,10 +18,14 @@
  *   would otherwise read it twice.
  * - It clears the safe area, the tab bar (which reports its height with `useSnackbarClearance`)
  *   and the keyboard.
- * - It slides and fades in Ink's base duration, and simply appears with Reduce Motion on
- *   (`theme.animate`).
- * - An inverse surface, as Material draws it, and the danger fill for a failure. No border, no
- *   icon: the colour and the sentence say which it is.
+ * - It rises on a short spring and fades, leaves in Ink's fast duration, and simply appears and
+ *   goes with Reduce Motion on (`theme.animate`).
+ * - It is drawn in the other scheme, as Material's inverse surface is: the other scheme's surface,
+ *   text, accent and status colours, so a dark bar over a light app and a light one over a dark
+ *   app, each already measured by Ink against its own surface (`snackbarPalette`). A leading
+ *   icon says which kind of message it is (`SNACKBAR_ICON`), in that tone's colour. Depth comes
+ *   from a shadow, not a border; the message wraps to two lines and the whole of it is still
+ *   announced.
  *
  * Which feedback goes here and which stays in the page is in docs/VIEW-LAYER.md, "Feedback for
  * actions".
@@ -39,8 +43,11 @@ import React, {
 import { AccessibilityInfo, Animated, Easing, Keyboard, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
-import { toneColors } from '@jarida/ink';
+import { EASE_IN_OUT, createTheme, toneColors, type InkTheme } from '@jarida/ink';
 import { inkText, readingTime, useInkTheme } from '@jarida/ink/native';
+
+import { GIcon } from '@/components/ui/g-icon';
+import type { IconName } from '@/constants/icons';
 
 import {
   SNACKBAR_ACTION_MS,
@@ -51,6 +58,7 @@ import {
   subscribeSnackbar,
   type Snackbar,
   type SnackbarRequest,
+  type SnackbarTone,
 } from '@/services/snackbar';
 
 /** What `useSnackbar()` hands a component. Both functions are stable. */
@@ -73,6 +81,46 @@ export function snackbarDuration(snackbar: Snackbar, screenReader: boolean): num
   if (snackbar.action && screenReader) return null;
   const floor = snackbar.action ? SNACKBAR_ACTION_MS : SNACKBAR_MS;
   return Math.max(floor, readingTime(snackbar.message));
+}
+
+/** The glyph at the start of each kind of message: a tick, an exclamation mark, an i. */
+export const SNACKBAR_ICON: Record<SnackbarTone, IconName> = {
+  success: 'done',
+  danger: 'alert',
+  neutral: 'info',
+};
+
+/** The colours a snackbar is drawn in. */
+export interface SnackbarPalette {
+  ground: string;
+  words: string;
+  action: string;
+  pressed: string;
+  icon: Record<SnackbarTone, string>;
+}
+
+/**
+ * The other scheme's colours, for a surface laid over this one.
+ *
+ * Taken whole from Ink's theme for the other scheme rather than mixed here, because every one of
+ * them is already measured against that scheme's surface: the text, the status foregrounds (AA
+ * 4.5:1 and up), and the accent line, which `createTheme` derives so that whichever accent is
+ * chosen still clears 4.5:1 as text. A neutral message takes Ink's info colour for its icon.
+ * Exported for the tests, which measure it.
+ */
+export function snackbarPalette(theme: Pick<InkTheme, 'scheme' | 'accent'>): SnackbarPalette {
+  const other = createTheme({ scheme: theme.scheme === 'dark' ? 'light' : 'dark', accent: theme.accent }).color;
+  return {
+    ground: other.surface,
+    words: other.text,
+    action: other.accentLine,
+    pressed: other.pressed,
+    icon: {
+      success: toneColors('success', other).fg,
+      danger: toneColors('danger', other).fg,
+      neutral: toneColors('info', other).fg,
+    },
+  };
 }
 
 export function SnackbarProvider({ children }: PropsWithChildren) {
@@ -164,17 +212,21 @@ function SnackbarHost({ clearance }: { clearance: number }) {
       progress.setValue(target);
       return;
     }
-    const run = Animated.timing(progress, {
-      toValue: target,
-      duration: theme.duration.base,
-      easing: Easing.bezier(theme.easing[0], theme.easing[1], theme.easing[2], theme.easing[3]),
-      useNativeDriver: true,
-    });
+    // In on a spring that settles just past its mark and back, out on a quick ease: arriving
+    // should catch the eye, leaving should not.
+    const run = snackbar
+      ? Animated.spring(progress, { toValue: 1, damping: 20, stiffness: 260, mass: 1, useNativeDriver: true })
+      : Animated.timing(progress, {
+          toValue: 0,
+          duration: theme.duration.fast,
+          easing: Easing.bezier(EASE_IN_OUT[0], EASE_IN_OUT[1], EASE_IN_OUT[2], EASE_IN_OUT[3]),
+          useNativeDriver: true,
+        });
     run.start(({ finished }) => {
       if (finished && !snackbar) setShown(null);
     });
     return () => run.stop();
-  }, [snackbar, progress, theme.animate, theme.duration.base, theme.easing]);
+  }, [snackbar, progress, theme.animate, theme.duration.fast]);
 
   useEffect(() => {
     if (!snackbar) return;
@@ -184,47 +236,57 @@ function SnackbarHost({ clearance }: { clearance: number }) {
     return () => clearTimeout(timer);
   }, [snackbar, screenReader]);
 
-  const palette = useMemo(() => {
-    const danger = toneColors('danger', theme.color);
-    // The inverse of the page: the text colour as the ground, the page colour as the words.
-    return {
-      ground: { neutral: theme.color.text, danger: danger.solid },
-      words: { neutral: theme.color.bg, danger: danger.onSolid },
-    };
-  }, [theme.color]);
+  const palette = useMemo(() => snackbarPalette(theme), [theme]);
 
   if (!shown) return null;
 
-  const fg = palette.words[shown.tone];
   const bottom = (keyboard > 0 ? keyboard : clearance > 0 ? clearance : insets.bottom) + theme.space[3];
-  const body = inkText(theme, { size: 'sm', color: fg });
-  const action = inkText(theme, { size: 'sm', weight: theme.weight.bold, color: fg });
+  const body = inkText(theme, { size: 'base', weight: theme.weight.medium, leading: 'snug', color: palette.words });
+  const action = inkText(theme, { size: 'base', weight: theme.weight.bold, color: palette.action });
+  // A dark bar over a light page casts a soft shadow; a light bar over a dark page is lifted by
+  // its own brightness, and a darker, wider shadow is what keeps its edge from glowing.
+  const shadow = theme.scheme === 'dark' ? { shadowOpacity: 0.5, shadowRadius: 20 } : { shadowOpacity: 0.22, shadowRadius: 16 };
 
   return (
-    <View pointerEvents="box-none" style={[StyleSheet.absoluteFill, { justifyContent: 'flex-end' }]}>
+    <View
+      pointerEvents="box-none"
+      style={[StyleSheet.absoluteFill, { justifyContent: 'flex-end', alignItems: 'center', paddingHorizontal: theme.space[4] }]}
+    >
       <Animated.View
         testID="snackbar"
         style={{
-          marginHorizontal: theme.space[4],
+          width: '100%',
+          // One sentence at reading measure: on a tablet it sits centred rather than across the screen.
+          maxWidth: theme.measure.prose,
           marginBottom: bottom,
-          opacity: progress,
-          transform: [{ translateY: progress.interpolate({ inputRange: [0, 1], outputRange: [theme.space[4], 0] }) }],
+          opacity: progress.interpolate({ inputRange: [0, 1], outputRange: [0, 1], extrapolate: 'clamp' }),
+          transform: [
+            { translateY: progress.interpolate({ inputRange: [0, 1], outputRange: [theme.space[5], 0] }) },
+            { scale: progress.interpolate({ inputRange: [0, 1], outputRange: [0.96, 1], extrapolate: 'clamp' }) },
+          ],
           flexDirection: 'row',
           alignItems: 'center',
-          gap: theme.space[2],
-          minHeight: theme.touch.tapMin,
+          gap: theme.space[3],
+          minHeight: theme.rowHeight.lg,
           paddingLeft: theme.space[4],
-          paddingRight: shown.action ? theme.space[2] : theme.space[4],
-          borderRadius: theme.radius.md,
-          backgroundColor: palette.ground[shown.tone],
+          paddingRight: shown.action ? theme.space[1] : theme.space[4],
+          borderRadius: theme.radius.lg,
+          backgroundColor: palette.ground,
           // A plane over the content, said by its lift rather than a rule around it.
           shadowColor: '#000',
-          shadowOpacity: 0.2,
-          shadowRadius: 8,
-          shadowOffset: { width: 0, height: 3 },
-          elevation: 6,
+          shadowOffset: { width: 0, height: 6 },
+          ...shadow,
+          elevation: 8,
         }}
       >
+        <View
+          testID="snackbar-icon"
+          accessible={false}
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
+        >
+          <GIcon name={SNACKBAR_ICON[shown.tone]} size={20} strokeWidth={2} color={palette.icon[shown.tone]} />
+        </View>
         <Pressable
           style={{ flex: 1, paddingVertical: theme.space[3] }}
           onPress={() => dismissSnackbar(shown.id)}
@@ -232,7 +294,9 @@ function SnackbarHost({ clearance }: { clearance: number }) {
           accessibilityLabel={shown.message}
           accessibilityHint={t('common.dismissHint')}
         >
-          <Text style={body.style}>{shown.message}</Text>
+          <Text style={body.style} numberOfLines={2} ellipsizeMode="tail">
+            {shown.message}
+          </Text>
         </Pressable>
         {shown.action ? (
           <Pressable
@@ -241,8 +305,15 @@ function SnackbarHost({ clearance }: { clearance: number }) {
               dismissSnackbar(shown.id);
               shown.action?.onPress();
             }}
-            hitSlop={theme.space[2]}
-            style={{ minHeight: theme.touch.tapMin, justifyContent: 'center', paddingHorizontal: theme.space[3] }}
+            style={({ pressed }) => ({
+              minHeight: theme.touch.tapMin,
+              minWidth: theme.touch.tapMin,
+              justifyContent: 'center',
+              alignItems: 'center',
+              paddingHorizontal: theme.space[3],
+              borderRadius: theme.radius.md,
+              backgroundColor: pressed ? palette.pressed : 'transparent',
+            })}
           >
             <Text style={action.style}>{shown.action.label}</Text>
           </Pressable>

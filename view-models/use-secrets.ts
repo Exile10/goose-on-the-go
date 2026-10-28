@@ -222,7 +222,7 @@ export function useSecrets(): UseSecrets {
           tone: 'danger',
         });
       } else {
-        showSnackbar({ message: i18n.t('secrets.saved', { name }) });
+        showSnackbar({ message: i18n.t('secrets.saved', { name }), tone: 'success' });
       }
       setForm(null);
       setDraftKeyText('');
@@ -247,7 +247,7 @@ export function useSecrets(): UseSecrets {
         writes.current += 1;
         setKeys((known) => (known ?? []).filter((row) => row.key !== key));
         if (form?.kind === 'replace' && form.key === key) closeForm();
-        showSnackbar({ message: i18n.t('secrets.deleted', { name: secretName(rowFor(key)) }) });
+        showSnackbar({ message: i18n.t('secrets.deleted', { name: secretName(rowFor(key)) }), tone: 'success' });
         return true;
       } catch (e) {
         console.warn('[secrets] delete failed', { status: statusOf(e) });

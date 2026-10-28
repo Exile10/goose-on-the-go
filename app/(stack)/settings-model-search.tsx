@@ -57,7 +57,7 @@ export default function ModelSearchScreen() {
     if (pictures === null) return;
     if (!(await lib.actions.downloadFile(file, pictures))) return;
     void confirm();
-    snackbar.show({ message: t('models.library.started') });
+    snackbar.show({ message: t('models.library.started'), tone: 'success' });
   };
 
   return (

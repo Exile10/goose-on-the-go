@@ -535,13 +535,14 @@ engineer's half: `[scope] what kind=http_500`.
 ## Feedback for actions
 
 What a tap came to -- saved, started, refused -- is not a fact about the page,
-so it does not become a box in the page that stays there. Four homes, chosen by
-what the sentence is about:
+so it does not become a box in the page that stays there. Where it goes is
+chosen by what the sentence is about:
 
 | The sentence is about | Where it goes |
 |---|---|
-| An action the user just took that worked: saved, run started, deleted, download started | The snackbar, neutral |
+| An action the user just took that worked: saved, run started, deleted, download started | The snackbar, success |
 | An action the user just took that failed: a switch the Pond refused, a delete, a run | The snackbar, danger, with Try again when sending the same request again is meaningful and cheap |
+| Something else about that action worth a sentence: the thing was already gone | The snackbar, neutral |
 | A field, or a form still open | Inline, beside the field or the form's button, so the typed values and the reason stay together |
 | A standing condition: a feature off or unavailable, a setup state, a warning about what an option does, a page that did not load | Inline (`InkNotice`, or `ContentUnavailable` for content) |
 
@@ -554,7 +555,7 @@ dialog keeps it.
 a module-level store calls `showSnackbar(...)` from `services/snackbar.ts`
 directly, since a store cannot call a hook.
 
-    show({ message, tone?: 'neutral' | 'danger', action?: { label, onPress } })
+    show({ message, tone?: 'success' | 'neutral' | 'danger', action?: { label, onPress } })
 
 It follows Material 3's snackbar and the HIG. One at a time: a new message
 replaces the one showing. It goes by itself after about 4 s (longer for a long
@@ -563,10 +564,27 @@ not at all while a screen reader is on and it carries an action. A tap or the
 screen reader's escape puts it away. It is announced once
 (`announceForAccessibility`), sits above the safe area, the tab bar (which
 reports its height with `useSnackbarClearance` while it is in front) and the
-keyboard, and appears without a slide under Reduce Motion. An inverse surface
-for neutral, the danger fill for danger; no border, no icon. The message is
-one short sentence from the catalogue: a status code or a route belongs to
-`logFailure` and `console.warn`, which every failure site still writes.
+keyboard. It rises on a short spring and fades in, leaves on Ink's fast
+duration, and simply appears and goes under Reduce Motion.
+
+It is drawn in the other scheme, as Material's inverse surface is: Ink's
+dark-scheme surface and text (`#1E1B26`, `#F3F1F8`) over a light app, its
+light-scheme surface and text (`#FFFFFF`, `#171616`) over a dark one, with that
+scheme's accent line for the action and its status foregrounds for the icon
+(`snackbarPalette`). Every one of
+those is Ink's own value, measured against that surface, so nothing is mixed
+here; the provider's tests re-measure all of them at 4.5:1 or better for both
+schemes and all five accents. A leading icon says which kind of message it is
+(`SNACKBAR_ICON`): a ticked circle for success, an exclamation in a circle for
+danger, an i for neutral, in the success, danger and info colours. Depth is a
+soft shadow and `elevation`, not a border; corners are Ink's `radius.lg`; it is
+centred and stops at `measure.prose` wide on a tablet. The message wraps to two
+lines and is cut after that, and the whole sentence is still what is read and
+announced. The action is a text button in the accent, at least 44 pt each way.
+
+The message is one short sentence from the catalogue: a status code or a
+route belongs to `logFailure` and `console.warn`, which every failure site
+still writes.
 
 Try again calls the action as it is now, not the closure the failure was
 caught in: a hook keeps a ref to its current action, set in an effect, and the

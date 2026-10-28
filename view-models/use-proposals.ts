@@ -131,7 +131,10 @@ export function useProposals(): UseProposals {
       try {
         await api.decideProposal(id, session, decision);
         console.info('[proposals] decided', id, decision);
-        showSnackbar({ message: decision === 'approve' ? i18n.t('proposals.accepted') : i18n.t('proposals.declined') });
+        showSnackbar({
+          message: decision === 'approve' ? i18n.t('proposals.accepted') : i18n.t('proposals.declined'),
+          tone: 'success',
+        });
       } catch (e) {
         console.warn('[proposals] decision failed', decision, e instanceof ApiError ? e.status : 'network');
         showSnackbar({

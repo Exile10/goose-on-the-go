@@ -41,7 +41,7 @@ export function useWakeWord(): UseWakeWord {
     if (await update('voice_wake_word', phrase)) {
       void confirm();
       setEdits(null);
-      showSnackbar({ message: i18n.t('setup.wake.saved', { phrase }) });
+      showSnackbar({ message: i18n.t('setup.wake.saved', { phrase }), tone: 'success' });
       if (profileId) void finishChecklistItem(profileId, 'wake');
     }
   };
