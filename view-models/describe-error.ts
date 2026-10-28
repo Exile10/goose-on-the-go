@@ -30,7 +30,7 @@ import i18n from '@/services/i18n';
 export function describeApiError(e: unknown): string | null {
   // Not an ApiError means the request never got an answer, which is a statement
   // about the connection rather than about this screen's operation. The banner
-  // already says "Pond is unavailable", and the failure that produced this also
+  // already says "Cannot reach your Pond", and the failure that produced this also
   // drove the recovery that put it there, so a screen repeating it underneath
   // is the same fact twice.
   if (!(e instanceof ApiError)) return null;

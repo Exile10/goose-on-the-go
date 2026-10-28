@@ -8,9 +8,9 @@
 import { useCallback, useRef, useState } from 'react';
 
 import { useServer } from '@/providers/server-provider';
-import { ApiError, api } from '@/services/api-client';
+import { api } from '@/services/api-client';
 import type { SessionSummary } from '@/services/types';
-import { describeApiError } from './describe-error';
+import { describeApiError, logFailure } from './describe-error';
 import { useLive } from './use-live';
 import i18n from '@/services/i18n';
 
@@ -51,6 +51,9 @@ export interface RecentSession {
 export interface UseRecentSessions {
   data: { sessions: RecentSession[] };
   loading: boolean;
+  /** No read has worked yet and the last one failed: the strip is unknown, not empty. */
+  failed: boolean;
+  /** Words for that failure, when there are any beyond the shared ones. */
   error: string | null;
   actions: { refresh: () => Promise<void> };
 }
@@ -63,6 +66,7 @@ export function useRecentSessions(): UseRecentSessions {
   const [sessions, setSessions] = useState<RecentSession[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
 
   // The base URL and bearer token arrive asynchronously; fetching before they
   // land calls the default address unauthenticated and never retries.
@@ -82,9 +86,13 @@ export function useRecentSessions(): UseRecentSessions {
       setSessions(all.slice(0, RECENT_LIMIT).map(toRecent));
       loaded.current = true;
       setError(null);
+      setFailed(false);
     } catch (e) {
-      if (loud || !loaded.current) setError(describeApiError(e));
-      else console.warn('[recent] refresh failed; showing the last result', e instanceof ApiError ? e.status : 'network');
+      if (loud || !loaded.current) {
+        setError(describeApiError(e));
+        logFailure('recent', 'read failed', e);
+      } else logFailure('recent', 'refresh failed; showing the last result', e);
+      if (!loaded.current) setFailed(true);
     } finally {
       setLoading(false);
     }
@@ -94,7 +102,7 @@ export function useRecentSessions(): UseRecentSessions {
 
   useLive(() => load(false), RECENT_SESSIONS_MS, hydrated);
 
-  return { data: { sessions }, loading, error, actions: { refresh } };
+  return { data: { sessions }, loading, failed, error, actions: { refresh } };
 }
 
 /**

@@ -12,7 +12,7 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 import { useServer } from '@/providers/server-provider';
 import { ApiError, api, type PondApiClient } from '@/services/api-client';
 import type { Device, DeviceStatePatch, MatterStatus, UpdateDeviceRequest } from '@/services/types';
-import { describeApiError } from './describe-error';
+import { describeApiError, logFailure } from './describe-error';
 import { useLive } from './use-live';
 import i18n from '@/services/i18n';
 
@@ -215,6 +215,8 @@ export interface UseDevices {
     matter: MatterStatus | null;
   };
   loading: boolean;
+  /** No read of the list has worked yet and the last one failed: the list is unknown, not empty. */
+  failed: boolean;
   error: string | null;
   actions: {
     refresh: () => Promise<void>;
@@ -279,6 +281,7 @@ export function useDevices(): UseDevices {
   const [matter, setMatter] = useState<MatterStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
   // When this screen last changed something itself, so a poll that began earlier cannot undo it.
   const powerChangedAt = useRef<Record<string, number>>({});
   const listChangedAt = useRef(0);
@@ -339,10 +342,14 @@ export function useDevices(): UseDevices {
         if (listPollStillCurrent(startedAt, listChangedAt.current)) setDevices(list);
         loaded.current = true;
         setError(null);
+        setFailed(false);
         void readPower(list, startedAt);
       } catch (e) {
-        if (loud || !loaded.current) setError(describeDeviceError(e));
-        else console.warn('[devices] refresh failed; showing the last list', e instanceof ApiError ? e.status : 'network');
+        if (loud || !loaded.current) {
+          setError(describeDeviceError(e));
+          logFailure('devices', 'read failed', e);
+        } else logFailure('devices', 'refresh failed; showing the last list', e);
+        if (!loaded.current) setFailed(true);
       } finally {
         setLoading(false);
       }
@@ -468,6 +475,7 @@ export function useDevices(): UseDevices {
       matter,
     },
     loading,
+    failed,
     error,
     actions: { refresh, setState, commission, remove, edit },
   };

@@ -14,7 +14,6 @@ import {
   InkButton,
   InkCard,
   InkEmptyState,
-  InkNotice,
   InkSwitch,
   InkText,
   InkTitle,
@@ -31,9 +30,12 @@ import type { ThemeColors } from '@/constants/colors';
 import { GIcon } from '@/components/ui/g-icon';
 import { GPressable } from '@/components/ui/g-pressable';
 import { EqualizerBars } from '@/components/ui/equalizer-bars';
+import { ContentUnavailable } from '@/components/patterns/content-unavailable';
 import { FinishSetup } from '@/components/patterns/finish-setup';
 import { PondGettingReady } from '@/components/patterns/pond-getting-ready';
 import { RemoteAccessOffer } from '@/components/patterns/remote-access-offer';
+import { isUnavailable } from '@/models/content-state';
+import { useContentState } from '@/view-models/use-content-state';
 import { useRecentSessions } from '@/view-models/use-recent-sessions';
 import { supports, useDevices } from '@/view-models/use-devices';
 import { initialOf, useMember } from '@/view-models/use-household';
@@ -69,35 +71,42 @@ function greetingKey(hour: number) {
 }
 
 /**
- * The Pond's reachability, as the page's opening statement.
+ * The Pond, as the page's opening statement.
  *
- * Three states, not two: until `hydrated` the stored URL has not been read
- * back, so claiming "unreachable" would be reporting a race rather than a
- * fact. A reconnect in progress is the same kind of not-yet: it said
- * "unreachable" for the six seconds a cold start on cellular takes to bring the
- * tailnet up, beside a banner saying it was reconnecting.
+ * Connected, it says so beside the Pond's address and offers the two things to do with it. Not
+ * connected, it says nothing about why: the connection indicator at the top of the app is already
+ * saying that, with the action for it, and this card used to repeat it underneath as "Pond
+ * unreachable", a red OFFLINE badge and a second Try again. What it keeps is what only it offers --
+ * switching to another Pond -- and a line on what Home will show once the connection is back.
+ *
+ * Until `hydrated` the stored URL has not been read back, so the card says it is looking rather
+ * than claiming anything about reachability.
  */
 function PondCard() {
   const styles = useThemedStyles(makeStyles);
   const { t } = useTranslation();
-  const { online, serverUrl, checkHealth, hydrated, connectionState } = useServer();
-  const [checking, setChecking] = useState(false);
+  const { online, serverUrl, hydrated } = useServer();
   const router = useRouter();
 
-  const retry = useCallback(async () => {
-    setChecking(true);
-    try {
-      await checkHealth();
-    } finally {
-      setChecking(false);
-    }
-  }, [checkHealth]);
-
-  if (!hydrated || connectionState === 'reconnecting') {
+  if (!hydrated) {
     return (
       <InkCard style={styles.pond}>
         <InkTitle level={2}>{t('pond.searching')}</InkTitle>
-        <InkText>{hydrated ? t('pond.connectingBody') : t('pond.searchingBody')}</InkText>
+        <InkText>{t('pond.searchingBody')}</InkText>
+      </InkCard>
+    );
+  }
+
+  if (!online) {
+    return (
+      <InkCard style={styles.pond}>
+        <InkTitle level={2}>{t('pond.yours')}</InkTitle>
+        <InkText>{t('pond.waitingBody')}</InkText>
+        <View style={styles.pondActions}>
+          <InkButton variant="quiet" icon="server" onPress={() => router.push('/(stack)/switch-pond')}>
+            {t('pond.switch')}
+          </InkButton>
+        </View>
       </InkCard>
     );
   }
@@ -105,40 +114,17 @@ function PondCard() {
   return (
     <InkCard style={styles.pond}>
       <View style={styles.pondTop}>
-        <InkTitle level={2}>{t(online ? 'pond.connected' : 'pond.unreachable')}</InkTitle>
-        <InkBadge tone={online ? 'success' : 'danger'}>
-          {t(online ? 'common.online' : 'common.offline')}
-        </InkBadge>
+        <InkTitle level={2}>{t('pond.connected')}</InkTitle>
+        <InkBadge tone="success">{t('common.online')}</InkBadge>
       </View>
       <InkText>{hostOf(serverUrl)}</InkText>
       <View style={styles.pondActions}>
-        {online ? (
-          <>
-            <InkButton
-              variant="primary"
-              icon="chat"
-              onPress={() => router.push('/conversation')}
-            >
-              {t('pond.askGoose')}
-            </InkButton>
-            <InkButton
-              variant="quiet"
-              icon="server"
-              onPress={() => router.push('/(stack)/switch-pond')}
-            >
-              {t('pond.switch')}
-            </InkButton>
-          </>
-        ) : (
-          <>
-            <InkButton variant="primary" disabled={checking} onPress={retry}>
-              {t(checking ? 'pond.checking' : 'common.retry')}
-            </InkButton>
-            <InkButton variant="quiet" onPress={() => router.push('/(stack)/switch-pond')}>
-              {t('pond.switch')}
-            </InkButton>
-          </>
-        )}
+        <InkButton variant="primary" icon="chat" onPress={() => router.push('/conversation')}>
+          {t('pond.askGoose')}
+        </InkButton>
+        <InkButton variant="quiet" icon="server" onPress={() => router.push('/(stack)/switch-pond')}>
+          {t('pond.switch')}
+        </InkButton>
       </View>
     </InkCard>
   );
@@ -291,11 +277,17 @@ export default function HomeScreen() {
   );
 
   const shown = devices.data.devices.slice(0, HOME_GRID_LIMIT);
+  const recentState = useContentState({
+    loading: recent.loading,
+    failed: recent.failed,
+    hasContent: recent.data.sessions.length > 0,
+  });
+  const devicesState = useContentState({ loading: devices.loading, failed: devices.failed, hasContent: shown.length > 0 });
 
   // Only badges with a source. The online count is the list the grid below
   // shows, so the two cannot disagree, and it is not shown while that list is
   // unknown.
-  const showOnlineCount = !devices.loading && !devices.error;
+  const showOnlineCount = devicesState === 'ready' || devicesState === 'empty';
   const showOutdoor = rightNow.outdoorTemp !== null;
 
   return (
@@ -389,16 +381,13 @@ export default function HomeScreen() {
             <Text style={styles.convoTime}>{c.time}</Text>
           </GPressable>
         ))}
-        {/* Say why the strip is empty: a read that failed is not "no
-            conversations yet". */}
-        {!recent.loading && recent.data.sessions.length === 0 ? (
-          recent.error ? (
-            <InkNotice tone="danger">{recent.error}</InkNotice>
-          ) : (
-            <InkEmptyState icon="chat" title={t('home.noConversations')}>
-              <InkText>{t('home.noConversationsBody')}</InkText>
-            </InkEmptyState>
-          )
+        {/* A read that failed is not "no conversations yet". */}
+        {isUnavailable(recentState) ? (
+          <ContentUnavailable compact state={recentState} reason={recent.error} onRetry={recent.actions.refresh} />
+        ) : recentState === 'empty' ? (
+          <InkEmptyState icon="chat" title={t('home.noConversations')}>
+            <InkText>{t('home.noConversationsBody')}</InkText>
+          </InkEmptyState>
         ) : null}
 
         <View style={styles.sectionHeader}>
@@ -422,25 +411,23 @@ export default function HomeScreen() {
         {/* An empty grid used to render as a blank gap, which reads as a broken
             screen rather than as an absence. A list that failed to load is
             neither, and says so. */}
-        {!devices.loading && shown.length === 0 ? (
-          devices.error ? (
-            <InkNotice tone="danger">{devices.error}</InkNotice>
-          ) : (
-            <InkEmptyState
-              icon="device"
-              title={t('home.noDevices')}
-              action={
-                <InkButton
-                  variant="primary"
-                  onPress={() => router.push('/(stack)/commission-device')}
-                >
-                  {t('home.addDevice')}
-                </InkButton>
-              }
-            >
-              <InkText>{t('home.noDevicesBody')}</InkText>
-            </InkEmptyState>
-          )
+        {isUnavailable(devicesState) ? (
+          <ContentUnavailable compact state={devicesState} reason={devices.error} onRetry={devices.actions.refresh} />
+        ) : devicesState === 'empty' ? (
+          <InkEmptyState
+            icon="device"
+            title={t('home.noDevices')}
+            action={
+              <InkButton
+                variant="primary"
+                onPress={() => router.push('/(stack)/commission-device')}
+              >
+                {t('home.addDevice')}
+              </InkButton>
+            }
+          >
+            <InkText>{t('home.noDevicesBody')}</InkText>
+          </InkEmptyState>
         ) : null}
           </>
         )}

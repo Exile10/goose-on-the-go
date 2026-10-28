@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactElement } from 'react';
-import { Pressable, StyleSheet, Text } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import { useRouter, useSegments } from 'expo-router';
@@ -8,10 +8,19 @@ import { useServer } from '@/providers/server-provider';
 import { useThemedStyles } from '@/hooks/use-themed-styles';
 import type { ThemeColors } from '@/constants/colors';
 import '@/services/i18n';
-import { bannerHiddenOn, type ConnectionState } from '@/models/connection';
+import { GIcon } from '@/components/ui/g-icon';
+import type { IconName } from '@/constants/icons';
+import { Spacing } from '@/constants/spacing';
+import { FontSize, FontWeight } from '@/constants/typography';
+import { useTheme } from '@/providers/theme-provider';
+import {
+  bannerHiddenOn,
+  connectionActionIsPairing,
+  connectionNeedsAttention,
+  type ConnectionState,
+} from '@/models/connection';
 // The insecure development banner above this one takes the top inset when it is shown.
 
-/** Persistent feedback with local pairing or recovery as the relevant action. */
 /**
  * One literal key per state, for the same reason as the steps in
  * app/(stack)/remote-access.tsx: a key built from the state is invisible to the
@@ -30,26 +39,6 @@ function stateLabel(t: TFunction, state: ConnectionState): string {
     case 'revoked': return t('connection.revoked');
   }
 }
-
-/**
- * The states that need saying. A working connection is not one of them.
- *
- * This banner sits above the navigator in the root layout, so whatever it draws
- * it draws over the notification bar and pushes every screen down -- and the
- * screens below apply the top inset again, which is the empty strip under it.
- * Paying that permanently to report "Connected locally" spent the status bar on
- * news that nothing is wrong, which Home already shows beside the Pond's
- * address. Healthy connections say nothing; the banner appears when there is
- * something to act on, and is the control that acts on it.
- */
-const NEEDS_ATTENTION: readonly ConnectionState[] = [
-  'trust',
-  'unpaired',
-  'upgrade',
-  'reconnecting',
-  'disconnected',
-  'revoked',
-];
 
 /**
  * How long a reconnect may run before the banner says so. The banner pushes every screen down, so
@@ -71,26 +60,75 @@ function AfterGrace({ children }: { children: ReactElement }) {
   return shown ? children : null;
 }
 
+/** The glyph for what kind of problem it is: the connection, the pairing, or trust in the Pond. */
+function stateIcon(state: ConnectionState): IconName {
+  if (connectionActionIsPairing(state)) return 'link';
+  if (state === 'trust') return 'shield';
+  return 'cloud-off';
+}
+
+/**
+ * The app's one statement that the Pond cannot be used, and the control that acts on it.
+ *
+ * Screens do not repeat it: while it is up, content that did not arrive shows only that it will
+ * fill in (`ContentUnavailable`), and Home's Pond card drops its own reachability title. That is
+ * the whole point of it being one strip rather than a notice per screen -- a Pond that is down was
+ * being reported three times on one screen.
+ *
+ * A working connection says nothing (`connectionNeedsAttention`). The strip sits above the
+ * navigator, over the notification bar, and pushes every screen down, so paying that permanently
+ * to report "Connected locally" spent the status bar on news that nothing is wrong. It is quiet when
+ * it does appear -- the secondary surface and a hairline, not a coloured slab -- and its action is a
+ * labelled control rather than the whole strip being tappable with nothing to say so: Try again
+ * where another attempt can help, Pair where only pairing can.
+ */
 export function ConnectionStatus() {
   const { connectionState, recover, hydrated } = useServer();
   const styles = useThemedStyles(makeStyles);
+  const { colors } = useTheme();
   const { t } = useTranslation();
   const router = useRouter();
   const segments = useSegments();
   const insets = useSafeAreaInsets();
-  // `revoked` joins the states that send you to pairing rather than retrying:
-  // the Pond is reachable and has stopped recognising this phone, so `recover`
-  // -- which probes endpoints without a token -- would report success and
-  // change nothing.
-  const act = () => {
-    if (['unpaired', 'upgrade', 'revoked'].includes(connectionState)) router.push('/(stack)/pond-pairing');
-    else void recover();
+  const [checking, setChecking] = useState(false);
+  const pairing = connectionActionIsPairing(connectionState);
+
+  const act = async () => {
+    if (pairing) {
+      router.push('/(stack)/pond-pairing');
+      return;
+    }
+    setChecking(true);
+    try {
+      await recover();
+    } finally {
+      setChecking(false);
+    }
   };
+
   // Before the saved pairing has loaded, the state is a placeholder, not news.
-  if (!hydrated || !NEEDS_ATTENTION.includes(connectionState) || bannerHiddenOn(segments)) return null;
-  const banner = <Pressable accessibilityRole="button" onPress={act} style={[styles.container, { paddingTop: insets.top + 6 }]}>
-    <Text accessibilityLiveRegion="polite" style={styles.text}>{stateLabel(t, connectionState)}</Text>
-  </Pressable>;
+  if (!hydrated || !connectionNeedsAttention(connectionState) || bannerHiddenOn(segments)) return null;
+  // A reconnect is already the attempt Try again would make, so it offers nothing to press.
+  const action = connectionState === 'reconnecting' ? null : pairing ? t('connection.actionPair') : checking ? t('pond.checking') : t('common.retry');
+  const banner = (
+    <View style={[styles.container, { paddingTop: insets.top + Spacing.sm }]}>
+      <GIcon name={stateIcon(connectionState)} size={16} color={colors.textSecondary} />
+      <Text accessibilityLiveRegion="polite" style={styles.text}>
+        {stateLabel(t, connectionState)}
+      </Text>
+      {action ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityState={{ busy: checking }}
+          disabled={checking}
+          hitSlop={Spacing.md}
+          onPress={() => void act()}
+        >
+          <Text style={[styles.action, checking && styles.actionBusy]}>{action}</Text>
+        </Pressable>
+      ) : null}
+    </View>
+  );
   return connectionState === 'reconnecting' ? <AfterGrace>{banner}</AfterGrace> : banner;
 }
 /*
@@ -105,11 +143,16 @@ export function ConnectionStatus() {
 const makeStyles = (c: ThemeColors) =>
   StyleSheet.create({
     container: {
-      paddingHorizontal: 16,
-      paddingVertical: 6,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: Spacing.sm,
+      paddingHorizontal: Spacing.lg,
+      paddingBottom: Spacing.sm,
       backgroundColor: c.backgroundSecondary,
       borderBottomWidth: StyleSheet.hairlineWidth,
       borderBottomColor: c.border,
     },
-    text: { color: c.text, fontSize: 12, textAlign: 'center' },
+    text: { flex: 1, color: c.text, fontSize: FontSize.sm },
+    action: { color: c.textBrand, fontSize: FontSize.sm, fontWeight: FontWeight.semibold },
+    actionBusy: { color: c.textTertiary },
   });
