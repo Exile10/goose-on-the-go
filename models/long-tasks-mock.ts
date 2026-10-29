@@ -5,6 +5,7 @@
 import { ApiError } from '@/services/api-client';
 import { REPORT_FILES } from '@/models/long-tasks';
 import type {
+  AnswerShape,
   DeepResearchAvailability,
   LongTask,
   LongTaskArtifactBody,
@@ -47,6 +48,10 @@ const PLAN: { key: string; role: string; summary: string }[] = [
   { key: 'check', role: 'long-task-verifier', summary: 'Checked the plan against the dates you gave.' },
 ];
 
+/** What a short answer reads as: a few sentences and a link, said in the chat rather than a report. */
+const SHORT_BODY = `Take the **Madaraka Express** on Saturday at 08:00 and stay two nights by Nyali beach, about KES 18,000 in all. Fort Jesus is a short walk from the old town. [Timetable](https://metickets.krc.co.ke)
+`;
+
 const RESULT_BODY = `## A weekend in Mombasa
 
 - **Getting there:** the Madaraka Express leaves Nairobi at 08:00 and arrives at 14:00.
@@ -87,6 +92,7 @@ const REPORT_SECTIONS = `## Day 1: Saturday
 interface Entry {
   goal: string;
   kind: LongTaskKind;
+  answer: AnswerShape;
   askedAt: number;
   cancelledAt: number | null;
   /** Holds a place in the line; this member can neither read nor stop it, as on the Pond. */
@@ -181,6 +187,8 @@ export function createMockLongTasks(now: () => number = Date.now) {
         ? [{ id: `${id}-result`, task_id: id, step_key: 'check', kind: 'draft', title: 'Weekend plan', summary: 'Two nights by the beach, by train, for about KES 18,000.', tokens: 120, created_at: iso(endedAt ?? t) }]
         : [],
       result_artifact_id: finished ? `${id}-result` : null,
+      answer: entry.answer,
+      answer_text: finished && entry.answer === 'short' ? SHORT_BODY : null,
       queue: placeOf(id, when),
     };
   };
@@ -190,9 +198,13 @@ export function createMockLongTasks(now: () => number = Date.now) {
      * What the mock chat calls when asked for a long task; the id goes in its `task_start` answer.
      * `anotherMember` asks it for someone else in the household, for a line this member cannot see into.
      */
-    start(goal: string, kind: LongTaskKind = 'general', { anotherMember = false }: { anotherMember?: boolean } = {}): string {
+    start(
+      goal: string,
+      kind: LongTaskKind = 'general',
+      { anotherMember = false, answer = 'auto' }: { anotherMember?: boolean; answer?: AnswerShape } = {},
+    ): string {
       const id = `00000000-0000-4000-8000-${String(next++).padStart(12, '0')}`;
-      tasks.set(id, { goal, kind, askedAt: now(), cancelledAt: null, anotherMember });
+      tasks.set(id, { goal, kind, answer, askedAt: now(), cancelledAt: null, anotherMember });
       return id;
     },
     researchAvailability: async (): Promise<DeepResearchAvailability> => ({ available: true }),
@@ -226,7 +238,7 @@ export function createMockLongTasks(now: () => number = Date.now) {
     artifact: async (taskId: string, artifactId: string) => {
       const task = view(taskId);
       if (task.result_artifact_id !== artifactId) throw new ApiError('mock artifact → 404', 404, null, 'there is no such artifact in this task');
-      return { id: artifactId, title: 'Weekend plan', kind: 'draft', summary: task.artifacts[0].summary, body: RESULT_BODY };
+      return { id: artifactId, title: 'Weekend plan', kind: 'draft', summary: task.artifacts[0].summary, body: task.answer_text ?? RESULT_BODY };
     },
     cancel: async (id: string) => {
       const task = view(id);

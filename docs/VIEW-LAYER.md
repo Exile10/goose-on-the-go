@@ -353,6 +353,10 @@ voice mode. What is worth knowing:
     stays picked, so trying again is one press.
   - Nothing shows at the front of the line, once the task has ended, or
     from an older Pond that sends no `queue`.
+  - A finished task whose `answer` is `short` shows its `answer_text` whole,
+    as chat Markdown, in place of the result line and Read the result: a
+    short answer is read in the conversation, not opened as a report. Any
+    other task, or an older Pond's, keeps the line and the button.
 - **A long task's report is read on its own page** (`/(stack)/task-report`).
   - It is the whole report from `GET /long-tasks/{id}/report`, cut at its
     headings so a row of section chips can jump between them.

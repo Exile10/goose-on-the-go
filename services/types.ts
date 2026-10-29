@@ -1527,6 +1527,9 @@ export interface LongTaskArtifact {
 /** `research` is one a person asked for as deep research; an older Pond sends no kind. */
 export type LongTaskKind = 'general' | 'research';
 
+/** How long a task's answer is: `auto` until the Pond reads it from the question, then `short` or `report`. */
+export type AnswerShape = 'auto' | 'short' | 'report';
+
 /** `GET /api/v1/long-tasks/{id}`. */
 export interface LongTask {
   id: string;
@@ -1541,6 +1544,10 @@ export interface LongTask {
   artifacts: LongTaskArtifact[];
   /** The artifact that answers the goal, once there is one. */
   result_artifact_id: string | null;
+  /** Absent from an older Pond. */
+  answer?: AnswerShape;
+  /** A finished short answer's whole text, in Markdown; null otherwise. */
+  answer_text?: string | null;
   /** Where an open task waits; `null` once it has ended, and absent from an older Pond. */
   queue?: LongTaskQueuePlace | null;
 }

@@ -8,8 +8,9 @@ import { useTranslation } from 'react-i18next';
 import { InkButton, InkEdge, InkEyebrow, InkSpinner, inkText, useInkTheme } from '@jarida/ink/native';
 
 import { LongTaskQueue } from '@/components/patterns/long-task-queue';
+import { Markdown } from '@/components/patterns/markdown';
 import { GIcon } from '@/components/ui/g-icon';
-import { isEnded, resultArtifact } from '@/models/long-tasks';
+import { isEnded, resultArtifact, shortAnswer } from '@/models/long-tasks';
 import { useConfirm } from '@/providers/confirm-provider';
 import { confirm, reject, tap } from '@/services/haptics';
 import type { LongTaskStep } from '@/services/types';
@@ -67,6 +68,7 @@ export const LongTaskCard = React.memo(function LongTaskCard({ taskId, callId }:
 
   const ended = task ? isEnded(task.state) : false;
   const answer = task ? resultArtifact(task) : null;
+  const short = task ? shortAnswer(task) : null;
   const note = task ? taskStateNote(task.state) : null;
 
   return (
@@ -104,7 +106,12 @@ export const LongTaskCard = React.memo(function LongTaskCard({ taskId, callId }:
             </View>
           ) : null}
 
-          {answer ? (
+          {short ? (
+            <View style={styles.result}>
+              <InkEyebrow>{t('chat.longTask.result')}</InkEyebrow>
+              <Markdown source={short} />
+            </View>
+          ) : answer ? (
             <View style={styles.result}>
               <InkEyebrow>{t('chat.longTask.result')}</InkEyebrow>
               <Text style={line.style}>{answer.title}</Text>

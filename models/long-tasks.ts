@@ -4,6 +4,7 @@
 import { bareToolName } from '@/constants/tools';
 import type { ToolCall } from '@/models/chat';
 import type {
+  AnswerShape,
   DeepResearchAvailability,
   LongTask,
   LongTaskAhead,
@@ -18,6 +19,7 @@ import type {
 
 const TASK_STATES: readonly LongTaskState[] = ['planning', 'running', 'awaiting_approval', 'paused', 'completed', 'failed', 'cancelled'];
 const STEP_STATES: readonly LongTaskStepState[] = ['pending', 'running', 'completed', 'failed', 'skipped', 'awaiting_approval'];
+const ANSWER_SHAPES: readonly AnswerShape[] = ['auto', 'short', 'report'];
 
 /** While it is planning or running: the poll floor, so a step that finishes is seen finishing. */
 export const LONG_TASK_ACTIVE_MS = 5_000;
@@ -79,6 +81,12 @@ export function queueChoices(task: Pick<LongTask, 'id' | 'goal' | 'state' | 'que
 export function resultArtifact(task: LongTask): LongTaskArtifact | null {
   if (!task.result_artifact_id) return null;
   return task.artifacts.find((a) => a.id === task.result_artifact_id) ?? null;
+}
+
+/** A finished short answer, read whole in the conversation; null leaves the card to name the report. */
+export function shortAnswer(task: Pick<LongTask, 'state' | 'answer' | 'answer_text'>): string | null {
+  if (task.state !== 'completed' || task.answer !== 'short') return null;
+  return task.answer_text?.trim() ? task.answer_text : null;
 }
 
 export function progressOf(steps: readonly LongTaskStep[]): { done: number; total: number; skipped: number } {
@@ -159,6 +167,9 @@ export function readLongTask(raw: unknown): LongTask | null {
     steps,
     artifacts,
     result_artifact_id: textOrNull(t.result_artifact_id),
+    // Absent stays absent: an older Pond's task, or a shape this phone does not know, shows as a report.
+    ...(ANSWER_SHAPES.includes(t.answer as AnswerShape) ? { answer: t.answer as AnswerShape } : {}),
+    answer_text: textOrNull(t.answer_text),
     queue: readQueue(t.queue),
   };
 }
