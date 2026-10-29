@@ -608,6 +608,8 @@ export type TriggerAction =
 export type TaskKind =
   | { type: 'agent_prompt'; prompt: string }
   | { type: 'webhook'; webhook_url: string }
+  /** A fixed list of actions the Pond runs itself, without Goose: a morning routine. */
+  | { type: 'routine'; actions: TriggerAction[] }
   | {
       type: 'sensor_trigger';
       source: TriggerSource;
@@ -660,6 +662,8 @@ export interface UpdateScheduleRequest {
   fire_at?: string;
   once?: boolean;
   ask_if_missed?: boolean;
+  /** A routine's new actions. Only a routine's kind is ever sent. */
+  kind?: TaskKind;
 }
 
 export interface ScheduleRun {
