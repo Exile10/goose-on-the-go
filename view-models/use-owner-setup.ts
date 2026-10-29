@@ -13,6 +13,7 @@ import { ApiError, api } from '@/services/api-client';
 import { confirm, reject } from '@/services/haptics';
 import i18n, { type TranslationKey } from '@/services/i18n';
 import { getInstallId } from '@/services/install-id';
+import { canKeepAdminKey, keepAdminKey } from '@/services/kept-admin-key';
 import { storageFamily } from '@/services/storage';
 import type { OnboardStatus, PondSettings, SystemInfo } from '@/services/types';
 import {
@@ -106,6 +107,20 @@ function saveMessage(e: unknown): string {
   return describeApiError(e) ?? i18n.t('setup.saveFailed');
 }
 
+/**
+ * The key to My Pond that setup's last call gave the phone that claimed the Pond. A phone that cannot
+ * keep it drops it: the member can enroll with the admin card later. Never logged, never in AsyncStorage.
+ */
+async function keepSetupKey(pin: string | null, key: string | undefined): Promise<boolean> {
+  if (!pin || !key || !canKeepAdminKey()) return false;
+  try {
+    await keepAdminKey(pin, key, i18n.t('myPond.key.savePrompt'));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /** What the step a skip leaves behind is set to: the defaults, so nothing it requires is left empty. */
 function skipped(step: SetupStep, draft: SetupDraft): SetupDraft {
   const base = defaultDraft(draft.timezone);
@@ -142,7 +157,7 @@ export interface UseOwnerSetup {
 }
 
 export function useOwnerSetup(): UseOwnerSetup {
-  const { hydrated, paired, profileId } = useServer();
+  const { hydrated, paired, profileId, pairedPin } = useServer();
   const [phase, setPhase] = useState<SetupPhase>('loading');
   const [index, setIndex] = useState(0);
   const [draft, setDraft] = useState<SetupDraft>(phoneDraft);
@@ -267,11 +282,13 @@ export function useOwnerSetup(): UseOwnerSetup {
       await api.updateSettings(finishPatch(d));
       const result = await api.completeOnboarding();
       if (result.completed) {
+        // Android asks for the fingerprint here, while setup is still on screen.
+        const keptAdminKey = await keepSetupKey(pairedPin ?? null, result.adminKey);
         void confirm();
         if (profileId) {
           markSetupDone(profileId);
           // Home says whether Goose can answer yet, and what is left to do, in place of two screens.
-          markGettingReady(profileId, true);
+          markGettingReady(profileId, true, keptAdminKey);
           void openSetupChecklist(profileId);
           void nameThisPhone(d.preferredName.trim() || d.userName.trim().split(/\s+/)[0] || '').catch(() => {
             console.warn('[setup] this phone keeps its own name on the Pond');
@@ -295,7 +312,7 @@ export function useOwnerSetup(): UseOwnerSetup {
     } finally {
       setSaving(false);
     }
-  }, [index, persist, profileId, saving]);
+  }, [index, pairedPin, persist, profileId, saving]);
 
   // Skipping How Goose talks keeps its defaults and finishes, since it is the last thing asked.
   const skip = useCallback(async () => {

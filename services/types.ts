@@ -1384,7 +1384,10 @@ export interface OnboardStatus {
 }
 
 /** `POST /api/v1/onboard/complete`: done, or the settings it refused to finish without. */
-export type OnboardCompletion = { completed: true } | { completed: false; missing: string[] };
+export type OnboardCompletion =
+  /** `adminKey`: My Pond's key for the phone that claimed the Pond, given once on this call only. */
+  | { completed: true; adminKey?: string }
+  | { completed: false; missing: string[] };
 
 /** `GET /api/v1/warmup`: whether the chat model has been primed for a first message. */
 export interface WarmupStatus {

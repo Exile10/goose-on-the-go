@@ -15,9 +15,11 @@ interface Gate {
   state: SetupState;
   /** Setup finished and was left before the Pond could answer, so Home keeps saying so. */
   gettingReady: boolean;
+  /** Setup's last call gave this phone its key to My Pond, and the phone kept it. */
+  keptAdminKey: boolean;
 }
 
-let gate: Gate = { profileId: '', state: 'unknown', gettingReady: false };
+let gate: Gate = { profileId: '', state: 'unknown', gettingReady: false, keptAdminKey: false };
 const listeners = new Set<() => void>();
 // One question in flight per pairing; a second caller waits on the first.
 let asking: { profileId: string; answer: Promise<SetupState> } | null = null;
@@ -41,7 +43,10 @@ export function checkSetup(profileId: string): Promise<SetupState> {
     .catch((): SetupState => 'unknown')
     .then((state) => {
       if (asking?.profileId === profileId) asking = null;
-      if (state !== 'unknown') set({ profileId, state, gettingReady: gate.profileId === profileId && gate.gettingReady });
+      if (state !== 'unknown') {
+        const same = gate.profileId === profileId;
+        set({ profileId, state, gettingReady: same && gate.gettingReady, keptAdminKey: same && gate.keptAdminKey });
+      }
       return state;
     });
   asking = { profileId, answer };
@@ -57,15 +62,17 @@ export function setupNeededNow(): Promise<boolean> {
 }
 
 export function markSetupNeeded(profileId: string): void {
-  if (gate.profileId !== profileId || gate.state !== 'needed') set({ profileId, state: 'needed', gettingReady: false });
+  if (gate.profileId !== profileId || gate.state !== 'needed') set({ profileId, state: 'needed', gettingReady: false, keptAdminKey: false });
 }
 
 export function markSetupDone(profileId: string): void {
-  set({ profileId, state: 'done', gettingReady: gate.profileId === profileId && gate.gettingReady });
+  const same = gate.profileId === profileId;
+  set({ profileId, state: 'done', gettingReady: same && gate.gettingReady, keptAdminKey: same && gate.keptAdminKey });
 }
 
-export function markGettingReady(profileId: string, on: boolean): void {
-  set({ profileId, state: gate.profileId === profileId ? gate.state : 'done', gettingReady: on });
+/** `keptAdminKey`: Home's card also says My Pond now opens with this phone's biometrics. */
+export function markGettingReady(profileId: string, on: boolean, keptAdminKey = false): void {
+  set({ profileId, state: gate.profileId === profileId ? gate.state : 'done', gettingReady: on, keptAdminKey: on && keptAdminKey });
 }
 
 /** Whether Home should keep showing that the Pond paired now is still getting ready. */
@@ -73,6 +80,13 @@ export function useGettingReady(): boolean {
   const { profileId } = useServer();
   const snap = useSyncExternalStore(subscribe, () => gate);
   return snap.profileId === profileId && snap.gettingReady;
+}
+
+/** Whether setup kept this phone's key to My Pond, for Home's getting-ready card to say so. */
+export function useSetupKeptAdminKey(): boolean {
+  const { profileId } = useServer();
+  const snap = useSyncExternalStore(subscribe, () => gate);
+  return snap.profileId === profileId && snap.gettingReady && snap.keptAdminKey;
 }
 
 /** The answer for the Pond paired now; a different pairing starts from `unknown`. */
@@ -93,7 +107,7 @@ export function useSetupGate(): SetupState {
 
 /** For tests: forget everything held. */
 export function resetSetupGate(): void {
-  gate = { profileId: '', state: 'unknown', gettingReady: false };
+  gate = { profileId: '', state: 'unknown', gettingReady: false, keptAdminKey: false };
   asking = null;
   listeners.forEach((l) => l());
 }

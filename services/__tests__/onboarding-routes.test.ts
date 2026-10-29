@@ -82,6 +82,13 @@ describe('finishing', () => {
     expect(seen[0]).toMatchObject({ url: `${BASE}/onboard/complete`, method: 'POST', auth: 'Bearer session-token' });
   });
 
+  it('carries My Pond’s key when the Pond gives the claiming phone one, and nothing else', async () => {
+    recordInto([], '{"status":"completed","admin_key":"key-1"}');
+    await expect(api().completeOnboarding()).resolves.toStrictEqual({ completed: true, adminKey: 'key-1' });
+    recordInto([], '{"status":"completed","admin_key":42}');
+    await expect(api().completeOnboarding()).resolves.toStrictEqual({ completed: true });
+  });
+
   it('answers the fields the Pond would not finish without, rather than failing', async () => {
     recordInto(
       [],

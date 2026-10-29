@@ -13,12 +13,13 @@ import { Spacing } from '@/constants/spacing';
 import { useServer } from '@/providers/server-provider';
 import { confirm } from '@/services/haptics';
 import { usePondReadiness } from '@/view-models/use-pond-readiness';
-import { markGettingReady, useGettingReady } from '@/view-models/use-setup-gate';
+import { markGettingReady, useGettingReady, useSetupKeptAdminKey } from '@/view-models/use-setup-gate';
 
 function GettingReadyCard() {
   const { t } = useTranslation();
   const { profileId } = useServer();
   const ready = usePondReadiness();
+  const keptAdminKey = useSetupKeptAdminKey();
   const done = ready.readiness === 'ready';
 
   useEffect(() => {
@@ -30,6 +31,11 @@ function GettingReadyCard() {
     <InkCard raised={false} contentStyle={styles.card}>
       <InkTitle level={3}>{done ? t('setup.gettingReady.readyTitle') : t('setup.gettingReady.title')}</InkTitle>
       {done ? <InkText tone="secondary">{t('setup.gettingReady.readyBody')}</InkText> : <ReadinessStatus ready={ready} />}
+      {keptAdminKey ? (
+        <InkText size="sm" tone="secondary">
+          {t('setup.gettingReady.adminKey')}
+        </InkText>
+      ) : null}
       {done ? (
         <View style={styles.actions}>
           <InkButton variant="quiet" onPress={() => profileId && markGettingReady(profileId, false)}>

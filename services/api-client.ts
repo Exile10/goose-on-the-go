@@ -1953,8 +1953,8 @@ export class PondApiClient {
   /** A 400 naming `missing_fields` is an answer here, not a failure: it says which steps to revisit. */
   async completeOnboarding(): Promise<OnboardCompletion> {
     try {
-      await this.post<unknown>('/api/v1/onboard/complete', {});
-      return { completed: true };
+      const adminKey = readAdminKey(await this.post<unknown>('/api/v1/onboard/complete', {}), 'admin_key');
+      return adminKey ? { completed: true, adminKey } : { completed: true };
     } catch (e) {
       const fields = e instanceof ApiError && e.status === 400 ? (e.body as { missing_fields?: unknown } | null)?.missing_fields : null;
       if (!Array.isArray(fields)) throw e;

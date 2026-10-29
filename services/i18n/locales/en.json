@@ -2696,7 +2696,8 @@
       "title": "Goose is set up and getting ready",
       "readyTitle": "Goose is ready",
       "readyBody": "Your Pond has its model and can answer now.",
-      "dismiss": "Dismiss"
+      "dismiss": "Dismiss",
+      "adminKey": "My Pond opens with your Face ID or fingerprint on this phone."
     },
     "model": {
       "title": "Choose what Goose thinks with",
