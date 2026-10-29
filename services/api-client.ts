@@ -1363,6 +1363,14 @@ export class PondApiClient {
     return this.post<void>(`/api/v1/schedules/${encodeURIComponent(id)}/run-now`, {});
   }
 
+  /**
+   * Settles a missed run the Pond is asking about: run it late, or skip it. The first phone to
+   * answer settles it; a later answer is a 409.
+   */
+  answerMissedRun(id: string, answer: 'run' | 'skip'): Promise<void> {
+    return this.post<void>(`/api/v1/schedules/${encodeURIComponent(id)}/missed/${answer}`, {});
+  }
+
   async listScheduleRuns(id: string, limit = 20): Promise<ScheduleRun[]> {
     const res = await this.request<{ runs?: ScheduleRun[] } | ScheduleRun[]>(
       `/api/v1/schedules/${encodeURIComponent(id)}/runs?limit=${limit}`,
