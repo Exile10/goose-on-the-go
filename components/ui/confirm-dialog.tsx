@@ -29,13 +29,15 @@ export interface ConfirmDialogProps {
   open: boolean;
   title: string;
   message: string;
+  /** The safe answer's words; Cancel when left out. */
+  cancelLabel?: string;
   actions: readonly ConfirmDialogAction[];
   /** The index into `actions` of the answer chosen. */
   onAction: (index: number) => void;
   onCancel: () => void;
 }
 
-export function ConfirmDialog({ open, title, message, actions, onAction, onCancel }: ConfirmDialogProps) {
+export function ConfirmDialog({ open, title, message, cancelLabel, actions, onAction, onCancel }: ConfirmDialogProps) {
   const { t } = useTranslation();
   const theme = useInkTheme();
   const titleRef = useRef<Text>(null);
@@ -52,7 +54,8 @@ export function ConfirmDialog({ open, title, message, actions, onAction, onCance
 
   // Without this a screen reader is left on whatever row opened the dialog, behind it.
   const focusTitle = useCallback(() => {
-    if (titleRef.current) AccessibilityInfo.sendAccessibilityEvent(titleRef.current, 'focus');
+    // React Native Web has no sendAccessibilityEvent, and calling it there throws.
+    if (titleRef.current) AccessibilityInfo.sendAccessibilityEvent?.(titleRef.current, 'focus');
   }, []);
 
   return (
@@ -107,7 +110,7 @@ export function ConfirmDialog({ open, title, message, actions, onAction, onCance
                   }}
                 >
                   <InkButton variant="quiet" onPress={onCancel}>
-                    {t('common.cancel')}
+                    {cancelLabel ?? t('common.cancel')}
                   </InkButton>
                   {actions.map((action, index) => (
                     <InkButton key={action.label} variant={action.variant} onPress={() => onAction(index)}>

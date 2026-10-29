@@ -23,6 +23,8 @@ export interface ConfirmRequest {
   title: string;
   message: string;
   confirmLabel: string;
+  /** The safe answer's words, such as "Keep it"; Cancel when left out. */
+  cancelLabel?: string;
   destructive?: boolean;
 }
 
@@ -50,6 +52,7 @@ export type ChooseFn = <T>(request: ChoiceRequest<T>) => Promise<T | null>;
 interface Question {
   title: string;
   message: string;
+  cancelLabel?: string;
   actions: readonly ConfirmDialogAction[];
   /** The index of the action chosen, or null for every way of cancelling. */
   settle: (index: number | null) => void;
@@ -93,9 +96,9 @@ export function ConfirmProvider({ children }: PropsWithChildren) {
 
   const api = useMemo<ConfirmApi>(
     () => ({
-      confirm: async ({ title, message, confirmLabel, destructive = false }) => {
+      confirm: async ({ title, message, confirmLabel, cancelLabel, destructive = false }) => {
         const index = await ask(
-          { title, message, actions: [{ label: confirmLabel, variant: destructive ? 'danger' : 'primary' }] },
+          { title, message, cancelLabel, actions: [{ label: confirmLabel, variant: destructive ? 'danger' : 'primary' }] },
           destructive,
         );
         return index === 0;
@@ -118,6 +121,7 @@ export function ConfirmProvider({ children }: PropsWithChildren) {
         open={visible}
         title={question?.title ?? ''}
         message={question?.message ?? ''}
+        cancelLabel={question?.cancelLabel}
         actions={question?.actions ?? []}
         onAction={(index) => question?.settle(index)}
         onCancel={() => question?.settle(null)}

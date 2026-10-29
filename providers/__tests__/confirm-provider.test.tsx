@@ -86,6 +86,13 @@ it('resolves false on Cancel', async () => {
   expect(modal(tree).props.visible).toBe(false);
 });
 
+it('names the safe answer in its own words when asked to, and still reads it as no', async () => {
+  const { tree, confirm } = await mount();
+  const keep = { ...REMOVE, cancelLabel: 'Keep it' };
+  expect(await answered(tree, () => confirm(keep), () => button(tree, 'Keep it').props.onPress())).toBe(false);
+  expect(tree.root.findAll((node) => node.type === InkButton && node.props.children === 'Cancel')).toHaveLength(0);
+});
+
 it("resolves false on Android's back button", async () => {
   const { tree, confirm } = await mount();
   expect(await answered(tree, () => confirm(REMOVE), () => modal(tree).props.onRequestClose())).toBe(false);
