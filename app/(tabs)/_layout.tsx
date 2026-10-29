@@ -1,5 +1,5 @@
 /**
- * The four destinations, drawn by Ink's bottom bar — and the bar contracting.
+ * The five destinations, drawn by Ink's bottom bar — and the bar contracting.
  *
  * The bar is positioned over the screens rather than beside them. React
  * Navigation renders a custom `tabBar` as a flex sibling in a column, so it
@@ -199,7 +199,7 @@ function AppTabBar({ state, navigation }: TabBarProps) {
             // Two placements, one prop. Ink's shell is `alignSelf: flex-end`
             // with a width it only learns from its first layout, so before that
             // layout it has to stretch or it measures its own content and the
-            // four destinations bunch into a corner. After it, the width is
+            // destinations bunch into a corner. After it, the width is
             // Ink's animated one, and `flex-end` is what makes the bar contract
             // towards the right rather than the left.
             alignSelf: height > 0 ? 'flex-end' : 'stretch',

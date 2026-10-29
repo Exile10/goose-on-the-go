@@ -58,7 +58,7 @@ export function SwitchRow({ value, onChange, ...row }: Common & { value: boolean
 }
 
 /** Ink's radio: an edge-coloured ring on the surface, the accent dot inside when chosen. */
-function Radio({ selected }: { selected: boolean }) {
+export function Radio({ selected }: { selected: boolean }) {
   const styles = useSettingsStyles(makeStyles);
   return <View style={styles.radio}>{selected ? <View style={styles.radioDot} /> : null}</View>;
 }

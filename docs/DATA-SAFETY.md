@@ -27,6 +27,13 @@ Via `expo-secure-store`, in `services/secure-storage.ts:26-33`:
 | `goose.refreshToken` | Used once on a 401 to re-obtain a session token |
 | `goose.installId` | Stable per-install UUID, sent as `client_id` in every handshake |
 
+`goose.adminKey` is kept apart from the table above, and only when the member keeps it: this
+phone's own key to My Pond, the Pond's administration. It is written with `requireAuthentication`
+and `WHEN_PASSCODE_SET_THIS_DEVICE_ONLY`, so it is read only after the phone's Face ID or
+fingerprint, never leaves in a backup or for another phone, and can no longer be read once the
+passcode is removed or a new face or finger is added. It goes nowhere but the paired Pond, and
+signing out forgets it.
+
 `installId` deserves a note for the forms, because "persistent identifier" is a category
 reviewers look at closely. It is generated on device (`services/install-id.ts`), never
 derived from hardware, never sent anywhere but the paired Pond, and is resettable. Its
@@ -37,7 +44,9 @@ purpose is that re-pairing updates the same device row rather than accumulating 
 `services/storage.ts:10-19`:
 
 `@goose/server-url`, `@goose/connection-profile`, `@goose/last-screen`, `@goose/settings`,
-`@goose/dev-screen-modes`, `@goose/remote-offer-dismissed`.
+`@goose/dev-screen-modes`, `@goose/remote-offer-dismissed`, and `@goose/admin-key-for`: the pin of
+the Pond whose My Pond key the phone keeps, so the app knows one is kept without a biometric
+prompt. The key itself is never written here.
 
 The connection profile (`models/connection.ts:2-9`) holds the Pond's host, port, its
 local URLs, an optional remote URL, and whether remote access is off or embedded along

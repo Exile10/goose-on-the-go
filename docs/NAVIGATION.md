@@ -269,6 +269,64 @@ the nested navigator has one entry in its own history and would draw no back
 button of its own. The header reads `useTheme()` directly, because a navigator
 header is the one surface `useThemedStyles` cannot reach.
 
+## My Pond
+
+My Pond (`app/(stack)/pond.tsx`, `view-models/use-my-pond.ts`), the first row of the You tab's
+menu under the household card, is the Pond's
+administration, against goose-in-a-pond's `docs/architecture/pond-administrator.md`. Every route
+is under `/api/v1/admin`, and every one but status, unlock and lock answers 403 `admin_locked`
+until this phone is unlocked with the Pond's administrator card.
+
+- **The lock is one state for the whole area** (`view-models/use-admin-gate.ts`). The tab and
+  every screen under it read it, and any admin route that answers `admin_locked` returns all of
+  them to the card's form (`components/pond/admin-lock.tsx`), which any of them can unlock from.
+- **The card's form.** Sixteen Crockford base32 characters, shown in the card's
+  `XXXX-XXXX-XXXX-XXXX` groups as they are typed. Case, dashes and spaces are ignored, and `O`
+  reads as `0`, `I` and `L` as `1`, as the Pond reads them. Nothing is sent until the password is
+  sixteen characters from the card. A Pond slowing wrong guesses gives `retry_after`, which the
+  form counts down.
+- **What it says instead of the form**: a Pond with no card (`card: "missing"`, made on the Pond
+  with `bash scripts/giap.sh admin-card`), a phone that is not a member's (`admin_members_only`),
+  and a Pond that predates My Pond (404, 405 or 501 on the status, after which it stops asking).
+- **This phone's key** (`services/kept-admin-key.ts`). After the card opens My Pond, the phone asks
+  the Pond for a key of its own (`POST /admin/enroll`, which replaces any older one) and keeps it
+  in the keychain behind its Face ID or fingerprint (`requireAuthentication`,
+  `WHEN_PASSCODE_SET_THIS_DEVICE_ONLY`), unless the form's "next time" switch is off or the phone
+  has no biometrics; the web never keeps one. Owner setup keeps the key `/onboard/complete` gives
+  the phone that claimed the Pond, and Home's getting-ready card says so. A non-secret AsyncStorage
+  marker names the Pond (its pin), so the app knows a key is kept without a prompt; Android asks
+  on every read of the key itself. With a key kept, the lock leads with "Unlock with Face ID or
+  fingerprint" (`POST /admin/unlock {key}`), asks once by itself on each arrival, and keeps the
+  card a tap away. A Pond with no card still opens to a key. A cancel leaves the lock as it was;
+  a key the phone can no longer read (a new face or finger invalidates it) or the Pond rejects
+  (`admin_key_rejected`) is forgotten, with a line saying to type the card. A status whose `key`
+  is false forgets the kept one quietly. Open, "Forget My Pond on this phone" asks with Keep it
+  as the safe answer, then sends `DELETE /admin/key` and locks. Signing out forgets it too.
+- **Only the status is polled**, every 30 s while My Pond is in front. It is the one admin route
+  that does not renew the unlock; the Pond locks after 15 idle minutes, and polling anything else
+  would keep it open for as long as the phone sat on the tab. The overview and health are read on
+  arrival, after an unlock and on a pull. After any admin request the countdown starts again,
+  since the Pond renews the unlock on each.
+- **Unlocked**, My Pond says when it locks, with Lock in the stack header's right, then the disk as
+  an `InkMeter`, what the Pond keeps as one bar in four parts (models, engine caches, saved prompts,
+  and the rest, every other area id included; `groupAreas`), its six counts, and rows to Files,
+  Caches, Tasks and reports, Health (All good, or a badge when a check is not ok) and Power. The
+  bar's parts differ in lightness as well as hue in both schemes (`StorageColors`).
+- **The screens under it** are `pond-files`, `pond-caches`, `pond-tasks`, `pond-health` and
+  `pond-power`. Each destructive action asks through `useConfirm()` with Keep it as the safe
+  answer (`cancelLabel`): a delete names the entry and its size, a cache says what clearing it
+  costs, a power mode change asks first, and a restart asks again when a long task is running (409
+  `long_task_running`), sending `force` only on that second yes. A restart locks My Pond, as it
+  ends every unlock on the Pond.
+- **Another member's task** shows its state, kind, dates and size but never its goal or the
+  titles of what it saved, so its artifacts are counted, not listed. Only the member's own tasks
+  open their report (`task-report`).
+
+My Pond is behind the Developer toggle `pond` (real by default). The mock (`models/pond-admin-mock.ts`)
+follows the contract, idle lock, cooling and the key included; its card is `G00S-E1NA-P0ND-2026`,
+which also unlocks typed as "goos eina pond 2026". A key kept for the mock is marked with its own
+pin, `mock-pond`, so it is never taken for the paired Pond's.
+
 ## Every route has to lead somewhere
 
 expo-router resolves routes at runtime, so a menu row pointing at a deleted screen passes `tsc` and fails only when someone taps it, on an unmatched-route screen. `constants/__tests__/navigation.test.ts` holds three rules:

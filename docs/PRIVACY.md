@@ -37,6 +37,11 @@ That identifier is how your Pond recognises this phone when you pair with it aga
 of gradually filling up with duplicate entries. It is generated on your device, it is not
 derived from anything about your hardware, and it goes nowhere except to your own Pond.
 
+If you choose to open My Pond with Face ID or fingerprint, your phone also keeps its own key to
+My Pond in that protected storage. Only your phone's Face ID or fingerprint can read it, it is
+never included in a backup or moved to another phone, and adding a new face or fingerprint makes
+it unreadable. Forgetting My Pond on this phone, or signing out, removes it.
+
 Your phone also keeps ordinary preferences: your Pond's address on your network, which
 screen you were last on, your settings. None of this leaves your phone.
 

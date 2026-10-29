@@ -9,10 +9,11 @@ import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { ApiError, api } from '@/services/api-client';
+import { canKeepAdminKey, keepAdminKey } from '@/services/kept-admin-key';
 import type { OnboardStatus, PondSettings } from '@/services/types';
 import { useOwnerSetup, type UseOwnerSetup } from '@/view-models/use-owner-setup';
 import { resetSetupChecklist } from '@/view-models/use-setup-checklist';
-import { resetSetupGate } from '@/view-models/use-setup-gate';
+import { resetSetupGate, useSetupKeptAdminKey } from '@/view-models/use-setup-gate';
 
 jest.mock('@/services/pond-trust', () => ({ assertPondTrust: jest.fn().mockResolvedValue(undefined) }));
 jest.mock('@/services/api-client', () => {
@@ -35,8 +36,9 @@ jest.mock('@/services/api-client', () => {
   };
 });
 jest.mock('@/providers/server-provider', () => ({
-  useServer: () => ({ hydrated: true, paired: true, profileId: 'pairing-1' }),
+  useServer: () => ({ hydrated: true, paired: true, profileId: 'pairing-1', pairedPin: 'sha256/claimed-pond' }),
 }));
+jest.mock('@/services/kept-admin-key', () => ({ canKeepAdminKey: jest.fn(() => true), keepAdminKey: jest.fn(async () => undefined) }));
 jest.mock('expo-localization', () => ({ getLocales: () => [{ languageTag: 'sw-KE' }] }));
 jest.mock('expo-device', () => ({ deviceName: 'iPhone', modelName: 'iPhone 17 Pro' }));
 jest.mock('@/services/install-id', () => ({ getInstallId: jest.fn().mockResolvedValue('install-1') }));
@@ -49,9 +51,9 @@ const record = (change: Partial<PondSettings> = {}) =>
   ({ user_name: 'Friend', assistant_name: 'Goose', timezone: 'UTC', primary_profile_id: null, ...change }) as PondSettings;
 
 async function mount() {
-  let latest!: UseOwnerSetup;
+  let latest!: UseOwnerSetup & { keptAdminKey: boolean };
   const Probe = () => {
-    latest = useOwnerSetup();
+    latest = { ...useOwnerSetup(), keptAdminKey: useSetupKeptAdminKey() };
     return null;
   };
   let tree!: ReactTestRenderer;
@@ -68,6 +70,8 @@ async function mount() {
 
 beforeEach(async () => {
   jest.clearAllMocks();
+  jest.mocked(canKeepAdminKey).mockReturnValue(true);
+  jest.mocked(keepAdminKey).mockReset().mockResolvedValue(undefined);
   resetSetupGate();
   resetSetupChecklist();
   await AsyncStorage.clear();
@@ -241,6 +245,54 @@ it('keeps the defaults and finishes when How Goose talks is skipped', async () =
   expect(m.vm.phase).toBe('finished');
   expect(pond.updateSettings).toHaveBeenCalledWith(expect.objectContaining({ assistant_name: 'Goose' }));
   m.unmount();
+});
+
+describe('My Pond’s key from the last call', () => {
+  const finishWith = async (answer: Awaited<ReturnType<typeof api.completeOnboarding>>) => {
+    pond.onboardStatus.mockResolvedValue(status('Location'));
+    pond.completeOnboarding.mockResolvedValue(answer);
+    const m = await mount();
+    await act(async () => {
+      await m.vm.actions.finish();
+    });
+    return m;
+  };
+
+  it('keeps it for the claimed Pond, and Home says My Pond opens with this phone’s biometrics', async () => {
+    const m = await finishWith({ completed: true, adminKey: 'setup-key' });
+    expect(keepAdminKey).toHaveBeenCalledWith('sha256/claimed-pond', 'setup-key', 'Keep a key to My Pond on this phone');
+    expect(m.vm.phase).toBe('finished');
+    expect(m.vm.keptAdminKey).toBe(true);
+    // Never in AsyncStorage, under any key.
+    const stored = await AsyncStorage.multiGet(await AsyncStorage.getAllKeys());
+    expect(stored.some(([, value]) => value?.includes('setup-key'))).toBe(false);
+    m.unmount();
+  });
+
+  it('drops it on a phone that cannot keep one, and still finishes', async () => {
+    jest.mocked(canKeepAdminKey).mockReturnValue(false);
+    const m = await finishWith({ completed: true, adminKey: 'setup-key' });
+    expect(keepAdminKey).not.toHaveBeenCalled();
+    expect(m.vm.phase).toBe('finished');
+    expect(m.vm.keptAdminKey).toBe(false);
+    m.unmount();
+  });
+
+  it('finishes and says nothing of it when the save is refused', async () => {
+    jest.mocked(keepAdminKey).mockRejectedValue(new Error('User canceled the authentication'));
+    const m = await finishWith({ completed: true, adminKey: 'setup-key' });
+    expect(m.vm.phase).toBe('finished');
+    expect(m.vm.keptAdminKey).toBe(false);
+    expect(m.vm.error).toBeNull();
+    m.unmount();
+  });
+
+  it('keeps nothing when the Pond gives no key', async () => {
+    const m = await finishWith({ completed: true });
+    expect(keepAdminKey).not.toHaveBeenCalled();
+    expect(m.vm.keptAdminKey).toBe(false);
+    m.unmount();
+  });
 });
 
 it('leaves a Pond that is already set up for Home', async () => {

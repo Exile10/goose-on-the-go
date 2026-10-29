@@ -32,6 +32,12 @@ export const ACCOUNT_ROUTE = '/(stack)/settings-household';
 
 export const PROFILE_NAV: NavGroup[] = [
   {
+    groupKey: 'settings.menu.pond',
+    items: [
+      { id: 'myPond', labelKey: 'screens.myPond', icon: 'server', tile: 'amber', route: '/(stack)/pond' },
+    ],
+  },
+  {
     groupKey: 'settings.menu.connection',
     items: [
       { id: 'remoteAccess', labelKey: 'screens.remoteAccess', icon: 'lock', tile: 'blue', route: '/(stack)/remote-access', summary: 'remoteAccess' },

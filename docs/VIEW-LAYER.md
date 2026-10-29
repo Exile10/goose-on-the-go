@@ -137,7 +137,7 @@ number somebody guessed.
 Both bars need `style={{ alignSelf: 'stretch' }}`. Ink's shell is
 `alignSelf: "flex-end"` with a width that is `undefined` until its first layout
 lands, so an unstyled bar hugs its own content on the right — the navbar puts
-its title beside the actions, and the bottom bar packs four destinations into a
+its title beside the actions, and the bottom bar packs its destinations into a
 corner. `style` is spread after the shell, so it wins.
 
 ### The bar leaving
@@ -173,7 +173,7 @@ Two departures from the web binding, both the bottom edge rather than taste:
   about 870 points, so a quarter of the screen would pass before the bar moved.
 
 `alignSelf` carries two placements. Before Ink's first layout the bar has to
-stretch or it measures its own content and the four destinations bunch into a
+stretch or it measures its own content and the destinations bunch into a
 corner; after it, the width is Ink's animated one and `flex-end` is what makes
 the bar contract towards the right rather than the left.
 

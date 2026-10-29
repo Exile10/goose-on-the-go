@@ -4,6 +4,7 @@ import { ServerProvider, useServer } from '../server-provider';
 import { SecureStorage } from '@/services/secure-storage';
 import { Storage } from '@/services/storage';
 import { api, ApiError } from '@/services/api-client';
+import { forgetKeptAdminKey } from '@/services/kept-admin-key';
 
 jest.mock('@react-native-community/netinfo', () => ({
   configure: jest.fn(), addEventListener: jest.fn(() => () => undefined),
@@ -12,6 +13,7 @@ jest.mock('@react-native-community/netinfo', () => ({
 jest.mock('@/services/storage', () => ({ Storage: { set: jest.fn(), remove: jest.fn(), getJSON: jest.fn(async () => null), setJSON: jest.fn() }, purgeLegacyStorage: jest.fn() }));
 // Signing out also forgets the tool cards; that store is not what these tests are about.
 jest.mock('@/services/card-cache', () => ({ forgetAllCards: jest.fn(async () => undefined) }));
+jest.mock('@/services/kept-admin-key', () => ({ forgetKeptAdminKey: jest.fn(async () => undefined) }));
 jest.mock('@/services/secure-storage', () => ({ SecureStorage: { set: jest.fn(), remove: jest.fn(), getJSON: jest.fn(async () => null), setJSON: jest.fn() } }));
 jest.mock('@/services/pond-trust', () => ({ configurePondTrust: jest.fn(async () => undefined), PondTrustError: class extends Error {} }));
 jest.mock('@/services/discovery', () => ({ findPondByHost: jest.fn(async () => null), findPondAt: jest.fn(async () => null) }));
@@ -63,6 +65,8 @@ it('clears the stored pairing when the Pond stops recognising this phone', async
   expect(secrets).toEqual(expect.arrayContaining(['pondIdentity', 'sessionToken', 'refreshToken']));
   const stored = jest.mocked(Storage.remove).mock.calls.map(([key]) => key);
   expect(stored).toEqual(expect.arrayContaining(['connectionProfile', 'serverUrl']));
+  // A key to My Pond opens only the Pond this phone has left.
+  expect(forgetKeptAdminKey).toHaveBeenCalled();
   // The tab layout redirects to pairing on an empty profile, so this is what
   // actually returns the user to a fresh pair.
   expect(server.profileId).toBe('');

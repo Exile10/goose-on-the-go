@@ -102,6 +102,15 @@ export const TileColors = {
 
 export type TileColor = keyof typeof TileColors;
 
+/**
+ * The parts of what the Pond keeps, drawn as one bar. Each is a step apart in lightness as well as
+ * hue, so they read apart without colour; the models, the largest, take the most contrast.
+ */
+export const StorageColors = {
+  light: { models: JaridaPurple[700], kv_snapshots: TileColors.blue, engine_caches: TileColors.teal, rest: Grey[400] },
+  dark: { models: Accent.onDark, engine_caches: TileColors.teal, kv_snapshots: TileColors.blue, rest: Grey[700] },
+} as const;
+
 /** Theme color shape */
 export interface ThemeColors {
   background: string;
