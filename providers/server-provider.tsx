@@ -97,6 +97,7 @@ export const MIGRATION_SCREENS = [
   'webSearch',
   'settings',
   'agents',
+  'pond',
 ] as const;
 
 export type MigrationScreen = (typeof MIGRATION_SCREENS)[number];
@@ -136,7 +137,9 @@ export type ScreenModes = Record<MigrationScreen, boolean>;
 // memories as the household's, and "Tidy up now" could never run, since nothing could flip it.
 // `agents` starts real as `webSearch` does, ahead of a Pond that serves all of it: on a Pond without
 // the prefill routes the screens say so, where the mock would show a made-up household's agents.
-const REAL_BY_DEFAULT: readonly MigrationScreen[] = ['chat', 'logs', 'webSearch', 'settings', 'schedule', 'memory', 'agents'];
+// `pond` (My Pond) starts real for the same reason: a Pond without `/admin` says so, where the mock
+// would offer to delete a made-up Pond's files.
+const REAL_BY_DEFAULT: readonly MigrationScreen[] = ['chat', 'logs', 'webSearch', 'settings', 'schedule', 'memory', 'agents', 'pond'];
 
 export const DEFAULT_SCREEN_MODES: ScreenModes = MIGRATION_SCREENS.reduce(
   (acc, screen) => ({ ...acc, [screen]: REAL_BY_DEFAULT.includes(screen) }),
