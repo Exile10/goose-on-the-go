@@ -1584,3 +1584,130 @@ export interface LongTaskReportWire {
 
 /** What `GET /long-tasks/{id}/export` gives: Markdown, a self-contained page, or a calendar file. */
 export type ReportFormat = 'markdown' | 'html' | 'ics';
+
+/**
+ * My Pond, the administration area under `/api/v1/admin` (goose-in-a-pond
+ * `docs/architecture/pond-administrator.md`). Sizes are bytes and times RFC 3339.
+ */
+export interface AdminStatus {
+  card: 'present' | 'missing';
+  unlocked: boolean;
+  expires_at: string | null;
+  idle_minutes: number;
+  /** Seconds before another unlock is heard, while wrong passwords are being slowed. */
+  retry_after: number | null;
+}
+
+export interface AdminUnlocked {
+  unlocked: true;
+  expires_at: string | null;
+}
+
+export type AdminAreaId = 'models' | 'conversations' | 'kv_snapshots' | 'engine_caches' | 'attachments' | 'camera' | 'logs' | 'other';
+
+export interface AdminOverview {
+  disk: { total_bytes: number; free_bytes: number };
+  data_dir_bytes: number;
+  areas: { id: AdminAreaId; bytes: number }[];
+  databases: { name: string; bytes: number }[];
+  counts: {
+    sessions: number | null;
+    messages: number | null;
+    memories: number | null;
+    long_tasks: number | null;
+    artifacts: number | null;
+    models: number | null;
+  };
+}
+
+export type AdminEntryKind = 'file' | 'directory' | 'symlink';
+/** Why an entry cannot be deleted here: the Pond has it open, or Models removes it. */
+export type AdminKeepReason = 'in_use' | 'managed_by_models' | 'protected';
+
+export interface AdminFileEntry {
+  name: string;
+  /** Relative to the Pond's data directory. */
+  path: string;
+  kind: AdminEntryKind;
+  bytes: number;
+  modified_at: string | null;
+  deletable: boolean;
+  reason: AdminKeepReason | null;
+}
+
+export interface AdminFileListing {
+  path: string;
+  entries: AdminFileEntry[];
+}
+
+export type AdminCacheId = 'kv_snapshots' | 'download_leftovers' | 'accelerator_caches';
+
+export interface AdminCache {
+  id: AdminCacheId;
+  bytes: number;
+  files: number;
+}
+
+export interface AdminTaskArtifact {
+  id: string;
+  /** Null on another member's task. */
+  title: string | null;
+  kind: string;
+  tokens: number;
+  created_at: string | null;
+}
+
+export interface AdminTask {
+  id: string;
+  /** Null on another member's task, whose goal is theirs. */
+  goal: string | null;
+  another_member: boolean;
+  /** Null for a state this phone does not know, which is never taken for finished. */
+  state: LongTaskState | null;
+  kind: LongTaskKind;
+  created_at: string | null;
+  finished_at: string | null;
+  has_report: boolean;
+  artifacts: AdminTaskArtifact[];
+}
+
+export type AdminCheckId = 'disk_space' | 'memory' | 'temperature' | 'other';
+export type AdminCheckStatus = 'ok' | 'warning' | 'critical';
+
+export interface AdminHealth {
+  version: string;
+  uptime_secs: number | null;
+  host: {
+    hostname: string;
+    os: string;
+    arch: string;
+    cpus: number | null;
+    uptime_secs: number | null;
+    load: number[];
+  };
+  memory: { total_bytes: number; available_bytes: number; swap_total_bytes: number; swap_free_bytes: number } | null;
+  disk: { total_bytes: number; free_bytes: number } | null;
+  temperatures: { zone: string; celsius: number }[];
+  process: { rss_bytes: number } | null;
+  checks: { id: AdminCheckId; status: AdminCheckStatus }[];
+}
+
+export interface PowerMode {
+  id: number;
+  name: string;
+}
+
+export interface AdminPower {
+  control: 'nvpmodel' | 'none';
+  mode: PowerMode | null;
+  default_mode_id: number | null;
+  modes: PowerMode[];
+  can_change: boolean;
+  supply: { millivolts: number; milliamps: number; milliwatts: number } | null;
+  battery: { percent: number; charging: boolean } | null;
+}
+
+export interface PowerModeChange {
+  mode: PowerMode | null;
+  reboot_required: boolean;
+}

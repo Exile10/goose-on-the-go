@@ -5,6 +5,18 @@ import { isInsecureDevOrigin, isLocalPairingUrl, normalizePondUrl } from '@/mode
 import { readWebSearch } from '@/models/web-search';
 import { readPrefills } from '@/models/agents';
 import { readLongTask, readLongTaskReport, readResearchAvailability, reportFileName } from '@/models/long-tasks';
+import {
+  readAdminStatus,
+  readCaches,
+  readFileListing,
+  readFreed,
+  readHealth,
+  readModeChange,
+  readOverview,
+  readPower,
+  readTasks,
+  readUnlocked,
+} from '@/models/pond-admin';
 /**
  * PondApiClient — HTTP client for goose-in-a-pond.
  *
@@ -26,6 +38,16 @@ import { randomBytes } from './secure-random';
 import { timeoutSignal } from './http';
 import { readSse, type SseEvent } from './sse';
 import type {
+  AdminCache,
+  AdminCacheId,
+  AdminFileListing,
+  AdminHealth,
+  AdminOverview,
+  AdminPower,
+  AdminStatus,
+  AdminTask,
+  AdminUnlocked,
+  PowerModeChange,
   DeepResearchAvailability,
   LongTaskReportWire,
   ReportFormat,
@@ -379,6 +401,12 @@ export const CONSOLIDATION_NOT_BUILT = 'Memory consolidation is not available in
  * A shape the client did not expect is an empty collection, and every one of
  * these screens has something to say about an empty collection.
  */
+/** A reader's answer, or a throw: a body that is not the answer must not pass for an empty one. */
+function required<T>(value: T | null, what: string): T {
+  if (value === null) throw new Error(`The Pond answered ${what} with something unexpected`);
+  return value;
+}
+
 function collection<T>(res: unknown, key: string): T[] {
   if (Array.isArray(res)) return res as T[];
   const value = (res as Record<string, unknown> | null | undefined)?.[key];
@@ -2131,6 +2159,76 @@ export class PondApiClient {
   /** Stops a task; a step under way finishes first. A 409 once it has already ended. */
   cancelLongTask(id: string): Promise<void> {
     return this.post<void>(`/api/v1/long-tasks/${encodeURIComponent(id)}/cancel`, {});
+  }
+
+  // My Pond: every route below but status, unlock and lock answers 403 `admin_locked` until unlocked.
+
+  /** Reading the status never renews the unlock, so it is the one admin route that may be polled. */
+  async adminStatus(): Promise<AdminStatus> {
+    return required(readAdminStatus(await this.get<unknown>('/api/v1/admin/status')), 'the administrator status');
+  }
+
+  async adminUnlock(password: string): Promise<AdminUnlocked> {
+    return required(readUnlocked(await this.post<unknown>('/api/v1/admin/unlock', { password })), 'the unlock');
+  }
+
+  /** A 204. */
+  adminLock(): Promise<void> {
+    return this.post<void>('/api/v1/admin/lock', {});
+  }
+
+  async adminOverview(): Promise<AdminOverview> {
+    return required(readOverview(await this.get<unknown>('/api/v1/admin/overview')), 'the overview');
+  }
+
+  /** One directory, `''` being the data directory itself. */
+  async adminFiles(path: string): Promise<AdminFileListing> {
+    const raw = await this.get<unknown>(`/api/v1/admin/files?path=${encodeURIComponent(path)}`);
+    return required(readFileListing(raw, path), 'the file listing');
+  }
+
+  /** Resolves with the bytes freed. */
+  async adminDeleteFile(path: string): Promise<number> {
+    return readFreed(await this.del<unknown>(`/api/v1/admin/files?path=${encodeURIComponent(path)}`));
+  }
+
+  async adminCaches(): Promise<AdminCache[]> {
+    return required(readCaches(await this.get<unknown>('/api/v1/admin/caches')), 'the cache listing');
+  }
+
+  /** Resolves with the bytes freed. */
+  async adminClearCache(id: AdminCacheId): Promise<number> {
+    return readFreed(await this.post<unknown>(`/api/v1/admin/caches/${encodeURIComponent(id)}/clear`, {}));
+  }
+
+  async adminTasks(): Promise<AdminTask[]> {
+    return required(readTasks(await this.get<unknown>('/api/v1/admin/tasks')), 'the task listing');
+  }
+
+  /** A 409 `task_active` until the task has finished or been stopped. */
+  async adminDeleteTask(id: string): Promise<void> {
+    await this.del<unknown>(`/api/v1/admin/tasks/${encodeURIComponent(id)}`);
+  }
+
+  async adminDeleteTaskArtifact(taskId: string, artifactId: string): Promise<void> {
+    await this.del<unknown>(`/api/v1/admin/tasks/${encodeURIComponent(taskId)}/artifacts/${encodeURIComponent(artifactId)}`);
+  }
+
+  async adminHealth(): Promise<AdminHealth> {
+    return required(readHealth(await this.get<unknown>('/api/v1/admin/health')), 'the health report');
+  }
+
+  async adminPower(): Promise<AdminPower> {
+    return required(readPower(await this.get<unknown>('/api/v1/admin/power')), 'the power report');
+  }
+
+  async adminSetPowerMode(id: number): Promise<PowerModeChange> {
+    return required(readModeChange(await this.put<unknown>('/api/v1/admin/power/mode', { id })), 'the power mode change');
+  }
+
+  /** A 202; a 409 `long_task_running` unless `force`, which loses the running step. */
+  async adminRestart(force: boolean): Promise<void> {
+    await this.post<unknown>('/api/v1/admin/power/restart', force ? { force: true } : {});
   }
 
   // ── Verb helpers ────────────────────────────────────────────
