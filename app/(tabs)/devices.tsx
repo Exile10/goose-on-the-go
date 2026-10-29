@@ -244,6 +244,28 @@ export default function DevicesTab() {
           </View>
         ) : null}
 
+        {/* Grey on their cards too; listed here because this is where they can be taken back. */}
+        {data.queued.length > 0 ? (
+          <InkCard>
+            <View style={styles.notice}>
+              <Text style={[styles.detail, styles.detailMuted]}>{t('devices.queuedTitle')}</Text>
+              {data.queued.map((c) => {
+                const name = data.devices.find((d) => d.id === c.deviceId)?.name ?? c.deviceId;
+                return (
+                  <View key={c.key} style={styles.queuedRow}>
+                    <Text style={[styles.detail, styles.detailMuted]}>
+                      {t(c.patch.power ? 'devices.queuedOn' : 'devices.queuedOff', { name })}
+                    </Text>
+                    <InkButton variant="quiet" onPress={() => actions.cancel(c.deviceId)}>
+                      {t('common.cancel')}
+                    </InkButton>
+                  </View>
+                );
+              })}
+            </View>
+          </InkCard>
+        ) : null}
+
         {loading ? <InkSpinner label={t('pond.checking')} /> : null}
 
         {error ? (
@@ -309,6 +331,7 @@ const makeStyles = (c: ThemeColors) =>
   StyleSheet.create({
     safe: { flex: 1, backgroundColor: c.background },
     notice: { marginBottom: Spacing.md },
+    queuedRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
 
     header: {
       paddingHorizontal: Spacing.lg,
