@@ -1,5 +1,10 @@
 {
   "common": {
+    "ago": {
+      "seconds": "{{count}} s",
+      "minutes": "{{count}} min",
+      "hours": "{{count}} h"
+    },
     "retry": "Try again",
     "cancel": "Cancel",
     "save": "Save changes",
@@ -464,6 +469,7 @@
     "matterStarting": "Your Pond is still starting its Matter controller. New devices cannot be added yet.",
     "matterUnreachable": "Your Pond cannot reach its Matter controller. Existing devices still work.",
     "online": "{{count}} on",
+    "updatedAgo": "updated {{ago}} ago",
     "allOffline": "Nothing is reachable",
     "allOfflineBody": "Your Pond lists these devices but cannot reach any of them right now.",
     "addDevice": "Add a device",
@@ -2934,11 +2940,6 @@
       "reconnectingFirstWhy": "Reconnecting. {{camera}} has not shown a picture yet: {{error}}",
       "off": "Switched off. Your Pond is not watching the camera.",
       "consentOff": "The camera is off in Privacy, so your Pond is not looking."
-    },
-    "ago": {
-      "seconds": "{{count}} s",
-      "minutes": "{{count}} min",
-      "hours": "{{count}} h"
     },
     "detail": {
       "discovered": "Camera: {{source}}, found by your Pond.",
