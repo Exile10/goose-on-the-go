@@ -445,10 +445,12 @@
       "sharing": "Getting the file ready...",
       "shareTitle": "Share this report",
       "shareBody": "Choose how to share it. Each opens your phone's share sheet.",
+      "asPdf": "As a PDF",
       "asDocument": "As a document",
       "asPage": "As a web page",
       "toCalendar": "Add to calendar",
       "shareFailed": "Could not get the file from your Pond. Try again in a moment.",
+      "pdfFailed": "Could not make the PDF. Try again, or share it as a web page.",
       "shareUnavailable": "This phone has no share sheet to hand the file to.",
       "noDates": "This report has no dated events for a calendar."
     }

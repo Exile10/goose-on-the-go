@@ -1,13 +1,16 @@
 // A long task's report: read whole from the Pond, or the result alone from an older one; and shared as
-// a file whose name and type are the export's, with the calendar offered only for a plan with dates.
+// a file whose name and type are the export's, with the calendar offered only for a plan with dates,
+// and a PDF printed on the phone where its build can.
 
 import React from 'react';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
+import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 
 import { readLongTaskReport, reportFileName, reportSections } from '@/models/long-tasks';
 import { ApiError, api } from '@/services/api-client';
 import { forgetLongTasks } from '@/services/long-task-cache';
+import { pdfPage } from '@/services/report-share';
 import type { LongTask, LongTaskReportWire } from '@/services/types';
 import { builtInName } from '@/view-models/agent-words';
 import { shareOptions, useTaskReport, type ShownReport, type UseTaskReport } from '@/view-models/use-task-report';
@@ -19,25 +22,32 @@ jest.mock('@/services/api-client', () => {
   return { ...actual, api: { longTaskReport: jest.fn(), longTaskExport: jest.fn(), longTask: jest.fn(), longTaskArtifact: jest.fn() } };
 });
 const written: { name: string; body: string }[] = [];
+const moved: { from: string; to: string }[] = [];
 jest.mock('expo-file-system', () => ({
   Paths: { cache: 'cache://' },
   File: class {
     name: string;
     uri: string;
-    constructor(_dir: string, name: string) {
-      this.name = name;
-      this.uri = `cache://${name}`;
+    constructor(...parts: string[]) {
+      this.name = parts[parts.length - 1];
+      this.uri = parts.length === 1 ? parts[0] : `cache://${this.name}`;
     }
     create() {}
     write(body: string) {
       written.push({ name: this.name, body });
     }
+    async move(to: { uri: string }) {
+      moved.push({ from: this.uri, to: to.uri });
+    }
   },
 }));
 jest.mock('expo-sharing', () => ({ isAvailableAsync: jest.fn(), shareAsync: jest.fn() }));
+jest.mock('expo-print', () => ({ printToFileAsync: jest.fn() }));
+jest.mock('expo-localization', () => ({ getLocales: () => [{ languageCode: 'en', regionCode: 'KE' }] }));
 
 const pond = jest.mocked(api);
 const sharing = jest.mocked(Sharing);
+const print = jest.mocked(Print);
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 const ID = 'task-0001-aaaa';
@@ -115,6 +125,8 @@ beforeEach(() => {
   jest.clearAllMocks();
   forgetLongTasks();
   written.length = 0;
+  moved.length = 0;
+  print.printToFileAsync.mockResolvedValue({ uri: 'file:///print/7f3a.pdf', numberOfPages: 2 });
   pond.longTaskReport.mockResolvedValue(REPORT);
   sharing.isAvailableAsync.mockResolvedValue(true);
   sharing.shareAsync.mockResolvedValue(undefined);
@@ -192,6 +204,45 @@ describe('sharing it', () => {
     await m.unmount();
   });
 
+  it('prints the Pond’s web page to a PDF named after it, on A4 outside Letter countries', async () => {
+    pond.longTaskExport.mockResolvedValue({ name: 'mombasa-weekend.html', body: '<html><head></head><body>trip</body></html>' });
+    const m = await mount();
+    expect(m.vm.options[0].format).toBe('pdf');
+    let shared = false;
+    await act(async () => {
+      shared = await m.vm.actions.share('pdf');
+    });
+    expect(shared).toBe(true);
+    expect(pond.longTaskExport).toHaveBeenCalledWith(ID, 'html');
+    expect(print.printToFileAsync).toHaveBeenCalledWith(expect.objectContaining({ width: 595, height: 842 }));
+    expect(moved).toEqual([{ from: 'file:///print/7f3a.pdf', to: 'cache://mombasa-weekend.pdf' }]);
+    expect(sharing.shareAsync).toHaveBeenCalledWith('cache://mombasa-weekend.pdf', { mimeType: 'application/pdf', UTI: 'com.adobe.pdf' });
+    await m.unmount();
+  });
+
+  it('says the PDF could not be made when printing fails, and shares nothing', async () => {
+    pond.longTaskExport.mockResolvedValue({ name: 'r.html', body: '<p>x</p>' });
+    print.printToFileAsync.mockRejectedValue(new Error('WebView gone'));
+    const m = await mount();
+    await act(async () => {
+      await m.vm.actions.share('pdf');
+    });
+    expect(m.vm.shareError).toBe('Could not make the PDF. Try again, or share it as a web page.');
+    expect(sharing.shareAsync).not.toHaveBeenCalled();
+    await m.unmount();
+  });
+
+  it('offers no PDF on a build without the printing module', async () => {
+    // The object report-share holds; a namespace import would be a copy of it.
+    const modulesCore = jest.requireMock<typeof import('expo-modules-core')>('expo-modules-core');
+    const lookup = modulesCore.requireOptionalNativeModule;
+    const spy = jest.spyOn(modulesCore, 'requireOptionalNativeModule').mockImplementation((name) => (name === 'ExpoPrint' ? null : lookup(name)));
+    const m = await mount();
+    expect(m.vm.options.map((o) => o.format)).not.toContain('pdf');
+    await m.unmount();
+    spy.mockRestore();
+  });
+
   it('says a plan has no dates when the calendar export finds none', async () => {
     pond.longTaskExport.mockRejectedValue(new ApiError('GET → 404', 404, null));
     const m = await mount();
@@ -217,10 +268,17 @@ describe('the share choices', () => {
   });
 
   it('offers the calendar only for a report with dated events, and nothing for an older Pond', () => {
-    expect(shareOptions(shown({})).map((o) => o.format)).toEqual(['markdown', 'html']);
-    expect(shareOptions(shown({ calendarEvents: 3 })).map((o) => o.format)).toEqual(['markdown', 'html', 'ics']);
-    expect(shareOptions(shown({ exportable: false, calendarEvents: 3 }))).toEqual([]);
-    expect(shareOptions(null)).toEqual([]);
+    expect(shareOptions(shown({}), false).map((o) => o.format)).toEqual(['markdown', 'html']);
+    expect(shareOptions(shown({ calendarEvents: 3 }), false).map((o) => o.format)).toEqual(['markdown', 'html', 'ics']);
+    expect(shareOptions(shown({ calendarEvents: 3 }), true).map((o) => o.format)).toEqual(['pdf', 'markdown', 'html', 'ics']);
+    expect(shareOptions(shown({ exportable: false, calendarEvents: 3 }), true)).toEqual([]);
+    expect(shareOptions(null, true)).toEqual([]);
+  });
+
+  it('prints on Letter where that is the usual paper, and A4 elsewhere', () => {
+    expect(pdfPage('US')).toEqual({ width: 612, height: 792 });
+    expect(pdfPage('KE')).toEqual({ width: 595, height: 842 });
+    expect(pdfPage(undefined)).toEqual({ width: 595, height: 842 });
   });
 });
 

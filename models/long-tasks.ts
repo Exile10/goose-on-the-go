@@ -220,6 +220,11 @@ export function reportFileName(disposition: string | null, format: ReportFormat)
   return /^[A-Za-z0-9][A-Za-z0-9_-]{0,79}$/.test(stem) ? `${stem}.${extension}` : `report.${extension}`;
 }
 
+/** The PDF printed from an export's web page takes that page's name. */
+export function pdfFileName(htmlName: string): string {
+  return htmlName.replace(/\.html$/, '') + '.pdf';
+}
+
 export interface ReportSection {
   /** Empty for what comes before the first section: the report's title and summary. */
   title: string;
