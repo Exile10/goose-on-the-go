@@ -13,9 +13,8 @@ import { Spacing } from '@/constants/spacing';
 import { useThemedStyles } from '@/hooks/use-themed-styles';
 import { useChoice } from '@/providers/confirm-provider';
 import { confirm, reject, selectionTick } from '@/services/haptics';
-import type { ReportFormat } from '@/services/types';
 import { taskEyebrow } from '@/view-models/long-task-words';
-import { useTaskReport } from '@/view-models/use-task-report';
+import { useTaskReport, type ShareFormat } from '@/view-models/use-task-report';
 
 /** A task id from a link: only what the Pond issues, never anything that could be a path. */
 function taskIdOf(param: string | string[] | undefined): string {
@@ -44,7 +43,7 @@ export default function TaskReportScreen() {
   );
 
   const share = useCallback(async () => {
-    const format = await choose<ReportFormat>({
+    const format = await choose<ShareFormat>({
       title: t('chat.report.shareTitle'),
       message: t('chat.report.shareBody'),
       options: options.map((o) => ({ label: t(o.labelKey), value: o.format })),

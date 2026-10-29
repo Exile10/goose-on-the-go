@@ -3,12 +3,12 @@
 
 import { useCallback, useEffect, useState } from 'react';
 
-import { isEnded, REPORT_FILES, reportSections, resultArtifact, type ReportSection } from '@/models/long-tasks';
+import { isEnded, pdfFileName, REPORT_FILES, reportSections, resultArtifact, type ReportSection } from '@/models/long-tasks';
 import { useServer } from '@/providers/server-provider';
 import { ApiError } from '@/services/api-client';
 import i18n, { type TranslationKey } from '@/services/i18n';
 import { endedReport, keepEndedReport } from '@/services/long-task-cache';
-import { shareReportFile, SharingUnavailableError } from '@/services/report-share';
+import { canMakePdf, shareReportFile, shareReportPdf, SharingUnavailableError } from '@/services/report-share';
 import type { LongTaskKind, ReportFormat } from '@/services/types';
 import { describeApiError } from './describe-error';
 import type { LongTasksSource } from '@/models/long-tasks-mock';
@@ -26,15 +26,22 @@ export interface ShownReport {
   final: boolean;
 }
 
+/** What the Pond exports, and a PDF the phone prints from the Pond's web page. */
+export type ShareFormat = ReportFormat | 'pdf';
+
 export interface ShareOption {
-  format: ReportFormat;
+  format: ShareFormat;
   labelKey: TranslationKey;
 }
 
-/** The share sheet's choices: a document and a web page always, a calendar only when there are dates. */
-export function shareOptions(report: ShownReport | null): ShareOption[] {
+/**
+ * The share sheet's choices: a PDF where this build can print one, a document and a web page always,
+ * a calendar only when there are dates.
+ */
+export function shareOptions(report: ShownReport | null, pdf: boolean): ShareOption[] {
   if (!report?.exportable) return [];
   const options: ShareOption[] = [
+    ...(pdf ? [{ format: 'pdf', labelKey: 'chat.report.asPdf' } as const] : []),
     { format: 'markdown', labelKey: 'chat.report.asDocument' },
     { format: 'html', labelKey: 'chat.report.asPage' },
   ];
@@ -91,13 +98,13 @@ export interface UseTaskReport {
   error: string | null;
   gone: boolean;
   /** The format being fetched and shared, or null. */
-  sharing: ReportFormat | null;
+  sharing: ShareFormat | null;
   shareError: string | null;
   options: ShareOption[];
   actions: {
     retry: () => Promise<void>;
     /** Resolves to whether the share sheet opened. */
-    share: (format: ReportFormat) => Promise<boolean>;
+    share: (format: ShareFormat) => Promise<boolean>;
   };
 }
 
@@ -108,7 +115,8 @@ export function useTaskReport(id: string): UseTaskReport {
   const [loading, setLoading] = useState(report === null);
   const [error, setError] = useState<string | null>(null);
   const [gone, setGone] = useState(false);
-  const [sharing, setSharing] = useState<ReportFormat | null>(null);
+  const [sharing, setSharing] = useState<ShareFormat | null>(null);
+  const [pdf] = useState(canMakePdf);
   const [shareError, setShareError] = useState<string | null>(null);
 
   /** Shows what the Pond answered, or why it could not. */
@@ -159,16 +167,22 @@ export function useTaskReport(id: string): UseTaskReport {
   }, [hydrated, opened, read, settle]);
 
   const share = useCallback(
-    async (format: ReportFormat) => {
+    async (format: ShareFormat) => {
       if (sharing) return false;
       setSharing(format);
       setShareError(null);
       try {
-        const file = await source.export(id, format);
-        await shareReportFile(file.name, file.body, REPORT_FILES[format]);
+        if (format === 'pdf') {
+          const page = await source.export(id, 'html');
+          await shareReportPdf(pdfFileName(page.name), page.body);
+        } else {
+          const file = await source.export(id, format);
+          await shareReportFile(file.name, file.body, REPORT_FILES[format]);
+        }
         return true;
       } catch (e) {
         if (e instanceof SharingUnavailableError) setShareError(i18n.t('chat.report.shareUnavailable'));
+        else if (format === 'pdf' && !(e instanceof ApiError)) setShareError(i18n.t('chat.report.pdfFailed'));
         else if (format === 'ics' && e instanceof ApiError && e.status === 404) setShareError(i18n.t('chat.report.noDates'));
         else setShareError(describeApiError(e) ?? i18n.t('chat.report.shareFailed'));
         return false;
@@ -179,5 +193,5 @@ export function useTaskReport(id: string): UseTaskReport {
     [id, sharing, source],
   );
 
-  return { report, loading, error, gone, sharing, shareError, options: shareOptions(report), actions: { retry, share } };
+  return { report, loading, error, gone, sharing, shareError, options: shareOptions(report, pdf), actions: { retry, share } };
 }
