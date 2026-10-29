@@ -12,6 +12,7 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 import { useServer } from '@/providers/server-provider';
 import { ApiError, api, type PondApiClient } from '@/services/api-client';
 import type { Device, DeviceStatePatch, MatterStatus, UpdateDeviceRequest } from '@/services/types';
+import { ago } from '@/models/elapsed';
 import { describeApiError } from './describe-error';
 import { useLive } from './use-live';
 import i18n from '@/services/i18n';
@@ -213,6 +214,11 @@ export interface UseDevices {
     /** Power state by device id. Absent means the device did not report one. */
     powerById: Record<string, boolean>;
     matter: MatterStatus | null;
+    /**
+     * How old what is on screen is, when the Pond could not be read since: "5 min". Null while
+     * the last read worked, or before any has.
+     */
+    staleFor: string | null;
   };
   loading: boolean;
   error: string | null;
@@ -273,12 +279,24 @@ export function powerPollStillCurrent(pollStartedAt: number, newestAppliedAt: nu
   return pollStartedAt >= newestAppliedAt;
 }
 
+/**
+ * How long the list on screen has gone without a successful read, once one has failed after it.
+ * Every poll that fails moves `failedAt` on, so the age grows while the Pond stays out of reach.
+ */
+export function staleFor(updatedAt: number | null, failedAt: number | null): string | null {
+  if (updatedAt == null || failedAt == null || failedAt < updatedAt) return null;
+  return ago((failedAt - updatedAt) / 1000);
+}
+
 export function useDevices(): UseDevices {
   const [devices, setDevices] = useState<Device[]>([]);
   const [powerById, setPowerById] = useState<Record<string, boolean>>({});
   const [matter, setMatter] = useState<MatterStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // When the list was last read, and when a read last failed after that.
+  const [updatedAt, setUpdatedAt] = useState<number | null>(null);
+  const [failedAt, setFailedAt] = useState<number | null>(null);
   // When this screen last changed something itself, so a poll that began earlier cannot undo it.
   const powerChangedAt = useRef<Record<string, number>>({});
   const listChangedAt = useRef(0);
@@ -339,8 +357,11 @@ export function useDevices(): UseDevices {
         if (listPollStillCurrent(startedAt, listChangedAt.current)) setDevices(list);
         loaded.current = true;
         setError(null);
+        setUpdatedAt(Date.now());
+        setFailedAt(null);
         void readPower(list, startedAt);
       } catch (e) {
+        setFailedAt(Date.now());
         if (loud || !loaded.current) setError(describeDeviceError(e));
         else console.warn('[devices] refresh failed; showing the last list', e instanceof ApiError ? e.status : 'network');
       } finally {
@@ -466,6 +487,7 @@ export function useDevices(): UseDevices {
       onlineCount: devices.filter((d) => d.is_online).length,
       powerById,
       matter,
+      staleFor: staleFor(updatedAt, failedAt),
     },
     loading,
     error,

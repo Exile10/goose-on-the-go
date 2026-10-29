@@ -15,6 +15,7 @@ import {
   supports,
   listPollStillCurrent,
   powerPollStillCurrent,
+  staleFor,
   mergePower,
   ALL_ROOMS,
   roomLabel,
@@ -175,5 +176,25 @@ describe('power readings from an older poll', () => {
   it('are applied when they are the newest', () => {
     expect(powerPollStillCurrent(3_000, 2_000)).toBe(true);
     expect(powerPollStillCurrent(1_000, 0)).toBe(true);
+  });
+});
+
+describe('how old the list on screen is', () => {
+  const at = Date.parse('2026-10-27T06:30:00Z');
+
+  it('says nothing while the last read worked', () => {
+    expect(staleFor(at, null)).toBeNull();
+  });
+
+  it('says nothing before anything has loaded', () => {
+    expect(staleFor(null, at)).toBeNull();
+  });
+
+  it('gives the age of the last good read once a later one fails', () => {
+    expect(staleFor(at, at + 5 * 60_000)).toBe('5 min');
+  });
+
+  it('ignores a failure from before the last good read', () => {
+    expect(staleFor(at, at - 1)).toBeNull();
   });
 });
