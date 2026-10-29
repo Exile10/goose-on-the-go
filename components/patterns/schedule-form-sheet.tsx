@@ -1,5 +1,6 @@
 /**
- * ScheduleFormSheet — a new schedule, or an edit to one, that runs a prompt.
+ * ScheduleFormSheet — a new schedule, or an edit to one, that runs a prompt
+ * or, on a Pond that can run one, a routine that switches devices.
  *
  * "Once" is a date and a time; "On repeat" is a cron expression, written by
  * hand for now. What each becomes on the wire, and which fields an edit
@@ -29,6 +30,7 @@ import {
 import type { CivilDate } from '@jarida/ink';
 
 import { LabelledSwitch } from '@/components/patterns/labelled-switch';
+import { RoutineDevices } from '@/components/patterns/routine-devices';
 import { GSheetBody } from '@/components/ui/g-sheet-body';
 import {
   createRequest,
@@ -131,6 +133,9 @@ export function ScheduleFormSheet(props: ScheduleFormSheetProps) {
   const today = todayCivil();
   // A webhook has no prompt to edit; see `updateRequest`.
   const hasPrompt = !editing || promptOf(editing) != null;
+  // Routines came to the Pond with asking about missed runs, so one says the other is there.
+  // What a schedule does is chosen once: an edit keeps it.
+  const offersRoutine = !editing && asksIfMissed;
   // The zone is offered only where there is a choice: the schedule's own, or this phone's.
   const zones = editing && editing.timezone !== phoneZone ? [editing.timezone, phoneZone] : null;
 
@@ -150,6 +155,20 @@ export function ScheduleFormSheet(props: ScheduleFormSheetProps) {
               onChange={set('name')}
             />
           </InkFormField>
+
+          {offersRoutine ? (
+            <InkFormField label={t('schedule.form.does')}>
+              <InkSegmented
+                label={t('schedule.form.does')}
+                value={draft.does}
+                options={[
+                  { value: 'prompt', label: t('schedule.form.doesPrompt') },
+                  { value: 'routine', label: t('schedule.form.doesRoutine') },
+                ]}
+                onChange={set('does')}
+              />
+            </InkFormField>
+          ) : null}
 
           <InkFormField label={t('schedule.form.timing')}>
             <InkSegmented
@@ -215,7 +234,10 @@ export function ScheduleFormSheet(props: ScheduleFormSheetProps) {
           ) : null}
           <InkText size="sm" tone="tertiary">{t('schedule.form.phoneZone', { zone: phoneZone })}</InkText>
 
-          {hasPrompt ? (
+          {draft.does === 'routine' ? (
+            // Only while open, so the device list is not read behind a closed sheet.
+            open ? <RoutineDevices value={draft.devices} onChange={set('devices')} /> : null
+          ) : hasPrompt ? (
             <InkFormField label={t('schedule.form.prompt')}>
               <InkTextArea
                 label={t('schedule.form.prompt')}
