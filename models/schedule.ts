@@ -284,6 +284,13 @@ export interface ScheduleDraft {
   time: CivilTime | null;
   cron: string;
   timezone: string;
+  /** Ask before running a missed repeat, or skip it. Null on a Pond that cannot ask. */
+  askIfMissed: boolean | null;
+}
+
+/** Whether this Pond can ask about missed runs: it says so on every schedule once it can. */
+export function pondAsksIfMissed(schedules: Schedule[]): boolean {
+  return schedules.some((s) => s.ask_if_missed !== undefined);
 }
 
 /** The request, or the key of the sentence that says what to fix. */
@@ -294,9 +301,18 @@ export function promptOf(schedule: Schedule): string | null {
   return schedule.kind.type === 'agent_prompt' ? schedule.kind.prompt : null;
 }
 
-/** An empty form for a new schedule, in the phone's zone. */
-export function emptyDraft(timezone: string): ScheduleDraft {
-  return { name: '', prompt: '', timing: 'once', date: null, time: null, cron: '', timezone };
+/** An empty form for a new schedule, in the phone's zone. Asking about a missed run starts on, where it can. */
+export function emptyDraft(timezone: string, asksIfMissed = false): ScheduleDraft {
+  return {
+    name: '',
+    prompt: '',
+    timing: 'once',
+    date: null,
+    time: null,
+    cron: '',
+    timezone,
+    askIfMissed: asksIfMissed ? true : null,
+  };
 }
 
 /**
@@ -304,7 +320,12 @@ export function emptyDraft(timezone: string): ScheduleDraft {
  * read back as a date and a time on this phone, which is how it was picked.
  */
 export function draftFrom(schedule: Schedule): ScheduleDraft {
-  const base = { name: schedule.label, prompt: promptOf(schedule) ?? '', timezone: schedule.timezone };
+  const base = {
+    name: schedule.label,
+    prompt: promptOf(schedule) ?? '',
+    timezone: schedule.timezone,
+    askIfMissed: schedule.ask_if_missed ?? null,
+  };
   if (isOneOff(schedule) && schedule.fire_at) {
     const at = new Date(schedule.fire_at);
     return {
@@ -339,16 +360,16 @@ export function createRequest(d: ScheduleDraft, now = new Date()): DraftResult<C
   if (!d.prompt.trim()) return { ok: false, error: 'schedule.errors.promptRequired' };
   const timing = checkTiming(d, now);
   if (!timing.ok) return timing;
-  return {
-    ok: true,
-    req: {
-      name: d.name.trim(),
-      cron: timing.req.cron,
-      prompt: d.prompt.trim(),
-      timezone: d.timezone,
-      once: d.timing === 'once',
-    },
+  const req: CreateScheduleRequest = {
+    name: d.name.trim(),
+    cron: timing.req.cron,
+    prompt: d.prompt.trim(),
+    timezone: d.timezone,
+    once: d.timing === 'once',
   };
+  // Only a repeat can be missed: a one-off the Pond slept through still fires late.
+  if (d.timing === 'repeat' && d.askIfMissed !== null) req.ask_if_missed = d.askIfMissed;
+  return { ok: true, req };
 }
 
 /**
@@ -389,6 +410,9 @@ export function updateRequest(
     if (!timing.ok) return timing;
     if (timing.req.at) req.fire_at = timing.req.at.toISOString();
     else req.cron = timing.req.cron;
+  }
+  if (d.timing === 'repeat' && d.askIfMissed !== null && d.askIfMissed !== was.askIfMissed) {
+    req.ask_if_missed = d.askIfMissed;
   }
   return { ok: true, req };
 }

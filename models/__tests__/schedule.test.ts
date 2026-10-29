@@ -15,6 +15,7 @@ import {
   isSixFieldCron,
   linkedScheduleId,
   oneOffCron,
+  pondAsksIfMissed,
   runStatus,
   timedSchedules,
   updateRequest,
@@ -288,6 +289,7 @@ describe('the schedule form', () => {
       time: null,
       cron: '0 0 7 * * *',
       timezone: 'Africa/Nairobi',
+      askIfMissed: null,
     });
     const at = new Date(2026, 9, 24, 18, 5);
     const oneOff = schedule({ cron: '@once', fire_at: at.toISOString() });
@@ -344,6 +346,44 @@ describe('the schedule form', () => {
     expect(updateRequest(brief, { ...draftFrom(brief), cron: '* 0 7 * * *' }, now)).toEqual({
       ok: false,
       error: 'schedule.errors.cronFields',
+    });
+  });
+});
+
+describe('asking about a missed run', () => {
+  const now = new Date(2026, 9, 24, 12, 0);
+  const daily = schedule({ label: 'Morning', cron: '0 30 6 * * *', ask_if_missed: false });
+  const repeat = (over: Partial<ScheduleDraft> = {}): ScheduleDraft => ({
+    ...emptyDraft('Africa/Nairobi', true),
+    name: 'Morning',
+    prompt: 'Lights on',
+    timing: 'repeat',
+    cron: '0 30 6 * * *',
+    ...over,
+  });
+
+  it('is offered only by a Pond whose schedules say whether they ask', () => {
+    expect(pondAsksIfMissed([schedule({})])).toBe(false);
+    expect(pondAsksIfMissed([schedule({}), daily])).toBe(true);
+    expect(emptyDraft('UTC').askIfMissed).toBeNull();
+    expect(emptyDraft('UTC', true).askIfMissed).toBe(true);
+  });
+
+  it('is sent for a new repeat, and never for a one-off or by an older Pond', () => {
+    expect(createRequest(repeat(), now)).toMatchObject({ ok: true, req: { ask_if_missed: true } });
+    const once = repeat({ timing: 'once', date: { year: 2026, month: 10, day: 25 }, time: { hour: 6, minute: 30 } });
+    const built = createRequest(once, now);
+    expect(built.ok && 'ask_if_missed' in built.req).toBe(false);
+    const older = createRequest(repeat({ askIfMissed: null }), now);
+    expect(older.ok && 'ask_if_missed' in older.req).toBe(false);
+  });
+
+  it('is sent on an edit only when it changed', () => {
+    expect(draftFrom(daily).askIfMissed).toBe(false);
+    expect(updateRequest(daily, draftFrom(daily), now)).toEqual({ ok: true, req: {} });
+    expect(updateRequest(daily, { ...draftFrom(daily), askIfMissed: true }, now)).toEqual({
+      ok: true,
+      req: { ask_if_missed: true },
     });
   });
 });
