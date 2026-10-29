@@ -75,7 +75,6 @@ const DESTINATIONS: { name: string; labelKey: TranslationKey; icon: IconName }[]
   { name: 'index', labelKey: 'tabs.home', icon: 'home' },
   { name: 'chat', labelKey: 'tabs.chat', icon: 'chat' },
   { name: 'devices', labelKey: 'tabs.devices', icon: 'device' },
-  { name: 'pond', labelKey: 'tabs.pond', icon: 'server' },
   { name: 'profile', labelKey: 'tabs.you', icon: 'profile' },
 ];
 

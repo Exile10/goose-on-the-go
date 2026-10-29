@@ -207,7 +207,7 @@ Android.
 
 ### My Pond (components/pond/)
 
-`AdminLockView` is everything My Pond shows while it is not open, drawn the same on the tab and on
+`AdminLockView` is everything My Pond shows while it is not open, drawn the same on My Pond and on
 every screen under it: the administrator card's form (the password in the card's groups, masked
 with a show control, its count of characters, the cooling countdown and the Pond's refusals in
 words), or why there is nothing to unlock (no card yet, a guest's phone, a Pond without My Pond).

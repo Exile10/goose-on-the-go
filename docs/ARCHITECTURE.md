@@ -273,8 +273,8 @@ The desktop app has the same problem and the same fix, on the Pond side (goose-i
 
 Uses Expo Router v6 with file-based routing:
 
-- **`(tabs)/`** — Bottom tab navigator (5 tabs: Home, Chat, Devices, My Pond, You)
-- **`(stack)/`** — Stack navigator for the You-tab sub-screens, My Pond's screens, plus Add Device, Connect Desktop and the dev-only Developer screen
+- **`(tabs)/`** — Bottom tab navigator (4 tabs: Home, Chat, Devices, You)
+- **`(stack)/`** — Stack navigator for the You-tab sub-screens, My Pond and its screens, plus Add Device, Connect Desktop and the dev-only Developer screen
 - **`modal.tsx`** — Modal presentation route
 
 See [NAVIGATION.md](./NAVIGATION.md) for detailed rationale.

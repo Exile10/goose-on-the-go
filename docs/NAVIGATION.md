@@ -5,7 +5,7 @@
 - **Google Home**: Device grid with color-coded toggles, room groupings, "Ask" bar
 - **Claude Mobile**: Clean threaded chat, conversation list, generous whitespace
 
-## Bottom Tabs (5)
+## Bottom Tabs (4)
 
 Ink's `InkBottomBar`, floating over the screens rather than beside them, and
 leaving on scroll. Labels come from `tabs.*` in the catalogue; icon names are
@@ -16,12 +16,7 @@ registry keys, so `device` is singular.
 | Home | Dashboard | home | Greeting, status, devices, shortcuts, recent |
 | Chat | Conversations wall → conversation | chat | Every conversation the Pond holds; open one or start one |
 | Devices | Device Grid | device | Room-grouped smart home control |
-| My Pond | The Pond's administration | server | Storage, files, caches, tasks, health and power, behind the administrator card |
 | You | Profile Hub | profile | Settings, integrations, data |
-
-Five is Ink's cap (`BAR_MAX`). Ink drops the labels and keeps the icons when a slot is narrower
-than 72 points (`fitBar`): the floating bar is the screen less 16 points a side, so a phone
-narrower than about 392 points shows icons alone.
 
 The bar is absolutely positioned, so a tab screen's own list has to clear it —
 `paddingBottom: useBottomBarInset()`, never a hardcoded spacer. Which stage the
@@ -276,7 +271,8 @@ header is the one surface `useThemedStyles` cannot reach.
 
 ## My Pond
 
-The My Pond tab (`app/(tabs)/pond.tsx`, `view-models/use-my-pond.ts`) is the Pond's
+My Pond (`app/(stack)/pond.tsx`, `view-models/use-my-pond.ts`), the first row of the You tab's
+menu under the household card, is the Pond's
 administration, against goose-in-a-pond's `docs/architecture/pond-administrator.md`. Every route
 is under `/api/v1/admin`, and every one but status, unlock and lock answers 403 `admin_locked`
 until this phone is unlocked with the Pond's administrator card.
@@ -292,12 +288,12 @@ until this phone is unlocked with the Pond's administrator card.
 - **What it says instead of the form**: a Pond with no card (`card: "missing"`, made on the Pond
   with `bash scripts/giap.sh admin-card`), a phone that is not a member's (`admin_members_only`),
   and a Pond that predates My Pond (404, 405 or 501 on the status, after which it stops asking).
-- **Only the status is polled**, every 30 s while the tab is in front. It is the one admin route
+- **Only the status is polled**, every 30 s while My Pond is in front. It is the one admin route
   that does not renew the unlock; the Pond locks after 15 idle minutes, and polling anything else
   would keep it open for as long as the phone sat on the tab. The overview and health are read on
   arrival, after an unlock and on a pull. After any admin request the countdown starts again,
   since the Pond renews the unlock on each.
-- **Unlocked**, the tab shows the disk as an `InkMeter`, storage by area, what the Pond holds,
+- **Unlocked**, My Pond shows the disk as an `InkMeter`, storage by area, what the Pond holds,
   when it locks and Lock, and rows to Files, Caches, Tasks and reports, Health (with a badge when a
   check is not ok) and Power.
 - **The screens under it** are `pond-files`, `pond-caches`, `pond-tasks`, `pond-health` and

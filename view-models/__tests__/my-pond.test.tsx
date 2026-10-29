@@ -285,7 +285,7 @@ describe('the lock', () => {
     await m.unmount();
   });
 
-  it('notices a lock that lapsed while the tab was open', async () => {
+  it('notices a lock that lapsed while My Pond was open', async () => {
     pond.adminStatus.mockResolvedValue(OPEN);
     const m = await mount(useMyPond);
     expect(m.vm.gate.phase).toBe('unlocked');

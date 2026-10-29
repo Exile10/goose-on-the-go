@@ -1,4 +1,4 @@
-// The My Pond tab: the lock, and once open what the Pond holds. Only the status is polled, because
+// My Pond: the lock, and once open what the Pond holds. Only the status is polled, because
 // it alone does not renew the unlock; reading anything else every 30 s would keep it open forever.
 
 import { useCallback, useEffect, useRef, useState } from 'react';

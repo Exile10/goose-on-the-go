@@ -1,4 +1,4 @@
-// Whether My Pond is unlocked, shared by the tab and every screen under it: any admin route that
+// Whether My Pond is unlocked, shared by its first screen and every screen under it: any admin route that
 // answers `admin_locked` returns the whole area to the lock, wherever it was asked from.
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
@@ -212,7 +212,7 @@ export interface UseAdminUnlock {
   unlock: () => Promise<boolean>;
 }
 
-/** The lock's form, shared by the tab and by any screen under it that finds itself locked. */
+/** The lock's form, shared by My Pond and by any screen under it that finds itself locked. */
 export function useAdminUnlock(): UseAdminUnlock {
   const { gate, source, readStatus, noteFailure } = useAdminGate();
   const store = storeFor(source);

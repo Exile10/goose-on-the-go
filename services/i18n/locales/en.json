@@ -24,8 +24,7 @@
     "chat": "Chat",
     "devices": "Devices",
     "you": "You",
-    "navigation": "Main navigation",
-    "pond": "My Pond"
+    "navigation": "Main navigation"
   },
   "greeting": {
     "night": "Good night,",
@@ -1388,6 +1387,7 @@
       "rulesNone": "None yet"
     },
     "menu": {
+      "pond": "My Pond",
       "connection": "Connection",
       "goose": "Goose",
       "home": "Home",
@@ -1533,6 +1533,7 @@
     "agent": "Agent",
     "newAgent": "New agent",
     "taskReport": "Report",
+    "myPond": "My Pond",
     "pondFiles": "Files",
     "pondCaches": "Caches",
     "pondTasks": "Tasks and reports",
