@@ -6,6 +6,9 @@
  * sends, is `createRequest` and `updateRequest` in `models/schedule.ts`.
  * Checks that would otherwise come back as a 400 run there first, so the
  * person hears what to fix before anything is sent.
+ *
+ * A repeat can ask about a run missed while the Pond was off, on a Pond that
+ * can ask. It is never run late on its own: somebody says run it or skip it.
  */
 
 import React, { useState } from 'react';
@@ -25,6 +28,7 @@ import {
 } from '@jarida/ink/native';
 import type { CivilDate } from '@jarida/ink';
 
+import { LabelledSwitch } from '@/components/patterns/labelled-switch';
 import { GSheetBody } from '@/components/ui/g-sheet-body';
 import {
   createRequest,
@@ -46,6 +50,8 @@ export type ScheduleFormSheetProps = {
   | {
       /** Resolves to why it was refused, or null once it exists. */
       onCreate: (req: CreateScheduleRequest) => Promise<string | null>;
+      /** Whether the Pond can ask about a missed run, so the form offers it. */
+      asksIfMissed: boolean;
       schedule?: undefined;
     }
   | {
@@ -66,7 +72,10 @@ export function ScheduleFormSheet(props: ScheduleFormSheetProps) {
   const editing = props.schedule;
   const { t } = useTranslation();
   const [phoneZone] = useState(deviceTimeZone);
-  const [draft, setDraft] = useState<ScheduleDraft>(() => (editing ? draftFrom(editing) : emptyDraft(phoneZone)));
+  const asksIfMissed = !editing && props.asksIfMissed;
+  const [draft, setDraft] = useState<ScheduleDraft>(() =>
+    editing ? draftFrom(editing) : emptyDraft(phoneZone, asksIfMissed),
+  );
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -80,6 +89,8 @@ export function ScheduleFormSheet(props: ScheduleFormSheetProps) {
       setDraft(draftFrom(editing));
       setError(null);
     }
+    // The list that says whether the Pond can ask may have loaded after this form was made.
+    if (open && asksIfMissed && draft.askIfMissed === null) setDraft((d) => ({ ...d, askIfMissed: true }));
   }
 
   const set =
@@ -107,7 +118,7 @@ export function ScheduleFormSheet(props: ScheduleFormSheetProps) {
     void confirm();
     // Only a created schedule clears the form. A stray tap on the backdrop
     // closes the sheet too, and it should not cost the draft.
-    if (!editing) setDraft(emptyDraft(phoneZone));
+    if (!editing) setDraft(emptyDraft(phoneZone, asksIfMissed));
     onClose();
   };
 
@@ -179,6 +190,16 @@ export function ScheduleFormSheet(props: ScheduleFormSheetProps) {
                 />
               </InkFormField>
               <InkText size="sm" tone="tertiary">{t('schedule.form.cronHint')}</InkText>
+              {draft.askIfMissed !== null ? (
+                <>
+                  <LabelledSwitch
+                    label={t('schedule.form.askIfMissed')}
+                    checked={draft.askIfMissed}
+                    onChange={set('askIfMissed')}
+                  />
+                  <InkText size="sm" tone="tertiary">{t('schedule.form.askIfMissedHint')}</InkText>
+                </>
+              ) : null}
             </>
           )}
 

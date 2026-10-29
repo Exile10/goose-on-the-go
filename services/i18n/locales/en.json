@@ -2193,6 +2193,8 @@
       "time": "Time",
       "cron": "Cron expression",
       "cronHint": "Six fields, seconds first: second minute hour day month weekday. 0 0 9 * * 1-5 is 9:00 on weekdays.",
+      "askIfMissed": "Ask me if it's missed",
+      "askIfMissedHint": "If your Pond is off when this is due, it asks your household's phones whether to run it late. It never runs late on its own.",
       "prompt": "What should Goose do?",
       "promptPlaceholder": "Summarise my calendar and the weather.",
       "create": "Create",
@@ -2286,7 +2288,14 @@
       "deleteTitle": "Delete this schedule?",
       "deleteBody": "“{{name}}” will be removed from your Pond and will not run again.",
       "saved": "Saved on your Pond.",
-      "runStarted": "Your Pond has started a run."
+      "runStarted": "Your Pond has started a run.",
+      "missedSkipped": "Skipped. It runs again at its next time."
+    },
+    "missed": {
+      "question": "This didn't run at {{when}} because your Pond was off. Run it now?",
+      "run": "Run now",
+      "skip": "Skip",
+      "answered": "Someone has already answered this, so it has been refreshed."
     }
   },
   "remote": {
