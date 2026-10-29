@@ -6,6 +6,7 @@
 
 import {
   createRequest,
+  describeRoutine,
   describeCron,
   describeWhen,
   draftFrom,
@@ -283,7 +284,9 @@ describe('the schedule form', () => {
   it('opens an edit on the schedule as the Pond has it', () => {
     expect(draftFrom(brief)).toEqual({
       name: 'Daily Brief',
+      does: 'prompt',
       prompt: 'Brief me',
+      devices: {},
       timing: 'repeat',
       date: null,
       time: null,
@@ -385,5 +388,79 @@ describe('asking about a missed run', () => {
       ok: true,
       req: { ask_if_missed: true },
     });
+  });
+});
+
+describe('routines', () => {
+  const now = new Date(2026, 9, 24, 12, 0);
+  const routine = (over: Partial<ScheduleDraft> = {}): ScheduleDraft => ({
+    ...emptyDraft('Africa/Nairobi', true),
+    name: 'Morning',
+    does: 'routine',
+    devices: { 'kitchen-lights': true, 'water-heater': true },
+    timing: 'repeat',
+    cron: '0 30 6 * * *',
+    ...over,
+  });
+  const morning = schedule({
+    label: 'Morning',
+    cron: '0 30 6 * * *',
+    ask_if_missed: true,
+    kind: {
+      type: 'routine',
+      actions: [
+        { type: 'device_power', device_id: 'kitchen-lights', on: true },
+        { type: 'notify', title: 'Morning', body: 'Kettle is on' },
+      ],
+    },
+  });
+
+  it('sends its devices as actions, with no prompt', () => {
+    const built = createRequest(routine(), now);
+    expect(built).toMatchObject({
+      ok: true,
+      req: {
+        kind: {
+          type: 'routine',
+          actions: [
+            { type: 'device_power', device_id: 'kitchen-lights', on: true },
+            { type: 'device_power', device_id: 'water-heater', on: true },
+          ],
+        },
+      },
+    });
+    expect(built.ok && 'prompt' in built.req).toBe(false);
+  });
+
+  it('needs at least one device', () => {
+    expect(createRequest(routine({ devices: {} }), now)).toEqual({ ok: false, error: 'schedule.errors.devicesRequired' });
+  });
+
+  it('opens an edit on its devices, and sends them only when they changed', () => {
+    const d = draftFrom(morning);
+    expect(d).toMatchObject({ does: 'routine', devices: { 'kitchen-lights': true } });
+    expect(updateRequest(morning, d, now)).toEqual({ ok: true, req: {} });
+  });
+
+  it('keeps what the form cannot show when its devices change', () => {
+    const built = updateRequest(morning, { ...draftFrom(morning), devices: { 'kitchen-lights': false } }, now);
+    expect(built).toEqual({
+      ok: true,
+      req: {
+        kind: {
+          type: 'routine',
+          actions: [
+            { type: 'device_power', device_id: 'kitchen-lights', on: false },
+            { type: 'notify', title: 'Morning', body: 'Kettle is on' },
+          ],
+        },
+      },
+    });
+  });
+
+  it('says what it sets by name, and by id when the name is unknown', () => {
+    expect(describeRoutine({ 'kitchen-lights': true, 'water-heater': false }, { 'kitchen-lights': 'Kitchen lights' })).toBe(
+      'Kitchen lights on, water-heater off',
+    );
   });
 });
