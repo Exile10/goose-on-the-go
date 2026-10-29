@@ -895,12 +895,20 @@ export class PondApiClient {
    * dispatch path, which is deny-by-default: `DIRECT_DISPATCH_ALLOWLIST` on the
    * server permits `set_device_state` and `get_device_state` and little else, so
    * this is the only shape that works.
+   *
+   * `key` is the tap's idempotency key, sent on every attempt at the same tap so a
+   * Pond that honours keys runs it once. Such a Pond echoes it as `idempotency_key`;
+   * an older one ignores the header and its answer carries none.
    */
-  setDeviceState(deviceId: string, patch: DeviceStatePatch): Promise<ToolCallResult> {
-    return this.post<ToolCallResult>('/api/v1/tools/invoke', {
-      server: 'giap-device-control',
-      tool: 'set_device_state',
-      args: { device_id: deviceId, ...patch },
+  setDeviceState(
+    deviceId: string,
+    patch: DeviceStatePatch,
+    key?: string,
+  ): Promise<ToolCallResult & { idempotency_key?: string }> {
+    return this.request('/api/v1/tools/invoke', {
+      method: 'POST',
+      headers: key ? { 'Idempotency-Key': key } : undefined,
+      body: JSON.stringify({ server: 'giap-device-control', tool: 'set_device_state', args: { device_id: deviceId, ...patch } }),
     });
   }
 
