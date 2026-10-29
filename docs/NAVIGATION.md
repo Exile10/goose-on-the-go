@@ -293,17 +293,20 @@ until this phone is unlocked with the Pond's administrator card.
   would keep it open for as long as the phone sat on the tab. The overview and health are read on
   arrival, after an unlock and on a pull. After any admin request the countdown starts again,
   since the Pond renews the unlock on each.
-- **Unlocked**, My Pond shows the disk as an `InkMeter`, storage by area, what the Pond holds,
-  when it locks and Lock, and rows to Files, Caches, Tasks and reports, Health (with a badge when a
-  check is not ok) and Power.
+- **Unlocked**, My Pond says when it locks, with Lock in the stack header's right, then the disk as
+  an `InkMeter`, what the Pond keeps as one bar in four parts (models, engine caches, saved prompts,
+  and the rest, every other area id included; `groupAreas`), its six counts, and rows to Files,
+  Caches, Tasks and reports, Health (All good, or a badge when a check is not ok) and Power. The
+  bar's parts differ in lightness as well as hue in both schemes (`StorageColors`).
 - **The screens under it** are `pond-files`, `pond-caches`, `pond-tasks`, `pond-health` and
-  `pond-power`. Each destructive action asks through `useConfirm()` with Cancel as the safe
-  default: a delete names the entry and its size, a cache says what clearing it costs, a power mode
-  change asks first, and a restart asks again when a long task is running (409
+  `pond-power`. Each destructive action asks through `useConfirm()` with Keep it as the safe
+  answer (`cancelLabel`): a delete names the entry and its size, a cache says what clearing it
+  costs, a power mode change asks first, and a restart asks again when a long task is running (409
   `long_task_running`), sending `force` only on that second yes. A restart locks My Pond, as it
   ends every unlock on the Pond.
 - **Another member's task** shows its state, kind, dates and size but never its goal or the
-  titles of what it saved. Only the member's own tasks open their report (`task-report`).
+  titles of what it saved, so its artifacts are counted, not listed. Only the member's own tasks
+  open their report (`task-report`).
 
 My Pond is behind the Developer toggle `pond` (real by default). The mock (`models/pond-admin-mock.ts`)
 follows the contract, idle lock and cooling included; its card is `G00S-E1NA-P0ND-2026`, which also

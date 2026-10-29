@@ -336,7 +336,8 @@ export function sizeWords(bytes: number): string {
     value /= 1024;
     unit++;
   }
-  return `${value >= 10 ? Math.round(value) : value.toFixed(1)} ${units[unit]}`;
+  // A tenth of a gigabyte is still a model's worth of difference; a tenth of a megabyte is not.
+  return `${value >= 10 && unit < 2 ? Math.round(value) : value.toFixed(1)} ${units[unit]}`;
 }
 
 /** How much of the disk is in use, as a fraction for the meter; zero for a disk the Pond did not measure. */
@@ -351,4 +352,71 @@ export function minutesLeft(expiresAt: string | null, now: number): number | nul
   const at = Date.parse(expiresAt);
   if (!Number.isFinite(at)) return null;
   return Math.max(0, Math.ceil((at - now) / 60_000));
+}
+
+/** What the Pond keeps, in the four parts My Pond draws: the three that can be acted on, and the rest. */
+export type AreaGroupId = 'models' | 'engine_caches' | 'kv_snapshots' | 'rest';
+export const AREA_GROUPS: readonly AreaGroupId[] = ['models', 'engine_caches', 'kv_snapshots', 'rest'];
+
+/** All four parts in a fixed order, so the bar and its legend never trade places between reads. */
+export function groupAreas(areas: readonly { id: string; bytes: number }[]): { id: AreaGroupId; bytes: number }[] {
+  const bytes = new Map<AreaGroupId, number>(AREA_GROUPS.map((id) => [id, 0]));
+  for (const area of areas) {
+    const id: AreaGroupId = area.id === 'models' || area.id === 'engine_caches' || area.id === 'kv_snapshots' ? area.id : 'rest';
+    bytes.set(id, (bytes.get(id) ?? 0) + count(area.bytes));
+  }
+  return AREA_GROUPS.map((id) => ({ id, bytes: bytes.get(id) ?? 0 }));
+}
+
+export type TaskFilter = 'all' | 'finished' | 'working';
+
+/** How many tasks each filter shows. A state this phone does not know counts as working, as it may be. */
+export function taskCounts(tasks: readonly AdminTask[]): Record<TaskFilter, number> {
+  const finished = tasks.filter((t) => isTaskFinished(t.state)).length;
+  return { all: tasks.length, finished, working: tasks.length - finished };
+}
+
+export function filterTasks(tasks: readonly AdminTask[], filter: TaskFilter): AdminTask[] {
+  if (filter === 'all') return [...tasks];
+  return tasks.filter((t) => isTaskFinished(t.state) === (filter === 'finished'));
+}
+
+/** The one task whose report is the screen's main action: the first of the member's own that finished with one. */
+export function leadReport(tasks: readonly AdminTask[]): string | null {
+  return tasks.find((t) => !t.another_member && t.state === 'completed' && t.has_report)?.id ?? null;
+}
+
+/** About how many words a saved piece holds, from its tokens, to the nearest ten; null for an empty one. */
+export function approxWords(tokens: number): number | null {
+  if (!Number.isFinite(tokens) || tokens <= 0) return null;
+  return Math.max(10, Math.round((tokens * 0.75) / 10) * 10);
+}
+
+/** The heat readings worth a tile each: all of them up to `max`, else the hottest `max`. */
+export function heatZones(temps: readonly { zone: string; celsius: number }[], max = 6): { zone: string; celsius: number }[] {
+  return temps.length <= max ? [...temps] : [...temps].sort((a, b) => b.celsius - a.celsius).slice(0, max);
+}
+
+/** The worst of the checks: ok only when every one is, and the ids of those that are not. */
+export function healthSummary(health: AdminHealth): { status: AdminCheckStatus; notOk: AdminCheckId[] } {
+  const notOk = health.checks.filter((c) => c.status !== 'ok');
+  const status: AdminCheckStatus = notOk.some((c) => c.status === 'critical') ? 'critical' : notOk.length > 0 ? 'warning' : 'ok';
+  return { status, notOk: [...new Set(notOk.map((c) => c.id))] };
+}
+
+/**
+ * The reading a check is judged on: percent of the disk free, percent of memory available, or the
+ * hottest zone in degrees. Null when the Pond sent nothing to read it from.
+ */
+export function checkReading(health: AdminHealth, id: AdminCheckId): number | null {
+  switch (id) {
+    case 'disk_space':
+      return health.disk && health.disk.total_bytes > 0 ? (health.disk.free_bytes * 100) / health.disk.total_bytes : null;
+    case 'memory':
+      return health.memory && health.memory.total_bytes > 0 ? (health.memory.available_bytes * 100) / health.memory.total_bytes : null;
+    case 'temperature':
+      return health.temperatures.length > 0 ? Math.max(...health.temperatures.map((t) => t.celsius)) : null;
+    case 'other':
+      return null;
+  }
 }

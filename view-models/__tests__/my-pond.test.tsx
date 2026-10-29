@@ -169,11 +169,14 @@ describe('the lock', () => {
     expect(pond.adminOverview).toHaveBeenCalledTimes(1);
     expect(pond.adminHealth).toHaveBeenCalledTimes(1);
     expect(m.vm.tab.disk).toEqual({ used: 750, total: 1000, free: 250, fraction: 0.75 });
-    expect(m.vm.tab.areas.map((a) => [a.id, a.label, a.bytes])).toEqual([
-      ['models', 'Models', 500],
-      ['logs', 'Logs', 100],
+    expect(m.vm.tab.parts).toEqual([
+      { id: 'models', bytes: 500 },
+      { id: 'engine_caches', bytes: 0 },
+      { id: 'kv_snapshots', bytes: 0 },
+      { id: 'rest', bytes: 100 },
     ]);
     expect(m.vm.tab.healthWarning).toBe(true);
+    expect(m.vm.tab.healthStatus).toBe('warning');
     expect(m.vm.tab.locksIn).toBe(15);
 
     // The poll reads the status alone: anything else would keep My Pond open for good.

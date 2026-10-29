@@ -17,6 +17,8 @@ export interface UsePondFiles {
   path: string;
   crumbs: Crumb[];
   entries: AdminFileEntry[];
+  /** What the folder on screen holds in all. */
+  total: number;
   /** Nothing is known yet about the folder on screen. */
   loading: boolean;
   /** The folder could not be read, so an empty list says nothing about it. */
@@ -127,7 +129,8 @@ export function usePondFiles(): UsePondFiles {
           entry.kind === 'directory'
             ? i18n.t('myPond.files.deleteFolderBody', { size })
             : i18n.t('myPond.files.deleteFileBody', { size }),
-        confirmLabel: i18n.t('myPond.files.delete'),
+        confirmLabel: i18n.t('myPond.files.deleteSize', { size }),
+        cancelLabel: i18n.t('myPond.keepIt'),
         destructive: true,
       });
       if (!yes) return false;
@@ -158,6 +161,7 @@ export function usePondFiles(): UsePondFiles {
     path,
     crumbs: breadcrumbs(path),
     entries,
+    total: entries.reduce((sum, e) => sum + e.bytes, 0),
     loading: reading && (shown === null || shown.path !== path),
     failed,
     error,

@@ -214,6 +214,10 @@ words), or why there is nothing to unlock (no card yet, a guest's phone, a Pond 
 It reads the shared lock through `useAdminGate` and `useAdminUnlock`, so a screen only decides when
 to draw it.
 
+`DangerQuietButton` is Ink's quiet button with its text and hairline in the danger colour, for an
+action that loses something but is not the screen's main one (Delete task, Clear 1.9 GB). Ink has no
+such variant, so a scoped `InkProvider` recolours its own button, as the tab bar's does.
+
 ### Owner setup and first run (components/setup/)
 
 The steps of `app/(onboarding)/owner-setup.tsx`, in Ink. A choice saved with its

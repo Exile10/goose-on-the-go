@@ -1,13 +1,21 @@
 // The readers stand between the Pond's JSON and the screens: whatever arrives, a screen gets a shape
 // it can draw, and an unknown value reads as the safest thing it could mean.
 
+import type { AdminHealth, AdminTask } from '@/services/types';
 import {
   adminPasswordProblem,
+  approxWords,
   breadcrumbs,
+  checkReading,
   diskUsed,
+  filterTasks,
   formatAdminPassword,
+  groupAreas,
   healthNeedsAttention,
+  healthSummary,
+  heatZones,
   isTaskFinished,
+  leadReport,
   minutesLeft,
   normalizeAdminPassword,
   readAdminStatus,
@@ -21,6 +29,7 @@ import {
   readTasks,
   readUnlocked,
   sizeWords,
+  taskCounts,
 } from '@/models/pond-admin';
 
 const GARBAGE: unknown[] = [null, undefined, 42, 'text', true, [], [1, 2]];
@@ -316,6 +325,8 @@ describe('the small pieces', () => {
     expect(sizeWords(1024)).toBe('1.0 KB');
     expect(sizeWords(15 * 1024 * 1024)).toBe('15 MB');
     expect(sizeWords(4.4 * 1024 ** 3)).toBe('4.4 GB');
+    expect(sizeWords(31.6 * 1024 ** 3)).toBe('31.6 GB');
+    expect(sizeWords(123.9 * 1024 ** 3)).toBe('123.9 GB');
     expect(sizeWords(2 * 1024 ** 4)).toBe('2.0 TB');
     expect(sizeWords(Number.NaN)).toBe('0 B');
   });
@@ -332,5 +343,146 @@ describe('the small pieces', () => {
     expect(minutesLeft('2026-10-29T09:59:00Z', now)).toBe(0);
     expect(minutesLeft(null, now)).toBeNull();
     expect(minutesLeft('not a time', now)).toBeNull();
+  });
+});
+
+describe('what the Pond keeps, in four parts', () => {
+  it('puts every area in one of four parts, in a fixed order, unknown ones with the rest', () => {
+    expect(
+      groupAreas([
+        { id: 'logs', bytes: 10 },
+        { id: 'kv_snapshots', bytes: 30 },
+        { id: 'models', bytes: 500 },
+        { id: 'camera', bytes: 5 },
+        { id: 'something_new', bytes: 7 },
+        { id: 'engine_caches', bytes: 40 },
+        { id: 'conversations', bytes: 3 },
+      ]),
+    ).toEqual([
+      { id: 'models', bytes: 500 },
+      { id: 'engine_caches', bytes: 40 },
+      { id: 'kv_snapshots', bytes: 30 },
+      { id: 'rest', bytes: 25 },
+    ]);
+  });
+
+  it('keeps all four parts when the Pond sent none, so the legend does not change shape', () => {
+    expect(groupAreas([]).map((p) => [p.id, p.bytes])).toEqual([
+      ['models', 0],
+      ['engine_caches', 0],
+      ['kv_snapshots', 0],
+      ['rest', 0],
+    ]);
+  });
+});
+
+const task = (over: Partial<AdminTask>): AdminTask => ({
+  id: 't',
+  goal: 'A goal',
+  another_member: false,
+  state: 'completed',
+  kind: 'general',
+  created_at: null,
+  finished_at: null,
+  has_report: false,
+  artifacts: [],
+  ...over,
+});
+
+describe('the task filters', () => {
+  const tasks = [
+    task({ id: 'a', state: 'running' }),
+    task({ id: 'b', state: 'completed' }),
+    task({ id: 'c', state: null }),
+    task({ id: 'd', state: 'cancelled' }),
+    task({ id: 'e', state: 'paused' }),
+  ];
+
+  it('counts finished as ended, and anything else, unknown states included, as working', () => {
+    expect(taskCounts(tasks)).toEqual({ all: 5, finished: 2, working: 3 });
+    expect(taskCounts([])).toEqual({ all: 0, finished: 0, working: 0 });
+  });
+
+  it('shows the tasks each filter names, in the order the Pond sent them', () => {
+    expect(filterTasks(tasks, 'all').map((t) => t.id)).toEqual(['a', 'b', 'c', 'd', 'e']);
+    expect(filterTasks(tasks, 'finished').map((t) => t.id)).toEqual(['b', 'd']);
+    expect(filterTasks(tasks, 'working').map((t) => t.id)).toEqual(['a', 'c', 'e']);
+  });
+
+  it("leads with the first of the member's own finished tasks that has a report", () => {
+    expect(
+      leadReport([
+        task({ id: 'theirs', another_member: true, goal: null, has_report: true }),
+        task({ id: 'stopped', state: 'cancelled', has_report: true }),
+        task({ id: 'mine', has_report: true }),
+        task({ id: 'later', has_report: true }),
+      ]),
+    ).toBe('mine');
+    expect(leadReport([task({ id: 'no-report' })])).toBeNull();
+  });
+
+  it('says about how many words a saved piece holds, to the nearest ten', () => {
+    expect(approxWords(160)).toBe(120);
+    expect(approxWords(3460)).toBe(2600);
+    expect(approxWords(4)).toBe(10);
+    expect(approxWords(0)).toBeNull();
+    expect(approxWords(Number.NaN)).toBeNull();
+  });
+});
+
+const HEALTH: AdminHealth = {
+  version: '1',
+  uptime_secs: 1,
+  host: { hostname: 'nano', os: 'Ubuntu', arch: 'aarch64', cpus: 6, uptime_secs: 1, load: [] },
+  memory: { total_bytes: 800, available_bytes: 104, swap_total_bytes: 0, swap_free_bytes: 0 },
+  disk: { total_bytes: 1000, free_bytes: 160 },
+  temperatures: [
+    { zone: 'cpu', celsius: 72.7 },
+    { zone: 'gpu', celsius: 74.2 },
+  ],
+  process: null,
+  checks: [
+    { id: 'disk_space', status: 'ok' },
+    { id: 'memory', status: 'ok' },
+    { id: 'temperature', status: 'ok' },
+  ],
+};
+
+describe('health', () => {
+  it('is ok only when every check is, and names the ones that are not', () => {
+    expect(healthSummary(HEALTH)).toEqual({ status: 'ok', notOk: [] });
+    const warm = { ...HEALTH, checks: [{ id: 'disk_space', status: 'ok' }, { id: 'temperature', status: 'warning' }] } as AdminHealth;
+    expect(healthSummary(warm)).toEqual({ status: 'warning', notOk: ['temperature'] });
+    const full = {
+      ...HEALTH,
+      checks: [
+        { id: 'memory', status: 'warning' },
+        { id: 'disk_space', status: 'critical' },
+      ],
+    } as AdminHealth;
+    expect(healthSummary(full)).toEqual({ status: 'critical', notOk: ['memory', 'disk_space'] });
+  });
+
+  it('reads each check from what it is judged on, and nothing from what the Pond did not send', () => {
+    expect(checkReading(HEALTH, 'disk_space')).toBeCloseTo(16);
+    expect(checkReading(HEALTH, 'memory')).toBeCloseTo(13);
+    expect(checkReading(HEALTH, 'temperature')).toBe(74.2);
+    expect(checkReading(HEALTH, 'other')).toBeNull();
+    const bare = { ...HEALTH, memory: null, disk: null, temperatures: [] };
+    expect(checkReading(bare, 'disk_space')).toBeNull();
+    expect(checkReading(bare, 'memory')).toBeNull();
+    expect(checkReading(bare, 'temperature')).toBeNull();
+  });
+
+  it('keeps every heat reading up to six, in the order sent, and otherwise the six hottest', () => {
+    const four = [
+      { zone: 'cpu', celsius: 50 },
+      { zone: 'gpu', celsius: 60 },
+      { zone: 'soc0', celsius: 40 },
+      { zone: 'tj', celsius: 61 },
+    ];
+    expect(heatZones(four)).toEqual(four);
+    const eight = Array.from({ length: 8 }, (_, i) => ({ zone: `z${i}`, celsius: [40, 70, 55, 80, 30, 65, 75, 50][i] }));
+    expect(heatZones(eight).map((z) => z.celsius)).toEqual([80, 75, 70, 65, 55, 50]);
   });
 });

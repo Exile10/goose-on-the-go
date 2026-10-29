@@ -14,6 +14,8 @@ import { useAdminGate, useAdminLoad, type AdminGate } from './use-admin-gate';
 export interface UsePondCaches {
   gate: AdminGate;
   caches: AdminCache[];
+  /** What clearing every cache would free. */
+  total: number;
   loading: boolean;
   failed: boolean;
   error: string | null;
@@ -59,11 +61,12 @@ export function usePondCaches(): UsePondCaches {
   const clear = useCallback(
     async (id: AdminCacheId) => {
       if (clearing) return false;
-      const cache = caches?.find((c) => c.id === id);
+      const size = sizeWords(caches?.find((c) => c.id === id)?.bytes ?? 0);
       const yes = await ask({
         title: i18n.t('myPond.caches.clearTitle', { name: cacheLabel(id) }),
-        message: i18n.t('myPond.caches.clearBody', { size: sizeWords(cache?.bytes ?? 0), effect: cacheEffect(id) }),
-        confirmLabel: i18n.t('myPond.caches.clear'),
+        message: i18n.t('myPond.caches.clearBody', { size, effect: cacheEffect(id) }),
+        confirmLabel: i18n.t('myPond.caches.clearSize', { size }),
+        cancelLabel: i18n.t('myPond.keepIt'),
         destructive: true,
       });
       if (!yes) return false;
@@ -94,6 +97,7 @@ export function usePondCaches(): UsePondCaches {
   return {
     gate,
     caches: caches ?? [],
+    total: (caches ?? []).reduce((sum, c) => sum + c.bytes, 0),
     loading: reading && caches === null,
     failed,
     error,

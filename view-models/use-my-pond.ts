@@ -4,33 +4,34 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useFocusEffect } from 'expo-router';
 
-import { diskUsed, healthNeedsAttention, minutesLeft } from '@/models/pond-admin';
+import { diskUsed, groupAreas, healthNeedsAttention, healthSummary, minutesLeft, type AreaGroupId } from '@/models/pond-admin';
 import { useServer } from '@/providers/server-provider';
 import i18n from '@/services/i18n';
-import type { AdminHealth, AdminOverview } from '@/services/types';
+import type { AdminCheckStatus, AdminHealth, AdminOverview } from '@/services/types';
 import { describeApiError } from './describe-error';
-import { areaLabel } from './pond-admin-words';
 import { useAdminGate, type AdminGate } from './use-admin-gate';
 import { useLive } from './use-live';
 
 /** Gentle: soon enough to show the lock that lapsed while the phone was down, about two requests a minute. */
 export const ADMIN_STATUS_MS = 30_000;
 
-export interface MyPondArea {
-  id: string;
-  label: string;
+export interface MyPondPart {
+  id: AreaGroupId;
   bytes: number;
 }
 
 export interface UseMyPond {
   gate: AdminGate;
   overview: AdminOverview | null;
-  areas: MyPondArea[];
+  /** What the Pond keeps, in four parts that always come in the same order. */
+  parts: MyPondPart[];
   disk: { used: number; total: number; free: number; fraction: number } | null;
   /** Whole minutes before the Pond locks My Pond again, or null when unknown. */
   locksIn: number | null;
   /** Any health check is not ok, so the Health row carries a badge. */
   healthWarning: boolean;
+  /** The worst of the health checks, or null before they are read. */
+  healthStatus: AdminCheckStatus | null;
   /** The overview is out for the first time. */
   loading: boolean;
   refreshing: boolean;
@@ -130,10 +131,11 @@ export function useMyPond(): UseMyPond {
   return {
     gate,
     overview: unlocked ? overview : null,
-    areas: (overview?.areas ?? []).filter((a) => a.bytes > 0).map((a) => ({ id: a.id, label: areaLabel(a.id), bytes: a.bytes })),
+    parts: unlocked && overview ? groupAreas(overview.areas) : [],
     disk: unlocked ? disk : null,
     locksIn: unlocked ? minutesLeft(gate.status?.expires_at ?? null, now) : null,
     healthWarning: unlocked && healthNeedsAttention(health),
+    healthStatus: unlocked && health ? healthSummary(health).status : null,
     loading: unlocked && reading && overview === null,
     refreshing: reading && overview !== null,
     error: unlocked ? error : null,

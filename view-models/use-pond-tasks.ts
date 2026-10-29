@@ -3,7 +3,7 @@
 
 import { useCallback, useState } from 'react';
 
-import { isTaskFinished } from '@/models/pond-admin';
+import { filterTasks, isTaskFinished, leadReport, taskCounts, type TaskFilter } from '@/models/pond-admin';
 import { useConfirm } from '@/providers/confirm-provider';
 import i18n from '@/services/i18n';
 import type { AdminTask, AdminTaskArtifact } from '@/services/types';
@@ -13,7 +13,13 @@ import { useAdminGate, useAdminLoad, type AdminGate } from './use-admin-gate';
 
 export interface UsePondTasks {
   gate: AdminGate;
+  /** The tasks the filter shows. */
   tasks: AdminTask[];
+  filter: TaskFilter;
+  /** How many each filter would show. */
+  counts: Record<TaskFilter, number>;
+  /** The task whose report is the screen's main action, or null. */
+  lead: string | null;
   loading: boolean;
   failed: boolean;
   error: string | null;
@@ -22,6 +28,7 @@ export interface UsePondTasks {
   removing: string | null;
   actions: {
     refresh: () => Promise<void>;
+    setFilter: (filter: TaskFilter) => void;
     /** Asks first; resolves to whether it was deleted. */
     removeTask: (task: AdminTask) => Promise<boolean>;
     removeArtifact: (task: AdminTask, artifact: AdminTaskArtifact) => Promise<boolean>;
@@ -54,6 +61,7 @@ export function usePondTasks(): UsePondTasks {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [removing, setRemoving] = useState<string | null>(null);
+  const [filter, setFilter] = useState<TaskFilter>('all');
 
   const read = useCallback(async () => {
     setReading(true);
@@ -106,7 +114,8 @@ export function usePondTasks(): UsePondTasks {
       const yes = await ask({
         title: i18n.t('myPond.tasks.deleteTitle'),
         message: i18n.t('myPond.tasks.deleteBody', { name: taskName(task), count: task.artifacts.length }),
-        confirmLabel: i18n.t('myPond.tasks.delete'),
+        confirmLabel: i18n.t('myPond.tasks.deleteTask'),
+        cancelLabel: i18n.t('myPond.keepIt'),
         destructive: true,
       });
       if (!yes) return false;
@@ -127,6 +136,7 @@ export function usePondTasks(): UsePondTasks {
         title: i18n.t('myPond.tasks.deleteArtifactTitle', { name }),
         message: i18n.t('myPond.tasks.deleteArtifactBody', { task: taskName(task) }),
         confirmLabel: i18n.t('myPond.tasks.delete'),
+        cancelLabel: i18n.t('myPond.keepIt'),
         destructive: true,
       });
       if (!yes) return false;
@@ -135,14 +145,18 @@ export function usePondTasks(): UsePondTasks {
     [ask, removing, run, source],
   );
 
+  const all = tasks ?? [];
   return {
     gate,
-    tasks: tasks ?? [],
+    tasks: filterTasks(all, filter),
+    filter,
+    counts: taskCounts(all),
+    lead: leadReport(all),
     loading: reading && tasks === null,
     failed,
     error,
     notice,
     removing,
-    actions: { refresh: read, removeTask, removeArtifact },
+    actions: { refresh: read, setFilter, removeTask, removeArtifact },
   };
 }

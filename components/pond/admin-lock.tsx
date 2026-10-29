@@ -4,20 +4,23 @@
 import React, { useState } from 'react';
 import { StyleSheet, Text, TextInput, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { InkButton, InkNotice, InkSpinner, InkText, inkText, useInkTheme } from '@jarida/ink/native';
+import { InkButton, InkEdge, InkEyebrow, InkNotice, InkSpinner, InkText, InkTitle, inkText, useInkTheme } from '@jarida/ink/native';
 
-import { SettingsGroup } from '@/components/settings/settings-list';
+import { IconTile, SettingsGroup } from '@/components/settings/settings-list';
 import { GIcon } from '@/components/ui/g-icon';
 import { GPressable } from '@/components/ui/g-pressable';
+import type { IconName } from '@/constants/icons';
 import { Spacing } from '@/constants/spacing';
 import { FontFamily } from '@/constants/typography';
-import { ADMIN_PASSWORD_LENGTH } from '@/models/pond-admin';
+import { ADMIN_IDLE_MINUTES, ADMIN_PASSWORD_LENGTH } from '@/models/pond-admin';
 import { confirm, reject, tap } from '@/services/haptics';
 import { useAdminGate, useAdminUnlock } from '@/view-models/use-admin-gate';
 
-/** The command that makes a card, run on the Pond itself; a command, so it is not translated. */
+/** The commands that make a card and print it again, run on the Pond itself; commands, so not translated. */
 // eslint-disable-next-line i18next/no-literal-string -- a command typed on the Pond, not copy
 const ADMIN_CARD_COMMAND = 'bash scripts/giap.sh admin-card';
+// eslint-disable-next-line i18next/no-literal-string -- a command typed on the Pond, not copy
+const SHOW_CARD_COMMAND = 'giap.sh admin-card show';
 
 function CardField({
   value,
@@ -40,10 +43,11 @@ function CardField({
       style={[
         styles.frame,
         {
-          minHeight: theme.touch.tapMin,
-          paddingHorizontal: theme.space[3],
-          borderWidth: theme.edge.hairlineWidth,
-          borderColor: invalid ? theme.color.danger : theme.color.lineStrong,
+          minHeight: theme.touch.tapMin + theme.space[2],
+          paddingLeft: theme.space[3],
+          paddingRight: theme.space[1],
+          borderWidth: theme.edge.borderWidth,
+          borderColor: invalid ? theme.color.danger : theme.color.accentLine,
           borderRadius: theme.radius.md,
           backgroundColor: theme.color.surface,
         },
@@ -67,15 +71,15 @@ function CardField({
         returnKeyType="go"
         onSubmitEditing={onSubmit}
         accessibilityLabel={t('myPond.lock.fieldLabel')}
-        style={[inkText(theme, { size: 'md' }).style, styles.code, { paddingVertical: theme.space[2] }]}
+        style={[inkText(theme, { size: 'md', weight: theme.weight.semibold }).style, styles.code, { paddingVertical: theme.space[2] }]}
       />
       <GPressable
-        hitSlop={8}
         onPress={() => setShown((s) => !s)}
         accessibilityRole="button"
         accessibilityLabel={shown ? t('myPond.lock.hide') : t('myPond.lock.show')}
+        style={styles.show}
       >
-        <GIcon name={shown ? 'eye-off' : 'eye'} size={18} />
+        <GIcon name={shown ? 'eye-off' : 'eye'} size={20} color={theme.color.textSecondary} />
       </GPressable>
     </View>
   );
@@ -87,16 +91,10 @@ function LockForm() {
   const { gate } = useAdminGate();
   const vm = useAdminUnlock();
 
-  const hint =
-    vm.problem === 'not_on_card'
-      ? t('myPond.lock.notOnCard')
-      : vm.problem === 'long'
-        ? t('myPond.lock.tooLong')
-        : vm.problem === 'short'
-          ? t('myPond.lock.typed', { typed: vm.typed, total: ADMIN_PASSWORD_LENGTH })
-          : null;
-  const mistaken = vm.problem === 'not_on_card' || vm.problem === 'long';
+  const mistake =
+    vm.problem === 'not_on_card' ? t('myPond.lock.notOnCard') : vm.problem === 'long' ? t('myPond.lock.tooLong') : null;
   const cooling = vm.coolingSecs > 0;
+  const small = inkText(theme, { size: 'sm', color: theme.color.textSecondary }).style;
 
   const submit = async () => {
     void tap();
@@ -107,35 +105,66 @@ function LockForm() {
   return (
     <View style={styles.form}>
       {gate.restarting ? <InkNotice tone="neutral">{t('myPond.lock.restarting')}</InkNotice> : null}
-      <View style={styles.intro}>
-        <GIcon name="lock" size={28} color={theme.color.textSecondary} />
-        <InkText size="md">{t('myPond.lock.intro')}</InkText>
-        <InkText size="sm" style={{ color: theme.color.textSecondary }}>
-          {t('myPond.lock.where')}
-        </InkText>
-      </View>
-      <CardField value={vm.password} onChange={vm.setPassword} invalid={mistaken} disabled={vm.unlocking} onSubmit={() => void submit()} />
-      {hint ? (
-        <View accessibilityLiveRegion="polite">
-          <InkText size="sm" style={{ color: mistaken ? theme.color.danger : theme.color.textTertiary }}>
-            {hint}
-          </InkText>
+      <InkEdge radius={theme.radius.lg} contentStyle={[styles.card, { padding: theme.space[5] }]}>
+        <View style={styles.heading}>
+          <IconTile icon="key" tile="purple" size={44} />
+          <View style={styles.headingText}>
+            <InkTitle level={3}>{t('myPond.lock.title')}</InkTitle>
+            <InkText size="sm" weight="semibold" tone="secondary">
+              {t('myPond.lock.locked')}
+            </InkText>
+          </View>
         </View>
-      ) : null}
-      {cooling ? (
-        <InkNotice tone="warning">{t('myPond.lock.wait', { count: vm.coolingSecs })}</InkNotice>
-      ) : vm.error ? (
-        <InkNotice tone="danger">{vm.error}</InkNotice>
-      ) : null}
-      <InkButton
-        variant="primary"
-        icon="lock"
-        block
-        disabled={vm.problem !== null || vm.unlocking || cooling}
-        onPress={() => void submit()}
-      >
-        {vm.unlocking ? t('myPond.lock.unlocking') : t('myPond.lock.unlock')}
-      </InkButton>
+        <InkText size="md" tone="secondary">
+          {t('myPond.lock.intro')}
+        </InkText>
+
+        <View style={styles.field}>
+          <InkEyebrow>{t('myPond.lock.cardTitle')}</InkEyebrow>
+          <CardField
+            value={vm.password}
+            onChange={vm.setPassword}
+            invalid={mistake !== null}
+            disabled={vm.unlocking}
+            onSubmit={() => void submit()}
+          />
+          <View style={styles.under} accessibilityLiveRegion="polite">
+            <Text style={[small, styles.underHint, mistake ? { color: theme.color.dangerFg } : null]}>
+              {mistake ?? t('myPond.lock.cardHint')}
+            </Text>
+            <Text style={[small, styles.count]}>
+              {t('myPond.lock.typed', { typed: Math.min(vm.typed, ADMIN_PASSWORD_LENGTH), total: ADMIN_PASSWORD_LENGTH })}
+            </Text>
+          </View>
+        </View>
+
+        {cooling ? (
+          <InkNotice tone="warning">{t('myPond.lock.wait', { count: vm.coolingSecs })}</InkNotice>
+        ) : vm.error ? (
+          <InkNotice tone="danger">{vm.error}</InkNotice>
+        ) : null}
+        <InkButton
+          variant="primary"
+          icon="unlock"
+          block
+          disabled={vm.problem !== null || vm.unlocking || cooling}
+          onPress={() => void submit()}
+        >
+          {vm.unlocking ? t('myPond.lock.unlocking') : t('myPond.lock.unlock')}
+        </InkButton>
+      </InkEdge>
+    </View>
+  );
+}
+
+function NoteRow({ icon, children }: { icon: IconName; children: string }) {
+  const theme = useInkTheme();
+  return (
+    <View style={[styles.note, { paddingHorizontal: theme.space[4], paddingVertical: theme.space[3] }]}>
+      <GIcon name={icon} size={20} color={theme.color.textSecondary} />
+      <InkText size="md" tone="secondary" style={styles.noteText}>
+        {children}
+      </InkText>
     </View>
   );
 }
@@ -146,6 +175,7 @@ export function AdminLockView({ onRetry }: { onRetry: () => void }) {
   const theme = useInkTheme();
   const { gate } = useAdminGate();
   const mono = inkText(theme, { role: 'mono', size: 'sm', color: theme.color.text }).style;
+  const chip = { backgroundColor: theme.color.chrome, borderRadius: theme.radius.sm };
 
   switch (gate.phase) {
     case 'checking':
@@ -171,29 +201,53 @@ export function AdminLockView({ onRetry }: { onRetry: () => void }) {
     case 'no_card':
       return (
         <SettingsGroup>
-          <View style={styles.card}>
+          <View style={styles.missing}>
             <InkText size="md">{t('myPond.lock.noCard')}</InkText>
-            <InkText size="sm" style={{ color: theme.color.textSecondary }}>
+            <InkText size="sm" tone="secondary">
               {t('myPond.lock.noCardHow')}
             </InkText>
-            <Text selectable style={[mono, styles.command, { backgroundColor: theme.color.bg, borderRadius: theme.radius.sm }]}>
+            <Text selectable style={[mono, styles.command, chip]}>
               {ADMIN_CARD_COMMAND}
             </Text>
           </View>
         </SettingsGroup>
       );
     case 'locked':
-      return <LockForm />;
+      return (
+        <>
+          <LockForm />
+          <SettingsGroup>
+            <NoteRow icon="bell">{t('myPond.lock.tellsHousehold')}</NoteRow>
+            <NoteRow icon="schedule">{t('myPond.lock.idle', { count: gate.status?.idle_minutes ?? ADMIN_IDLE_MINUTES })}</NoteRow>
+          </SettingsGroup>
+          <Text style={inkText(theme, { size: 'sm', leading: 'loose', color: theme.color.textSecondary }).style}>
+            {t('myPond.lock.lostCard')}{' '}
+            <Text selectable style={[mono, chip]}>
+              {` ${SHOW_CARD_COMMAND} `}
+            </Text>{' '}
+            {t('myPond.lock.lostCardAfter')}
+          </Text>
+        </>
+      );
   }
 }
 
 const styles = StyleSheet.create({
   form: { gap: Spacing.md, marginBottom: Spacing.xl },
-  intro: { gap: Spacing.sm, marginBottom: Spacing.sm },
+  card: { gap: Spacing.md },
+  heading: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md },
+  headingText: { flex: 1, gap: 2 },
+  field: { gap: Spacing.sm },
   frame: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
   // Copied off a printed card group by group, so every character keeps a fixed-width column.
-  code: { flex: 1, fontFamily: FontFamily.mono, letterSpacing: 1 },
+  code: { flex: 1, minWidth: 0, fontFamily: FontFamily.mono, letterSpacing: 1.5 },
+  show: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+  under: { flexDirection: 'row', justifyContent: 'space-between', gap: Spacing.sm },
+  underHint: { flex: 1 },
+  count: { fontVariant: ['tabular-nums'] },
+  note: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.md },
+  noteText: { flex: 1 },
   centre: { alignItems: 'center', paddingVertical: Spacing['2xl'] },
-  card: { gap: Spacing.sm, padding: Spacing.lg },
+  missing: { gap: Spacing.sm, padding: Spacing.lg },
   command: { paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm, overflow: 'hidden' },
 });
