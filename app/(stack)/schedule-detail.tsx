@@ -154,7 +154,32 @@ export default function ScheduleDetailScreen() {
 
       {notice === 'saved' ? <InkNotice tone="success">{t('schedule.detail.saved')}</InkNotice> : null}
       {notice === 'runStarted' ? <InkNotice tone="success">{t('schedule.detail.runStarted')}</InkNotice> : null}
+      {notice === 'missedSkipped' ? <InkNotice tone="success">{t('schedule.detail.missedSkipped')}</InkNotice> : null}
       {error ? <InkNotice tone="danger">{error}</InkNotice> : null}
+
+      {schedule.missed_run ? (
+        <InkCard>
+          <View style={styles.gap}>
+            <InkText weight="semibold">
+              {t('schedule.missed.question', { when: formatScheduleTime(schedule.missed_run.due_at) })}
+            </InkText>
+            <View style={styles.buttons}>
+              <InkButton
+                variant="primary"
+                icon="play"
+                block
+                style={styles.button}
+                onPress={() => void actions.answerMissed('run')}
+              >
+                {t('schedule.missed.run')}
+              </InkButton>
+              <InkButton variant="quiet" block style={styles.button} onPress={() => void actions.answerMissed('skip')}>
+                {t('schedule.missed.skip')}
+              </InkButton>
+            </View>
+          </View>
+        </InkCard>
+      ) : null}
 
       <InkCard>
         <View style={styles.gap}>
