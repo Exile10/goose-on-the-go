@@ -5,7 +5,7 @@
 - **Google Home**: Device grid with color-coded toggles, room groupings, "Ask" bar
 - **Claude Mobile**: Clean threaded chat, conversation list, generous whitespace
 
-## Bottom Tabs (4)
+## Bottom Tabs (5)
 
 Ink's `InkBottomBar`, floating over the screens rather than beside them, and
 leaving on scroll. Labels come from `tabs.*` in the catalogue; icon names are
@@ -16,7 +16,12 @@ registry keys, so `device` is singular.
 | Home | Dashboard | home | Greeting, status, devices, shortcuts, recent |
 | Chat | Conversations wall → conversation | chat | Every conversation the Pond holds; open one or start one |
 | Devices | Device Grid | device | Room-grouped smart home control |
+| My Pond | The Pond's administration | server | Storage, files, caches, tasks, health and power, behind the administrator card |
 | You | Profile Hub | profile | Settings, integrations, data |
+
+Five is Ink's cap (`BAR_MAX`). Ink drops the labels and keeps the icons when a slot is narrower
+than 72 points (`fitBar`): the floating bar is the screen less 16 points a side, so a phone
+narrower than about 392 points shows icons alone.
 
 The bar is absolutely positioned, so a tab screen's own list has to clear it —
 `paddingBottom: useBottomBarInset()`, never a hardcoded spacer. Which stage the
@@ -268,6 +273,45 @@ Every other stack screen gets its header, and its back control, from
 the nested navigator has one entry in its own history and would draw no back
 button of its own. The header reads `useTheme()` directly, because a navigator
 header is the one surface `useThemedStyles` cannot reach.
+
+## My Pond
+
+The My Pond tab (`app/(tabs)/pond.tsx`, `view-models/use-my-pond.ts`) is the Pond's
+administration, against goose-in-a-pond's `docs/architecture/pond-administrator.md`. Every route
+is under `/api/v1/admin`, and every one but status, unlock and lock answers 403 `admin_locked`
+until this phone is unlocked with the Pond's administrator card.
+
+- **The lock is one state for the whole area** (`view-models/use-admin-gate.ts`). The tab and
+  every screen under it read it, and any admin route that answers `admin_locked` returns all of
+  them to the card's form (`components/pond/admin-lock.tsx`), which any of them can unlock from.
+- **The card's form.** Sixteen Crockford base32 characters, shown in the card's
+  `XXXX-XXXX-XXXX-XXXX` groups as they are typed. Case, dashes and spaces are ignored, and `O`
+  reads as `0`, `I` and `L` as `1`, as the Pond reads them. Nothing is sent until the password is
+  sixteen characters from the card. A Pond slowing wrong guesses gives `retry_after`, which the
+  form counts down.
+- **What it says instead of the form**: a Pond with no card (`card: "missing"`, made on the Pond
+  with `bash scripts/giap.sh admin-card`), a phone that is not a member's (`admin_members_only`),
+  and a Pond that predates My Pond (404, 405 or 501 on the status, after which it stops asking).
+- **Only the status is polled**, every 30 s while the tab is in front. It is the one admin route
+  that does not renew the unlock; the Pond locks after 15 idle minutes, and polling anything else
+  would keep it open for as long as the phone sat on the tab. The overview and health are read on
+  arrival, after an unlock and on a pull. After any admin request the countdown starts again,
+  since the Pond renews the unlock on each.
+- **Unlocked**, the tab shows the disk as an `InkMeter`, storage by area, what the Pond holds,
+  when it locks and Lock, and rows to Files, Caches, Tasks and reports, Health (with a badge when a
+  check is not ok) and Power.
+- **The screens under it** are `pond-files`, `pond-caches`, `pond-tasks`, `pond-health` and
+  `pond-power`. Each destructive action asks through `useConfirm()` with Cancel as the safe
+  default: a delete names the entry and its size, a cache says what clearing it costs, a power mode
+  change asks first, and a restart asks again when a long task is running (409
+  `long_task_running`), sending `force` only on that second yes. A restart locks My Pond, as it
+  ends every unlock on the Pond.
+- **Another member's task** shows its state, kind, dates and size but never its goal or the
+  titles of what it saved. Only the member's own tasks open their report (`task-report`).
+
+My Pond is behind the Developer toggle `pond` (real by default). The mock (`models/pond-admin-mock.ts`)
+follows the contract, idle lock and cooling included; its card is `G00S-E1NA-P0ND-2026`, which also
+unlocks typed as "goos eina pond 2026".
 
 ## Every route has to lead somewhere
 

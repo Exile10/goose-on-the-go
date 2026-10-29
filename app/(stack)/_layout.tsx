@@ -107,6 +107,11 @@ export default function StackLayout() {
       <Stack.Screen name="ride" options={{ title: t('screens.ride') }} />
       <Stack.Screen name="agents" options={{ title: t('screens.agents') }} />
       <Stack.Screen name="task-report" options={{ title: t('screens.taskReport') }} />
+      <Stack.Screen name="pond-files" options={{ title: t('screens.pondFiles') }} />
+      <Stack.Screen name="pond-caches" options={{ title: t('screens.pondCaches') }} />
+      <Stack.Screen name="pond-tasks" options={{ title: t('screens.pondTasks') }} />
+      <Stack.Screen name="pond-health" options={{ title: t('screens.pondHealth') }} />
+      <Stack.Screen name="pond-power" options={{ title: t('screens.pondPower') }} />
       <Stack.Screen name="agent" options={{ title: t('screens.agent') }} />
       <Stack.Screen name="extensions" options={{ title: t('screens.extensions') }} />
       <Stack.Screen name="web-search" options={{ title: t('screens.webSearch') }} />
