@@ -56,7 +56,11 @@ export const ScheduleCard = React.memo(function ScheduleCard({
             {next ? <InkText size="sm" tone="secondary">{next}</InkText> : null}
           </View>
           <InkBadge tone="neutral">
-            {schedule.kind.type === 'webhook' ? t('schedule.card.kindWebhook') : t('schedule.card.kindPrompt')}
+            {schedule.kind.type === 'webhook'
+              ? t('schedule.card.kindWebhook')
+              : schedule.kind.type === 'routine'
+                ? t('schedule.card.kindRoutine')
+                : t('schedule.card.kindPrompt')}
           </InkBadge>
         </View>
         <View style={styles.status}>

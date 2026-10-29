@@ -12,7 +12,7 @@
  * same wrapped row as Edit it read as a stray.
  */
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
@@ -31,15 +31,18 @@ import { LabelledSwitch } from '@/components/patterns/labelled-switch';
 import { ScheduleFormSheet } from '@/components/patterns/schedule-form-sheet';
 import { useThemedStyles } from '@/hooks/use-themed-styles';
 import {
+  describeRoutine,
   deviceTimeZone,
   describeWhen,
   formatScheduleTime,
   isOneOff,
   linkedScheduleId,
   promptOf,
+  routineDevices,
   runStatus,
 } from '@/models/schedule';
 import { useServer } from '@/providers/server-provider';
+import { api } from '@/services/api-client';
 import { toggle } from '@/services/haptics';
 import type { ScheduleRun } from '@/services/types';
 import { useScheduleDetail } from '@/view-models/use-schedule-detail';
@@ -94,6 +97,28 @@ function Fact({ label, children, mono }: { label: string; children: string; mono
   );
 }
 
+/**
+ * What a routine sets, by device name. The names are read once: a rename while this is open is not
+ * worth a poll, and if the read fails the device ids still say which devices they are.
+ */
+function RoutineFact({ devices }: { devices: Record<string, boolean> }) {
+  const { t } = useTranslation();
+  const [names, setNames] = useState<Record<string, string>>({});
+  useEffect(() => {
+    let current = true;
+    api
+      .listDevices()
+      .then((list) => {
+        if (current) setNames(Object.fromEntries(list.map((d) => [d.id, d.name])));
+      })
+      .catch((e: unknown) => console.warn('[schedule-detail] device names unavailable', e));
+    return () => {
+      current = false;
+    };
+  }, []);
+  return <Fact label={t('schedule.detail.routine')}>{describeRoutine(devices, names)}</Fact>;
+}
+
 export default function ScheduleDetailScreen() {
   const { t } = useTranslation();
   const styles = useThemedStyles(makeStyles);
@@ -143,6 +168,7 @@ export default function ScheduleDetailScreen() {
 
   const when = describeWhen(schedule, phoneZone);
   const prompt = promptOf(schedule);
+  const devices = routineDevices(schedule);
   const oneOff = isOneOff(schedule);
 
   return (
@@ -183,7 +209,9 @@ export default function ScheduleDetailScreen() {
 
       <InkCard>
         <View style={styles.gap}>
-          {prompt != null ? (
+          {devices ? (
+            <RoutineFact devices={devices} />
+          ) : prompt != null ? (
             <Fact label={t('schedule.detail.prompt')}>{prompt}</Fact>
           ) : (
             <Fact label={t('schedule.detail.webhook')}>{t('schedule.detail.webhookNote')}</Fact>
