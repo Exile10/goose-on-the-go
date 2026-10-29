@@ -430,7 +430,16 @@
       "unidentified": "Only a household member can ask for research, and your Pond doesn't know this phone as one.",
       "noAttachments": "Research takes a question on its own. Remove the pictures and files first.",
       "attachOff": "Research takes a question on its own, so pictures and files wait until it is sent.",
-      "refusedOff": "Your Pond has research switched off, so it did not take the question."
+      "refusedOff": "Your Pond has research switched off, so it did not take the question.",
+      "answer": {
+        "label": "How much to write",
+        "auto": "Pond decides",
+        "autoHint": "Short for a quick question, a report for a big one.",
+        "short": "Short answer",
+        "shortHint": "A few sentences, here in the chat.",
+        "report": "Full report",
+        "reportHint": "Sections with sources, to read and export."
+      }
     },
     "report": {
       "loading": "Reading the report from your Pond",

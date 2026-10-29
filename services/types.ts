@@ -207,6 +207,8 @@ export interface ChatStreamRequest {
   resumable?: boolean;
   /** The message is a research question: the Pond starts a long task on it, then acknowledges. */
   deep_research?: boolean;
+  /** With `deep_research` only, and left out for `auto`, so an older Pond sees the body it knows. */
+  deep_research_answer?: Exclude<AnswerShape, 'auto'>;
 }
 
 /**
