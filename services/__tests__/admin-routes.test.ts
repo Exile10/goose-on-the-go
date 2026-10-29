@@ -59,7 +59,7 @@ describe('the lock', () => {
     recordInto(seen, '{"card":"present","unlocked":true,"expires_at":"2026-10-29T10:15:00Z","idle_minutes":15,"retry_after":null}');
     const status = await paired().adminStatus();
     expect(seen).toEqual([{ url: `${BASE}/status`, method: undefined, body: undefined, authorization: 'Bearer session-token' }]);
-    expect(status).toEqual({ card: 'present', unlocked: true, expires_at: '2026-10-29T10:15:00Z', idle_minutes: 15, retry_after: null });
+    expect(status).toEqual({ card: 'present', unlocked: true, expires_at: '2026-10-29T10:15:00Z', idle_minutes: 15, retry_after: null, key: false });
   });
 
   it('unlocks with the password as the body, and locks with an empty one', async () => {
@@ -85,6 +85,48 @@ describe('the lock', () => {
   it('refuses a status that is not one', async () => {
     recordInto([], '"nope"');
     await expect(paired().adminStatus()).rejects.toThrow('unexpected');
+  });
+});
+
+describe('this phone’s key', () => {
+  it('reads whether the Pond holds one, and reads a missing field as none', async () => {
+    recordInto([], '{"card":"present","unlocked":false,"key":true}');
+    expect((await paired().adminStatus()).key).toBe(true);
+    recordInto([], '{"card":"present","unlocked":false}');
+    expect((await paired().adminStatus()).key).toBe(false);
+  });
+
+  it('unlocks with the key as the body, on the same route as the card', async () => {
+    const seen: Seen[] = [];
+    recordInto(seen, '{"unlocked":true,"expires_at":"2026-10-29T10:15:00Z"}');
+    expect(await paired().adminUnlockWithKey('key-1')).toEqual({ unlocked: true, expires_at: '2026-10-29T10:15:00Z' });
+    expect(seen).toEqual([{ url: `${BASE}/unlock`, method: 'POST', body: { key: 'key-1' }, authorization: 'Bearer session-token' }]);
+  });
+
+  it('hands the caller a rejected key', async () => {
+    recordInto([], '{"error":"admin_key_rejected"}', 403);
+    await expect(paired().adminUnlockWithKey('old-key')).rejects.toMatchObject({ status: 403, detail: 'admin_key_rejected' });
+  });
+
+  it('enrolls with an empty body and reads the key it gives', async () => {
+    const seen: Seen[] = [];
+    recordInto(seen, '{"key":"key-2"}');
+    expect(await paired().adminEnroll()).toBe('key-2');
+    expect(seen).toEqual([{ url: `${BASE}/enroll`, method: 'POST', body: {}, authorization: 'Bearer session-token' }]);
+  });
+
+  it('refuses an enrolment answer with no key, without repeating the answer', async () => {
+    recordInto([], '{"key":""}');
+    const e = await paired().adminEnroll().catch((err: unknown) => err);
+    expect(e).toBeInstanceOf(Error);
+    expect((e as Error).message).toMatch('unexpected');
+  });
+
+  it('forgets the key with a DELETE and no body', async () => {
+    const seen: Seen[] = [];
+    recordInto(seen, '', 204);
+    await paired().adminForgetKey();
+    expect(seen).toEqual([{ url: `${BASE}/key`, method: 'DELETE', body: undefined, authorization: 'Bearer session-token' }]);
   });
 });
 

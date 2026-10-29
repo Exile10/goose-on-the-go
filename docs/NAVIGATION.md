@@ -288,6 +288,18 @@ until this phone is unlocked with the Pond's administrator card.
 - **What it says instead of the form**: a Pond with no card (`card: "missing"`, made on the Pond
   with `bash scripts/giap.sh admin-card`), a phone that is not a member's (`admin_members_only`),
   and a Pond that predates My Pond (404, 405 or 501 on the status, after which it stops asking).
+- **This phone's key** (`services/kept-admin-key.ts`). After the card opens My Pond, the phone asks
+  the Pond for a key of its own (`POST /admin/enroll`, which replaces any older one) and keeps it
+  in the keychain behind its Face ID or fingerprint (`requireAuthentication`,
+  `WHEN_PASSCODE_SET_THIS_DEVICE_ONLY`), unless the form's "next time" switch is off or the phone
+  has no biometrics; the web never keeps one. A non-secret AsyncStorage marker names the Pond (its pin), so the app knows a key is kept without a prompt; Android asks
+  on every read of the key itself. With a key kept, the lock leads with "Unlock with Face ID or
+  fingerprint" (`POST /admin/unlock {key}`), asks once by itself on each arrival, and keeps the
+  card a tap away. A Pond with no card still opens to a key. A cancel leaves the lock as it was;
+  a key the phone can no longer read (a new face or finger invalidates it) or the Pond rejects
+  (`admin_key_rejected`) is forgotten, with a line saying to type the card. A status whose `key`
+  is false forgets the kept one quietly. Open, "Forget My Pond on this phone" asks with Keep it
+  as the safe answer, then sends `DELETE /admin/key` and locks. Signing out forgets it too.
 - **Only the status is polled**, every 30 s while My Pond is in front. It is the one admin route
   that does not renew the unlock; the Pond locks after 15 idle minutes, and polling anything else
   would keep it open for as long as the phone sat on the tab. The overview and health are read on
@@ -309,8 +321,9 @@ until this phone is unlocked with the Pond's administrator card.
   open their report (`task-report`).
 
 My Pond is behind the Developer toggle `pond` (real by default). The mock (`models/pond-admin-mock.ts`)
-follows the contract, idle lock and cooling included; its card is `G00S-E1NA-P0ND-2026`, which also
-unlocks typed as "goos eina pond 2026".
+follows the contract, idle lock, cooling and the key included; its card is `G00S-E1NA-P0ND-2026`,
+which also unlocks typed as "goos eina pond 2026". A key kept for the mock is marked with its own
+pin, `mock-pond`, so it is never taken for the paired Pond's.
 
 ## Every route has to lead somewhere
 

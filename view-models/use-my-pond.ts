@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useFocusEffect } from 'expo-router';
 
 import { diskUsed, groupAreas, healthNeedsAttention, healthSummary, minutesLeft, type AreaGroupId } from '@/models/pond-admin';
+import { useConfirm } from '@/providers/confirm-provider';
 import { useServer } from '@/providers/server-provider';
 import i18n from '@/services/i18n';
 import type { AdminCheckStatus, AdminHealth, AdminOverview } from '@/services/types';
@@ -38,15 +39,20 @@ export interface UseMyPond {
   /** What went wrong reading the overview, in words. */
   error: string | null;
   locking: boolean;
+  /** This phone keeps its own key to My Pond, which it can forget. */
+  kept: boolean;
   actions: {
     refresh: () => Promise<void>;
     lock: () => Promise<boolean>;
+    /** Asks first; on yes the key is revoked on the Pond and here, and My Pond locks. */
+    forgetKey: () => Promise<boolean>;
   };
 }
 
 export function useMyPond(): UseMyPond {
   const { hydrated } = useServer();
-  const { gate, source, readStatus, noteFailure, noteLocked, touch } = useAdminGate();
+  const ask = useConfirm();
+  const { gate, source, readStatus, noteFailure, noteLocked, touch, forgetKept } = useAdminGate();
   const [overview, setOverview] = useState<AdminOverview | null>(null);
   const [health, setHealth] = useState<AdminHealth | null>(null);
   const [reading, setReading] = useState(false);
@@ -124,6 +130,19 @@ export function useMyPond(): UseMyPond {
     }
   }, [locking, noteFailure, noteLocked, source]);
 
+  const forgetKey = useCallback(async () => {
+    const yes = await ask({
+      title: i18n.t('myPond.key.forgetTitle'),
+      message: i18n.t('myPond.key.forgetBody'),
+      confirmLabel: i18n.t('myPond.key.forgetConfirm'),
+      cancelLabel: i18n.t('myPond.keepIt'),
+      destructive: true,
+    });
+    if (!yes) return false;
+    await forgetKept();
+    return true;
+  }, [ask, forgetKept]);
+
   const disk = overview
     ? { ...diskUsed(overview.disk), total: overview.disk.total_bytes, free: overview.disk.free_bytes }
     : null;
@@ -140,6 +159,7 @@ export function useMyPond(): UseMyPond {
     refreshing: reading && overview !== null,
     error: unlocked ? error : null,
     locking,
-    actions: { refresh, lock },
+    kept: gate.kept,
+    actions: { refresh, lock, forgetKey },
   };
 }

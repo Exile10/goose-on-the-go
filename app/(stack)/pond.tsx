@@ -113,7 +113,7 @@ export default function MyPondScreen() {
   const router = useRouter();
   const theme = useInkTheme();
   const styles = useSettingsStyles(makeStyles);
-  const { gate, overview, parts, disk, locksIn, healthStatus, loading, refreshing, error, locking, actions } = useMyPond();
+  const { gate, overview, parts, disk, locksIn, healthStatus, loading, refreshing, error, locking, kept, actions } = useMyPond();
   const unlocked = gate.phase === 'unlocked';
 
   const go = useCallback(
@@ -128,6 +128,11 @@ export default function MyPondScreen() {
     void tap();
     const ok = await actions.lock();
     void (ok ? confirm() : reject());
+  }, [actions]);
+
+  const forgetKey = useCallback(async () => {
+    void tap();
+    if (await actions.forgetKey()) void confirm();
   }, [actions]);
 
   // Options merge, so the locked screen has to take Lock away again rather than leave it standing.
@@ -235,6 +240,20 @@ export default function MyPondScreen() {
           />
         ))}
       </SettingsGroup>
+
+      {kept ? (
+        <SettingsGroup inset={TILE_INSET}>
+          <SettingsRow
+            label={t('myPond.key.forget')}
+            description={t('myPond.key.forgetHint')}
+            icon="face"
+            tile="purple"
+            destructive
+            accessibilityRole="button"
+            onPress={() => void forgetKey()}
+          />
+        </SettingsGroup>
+      ) : null}
     </SettingsScroll>
   );
 }

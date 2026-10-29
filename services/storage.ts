@@ -21,6 +21,8 @@ const KEYS = {
   remoteOfferDismissed: '@goose/remote-offer-dismissed',
   /** When the Pond will drop remote access unless the phone is seen at home. Not a secret. */
   remoteLapsesAt: '@goose/remote-lapses-at',
+  /** The pin of the Pond whose admin key this phone keeps behind its biometrics. Not the key. */
+  adminKeyFor: '@goose/admin-key-for',
 } as const;
 
 /**

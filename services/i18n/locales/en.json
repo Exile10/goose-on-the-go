@@ -3476,6 +3476,23 @@
       "lostCard": "Lost the card? On the Pond itself,",
       "lostCardAfter": "prints it again."
     },
+    "key": {
+      "title": "Open My Pond with this phone's security",
+      "body": "This phone keeps its own key to My Pond. It never leaves the phone, and only this phone's Face ID or fingerprint opens it.",
+      "unlock": "Unlock with Face ID or fingerprint",
+      "useCard": "Use the admin card instead",
+      "remember": "Open My Pond with Face ID or fingerprint next time",
+      "prompt": "Unlock My Pond",
+      "savePrompt": "Keep a key to My Pond on this phone",
+      "lost": "This phone can no longer read its key. That often happens after a new fingerprint or face is added. Type the admin card once more.",
+      "rejected": "This phone's key no longer opens My Pond. Type the admin card to open it.",
+      "unreadable": "Face ID or fingerprint didn't open the key. Try again, or use the admin card.",
+      "forget": "Forget My Pond on this phone",
+      "forgetHint": "My Pond opens here with Face ID or fingerprint.",
+      "forgetTitle": "Forget My Pond on this phone?",
+      "forgetBody": "This phone's key is removed here and on the Pond, and My Pond locks. Next time, My Pond asks for the admin card.",
+      "forgetConfirm": "Forget it"
+    },
     "overview": {
       "loading": "Reading what your Pond holds",
       "failed": "Couldn't read what your Pond holds.",

@@ -6,6 +6,7 @@ import { readWebSearch } from '@/models/web-search';
 import { readPrefills } from '@/models/agents';
 import { readLongTask, readLongTaskReport, readResearchAvailability, reportFileName } from '@/models/long-tasks';
 import {
+  readAdminKey,
   readAdminStatus,
   readCaches,
   readFileListing,
@@ -2170,6 +2171,21 @@ export class PondApiClient {
 
   async adminUnlock(password: string): Promise<AdminUnlocked> {
     return required(readUnlocked(await this.post<unknown>('/api/v1/admin/unlock', { password })), 'the unlock');
+  }
+
+  /** A 403 `admin_key_rejected` for a key the Pond revoked or replaced, which counts as a wrong guess. */
+  async adminUnlockWithKey(key: string): Promise<AdminUnlocked> {
+    return required(readUnlocked(await this.post<unknown>('/api/v1/admin/unlock', { key })), 'the unlock');
+  }
+
+  /** Unlocked only: this phone's own key, replacing any older one. The Pond shows it this once. */
+  async adminEnroll(): Promise<string> {
+    return required(readAdminKey(await this.post<unknown>('/api/v1/admin/enroll', {})), 'the key');
+  }
+
+  /** A 204: this phone's key is revoked and the phone locked. */
+  async adminForgetKey(): Promise<void> {
+    await this.del<unknown>('/api/v1/admin/key');
   }
 
   /** A 204. */

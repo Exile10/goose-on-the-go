@@ -6,6 +6,7 @@ import NetInfo from '@react-native-community/netinfo';
 import { forgetAllCards } from '@/services/card-cache';
 import { forgetPondImages } from '@/services/pond-images';
 import { forgetLongTasks } from '@/services/long-task-cache';
+import { forgetKeptAdminKey } from '@/services/kept-admin-key';
 import { Storage, purgeLegacyStorage } from '@/services/storage';
 import { SecureStorage } from '@/services/secure-storage';
 import { ApiError, api, PondApiClient, type HandshakeResponse, type SpokenCode } from '@/services/api-client';
@@ -259,6 +260,8 @@ export function ServerProvider({ children }: PropsWithChildren) {
     // So are the pictures its cameras showed, held in memory while their list scrolled.
     forgetPondImages();
     forgetLongTasks();
+    // A key to My Pond opens only the Pond this phone has just left.
+    await forgetKeptAdminKey().catch(() => undefined);
     await manager.configure(null);
   }, [manager]);
 

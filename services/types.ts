@@ -1596,6 +1596,8 @@ export interface AdminStatus {
   idle_minutes: number;
   /** Seconds before another unlock is heard, while wrong passwords are being slowed. */
   retry_after: number | null;
+  /** Whether the Pond holds a live key for this phone; false when it does not say. */
+  key: boolean;
 }
 
 export interface AdminUnlocked {

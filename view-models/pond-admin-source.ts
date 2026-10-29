@@ -10,6 +10,9 @@ export type { PondAdminSource } from '@/models/pond-admin-mock';
 export const POND_ADMIN: PondAdminSource = {
   status: () => api.adminStatus(),
   unlock: (password) => api.adminUnlock(password),
+  unlockWithKey: (key) => api.adminUnlockWithKey(key),
+  enroll: () => api.adminEnroll(),
+  forgetKey: () => api.adminForgetKey(),
   lock: () => api.adminLock(),
   overview: () => api.adminOverview(),
   files: (path) => api.adminFiles(path),
@@ -41,6 +44,15 @@ export function resetMockPondAdmin(): void {
 export function usePondAdminSource(): PondAdminSource {
   const { isScreenReal } = useServer();
   return isScreenReal('pond') ? POND_ADMIN : mockPondAdmin();
+}
+
+/** The mock's stand-in for a pin, so a key kept for it is never taken for the paired Pond's. */
+export const MOCK_POND_PIN = 'mock-pond';
+
+/** Whose key this phone may keep: the paired Pond's pin, or the mock's; null when nothing is paired. */
+export function useAdminKeyPin(): string | null {
+  const { isScreenReal, pairedPin } = useServer();
+  return isScreenReal('pond') ? (pairedPin ?? null) : MOCK_POND_PIN;
 }
 
 /** The code in an admin refusal's `error` field, such as `admin_locked`, or null for any other failure. */

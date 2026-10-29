@@ -50,6 +50,51 @@ function warnOnceOnWeb(): void {
   );
 }
 
+/** Kept apart from `KEYS`: read only behind the phone's own biometrics, never alongside the tokens. */
+const ADMIN_KEY = 'goose.adminKey';
+
+function adminKeyOptions(prompt?: string): SecureStore.SecureStoreOptions {
+  return {
+    requireAuthentication: true,
+    authenticationPrompt: prompt,
+    // Never in a backup or on another phone, and only while this one has a passcode.
+    keychainAccessible: SecureStore.WHEN_PASSCODE_SET_THIS_DEVICE_ONLY,
+  };
+}
+
+/**
+ * This phone's own key to My Pond, kept only when the member chooses to, and readable only after the
+ * phone's Face ID or fingerprint. A new face or finger invalidates it. Web cannot hold it at all.
+ */
+export const AdminKeyKeychain = {
+  available(): boolean {
+    if (isWeb) return false;
+    try {
+      return SecureStore.canUseBiometricAuthentication() === true;
+    } catch {
+      return false;
+    }
+  },
+
+  async save(key: string, prompt: string): Promise<void> {
+    if (isWeb) throw new Error('A browser cannot keep the admin key');
+    // Updating a kept item asks for biometrics on iOS; a fresh one is written without asking.
+    await SecureStore.deleteItemAsync(ADMIN_KEY, adminKeyOptions()).catch(() => undefined);
+    await SecureStore.setItemAsync(ADMIN_KEY, key, adminKeyOptions(prompt));
+  },
+
+  /** Asks for the phone's biometrics. Null when nothing is kept or the system invalidated it; throws on a refusal. */
+  async read(prompt: string): Promise<string | null> {
+    if (isWeb) return null;
+    return SecureStore.getItemAsync(ADMIN_KEY, adminKeyOptions(prompt));
+  },
+
+  async forget(): Promise<void> {
+    if (isWeb) return;
+    await SecureStore.deleteItemAsync(ADMIN_KEY, adminKeyOptions());
+  },
+};
+
 export const SecureStorage = {
   async get(key: SecureKey): Promise<string | null> {
     if (isWeb) {

@@ -90,7 +90,14 @@ export function readAdminStatus(raw: unknown): AdminStatus | null {
     expires_at: textOrNull(s.expires_at),
     idle_minutes: idle && idle > 0 ? idle : ADMIN_IDLE_MINUTES,
     retry_after: retry && retry > 0 ? Math.ceil(retry) : null,
+    key: s.key === true,
   };
+}
+
+/** A phone's key to My Pond: `key` from `POST /admin/enroll`, `admin_key` from owner setup's last call. */
+export function readAdminKey(raw: unknown, field: 'key' | 'admin_key' = 'key'): string | null {
+  const key = record(raw)?.[field];
+  return typeof key === 'string' && key.trim() !== '' ? key : null;
 }
 
 export function readUnlocked(raw: unknown): AdminUnlocked | null {

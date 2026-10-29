@@ -27,6 +27,11 @@ import { ADMIN_IDLE_MINUTES, ADMIN_PASSWORD_LENGTH, CACHE_IDS, CROCKFORD, isTask
 export interface PondAdminSource {
   status(): Promise<AdminStatus>;
   unlock(password: string): Promise<AdminUnlocked>;
+  unlockWithKey(key: string): Promise<AdminUnlocked>;
+  /** Unlocked only: this phone's key, replacing any older one. */
+  enroll(): Promise<string>;
+  /** Revokes this phone's key and locks it. */
+  forgetKey(): Promise<void>;
   lock(): Promise<void>;
   overview(): Promise<AdminOverview>;
   files(path: string): Promise<AdminFileListing>;
@@ -58,6 +63,8 @@ export interface MockPondOptions {
   member?: boolean;
   /** False for a board the service may not change the power mode of. */
   powerControl?: boolean;
+  /** A key the Pond already gave this phone, as owner setup's last call does. */
+  key?: string;
 }
 
 const KB = 1024;
@@ -259,6 +266,8 @@ export function createMockPond(options: MockPondOptions = {}, now: () => number 
   let lastUsed: number | null = null;
   let failures = 0;
   let coolUntil = 0;
+  let liveKey: string | null = options.key ?? null;
+  let enrolments = 0;
   let mode = 1;
   const idleMs = ADMIN_IDLE_MINUTES * MINUTE;
 
@@ -268,6 +277,25 @@ export function createMockPond(options: MockPondOptions = {}, now: () => number 
 
   const needMember = () => {
     if (!member) throw refuse(403, 'admin_members_only');
+  };
+  const notCooling = () => {
+    const wait = waiting();
+    if (wait > 0) throw refuse(429, 'admin_cooling', { retry_after: wait }, wait);
+  };
+  /** A wrong card and a wrong key share one count, as the Pond slows them together. */
+  const wrongGuess = (error: string) => {
+    failures++;
+    if (failures >= MOCK_FREE_ATTEMPTS) {
+      const secs = Math.min(MOCK_LONGEST_WAIT_SECS, MOCK_FIRST_WAIT_SECS * 2 ** (failures - MOCK_FREE_ATTEMPTS));
+      coolUntil = now() + secs * 1000;
+    }
+    return refuse(403, error);
+  };
+  const opened = () => {
+    failures = 0;
+    coolUntil = 0;
+    lastUsed = now();
+    return { unlocked: true as const, expires_at: expiresAt() };
   };
   /** Every route but status, unlock and lock: refused while locked, and each one renews the unlock. */
   const admit = () => {
@@ -342,30 +370,41 @@ export function createMockPond(options: MockPondOptions = {}, now: () => number 
         expires_at: expiresAt(),
         idle_minutes: ADMIN_IDLE_MINUTES,
         retry_after: wait > 0 ? wait : null,
+        key: liveKey !== null,
       };
     },
 
     unlock: async (password) => {
       needMember();
       if (card === 'missing') throw refuse(409, 'admin_card_missing');
-      const wait = waiting();
-      if (wait > 0) throw refuse(429, 'admin_cooling', { retry_after: wait }, wait);
+      notCooling();
       const typed = normalizeAdminPassword(password);
       if (typed.length !== ADMIN_PASSWORD_LENGTH || [...typed].some((c) => !CROCKFORD.includes(c))) {
         throw refuse(400, 'admin_password_malformed');
       }
-      if (typed !== secret) {
-        failures++;
-        if (failures >= MOCK_FREE_ATTEMPTS) {
-          const secs = Math.min(MOCK_LONGEST_WAIT_SECS, MOCK_FIRST_WAIT_SECS * 2 ** (failures - MOCK_FREE_ATTEMPTS));
-          coolUntil = now() + secs * 1000;
-        }
-        throw refuse(403, 'admin_password_rejected');
-      }
-      failures = 0;
-      coolUntil = 0;
-      lastUsed = now();
-      return { unlocked: true, expires_at: expiresAt() };
+      if (typed !== secret) throw wrongGuess('admin_password_rejected');
+      return opened();
+    },
+
+    // No card is needed: a Pond whose card was never made still opens to a key it gave.
+    unlockWithKey: async (key) => {
+      needMember();
+      notCooling();
+      if (liveKey === null || key !== liveKey) throw wrongGuess('admin_key_rejected');
+      return opened();
+    },
+
+    enroll: async () => {
+      admit();
+      enrolments++;
+      liveKey = `mock-key-${made.toString(36)}-${enrolments}`;
+      return liveKey;
+    },
+
+    forgetKey: async () => {
+      needMember();
+      liveKey = null;
+      lastUsed = null;
     },
 
     lock: async () => {

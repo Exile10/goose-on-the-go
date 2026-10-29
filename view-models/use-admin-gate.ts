@@ -7,10 +7,19 @@ import { useFocusEffect } from 'expo-router';
 import { adminPasswordProblem, formatAdminPassword, normalizeAdminPassword, type AdminPasswordProblem } from '@/models/pond-admin';
 import { useServer } from '@/providers/server-provider';
 import i18n from '@/services/i18n';
+import {
+  canKeepAdminKey,
+  forgetKeptAdminKey,
+  isAdminKeyKeptFor,
+  keepAdminKey,
+  keptKeyIsLost,
+  keptKeyWasCancelled,
+  readKeptAdminKey,
+} from '@/services/kept-admin-key';
 import type { AdminStatus } from '@/services/types';
 import { isMissingRoute } from './agents-source';
 import { describeApiError } from './describe-error';
-import { adminRefusal, coolingSeconds, usePondAdminSource, type PondAdminSource } from './pond-admin-source';
+import { adminRefusal, coolingSeconds, useAdminKeyPin, usePondAdminSource, type PondAdminSource } from './pond-admin-source';
 
 export type AdminPhase =
   /** Nothing heard from the Pond yet. */
@@ -35,9 +44,11 @@ export interface AdminGate {
   unlocks: number;
   /** A restart was asked for, which ends every unlock. Cleared by the next status the Pond answers. */
   restarting: boolean;
+  /** This phone keeps its own key to this Pond, behind its biometrics; known without asking for them. */
+  kept: boolean;
 }
 
-const INITIAL: AdminGate = { phase: 'checking', status: null, coolingUntil: null, unlocks: 0, restarting: false };
+const INITIAL: AdminGate = { phase: 'checking', status: null, coolingUntil: null, unlocks: 0, restarting: false, kept: false };
 
 /** The phases in which the admin routes are not worth asking. */
 const CLOSED: readonly AdminPhase[] = ['locked', 'no_card', 'members_only', 'unsupported'];
@@ -49,6 +60,10 @@ export function isGateClosed(phase: AdminPhase): boolean {
 class GateStore {
   private state: AdminGate = INITIAL;
   private listeners = new Set<() => void>();
+  /** Moves whenever this phone keeps a key, so a status asked before then cannot have it forgotten. */
+  keyEpoch = 0;
+  /** One biometric read at a time, however many screens under My Pond are showing the lock. */
+  readingKey = false;
 
   get = () => this.state;
 
@@ -66,7 +81,8 @@ class GateStore {
 
   status(status: AdminStatus, now: number) {
     this.set({
-      phase: status.card === 'missing' ? 'no_card' : status.unlocked ? 'unlocked' : 'locked',
+      // A Pond with no card can still be open, unlocked by this phone's key.
+      phase: status.unlocked ? 'unlocked' : status.card === 'missing' ? 'no_card' : 'locked',
       status,
       coolingUntil: status.retry_after ? now + status.retry_after * 1000 : null,
       restarting: false,
@@ -79,7 +95,14 @@ class GateStore {
   }
 
   unlocked(expiresAt: string | null) {
-    const base: AdminStatus = this.state.status ?? { card: 'present', unlocked: true, expires_at: null, idle_minutes: 15, retry_after: null };
+    const base: AdminStatus = this.state.status ?? {
+      card: 'present',
+      unlocked: true,
+      expires_at: null,
+      idle_minutes: 15,
+      retry_after: null,
+      key: false,
+    };
     this.set({
       phase: 'unlocked',
       status: { ...base, unlocked: true, expires_at: expiresAt, retry_after: null },
@@ -129,12 +152,26 @@ export interface UseAdminGate {
   noteLocked: () => void;
   /** After asking the Pond to restart, which locks everyone. */
   noteRestart: () => void;
+  /** Revokes this phone's key on the Pond as far as it can be reached, forgets it here, and locks. */
+  forgetKept: () => Promise<void>;
 }
 
 export function useAdminGate(): UseAdminGate {
   const source = usePondAdminSource();
+  const pin = useAdminKeyPin();
   const store = storeFor(source);
   const gate = useSyncExternalStore(store.subscribe, store.get, store.get);
+
+  useEffect(() => {
+    let live = true;
+    const epoch = store.keyEpoch;
+    void isAdminKeyKeptFor(pin).then((kept) => {
+      if (live && epoch === store.keyEpoch) store.set({ kept });
+    });
+    return () => {
+      live = false;
+    };
+  }, [pin, store]);
 
   const noteFailure = useCallback(
     (e: unknown) => {
@@ -156,8 +193,15 @@ export function useAdminGate(): UseAdminGate {
   );
 
   const readStatus = useCallback(async () => {
+    const epoch = store.keyEpoch;
     try {
-      store.status(await source.status(), Date.now());
+      const status = await source.status();
+      store.status(status, Date.now());
+      // The Pond already revoked it: the card was rotated, or the phone removed or forgotten elsewhere.
+      if (!status.key && (await isAdminKeyKeptFor(pin)) && epoch === store.keyEpoch) {
+        await forgetKeptAdminKey();
+        store.set({ kept: false });
+      }
       return true;
     } catch (e) {
       if (noteFailure(e)) return true;
@@ -165,7 +209,7 @@ export function useAdminGate(): UseAdminGate {
       else if (store.get().phase === 'checking') store.set({ phase: 'unreachable' });
       return false;
     }
-  }, [noteFailure, source, store]);
+  }, [noteFailure, pin, source, store]);
 
   const touch = useCallback(() => store.touched(Date.now()), [store]);
   const noteLocked = useCallback(() => store.locked(), [store]);
@@ -174,7 +218,16 @@ export function useAdminGate(): UseAdminGate {
     store.set({ restarting: true });
   }, [store]);
 
-  return { gate, source, readStatus, noteFailure, touch, noteLocked, noteRestart };
+  const forgetKept = useCallback(async () => {
+    store.keyEpoch++;
+    // Revoking also locks this phone on the Pond; unreachable, it is at least asked to lock.
+    await source.forgetKey().catch(() => source.lock().catch(() => undefined));
+    await forgetKeptAdminKey();
+    store.set({ kept: false });
+    store.locked();
+  }, [source, store]);
+
+  return { gate, source, readStatus, noteFailure, touch, noteLocked, noteRestart, forgetKept };
 }
 
 /**
@@ -207,19 +260,36 @@ export interface UseAdminUnlock {
   coolingSecs: number;
   /** Why the last unlock did not work, in words. */
   error: string | null;
+  /** This phone keeps a key to this Pond, so My Pond can open with its Face ID or fingerprint. */
+  kept: boolean;
+  /** This phone can keep a key behind its biometrics; never on the web. */
+  canKeep: boolean;
+  /** Keep a key after the card opens My Pond, so the next unlock needs only the phone's biometrics. */
+  remember: boolean;
+  setRemember: (on: boolean) => void;
   setPassword: (raw: string) => void;
   /** Resolves to whether My Pond is now unlocked. */
   unlock: () => Promise<boolean>;
+  /** Reads the kept key behind the phone's biometrics and opens with it. Resolves to whether it opened. */
+  unlockWithKept: () => Promise<boolean>;
+  forgetKept: () => Promise<void>;
 }
 
-/** The lock's form, shared by My Pond and by any screen under it that finds itself locked. */
+/**
+ * The lock's form, shared by My Pond and by any screen under it that finds itself locked. Arriving
+ * locked with a kept key asks for the phone's biometrics once by itself, once per mount.
+ */
 export function useAdminUnlock(): UseAdminUnlock {
-  const { gate, source, readStatus, noteFailure } = useAdminGate();
+  const { gate, source, readStatus, noteFailure, touch, forgetKept } = useAdminGate();
+  const pin = useAdminKeyPin();
   const store = storeFor(source);
   const [password, setPasswordState] = useState('');
   const [unlocking, setUnlocking] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
+  const [remember, setRemember] = useState(true);
+  const [biometrics] = useState(canKeepAdminKey);
+  const canKeep = biometrics && pin !== null;
 
   // A countdown on screen, not a poll: nothing is asked of the Pond while it runs.
   const until = gate.coolingUntil;
@@ -245,16 +315,9 @@ export function useAdminUnlock(): UseAdminUnlock {
 
   const problem = adminPasswordProblem(password);
 
-  const unlock = useCallback(async () => {
-    if (unlocking || adminPasswordProblem(password) !== null || coolingSecs > 0) return false;
-    setUnlocking(true);
-    setError(null);
-    try {
-      const answer = await source.unlock(normalizeAdminPassword(password));
-      store.unlocked(answer.expires_at);
-      setPasswordState('');
-      return true;
-    } catch (e) {
+  /** Says why an unlock was refused, whether it was sent with the card or the kept key. */
+  const explain = useCallback(
+    (e: unknown) => {
       const code = adminRefusal(e);
       if (code === 'admin_cooling') {
         const wait = coolingSeconds(e);
@@ -273,11 +336,113 @@ export function useAdminUnlock(): UseAdminUnlock {
       } else {
         setError(describeApiError(e) ?? i18n.t('myPond.lock.failed'));
       }
+    },
+    [noteFailure, readStatus, store],
+  );
+
+  const forgetLocally = useCallback(async () => {
+    await forgetKeptAdminKey();
+    store.set({ kept: false });
+  }, [store]);
+
+  /** After the card opened My Pond. Nothing here can close it again: a refused save keeps nothing. */
+  const keepKey = useCallback(
+    async (keepFor: string) => {
+      store.keyEpoch++;
+      let key: string;
+      try {
+        key = await source.enroll();
+      } catch {
+        return;
+      }
+      touch();
+      try {
+        await keepAdminKey(keepFor, key, i18n.t('myPond.key.savePrompt'));
+        store.set({ kept: true });
+      } catch {
+        // Enrolling replaced any older key on the Pond, so whatever was kept before no longer opens.
+        await forgetLocally();
+      } finally {
+        store.keyEpoch++;
+      }
+    },
+    [forgetLocally, source, store, touch],
+  );
+
+  const unlock = useCallback(async () => {
+    if (unlocking || adminPasswordProblem(password) !== null || coolingSecs > 0) return false;
+    setUnlocking(true);
+    setError(null);
+    try {
+      const answer = await source.unlock(normalizeAdminPassword(password));
+      store.unlocked(answer.expires_at);
+      setPasswordState('');
+      if (remember && canKeep && pin) await keepKey(pin);
+      return true;
+    } catch (e) {
+      explain(e);
       return false;
     } finally {
       setUnlocking(false);
     }
-  }, [coolingSecs, noteFailure, password, readStatus, source, store, unlocking]);
+  }, [canKeep, coolingSecs, explain, keepKey, password, pin, remember, source, store, unlocking]);
+
+  const unlockWithKept = useCallback(async () => {
+    if (!pin || unlocking || coolingSecs > 0 || store.readingKey) return false;
+    store.readingKey = true;
+    setUnlocking(true);
+    setError(null);
+    try {
+      let key: string | null;
+      try {
+        key = await readKeptAdminKey(pin, i18n.t('myPond.key.prompt'));
+      } catch (e) {
+        if (keptKeyIsLost(e)) {
+          await forgetLocally();
+          setError(i18n.t('myPond.key.lost'));
+        } else if (!keptKeyWasCancelled(e)) {
+          setError(i18n.t('myPond.key.unreadable'));
+        }
+        return false;
+      }
+      if (key === null) {
+        store.set({ kept: false });
+        return false;
+      }
+      const answer = await source.unlockWithKey(key);
+      store.unlocked(answer.expires_at);
+      return true;
+    } catch (e) {
+      if (adminRefusal(e) === 'admin_key_rejected') {
+        await forgetLocally();
+        setError(i18n.t('myPond.key.rejected'));
+        // A wrong key counts toward the Pond's slowing, as a wrong card does.
+        void readStatus();
+      } else {
+        explain(e);
+      }
+      return false;
+    } finally {
+      store.readingKey = false;
+      setUnlocking(false);
+    }
+  }, [coolingSecs, explain, forgetLocally, pin, readStatus, source, store, unlocking]);
+
+  // Once per mount, so a refusal or a cancel leaves the lock on screen rather than asking again.
+  const asked = useRef(false);
+  const askRef = useRef(unlockWithKept);
+  useEffect(() => {
+    askRef.current = unlockWithKept;
+  });
+  const arrivedLocked = (gate.phase === 'locked' || gate.phase === 'no_card') && !gate.restarting;
+  const cooling = coolingSecs > 0;
+  useFocusEffect(
+    useCallback(() => {
+      if (asked.current || !gate.kept || !arrivedLocked) return;
+      asked.current = true;
+      if (!cooling) void askRef.current();
+    }, [arrivedLocked, cooling, gate.kept]),
+  );
 
   return {
     password,
@@ -286,7 +451,13 @@ export function useAdminUnlock(): UseAdminUnlock {
     unlocking,
     coolingSecs,
     error,
+    kept: gate.kept,
+    canKeep,
+    remember,
+    setRemember,
     setPassword,
     unlock,
+    unlockWithKept,
+    forgetKept,
   };
 }

@@ -18,6 +18,7 @@ import {
   leadReport,
   minutesLeft,
   normalizeAdminPassword,
+  readAdminKey,
   readAdminStatus,
   readCaches,
   readFileListing,
@@ -68,7 +69,13 @@ describe('readAdminStatus', () => {
       expires_at: '2026-10-29T10:00:00Z',
       idle_minutes: 15,
       retry_after: null,
+      key: false,
     });
+  });
+
+  it('reads key only when the Pond says true', () => {
+    expect(readAdminStatus({ card: 'present', unlocked: false, key: true })?.key).toBe(true);
+    for (const key of ['true', 1, null, {}]) expect(readAdminStatus({ card: 'present', unlocked: false, key })?.key).toBe(false);
   });
 
   it('reads anything unclear as locked, with a card, and no wait', () => {
@@ -78,6 +85,7 @@ describe('readAdminStatus', () => {
       expires_at: null,
       idle_minutes: 15,
       retry_after: null,
+      key: false,
     });
     expect(readAdminStatus({ card: 'missing', unlocked: false, retry_after: 12.2 })).toMatchObject({ card: 'missing', retry_after: 13 });
   });
@@ -90,6 +98,19 @@ describe('readAdminStatus', () => {
     expect(readUnlocked({ unlocked: true, expires_at: 'x' })).toEqual({ unlocked: true, expires_at: 'x' });
     expect(readUnlocked({ unlocked: false })).toBeNull();
     for (const raw of GARBAGE) expect(readUnlocked(raw)).toBeNull();
+  });
+});
+
+describe('readAdminKey', () => {
+  it('reads an enrolled key, and owner setup\'s under its own name', () => {
+    expect(readAdminKey({ key: 'k-1' })).toBe('k-1');
+    expect(readAdminKey({ status: 'completed', admin_key: 'k-2' }, 'admin_key')).toBe('k-2');
+    expect(readAdminKey({ admin_key: 'k-2' })).toBeNull();
+  });
+
+  it('is null for a key that is empty, blank or not a string', () => {
+    for (const key of ['', '   ', 42, null, {}]) expect(readAdminKey({ key })).toBeNull();
+    for (const raw of GARBAGE) expect(readAdminKey(raw)).toBeNull();
   });
 });
 

@@ -39,7 +39,7 @@ describe('the lock', () => {
   it('starts locked, refuses every admin route, and opens with the card', async () => {
     const time = clock();
     const pond = createMockPond({}, time.now);
-    expect(await pond.status()).toEqual({ card: 'present', unlocked: false, expires_at: null, idle_minutes: 15, retry_after: null });
+    expect(await pond.status()).toEqual({ card: 'present', unlocked: false, expires_at: null, idle_minutes: 15, retry_after: null, key: false });
     expect(await refusal(pond.overview())).toMatchObject({ status: 403, error: 'admin_locked' });
     expect(await refusal(pond.files(''))).toMatchObject({ status: 403, error: 'admin_locked' });
 
@@ -107,6 +107,63 @@ describe('the lock', () => {
     expect(await refusal(pond.status())).toMatchObject({ status: 403, error: 'admin_members_only' });
     expect(await refusal(pond.unlock(MOCK_ADMIN_PASSWORD))).toMatchObject({ status: 403, error: 'admin_members_only' });
     expect(await refusal(pond.lock())).toMatchObject({ status: 403, error: 'admin_members_only' });
+  });
+});
+
+describe('this phone’s key', () => {
+  it('enrolls only while unlocked, and says it holds a key', async () => {
+    const pond = createMockPond({}, clock().now);
+    expect(await refusal(pond.enroll())).toMatchObject({ status: 403, error: 'admin_locked' });
+    await pond.unlock(MOCK_ADMIN_PASSWORD);
+    const key = await pond.enroll();
+    expect(typeof key).toBe('string');
+    expect((await pond.status()).key).toBe(true);
+  });
+
+  it('opens with the key once locked again, and needs no card to', async () => {
+    const { pond } = await unlocked();
+    const key = await pond.enroll();
+    await pond.lock();
+    await expect(pond.unlockWithKey(key)).resolves.toMatchObject({ unlocked: true });
+    expect((await pond.status()).unlocked).toBe(true);
+  });
+
+  it('rejects a key it replaced, and one it revoked, and locks on revoking', async () => {
+    const { pond } = await unlocked();
+    const first = await pond.enroll();
+    const second = await pond.enroll();
+    expect(second).not.toBe(first);
+    await pond.lock();
+    expect(await refusal(pond.unlockWithKey(first))).toMatchObject({ status: 403, error: 'admin_key_rejected' });
+    await pond.unlockWithKey(second);
+
+    await pond.forgetKey();
+    expect(await pond.status()).toMatchObject({ unlocked: false, key: false });
+    expect(await refusal(pond.unlockWithKey(second))).toMatchObject({ status: 403, error: 'admin_key_rejected' });
+  });
+
+  it('counts a wrong key toward the same slowing as a wrong card', async () => {
+    const pond = createMockPond({}, clock().now);
+    for (let i = 1; i < MOCK_FREE_ATTEMPTS; i++) await refusal(pond.unlock('AAAA-AAAA-AAAA-AAAA'));
+    expect((await pond.status()).retry_after).toBeNull();
+    expect(await refusal(pond.unlockWithKey('not-a-key'))).toMatchObject({ error: 'admin_key_rejected' });
+    expect((await pond.status()).retry_after).toBe(MOCK_FIRST_WAIT_SECS);
+    expect(await refusal(pond.unlockWithKey('not-a-key'))).toMatchObject({ status: 429, error: 'admin_cooling' });
+  });
+
+  it('opens to the key setup gave on a Pond whose card was never made', async () => {
+    const pond = createMockPond({ card: 'missing', key: 'setup-key' }, clock().now);
+    expect(await pond.status()).toMatchObject({ card: 'missing', key: true });
+    expect(await refusal(pond.unlock(MOCK_ADMIN_PASSWORD))).toMatchObject({ status: 409, error: 'admin_card_missing' });
+    expect(await refusal(pond.unlockWithKey('anything'))).toMatchObject({ status: 403, error: 'admin_key_rejected' });
+    await expect(pond.unlockWithKey('setup-key')).resolves.toMatchObject({ unlocked: true });
+  });
+
+  it('refuses a guest phone the key routes too', async () => {
+    const pond = createMockPond({ member: false });
+    expect(await refusal(pond.unlockWithKey('k'))).toMatchObject({ status: 403, error: 'admin_members_only' });
+    expect(await refusal(pond.enroll())).toMatchObject({ status: 403, error: 'admin_members_only' });
+    expect(await refusal(pond.forgetKey())).toMatchObject({ status: 403, error: 'admin_members_only' });
   });
 });
 
