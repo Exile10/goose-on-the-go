@@ -23,6 +23,7 @@ jest.mock('@/services/api-client', () => {
       pauseSchedule: jest.fn(),
       resumeSchedule: jest.fn(),
       runScheduleNow: jest.fn(),
+      answerMissedRun: jest.fn(),
       deleteSchedule: jest.fn(),
     },
   };
@@ -229,6 +230,32 @@ describe('the other actions', () => {
     expect(pond.runScheduleNow).toHaveBeenCalledTimes(1);
     expect(m.vm.schedule?.currently_running).toBe(true);
     expect(m.vm.notice).toBe('runStarted');
+  });
+
+  it('runs a missed run when asked to, and reads the schedule again', async () => {
+    const missed = { ...BRIEF, ask_if_missed: true, missed_run: { due_at: '2026-10-20T03:30:00Z' } };
+    pond.listSchedules.mockResolvedValue([missed]);
+    pond.answerMissedRun.mockResolvedValue(undefined);
+    const m = await mount();
+    expect(m.vm.schedule?.missed_run).toEqual({ due_at: '2026-10-20T03:30:00Z' });
+
+    pond.listSchedules.mockResolvedValue([{ ...missed, missed_run: null }]);
+    await act(async () => {
+      await m.vm.actions.answerMissed('run');
+    });
+    expect(pond.answerMissedRun).toHaveBeenCalledWith('daily-brief', 'run');
+    expect(m.vm.notice).toBe('runStarted');
+    expect(m.vm.schedule?.missed_run).toBeNull();
+  });
+
+  it('says so when another phone answered first', async () => {
+    pond.answerMissedRun.mockRejectedValue(new ApiError('x', 409, null));
+    const m = await mount();
+    await act(async () => {
+      await m.vm.actions.answerMissed('skip');
+    });
+    expect(m.vm.error).toBe(i18n.t('schedule.missed.answered'));
+    expect(m.vm.notice).toBeNull();
   });
 
   it('deletes it', async () => {
