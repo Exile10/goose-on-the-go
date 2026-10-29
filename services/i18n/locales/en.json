@@ -470,6 +470,7 @@
     "matterUnreachable": "Your Pond cannot reach its Matter controller. Existing devices still work.",
     "online": "{{count}} on",
     "updatedAgo": "updated {{ago}} ago",
+    "waitingForPond": "Waiting for Pond",
     "allOffline": "Nothing is reachable",
     "allOfflineBody": "Your Pond lists these devices but cannot reach any of them right now.",
     "addDevice": "Add a device",
