@@ -630,6 +630,13 @@ export interface Schedule {
   last_run: string | null;
   next_run: string | null;
   created_at: string;
+  /**
+   * Whether a run missed while the Pond was off is asked about rather than skipped. Absent on a
+   * Pond that cannot ask, which is how the form knows not to offer it.
+   */
+  ask_if_missed?: boolean;
+  /** A missed run waiting for somebody to say run it or skip it. */
+  missed_run?: { due_at: string } | null;
 }
 
 /** `POST /schedules`. `name` is the label; `once` removes it after its first run. */
@@ -641,6 +648,7 @@ export interface CreateScheduleRequest {
   timezone?: string;
   kind?: TaskKind;
   once?: boolean;
+  ask_if_missed?: boolean;
 }
 
 /** `PUT /schedules/{id}`. Absent fields are left as they are. */
@@ -651,6 +659,7 @@ export interface UpdateScheduleRequest {
   prompt?: string;
   fire_at?: string;
   once?: boolean;
+  ask_if_missed?: boolean;
 }
 
 export interface ScheduleRun {
