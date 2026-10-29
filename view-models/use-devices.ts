@@ -6,17 +6,21 @@
  * it back from the device: an optimistic switch could say a heater was off while
  * it was still on. A Matter round trip is slow enough that an unacknowledged tap
  * reads as a broken switch, so the tap is shown at once as waiting instead.
+ *
+ * On a Pond with a device event stream, changes arrive as they happen and the
+ * full read drops to a rare check, which is most of this screen's mobile data.
  */
 
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { useServer } from '@/providers/server-provider';
 import { ApiError, api, type PondApiClient } from '@/services/api-client';
-import type { Device, DeviceStatePatch, MatterStatus, UpdateDeviceRequest } from '@/services/types';
+import type { Device, DeviceEvent, DeviceStatePatch, MatterStatus, UpdateDeviceRequest } from '@/services/types';
 import { ago } from '@/models/elapsed';
 import { COMMAND_MAX_WAIT_MS, commandKey, enqueue, sortWaiting, type WaitingCommand } from './command-queue';
 import { describeApiError } from './describe-error';
 import { useLive } from './use-live';
+import { useScreenActive } from './use-screen-active';
 import i18n from '@/services/i18n';
 
 /**
@@ -248,6 +252,18 @@ export interface UseDevices {
  */
 export const DEVICES_MS = 15_000;
 
+/** The full read while the event stream is open: only a check that nothing was missed. */
+export const DEVICES_STREAMING_MS = 5 * 60_000;
+/** The first wait before opening a dropped stream again, doubling up to the second. */
+export const DEVICES_STREAM_RETRY_MS = 5_000;
+export const DEVICES_STREAM_RETRY_MAX_MS = 60_000;
+
+/** The device list with one `device` event applied. */
+export function applyDeviceChange(devices: Device[], event: Extract<DeviceEvent, { type: 'device' }>): Device[] {
+  const others = devices.filter((d) => d.id !== event.device.id);
+  return event.change === 'removed' ? others : [...others, event.device];
+}
+
 /**
  * Fold a poll's power readings in without undoing anything changed after that poll began.
  *
@@ -459,7 +475,73 @@ export function useDevices(): UseDevices {
     },
     [readPower, replay],
   );
-  useLive(() => load(false), DEVICES_MS, hydrated);
+  // Polling until the stream is open, and while it is down; see the effect below.
+  const [streaming, setStreaming] = useState(false);
+  const delay = useCallback(() => (streaming ? DEVICES_STREAMING_MS : DEVICES_MS), [streaming]);
+  useLive(() => load(false), delay, hydrated);
+  const active = useScreenActive();
+
+  /**
+   * The event stream, opened again whenever it ends, from the last event seen. A Pond without the
+   * route answers 404 and is left to the poll. The first open starts from now, so one read follows
+   * it to cover what changed in between.
+   */
+  useEffect(() => {
+    if (!hydrated || !active) return;
+    const controller = new AbortController();
+    const { signal } = controller;
+    let backoff = DEVICES_STREAM_RETRY_MS;
+    let reopen: ReturnType<typeof setTimeout> | null = null;
+    let lastSeq: number | undefined;
+
+    const onEvent = (event: DeviceEvent) => {
+      // An event is the Pond answering: what is on screen is current.
+      setUpdatedAt(Date.now());
+      setFailedAt(null);
+      if (event.type === 'resync') return void load(false);
+      lastSeq = event.seq;
+      if (event.type === 'device') {
+        listChangedAt.current = Date.now();
+        setDevices((current) => applyDeviceChange(current, event));
+        return;
+      }
+      if (event.key !== 'power' || typeof event.value !== 'boolean') return;
+      const on = event.value;
+      powerChangedAt.current[event.device_id] = Date.now();
+      setPowerById((current) => ({ ...current, [event.device_id]: on }));
+    };
+
+    const open = () => {
+      reopen = null;
+      const resuming = lastSeq;
+      api
+        .streamDeviceEvents(onEvent, signal, () => {
+          backoff = DEVICES_STREAM_RETRY_MS;
+          setStreaming(true);
+          if (resuming == null) void load(false);
+          // The link is back: what was tapped meanwhile can go now, not at the next check.
+          void replay(true);
+        }, resuming)
+        .then(
+          () => true,
+          (e: unknown) => !(e instanceof ApiError && e.status === 404),
+        )
+        .then((again) => {
+          if (signal.aborted) return;
+          setStreaming(false);
+          if (!again) return;
+          reopen = setTimeout(open, backoff);
+          backoff = Math.min(backoff * 2, DEVICES_STREAM_RETRY_MAX_MS);
+        });
+    };
+    open();
+
+    return () => {
+      controller.abort();
+      if (reopen) clearTimeout(reopen);
+      setStreaming(false);
+    };
+  }, [hydrated, active, load, replay]);
 
   const refresh = useCallback(() => load(true), [load]);
 
