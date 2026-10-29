@@ -48,6 +48,7 @@ import type {
   CommissionDeviceResponse,
   CreateDeviceRequest,
   Device,
+  DeviceEvent,
   DeviceSelf,
   DeviceStatePatch,
   EventCategory,
@@ -925,6 +926,36 @@ export class PondApiClient {
       tool: 'get_device_state',
       args: { device_id: deviceId },
     });
+  }
+
+  /**
+   * What changes on the Pond's devices, as it happens, instead of reading every device again.
+   * `afterSeq` resumes after the last event seen; without it the stream starts from now. Resolves
+   * when the stream ends; a Pond without the route refuses it with a 404.
+   */
+  async streamDeviceEvents(
+    onEvent: (event: DeviceEvent) => void,
+    signal?: AbortSignal,
+    onOpen?: () => void,
+    afterSeq?: number,
+  ): Promise<void> {
+    const query = afterSeq != null ? `?after_seq=${afterSeq}` : '';
+    const res = await this.open(`/api/v1/devices/events${query}`, {
+      headers: { Accept: 'text/event-stream' },
+      signal,
+    });
+    onOpen?.();
+    await readSse(
+      res,
+      (event) => {
+        try {
+          onEvent({ type: event.event, ...JSON.parse(event.data || '{}') } as DeviceEvent);
+        } catch {
+          // A frame that is not JSON carries nothing to act on.
+        }
+      },
+      { idleMs: STREAM_IDLE_MS },
+    );
   }
 
   // ── Chat ────────────────────────────────────────────────────

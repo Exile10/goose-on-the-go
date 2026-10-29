@@ -35,6 +35,16 @@ export interface Device {
   metadata?: Record<string, unknown>;
 }
 
+/**
+ * One frame of `GET /devices/events`. A state change is sent when the device itself reports it, so
+ * it is a confirmation, not an echo of a command. `resync` means the phone fell too far behind to
+ * resume, and should read everything once.
+ */
+export type DeviceEvent =
+  | { type: 'device_state'; seq: number; device_id: string; key: string; value: boolean | number | string; changed_at: string }
+  | { type: 'device'; seq: number; change: 'added' | 'updated' | 'removed'; device: Device }
+  | { type: 'resync' };
+
 export interface CreateDeviceRequest {
   id?: string;
   name: string;
