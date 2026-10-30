@@ -32,6 +32,7 @@ const TOOLS: Record<string, ToolWords> = {
   get_weather_forecast: { label: 'chat.tools.forecast', doing: 'chat.tools.doingWeather', icon: 'partly-sunny' },
   get_wikipedia_article: { label: 'chat.tools.wikipedia', doing: 'chat.tools.doingLookup', icon: 'globe' },
   search_web: { label: 'chat.tools.webSearch', doing: 'chat.tools.doingWebSearch', icon: 'search' },
+  read_web_page: { label: 'chat.tools.webPage', doing: 'chat.tools.doingWebPage', icon: 'globe' },
   compute_answer: { label: 'chat.tools.computed', doing: 'chat.tools.doingCompute', icon: 'sparkle' },
   list_schedules: { label: 'chat.tools.schedules', doing: 'chat.tools.doingSchedules', icon: 'schedule' },
   create_schedule: { label: 'chat.tools.createSchedule', icon: 'schedule' },
