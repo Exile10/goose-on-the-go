@@ -18,7 +18,7 @@ configuration outside this repo, and the open questions are collected at the end
 
 ### Secret material — Keychain (iOS) / EncryptedSharedPreferences (Android)
 
-Via `expo-secure-store`, in `services/secure-storage.ts:26-33`:
+Via `expo-secure-store`, in `services/secure-storage.ts:33-39`:
 
 | Key | What it is |
 |---|---|
@@ -26,6 +26,14 @@ Via `expo-secure-store`, in `services/secure-storage.ts:26-33`:
 | `goose.sessionToken` | Bearer token for the Pond's API |
 | `goose.refreshToken` | Used once on a 401 to re-obtain a session token |
 | `goose.installId` | Stable per-install UUID, sent as `client_id` in every handshake |
+
+On iOS, `goose.pondIdentity` is kept readable once the phone has been unlocked after starting
+(`AFTER_FIRST_UNLOCK`, in its own Keychain service), where the others keep the Keychain's
+default of readable only while unlocked. A Pond alert wakes the app while the phone is locked,
+and the app needs the pairing then to fetch the alert from the Pond (2026-10-30, #164). It is the
+setting messaging apps use for the same reason: the item stays in the Keychain, encrypted, and is
+not readable before the first unlock after a restart. Pairings saved before this move over the
+next time the app saves the sign-in.
 
 `goose.adminKey` is kept apart from the table above, and only when the member keeps it: this
 phone's own key to My Pond, the Pond's administration. It is written with `requireAuthentication`
@@ -153,6 +161,20 @@ content from the Pond over its own authenticated channel.
 
 So Google and Apple see a device token and the fact that a ping occurred. They do not see
 notification text, because there is none to see.
+
+On the phone (2026-10-30, #164), the ping runs a background task
+(`services/background-notifications.ts`). The task reads the alert's id from the ping and
+fetches this phone's waiting alerts from the Pond (`GET /api/v1/notifications/pending`) over the
+same pinned connection the app always uses. It shows each alert with the time the Pond recorded
+it and confirms it (`POST /api/v1/notifications/{id}/ack`). When the Pond cannot be reached, the
+phone shows "Alert from your Pond" with no detail, under the alert's id, so the real alert
+replaces it once fetched. Nothing in that notice came from anywhere but the ping.
+
+On iPhone the ping is a silent push, which needs the `remote-notification` background mode.
+`expo-task-manager` also declares `fetch`, which the app does not use. iOS decides whether to
+deliver a silent push: it limits how often, and delivers none to an app the user has
+force-quit. Away from home, the embedded remote-access node is not running in a cold
+background start (#50), so the phone shows the "Alert from your Pond" notice instead.
 
 ### 4. Uber — through the Pond, for a ride the user asks for
 
