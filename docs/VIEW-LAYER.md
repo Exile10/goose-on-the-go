@@ -19,6 +19,14 @@ loser re-renders.
 const { colors, isDark, preference, setPreference } = useTheme();
 ```
 
+On Android, React Native hears of a system light/dark change only through
+`MainActivity.onConfigurationChanged`. A change made while the process lives
+on without an activity — swiped from Recents while `PondNetworkService` holds
+it — reaches nothing, and the next activity starts in a scheme the JS side
+never learns of. `plugins/with-appearance-resync.js` makes `MainActivity`
+forward its configuration on every resume, which re-syncs it; keep that plugin
+when touching the activity.
+
 A screen never hardcodes a surface or text colour. `StyleSheet.create` runs once
 at module load, so a sheet that has to follow the scheme is built through
 `useThemedStyles`:
