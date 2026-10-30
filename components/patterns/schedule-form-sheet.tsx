@@ -1,22 +1,27 @@
 /**
  * ScheduleFormSheet — a new schedule, or an edit to one, that runs a prompt.
  *
- * "Once" is a date and a time; "On repeat" is a cron expression, written by
- * hand for now. What each becomes on the wire, and which fields an edit
- * sends, is `createRequest` and `updateRequest` in `models/schedule.ts`.
+ * "Once" is a date and a time. The repeats are the dashboard's: hourly, daily,
+ * weekly on chosen days, monthly on a day, or a custom cron typed by hand;
+ * each preset writes the cron the dashboard would. A line under them says in
+ * words when it will run. What each becomes on the wire, and which fields an
+ * edit sends, is `createRequest` and `updateRequest` in `models/schedule.ts`.
  * Checks that would otherwise come back as a 400 run there first, so the
  * person hears what to fix before anything is sent.
  */
 
 import React, { useState } from 'react';
-import { ScrollView, StyleSheet } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import {
   InkButton,
+  InkChip,
   InkDatePicker,
   InkFormField,
   InkInput,
   InkNotice,
+  InkNumberField,
   InkSegmented,
   InkSheet,
   InkText,
@@ -27,13 +32,19 @@ import type { CivilDate } from '@jarida/ink';
 
 import { GSheetBody } from '@/components/ui/g-sheet-body';
 import {
+  CRON_WEEKDAYS,
+  TIMINGS,
   createRequest,
+  describeCron,
   deviceTimeZone,
+  draftCron,
   draftFrom,
   emptyDraft,
   promptOf,
   updateRequest,
+  weekdayShortName,
   type ScheduleDraft,
+  type Timing,
 } from '@/models/schedule';
 import { confirm, reject } from '@/services/haptics';
 import type { CreateScheduleRequest, Schedule, UpdateScheduleRequest } from '@/services/types';
@@ -55,6 +66,24 @@ export type ScheduleFormSheetProps = {
       onUpdate: (req: UpdateScheduleRequest) => Promise<string | null>;
     }
 );
+
+/** Each timing's name; spelled out so every key is a literal the catalogue checks. */
+function timingLabel(timing: Timing, t: TFunction): string {
+  switch (timing) {
+    case 'once':
+      return t('schedule.form.once');
+    case 'hourly':
+      return t('schedule.form.hourly');
+    case 'daily':
+      return t('schedule.form.daily');
+    case 'weekly':
+      return t('schedule.form.weekly');
+    case 'monthly':
+      return t('schedule.form.monthly');
+    case 'custom':
+      return t('schedule.form.custom');
+  }
+}
 
 function todayCivil(): CivilDate {
   const d = new Date();
@@ -86,6 +115,20 @@ export function ScheduleFormSheet(props: ScheduleFormSheetProps) {
     <K extends keyof ScheduleDraft>(key: K) =>
     (value: ScheduleDraft[K]) =>
       setDraft((d) => ({ ...d, [key]: value }));
+
+  // Custom opens on the cron the chosen preset would send, to adjust rather than retype.
+  const chooseTiming = (timing: Timing) =>
+    setDraft((d) => {
+      const current = d.timing === 'once' ? null : draftCron(d);
+      return { ...d, timing, cron: timing === 'custom' && current ? current : d.cron };
+    });
+
+  // Like the dashboard, the last day stays chosen: a week with no days never runs.
+  const toggleDay = (day: number) =>
+    setDraft((d) => {
+      const next = d.weekdays.includes(day) ? d.weekdays.filter((x) => x !== day) : [...d.weekdays, day];
+      return next.length ? { ...d, weekdays: next } : d;
+    });
 
   const submit = async () => {
     let refused: string | null;
@@ -122,6 +165,20 @@ export function ScheduleFormSheet(props: ScheduleFormSheetProps) {
   const hasPrompt = !editing || promptOf(editing) != null;
   // The zone is offered only where there is a choice: the schedule's own, or this phone's.
   const zones = editing && editing.timezone !== phoneZone ? [editing.timezone, phoneZone] : null;
+  // When it will run, in words, as the dashboard previews it. Nothing until the
+  // fields are complete; a cron the words cannot read is pointed back at.
+  const cron = draftCron(draft);
+  const words = cron ? describeCron(cron) : null;
+  const preview = !cron
+    ? null
+    : words
+      ? t('schedule.form.preview', { when: words, zone: draft.timezone })
+      : t('schedule.form.previewCron', { zone: draft.timezone });
+  const timeField = (
+    <InkFormField label={t('schedule.form.time')}>
+      <InkTimePicker label={t('schedule.form.time')} value={draft.time} onChange={set('time')} />
+    </InkFormField>
+  );
 
   return (
     <InkSheet
@@ -141,15 +198,13 @@ export function ScheduleFormSheet(props: ScheduleFormSheetProps) {
           </InkFormField>
 
           <InkFormField label={t('schedule.form.timing')}>
-            <InkSegmented
-              label={t('schedule.form.timing')}
-              value={draft.timing}
-              options={[
-                { value: 'once', label: t('schedule.form.once') },
-                { value: 'repeat', label: t('schedule.form.repeat') },
-              ]}
-              onChange={set('timing')}
-            />
+            <View style={styles.chips}>
+              {TIMINGS.map((timing) => (
+                <InkChip key={timing} selected={draft.timing === timing} onPress={() => chooseTiming(timing)}>
+                  {timingLabel(timing, t)}
+                </InkChip>
+              ))}
+            </View>
           </InkFormField>
 
           {draft.timing === 'once' ? (
@@ -164,11 +219,67 @@ export function ScheduleFormSheet(props: ScheduleFormSheetProps) {
                   min={today}
                 />
               </InkFormField>
-              <InkFormField label={t('schedule.form.time')}>
-                <InkTimePicker label={t('schedule.form.time')} value={draft.time} onChange={set('time')} />
+              {timeField}
+            </>
+          ) : null}
+
+          {draft.timing === 'hourly' ? (
+            <>
+              <InkFormField label={t('schedule.form.everyHours')}>
+                <InkNumberField
+                  label={t('schedule.form.everyHours')}
+                  value={draft.everyHours}
+                  onChange={set('everyHours')}
+                  min={1}
+                  max={23}
+                />
+              </InkFormField>
+              <InkFormField label={t('schedule.form.minutePast')}>
+                <InkNumberField
+                  label={t('schedule.form.minutePast')}
+                  value={draft.minute}
+                  onChange={set('minute')}
+                  min={0}
+                  max={59}
+                />
               </InkFormField>
             </>
-          ) : (
+          ) : null}
+
+          {draft.timing === 'daily' ? timeField : null}
+
+          {draft.timing === 'weekly' ? (
+            <>
+              <InkFormField label={t('schedule.form.days')}>
+                <View style={styles.chips}>
+                  {CRON_WEEKDAYS.map((day) => (
+                    <InkChip key={day} selected={draft.weekdays.includes(day)} onPress={() => toggleDay(day)}>
+                      {weekdayShortName(day)}
+                    </InkChip>
+                  ))}
+                </View>
+              </InkFormField>
+              {timeField}
+            </>
+          ) : null}
+
+          {draft.timing === 'monthly' ? (
+            <>
+              <InkFormField label={t('schedule.form.dayOfMonth')}>
+                <InkNumberField
+                  label={t('schedule.form.dayOfMonth')}
+                  value={draft.dayOfMonth}
+                  onChange={set('dayOfMonth')}
+                  min={1}
+                  max={31}
+                />
+              </InkFormField>
+              <InkText size="sm" tone="tertiary">{t('schedule.form.dayOfMonthHint')}</InkText>
+              {timeField}
+            </>
+          ) : null}
+
+          {draft.timing === 'custom' ? (
             <>
               <InkFormField label={t('schedule.form.cron')}>
                 <InkInput
@@ -180,7 +291,9 @@ export function ScheduleFormSheet(props: ScheduleFormSheetProps) {
               </InkFormField>
               <InkText size="sm" tone="tertiary">{t('schedule.form.cronHint')}</InkText>
             </>
-          )}
+          ) : null}
+
+          {preview ? <InkText size="sm" tone="secondary">{preview}</InkText> : null}
 
           {zones ? (
             <InkFormField label={t('schedule.form.timezone')}>
@@ -222,4 +335,5 @@ export function ScheduleFormSheet(props: ScheduleFormSheetProps) {
 
 const styles = StyleSheet.create({
   content: { gap: Spacing.lg, paddingBottom: Spacing['2xl'] },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm },
 });

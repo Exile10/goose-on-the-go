@@ -239,9 +239,9 @@ function weekdays(field: string): Set<number> | null {
   return days;
 }
 
-function dayName(day: number): string {
-  // 2023-01-01 was a Sunday, so day n of that week is weekday n.
-  return new Date(2023, 0, 1 + day).toLocaleDateString(undefined, { weekday: 'long' });
+function dayName(day: number, weekday: 'long' | 'short' = 'long'): string {
+  // 2023-01-01 was a Sunday, so day n of that week is weekday n, and day 7 is Sunday again.
+  return new Date(2023, 0, 1 + day).toLocaleDateString(undefined, { weekday });
 }
 
 const same = (a: Set<number>, b: number[]) => a.size === b.length && b.every((d) => a.has(d));
@@ -288,7 +288,7 @@ export function describeCron(cron: string): string | null {
     if (same(days, [1, 2, 3, 4, 5])) return i18n.t('schedule.cron.weekdays', { time });
     if (same(days, [0, 6])) return i18n.t('schedule.cron.weekends', { time });
     // Monday first, as a week reads.
-    const names = [1, 2, 3, 4, 5, 6, 0].filter((d) => days.has(d)).map(dayName);
+    const names = [1, 2, 3, 4, 5, 6, 0].filter((d) => days.has(d)).map((d) => dayName(d));
     return i18n.t('schedule.cron.onDays', { days: names.join(', '), time });
   }
 
@@ -348,15 +348,46 @@ export function linkedScheduleId(param: string | string[] | undefined): string |
 
 // ── The schedule form ────────────────────────────────────────────────────────
 
-export type Timing = 'once' | 'repeat';
+/**
+ * How a schedule runs, as the form offers it: the dashboard's six choices.
+ * Each repeat but `custom` is a fixed cron shape filled from a few fields;
+ * `custom` is the cron itself, typed by hand.
+ */
+export type Timing = 'once' | 'hourly' | 'daily' | 'weekly' | 'monthly' | 'custom';
+
+/** The choices, in the order the form shows them. */
+export const TIMINGS: readonly Timing[] = ['once', 'hourly', 'daily', 'weekly', 'monthly', 'custom'];
+
+/**
+ * The weekdays as the Pond's cron numbers them, Monday first: 1 is Monday and
+ * 7 is Sunday, as the dashboard writes them. The Pond's croner reads 7 as
+ * Sunday (and 0 too, which the form never writes).
+ */
+export const CRON_WEEKDAYS: readonly number[] = [1, 2, 3, 4, 5, 6, 7];
+
+/** A weekday's short name in the phone's language, from its cron number (1 Monday to 7 Sunday). */
+export function weekdayShortName(day: number): string {
+  return dayName(day, 'short');
+}
 
 /** What the create and edit form holds, as typed. */
 export interface ScheduleDraft {
   name: string;
   prompt: string;
   timing: Timing;
+  /** The day a one-off runs. */
   date: CivilDate | null;
+  /** When a one-off runs, and the time of day a daily, weekly or monthly repeat runs at. */
   time: CivilTime | null;
+  /** Hourly: every this many hours, 1 to 23. */
+  everyHours: number;
+  /** Hourly: at this many minutes past, 0 to 59. */
+  minute: number;
+  /** Weekly: the days it runs on, 1 Monday to 7 Sunday. */
+  weekdays: number[];
+  /** Monthly: the day of the month, 1 to 31. */
+  dayOfMonth: number;
+  /** Custom: the cron as typed. */
   cron: string;
   timezone: string;
 }
@@ -369,14 +400,131 @@ export function promptOf(schedule: Schedule): string | null {
   return schedule.kind.type === 'agent_prompt' ? schedule.kind.prompt : null;
 }
 
+/** What the repeat fields hold before anything is chosen; the dashboard's defaults. */
+const REPEAT_DEFAULTS = { everyHours: 1, minute: 0, weekdays: [1], dayOfMonth: 1 };
+
 /** An empty form for a new schedule, in the phone's zone. */
 export function emptyDraft(timezone: string): ScheduleDraft {
-  return { name: '', prompt: '', timing: 'once', date: null, time: null, cron: '', timezone };
+  return { name: '', prompt: '', timing: 'once', date: null, time: null, ...REPEAT_DEFAULTS, cron: '', timezone };
+}
+
+const whole = (n: number, min: number, max: number) => Number.isInteger(n) && n >= min && n <= max;
+
+/**
+ * Weekdays as the dashboard's `formatDays` writes them: in week order, with a
+ * run of three or more days as a range and shorter runs as single days, so
+ * Monday to Friday is `1-5`, Saturday and Sunday `6,7`, and `1,3,5` a list.
+ */
+function formatWeekdays(days: number[]): string {
+  const sorted = CRON_WEEKDAYS.filter((day) => days.includes(day));
+  const parts: string[] = [];
+  let i = 0;
+  while (i < sorted.length) {
+    let j = i;
+    while (j + 1 < sorted.length && sorted[j + 1] === sorted[j] + 1) j++;
+    if (j - i >= 2) parts.push(`${sorted[i]}-${sorted[j]}`);
+    else parts.push(...sorted.slice(i, j + 1).map(String));
+    i = j + 1;
+  }
+  return parts.join(',');
+}
+
+/**
+ * The days a weekday field of single days and ranges names (`1-5`, `1,3,5`),
+ * 1 Monday to 7 Sunday, or null for anything else. Whether it is written the
+ * way the form would write it is `repeatFrom`'s round-trip check.
+ */
+function parseWeekdays(field: string): number[] | null {
+  const days: number[] = [];
+  for (const part of field.split(',')) {
+    const range = /^([1-7])(?:-([1-7]))?$/.exec(part);
+    if (!range) return null;
+    const from = Number(range[1]);
+    const to = range[2] == null ? from : Number(range[2]);
+    if (to < from) return null;
+    for (let day = from; day <= to; day++) days.push(day);
+  }
+  return days;
+}
+
+/**
+ * The cron a repeat other than `custom` becomes, written exactly as the
+ * dashboard's `buildCron` writes it (six fields, seconds first), so a schedule
+ * made on either reads back the same on the other. Weekly days go in week
+ * order, whatever order they were tapped in (see `formatWeekdays`).
+ */
+export function presetCron(d: ScheduleDraft): DraftResult<string> {
+  if (d.timing === 'hourly') {
+    if (!whole(d.everyHours, 1, 23) || !whole(d.minute, 0, 59)) {
+      return { ok: false, error: 'schedule.errors.repeatNumbers' };
+    }
+    return { ok: true, req: `0 ${d.minute} */${d.everyHours} * * *` };
+  }
+  if (!d.time) return { ok: false, error: 'schedule.errors.timeRequired' };
+  const { hour, minute } = d.time;
+  switch (d.timing) {
+    case 'daily':
+      return { ok: true, req: `0 ${minute} ${hour} * * *` };
+    case 'weekly': {
+      const days = formatWeekdays(d.weekdays);
+      if (!days) return { ok: false, error: 'schedule.errors.daysRequired' };
+      return { ok: true, req: `0 ${minute} ${hour} * * ${days}` };
+    }
+    case 'monthly':
+      if (!whole(d.dayOfMonth, 1, 31)) return { ok: false, error: 'schedule.errors.repeatNumbers' };
+      return { ok: true, req: `0 ${minute} ${hour} ${d.dayOfMonth} * *` };
+    default:
+      return { ok: false, error: 'schedule.errors.cronFields' };
+  }
+}
+
+/** The repeat fields of a draft: everything but its name, prompt and zone. */
+type RepeatFields = Omit<ScheduleDraft, 'name' | 'prompt' | 'timezone'>;
+
+/**
+ * The choice a repeating cron opens on: the preset whose builder writes this
+ * very cron back, or `custom` with the cron as it is. Reading it any looser
+ * would lose something on save — `1,2,3,4,5` is not how the weekly picker
+ * writes Monday to Friday (`1-5`), and a `07` minute is not the `7` it would
+ * send — so anything that does not round-trip stays the raw cron, untouched.
+ */
+export function repeatFrom(cron: string): RepeatFields {
+  const custom: RepeatFields = {
+    timing: 'custom',
+    date: null,
+    time: null,
+    ...REPEAT_DEFAULTS,
+    cron,
+  };
+  const fields = cron.trim().split(/\s+/);
+  if (fields.length !== 6) return custom;
+  const [, min, hour, dom, , dow] = fields;
+  const num = (field: string) => (NUMBER.test(field) ? Number(field) : NaN);
+
+  const hourStep = /^\*\/(\d{1,2})$/.exec(hour);
+  const candidates: RepeatFields[] = [];
+  if (hourStep) {
+    candidates.push({ ...custom, timing: 'hourly', everyHours: Number(hourStep[1]), minute: num(min) });
+  } else {
+    const time = { hour: num(hour), minute: num(min) };
+    candidates.push(
+      { ...custom, timing: 'daily', time },
+      { ...custom, timing: 'weekly', time, weekdays: parseWeekdays(dow) ?? [] },
+      { ...custom, timing: 'monthly', time, dayOfMonth: num(dom) },
+    );
+  }
+  for (const candidate of candidates) {
+    if (candidate.time && !(whole(candidate.time.hour, 0, 23) && whole(candidate.time.minute, 0, 59))) continue;
+    const built = presetCron({ ...candidate, name: '', prompt: '', timezone: '' });
+    if (built.ok && built.req === fields.join(' ')) return { ...candidate, cron };
+  }
+  return custom;
 }
 
 /**
  * The form filled with a schedule as the Pond has it. A one-off's instant is
- * read back as a date and a time on this phone, which is how it was picked.
+ * read back as a date and a time on this phone, which is how it was picked; a
+ * repeat opens on its preset, or as custom (see `repeatFrom`).
  */
 export function draftFrom(schedule: Schedule): ScheduleDraft {
   const base = { name: schedule.label, prompt: promptOf(schedule) ?? '', timezone: schedule.timezone };
@@ -387,10 +535,11 @@ export function draftFrom(schedule: Schedule): ScheduleDraft {
       timing: 'once',
       date: { year: at.getFullYear(), month: at.getMonth() + 1, day: at.getDate() },
       time: { hour: at.getHours(), minute: at.getMinutes() },
+      ...REPEAT_DEFAULTS,
       cron: '',
     };
   }
-  return { ...base, timing: 'repeat', date: null, time: null, cron: schedule.cron };
+  return { ...base, ...repeatFrom(schedule.cron) };
 }
 
 /** The checks the Pond would answer with a 400, and the one-off's instant. */
@@ -401,13 +550,28 @@ function checkTiming(d: ScheduleDraft, now: Date): DraftResult<{ at: Date | null
     if (at.getTime() <= now.getTime()) return { ok: false, error: 'schedule.errors.whenPast' };
     return { ok: true, req: { at, cron: oneOffCron(d.date, d.time) } };
   }
-  if (!isSixFieldCron(d.cron)) return { ok: false, error: 'schedule.errors.cronFields' };
-  return { ok: true, req: { at: null, cron: d.cron.trim() } };
+  if (d.timing === 'custom') {
+    if (!isSixFieldCron(d.cron)) return { ok: false, error: 'schedule.errors.cronFields' };
+    return { ok: true, req: { at: null, cron: d.cron.trim() } };
+  }
+  const built = presetCron(d);
+  return built.ok ? { ok: true, req: { at: null, cron: built.req } } : built;
+}
+
+/**
+ * The cron the draft would be sent as, for the form's preview, or null while
+ * it is not yet complete or not valid. A one-off previews as its pinned cron,
+ * which reads as its date.
+ */
+export function draftCron(d: ScheduleDraft): string | null {
+  // A one-off in the past is still a date to read back; only `createRequest` refuses it.
+  const timing = checkTiming(d, new Date(0));
+  return timing.ok ? timing.req.cron : null;
 }
 
 /**
  * `POST /schedules` for a new schedule. A one-off is a pinned cron sent with
- * `once: true` (see `oneOffCron`); both kinds carry the draft's zone.
+ * `once: true` (see `oneOffCron`); every kind carries the draft's zone.
  */
 export function createRequest(d: ScheduleDraft, now = new Date()): DraftResult<CreateScheduleRequest> {
   if (!d.name.trim()) return { ok: false, error: 'schedule.errors.nameRequired' };
@@ -427,13 +591,30 @@ export function createRequest(d: ScheduleDraft, now = new Date()): DraftResult<C
 }
 
 /**
+ * Whether the draft runs at a different time from the schedule. A repeat is
+ * compared by the cron it would send, so opening a weekly schedule, looking
+ * at it as custom and saving changes nothing; a custom cron left as it was is
+ * not re-checked, so a shape the form would refuse does not block an edit to
+ * the name.
+ */
+function timingChanged(original: Schedule, d: ScheduleDraft): boolean {
+  const was = draftFrom(original);
+  if (d.timing === 'once' || was.timing === 'once') {
+    return d.timing !== was.timing || JSON.stringify([d.date, d.time]) !== JSON.stringify([was.date, was.time]);
+  }
+  if (d.timing === 'custom') return d.cron.trim() !== original.cron.trim();
+  const built = presetCron(d);
+  return !built.ok || built.req !== original.cron.trim();
+}
+
+/**
  * `PUT /schedules/{id}` for an edit, carrying only what changed: the Pond
  * leaves an absent field as it is, and a changed shape re-registers the job,
  * so an edit to the name alone should not touch when it runs.
  *
  * A one-off's new moment goes as `fire_at`, an instant, which keeps it a
  * one-off; a cron alone would make it repeat. A cron sent for a one-off turns
- * it into a repeating schedule, which is what choosing "On repeat" means.
+ * it into a repeating schedule, which is what choosing a repeat means.
  *
  * A webhook's URL is not here: `PUT /schedules/{id}` takes a prompt, which
  * would replace the webhook with an agent prompt, and nothing else changes the
@@ -453,13 +634,7 @@ export function updateRequest(
   if (prompt != null && d.prompt.trim() !== prompt) req.prompt = d.prompt.trim();
   if (d.timezone !== original.timezone) req.timezone = d.timezone;
 
-  const was = draftFrom(original);
-  const timingChanged =
-    d.timing !== was.timing ||
-    (d.timing === 'once'
-      ? JSON.stringify([d.date, d.time]) !== JSON.stringify([was.date, was.time])
-      : d.cron.trim() !== was.cron.trim());
-  if (timingChanged) {
+  if (timingChanged(original, d)) {
     const timing = checkTiming(d, now);
     if (!timing.ok) return timing;
     if (timing.req.at) req.fire_at = timing.req.at.toISOString();
