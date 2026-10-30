@@ -18,6 +18,13 @@
  * this module exists to avoid. Tokens therefore do not survive a reload there.
  * That is acceptable because web is a development preview, not a shipping
  * target; see `docs/TESTING.md`.
+ *
+ * On iOS the pairing is the one item kept readable while the phone is locked,
+ * after it has been unlocked once since starting. A push wake runs exactly then,
+ * and with the Keychain's default it could not read the pairing to pull the
+ * alert. The Keychain only applies that setting when an item is created, so the
+ * pairing lives in its own Keychain service, is moved there the next time it is
+ * written, and the old copy is removed only once the new one is saved.
  */
 
 import { Platform } from 'react-native';
@@ -34,6 +41,17 @@ const KEYS = {
 export type SecureKey = keyof typeof KEYS;
 
 const isWeb = Platform.OS === 'web';
+
+/** Keys a background task must read while the phone is locked. See the module comment. */
+const READABLE_WHEN_LOCKED: ReadonlySet<SecureKey> = new Set(['pondIdentity']);
+const LOCKED_READ_OPTIONS: SecureStore.SecureStoreOptions = {
+  keychainService: 'goose.afterFirstUnlock',
+  keychainAccessible: SecureStore.AFTER_FIRST_UNLOCK,
+};
+
+function lockedReadable(key: SecureKey): boolean {
+  return Platform.OS === 'ios' && READABLE_WHEN_LOCKED.has(key);
+}
 
 /** Web-only, deliberately not persisted. See the module comment. */
 const ephemeral = new Map<string, string>();
@@ -101,6 +119,10 @@ export const SecureStorage = {
       warnOnceOnWeb();
       return ephemeral.get(KEYS[key]) ?? null;
     }
+    if (lockedReadable(key)) {
+      // Not moved yet: the copy written before this setting existed.
+      return (await SecureStore.getItemAsync(KEYS[key], LOCKED_READ_OPTIONS)) ?? SecureStore.getItemAsync(KEYS[key]);
+    }
     return SecureStore.getItemAsync(KEYS[key]);
   },
 
@@ -108,6 +130,12 @@ export const SecureStorage = {
     if (isWeb) {
       warnOnceOnWeb();
       ephemeral.set(KEYS[key], value);
+      return;
+    }
+    if (lockedReadable(key)) {
+      await SecureStore.setItemAsync(KEYS[key], value, LOCKED_READ_OPTIONS);
+      // Only now that the new copy is saved; a stale one left here would never be read again anyway.
+      await SecureStore.deleteItemAsync(KEYS[key]).catch(() => undefined);
       return;
     }
     return SecureStore.setItemAsync(KEYS[key], value);
@@ -118,6 +146,7 @@ export const SecureStorage = {
       ephemeral.delete(KEYS[key]);
       return;
     }
+    if (lockedReadable(key)) await SecureStore.deleteItemAsync(KEYS[key], LOCKED_READ_OPTIONS);
     return SecureStore.deleteItemAsync(KEYS[key]);
   },
 };
