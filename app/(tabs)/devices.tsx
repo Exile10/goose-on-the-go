@@ -43,15 +43,21 @@ import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
 import { Spacing } from '@/constants/spacing';
 import { Radii } from '@/constants/radii';
 
-/** Device card. The switch appears only for devices that accept one; a tap opens its name and room. */
+/**
+ * Device card. The switch appears only for devices that accept one; a tap opens its name and room.
+ * A switch that was just tapped sits where it was put, greyed out, until the Pond confirms it.
+ */
 const DeviceCard = React.memo(function DeviceCard({
   device,
   power,
+  waiting,
   onToggle,
   onEdit,
 }: {
   device: Device;
   power: boolean | undefined;
+  /** The power asked for and not yet confirmed. */
+  waiting: boolean | undefined;
   onToggle: (device: Device, on: boolean) => void;
   onEdit: (device: Device) => void;
 }) {
@@ -76,7 +82,9 @@ const DeviceCard = React.memo(function DeviceCard({
    */
   const detail = !device.is_online
     ? t('common.offline')
-    : power === undefined
+    : waiting !== undefined
+      ? t('devices.waitingForPond')
+      : power === undefined
       ? t('common.online')
       : t(power ? 'common.on' : 'common.off');
 
@@ -87,13 +95,19 @@ const DeviceCard = React.memo(function DeviceCard({
           <GIcon name={icon} size={17} color={lit ? color : Grey[500]} />
         </View>
         {canPower ? (
-          <InkSwitch checked={on} onChange={handleToggle} disabled={!device.is_online} />
+          <InkSwitch
+            checked={waiting ?? on}
+            onChange={handleToggle}
+            disabled={!device.is_online || waiting !== undefined}
+          />
         ) : null}
       </View>
       <Text style={styles.name} numberOfLines={1}>
         {device.name}
       </Text>
-      <Text style={[styles.detail, !device.is_online && styles.detailMuted]}>{detail}</Text>
+      <Text style={[styles.detail, (!device.is_online || waiting !== undefined) && styles.detailMuted]}>
+        {detail}
+      </Text>
     </InkCard>
   );
 });
@@ -153,6 +167,8 @@ export default function DevicesTab() {
         <Text style={styles.subtitle} numberOfLines={1}>
           {t('devices.count', { count: total })}
           {total > 0 ? ` · ${t('devices.online', { count: data.onlineCount })}` : ''}
+          {/* Only when the Pond has stopped answering: what is shown is its last word, and this is its age. */}
+          {data.staleFor ? ` · ${t('devices.updatedAgo', { ago: data.staleFor })}` : ''}
         </Text>
         {/* Add lives up here rather than under the grid, so it stays in reach
             however many devices there are. With none, the empty state below
@@ -265,6 +281,7 @@ export default function DevicesTab() {
                   key={d.id}
                   device={d}
                   power={data.powerById[d.id]}
+                  waiting={data.waitingById[d.id]}
                   onToggle={handleToggle}
                   onEdit={handleEdit}
                 />

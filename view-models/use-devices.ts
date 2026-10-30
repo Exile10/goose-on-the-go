@@ -2,9 +2,10 @@
  * The devices this Pond knows about, grouped the way the screen shows them.
  *
  * Control goes through `set_device_state`, which the server exposes on the
- * LLM-free dispatch path. Every command is optimistic and rolls back on failure,
- * because a Matter round trip is slow enough that an unacknowledged tap reads as
- * a broken switch.
+ * LLM-free dispatch path. A device shows a new state only once the Pond has read
+ * it back from the device: an optimistic switch could say a heater was off while
+ * it was still on. A Matter round trip is slow enough that an unacknowledged tap
+ * reads as a broken switch, so the tap is shown at once as waiting instead.
  */
 
 import { useCallback, useMemo, useRef, useState } from 'react';
@@ -12,6 +13,7 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 import { useServer } from '@/providers/server-provider';
 import { ApiError, api, type PondApiClient } from '@/services/api-client';
 import type { Device, DeviceStatePatch, MatterStatus, UpdateDeviceRequest } from '@/services/types';
+import { ago } from '@/models/elapsed';
 import { describeApiError } from './describe-error';
 import { useLive } from './use-live';
 import i18n from '@/services/i18n';
@@ -210,9 +212,16 @@ export interface UseDevices {
     roomTabs: string[];
     /** How many devices the Pond can currently reach. */
     onlineCount: number;
-    /** Power state by device id. Absent means the device did not report one. */
+    /** Power state by device id, as the device last confirmed it. Absent means it did not report one. */
     powerById: Record<string, boolean>;
+    /** The power asked for by device id, while the Pond has not yet confirmed it. */
+    waitingById: Record<string, boolean>;
     matter: MatterStatus | null;
+    /**
+     * How old what is on screen is, when the Pond could not be read since: "5 min". Null while
+     * the last read worked, or before any has.
+     */
+    staleFor: string | null;
   };
   loading: boolean;
   error: string | null;
@@ -273,12 +282,25 @@ export function powerPollStillCurrent(pollStartedAt: number, newestAppliedAt: nu
   return pollStartedAt >= newestAppliedAt;
 }
 
+/**
+ * How long the list on screen has gone without a successful read, once one has failed after it.
+ * Every poll that fails moves `failedAt` on, so the age grows while the Pond stays out of reach.
+ */
+export function staleFor(updatedAt: number | null, failedAt: number | null): string | null {
+  if (updatedAt == null || failedAt == null || failedAt < updatedAt) return null;
+  return ago((failedAt - updatedAt) / 1000);
+}
+
 export function useDevices(): UseDevices {
   const [devices, setDevices] = useState<Device[]>([]);
   const [powerById, setPowerById] = useState<Record<string, boolean>>({});
+  const [waitingById, setWaitingById] = useState<Record<string, boolean>>({});
   const [matter, setMatter] = useState<MatterStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // When the list was last read, and when a read last failed after that.
+  const [updatedAt, setUpdatedAt] = useState<number | null>(null);
+  const [failedAt, setFailedAt] = useState<number | null>(null);
   // When this screen last changed something itself, so a poll that began earlier cannot undo it.
   const powerChangedAt = useRef<Record<string, number>>({});
   const listChangedAt = useRef(0);
@@ -339,8 +361,11 @@ export function useDevices(): UseDevices {
         if (listPollStillCurrent(startedAt, listChangedAt.current)) setDevices(list);
         loaded.current = true;
         setError(null);
+        setUpdatedAt(Date.now());
+        setFailedAt(null);
         void readPower(list, startedAt);
       } catch (e) {
+        setFailedAt(Date.now());
         if (loud || !loaded.current) setError(describeDeviceError(e));
         else console.warn('[devices] refresh failed; showing the last list', e instanceof ApiError ? e.status : 'network');
       } finally {
@@ -362,26 +387,19 @@ export function useDevices(): UseDevices {
   const refresh = useCallback(() => load(true), [load]);
 
   /**
-   * Apply a patch optimistically, then reconcile against the server.
+   * Send a patch, and show the device's new state only once the Pond has read it back.
    *
-   * The reconcile matters as much as the rollback: the controller reads a device
-   * back after applying, because devices quantise and clamp — asking for 37%
-   * brightness may land on 40. Rendering the request rather than the result is a
-   * bug this protocol has already had once.
+   * Until then the asked-for power is waiting, not shown as the device's state. The read-back is
+   * the confirmation, because devices quantise and clamp — asking for 37% brightness may land on
+   * 40. Rendering the request rather than the result is a bug this protocol has already had once.
    */
   const setState = useCallback(
     async (device: Device, patch: DeviceStatePatch) => {
-      const previous = powerById;
-      powerChangedAt.current[device.id] = Date.now();
       if (patch.power !== undefined) {
-        setPowerById((current) => ({ ...current, [device.id]: patch.power as boolean }));
+        setWaitingById((current) => ({ ...current, [device.id]: patch.power as boolean }));
       }
       try {
         await api.setDeviceState(device.id, patch);
-        // Read back rather than trusting the request. The controller reports
-        // what the device actually did, and devices quantise and clamp — asking
-        // for 37% may land on 40. Rendering the ask instead of the outcome is a
-        // bug this protocol has already had.
         const result = await api.getDeviceState(device.id);
         const actual = parsePowerState(result.content);
         if (actual !== undefined) {
@@ -391,11 +409,12 @@ export function useDevices(): UseDevices {
           setPowerById((current) => ({ ...current, [device.id]: actual }));
         }
       } catch (e) {
-        setPowerById(previous);
         setError(describeDeviceError(e));
+      } finally {
+        setWaitingById(({ [device.id]: _settled, ...rest }) => rest);
       }
     },
-    [powerById],
+    [],
   );
 
   /** Returns the new device's id, or null when commissioning failed. */
@@ -465,7 +484,9 @@ export function useDevices(): UseDevices {
       roomTabs: rooms.length > 1 ? [ALL_ROOMS, ...rooms.map((r) => r.name)] : [],
       onlineCount: devices.filter((d) => d.is_online).length,
       powerById,
+      waitingById,
       matter,
+      staleFor: staleFor(updatedAt, failedAt),
     },
     loading,
     error,
