@@ -38,6 +38,7 @@ import { confirmationMatches, NONCE_BYTES, respond, type PakeCredential } from '
 import { randomBytes } from './secure-random';
 import { timeoutSignal } from './http';
 import { readSse, type SseEvent } from './sse';
+import type { ServerNotification } from './notification-stream';
 import type {
   AdminCache,
   AdminCacheId,
@@ -1139,6 +1140,26 @@ export class PondApiClient {
 
   usageSummary(): Promise<UsageSummary> {
     return this.get<UsageSummary>('/api/v1/usage/summary');
+  }
+
+  // ── Notifications ───────────────────────────────────────────
+
+  /**
+   * This phone's notifications the Pond has not yet seen delivered, oldest
+   * first. The Pond reads the device from the token; a push wake carries only
+   * an id, so this is where the alert's text and time come from.
+   */
+  async pendingNotifications(): Promise<ServerNotification[]> {
+    const res = await this.request<{ notifications?: ServerNotification[] }>('/api/v1/notifications/pending');
+    return collection<ServerNotification>(res, 'notifications');
+  }
+
+  /**
+   * Marks one notification delivered to this phone, so it is not pulled or
+   * flushed to the stream again. A 404 means it was never this phone's.
+   */
+  async acknowledgeNotification(id: string): Promise<void> {
+    await this.post(`/api/v1/notifications/${encodeURIComponent(id)}/ack`, {});
   }
 
   // ── Reminders ───────────────────────────────────────────────
