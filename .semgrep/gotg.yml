@@ -1,0 +1,21 @@
+rules:
+  # services/storage.ts is the one typed AsyncStorage wrapper, and its keys are all non-secret.
+  # AsyncStorage is unencrypted, so a second import site is how a token ends up there instead of
+  # in services/secure-storage.ts (expo-secure-store). Tests mock it and are excluded.
+  - id: asyncstorage-outside-the-storage-wrapper
+    languages: [typescript]
+    severity: ERROR
+    message: >-
+      AsyncStorage is unencrypted and is used only through services/storage.ts. Store
+      non-secret values through that wrapper, and tokens or pairing material through
+      services/secure-storage.ts.
+    patterns:
+      - pattern-either:
+          - pattern: import $X from '@react-native-async-storage/async-storage'
+          - pattern: import { ... } from '@react-native-async-storage/async-storage'
+          - pattern: require('@react-native-async-storage/async-storage')
+    paths:
+      exclude:
+        - services/storage.ts
+        - "**/__tests__/**"
+        - tests/**

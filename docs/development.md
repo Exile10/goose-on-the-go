@@ -128,3 +128,20 @@ exposing, and pair again over HTTPS before trusting that Pond or that phone agai
 combination of `__DEV__` and the variable, and checks that every relaxation is off
 unless both are set. The HTTPS suites (`pond-trust`, `https-requests`,
 `https-pairing`, `api-client`) run with the variable unset and are unchanged.
+
+## Code scanning
+
+`.github/workflows/security.yml` runs Semgrep Community Edition on every PR and
+push to `main`, beside npm audit and gitleaks. It runs entirely on the runner,
+with no account or token, and `--metrics=off` sends nothing to Semgrep. It uses
+the registry packs for JavaScript, TypeScript, React, secrets, OWASP Top 10 and
+GitHub Actions, plus this repository's rules in `.semgrep/`. The first of those,
+`asyncstorage-outside-the-storage-wrapper`, keeps AsyncStorage behind
+`services/storage.ts`, so a token cannot quietly land in unencrypted storage.
+
+It is report-only for now. Findings show as warnings on the run and on the
+changed lines of a PR, and the job stays green. To check locally:
+
+```bash
+semgrep scan --metrics=off --config .semgrep/ --config p/typescript --config p/react .
+```

@@ -9,6 +9,12 @@
 #   secrets   — gitleaks over the FULL git history. This app holds pairing
 #               material and session tokens, so a credential committed once and
 #               "removed" later must still fail.
+#   semgrep   — static analysis of the app's own code, which the two above do
+#               not read. Semgrep Community Edition runs entirely on the
+#               runner: no account, no token, no code leaves it. Rules are
+#               the registry packs below plus this repository's own in
+#               .semgrep/. Report-only for now: findings appear as warnings
+#               on the run and the PR, and the job does not fail.
 #
 # Runs on every PR/push to main, weekly (advisories get published against
 # lockfiles that never changed), and on demand.
@@ -66,3 +72,41 @@ jobs:
         run: |
           docker run --rm -v "$PWD:/repo" zricethezav/gitleaks:v8.21.2 \
             detect --source /repo --no-banner --redact --exit-code 1
+
+  semgrep:
+    name: Code — Semgrep (report only)
+    runs-on: ubuntu-latest
+    # The official image, pinned by digest. Running the CLI from it, not the
+    # semgrep-action, keeps it off Semgrep's hosted service entirely.
+    container:
+      image: semgrep/semgrep:1.179.0@sha256:93963d9295a366f59e4850127b1550400ee7b388f04fe144e4a1f6325d96e01b
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 1
+
+      # --metrics=off: nothing about the scan is sent to Semgrep. The registry
+      # packs are still downloaded at run time; they are rules, not code.
+      #
+      # Report-only: no --error, so findings leave the job green. Each one is
+      # printed in the log and raised as a warning annotation on its line, so a
+      # reviewer sees it on the PR. Add --error here once the baseline is clean
+      # (at introduction: 10 findings, all in workflow and Dependabot config,
+      # none in app code).
+      - name: semgrep scan
+        run: |
+          semgrep scan --metrics=off \
+            --config .semgrep/ \
+            --config p/javascript --config p/typescript --config p/react \
+            --config p/secrets --config p/owasp-top-ten --config p/github-actions \
+            --exclude node_modules \
+            --text --json-output=semgrep.json .
+          python3 - <<'PY'
+          import json
+          results = json.load(open("semgrep.json"))["results"]
+          for r in results:
+              rule = r["check_id"].rsplit(".", 1)[-1]
+              msg = " ".join(r["extra"]["message"].split()).replace("%", "%25")
+              print(f"::warning file={r['path']},line={r['start']['line']},title=semgrep {rule}::{msg}")
+          print(f"::notice title=Semgrep::{len(results)} finding(s). Report-only: the job does not fail on them.")
+          PY
