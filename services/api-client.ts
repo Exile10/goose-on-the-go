@@ -462,6 +462,8 @@ export class PondApiClient {
   private onboardingRequired: (() => void) | null = null;
   private identityEpoch = 0;
   setRecovery(recover: (() => Promise<string | null>) | null) { this.recovery = recover; }
+  /** Whether a session is loaded, so background work can tell a running app from a cold start. */
+  get signedIn(): boolean { return this.token !== null; }
 
   /**
    * Called when the Pond refuses this phone's credentials and a refresh cannot
