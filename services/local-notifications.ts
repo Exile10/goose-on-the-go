@@ -33,7 +33,16 @@ import type { ServerNotification } from './notification-stream';
  * security alert and a schedule result should not arrive the same way.
  */
 const ALERT_CHANNEL = 'giap-alerts';
-const INFO_CHANNEL = 'giap-info';
+/**
+ * Updates (schedule results, pairings, reminders) at HIGH importance, so they
+ * pop up as a heads-up banner: Android shows one only for a HIGH channel. The
+ * first Updates channel, `giap-info`, was DEFAULT, and Android never lets an app
+ * raise an existing channel's importance (the user owns it once created), so
+ * the HIGH one needs a new id and the old one is deleted.
+ */
+const INFO_CHANNEL = 'giap-info-v2';
+/** The DEFAULT-importance Updates channel that installs made before `giap-info-v2`. */
+const RETIRED_INFO_CHANNEL = 'giap-info';
 
 /** Categories that warrant a heads-up rather than a quiet shade entry. */
 const URGENT = new Set(['alert', 'action_required']);
@@ -68,8 +77,10 @@ async function createChannels(Notifications: NotificationsModule): Promise<void>
   });
   await Notifications.setNotificationChannelAsync(INFO_CHANNEL, {
     name: 'Updates',
-    importance: Notifications.AndroidImportance.DEFAULT,
+    importance: Notifications.AndroidImportance.HIGH,
   });
+  // Deleting a channel that was never created is a no-op, so a fresh install is fine.
+  await Notifications.deleteNotificationChannelAsync(RETIRED_INFO_CHANNEL);
 }
 
 /**
