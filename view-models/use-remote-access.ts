@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { AppState } from 'react-native';
 import { useServer } from '@/providers/server-provider';
 import {
   cancelRemoteAccess,
   enableRemoteAccess,
+  remoteBackgroundPaused,
   RemoteInfrastructureUnavailableError,
   RemoteReplacementUnavailableError,
   type RemoteProgress,
@@ -72,6 +74,7 @@ export function useRemoteAccess() {
   const [setupUnavailable, setSetupUnavailable] = useState(false);
   const [lapsesAt, setLapsesAt] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [backgroundPaused, setBackgroundPaused] = useState(false);
   const alive = useRef(true);
   useEffect(() => { alive.current = true; return () => { alive.current = false; void cancelRemoteAccess().catch(() => undefined); }; }, []);
   // The deadline is only readable at home, and the warning matters away from it, so keep
@@ -80,6 +83,15 @@ export function useRemoteAccess() {
     void Storage.get('remoteLapsesAt').then((at) => { if (alive.current && at) setLapsesAt((current) => current ?? at); })
       .catch(() => undefined);
   }, []);
+  // Asked on opening and on every return to the foreground: that return is when Android may
+  // allow the service again, and the read itself is what retries it.
+  useEffect(() => {
+    if (!remoteEnabled) return;
+    const check = () => { void remoteBackgroundPaused().then((paused) => { if (alive.current) setBackgroundPaused(paused); }); };
+    check();
+    const subscription = AppState.addEventListener('change', (next) => { if (next === 'active') check(); });
+    return () => subscription.remove();
+  }, [remoteEnabled]);
   const start = useCallback(async (recovery = false) => {
     if (busy) return;
     setBusy(true); setError(null); setReviewId(null); setReviewKey(null); setProgress(null); setSetupUnavailable(false);
@@ -115,5 +127,5 @@ export function useRemoteAccess() {
   // Shown whether or not anything failed: the point is to say it before access
   // lapses, and nothing has gone wrong yet at that stage.
   const lapse = describeLapse(lapseIn(lapsesAt));
-  return { setupUnavailable, reviewId, reviewKey, lapse, recover: () => start(true), progress: remoteEnabled ? 'enabled' as const : progress, error, busy, enable: () => start(false), localOnly };
+  return { setupUnavailable, reviewId, reviewKey, lapse, backgroundPaused: remoteEnabled && backgroundPaused, recover: () => start(true), progress: remoteEnabled ? 'enabled' as const : progress, error, busy, enable: () => start(false), localOnly };
 }
