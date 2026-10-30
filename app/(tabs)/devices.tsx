@@ -13,7 +13,7 @@
  */
 
 import React, { useCallback, useMemo, useState } from 'react';
-import { StyleSheet, ScrollView, Text, View } from 'react-native';
+import { RefreshControl, StyleSheet, ScrollView, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -30,6 +30,7 @@ import {
 } from '@jarida/ink/native';
 
 import { GIcon } from '@/components/ui/g-icon';
+import { GRoundButton } from '@/components/ui/g-round-button';
 import { useBottomBarInset, useChromeScroll } from '@/providers/chrome-provider';
 import { useThemedStyles } from '@/hooks/use-themed-styles';
 import { selectionTick, toggle } from '@/services/haptics';
@@ -117,6 +118,9 @@ export default function DevicesTab() {
   const { t } = useTranslation();
   const router = useRouter();
   const { data, loading, error, actions } = useDevices();
+  // A pull draws its own spinner at the top of the list, so the one in the
+  // list body stands down while it runs rather than showing two.
+  const [pulling, setPulling] = useState(false);
   const [activeRoom, setActiveRoom] = useState(ALL_ROOMS);
   const [editing, setEditing] = useState<Device | null>(null);
   const chrome = useChromeScroll();
@@ -140,6 +144,15 @@ export default function DevicesTab() {
     void actions.refresh();
   }, [actions]);
 
+  const handlePull = useCallback(async () => {
+    setPulling(true);
+    try {
+      await actions.refresh();
+    } finally {
+      setPulling(false);
+    }
+  }, [actions]);
+
   const handleEdit = useCallback((device: Device) => {
     void selectionTick();
     setEditing(device);
@@ -160,40 +173,38 @@ export default function DevicesTab() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
-      {/* Title, count and actions each get their own line: squeezed into one
-          row at phone width, the count wrapped and both buttons shrank. */}
+      {/* Title and count on the left, the two actions as a matched pair of
+          round buttons on the right. Add lives up here rather than under the
+          grid, so it stays in reach however many devices there are; with none,
+          the empty state below carries it instead, and the screen still has a
+          single primary. Add used to be a full-width labelled bar beside a
+          small round Refresh, one row with two sizes for two actions of one
+          rank; now both are the same circle, Add filled as the primary. */}
       <View style={styles.header}>
-        <InkTitle level={1}>{t('devices.title')}</InkTitle>
-        <Text style={styles.subtitle} numberOfLines={1}>
-          {t('devices.count', { count: total })}
-          {total > 0 ? ` · ${t('devices.online', { count: data.onlineCount })}` : ''}
-          {/* Only when the Pond has stopped answering: what is shown is its last word, and this is its age. */}
-          {data.staleFor ? ` · ${t('devices.updatedAgo', { ago: data.staleFor })}` : ''}
-        </Text>
-        {/* Add lives up here rather than under the grid, so it stays in reach
-            however many devices there are. With none, the empty state below
-            carries it instead, and the screen still has a single primary. */}
+        <View style={styles.headerText}>
+          <InkTitle level={1}>{t('devices.title')}</InkTitle>
+          <Text style={styles.subtitle} numberOfLines={1}>
+            {t('devices.count', { count: total })}
+            {total > 0 ? ` · ${t('devices.online', { count: data.onlineCount })}` : ''}
+            {/* Only when the Pond has stopped answering: what is shown is its last word, and this is its age. */}
+            {data.staleFor ? ` · ${t('devices.updatedAgo', { ago: data.staleFor })}` : ''}
+          </Text>
+        </View>
         <View style={styles.headerActions}>
-          {total > 0 ? (
-            <InkButton
-              variant="primary"
-              icon="plus"
-              block
-              style={styles.headerButton}
-              onPress={() => router.push('/(stack)/commission-device')}
-            >
-              {t('devices.addDevice')}
-            </InkButton>
-          ) : null}
-          <InkButton
-            variant="quiet"
+          <GRoundButton
             icon="refresh"
-            block={total > 0}
-            style={total > 0 ? styles.headerButton : null}
+            label={t('devices.refreshList')}
             onPress={handleRefresh}
-          >
-            {t('common.refresh')}
-          </InkButton>
+            busy={loading}
+          />
+          {total > 0 ? (
+            <GRoundButton
+              icon="plus"
+              tone="primary"
+              label={t('devices.addDevice')}
+              onPress={() => router.push('/(stack)/commission-device')}
+            />
+          ) : null}
         </View>
       </View>
 
@@ -226,6 +237,7 @@ export default function DevicesTab() {
         {...chrome}
         contentContainerStyle={[styles.scroll, { paddingBottom: bottomInset }]}
         showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={pulling} onRefresh={() => void handlePull()} />}
       >
         {/* The controller can take minutes to come up on first use, and nothing
             can be commissioned until it has. Say so rather than failing later. */}
@@ -244,7 +256,7 @@ export default function DevicesTab() {
           </View>
         ) : null}
 
-        {loading ? <InkSpinner label={t('pond.checking')} /> : null}
+        {loading && !pulling ? <InkSpinner label={t('pond.checking')} /> : null}
 
         {error ? (
           <View style={styles.notice}>
@@ -311,19 +323,23 @@ const makeStyles = (c: ThemeColors) =>
     notice: { marginBottom: Spacing.md },
 
     header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: Spacing.md,
       paddingHorizontal: Spacing.lg,
       paddingTop: Spacing.lg,
       paddingBottom: Spacing.md,
     },
+    // Takes the width the buttons leave, and may shrink so the count line
+    // truncates rather than pushing the buttons off the row.
+    headerText: { flex: 1, minWidth: 0 },
     subtitle: {
       fontFamily: FontFamily.body,
       fontSize: FontSize.sm,
       color: c.textTertiary,
       marginTop: Spacing.xs,
     },
-    headerActions: { flexDirection: 'row', gap: Spacing.sm, marginTop: Spacing.md },
-    // Split the row evenly, so neither label is squeezed by the other.
-    headerButton: { flex: 1 },
+    headerActions: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
 
     // Pins this ScrollView's own height to its content instead of letting it
     // compete for leftover flex space in the column layout below — without
