@@ -105,13 +105,14 @@ export function configureLocalNotifications(): Promise<void> {
  *
  * Failure is logged rather than thrown: the caller is a stream handler, and a
  * notification that could not be presented must not take the stream down with
- * it. It is still kept in the provider's list either way.
+ * it. It is still kept in the provider's list either way. Resolves whether it
+ * reached the shade, for a caller that must not acknowledge one that did not.
  */
-export async function presentLocally(notification: ServerNotification): Promise<void> {
+export async function presentLocally(notification: ServerNotification): Promise<boolean> {
   try {
     await configureLocalNotifications();
     const Notifications = notifications;
-    if (!Notifications) return; // Expo Go: see notifications-module.ts
+    if (!Notifications) return false; // Expo Go: see notifications-module.ts
     await Notifications.scheduleNotificationAsync({
       // The server's own id, so the same notification arriving over both the
       // stream and a remote push replaces itself instead of duplicating.
@@ -135,8 +136,10 @@ export async function presentLocally(notification: ServerNotification): Promise<
           ? { channelId: URGENT.has(notification.category) ? ALERT_CHANNEL : INFO_CHANNEL }
           : null, // iOS has no channels; null is immediate.
     });
+    return true;
   } catch (e) {
     console.warn('[notifications] could not present', notification.id, e);
+    return false;
   }
 }
 
