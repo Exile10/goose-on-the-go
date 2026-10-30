@@ -1,6 +1,6 @@
 {
   "name": "goose-on-the-go",
-  "main": "expo-router/entry",
+  "main": "index.ts",
   "version": "1.0.0",
   "scripts": {
     "postinstall": "patch-package && node scripts/patch-expo-fetch.cjs",
