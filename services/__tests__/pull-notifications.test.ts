@@ -1,6 +1,6 @@
 import type { PondApiClient } from '@/services/api-client';
 import type { ServerNotification } from '@/services/notification-stream';
-import { pullPendingNotifications } from '@/services/pull-notifications';
+import { pullPendingNotifications, withEventTime } from '@/services/pull-notifications';
 
 const mockPresent = jest.fn();
 jest.mock('@/services/local-notifications', () => ({
@@ -67,5 +67,34 @@ describe('pullPendingNotifications', () => {
     const pond = { pendingNotifications: jest.fn().mockRejectedValue(new Error('unreachable')) } as unknown as PondApiClient;
     await expect(pullPendingNotifications(pond)).rejects.toThrow('unreachable');
     expect(mockPresent).not.toHaveBeenCalled();
+  });
+});
+
+describe('withEventTime', () => {
+  const at = new Date(DOOR.timestamp);
+  const time = at.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+
+  it('adds the time the Pond saw it, after the room', () => {
+    expect(withEventTime(DOOR, new Date(at.getTime() + 60_000)).body).toBe(`Hallway · ${time}`);
+  });
+
+  it('adds the date too once it is from another day', () => {
+    const body = withEventTime(DOOR, new Date(at.getTime() + 3 * 86_400_000)).body;
+    expect(body).toBe(`Hallway · ${at.toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}`);
+    expect(body).not.toBe(`Hallway · ${time}`);
+  });
+
+  it('is the whole text when the Pond sent none', () => {
+    expect(withEventTime({ ...DOOR, body: '' }, at).body).toBe(time);
+  });
+
+  it('leaves the text alone when the time cannot be read', () => {
+    expect(withEventTime({ ...DOOR, timestamp: 'soon' })).toEqual({ ...DOOR, timestamp: 'soon' });
+  });
+
+  it('is what reaches the shade for a pulled alert', async () => {
+    const { pond } = client([DOOR]);
+    await pullPendingNotifications(pond);
+    expect(mockPresent.mock.calls[0][0].body).toMatch(/^Hallway · /);
   });
 });
