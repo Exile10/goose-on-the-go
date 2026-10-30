@@ -6,8 +6,9 @@ import { api } from '@/services/api-client';
  * an SSE connection to `GET /api/v1/notifications/stream` (see
  * `services/notification-stream.ts`). Notifications queued while the phone
  * was away are flushed by the server on connect, so nothing is lost between
- * sessions. Background/killed-state delivery is the server's FCM/APNs relay
- * (still stubbed server-side) — out of scope here.
+ * sessions. While the app is in the background or closed, the Pond's FCM/APNs
+ * wake ping runs `services/background-notifications.ts` instead, which pulls
+ * the alert itself.
  *
  * Arrivals are presented in the phone's own notification shade
  * (`services/local-notifications.ts`) rather than as an in-app banner, so a
