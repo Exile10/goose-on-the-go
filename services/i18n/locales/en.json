@@ -3806,5 +3806,12 @@
       "none": "No conversations yet.",
       "footer": "How long Goose took over its latest conversation. Tap it for each command: time to the first word, the whole answer and any tool it used."
     }
+  },
+  "notifications": {
+    "wake": {
+      "alertTitle": "Alert from your Pond",
+      "updateTitle": "Update from your Pond",
+      "body": "Your Pond could not be reached to show it here. Open Goose On The Go to see it."
+    }
   }
 }
