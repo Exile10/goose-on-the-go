@@ -2185,7 +2185,14 @@
       "statusRunning": "Running",
       "statusCompleted": "Done",
       "statusFailed": "Failed",
-      "duration": "{{ms}} ms"
+      "durationMs": "{{ms}} ms",
+      "durationSeconds": "{{s}} s",
+      "durationMinutes": "{{m}} min",
+      "durationMinutesSeconds": "{{m}} min {{s}} s",
+      "durationHours": "{{h}} h",
+      "durationHoursMinutes": "{{h}} h {{m}} min",
+      "showAll": "Shows everything this run produced",
+      "showLess": "Shows only the start of what this run produced"
     },
     "form": {
       "scheduleTitle": "New schedule",

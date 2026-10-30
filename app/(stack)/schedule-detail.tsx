@@ -13,7 +13,7 @@
  */
 
 import React, { useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, ScrollView, StyleSheet, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import {
@@ -23,62 +23,18 @@ import {
   InkNotice,
   InkSpinner,
   InkText,
-  inkText,
-  useInkTheme,
 } from '@jarida/ink/native';
-import type { InkTone } from '@jarida/ink';
 
 import { LabelledSwitch } from '@/components/patterns/labelled-switch';
+import { RunRow } from '@/components/patterns/schedule-run-row';
 import { ScheduleFormSheet } from '@/components/patterns/schedule-form-sheet';
 import { useThemedStyles } from '@/hooks/use-themed-styles';
 import { deviceTimeZone, describeWhen, formatScheduleTime, isOneOff, linkedScheduleId, promptOf } from '@/models/schedule';
 import { useServer } from '@/providers/server-provider';
 import { toggle } from '@/services/haptics';
-import type { TranslationKey } from '@/services/i18n';
-import type { ScheduleRun } from '@/services/types';
 import { useScheduleDetail } from '@/view-models/use-schedule-detail';
 import type { ThemeColors } from '@/constants/colors';
 import { Spacing } from '@/constants/spacing';
-
-function runStatus(run: ScheduleRun): { tone: InkTone; key: TranslationKey } {
-  switch (run.status) {
-    case 'running':
-      return { tone: 'brand', key: 'schedule.runs.statusRunning' };
-    case 'completed':
-      return { tone: 'success', key: 'schedule.runs.statusCompleted' };
-    case 'failed':
-      return { tone: 'danger', key: 'schedule.runs.statusFailed' };
-  }
-}
-
-/** A run's result is what the agent said, and an error is why it did not. */
-const RunRow = React.memo(function RunRow({ run }: { run: ScheduleRun }) {
-  const { t } = useTranslation();
-  const styles = useThemedStyles(makeStyles);
-  const theme = useInkTheme();
-  const { tone, key } = runStatus(run);
-  const snippet = run.error ?? run.result;
-  const snippetText = inkText(theme, { size: 'sm', color: theme.color.textSecondary });
-  return (
-    <View style={styles.run}>
-      <View style={styles.runTop}>
-        <InkBadge tone={tone}>{t(key)}</InkBadge>
-        <InkText size="sm" tone="tertiary">{formatScheduleTime(run.started_at)}</InkText>
-      </View>
-      {/* A result is a whole answer; ten of them in full would bury the list. */}
-      {snippet ? (
-        <Text style={snippetText.style} numberOfLines={6} selectable>
-          {snippet}
-        </Text>
-      ) : null}
-      {run.duration_ms != null ? (
-        <InkText size="xs" tone="tertiary" mono>
-          {t('schedule.runs.duration', { ms: run.duration_ms })}
-        </InkText>
-      ) : null}
-    </View>
-  );
-});
 
 /** One labelled line of the schedule's facts. */
 function Fact({ label, children, mono }: { label: string; children: string; mono?: boolean }) {
@@ -255,11 +211,4 @@ const makeStyles = (c: ThemeColors) =>
       borderTopWidth: StyleSheet.hairlineWidth,
       borderTopColor: c.border,
     },
-    run: {
-      gap: Spacing.xs,
-      paddingVertical: Spacing.sm,
-      borderBottomWidth: StyleSheet.hairlineWidth,
-      borderBottomColor: c.border,
-    },
-    runTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   });
