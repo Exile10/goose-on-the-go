@@ -328,9 +328,14 @@ voice mode. What is worth knowing:
   per result — whose `content` is a JSON blob around the result — and one
   `assistant` row holding every call. `fromHistory` matches results to calls.
   A live `tool_result` may carry a card hint (`ui.card_type`: weather, devices,
-  time, knowledge, wolfram, memory) that `tool-card.tsx` draws. The Pond strips
-  it before saving, so the phone keeps each card it is shown
-  (`services/card-cache.ts`, by conversation and call id) and `fromHistory`
+  time, knowledge, wolfram, memory) that `tool-card.tsx` draws. Both weather
+  tools send `weather`: a current reading (`temperature`, `condition`, ...) or
+  a forecast (`location` plus a `forecast` array, a row per day, a week at
+  most before it counts the rest). `models/weather-card.ts` tells them apart
+  by shape; a payload with nothing to draw stays the tool's chip rather than
+  an empty card. The Pond strips the hint before saving, so the phone keeps
+  each card it is shown (`services/card-cache.ts`, by conversation and call
+  id) and `fromHistory`
   puts it back on reopen. A turn this phone never streamed has no card to
   restore and shows its result chip. Kept cards go with their conversation,
   and all of them on sign-out. Friendly names are pond-desktop's, kept in

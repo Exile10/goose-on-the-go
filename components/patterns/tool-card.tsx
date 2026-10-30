@@ -2,11 +2,13 @@
  * ToolTrail — what Goose did on the way to its answer, under it.
  *
  * Two shapes. A tool whose answer is a fact a person wants to see — the
- * weather, the devices it found, the time, the article it read — draws that
- * fact, from the card the tool itself described (`ui.card_type` on the live
- * stream). Everything else is a chip: the tool's name, whether it is still
- * running, and its raw answer one tap away, because that answer was written
- * for the model and is best kept out of the reader's way until asked for.
+ * weather now or for the week, the devices it found, the time, the article it
+ * read — draws that fact, from the card the tool itself described
+ * (`ui.card_type` on the live stream). A card whose payload holds nothing it
+ * can draw stays a chip rather than an empty frame. Everything else is a
+ * chip: the tool's name, whether it is still running, and its raw answer one
+ * tap away, because that answer was written for the model and is best kept
+ * out of the reader's way until asked for.
  *
  * It all lies flat on a hairline under the answer, which is what the turn is
  * for; a tool card wearing the plate would outrank it. A reopened conversation
@@ -26,6 +28,14 @@ import { GPressable } from '@/components/ui/g-pressable';
 import { humanizeTool, sourcesOf, toolIcon, toolWords } from '@/constants/tools';
 import type { ToolCall } from '@/models/chat';
 import { startedTaskId } from '@/models/long-tasks';
+import {
+  conditionIcon,
+  dayLabel,
+  rangeEnd,
+  readWeatherCard,
+  type CurrentWeather,
+  type WeatherForecast,
+} from '@/models/weather-card';
 import { selectionTick } from '@/services/haptics';
 
 /** How much of a raw tool answer a chip shows when opened: the desktop's 300. */
@@ -33,39 +43,108 @@ const RESULT_PREVIEW = 300;
 
 type Data = Record<string, unknown>;
 const str = (v: unknown) => (typeof v === 'string' ? v : typeof v === 'number' ? String(v) : '');
-const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : null);
 
 /** A tool's answer without the Pond's trailing source line, which draws as a link. */
 function bodyOf(result: string | undefined): string {
   return (result ?? '').replace(/\n+Source:\s*\S+\s*$/i, '').trim();
 }
 
-function Weather({ data }: { data: Data }) {
+function CurrentWeatherCard({ weather }: { weather: CurrentWeather }) {
   const theme = useInkTheme();
   const { t } = useTranslation();
-  const temp = num(data.temperature);
-  const feels = num(data.feels_like);
-  const humidity = num(data.humidity);
-  const wind = num(data.wind_speed);
   const big = inkText(theme, { role: 'display', size: '3xl', weight: theme.weight.bold, tracking: 'title', leading: 'tight' });
   const line = inkText(theme, { size: 'md', weight: theme.weight.semibold });
   const meta = inkText(theme, { role: 'mono', size: 'xs', color: theme.color.textTertiary });
   const facts = [
-    feels !== null ? t('chat.tools.feelsLike', { value: Math.round(feels) }) : '',
-    humidity !== null ? t('chat.tools.humidity', { value: Math.round(humidity) }) : '',
-    wind !== null ? t('chat.tools.wind', { value: Math.round(wind) }) : '',
+    weather.feelsLike !== null ? t('chat.tools.feelsLike', { value: Math.round(weather.feelsLike) }) : '',
+    weather.humidity !== null ? t('chat.tools.humidity', { value: Math.round(weather.humidity) }) : '',
+    weather.wind !== null ? t('chat.tools.wind', { value: Math.round(weather.wind) }) : '',
   ].filter(Boolean);
   return (
     <View style={styles.cardBody}>
-      <InkEyebrow>{str(data.location) || t('chat.tools.weather')}</InkEyebrow>
+      <InkEyebrow>{weather.location || t('chat.tools.weather')}</InkEyebrow>
       <View style={styles.row}>
-        <GIcon name={data.is_day === false ? 'moon' : 'sun'} size={28} color={theme.color.text} />
-        {temp !== null ? <Text style={big.style}>{`${Math.round(temp)}°`}</Text> : null}
-        <Text style={[line.style, styles.shrink]}>{str(data.condition)}</Text>
+        <GIcon name={conditionIcon(weather.condition, weather.isDay)} size={28} color={theme.color.text} />
+        {weather.temperature !== null ? <Text style={big.style}>{`${Math.round(weather.temperature)}°`}</Text> : null}
+        <Text style={[line.style, styles.shrink]}>{weather.condition}</Text>
       </View>
       {facts.length > 0 ? <Text style={meta.style}>{facts.join(' · ')}</Text> : null}
     </View>
   );
+}
+
+/** Rows a forecast draws before it counts the rest: the Pond's own ceiling of a week. */
+export const FORECAST_ROWS = 7;
+
+const degrees = (v: number | null) => (v === null ? '' : `${Math.round(v)}°`);
+
+function ForecastCard({ forecast }: { forecast: WeatherForecast }) {
+  const theme = useInkTheme();
+  const { t, i18n } = useTranslation();
+  const locale = i18n.language;
+  const shown = forecast.days.slice(0, FORECAST_ROWS);
+  const first = forecast.days[0];
+  const last = forecast.days[forecast.days.length - 1];
+  const range =
+    first === last
+      ? rangeEnd(first.date, locale)
+      : t('chat.tools.forecastRange', { from: rangeEnd(first.date, locale), to: rangeEnd(last.date, locale) });
+  const day = inkText(theme, { size: 'base', weight: theme.weight.semibold });
+  const high = inkText(theme, { role: 'mono', size: 'sm', weight: theme.weight.semibold });
+  const low = inkText(theme, { role: 'mono', size: 'sm', color: theme.color.textTertiary });
+  const meta = inkText(theme, { role: 'mono', size: 'xs', color: theme.color.textTertiary });
+  const rule = { borderTopWidth: theme.edge.hairlineWidth, borderTopColor: theme.color.line };
+  return (
+    <View style={styles.cardBody}>
+      <InkEyebrow>{forecast.location || t('chat.tools.forecast')}</InkEyebrow>
+      <Text style={meta.style}>{range}</Text>
+      <View>
+        {shown.map((d, i) => {
+          const label = dayLabel(d.date, locale);
+          const spoken = [
+            label,
+            d.condition,
+            d.high !== null ? t('chat.tools.forecastHigh', { value: Math.round(d.high) }) : '',
+            d.low !== null ? t('chat.tools.forecastLow', { value: Math.round(d.low) }) : '',
+            d.rainChance !== null ? t('chat.tools.forecastRain', { value: Math.round(d.rainChance) }) : '',
+          ].filter(Boolean);
+          return (
+            <View
+              key={d.iso}
+              style={[styles.forecastRow, i > 0 ? rule : null]}
+              accessible
+              accessibilityLabel={spoken.join(', ')}
+            >
+              <Text style={[day.style, styles.forecastDay]} numberOfLines={1}>
+                {label}
+              </Text>
+              <GIcon name={conditionIcon(d.condition)} size={18} color={theme.color.text} />
+              <Text style={[high.style, styles.forecastTemp]}>{degrees(d.high)}</Text>
+              <Text style={[low.style, styles.forecastTemp]}>{degrees(d.low)}</Text>
+              <View style={styles.forecastRain}>
+                {d.rainChance !== null ? (
+                  <>
+                    <GIcon name="droplet" size={12} color={theme.color.textTertiary} />
+                    <Text style={meta.style}>{t('chat.tools.rainChance', { value: Math.round(d.rainChance) })}</Text>
+                  </>
+                ) : null}
+              </View>
+            </View>
+          );
+        })}
+      </View>
+      {forecast.days.length > shown.length ? (
+        <Text style={meta.style}>{t('chat.tools.moreDays', { count: forecast.days.length - shown.length })}</Text>
+      ) : null}
+    </View>
+  );
+}
+
+/** Either weather card, by what the payload holds. `hasFact` has already refused one that holds nothing. */
+function Weather({ data }: { data: Data }) {
+  const weather = readWeatherCard(data);
+  if (!weather) return null;
+  return weather.kind === 'forecast' ? <ForecastCard forecast={weather} /> : <CurrentWeatherCard weather={weather} />;
 }
 
 function Devices({ data }: { data: Data }) {
@@ -161,15 +240,30 @@ const CARDS: Record<string, React.ComponentType<{ data: Data }>> = {
   memory: Memories,
 };
 
-/** A finished tool that asked to be drawn as a card this app knows how to draw. */
-const hasFact = (tool: ToolCall) => Boolean(tool.card && tool.status !== 'running' && CARDS[tool.card.type]);
+/**
+ * Cards that can tell from the payload alone that it holds nothing to draw.
+ * Such a payload keeps its tool as a chip, so its answer is still a tap away
+ * rather than a frame around an empty card.
+ */
+const DRAWS: Partial<Record<string, (data: Data) => boolean>> = {
+  weather: (data) => readWeatherCard(data) !== null,
+};
+
+/** A finished tool that asked to be drawn as a card this app knows how to draw, with something to draw. */
+const hasFact = (tool: ToolCall) =>
+  Boolean(
+    tool.card &&
+      tool.status !== 'running' &&
+      CARDS[tool.card.type] &&
+      (DRAWS[tool.card.type]?.(tool.card.data) ?? true),
+  );
 
 const expandable = (tool: ToolCall) => tool.status !== 'running' && bodyOf(tool.result).length > 0;
 
 const FactCard = React.memo(function FactCard({ tool }: { tool: ToolCall }) {
   const theme = useInkTheme();
-  const Card = tool.card && tool.status !== 'running' ? CARDS[tool.card.type] : undefined;
-  if (!Card || !tool.card) return null;
+  if (!hasFact(tool) || !tool.card) return null;
+  const Card = CARDS[tool.card.type];
   return (
     <InkEdge raised={false} budgeted={false} radius={theme.radius.lg} contentStyle={styles.card}>
       <Card data={tool.card.data} />
@@ -343,6 +437,10 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   shrink: { flexShrink: 1 },
   dot: { width: 8, height: 8, borderRadius: 4 },
+  forecastRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 7 },
+  forecastDay: { flex: 1 },
+  forecastTemp: { minWidth: 34, textAlign: 'right' },
+  forecastRain: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 3, minWidth: 48 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   chip: {
     flexDirection: 'row',

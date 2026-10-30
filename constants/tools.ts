@@ -29,6 +29,7 @@ const TOOLS: Record<string, ToolWords> = {
   // The Pond's own step: it loads a group of tools before the model may use them.
   enable_tool_group: { label: 'chat.tools.toolGroup', doing: 'chat.tools.doingToolGroup', icon: 'skills' },
   get_current_weather: { label: 'chat.tools.weather', doing: 'chat.tools.doingWeather', icon: 'sun' },
+  get_weather_forecast: { label: 'chat.tools.forecast', doing: 'chat.tools.doingWeather', icon: 'partly-sunny' },
   get_wikipedia_article: { label: 'chat.tools.wikipedia', doing: 'chat.tools.doingLookup', icon: 'globe' },
   search_web: { label: 'chat.tools.webSearch', doing: 'chat.tools.doingWebSearch', icon: 'search' },
   compute_answer: { label: 'chat.tools.computed', doing: 'chat.tools.doingCompute', icon: 'sparkle' },
