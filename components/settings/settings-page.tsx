@@ -48,6 +48,7 @@ import {
 } from './special-rows';
 import { SettingsScroll } from './settings-scroll';
 import { VisionStatusCard, visionEventTypeRows } from './vision-rows';
+import { DebugScreenGroup } from './debug-row';
 import { VoicePicker } from './voice-picker';
 
 /** Footers that already say a change waits for a restart, so their rows need not say it again. */
@@ -61,7 +62,7 @@ const RESTART_FOOTERS = new Set<TranslationKey>([
 ]);
 
 /** Specials that draw their own surface, so the page does not put them in a group. */
-const BARE_SPECIALS = new Set<SpecialId>(['visionStatus']);
+const BARE_SPECIALS = new Set<SpecialId>(['visionStatus', 'debugScreen']);
 
 /** Settings that live on this phone, so the page works with no Pond at all. */
 const PHONE_PAGES = new Set<SettingsPageId>(['appearance']);
@@ -206,6 +207,8 @@ function specialRows(id: SpecialId, ctx: Context): ReactElement[] {
       return [<PostureRow key={id} {...props} />];
     case 'visionStatus':
       return [<VisionStatusCard key={id} />];
+    case 'debugScreen':
+      return [<DebugScreenGroup key={id} onOpen={() => ctx.go('/(stack)/debug')} />];
     case 'visionEventTypes':
       return visionEventTypeRows({ ...props, t });
     case 'theme':

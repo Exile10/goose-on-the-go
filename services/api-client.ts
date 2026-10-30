@@ -54,6 +54,9 @@ import type {
   Extension,
   ExtensionSecretsResult,
   LogEntry,
+  LogStreamEvent,
+  LogStreamStatus,
+  DeveloperDebug,
   SecretSaveResult,
   TelemetrySummary,
   TurnMetrics,
@@ -74,6 +77,8 @@ import type {
   PromptExtra,
   SavePromptExtraRequest,
   ModelActiveRoles,
+  ActiveChatRole,
+  ModelRollbackResult,
   ModelCapabilities,
   ModelEntry,
   ModelListResponse,
@@ -1271,6 +1276,20 @@ export class PondApiClient {
     );
   }
 
+  /**
+   * Return chat to the model that last answered before the latest switch. 404
+   * `nothing_to_roll_back` when there is none; `activeChatRole` says beforehand.
+   */
+  rollbackModel(): Promise<ModelRollbackResult> {
+    return this.post<ModelRollbackResult>('/api/v1/models/rollback', { role: 'chat' });
+  }
+
+  /** The chat entry of `GET /models/active-roles`, which `ModelActiveRoles` flattens away. */
+  async activeChatRole(): Promise<ActiveChatRole> {
+    const roles = await this.get<{ chat?: ActiveChatRole }>('/api/v1/models/active-roles');
+    return roles.chat ?? { model_id: null };
+  }
+
   diskUsage(): Promise<DiskUsage> {
     return this.get<DiskUsage>('/api/v1/models/disk-usage');
   }
@@ -1689,6 +1708,51 @@ export class PondApiClient {
   async exportLogsCsv(): Promise<string> {
     const res = await this.open('/api/v1/logs/export', { headers: { Accept: 'text/csv' } });
     return res.text();
+  }
+
+  /**
+   * The operational log as the Pond stores it: a `status` frame first, then each line, and a
+   * `skipped` frame when the phone fell behind and lines were dropped. Resolves when the stream
+   * ends; the caller decides whether to reopen it. The Pond allows four at once and answers a
+   * fifth 503, so a screen that leaves must abort `signal`.
+   */
+  async streamLogs(
+    onEvent: (event: LogStreamEvent) => void,
+    signal?: AbortSignal,
+    onOpen?: () => void,
+  ): Promise<void> {
+    const res = await this.open('/api/v1/logs/stream', {
+      headers: { Accept: 'text/event-stream' },
+      signal,
+    });
+    onOpen?.();
+    await readSse(
+      res,
+      (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          if (event.event === 'status') onEvent({ kind: 'status', status: data as LogStreamStatus });
+          else if (event.event === 'log') onEvent({ kind: 'log', entry: data as LogEntry });
+          else if (event.event === 'skipped') onEvent({ kind: 'skipped', count: Number(data.count) || 0 });
+        } catch {
+          // A frame that is not JSON carries nothing to act on.
+        }
+      },
+      { idleMs: STREAM_IDLE_MS },
+    );
+  }
+
+  // ── Developer mode ──────────────────────────────────────────
+  //
+  // Only a Jarida test Pond has one. Its debug switch shows household content in the Pond's
+  // logs; a home Pond refuses it (409 `not_a_test_pond`), whatever the phone sends.
+
+  developerDebug(): Promise<DeveloperDebug> {
+    return this.get<DeveloperDebug>('/api/v1/developer/debug');
+  }
+
+  setDeveloperDebug(enabled: boolean): Promise<DeveloperDebug> {
+    return this.put<DeveloperDebug>('/api/v1/developer/debug', { enabled });
   }
 
   // ── Telemetry ───────────────────────────────────────────────
