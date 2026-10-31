@@ -33,12 +33,6 @@
     "you": "You",
     "navigation": "Main navigation"
   },
-  "greeting": {
-    "night": "Good night,",
-    "morning": "Good morning,",
-    "afternoon": "Good afternoon,",
-    "evening": "Good evening,"
-  },
   "pond": {
     "connected": "Pond connected",
     "unreachable": "Pond unreachable",
@@ -95,8 +89,7 @@
     "lineDevicesOn_other": "{{count}} devices on",
     "lineOutdoorPlace": "{{temp}}° in {{place}}",
     "lineOutdoor": "{{temp}}° outside",
-    "lineToday_one": "1 event today",
-    "lineToday_other": "{{count}} events today"
+    "greetingNight": "Good night"
   },
   "chat": {
     "connecting": "Connecting",

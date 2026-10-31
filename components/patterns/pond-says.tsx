@@ -24,10 +24,10 @@
  */
 
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { InkButton, InkText, inkText, useInkTheme } from '@jarida/ink/native';
+import { InkButton, InkText, InkTitle, useInkTheme } from '@jarida/ink/native';
 
 import { GPressable } from '@/components/ui/g-pressable';
 import { selectionTick } from '@/services/haptics';
@@ -47,22 +47,15 @@ export function PondSays({ lead, reminderCount, deciding, onAccept, onDecline }:
   const theme = useInkTheme();
   const styles = makeStyles(theme);
 
-  // The sentence carries the screen, so it is set at the display size rather than the title's:
-  // long enough to wrap to three lines and still read as one thought.
-  const sentence = inkText(theme, {
-    role: 'display',
-    size: 'xl',
-    weight: theme.weight.bold,
-    italic: true,
-    tracking: 'title',
-    leading: 'tight',
-  });
-  const says = [sentence.style, sentence.slant ? { transform: [{ skewX: `-${sentence.slant}deg` }] } : null];
+  // `InkTitle`, not a hand-set style: Quicksand ships no italic face, so each platform fakes it
+  // differently and `core/font.ts` is what knows how. Setting the spec by hand rendered the
+  // sentence upright on the phone while every card title beside it slanted -- which lost the
+  // whole point of putting it here.
 
   if (lead) {
     return (
       <View style={styles.block}>
-        <Text style={says}>{lead.summary}</Text>
+        <InkTitle level={1}>{lead.summary}</InkTitle>
         <InkText size="sm" tone="secondary">{t('proposals.card.why', { rationale: lead.rationale })}</InkText>
         <View style={styles.actions}>
           <InkButton variant="quiet" disabled={deciding !== null} onPress={() => onDecline(lead.id)}>
@@ -91,14 +84,14 @@ export function PondSays({ lead, reminderCount, deciding, onAccept, onDecline }:
           router.push('/(stack)/reminders');
         }}
       >
-        <Text style={says}>{t('home.saysReminders', { count: reminderCount })}</Text>
+        <InkTitle level={1}>{t('home.saysReminders', { count: reminderCount })}</InkTitle>
       </GPressable>
     );
   }
 
   return (
     <View style={styles.block}>
-      <Text style={says}>{t('home.saysQuiet')}</Text>
+      <InkTitle level={1}>{t('home.saysQuiet')}</InkTitle>
     </View>
   );
 }

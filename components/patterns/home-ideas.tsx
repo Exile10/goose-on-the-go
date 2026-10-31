@@ -91,6 +91,6 @@ export function HomeIdeas() {
 
 const makeStyles = (theme: ReturnType<typeof useInkTheme>) =>
   StyleSheet.create({
-    block: { gap: theme.space[2], marginBottom: theme.space[5] },
+    block: { gap: theme.space[2], marginTop: theme.space[4], marginBottom: theme.space[5] },
     chips: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.space[2] },
   });

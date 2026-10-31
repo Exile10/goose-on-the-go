@@ -41,7 +41,6 @@ import { AgentsGettingReady } from '@/components/patterns/agents-building';
 import { PondGettingReady } from '@/components/patterns/pond-getting-ready';
 import { RemoteAccessOffer } from '@/components/patterns/remote-access-offer';
 import { isUnavailable } from '@/models/content-state';
-import { useActivitySummary } from '@/view-models/use-activity-summary';
 import { useHomeIdeas } from '@/view-models/use-home-ideas';
 import { useContentState } from '@/view-models/use-content-state';
 import { usePullToRefresh } from '@/view-models/use-pull-to-refresh';
@@ -99,17 +98,12 @@ const HOME_GRID_LIMIT = 6;
 /** How often the greeting and the countdowns catch up with the clock. */
 const CLOCK_MS = 60_000;
 
-/** A greeting uses the name someone is called, not their full record. */
-function firstName(displayName: string | undefined): string | null {
-  const first = displayName?.trim().split(/\s+/)[0];
-  return first || null;
-}
 
 function greetingKey(hour: number) {
-  if (hour < 5) return 'greeting.night' as const;
-  if (hour < 12) return 'greeting.morning' as const;
-  if (hour < 18) return 'greeting.afternoon' as const;
-  return 'greeting.evening' as const;
+  if (hour < 5) return 'home.greetingNight' as const;
+  if (hour < 12) return 'home.greetingMorning' as const;
+  if (hour < 18) return 'home.greetingAfternoon' as const;
+  return 'home.greetingEvening' as const;
 }
 
 /**
@@ -305,7 +299,6 @@ export default function HomeScreen() {
   // this phone.
   const member = useMember();
   const rightNow = useRightNow().data;
-  const today = useActivitySummary().data.summary?.total ?? null;
   // One read for both the sentence at the top and the chips below it.
   const ideas = useHomeIdeas();
   const router = useRouter();
@@ -358,9 +351,6 @@ export default function HomeScreen() {
         : t('home.lineOutdoor', { temp: rightNow.outdoorTemp }),
     });
   }
-  if (today !== null) {
-    figures.push({ key: 'today', phrase: t('home.lineToday', { count: today }) });
-  }
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -372,10 +362,7 @@ export default function HomeScreen() {
       >
         <View style={styles.greetingRow}>
           <View style={styles.greetingText}>
-            <Text style={styles.greetingLabel}>
-              {t(greetingKey(now.getHours()))}
-              {member?.displayName ? `, ${firstName(member.displayName)}` : ''}
-            </Text>
+            <Text style={styles.greetingLabel}>{t(greetingKey(now.getHours()))}</Text>
           </View>
           <GPressable feedback="lift"
             style={styles.avatar}
