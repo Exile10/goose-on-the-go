@@ -94,7 +94,8 @@ export type SpecialId =
   | 'haptics'
   | 'posture'
   | 'visionStatus'
-  | 'visionEventTypes';
+  | 'visionEventTypes'
+  | 'debugScreen';
 
 export type SliderFormat = 'pace' | 'creativity' | 'fraction';
 

@@ -698,6 +698,8 @@ const advanced: SettingsPage = {
         { kind: 'number', key: 'cloud_output_price_per_million', min: 0, step: 0.01, unitKey: 'settings.unit.perMillion', labelKey: 'settings.field.cloud_output_price_per_million.label' },
       ],
     },
+    // Drawn only on a Jarida test Pond; a home Pond shows nothing here.
+    { items: [{ kind: 'special', id: 'debugScreen' }] },
   ],
 };
 

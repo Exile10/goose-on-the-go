@@ -1536,6 +1536,7 @@
     "homeManagement": "Your home",
     "pondPairing": "Pair a Pond",
     "developer": "Developer",
+    "debug": "Debug",
     "commissionDevice": "Add a device",
     "switchPond": "Switch Pond",
     "sessions": "Conversations",
@@ -1582,8 +1583,7 @@
     "pondCaches": "Caches",
     "pondTasks": "Tasks and reports",
     "pondHealth": "Health",
-    "pondPower": "Power",
-    "debug": "Debug"
+    "pondPower": "Power"
   },
   "nav": {
     "goose": "Goose",
@@ -2481,6 +2481,118 @@
     "devOnly": "This screen is dev-only. It isn’t linked from Settings in production builds.",
     "openDebug": "Debug view",
     "openDebugHint": "Live logs, the models in use and how long each command took."
+  },
+  "debug": {
+    "loading": "Asking your Pond…",
+    "homePond": {
+      "title": "Not a test Pond",
+      "body": "Debug mode is only on Jarida’s test Ponds. A home Pond never shows what people say in its logs."
+    },
+    "switch": {
+      "title": "Debug mode",
+      "label": "Show household content in logs",
+      "offHint": "Names and words read [redacted] in the log below.",
+      "onHint": "Names and words show as said.",
+      "footer": "Turns itself off when the Pond restarts."
+    },
+    "model": {
+      "title": "Chat model",
+      "none": "No chat model set",
+      "rollback": "Back to {{model}}",
+      "rollingBack": "Switching back…",
+      "noRollback": "No earlier model to go back to.",
+      "rollbackTitle": "Switch chat back?",
+      "rollbackMessage": "Chat will run on {{model}}, the last model that answered.",
+      "rollbackConfirm": "Switch back"
+    },
+    "timing": {
+      "title": "Command timing",
+      "empty": "Ask Goose something and each answer’s time shows here.",
+      "firstWord": "First word",
+      "finished": "Finished",
+      "took": "Took"
+    },
+    "log": {
+      "title": "Live log",
+      "empty": "Nothing in the log yet.",
+      "showRaw": "Tap a line to view more details.",
+      "repeats": "×{{count}}",
+      "skipped_one": "{{count}} line was skipped while this phone caught up.",
+      "skipped_other": "{{count}} lines were skipped while this phone caught up."
+    },
+    "group": {
+      "command": "Chat message",
+      "warmUp": "Warm-up after a restart",
+      "running": "still answering",
+      "startedAt": "started {{time}}"
+    },
+    "line": {
+      "turnStart": "Started on {{model}}",
+      "turnStartNoModel": "Started",
+      "messageLength_one": "{{count}} character asked",
+      "messageLength_other": "{{count}} characters asked",
+      "toolsOffered_one": "{{count}} tool offered to the model",
+      "toolsOffered_other": "{{count}} tools offered to the model",
+      "toolsWithheld": "Some tools held back: their keys aren’t stored",
+      "toolCall": "Asked for {{tool}}",
+      "toolResult": "{{tool}} answered",
+      "toolFailed": "{{tool}} failed",
+      "inference_one": "Model wrote {{count}} token",
+      "inference_other": "Model wrote {{count}} tokens",
+      "inferenceStarted": "started after {{time}}",
+      "turnEnd": "Replied in {{time}}",
+      "turnEndNoTime": "Replied",
+      "firstWord": "first word {{time}}",
+      "tokens_one": "{{count}} token",
+      "tokens_other": "{{count}} tokens",
+      "rate": "{{rate}} tokens/s",
+      "summaryRefresh": "Chat summary updated",
+      "sessionRetitled": "Chat renamed",
+      "modelActivated": "{{role}} model set to {{model}}",
+      "providerSwap": "Goose switched to {{model}}",
+      "prewarm": "Model warmed up in {{time}}",
+      "cacheServed": "Reused the prepared prompt",
+      "cacheRebuilt": "Prepared the prompt again",
+      "memoryPass": "Looked for things to remember",
+      "memoriesSaved_one": "{{count}} memory saved",
+      "memoriesSaved_other": "{{count}} memories saved",
+      "suggestions_one": "Made {{count}} suggestion",
+      "suggestions_other": "Made {{count}} suggestions",
+      "debugOn": "Debug mode turned on",
+      "debugOff": "Debug mode turned off",
+      "testPond": "Running as a Jarida test Pond",
+      "matterState": "Smart home controller {{state}}"
+    },
+    "stream": {
+      "connecting": "Connecting…",
+      "live": "Live",
+      "busy": "Too many viewers; retrying",
+      "offline": "Reconnecting…"
+    },
+    "error": {
+      "notTestPond": "This Pond isn’t a test Pond, so debug mode stays off.",
+      "notDeveloper": "Only a developer can change debug mode.",
+      "nothingToRollBack": "There’s no earlier model to go back to.",
+      "unsupported": "This Pond doesn’t have developer mode yet."
+    },
+    "intro": "What your Pond is doing right now, for finding out why something went wrong.",
+    "models": {
+      "title": "Models in use",
+      "none": "None"
+    },
+    "logs": {
+      "failed": "Could not read your Pond's log.",
+      "title": "Live log",
+      "pause": "Pause",
+      "resume": "Resume",
+      "empty": "Nothing logged yet.",
+      "footer": "The newest 100 lines, read every 5 seconds while this screen is open."
+    },
+    "timings": {
+      "title": "Command timings",
+      "none": "No conversations yet.",
+      "footer": "How long Goose took over its latest conversation. Tap it for each command: time to the first word, the whole answer and any tool it used."
+    }
   },
   "errors": {
     "busy": "Your Pond is busy. Try again in a moment.",
@@ -3850,26 +3962,6 @@
       "today": "today {{time}}",
       "yesterday": "yesterday {{time}}",
       "dateTime": "{{date}} {{time}}"
-    }
-  },
-  "debug": {
-    "intro": "What your Pond is doing right now, for finding out why something went wrong.",
-    "models": {
-      "title": "Models in use",
-      "none": "None"
-    },
-    "logs": {
-      "failed": "Could not read your Pond's log.",
-      "title": "Live log",
-      "pause": "Pause",
-      "resume": "Resume",
-      "empty": "Nothing logged yet.",
-      "footer": "The newest 100 lines, read every 5 seconds while this screen is open."
-    },
-    "timings": {
-      "title": "Command timings",
-      "none": "No conversations yet.",
-      "footer": "How long Goose took over its latest conversation. Tap it for each command: time to the first word, the whole answer and any tool it used."
     }
   }
 }

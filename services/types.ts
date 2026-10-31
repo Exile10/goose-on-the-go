@@ -547,6 +547,21 @@ export interface ModelActiveRoles {
   [role: string]: string | null;
 }
 
+/** The chat entry of `GET /models/active-roles`. */
+export interface ActiveChatRole {
+  model_id: string | null;
+  model?: string | null;
+  provider?: string | null;
+  /** What `POST /models/rollback` would return to; null or absent when there is no way back. */
+  rollback?: { model_id: string; model: string } | null;
+}
+
+/** `POST /models/rollback`: the model chat now runs on. */
+export interface ModelRollbackResult {
+  role: string;
+  model_id: string;
+}
+
 export interface ModelMemoryStatus {
   total_mb: number;
   available_for_llm_mb: number;
@@ -901,6 +916,26 @@ export interface LogEntry {
   message: string;
   /** JSON, as a string, or null. */
   metadata: string | null;
+}
+
+/** The first frame of `GET /logs/stream`: what chat runs on as the stream opens. */
+export interface LogStreamStatus {
+  chat_provider: string;
+  chat_model: string;
+}
+
+export type LogStreamEvent =
+  | { kind: 'status'; status: LogStreamStatus }
+  | { kind: 'log'; entry: LogEntry }
+  /** Lines dropped because the phone fell behind; they are still in `GET /logs`. */
+  | { kind: 'skipped'; count: number };
+
+/** `GET`/`PUT /developer/debug`. */
+export interface DeveloperDebug {
+  /** Set by whoever started the Pond; nothing the phone sends changes it. */
+  test_pond: boolean;
+  /** Household content shows in the logs while on. Off after every restart. */
+  debug: boolean;
 }
 
 export type EventCategory =
