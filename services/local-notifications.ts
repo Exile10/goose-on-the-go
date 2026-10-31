@@ -207,8 +207,8 @@ function openTapped(Notifications: NotificationsModule, response: NotificationRe
 
 /**
  * Open ride and directions links, the ride screen for a ride offer, and the
- * schedules, devices or chat screen the Pond names, when their notification is
- * tapped, including the tap that launched the app.
+ * screen the Pond names (schedules, devices, chat, models, extensions or remote
+ * access), when their notification is tapped, including the tap that launched the app.
  * Returns the unsubscribe.
  */
 export function watchLinkTaps(): () => void {

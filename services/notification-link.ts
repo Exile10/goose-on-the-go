@@ -89,17 +89,23 @@ export function rideOfferFromData(data: unknown): RideOffer | null {
 
 /**
  * The app screen a Pond notification asks a tap to open. The Pond puts it in
- * `Notification.data` as `{ open: "schedule", schedule_id, run_id }`,
- * `{ open: "devices" }` or `{ open: "chat" }`.
+ * `Notification.data` as `{ open: "schedule", schedule_id, run_id }`, or as
+ * `{ open: "devices" }`, `"chat"`, `"models"`, `"extensions"` or
+ * `"remote_access"` (the Pond's `OpenScreen` in pond-core's
+ * `mcp/ports/notification.rs`).
  *
- * Only these three screens are accepted, and only ids of the shape the Pond
+ * Only these six screens are accepted, and only ids of the shape the Pond
  * mints, so a notification can open one of them and nothing else. An older Pond
- * sends no `open`, and the tap opens the app where it was, as before.
+ * sends no `open`, and the tap opens the app where it was, as before; a value
+ * this app does not know does the same.
  */
 export type OpenRoute =
   | { open: 'schedule'; scheduleId?: string; runId?: string }
   | { open: 'devices' }
-  | { open: 'chat' };
+  | { open: 'chat' }
+  | { open: 'models' }
+  | { open: 'extensions' }
+  | { open: 'remote_access' };
 
 /** A Pond id: a UUID, optionally prefixed (`timer-...`). Nothing that could be a path. */
 const POND_ID = /^[A-Za-z0-9_-]{1,128}$/;
@@ -128,6 +134,12 @@ export function openRouteFromData(data: unknown): OpenRoute | null {
       return { open: 'devices' };
     case 'chat':
       return { open: 'chat' };
+    case 'models':
+      return { open: 'models' };
+    case 'extensions':
+      return { open: 'extensions' };
+    case 'remote_access':
+      return { open: 'remote_access' };
     default:
       return null;
   }
@@ -138,7 +150,10 @@ type ScreenHref =
   | '/(stack)/schedule'
   | { pathname: '/(stack)/schedule'; params: { schedule_id: string } }
   | '/(tabs)/devices'
-  | '/(tabs)/chat';
+  | '/(tabs)/chat'
+  | '/(stack)/models'
+  | '/(stack)/extensions'
+  | '/(stack)/remote-access';
 
 /**
  * The expo-router location a route opens. A schedule notification names the
@@ -156,5 +171,11 @@ export function screenPath(route: OpenRoute): ScreenHref {
       return '/(tabs)/devices';
     case 'chat':
       return '/(tabs)/chat';
+    case 'models':
+      return '/(stack)/models';
+    case 'extensions':
+      return '/(stack)/extensions';
+    case 'remote_access':
+      return '/(stack)/remote-access';
   }
 }

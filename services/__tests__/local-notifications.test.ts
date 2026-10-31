@@ -51,8 +51,16 @@ describe('openTapped', () => {
     expect(mockPush.mock.calls).toEqual([['/(tabs)/devices'], ['/(tabs)/chat']]);
   });
 
+  it('opens the models, extensions and remote access screens', () => {
+    tap({ open: 'models', kind: 'model_downloaded' });
+    tap({ open: 'extensions', kind: 'startup_problems' });
+    tap({ open: 'remote_access', kind: 'remote_access_down' });
+    expect(mockPush.mock.calls).toEqual([['/(stack)/models'], ['/(stack)/extensions'], ['/(stack)/remote-access']]);
+  });
+
   it('opens nothing for a screen outside the allow-list, or no hint at all', () => {
     tap({ open: '/(stack)/developer' });
+    tap({ open: 'storage' });
     tap({ id: 'b', category: 'info' });
     expect(mockPush).not.toHaveBeenCalled();
   });
@@ -101,6 +109,15 @@ describe('presentLocally', () => {
       open: 'schedule',
       schedule_id: 'sched-1',
     });
+  });
+  /** The shade keeps the Pond's own hint, so the tap reads back a value it accepts. */
+  it('stores the remote access hint as the Pond sent it, and drops one it does not know', async () => {
+    mockSchedule.mockClear();
+    const base = { target: 'broadcast', category: 'alert', title: 'Remote access stopped', body: 'b', timestamp: '2026-10-27T08:00:00Z' } as const;
+    await presentLocally({ ...base, id: 'n-2', data: { open: 'remote_access' } });
+    await presentLocally({ ...base, id: 'n-3', data: { open: 'storage' } });
+    expect(mockSchedule.mock.calls[0][0].content.data).toEqual({ id: 'n-2', category: 'alert', open: 'remote_access' });
+    expect(mockSchedule.mock.calls[1][0].content.data).toEqual({ id: 'n-3', category: 'alert' });
   });
 });
 
