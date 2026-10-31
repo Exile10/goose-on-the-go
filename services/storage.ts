@@ -52,6 +52,8 @@ const FAMILIES = {
   setupDrafts: '@goose/setup-drafts/',
   /** What owner setup left for later, by paired profile: shown on Home until done or put away. */
   setupChecklist: '@goose/setup-checklist/',
+  /** Home's offer of the setup interview, put away, by member: Assistant notes still offers it. */
+  interviewOffer: '@goose/interview-offer/',
 } as const;
 
 type StorageFamily = keyof typeof FAMILIES;
