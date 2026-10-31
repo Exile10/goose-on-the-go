@@ -1734,7 +1734,9 @@
         "engine": "Runs on",
         "quantization": "Precision",
         "job": "Job"
-      }
+      },
+      "switchBack": "Switch back to {{name}}",
+      "switchBackHint": "The model that had this job before the last change."
     }
   },
   "sections": {

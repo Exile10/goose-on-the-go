@@ -23,6 +23,8 @@ const KEYS = {
   remoteLapsesAt: '@goose/remote-lapses-at',
   /** The pin of the Pond whose admin key this phone keeps behind its biometrics. Not the key. */
   adminKeyFor: '@goose/admin-key-for',
+  /** The model each job had before its last change, by model id, so it can be switched back to. */
+  lastWorkingModels: '@goose/last-working-models',
 } as const;
 
 /**
