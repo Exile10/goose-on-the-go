@@ -8,7 +8,7 @@ const fixture = () => {
     trust: jest.fn(async () => undefined), changed: jest.fn() };
   return { deps, manager: new ConnectionManager(deps) };
 };
-afterEach(() => jest.useRealTimers());
+afterEach(() => { jest.useRealTimers(); jest.restoreAllMocks(); });
 it('coalesces simultaneous REST and SSE recovery', async () => {
   const { deps, manager } = fixture(); await manager.configure(profile, pin);
   const first = manager.recover(); const second = manager.recover();
@@ -37,12 +37,60 @@ it('continues after a pin-rejected candidate but never changes the pin', async (
   expect(deps.trust).toHaveBeenCalledWith([...profile.localUrls, profile.remoteUrl], pin);
   manager.environment(false, false);
 });
-it('bounds failed recovery and pauses all timers in the background', async () => {
+/**
+ * Seen on the iPhone simulator on 2026-10-24: the Pond dropped at 19:45, the retries ran out at
+ * 19:46, and the app said the Pond was unavailable, in front, for two hours after it was back.
+ */
+it('keeps checking a Pond that is down every 30 s while in front, and finds it once it is back', async () => {
+  jest.useFakeTimers();
+  // The jitter's midpoint, so each wait is exactly its nominal length.
+  jest.spyOn(Math, 'random').mockReturnValue(0.5);
+  const { deps, manager } = fixture();
+  let up = false;
+  const start = Date.now();
+  const checks: number[] = [];
+  deps.probe.mockImplementation(async (url: string) => {
+    if (url === profile.localUrls[0]) checks.push((Date.now() - start) / 1000);
+    return up;
+  });
+  await manager.configure(profile, pin); await manager.recover();
+  await jest.advanceTimersByTimeAsync(31_000);
+  expect(checks).toEqual([0, 1, 3, 7, 15, 31]);
+  deps.changed.mockClear();
+
+  await jest.advanceTimersByTimeAsync(269_000);
+  expect(checks).toEqual([0, 1, 3, 7, 15, 31, 61, 91, 121, 151, 181, 211, 241, 271]);
+  // The LAN address and the tailnet each time, and nothing more: the Pond rate-limits per IP.
+  expect(deps.probe).toHaveBeenCalledTimes(28);
+
+  up = true;
+  await jest.advanceTimersByTimeAsync(30_000);
+  expect(checks.at(-1)).toBe(301);
+  expect(manager.current).toEqual({ state: 'local', url: profile.localUrls[0] });
+  const states = deps.changed.mock.calls.map(([snapshot]: [{ state: string }]) => snapshot.state);
+  expect(states).not.toContain('reconnecting');
+  expect(states.at(-1)).toBe('local');
+  expect(jest.getTimerCount()).toBe(0);
+  manager.environment(false, false);
+});
+
+it('stops checking a Pond that is down while the app is in the background', async () => {
   jest.useFakeTimers(); const { deps, manager } = fixture(); deps.probe.mockResolvedValue(false);
   await manager.configure(profile, pin); await manager.recover();
-  await jest.advanceTimersByTimeAsync(300_000);
-  expect(deps.probe).toHaveBeenCalledTimes(12);
-  manager.environment(false, false); expect(jest.getTimerCount()).toBe(0);
+  await jest.advanceTimersByTimeAsync(120_000);
+  const probes = deps.probe.mock.calls.length;
+
+  manager.environment(false, false);
+  expect(jest.getTimerCount()).toBe(0);
+  await jest.advanceTimersByTimeAsync(3_600_000);
+  expect(deps.probe).toHaveBeenCalledTimes(probes);
+
+  // Back in front, it checks at once rather than waiting out the old schedule.
+  deps.probe.mockResolvedValue(true);
+  manager.environment(false, true); await manager.recover();
+  expect(deps.probe).toHaveBeenCalledTimes(probes + 1);
+  expect(manager.current.state).toBe('local');
+  manager.environment(false, false);
 });
 it('returns to LAN when a temporary local outage clears on the same Wi-Fi', async () => {
   jest.useFakeTimers(); const { deps, manager } = fixture();

@@ -40,6 +40,14 @@ const LOCAL_HEAD_START_MS = 250;
  */
 const SECOND_CHANCE_MS = 1_000;
 
+/**
+ * The longest wait between checks of a Pond that is not answering, kept up for as long as the app
+ * is in front. Six tries and a stop, about a minute, left "Pond is unavailable" on screen for two
+ * hours after the Pond came back, on the iPhone simulator on 2026-10-24.
+ */
+const MAX_BACKOFF_MS = 30_000;
+const BACKOFF_STEPS = 6;
+
 type Route = { state: 'local' | 'remote'; url: string; discovered?: boolean };
 
 export class ConnectionManager {
@@ -223,9 +231,13 @@ export class ConnectionManager {
         }
       }
       if (current()) {
-        this.retryAfter = Date.now() + Math.min(30_000, 1000 * 2 ** Math.min(this.attempts++, 5)) * (0.75 + Math.random() * 0.5);
+        this.retryAfter = Date.now() + Math.min(MAX_BACKOFF_MS, 1000 * 2 ** Math.min(this.attempts, BACKOFF_STEPS - 1)) * (0.75 + Math.random() * 0.5);
+        this.attempts = Math.min(this.attempts + 1, BACKOFF_STEPS);
         this.publish(trustRejected ? 'trust' : 'disconnected');
-        if (this.attempts < 6) this.timer = setTimeout(() => { this.timer = null; if (current()) void this.recover(); }, Math.max(1, Math.ceil(this.retryAfter - Date.now())));
+        // At the cap the check is quiet: dropping to `reconnecting` every 30 s would swap Home's card
+        // and take the banner away and back each time, for as long as the Pond stays down.
+        const quietly = this.attempts === BACKOFF_STEPS;
+        this.timer = setTimeout(() => { this.timer = null; if (current()) void this.recover(quietly); }, Math.max(1, Math.ceil(this.retryAfter - Date.now())));
       }
       return null;
     };
