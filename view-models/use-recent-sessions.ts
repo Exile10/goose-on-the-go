@@ -45,6 +45,11 @@ export interface RecentSession {
   text: string;
   /** The title alone, for the conversation's own bar: the preview is not a name. */
   title: string | null;
+  /**
+   * How the conversation opened, for a second line under the name. Null when the Pond sent none,
+   * and when it is what `text` already shows -- a row must not say the same thing twice.
+   */
+  preview: string | null;
   time: string;
 }
 
@@ -109,12 +114,20 @@ export function useRecentSessions(): UseRecentSessions {
  * A session with no title and no preview is a real state — the title is derived
  * from the first user message and is absent until a turn has been persisted — so
  * it gets a name rather than an empty row.
+ *
+ * Pure, so the mapping is testable without a Pond.
  */
-function toRecent(s: SessionSummary): RecentSession {
+export function toRecent(s: SessionSummary): RecentSession {
+  const title = s.title?.trim() || null;
+  const preview = s.preview?.trim() || null;
+  const text = title || preview || i18n.t('sessions.untitled');
   return {
     id: s.id,
-    text: s.title?.trim() || s.preview?.trim() || i18n.t('sessions.untitled'),
-    title: s.title?.trim() || null,
+    text,
+    title,
+    // Compared against the line that is actually drawn, not against the title: with no title the
+    // preview is already that line, and a row must not print it twice.
+    preview: preview && preview !== text ? preview : null,
     time: formatRelativeTime(s.updated_at),
   };
 }
