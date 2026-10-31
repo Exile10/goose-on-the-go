@@ -31,6 +31,8 @@ export type Until = { unit: 'now' } | { unit: 'minutes' | 'hours' | 'days'; coun
 export interface RightNow {
   /** Degrees Celsius outside, or null: no location configured, or the read failed. */
   outdoorTemp: number | null;
+  /** Where that temperature is, as the Pond names it, for a reading that says where it is from. */
+  outdoorPlace: string | null;
   nowPlaying: NowPlaying | null;
   nextRoutine: NextRoutine | null;
 }
@@ -106,13 +108,26 @@ export function untilOf(at: Date, now: Date): Until {
 
 type RightNowReader = Pick<PondApiClient, 'weather' | 'nowPlaying' | 'upcomingSchedules'>;
 
-/** Degrees Celsius outside, or null: no location configured, or the read failed. */
-export async function readOutdoorTemp(client: Pick<RightNowReader, 'weather'> = api): Promise<number | null> {
+/** What is outside: the temperature in Celsius and where it was measured, either of which may be null. */
+export interface Outdoor {
+  temp: number | null;
+  place: string | null;
+}
+
+/**
+ * Degrees Celsius outside and the place it is for. Both null on a Pond with no location
+ * configured, which is a setting rather than a failure, and on a read that failed.
+ *
+ * There is no forecast here because there is no route for one: `GET /weather` answers a single
+ * temperature, and `WeatherForecast` is parsed out of a chat tool result (`models/weather-card.ts`).
+ */
+export async function readOutdoor(client: Pick<RightNowReader, 'weather'> = api): Promise<Outdoor> {
   try {
     const w = await client.weather();
-    return w.enabled && typeof w.temp === 'number' ? w.temp : null;
+    if (!w.enabled || typeof w.temp !== 'number') return { temp: null, place: null };
+    return { temp: w.temp, place: w.location_name?.trim() || null };
   } catch {
-    return null;
+    return { temp: null, place: null };
   }
 }
 
@@ -147,12 +162,12 @@ export async function readNextRoutine(client: Pick<RightNowReader, 'upcomingSche
 
 /** Read the row in one pass. Never rejects: a card whose read fails is absent, not wrong. */
 export async function readRightNow(client: RightNowReader = api): Promise<RightNow> {
-  const [outdoorTemp, playing, nextRoutine] = await Promise.all([
-    readOutdoorTemp(client),
+  const [outdoor, playing, nextRoutine] = await Promise.all([
+    readOutdoor(client),
     readNowPlaying(client),
     readNextRoutine(client),
   ]);
-  return { outdoorTemp, nowPlaying: playing.card, nextRoutine };
+  return { outdoorTemp: outdoor.temp, outdoorPlace: outdoor.place, nowPlaying: playing.card, nextRoutine };
 }
 
 /**
@@ -163,7 +178,7 @@ export async function readRightNow(client: RightNowReader = api): Promise<RightN
  * a track sit a minute after it ended.
  */
 export function useRightNow(): UseRightNow {
-  const [outdoorTemp, setOutdoorTemp] = useState<number | null>(null);
+  const [outdoor, setOutdoor] = useState<Outdoor>({ temp: null, place: null });
   const [nowPlaying, setNowPlaying] = useState<NowPlaying | null>(null);
   const [nextRoutine, setNextRoutine] = useState<NextRoutine | null>(null);
   const lastPlaying = useRef<NowPlayingReading>({ card: null, backOff: false });
@@ -181,8 +196,8 @@ export function useRightNow(): UseRightNow {
     () => nowPlayingDelay(lastPlaying.current),
     hydrated,
   );
-  useLive(async () => setOutdoorTemp(await readOutdoorTemp()), WEATHER_MS, hydrated);
+  useLive(async () => setOutdoor(await readOutdoor()), WEATHER_MS, hydrated);
   useLive(async () => setNextRoutine(await readNextRoutine()), ROUTINE_MS, hydrated);
 
-  return { data: { outdoorTemp, nowPlaying, nextRoutine } };
+  return { data: { outdoorTemp: outdoor.temp, outdoorPlace: outdoor.place, nowPlaying, nextRoutine } };
 }
