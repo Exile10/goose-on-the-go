@@ -2,7 +2,7 @@
 // `useOnboardingPersist.ts` so a Pond set up from either screen reads the same.
 
 import type { TranslationKey } from '@/services/i18n';
-import type { PondSettings } from '@/services/types';
+import type { PondSettings, PromptExtra } from '@/services/types';
 
 /**
  * The desktop's six screens, trimmed to what a phone has to ask: who you are and where (the place
@@ -115,6 +115,8 @@ export interface SetupDraft {
   enableWeather: boolean;
   promptStyle: string;
   personality: string;
+  /** Saved as an Assistant note once setup is done, since the Pond keeps none before. */
+  notes: string;
   assistantName: string;
   ttsVoice: string;
   /** The engine's multiplier, 0.5 to 2. */
@@ -139,6 +141,7 @@ export function defaultDraft(deviceZone: string, language = 'en'): SetupDraft {
     enableWeather: false,
     promptStyle: 'balanced',
     personality: 'friendly and helpful',
+    notes: '',
     assistantName: 'Goose',
     ttsVoice: 'af_heart',
     ttsSpeed: 1,
@@ -220,6 +223,15 @@ export function settingsPatch(step: SetupStep, draft: SetupDraft): Partial<PondS
 /** What All set used to save with Finish: memory on, which Settings > Memory shows and changes. */
 export function finishPatch(draft: SetupDraft): Partial<PondSettings> {
   return { agent_memory_inject: draft.enableMemory };
+}
+
+/** The note setup writes, which the Assistant notes screen reads back as "House notes". */
+export const SETUP_NOTE_KEY = 'house_notes';
+
+/** What was typed under Assistant notes, as the note to save after setup, or nothing. */
+export function setupNote(draft: SetupDraft): PromptExtra | null {
+  const instruction = draft.notes.trim();
+  return instruction ? { key: SETUP_NOTE_KEY, instruction, active: true, sort_order: 0 } : null;
 }
 
 /** The step that writes the owner's profile preferences, language among them. */

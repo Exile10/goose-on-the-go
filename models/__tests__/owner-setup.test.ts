@@ -15,6 +15,7 @@ import {
   resumeIndex,
   settingsPatch,
   setupLanguageFor,
+  setupNote,
   shortPhraseSuggestion,
   stepRecords,
   wakeChoiceValid,
@@ -147,6 +148,17 @@ describe('finishing', () => {
     expect(firstStepFor(['chat_model'])).toBe('model');
     expect(firstStepFor(['chat_model', 'timezone'])).toBe('about-you');
     expect(firstStepFor(['nonsense'])).toBeNull();
+  });
+
+  it('leaves what was typed under Assistant notes as one note, and nothing when it was left blank', () => {
+    expect(setupNote(draft({ notes: '  Always answer in Swahili.\n' }))).toEqual({
+      key: 'house_notes',
+      instruction: 'Always answer in Swahili.',
+      active: true,
+      sort_order: 0,
+    });
+    expect(setupNote(draft({ notes: ' \n ' }))).toBeNull();
+    expect(setupNote(draft())).toBeNull();
   });
 });
 

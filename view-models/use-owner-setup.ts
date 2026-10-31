@@ -28,6 +28,7 @@ import {
   resumeIndex,
   settingsPatch,
   setupLanguageFor,
+  setupNote,
   stepRecords,
   writesProfile,
   type SetupDraft,
@@ -85,6 +86,28 @@ async function nameThisPhone(owner: string): Promise<void> {
   await api.updateDevice(id, { name: i18n.t('setup.phoneOf', { name: owner, device: generic }), hostname: mine.hostname, room: mine.room });
 }
 
+/**
+ * The Assistant notes typed during setup, which the Pond keeps only once setup is done. Setup has no
+ * screen left by then to say it failed on, so a dropped connection is tried again; a refusal is final.
+ */
+async function saveSetupNote(draft: SetupDraft): Promise<void> {
+  const note = setupNote(draft);
+  if (!note) return;
+  for (let attempt = 1; ; attempt++) {
+    try {
+      await api.savePromptExtra(note);
+      return;
+    } catch (e) {
+      const refused = e instanceof ApiError && e.status < 500;
+      if (refused || attempt >= 3) {
+        console.warn('[setup] the Assistant notes were not saved', e instanceof ApiError ? e.status : 'network');
+        return;
+      }
+      await new Promise((r) => setTimeout(r, attempt * 1000));
+    }
+  }
+}
+
 /** The model step says it itself; every other missing field is named over the step it sends back to. */
 function namedMissing(fields: readonly string[]): string {
   return fields.filter((f) => f !== 'chat_model').map((f) => i18n.t(missingKey(f))).join(' ');
@@ -125,7 +148,7 @@ async function keepSetupKey(pin: string | null, key: string | undefined): Promis
 function skipped(step: SetupStep, draft: SetupDraft): SetupDraft {
   const base = defaultDraft(draft.timezone);
   return step === 'personality'
-    ? { ...draft, promptStyle: base.promptStyle, personality: base.personality, assistantName: base.assistantName }
+    ? { ...draft, promptStyle: base.promptStyle, personality: base.personality, notes: base.notes, assistantName: base.assistantName }
     : draft;
 }
 
@@ -290,6 +313,7 @@ export function useOwnerSetup(): UseOwnerSetup {
           // Home says whether Goose can answer yet, and what is left to do, in place of two screens.
           markGettingReady(profileId, true, keptAdminKey);
           void openSetupChecklist(profileId);
+          void saveSetupNote(d);
           void nameThisPhone(d.preferredName.trim() || d.userName.trim().split(/\s+/)[0] || '').catch(() => {
             console.warn('[setup] this phone keeps its own name on the Pond');
           });
