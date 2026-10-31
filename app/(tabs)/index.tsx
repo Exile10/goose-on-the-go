@@ -8,7 +8,7 @@
  * say is not drawn. Surfaces are Ink's printed plate, not a shadow.
  */
 
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   InkBadge,
   InkButton,
@@ -17,6 +17,8 @@ import {
   InkSwitch,
   InkText,
   InkTitle,
+  inkText,
+  useInkTheme,
 } from '@jarida/ink/native';
 import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -51,10 +53,42 @@ import { hostOf } from '@/services/discovery';
 import { deviceStyle } from '@/constants/device-style';
 import { toggle } from '@/services/haptics';
 import type { Device } from '@/services/types';
-import { Brand, Grey, JaridaPurple } from '@/constants/colors';
+import { Brand, Grey } from '@/constants/colors';
 import { FontSize, face } from '@/constants/typography';
 import { Spacing } from '@/constants/spacing';
 import { Radii } from '@/constants/radii';
+
+/**
+ * The type the Right now cards are set in, from Ink's own scale rather than by hand.
+ *
+ * The eyebrow is the mono micro-label the tracking scale was built for: at 0.14em it separates
+ * the card's label from its content without a rule or a box. The title is display at -0.02em,
+ * because a bold face reads looser the larger it is set and the negative tracking is what takes
+ * that back. Leading tightens as the size grows, for the same reason.
+ */
+function useCardType() {
+  const theme = useInkTheme();
+  return useMemo(
+    () => ({
+      eyebrow: inkText(theme, {
+        role: 'mono',
+        size: 'xs',
+        tracking: 'eyebrow',
+        uppercase: true,
+        color: theme.color.textTertiary,
+      }).style,
+      title: inkText(theme, {
+        role: 'display',
+        size: 'md',
+        weight: theme.weight.bold,
+        tracking: 'title',
+        leading: 'tight',
+      }).style,
+      detail: inkText(theme, { size: 'sm', color: theme.color.textSecondary }).style,
+    }),
+    [theme],
+  );
+}
 
 /** The home grid is a glance, not the full list — that is the Devices tab. */
 const HOME_GRID_LIMIT = 6;
@@ -143,26 +177,28 @@ function PondCard() {
 function NowPlayingCard({ playing }: { playing: NowPlaying }) {
   const styles = useThemedStyles(makeStyles);
   const { t } = useTranslation();
+  const theme = useInkTheme();
+  const type = useCardType();
 
   return (
     <InkCard style={styles.rightNowCard} contentStyle={styles.rightNowFace}>
-      <Text style={styles.cardEyebrow}>{t('home.nowPlaying')}</Text>
+      <Text style={[styles.cardEyebrow, type.eyebrow]}>{t('home.nowPlaying')}</Text>
       {playing.state === 'playing' ? (
         <>
-          <Text style={styles.cardTitle} numberOfLines={2}>
+          <Text style={type.title} numberOfLines={2}>
             {playing.track}
           </Text>
           {playing.artist ? (
-            <Text style={styles.cardDetail} numberOfLines={1}>
+            <Text style={type.detail} numberOfLines={1}>
               {playing.artist}
             </Text>
           ) : null}
           <View style={styles.waveformRow}>
-            <EqualizerBars color={JaridaPurple[400]} />
+            <EqualizerBars color={theme.color.accentLine} />
           </View>
         </>
       ) : (
-        <Text style={styles.cardTitle}>{t('home.nothingPlaying')}</Text>
+        <Text style={type.title}>{t('home.nothingPlaying')}</Text>
       )}
     </InkCard>
   );
@@ -175,15 +211,16 @@ function NowPlayingCard({ playing }: { playing: NowPlaying }) {
 function NextRoutineCard({ routine, now }: { routine: NextRoutine; now: Date }) {
   const styles = useThemedStyles(makeStyles);
   const { t } = useTranslation();
+  const type = useCardType();
   const until = untilOf(routine.nextRun, now);
 
   return (
     <InkCard style={styles.rightNowCard} contentStyle={styles.rightNowFace}>
-      <Text style={styles.cardEyebrow}>{t('home.nextRoutine')}</Text>
-      <Text style={styles.cardTitle} numberOfLines={2}>
+      <Text style={[styles.cardEyebrow, type.eyebrow]}>{t('home.nextRoutine')}</Text>
+      <Text style={type.title} numberOfLines={2}>
         {routine.label}
       </Text>
-      <Text style={styles.cardDetail}>
+      <Text style={[type.detail, styles.cardClock]}>
         {routine.nextRun.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
       </Text>
       <View style={styles.routineBadge}>
@@ -255,6 +292,7 @@ const DeviceGridItem = React.memo(function DeviceGridItem({
 export default function HomeScreen() {
   const styles = useThemedStyles(makeStyles);
   const { t } = useTranslation();
+  const theme = useInkTheme();
   const { online, hydrated } = useServer();
   const offline = hydrated && !online;
   const recent = useRecentSessions();
@@ -378,7 +416,12 @@ export default function HomeScreen() {
 
         <View style={styles.sectionHeader}>
           <InkTitle level={3}>{t('home.conversations')}</InkTitle>
-          <GPressable onPress={() => router.push('/(tabs)/chat')}>
+          <GPressable
+            onPress={() => router.push('/(tabs)/chat')}
+            hitSlop={12}
+            accessibilityRole="button"
+            accessibilityLabel={t('home.seeAllConversations')}
+          >
             <Text style={styles.seeAllText}>{t('common.seeAll')}</Text>
           </GPressable>
         </View>
@@ -393,7 +436,7 @@ export default function HomeScreen() {
               })
             }
           >
-            <GIcon name="chat" size={14} color={JaridaPurple[400]} />
+            <GIcon name="chat" size={14} color={theme.color.accentLine} />
             <View style={styles.convoWords}>
               <Text style={styles.convoText} numberOfLines={1}>
                 {c.text}
@@ -419,7 +462,12 @@ export default function HomeScreen() {
 
         <View style={styles.sectionHeader}>
           <InkTitle level={3}>{t('home.devices')}</InkTitle>
-          <GPressable onPress={() => router.push('/(tabs)/devices')}>
+          <GPressable
+            onPress={() => router.push('/(tabs)/devices')}
+            hitSlop={12}
+            accessibilityRole="button"
+            accessibilityLabel={t('home.seeAllDevices')}
+          >
             <Text style={styles.seeAllText}>{t('common.seeAll')}</Text>
           </GPressable>
         </View>
@@ -483,10 +531,11 @@ const makeStyles = (c: ThemeColors) =>
     color: c.textTertiary,
   },
   avatar: {
+    // Ink's `touch.tapMin`: the floor a finger can hit, which is also the size this reads best at.
     width: 44,
     height: 44,
-    borderRadius: 22,
-    backgroundColor: JaridaPurple[500],
+    borderRadius: Radii.pill,
+    backgroundColor: c.tint,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -538,23 +587,8 @@ const makeStyles = (c: ThemeColors) =>
   // less to say showed a slab of bare ink below it. The face takes the height
   // too, and the pair reads as one row again.
   rightNowFace: { flex: 1 },
-  cardEyebrow: {
-    ...face('body', 'regular'),
-    fontSize: FontSize.xs,
-    color: c.textTertiary,
-    marginBottom: Spacing.xs,
-  },
-  cardTitle: {
-    ...face('display', 'bold'),
-    fontSize: FontSize.md,
-    color: c.text,
-  },
-  cardDetail: {
-    ...face('body', 'regular'),
-    fontSize: FontSize.sm,
-    color: c.textSecondary,
-    marginTop: 2,
-  },
+  cardEyebrow: { marginBottom: Spacing.xs },
+  cardClock: { fontVariant: ['tabular-nums'], marginTop: Spacing.xs },
   waveformRow: { marginTop: 'auto', paddingTop: Spacing.md },
   routineBadge: { alignSelf: 'flex-start', marginTop: 'auto', paddingTop: Spacing.md },
 

@@ -10,13 +10,9 @@
  * answers one temperature, and the forecast reaches the phone only as a chat tool result.
  */
 
-import React from 'react';
-import { StyleSheet, View } from 'react-native';
-import { InkText } from '@jarida/ink/native';
-
-import { useThemedStyles } from '@/hooks/use-themed-styles';
-import type { ThemeColors } from '@/constants/colors';
-import { Spacing } from '@/constants/spacing';
+import React, { useMemo } from 'react';
+import { StyleSheet, Text, View } from 'react-native';
+import { InkText, inkText, useInkTheme } from '@jarida/ink/native';
 
 export interface Figure {
   key: string;
@@ -25,7 +21,14 @@ export interface Figure {
 }
 
 export function GlanceStrip({ figures }: { figures: Figure[] }) {
-  const styles = useThemedStyles(makeStyles);
+  const theme = useInkTheme();
+  const styles = useMemo(() => makeStyles(theme), [theme]);
+  // Tabular figures and the display face's negative tracking: a number is the loudest thing in
+  // the row, and a proportional set shuffles the label under it each time the count changes.
+  const value = useMemo(
+    () => inkText(theme, { role: 'display', size: 'lg', weight: theme.weight.semibold, tracking: 'title' }).style,
+    [theme],
+  );
 
   if (figures.length === 0) return null;
 
@@ -40,7 +43,7 @@ export function GlanceStrip({ figures }: { figures: Figure[] }) {
           accessible
           accessibilityLabel={`${figure.value} ${figure.label}`}
         >
-          <InkText size="lg" weight="semibold">{figure.value}</InkText>
+          <Text style={[value, styles.numeric]}>{figure.value}</Text>
           <InkText size="sm" tone="tertiary" numberOfLines={1}>{figure.label}</InkText>
         </View>
       ))}
@@ -48,19 +51,17 @@ export function GlanceStrip({ figures }: { figures: Figure[] }) {
   );
 }
 
-const makeStyles = (c: ThemeColors) =>
+const makeStyles = (theme: ReturnType<typeof useInkTheme>) =>
   StyleSheet.create({
-    strip: {
-      flexDirection: 'row',
-      gap: Spacing.sm,
-    },
+    strip: { flexDirection: 'row', gap: theme.space[2] },
     // Equal widths, so three figures read as one row of three rather than as a ragged line.
     figure: {
       flex: 1,
-      gap: 2,
-      paddingVertical: Spacing.sm,
-      paddingHorizontal: Spacing.md,
-      borderRadius: 12,
-      backgroundColor: c.backgroundSecondary,
+      gap: theme.space[1],
+      paddingVertical: theme.space[2],
+      paddingHorizontal: theme.space[3],
+      borderRadius: theme.radius.lg,
+      backgroundColor: theme.color.content,
     },
+    numeric: { fontVariant: ['tabular-nums'] },
   });

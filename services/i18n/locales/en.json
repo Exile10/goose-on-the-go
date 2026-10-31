@@ -92,7 +92,9 @@
     "statOutdoor": "outside",
     "statToday_one": "event today",
     "statToday_other": "events today",
-    "statTempValue": "{{temp}}°"
+    "statTempValue": "{{temp}}°",
+    "seeAllConversations": "See all conversations",
+    "seeAllDevices": "See all devices"
   },
   "chat": {
     "connecting": "Connecting",
