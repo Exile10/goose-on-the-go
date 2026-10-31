@@ -25,8 +25,13 @@ import { useSuggestions, type OfferedPrompt } from './use-suggestions';
 /** A prompt the Pond itself offered: it carries the Pond's id, where a fixed starter carries none. */
 export type PondPrompt = OfferedPrompt & { id: string };
 
-/** How many proposals Home shows before it stops and offers the rest behind See all. */
-export const HOME_PROPOSAL_LIMIT = 2;
+/**
+ * Home states one proposal, not a list of them.
+ *
+ * The screen's one loud thing is the sentence the Pond has for you, and two of them side by side
+ * is a list rather than a statement. The rest wait behind See all, where they already lived.
+ */
+export const HOME_PROPOSAL_LIMIT = 1;
 
 /** How many chips fit a phone without the row becoming a paragraph. */
 export const HOME_PROMPT_LIMIT = 3;
@@ -38,8 +43,10 @@ function homeSessionLabel(): string {
 
 export interface UseHomeIdeas {
   data: {
-    /** At most `HOME_PROPOSAL_LIMIT`, newest first as the Pond ordered them. */
-    proposals: ProposalRow[];
+    /** The one Home states, or null. The Pond's own order decides which. */
+    lead: ProposalRow | null;
+    /** How many wait behind it, for the link that offers them. */
+    rest: number;
     /** How many the Pond is offering in all, so See all can say so. */
     proposalCount: number;
     prompts: PondPrompt[];
@@ -71,7 +78,7 @@ export function useHomeIdeas(): UseHomeIdeas {
   const suggestions = useSuggestions(session);
 
   const rows = proposals.data.rows;
-  const shown = useMemo(() => rows.slice(0, HOME_PROPOSAL_LIMIT), [rows]);
+  const lead = rows.length > 0 ? rows[0] : null;
   // Only what the Pond itself offered. `useSuggestions` keeps the fixed starters on screen when
   // the Pond has none, which is right in a conversation about to be started and wrong here: the
   // same three chips every day under "Ideas from your Pond" would be chrome, and would stop this
@@ -98,7 +105,8 @@ export function useHomeIdeas(): UseHomeIdeas {
 
   return {
     data: {
-      proposals: shown,
+      lead,
+      rest: Math.max(0, rows.length - HOME_PROPOSAL_LIMIT),
       proposalCount: rows.length,
       prompts,
       reminderCount: reminders.data.rows.length,

@@ -35,12 +35,14 @@ import { EqualizerBars } from '@/components/ui/equalizer-bars';
 import { ContentUnavailable } from '@/components/patterns/content-unavailable';
 import { GlanceStrip, type Figure } from '@/components/patterns/glance-strip';
 import { HomeIdeas } from '@/components/patterns/home-ideas';
+import { PondSays } from '@/components/patterns/pond-says';
 import { FinishSetup } from '@/components/patterns/finish-setup';
 import { AgentsGettingReady } from '@/components/patterns/agents-building';
 import { PondGettingReady } from '@/components/patterns/pond-getting-ready';
 import { RemoteAccessOffer } from '@/components/patterns/remote-access-offer';
 import { isUnavailable } from '@/models/content-state';
 import { useActivitySummary } from '@/view-models/use-activity-summary';
+import { useHomeIdeas } from '@/view-models/use-home-ideas';
 import { useContentState } from '@/view-models/use-content-state';
 import { usePullToRefresh } from '@/view-models/use-pull-to-refresh';
 import { useRecentSessions } from '@/view-models/use-recent-sessions';
@@ -62,7 +64,9 @@ import { Radii } from '@/constants/radii';
  * The type the Right now cards are set in, from Ink's own scale rather than by hand.
  *
  * The eyebrow is the mono micro-label the tracking scale was built for: at 0.14em it separates
- * the card's label from its content without a rule or a box. The title is display at -0.02em,
+ * the card's label from its content without a rule or a box. Sentence case, not caps -- the
+ * tracking is what does the separating, and a tracked-out capital label above every heading is
+ * the commonest tell of a page nobody chose the type for. The title is display at -0.02em,
  * because a bold face reads looser the larger it is set and the negative tracking is what takes
  * that back. Leading tightens as the size grows, for the same reason.
  */
@@ -74,7 +78,6 @@ function useCardType() {
         role: 'mono',
         size: 'xs',
         tracking: 'eyebrow',
-        uppercase: true,
         color: theme.color.textTertiary,
       }).style,
       title: inkText(theme, {
@@ -303,6 +306,8 @@ export default function HomeScreen() {
   const member = useMember();
   const rightNow = useRightNow().data;
   const today = useActivitySummary().data.summary?.total ?? null;
+  // One read for both the sentence at the top and the chips below it.
+  const ideas = useHomeIdeas();
   const router = useRouter();
   const chrome = useChromeScroll();
   const bottomInset = useBottomBarInset();
@@ -339,21 +344,22 @@ export default function HomeScreen() {
   const showOnlineCount = devicesState === 'ready' || devicesState === 'empty';
   const showOutdoor = rightNow.outdoorTemp !== null;
 
-  // Only figures with a source behind them; the strip hides when there are none.
+  // Only phrases with a source behind them; the line hides when there are none.
   const figures: Figure[] = [];
   if (showOnlineCount) {
-    figures.push({ key: 'devices', value: String(devices.data.onlineCount), label: t('home.statDevicesOn') });
+    figures.push({ key: 'devices', phrase: t('home.lineDevicesOn', { count: devices.data.onlineCount }) });
   }
   if (showOutdoor) {
     figures.push({
       key: 'outdoor',
-      value: t('home.statTempValue', { temp: rightNow.outdoorTemp }),
       // Where the Pond is configured to be, which is not always where the reader is.
-      label: rightNow.outdoorPlace ?? t('home.statOutdoor'),
+      phrase: rightNow.outdoorPlace
+        ? t('home.lineOutdoorPlace', { temp: rightNow.outdoorTemp, place: rightNow.outdoorPlace })
+        : t('home.lineOutdoor', { temp: rightNow.outdoorTemp }),
     });
   }
   if (today !== null) {
-    figures.push({ key: 'today', value: String(today), label: t('home.statToday', { count: today }) });
+    figures.push({ key: 'today', phrase: t('home.lineToday', { count: today }) });
   }
 
   return (
@@ -366,8 +372,10 @@ export default function HomeScreen() {
       >
         <View style={styles.greetingRow}>
           <View style={styles.greetingText}>
-            <Text style={styles.greetingLabel}>{t(greetingKey(now.getHours()))}</Text>
-            <InkTitle level={1}>{firstName(member?.displayName) ?? t('home.you')}</InkTitle>
+            <Text style={styles.greetingLabel}>
+              {t(greetingKey(now.getHours()))}
+              {member?.displayName ? `, ${firstName(member.displayName)}` : ''}
+            </Text>
           </View>
           <GPressable feedback="lift"
             style={styles.avatar}
@@ -382,6 +390,16 @@ export default function HomeScreen() {
             )}
           </GPressable>
         </View>
+
+        {offline ? null : (
+          <PondSays
+            lead={ideas.data.lead}
+            reminderCount={ideas.data.reminderCount}
+            deciding={ideas.deciding}
+            onAccept={(id) => void ideas.actions.approve(id)}
+            onDecline={(id) => void ideas.actions.decline(id)}
+          />
+        )}
 
         {offline ? null : <GlanceStrip figures={figures} />}
 

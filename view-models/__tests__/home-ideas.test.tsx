@@ -102,7 +102,8 @@ it('mints a different label each visit, so one is never a session anyone else ho
   expect(a).not.toBe(b);
 });
 
-it('shows only as many proposals as Home has room for, and says how many are left', async () => {
+// Home states one, because two side by side is a list and a list is not a statement.
+it('states one proposal and says how many wait behind it', async () => {
   pond.listProposals.mockResolvedValue([
     proposal(),
     proposal({ id: 'p2' }),
@@ -110,8 +111,17 @@ it('shows only as many proposals as Home has room for, and says how many are lef
     proposal({ id: 'p4' }),
   ] as never);
   const m = await mount();
-  expect(m.vm.data.proposals).toHaveLength(HOME_PROPOSAL_LIMIT);
+  expect(HOME_PROPOSAL_LIMIT).toBe(1);
+  expect(m.vm.data.lead?.id).toBe('p1');
+  expect(m.vm.data.rest).toBe(3);
   expect(m.vm.data.proposalCount).toBe(4);
+  await m.unmount();
+});
+
+it('has no lead and nothing behind it when the Pond proposed nothing', async () => {
+  const m = await mount();
+  expect(m.vm.data.lead).toBeNull();
+  expect(m.vm.data.rest).toBe(0);
   await m.unmount();
 });
 

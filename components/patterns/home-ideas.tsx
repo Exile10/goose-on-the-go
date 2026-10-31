@@ -1,42 +1,41 @@
 /**
- * HomeIdeas — the Pond's own ideas, on Home: proposals awaiting a yes or no, prompts worth
- * asking, and a line for reminders still pending.
+ * HomeIdeas — the prompts the Pond offers, and the way through to what it has not said yet.
  *
- * All three were already composed by the Pond and reachable only from the You tab. Home is the
- * glance; `/(stack)/suggestions` and `/(stack)/reminders` stay the record, and See all leads
- * there once there is more than fits.
+ * The one proposal Home states is the sentence at the top (`PondSays`); this is what is left:
+ * things worth asking, composed by the Pond from its memories, and a link to any proposals
+ * waiting behind the one on show.
  *
- * Accepting records a yes and runs nothing -- `ProposalDecisionResult.executed` is always false --
- * which is what makes deciding in place here acceptable rather than a button that acts unseen.
+ * Only prompts carrying a Pond id appear. `useSuggestions` keeps the fixed starters on screen
+ * when the Pond has none, which is right in a conversation about to be started and wrong here --
+ * the same three chips every day would be chrome, and would stop this ever being absent.
  *
  * Reminders are a line and never a card with a dismiss: dismissal is final, the Pond has no route
- * that brings one back, and the asking belongs on the screen that already asks.
- *
- * Draws nothing at all when the Pond has offered nothing, which is the rest of Home's rule.
+ * that brings one back, and the asking belongs on the screen that already asks. They appear here
+ * only when the sentence above is not already carrying them.
  */
 
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { InkButton, InkCard, InkChip, InkText, InkTitle } from '@jarida/ink/native';
+import { InkChip, InkText, InkTitle, useInkTheme } from '@jarida/ink/native';
 
 import { GPressable } from '@/components/ui/g-pressable';
-import { useThemedStyles } from '@/hooks/use-themed-styles';
-import type { ThemeColors } from '@/constants/colors';
-import { Spacing } from '@/constants/spacing';
 import { selectionTick } from '@/services/haptics';
 import { useHomeIdeas, type PondPrompt } from '@/view-models/use-home-ideas';
 
 export function HomeIdeas() {
   const { t } = useTranslation();
   const router = useRouter();
-  const styles = useThemedStyles(makeStyles);
-  const { data, deciding, empty, actions } = useHomeIdeas();
+  const theme = useInkTheme();
+  const styles = makeStyles(theme);
+  const { data, actions } = useHomeIdeas();
 
-  if (empty) return null;
+  // The sentence at the top states a proposal when there is one, and carries the reminders when
+  // there is not. This draws the reminders line only in the case it does not.
+  const showReminders = data.reminderCount > 0 && data.lead !== null;
 
-  const more = data.proposalCount - data.proposals.length;
+  if (data.prompts.length === 0 && data.rest === 0 && !showReminders) return null;
 
   const ask = (prompt: PondPrompt) => {
     void selectionTick();
@@ -45,71 +44,53 @@ export function HomeIdeas() {
   };
 
   return (
-    <>
-      <View style={styles.header}>
-        <InkTitle level={3}>
-          {data.proposals.length > 0 ? t('home.ideasTitle') : t('home.ideasAsk')}
-        </InkTitle>
-        {more > 0 ? (
-          <GPressable onPress={() => router.push('/(stack)/suggestions')}>
-            <InkText size="sm" tone="secondary">{t('home.ideasSeeAll', { count: more })}</InkText>
-          </GPressable>
-        ) : null}
-      </View>
-
-      {data.proposals.map((row) => (
-        <InkCard key={row.id} style={styles.card}>
-          <InkText weight="semibold">{row.summary}</InkText>
-          <InkText size="sm" tone="secondary">{t('proposals.card.why', { rationale: row.rationale })}</InkText>
-          <View style={styles.actions}>
-            <InkButton
-              variant="quiet"
-              icon="x"
-              disabled={deciding !== null}
-              onPress={() => void actions.decline(row.id)}
-            >
-              {t('proposals.card.decline')}
-            </InkButton>
-            <InkButton
-              variant="primary"
-              icon="check"
-              loading={deciding === row.id}
-              disabled={deciding !== null}
-              onPress={() => void actions.approve(row.id)}
-            >
-              {t('proposals.card.accept')}
-            </InkButton>
-          </View>
-        </InkCard>
-      ))}
-
+    <View style={styles.block}>
       {data.prompts.length > 0 ? (
-        <View style={styles.chips}>
-          {data.prompts.map((prompt) => (
-            <InkChip key={prompt.id} onPress={() => ask(prompt)}>
-              {prompt.prompt}
-            </InkChip>
-          ))}
-        </View>
+        <>
+          <InkTitle level={3}>{t('home.ideasAsk')}</InkTitle>
+          <View style={styles.chips}>
+            {data.prompts.map((prompt) => (
+              <InkChip key={prompt.id} onPress={() => ask(prompt)}>
+                {prompt.prompt}
+              </InkChip>
+            ))}
+          </View>
+        </>
       ) : null}
 
-      {data.reminderCount > 0 ? (
-        <GPressable style={styles.reminders} onPress={() => router.push('/(stack)/reminders')}>
+      {data.rest > 0 ? (
+        <GPressable
+          hitSlop={12}
+          accessibilityRole="button"
+          onPress={() => {
+            void selectionTick();
+            router.push('/(stack)/suggestions');
+          }}
+        >
+          <InkText size="sm" tone="secondary">{t('home.ideasSeeAll', { count: data.rest })}</InkText>
+        </GPressable>
+      ) : null}
+
+      {showReminders ? (
+        <GPressable
+          hitSlop={12}
+          accessibilityRole="button"
+          onPress={() => {
+            void selectionTick();
+            router.push('/(stack)/reminders');
+          }}
+        >
           <InkText size="sm" tone="secondary">
             {t('home.remindersWaiting', { count: data.reminderCount })}
           </InkText>
         </GPressable>
       ) : null}
-    </>
+    </View>
   );
 }
 
-const makeStyles = (_c: ThemeColors) =>
+const makeStyles = (theme: ReturnType<typeof useInkTheme>) =>
   StyleSheet.create({
-    header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-    // InkCard draws its own face and plate; this carries layout only.
-    card: { gap: Spacing.sm },
-    actions: { flexDirection: 'row', justifyContent: 'flex-end', gap: Spacing.sm },
-    chips: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm },
-    reminders: { paddingVertical: Spacing.xs },
+    block: { gap: theme.space[2], marginBottom: theme.space[5] },
+    chips: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.space[2] },
   });
