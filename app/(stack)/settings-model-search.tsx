@@ -3,9 +3,9 @@
  */
 
 import React from 'react';
-import { Pressable, Text, TextInput, View } from 'react-native';
+import { View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { InkSpinner } from '@jarida/ink/native';
+import { InkButton, InkSearchField, InkSpinner } from '@jarida/ink/native';
 
 import { SettingsGroup, SettingsHeader, SettingsMessage, SettingsRow } from '@/components/settings/settings-list';
 import { SettingsScroll } from '@/components/settings/settings-scroll';
@@ -64,22 +64,17 @@ export default function ModelSearchScreen() {
     <SettingsScroll typing>
       <SettingsHeader icon="search" tile="blue" title={t('models.library.search')} description={t('models.library.footer.search')} />
       <View style={styles.search}>
-        <GIcon name="search" size={18} color={colors.textTertiary} />
-        <TextInput
+        <InkSearchField
+          label={t('models.library.search')}
           value={search.query}
-          onChangeText={search.actions.setQuery}
-          onSubmitEditing={() => void search.actions.search()}
+          onChange={search.actions.setQuery}
+          onSubmit={() => void search.actions.search()}
           placeholder={t('models.library.searchPlaceholder')}
-          placeholderTextColor={colors.textTertiary}
-          autoCapitalize="none"
-          autoCorrect={false}
-          returnKeyType="search"
-          accessibilityLabel={t('models.library.search')}
-          style={styles.input}
+          style={styles.field}
         />
-        <Pressable onPress={() => void search.actions.search()} accessibilityRole="button" hitSlop={8}>
-          <Text style={styles.searchButton}>{t('models.library.searchButton')}</Text>
-        </Pressable>
+        <InkButton variant="primary" loading={search.searching} onPress={() => void search.actions.search()}>
+          {t('models.library.searchButton')}
+        </InkButton>
       </View>
 
       {search.searching ? <InkSpinner label={t('models.library.searchButton')} /> : null}
@@ -122,18 +117,6 @@ export default function ModelSearchScreen() {
 }
 
 const makeStyles = (c: SettingsColors, type: SettingsType, m: SettingsMetrics) => ({
-  search: {
-    flexDirection: 'row' as const,
-    alignItems: 'center' as const,
-    gap: Spacing.sm,
-    backgroundColor: c.group,
-    borderRadius: m.radius.md,
-    borderWidth: m.hairline,
-    borderColor: c.edge,
-    paddingHorizontal: Spacing.md,
-    minHeight: 48,
-    marginBottom: Spacing.lg,
-  },
-  input: { ...type.body, flex: 1, paddingVertical: Spacing.sm },
-  searchButton: { ...type.label, color: c.accent },
+  search: { flexDirection: 'row' as const, alignItems: 'center' as const, gap: Spacing.sm, marginBottom: Spacing.lg },
+  field: { flex: 1 },
 });

@@ -61,7 +61,7 @@ export default function WakeWordScreen() {
           {wake.error ? <InkNotice tone="danger">{wake.error}</InkNotice> : null}
         </ScrollView>
         <View style={styles.foot}>
-          <InkButton variant="primary" block disabled={!valid || !changed || wake.saving} onPress={() => void wake.actions.save()}>
+          <InkButton variant="primary" block disabled={!valid || !changed} loading={wake.saving} onPress={() => void wake.actions.save()}>
             {t('setup.wake.save')}
           </InkButton>
         </View>

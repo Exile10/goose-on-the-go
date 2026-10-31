@@ -15,7 +15,7 @@
  */
 
 import React, { useState } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import {
@@ -34,9 +34,9 @@ import {
 } from '@jarida/ink/native';
 import type { CivilDate } from '@jarida/ink';
 
+import { Spacing } from '@/constants/spacing';
 import { LabelledSwitch } from '@/components/patterns/labelled-switch';
 import { RoutineDevices } from '@/components/patterns/routine-devices';
-import { GSheetBody } from '@/components/ui/g-sheet-body';
 import {
   CRON_WEEKDAYS,
   TIMINGS,
@@ -54,7 +54,6 @@ import {
 } from '@/models/schedule';
 import { confirm, reject } from '@/services/haptics';
 import type { CreateScheduleRequest, Schedule, UpdateScheduleRequest } from '@/services/types';
-import { Spacing } from '@/constants/spacing';
 
 export type ScheduleFormSheetProps = {
   open: boolean;
@@ -202,16 +201,45 @@ export function ScheduleFormSheet(props: ScheduleFormSheetProps) {
       onClose={onClose}
       title={editing ? t('schedule.form.editScheduleTitle') : t('schedule.form.scheduleTitle')}
     >
-      <GSheetBody>
-        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-          <InkFormField label={t('schedule.form.name')}>
-            <InkInput
-              label={t('schedule.form.name')}
-              placeholder={t('schedule.form.schedulePlaceholder')}
-              value={draft.name}
-              onChange={set('name')}
+      <InkFormField label={t('schedule.form.name')}>
+        <InkInput
+          label={t('schedule.form.name')}
+          placeholder={t('schedule.form.schedulePlaceholder')}
+          value={draft.name}
+          onChange={set('name')}
+        />
+      </InkFormField>
+
+
+      {draft.timing === 'once' ? (
+        <>
+          <InkFormField label={t('schedule.form.date')}>
+            <InkDatePicker
+              label={t('schedule.form.date')}
+              placeholder={t('schedule.form.datePlaceholder')}
+              value={draft.date}
+              onChange={set('date')}
+              today={today}
+              min={today}
             />
           </InkFormField>
+          <InkFormField label={t('schedule.form.time')}>
+            <InkTimePicker label={t('schedule.form.time')} value={draft.time} onChange={set('time')} />
+          </InkFormField>
+        </>
+      ) : (
+        <>
+          <InkFormField label={t('schedule.form.cron')}>
+            <InkInput
+              label={t('schedule.form.cron')}
+              placeholder="0 0 9 * * 1-5"
+              value={draft.cron}
+              onChange={set('cron')}
+            />
+          </InkFormField>
+          <InkText size="sm" tone="tertiary">{t('schedule.form.cronHint')}</InkText>
+        </>
+      )}
 
           {offersRoutine ? (
             <InkFormField label={t('schedule.form.does')}>
@@ -335,17 +363,7 @@ export function ScheduleFormSheet(props: ScheduleFormSheetProps) {
 
           {preview ? <InkText size="sm" tone="secondary">{preview}</InkText> : null}
 
-          {zones ? (
-            <InkFormField label={t('schedule.form.timezone')}>
-              <InkSegmented
-                label={t('schedule.form.timezone')}
-                value={draft.timezone}
-                options={zones.map((zone) => ({ value: zone, label: zone }))}
-                onChange={set('timezone')}
-              />
-            </InkFormField>
-          ) : null}
-          <InkText size="sm" tone="tertiary">{t('schedule.form.phoneZone', { zone: phoneZone })}</InkText>
+      {error ? <InkNotice tone="danger">{error}</InkNotice> : null}
 
           {draft.does === 'routine' ? (
             // Only while open, so the device list is not read behind a closed sheet.
@@ -367,11 +385,9 @@ export function ScheduleFormSheet(props: ScheduleFormSheetProps) {
 
           {error ? <InkNotice tone="danger">{error}</InkNotice> : null}
 
-          <InkButton variant="primary" block disabled={submitting} onPress={submit}>
+          <InkButton variant="primary" block loading={submitting} onPress={submit}>
             {editing ? t('schedule.form.save') : t('schedule.form.create')}
           </InkButton>
-        </ScrollView>
-      </GSheetBody>
     </InkSheet>
   );
 }

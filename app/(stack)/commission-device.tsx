@@ -8,27 +8,33 @@
  * work — so the screen commits to waiting rather than appearing to hang.
  */
 
-import { useTranslation } from 'react-i18next';
 import React, { useCallback, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, TextInput, View } from 'react-native';
-import { InkButton } from '@jarida/ink/native';
+import { ScrollView, StyleSheet, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
+import {
+  InkButton,
+  InkFormField,
+  InkInput,
+  InkNotice,
+  InkSpinner,
+  InkText,
+  InkTitle,
+  useInkTheme,
+} from '@jarida/ink/native';
 import { useFocusEffect, useRouter } from 'expo-router';
 
 import { GIcon } from '@/components/ui/g-icon';
 import { GKeyboardView } from '@/components/ui/g-keyboard-view';
-import { GPressable } from '@/components/ui/g-pressable';
+import type { ThemeColors } from '@/constants/colors';
+import { Spacing } from '@/constants/spacing';
+import { useThemedStyles } from '@/hooks/use-themed-styles';
 import { looksLikeTypedSetupCode } from '@/models/pairing';
 import { takeSetupCode } from '@/services/pairing-handoff';
 import { useDevices } from '@/view-models/use-devices';
-import { Grey, JaridaPurple, Semantic } from '@/constants/colors';
-import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
-import { Spacing } from '@/constants/spacing';
-import { Radii } from '@/constants/radii';
-import { useThemedStyles } from '@/hooks/use-themed-styles';
-import type { ThemeColors } from '@/constants/colors';
 
 export default function CommissionDeviceScreen() {
   const styles = useThemedStyles(makeStyles);
+  const theme = useInkTheme();
   const { t } = useTranslation();
   const router = useRouter();
   const { data, error, actions } = useDevices();
@@ -59,144 +65,70 @@ export default function CommissionDeviceScreen() {
   if (busy) {
     return (
       <View style={styles.centred}>
-        <ActivityIndicator color={JaridaPurple[500]} />
-        <Text style={styles.title}>{t('commission.adding')}</Text>
-        <Text style={styles.desc}>{t('commission.addingDesc')}</Text>
+        <InkSpinner label={t('commission.adding')} size={28} />
+        <InkTitle level={2} style={styles.centredText}>{t('commission.adding')}</InkTitle>
+        <InkText tone="secondary" style={styles.centredText}>{t('commission.addingDesc')}</InkText>
       </View>
     );
   }
 
   return (
     <GKeyboardView style={styles.container}>
-      <GIcon name="device" size={28} color={JaridaPurple[500]} />
-      <Text style={styles.title}>{t('commission.title')}</Text>
-      <Text style={styles.desc}>{t('commission.desc')}</Text>
+      <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+        <GIcon name="device" size={28} color={theme.color.accentLine} />
+        <InkTitle level={2}>{t('commission.title')}</InkTitle>
+        <InkText tone="secondary">{t('commission.desc')}</InkText>
 
-      {commissioning ? (
-        <Text style={styles.notice}>{t('commission.controllerStarting')}</Text>
-      ) : null}
+        {commissioning ? <InkNotice tone="warning">{t('commission.controllerStarting')}</InkNotice> : null}
 
-      <View style={styles.inputGroup}>
-        <Text style={styles.inputLabel}>{t('commission.setupCode')}</Text>
-        <TextInput
-          style={styles.textInput}
-          value={code}
-          onChangeText={setCode}
-          placeholder={t('commission.codePlaceholder')}
-          placeholderTextColor={Grey[400]}
-          autoCapitalize="characters"
-          autoCorrect={false}
-        />
-        {/* A Matter QR payload is around ninety characters of base-38, which is
-            not a thing to read off a box and type. Scanning is the ordinary
-            route; the field stays because the manual code beside the QR exists
-            for exactly the times the camera cannot be used. */}
-        <GPressable
-          accessibilityRole="button"
-          onPress={() => router.push('/(stack)/connect-desktop?mode=matter')}
-          hitSlop={8}
-          style={styles.scanLink}
-        >
-          <GIcon name="camera" size={16} color={JaridaPurple[500]} />
-          <Text style={styles.scanLinkText}>{t('commission.scan')}</Text>
-        </GPressable>
-      </View>
+        <InkFormField label={t('commission.setupCode')}>
+          <InkInput
+            label={t('commission.setupCode')}
+            value={code}
+            onChange={setCode}
+            placeholder={t('commission.codePlaceholder')}
+            inputProps={{ autoCapitalize: 'characters', autoCorrect: false, returnKeyType: 'next' }}
+          />
+          {/* A Matter QR payload is around ninety characters of base-38, which is
+              not a thing to read off a box and type. Scanning is the ordinary
+              route; the field stays because the manual code beside the QR exists
+              for exactly the times the camera cannot be used. */}
+          <InkButton size="sm" icon="camera" onPress={() => router.push('/(stack)/connect-desktop?mode=matter')}>
+            {t('commission.scan')}
+          </InkButton>
+        </InkFormField>
 
-      <View style={styles.inputGroup}>
-        <Text style={styles.inputLabel}>{t('commission.nameOptional')}</Text>
-        <TextInput
-          style={styles.textInput}
-          value={name}
-          onChangeText={setName}
-          placeholder={t('commission.namePlaceholder')}
-          placeholderTextColor={Grey[400]}
-        />
-      </View>
+        <InkFormField label={t('commission.nameOptional')}>
+          <InkInput
+            label={t('commission.nameOptional')}
+            value={name}
+            onChange={setName}
+            placeholder={t('commission.namePlaceholder')}
+          />
+        </InkFormField>
 
-      {error ? <Text style={styles.error}>{error}</Text> : null}
+        {error ? <InkNotice tone="danger">{error}</InkNotice> : null}
 
-      <InkButton
-        variant="primary"
-        disabled={!looksLikeTypedSetupCode(code) || commissioning}
-        onPress={submit}
-      >
-        {t('commission.addDevice')}
-      </InkButton>
-
-      <Text style={styles.footnote}>{t('commission.bluetoothFootnote')}</Text>
+        <InkButton variant="primary" block disabled={!looksLikeTypedSetupCode(code) || commissioning} onPress={submit}>
+          {t('commission.addDevice')}
+        </InkButton>
+        <InkText size="sm" tone="secondary">{t('commission.bluetoothFootnote')}</InkText>
+      </ScrollView>
     </GKeyboardView>
   );
 }
 
 const makeStyles = (c: ThemeColors) =>
   StyleSheet.create({
-  container: { flex: 1, backgroundColor: c.background, padding: Spacing.xl, gap: Spacing.md },
-  centred: {
-    flex: 1,
-    backgroundColor: c.background,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: Spacing.xl,
-    gap: Spacing.md,
-  },
-  title: {
-    fontFamily: FontFamily.heading,
-    fontSize: FontSize.xl,
-    fontWeight: FontWeight.bold,
-    color: c.text,
-  },
-  desc: {
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.base,
-    color: c.textTertiary,
-    lineHeight: FontSize.base * 1.5,
-  },
-  notice: {
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.sm,
-    color: Semantic.warning,
-  },
-  error: {
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.sm,
-    color: Semantic.danger,
-    lineHeight: FontSize.sm * 1.5,
-  },
-  footnote: {
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.sm,
-    color: c.textTertiary,
-    lineHeight: FontSize.sm * 1.5,
-  },
-  inputGroup: { gap: Spacing.xs },
-  scanLink: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-    gap: Spacing.xs,
-    paddingTop: Spacing.xs,
-  },
-  scanLinkText: {
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.sm,
-    fontWeight: FontWeight.semibold,
-    color: c.textBrand,
-  },
-  inputLabel: {
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.sm,
-    fontWeight: FontWeight.semibold,
-    color: c.textSecondary,
-  },
-  textInput: {
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.base,
-    color: c.text,
-    backgroundColor: c.backgroundSecondary,
-    borderWidth: 1,
-    borderColor: c.border,
-    borderRadius: Radii.md,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.md,
-  },
-});
+    container: { flex: 1, backgroundColor: c.background },
+    scroll: { padding: Spacing.xl, gap: Spacing.lg, paddingBottom: Spacing['3xl'] },
+    centred: {
+      flex: 1,
+      backgroundColor: c.background,
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: Spacing.xl,
+      gap: Spacing.md,
+    },
+    centredText: { textAlign: 'center' },
+  });

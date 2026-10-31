@@ -72,6 +72,21 @@ elements; use `Accent` for those.
 
 Each has a `Soft` variant for backgrounds (e.g., `Semantic.successSoft`).
 
+These are fixed fills, the same on both grounds. As text or a mark on a themed
+surface use the theme's tone instead — `colors.danger`, `success`, `warning`,
+`info` from `useTheme()` or a `ThemeColors` style factory. `Semantic.danger` is
+about 3.3:1 as text on the dark card; the theme's tone is Ink's per-scheme
+foreground and clears 4.5:1 on both.
+
+### Theme colours
+
+`LightColors` and `DarkColors` in `constants/colors.ts` are read off Ink's own
+theme (`createTheme({ scheme, accent: 'Purple' })`), not kept beside it:
+`background` is Ink's `bg`, `card` its `surface`, `border` its `line`, the text
+steps its text steps. A screen styled through `useThemedStyles` and the Ink
+components on it therefore share one page, one card and one ink in both schemes.
+Change a value in Ink, not here.
+
 ## Typography
 
 ### Font Families
@@ -101,6 +116,11 @@ medium:   500
 semibold: 600
 bold:     700
 ```
+
+Never set `fontWeight` beside `FontFamily` in a style. Android draws a weight on
+a custom family in its regular face, so headings came out thin there. Spread
+`face(role, weight)` instead — `...face('display', 'semibold')` — which names that
+weight's own registered file, exactly as Ink's text does.
 
 ## Spacing (4pt Grid)
 ```

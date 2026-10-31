@@ -6,7 +6,8 @@
  */
 
 import React, { useCallback, useState } from 'react';
-import { ActivityIndicator, FlatList, StyleSheet, Text, TextInput, View } from 'react-native';
+import { FlatList, StyleSheet, Text, TextInput, View } from 'react-native';
+import { InkSpinner } from '@jarida/ink/native';
 import { useRouter } from 'expo-router';
 
 import { GIcon } from '@/components/ui/g-icon';
@@ -14,8 +15,8 @@ import { GPressable } from '@/components/ui/g-pressable';
 import type { SessionSummary } from '@/services/types';
 import { usePullToRefresh } from '@/view-models/use-pull-to-refresh';
 import { useSessions } from '@/view-models/use-sessions';
-import { Semantic, type ThemeColors } from '@/constants/colors';
-import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
+import type { ThemeColors } from '@/constants/colors';
+import { FontSize, face } from '@/constants/typography';
 import { Spacing } from '@/constants/spacing';
 import { Radii } from '@/constants/radii';
 import { useThemedStyles } from '@/hooks/use-themed-styles';
@@ -59,7 +60,7 @@ const SessionRow = React.memo(function SessionRow({
               placeholderTextColor={colors.textTertiary}
             />
             <GPressable onPress={confirmRename} hitSlop={8}>
-              <GIcon name="check" size={18} color={Semantic.success} />
+              <GIcon name="check" size={18} color={colors.success} />
             </GPressable>
           </View>
         ) : (
@@ -132,7 +133,7 @@ export default function SessionsScreen() {
   if (loading && data.sessions.length === 0) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator color={Semantic.info} />
+        <InkSpinner label={i18n.t('sessions.loading')} />
       </View>
     );
   }
@@ -175,19 +176,18 @@ const makeStyles = (c: ThemeColors) =>
     },
     rowBody: { flex: 1 },
     title: {
-      fontFamily: FontFamily.heading,
+      ...face('display', 'semibold'),
       fontSize: FontSize.base,
-      fontWeight: FontWeight.semibold,
       color: c.text,
     },
     preview: {
-      fontFamily: FontFamily.body,
+      ...face('body', 'regular'),
       fontSize: FontSize.sm,
       color: c.textSecondary,
       marginTop: 2,
     },
     updatedAt: {
-      fontFamily: FontFamily.body,
+      ...face('body', 'regular'),
       fontSize: FontSize.xs,
       color: c.textTertiary,
       marginTop: Spacing.xs,
@@ -203,7 +203,7 @@ const makeStyles = (c: ThemeColors) =>
     },
     editInput: {
       flex: 1,
-      fontFamily: FontFamily.body,
+      ...face('body', 'regular'),
       fontSize: FontSize.base,
       color: c.text,
       borderBottomWidth: 1,
@@ -218,13 +218,12 @@ const makeStyles = (c: ThemeColors) =>
       gap: Spacing.xs,
     },
     emptyTitle: {
-      fontFamily: FontFamily.heading,
+      ...face('display', 'semibold'),
       fontSize: FontSize.base,
-      fontWeight: FontWeight.semibold,
       color: c.text,
     },
     emptyMessage: {
-      fontFamily: FontFamily.body,
+      ...face('body', 'regular'),
       fontSize: FontSize.sm,
       color: c.textSecondary,
     },

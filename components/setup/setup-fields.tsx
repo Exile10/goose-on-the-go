@@ -2,9 +2,9 @@
 // this month and a birth year is decades back, and a zone as a searchable sheet of the Pond's own.
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { FlatList, StyleSheet, TextInput, View } from 'react-native';
+import { FlatList, StyleSheet, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { InkButton, InkInput, InkListItem, InkSelect, InkSheet, InkSpinner, InkText, inkText, useInkTheme } from '@jarida/ink/native';
+import { InkButton, InkInput, InkListItem, InkSearchField, InkSelect, InkSheet, InkSpinner, InkText } from '@jarida/ink/native';
 
 import { GIcon } from '@/components/ui/g-icon';
 import { GPressable } from '@/components/ui/g-pressable';
@@ -85,45 +85,17 @@ export function BirthdayField({ value, onChange }: { value: string; onChange: (n
   );
 }
 
-// Ink's search field with autocorrect off, which Ink's own cannot do: tapping a result committed
-// "Jairo" for "nairo" and emptied the list under the finger.
+// Autocorrect stays off, as Ink's search field keeps it: on, tapping a result committed "Jairo" for
+// "nairo" and emptied the list under the finger.
 function ZoneSearch({ value, onChange }: { value: string; onChange: (next: string) => void }) {
   const { t } = useTranslation();
-  const theme = useInkTheme();
-  const field = inkText(theme, { size: 'md' });
   return (
-    <View
-      style={[
-        styles.search,
-        {
-          gap: theme.space[2],
-          minHeight: theme.touch.tapMin,
-          paddingHorizontal: theme.space[3],
-          borderWidth: theme.edge.hairlineWidth,
-          borderColor: theme.color.lineStrong,
-          borderRadius: theme.radius.pill,
-          backgroundColor: theme.color.surface,
-        },
-      ]}
-    >
-      <TextInput
-        value={value}
-        onChangeText={onChange}
-        placeholder={t('setup.locale.zoneSearch')}
-        placeholderTextColor={theme.color.textTertiary}
-        autoCorrect={false}
-        autoCapitalize="none"
-        spellCheck={false}
-        returnKeyType="search"
-        accessibilityLabel={t('setup.locale.zoneSearch')}
-        style={[field.style, styles.searchInput, { paddingVertical: theme.space[2] }]}
-      />
-      {value ? (
-        <InkButton variant="quiet" icon="x" onPress={() => onChange('')}>
-          {t('setup.locale.zoneClear')}
-        </InkButton>
-      ) : null}
-    </View>
+    <InkSearchField
+      label={t('setup.locale.zoneSearch')}
+      value={value}
+      onChange={onChange}
+      placeholder={t('setup.locale.zoneSearch')}
+    />
   );
 }
 
@@ -214,7 +186,5 @@ const styles = StyleSheet.create({
   month: { flex: 4 },
   year: { flex: 2.5 },
   sheet: { gap: Spacing.md, minHeight: 320 },
-  search: { flexDirection: 'row', alignItems: 'center' },
-  searchInput: { flex: 1 },
   list: { maxHeight: 420 },
 });

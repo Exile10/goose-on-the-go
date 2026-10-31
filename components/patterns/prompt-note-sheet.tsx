@@ -6,15 +6,12 @@
  */
 
 import React, { useState } from 'react';
-import { ScrollView, StyleSheet } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { InkButton, InkFormField, InkInput, InkNotice, InkSheet, InkText, InkTextArea } from '@jarida/ink/native';
 
-import { GSheetBody } from '@/components/ui/g-sheet-body';
 import { ADVISED_NOTE_LENGTH, noteName } from '@/models/prompt-extras';
 import { confirm, reject } from '@/services/haptics';
 import type { PromptExtra } from '@/services/types';
-import { Spacing } from '@/constants/spacing';
 
 export interface PromptNoteSheetProps {
   open: boolean;
@@ -57,48 +54,40 @@ export function PromptNoteSheet({ open, editing, onClose, onAdd, onEdit }: Promp
       onClose={onClose}
       title={editing ? t('promptNotes.form.editTitle', { name: noteName(editing.key) }) : t('promptNotes.form.newTitle')}
     >
-      <GSheetBody maxHeightRatio={0.75}>
-        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-          {editing ? null : (
-            <>
-              <InkFormField label={t('promptNotes.form.name')}>
-                <InkInput
-                  label={t('promptNotes.form.name')}
-                  placeholder={t('promptNotes.form.namePlaceholder')}
-                  value={name}
-                  onChange={setName}
-                />
-              </InkFormField>
-              <InkText size="sm" tone="tertiary">{t('promptNotes.form.nameHint')}</InkText>
-            </>
-          )}
-
-          <InkFormField label={t('promptNotes.form.text')}>
-            <InkTextArea
-              label={t('promptNotes.form.text')}
-              placeholder={t('promptNotes.form.textPlaceholder')}
-              value={text}
-              onChange={setText}
-              rows={3}
-              maxRows={8}
+      {editing ? null : (
+        <>
+          <InkFormField label={t('promptNotes.form.name')}>
+            <InkInput
+              label={t('promptNotes.form.name')}
+              placeholder={t('promptNotes.form.namePlaceholder')}
+              value={name}
+              onChange={setName}
             />
           </InkFormField>
-          <InkText size="sm" tone="tertiary">
-            {t('promptNotes.form.length', { count: length, advised: ADVISED_NOTE_LENGTH })}
-          </InkText>
-          {long ? <InkNotice tone="warning">{t('promptNotes.form.tooLong')}</InkNotice> : null}
+          <InkText size="sm" tone="tertiary">{t('promptNotes.form.nameHint')}</InkText>
+        </>
+      )}
 
-          {error ? <InkNotice tone="danger">{error}</InkNotice> : null}
+      <InkFormField label={t('promptNotes.form.text')}>
+        <InkTextArea
+          label={t('promptNotes.form.text')}
+          placeholder={t('promptNotes.form.textPlaceholder')}
+          value={text}
+          onChange={setText}
+          rows={3}
+          maxRows={8}
+        />
+      </InkFormField>
+      <InkText size="sm" tone="tertiary">
+        {t('promptNotes.form.length', { count: length, advised: ADVISED_NOTE_LENGTH })}
+      </InkText>
+      {long ? <InkNotice tone="warning">{t('promptNotes.form.tooLong')}</InkNotice> : null}
 
-          <InkButton variant="primary" block disabled={submitting} onPress={submit}>
-            {t('promptNotes.form.save')}
-          </InkButton>
-        </ScrollView>
-      </GSheetBody>
+      {error ? <InkNotice tone="danger">{error}</InkNotice> : null}
+
+      <InkButton variant="primary" block loading={submitting} onPress={submit}>
+        {t('promptNotes.form.save')}
+      </InkButton>
     </InkSheet>
   );
 }
-
-const styles = StyleSheet.create({
-  content: { gap: Spacing.lg, paddingBottom: Spacing['2xl'] },
-});

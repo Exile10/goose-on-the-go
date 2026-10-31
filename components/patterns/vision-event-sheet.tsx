@@ -9,14 +9,13 @@
  */
 
 import React, { useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { InkBadge, InkButton, InkEdge, InkNotice, InkSheet, InkText, InkTitle, useInkTheme } from '@jarida/ink/native';
 
 import { AutomationForm } from '@/components/patterns/automation-form-sheet';
 import { PondPicture } from '@/components/patterns/pond-picture';
 import { SettingsGroup, SettingsRow } from '@/components/settings/settings-list';
-import { GSheetBody } from '@/components/ui/g-sheet-body';
 import { describeEvent, describeFacts, requestFromEvent, whenOf } from '@/models/vision';
 import type { CameraEvent, RuleRequest } from '@/services/types';
 import { Spacing } from '@/constants/spacing';
@@ -73,57 +72,55 @@ export function VisionEventSheet({ event, nameOf, acknowledging, onClose, onAckn
       ) : null}
 
       {event && !making ? (
-        <GSheetBody maxHeightRatio={0.85}>
-          <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-            {event.snapshot_url ? (
-              <InkEdge radius={theme.radius.lg} contentStyle={styles.pictureFace}>
-                <PondPicture
-                  path={event.snapshot_url}
-                  version={event.created_at}
-                  label={t('visionEvents.sheet.pictureAlt')}
-                  contentFit="contain"
-                  iconSize={32}
-                  style={styles.picture}
-                />
-              </InkEdge>
-            ) : (
-              <InkText size="sm" tone="secondary">
-                {t('visionEvents.sheet.noPicture')}
+        <>
+          {event.snapshot_url ? (
+            <InkEdge radius={theme.radius.lg} contentStyle={styles.pictureFace}>
+              <PondPicture
+                path={event.snapshot_url}
+                version={event.created_at}
+                label={t('visionEvents.sheet.pictureAlt')}
+                contentFit="contain"
+                iconSize={32}
+                style={styles.picture}
+              />
+            </InkEdge>
+          ) : (
+            <InkText size="sm" tone="secondary">
+              {t('visionEvents.sheet.noPicture')}
+            </InkText>
+          )}
+
+          <View style={styles.head}>
+            <View style={styles.headText}>
+              <InkTitle level={3}>{title}</InkTitle>
+              <InkText size="sm" tone="tertiary">
+                {whenOf(event)}
               </InkText>
-            )}
-
-            <View style={styles.head}>
-              <View style={styles.headText}>
-                <InkTitle level={3}>{title}</InkTitle>
-                <InkText size="sm" tone="tertiary">
-                  {whenOf(event)}
-                </InkText>
-              </View>
-              {event.acknowledged ? (
-                <InkBadge tone="neutral">{t('visionEvents.acknowledged')}</InkBadge>
-              ) : (
-                <InkBadge tone="warning">{t('visionEvents.new')}</InkBadge>
-              )}
             </View>
-
-            <SettingsGroup>
-              {facts.map((fact) => (
-                <SettingsRow key={fact.label} label={fact.label} value={fact.value} />
-              ))}
-            </SettingsGroup>
-
-            {added ? <InkNotice tone="success">{t('visionEvents.sheet.automationAdded')}</InkNotice> : null}
-
-            {event.acknowledged ? null : (
-              <InkButton variant="primary" block icon="check" disabled={acknowledging} onPress={() => onAcknowledge(event)}>
-                {t('visionEvents.acknowledge')}
-              </InkButton>
+            {event.acknowledged ? (
+              <InkBadge tone="neutral">{t('visionEvents.acknowledged')}</InkBadge>
+            ) : (
+              <InkBadge tone="warning">{t('visionEvents.new')}</InkBadge>
             )}
-            <InkButton variant="quiet" block icon="bolt" onPress={() => setMaking(true)}>
-              {t('visionEvents.sheet.makeAutomation')}
+          </View>
+
+          <SettingsGroup>
+            {facts.map((fact) => (
+              <SettingsRow key={fact.label} label={fact.label} value={fact.value} />
+            ))}
+          </SettingsGroup>
+
+          {added ? <InkNotice tone="success">{t('visionEvents.sheet.automationAdded')}</InkNotice> : null}
+
+          {event.acknowledged ? null : (
+            <InkButton variant="primary" block icon="check" disabled={acknowledging} onPress={() => onAcknowledge(event)}>
+              {t('visionEvents.acknowledge')}
             </InkButton>
-          </ScrollView>
-        </GSheetBody>
+          )}
+          <InkButton variant="quiet" block icon="bolt" onPress={() => setMaking(true)}>
+            {t('visionEvents.sheet.makeAutomation')}
+          </InkButton>
+        </>
       ) : null}
     </InkSheet>
   );
@@ -131,7 +128,6 @@ export function VisionEventSheet({ event, nameOf, acknowledging, onClose, onAckn
 
 const styles = StyleSheet.create({
   stack: { gap: Spacing.sm },
-  content: { gap: Spacing.lg, paddingBottom: Spacing['2xl'] },
   pictureFace: { overflow: 'hidden' },
   picture: { width: '100%', aspectRatio: 16 / 9 },
   head: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: Spacing.sm },

@@ -49,7 +49,7 @@ import { deviceStyle } from '@/constants/device-style';
 import { toggle } from '@/services/haptics';
 import type { Device } from '@/services/types';
 import { Brand, Grey, JaridaPurple } from '@/constants/colors';
-import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
+import { FontSize, face } from '@/constants/typography';
 import { Spacing } from '@/constants/spacing';
 import { Radii } from '@/constants/radii';
 
@@ -461,7 +461,7 @@ const makeStyles = (c: ThemeColors) =>
   },
   greetingText: { flex: 1 },
   greetingLabel: {
-    fontFamily: FontFamily.body,
+    ...face('body', 'regular'),
     fontSize: FontSize.base,
     color: c.textTertiary,
   },
@@ -474,9 +474,8 @@ const makeStyles = (c: ThemeColors) =>
     justifyContent: 'center',
   },
   avatarText: {
-    fontFamily: FontFamily.heading,
+    ...face('display', 'bold'),
     fontSize: FontSize.lg,
-    fontWeight: FontWeight.bold,
     color: Brand.white,
   },
 
@@ -511,9 +510,8 @@ const makeStyles = (c: ThemeColors) =>
     marginBottom: Spacing.sm,
   },
   seeAllText: {
-    fontFamily: FontFamily.body,
+    ...face('body', 'semibold'),
     fontSize: FontSize.sm,
-    fontWeight: FontWeight.semibold,
     color: c.textBrand,
   },
 
@@ -530,19 +528,18 @@ const makeStyles = (c: ThemeColors) =>
   // too, and the pair reads as one row again.
   rightNowFace: { flex: 1 },
   cardEyebrow: {
-    fontFamily: FontFamily.body,
+    ...face('body', 'regular'),
     fontSize: FontSize.xs,
     color: c.textTertiary,
     marginBottom: Spacing.xs,
   },
   cardTitle: {
-    fontFamily: FontFamily.heading,
+    ...face('display', 'bold'),
     fontSize: FontSize.md,
-    fontWeight: FontWeight.bold,
     color: c.text,
   },
   cardDetail: {
-    fontFamily: FontFamily.body,
+    ...face('body', 'regular'),
     fontSize: FontSize.sm,
     color: c.textSecondary,
     marginTop: 2,
@@ -558,12 +555,12 @@ const makeStyles = (c: ThemeColors) =>
   },
   convoText: {
     flex: 1,
-    fontFamily: FontFamily.body,
+    ...face('body', 'regular'),
     fontSize: FontSize.base,
     color: c.text,
   },
   convoTime: {
-    fontFamily: FontFamily.body,
+    ...face('body', 'regular'),
     fontSize: FontSize.xs,
     color: c.textTertiary,
   },
@@ -593,13 +590,12 @@ const makeStyles = (c: ThemeColors) =>
     marginBottom: Spacing.sm,
   },
   deviceLabel: {
-    fontFamily: FontFamily.body,
+    ...face('body', 'semibold'),
     fontSize: FontSize.base,
-    fontWeight: FontWeight.semibold,
     color: c.text,
   },
   deviceDetail: {
-    fontFamily: FontFamily.body,
+    ...face('body', 'regular'),
     fontSize: FontSize.xs,
     color: c.textTertiary,
   },

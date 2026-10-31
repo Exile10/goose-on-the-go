@@ -161,11 +161,12 @@ re-render every list on every change.
 
 The last stage is Ink's: the bar contracts to a single control carrying the
 current destination's glyph, and pressing it restores the bar rather than
-navigating. That needs `patches/@jarida+ink+1.0.0.patch`, which fixes two things
-in `InkBottomBar` (a third change, the blur slot, is under *The bar's glass*). The puck answered its own press with local state
+navigating. Ink 1.0.0 needed a local patch for two things in `InkBottomBar`
+(a third, the blur slot, is under *The bar's glass*); 1.1.0 carries all three, so
+the patch is gone. The puck answered its own press with local state
 (`setPushed`) that nothing ever cleared, so `collapse` worked exactly once —
-press it and the bar was pinned open for the life of the app. The patch clears
-that push when the stage changes, and adds an `onExpand` so a host can own the
+press it and the bar was pinned open for the life of the app. Ink now clears
+that push when the stage changes, and takes an `onExpand` so a host can own the
 decision instead. The app passes `onExpand={restore}`, because the component
 cannot see a scroll that leaves the stage unchanged: a reader who pressed and
 carried on scrolling down would otherwise hold a bar that never contracted
@@ -191,13 +192,13 @@ The bar is glass in both schemes: a real blur, a light tint of `surface` over
 it, and a hairline in `lineStrong`. This is what #18 asked for, and the
 conversation-wall rebuild had replaced it with an opaque `chrome` fill.
 
-- **The blur.** Ink's native `InkBottomBar` drew only a tint; the patch adds a
+- **The blur.** Ink's native `InkBottomBar` drew only a tint; 1.1.0 adds a
   `blurComponent` slot, the same one `InkNavbar` has, and draws the blur behind
   the bar's content so the padding, the morph and the puck are unchanged. The
   app passes `TabBarBlur`, a function wrapping expo-blur's `BlurView`: a class
   component's props would have to match the slot's exactly, and `BlurView`
   takes more tints than the `light` and `dark` Ink passes.
-- **Reduce Transparency.** With it on, the patched bar skips the blur and fills
+- **Reduce Transparency.** With it on, the bar skips the blur and fills
   with Ink's `glass.solid`, as the navbar does. The app needs no second path.
 - **How clear it is.** Ink's blur intensity (60), with the tint lowered to
   `TINT_ALPHA` (0.3) in `app/(tabs)/_layout.tsx`. Ink derives about 0.50 light

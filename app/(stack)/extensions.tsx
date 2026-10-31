@@ -9,17 +9,18 @@
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import React, { useCallback, useState } from 'react';
-import { InkButton, InkEmptyState, InkNotice, InkSegmented, InkSpinner, InkSwitch, InkText, InkTitle } from '@jarida/ink/native';
-import { RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { InkButton, InkEmptyState, InkNotice, InkSegmented, InkSpinner, InkSwitch, InkText, InkTitle, InkInput } from '@jarida/ink/native';
+import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { GIcon } from '@/components/ui/g-icon';
 import { GKeyboardView } from '@/components/ui/g-keyboard-view';
 import { isIconName } from '@/constants/icons';
-import { Grey, JaridaPurple, Semantic } from '@/constants/colors';
-import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
+import { JaridaPurple } from '@/constants/colors';
+import { FontSize, face } from '@/constants/typography';
 import { Spacing } from '@/constants/spacing';
 import { Radii } from '@/constants/radii';
 import { useThemedStyles } from '@/hooks/use-themed-styles';
+import { useTheme } from '@/providers/theme-provider';
 import { useConfirm } from '@/providers/confirm-provider';
 import type { ThemeColors } from '@/constants/colors';
 import type { Extension, MarketplaceExtension } from '@/services/types';
@@ -29,11 +30,13 @@ import { useContentState } from '@/view-models/use-content-state';
 import { usePullToRefresh } from '@/view-models/use-pull-to-refresh';
 import { credentialFields, useExtensions } from '@/view-models/use-extensions';
 
-const STATUS_COLORS: Record<string, string> = {
-  connected: Semantic.success,
-  error: Semantic.danger,
-  loading: Grey[400],
-};
+/** Which of the theme's colours each status wears; the tone flips with the scheme, the fixed values did not. */
+function statusColor(status: string, colors: ThemeColors): string | undefined {
+  if (status === 'connected') return colors.success;
+  if (status === 'error') return colors.danger;
+  if (status === 'loading') return colors.textTertiary;
+  return undefined;
+}
 
 /** One literal key per status, so the key-completeness test can see every one. */
 function statusLabel(status: string, t: TFunction): string | null {
@@ -60,8 +63,9 @@ const InstalledCard = React.memo(function InstalledCard({
   onRemove?: (name: string) => void;
 }) {
   const styles = useThemedStyles(makeStyles);
+  const { colors } = useTheme();
   const { t } = useTranslation();
-  const statusColor = extension.status ? STATUS_COLORS[extension.status] : undefined;
+  const tone = extension.status ? statusColor(extension.status, colors) : undefined;
   const statusText = extension.status ? statusLabel(extension.status, t) : null;
 
   return (
@@ -77,10 +81,10 @@ const InstalledCard = React.memo(function InstalledCard({
         <InkSwitch checked={extension.enabled} onChange={(next) => onToggle(extension.name, next)} />
       </View>
 
-      {statusColor && statusText ? (
+      {tone && statusText ? (
         <View style={styles.statusRow}>
-          <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
-          <Text style={[styles.statusText, { color: statusColor }]}>{statusText}</Text>
+          <View style={[styles.statusDot, { backgroundColor: tone }]} />
+          <Text style={[styles.statusText, { color: tone }]}>{statusText}</Text>
         </View>
       ) : null}
 
@@ -169,20 +173,15 @@ function CredentialsForm({
                 onChange={(next) => setValue(req.key, next)}
               />
             ) : (
-              <View style={styles.secretInputRow}>
-                <TextInput
-                  style={styles.secretInput}
-                  value={values[req.key] ?? ''}
-                  onChangeText={(next) => setValue(req.key, next)}
-                  secureTextEntry
-                  editable={!busy}
-                  accessibilityLabel={req.display_name}
-                  placeholder={t('extensions.secretPlaceholder')}
-                  placeholderTextColor={Grey[400]}
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                />
-              </View>
+              <InkInput
+                label={req.display_name}
+                type="password"
+                value={values[req.key] ?? ''}
+                onChange={(next) => setValue(req.key, next)}
+                disabled={busy}
+                placeholder={t('extensions.secretPlaceholder')}
+                inputProps={{ autoComplete: 'off', spellCheck: false }}
+              />
             )}
             {chosen?.description ? <Text style={styles.secretDesc}>{chosen.description}</Text> : null}
           </View>
@@ -190,7 +189,7 @@ function CredentialsForm({
       })}
       <View style={styles.formActions}>
         <InkButton variant="quiet" onPress={onCancel} disabled={busy}>{t('common.cancel')}</InkButton>
-        <InkButton variant="primary" onPress={() => onSubmit(filled)} disabled={busy || !ready}>
+        <InkButton variant="primary" onPress={() => onSubmit(filled)} disabled={!ready} loading={busy}>
           {mode === 'install'
             ? busy ? t('extensions.installing') : t('extensions.install')
             : busy ? t('extensions.saving') : t('common.save')}
@@ -452,13 +451,12 @@ const makeStyles = (c: ThemeColors) =>
   },
   cardInfo: { flex: 1 },
   cardName: {
-    fontFamily: FontFamily.heading,
+    ...face('display', 'bold'),
     fontSize: FontSize.md,
-    fontWeight: FontWeight.bold,
     color: c.text,
   },
   cardDesc: {
-    fontFamily: FontFamily.body,
+    ...face('body', 'regular'),
     fontSize: FontSize.sm,
     color: c.textTertiary,
     marginTop: 2,
@@ -476,14 +474,13 @@ const makeStyles = (c: ThemeColors) =>
   },
   statusDot: { width: 8, height: 8, borderRadius: 4 },
   statusText: {
-    fontFamily: FontFamily.body,
+    ...face('body', 'semibold'),
     fontSize: FontSize.xs,
-    fontWeight: FontWeight.semibold,
   },
   errorText: {
-    fontFamily: FontFamily.body,
+    ...face('body', 'regular'),
     fontSize: FontSize.xs,
-    color: Semantic.danger,
+    color: c.danger,
     marginTop: Spacing.xs,
   },
   actionRow: {
@@ -507,9 +504,8 @@ const makeStyles = (c: ThemeColors) =>
     borderRadius: Radii.pill,
   },
   categoryText: {
-    fontFamily: FontFamily.body,
+    ...face('body', 'semibold'),
     fontSize: FontSize.xs,
-    fontWeight: FontWeight.semibold,
     color: c.textSecondary,
   },
 
@@ -522,37 +518,20 @@ const makeStyles = (c: ThemeColors) =>
     gap: Spacing.md,
   },
   setupTitle: {
-    fontFamily: FontFamily.heading,
+    ...face('display', 'bold'),
     fontSize: FontSize.md,
-    fontWeight: FontWeight.bold,
     color: c.text,
   },
   secretField: { gap: Spacing.xs },
   secretLabel: {
-    fontFamily: FontFamily.body,
+    ...face('body', 'semibold'),
     fontSize: FontSize.sm,
-    fontWeight: FontWeight.semibold,
     color: c.text,
   },
   secretDesc: {
-    fontFamily: FontFamily.body,
+    ...face('body', 'regular'),
     fontSize: FontSize.xs,
     color: c.textTertiary,
-  },
-  secretInputRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: c.card,
-    borderRadius: Radii.md,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: 8,
-    gap: Spacing.sm,
-  },
-  secretInput: {
-    flex: 1,
-    fontFamily: FontFamily.mono,
-    fontSize: FontSize.sm,
-    color: c.text,
   },
   labelRow: { flexDirection: 'row', alignItems: 'baseline', gap: Spacing.sm },
   formActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: Spacing.sm },

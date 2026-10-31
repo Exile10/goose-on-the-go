@@ -3,15 +3,16 @@
  * confirm button settles it as yes.
  *
  * The answers are driven through what the dialog actually renders -- the Ink buttons by their
- * label, the backdrop, and the Modal's `onRequestClose`, which is what Android's back button
- * calls -- so a dialog whose Cancel button or back press stopped reaching the provider fails here.
+ * label, the dialog's dismissal, and the Modal's `onRequestClose`, which is what Android's back
+ * button calls -- so a dialog whose Cancel button or back press stopped reaching the provider
+ * fails here.
  */
 
 import '@/services/i18n';
 import React from 'react';
 import { Modal } from 'react-native';
 import { act, create, type ReactTestInstance, type ReactTestRenderer } from 'react-test-renderer';
-import { InkButton } from '@jarida/ink/native';
+import { InkButton, InkDialog } from '@jarida/ink/native';
 
 import { caution } from '@/services/haptics';
 import { ConfirmProvider, useChoice, useConfirm, useInform, type ChooseFn, type ConfirmFn, type InformFn } from '../confirm-provider';
@@ -26,6 +27,13 @@ interface Mounted {
   choose: ChooseFn;
   inform: InformFn;
 }
+
+// Every tree is unmounted after its test: a dialog left open keeps its spring running past the
+// end of the suite, and the spring's last frame then reaches for a module Jest has torn down.
+const mounted: ReactTestRenderer[] = [];
+afterEach(async () => {
+  for (const tree of mounted.splice(0)) await act(async () => tree.unmount());
+});
 
 async function mount(): Promise<Mounted> {
   const hooks: { confirm?: ConfirmFn; choose?: ChooseFn; inform?: InformFn } = {};
@@ -43,6 +51,7 @@ async function mount(): Promise<Mounted> {
       </ConfirmProvider>,
     );
   });
+  mounted.push(tree);
   return { tree, confirm: hooks.confirm!, choose: hooks.choose!, inform: hooks.inform! };
 }
 
@@ -54,6 +63,12 @@ function button(tree: ReactTestRenderer, label: string): ReactTestInstance {
 
 function modal(tree: ReactTestRenderer): ReactTestInstance {
   return tree.root.findByType(Modal);
+}
+
+// Whether the dialog was told to close. The Modal itself stays mounted until the panel has
+// finished leaving, which no test waits for.
+function dialog(tree: ReactTestRenderer): ReactTestInstance {
+  return tree.root.findByType(InkDialog);
 }
 
 /** Ask, let the dialog render, then run `answer` against it and return what the promise settled to. */
@@ -79,13 +94,13 @@ it('resolves true when the confirm button is pressed, and closes', async () => {
   const { tree, confirm } = await mount();
   const result = await answered(tree, () => confirm(REMOVE), () => button(tree, 'Forget').props.onPress());
   expect(result).toBe(true);
-  expect(modal(tree).props.visible).toBe(false);
+  expect(dialog(tree).props.open).toBe(false);
 });
 
 it('resolves false on Cancel', async () => {
   const { tree, confirm } = await mount();
   expect(await answered(tree, () => confirm(REMOVE), () => button(tree, 'Cancel').props.onPress())).toBe(false);
-  expect(modal(tree).props.visible).toBe(false);
+  expect(dialog(tree).props.open).toBe(false);
 });
 
 it('names the safe answer in its own words when asked to, and still reads it as no', async () => {
@@ -100,10 +115,9 @@ it("resolves false on Android's back button", async () => {
   expect(await answered(tree, () => confirm(REMOVE), () => modal(tree).props.onRequestClose())).toBe(false);
 });
 
-it('resolves false on a tap on the backdrop', async () => {
+it('resolves false when the dialog is dismissed, as a tap on the backdrop does', async () => {
   const { tree, confirm } = await mount();
-  const backdrop = () => tree.root.find((node) => node.props.testID === 'confirm-dialog-backdrop' && typeof node.props.onPress === 'function');
-  expect(await answered(tree, () => confirm(REMOVE), () => backdrop().props.onPress())).toBe(false);
+  expect(await answered(tree, () => confirm(REMOVE), () => dialog(tree).props.onClose())).toBe(false);
 });
 
 it('shows the question it was asked, with the confirm painted by how much it costs', async () => {
@@ -112,6 +126,7 @@ it('shows the question it was asked, with the confirm painted by how much it cos
     void confirm(REMOVE);
   });
   expect(modal(tree).props.visible).toBe(true);
+  expect(dialog(tree).props.open).toBe(true);
   expect(tree.root.findAll((n) => n.props.children === REMOVE.title).length).toBeGreaterThan(0);
   expect(tree.root.findAll((n) => n.props.children === REMOVE.message).length).toBeGreaterThan(0);
   expect(button(tree, 'Forget').props.variant).toBe('danger');
@@ -232,7 +247,7 @@ describe('inform', () => {
   it('settles once it is put away, by its button or by back', async () => {
     const { tree, inform } = await mount();
     await expect(answered(tree, () => inform(FAILED), () => button(tree, 'OK').props.onPress())).resolves.toBeUndefined();
-    expect(modal(tree).props.visible).toBe(false);
+    expect(tree.root.findByType(InkDialog).props.open).toBe(false);
     await expect(answered(tree, () => inform(FAILED), () => modal(tree).props.onRequestClose())).resolves.toBeUndefined();
   });
 });

@@ -47,7 +47,7 @@ export default function PondWifiScreen() {
             icon="wifi"
             title={phase.ssid ? t('bleSetup.wifi.unreachableTitle', { ssid: phase.ssid }) : t('bleSetup.wifi.unreachableTitleWired')}
             action={
-              <InkButton variant="primary" icon="refresh" disabled={phase.checking} onPress={wifi.actions.checkAgain}>
+              <InkButton variant="primary" icon="refresh" loading={phase.checking} onPress={wifi.actions.checkAgain}>
                 {t('bleSetup.wifi.checkAgain')}
               </InkButton>
             }

@@ -7,9 +7,8 @@
  */
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { InkButton } from '@jarida/ink/native';
+import { InkButton, InkSpinner, InkFormField, InkInput, InkTitle } from '@jarida/ink/native';
 import {
-  ActivityIndicator,
   ScrollView,
   StyleSheet,
   Text,
@@ -21,8 +20,8 @@ import { Stack, useFocusEffect, useRouter } from 'expo-router';
 import { GIcon } from '@/components/ui/g-icon';
 import { GPressable } from '@/components/ui/g-pressable';
 import { GKeyboardView } from '@/components/ui/g-keyboard-view';
-import { Grey, JaridaPurple, Brand, Semantic } from '@/constants/colors';
-import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
+import { JaridaPurple, Brand } from '@/constants/colors';
+import { FontSize, face } from '@/constants/typography';
 import { Spacing } from '@/constants/spacing';
 import { Radii } from '@/constants/radii';
 import { PondApiClient } from '@/services/api-client';
@@ -65,6 +64,7 @@ import { useSpokenCode, type UseSpokenCode } from '@/view-models/use-spoken-code
 import { setupNeededNow } from '@/view-models/use-setup-gate';
 import { useCountdown } from '@/hooks/use-countdown';
 import { useThemedStyles } from '@/hooks/use-themed-styles';
+import { useTheme } from '@/providers/theme-provider';
 import type { ThemeColors } from '@/constants/colors';
 
 type Step = 0 | 1 | 2 | 3;
@@ -209,14 +209,14 @@ function DiscoverStep({
   return (
     <StepBody>
       {data.phase === 'searching' ? (
-        <ActivityIndicator color={JaridaPurple[500]} />
+        <InkSpinner label={t('pairing.searching')} size={28} />
       ) : (
         <GIcon name="search" size={28} color={JaridaPurple[500]} />
       )}
 
-      <Text style={styles.stepTitle}>
+      <InkTitle level={2}>
         {data.phase === 'searching' ? t('pond.searching') : t('pairing.addressTitle')}
-      </Text>
+      </InkTitle>
 
       {data.phase === 'searching' ? (
         <Text style={styles.stepDesc}>{t('pairing.searching')}</Text>
@@ -468,7 +468,7 @@ function ServerStep({
     return (
       <StepBody>
         <GIcon name="shield" size={28} color={JaridaPurple[500]} />
-        <Text style={styles.stepTitle}>{t('pairing.fingerprintConfirmTitle')}</Text>
+        <InkTitle level={2}>{t('pairing.fingerprintConfirmTitle')}</InkTitle>
         <Text style={styles.stepDesc}>{t('pairing.fingerprintConfirmDesc')}</Text>
         {confirming.choices.map((choice) => (
           <GPressable
@@ -498,47 +498,44 @@ function ServerStep({
   return (
     <StepBody>
       <GIcon name="search" size={28} color={JaridaPurple[500]} />
-      <Text style={styles.stepTitle}>{t('pairing.addressTitle')}</Text>
-      <View style={styles.inputGroup}>
-        <Text style={styles.inputLabel}>{t('pairing.addressLabel')}</Text>
-        <TextInput
-          style={styles.textInput}
+      <InkTitle level={2}>{t('pairing.addressTitle')}</InkTitle>
+      <InkFormField
+        label={t('pairing.addressLabel')}
+        hint={insecureDevMode ? t('devMode.addressHint') : undefined}
+        style={styles.inputGroup}
+      >
+        <InkInput
+          label={t('pairing.addressLabel')}
+          type="url"
           value={url}
-          onChangeText={(next) => {
+          onChange={(next) => {
             setUrl(next);
             setError(null);
           }}
           placeholder={ADDRESS_PLACEHOLDER}
-          placeholderTextColor={Grey[400]}
-          autoCapitalize="none"
-          autoCorrect={false}
-          editable={!checking}
+          disabled={checking}
+          onSubmit={submit}
         />
-        {insecureDevMode ? <Text style={styles.inputHint}>{t('devMode.addressHint')}</Text> : null}
-      </View>
+      </InkFormField>
       {askForPin ? (
-        <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>{t('pairing.fingerprint')}</Text>
-          <TextInput
-            style={styles.textInput}
+        <InkFormField label={t('pairing.fingerprint')} hint={t('pairing.fingerprintHint')} style={styles.inputGroup}>
+          <InkInput
+            label={t('pairing.fingerprint')}
             value={pin}
-            onChangeText={(next) => {
+            onChange={(next) => {
               setPin(next);
               setPinFromNetwork(false);
               setNetworkUnclaimed(false);
               setError(null);
             }}
             placeholder="sha256/..."
-            placeholderTextColor={Grey[400]}
-            autoCapitalize="none"
-            autoCorrect={false}
-            editable={!checking}
+            disabled={checking}
+            inputProps={{ autoCapitalize: 'none', autoCorrect: false, spellCheck: false }}
           />
-          <Text style={styles.inputHint}>{t('pairing.fingerprintHint')}</Text>
-        </View>
+        </InkFormField>
       ) : null}
       {error ? <Text style={styles.stepError}>{error}</Text> : null}
-      <InkButton variant="primary" disabled={!url.trim() || checking} onPress={submit}>
+      <InkButton variant="primary" disabled={!url.trim()} loading={checking} onPress={submit}>
         {checking ? t('pairing.fingerprintSearching') : t('pairing.continueAction')}
       </InkButton>
       <ScanLink onPress={onScan} />
@@ -600,6 +597,7 @@ function PairingCodeStep({
   onScan: () => void;
 }) {
   const styles = useThemedStyles(makeStyles);
+  const { colors } = useTheme();
   const { t } = useTranslation();
   const [code, setCode] = useState(credential === 'pairing' ? initial : '');
   const [setupDigits, setSetupDigits] = useState(credential === 'setup' ? initial : '');
@@ -610,22 +608,27 @@ function PairingCodeStep({
     return (
       <StepBody>
         <GIcon name="key" size={28} color={JaridaPurple[500]} />
-        <Text style={styles.stepTitle}>{t('pairing.setupCodeTitle')}</Text>
+        <InkTitle level={2}>{t('pairing.setupCodeTitle')}</InkTitle>
         <Text style={styles.stepDesc}>{t('pairing.setupCodeBody')}</Text>
-        <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>{t('pairing.setupCodeLabel')}</Text>
+        <InkFormField
+          label={t('pairing.setupCodeLabel')}
+          error={setup.status === 'typo' ? t('pairing.setupCodeTypo') : undefined}
+          style={styles.inputGroup}
+        >
           <TextInput
             style={[styles.textInput, styles.codeInput]}
             value={setup.display}
             onChangeText={(next) => setSetupDigits(readSetupCode(next).digits)}
             placeholder={t('pairing.setupCodePlaceholder')}
-            placeholderTextColor={Grey[400]}
+            placeholderTextColor={colors.textTertiary}
+            selectionColor={colors.textBrand}
+            cursorColor={colors.textBrand}
+            accessibilityLabel={t('pairing.setupCodeLabel')}
             keyboardType="number-pad"
             autoCorrect={false}
             autoFocus
           />
-          {setup.status === 'typo' ? <Text style={styles.stepError}>{t('pairing.setupCodeTypo')}</Text> : null}
-        </View>
+        </InkFormField>
         <PhoneName value={phoneName} onChange={onPhoneName} />
         <InkButton variant="primary" disabled={setup.status !== 'valid' || !phoneName.trim()} onPress={() => onNext(setup.digits)}>
           {t('pairing.pairDevice')}
@@ -640,22 +643,24 @@ function PairingCodeStep({
   return (
     <StepBody>
       <GIcon name="wifi" size={28} color={JaridaPurple[500]} />
-      <Text style={styles.stepTitle}>{t('pairing.codeTitle')}</Text>
+      <InkTitle level={2}>{t('pairing.codeTitle')}</InkTitle>
       <Text style={styles.stepDesc}>
         {spoken.data.phase === 'spoken' ? t('pairing.spokenSaid') : t('pairing.codeBody')}
       </Text>
-      <View style={styles.inputGroup}>
-        <Text style={styles.inputLabel}>{t('pairing.codeLabel')}</Text>
+      <InkFormField label={t('pairing.codeLabel')} style={styles.inputGroup}>
         <TextInput
-          style={styles.textInput}
+          style={[styles.textInput, styles.codeInput]}
           value={code}
           onChangeText={(next) => setCode(next.replace(/\D/g, '').slice(0, 6))}
           placeholder={t('pairing.codePlaceholder')}
-          placeholderTextColor={Grey[400]}
+          placeholderTextColor={colors.textTertiary}
+          selectionColor={colors.textBrand}
+          cursorColor={colors.textBrand}
+          accessibilityLabel={t('pairing.codeLabel')}
           keyboardType="number-pad"
           autoFocus
         />
-      </View>
+      </InkFormField>
       <PhoneName value={phoneName} onChange={onPhoneName} />
       <InkButton variant="primary" disabled={!valid || !phoneName.trim()} onPress={() => onNext(code)}>
         {t('pairing.pairDevice')}
@@ -672,8 +677,8 @@ function WaitStep({ title, body }: { title: string; body?: string }) {
   const styles = useThemedStyles(makeStyles);
   return (
     <StepBody>
-      <ActivityIndicator color={JaridaPurple[500]} />
-      <Text style={styles.stepTitle}>{title}</Text>
+      <InkSpinner label={title} size={28} />
+      <InkTitle level={2}>{title}</InkTitle>
       {body ? <Text style={styles.stepDesc}>{body}</Text> : null}
     </StepBody>
   );
@@ -695,13 +700,14 @@ function CompleteStep({
   onRetry: () => void;
 }) {
   const styles = useThemedStyles(makeStyles);
+  const { colors } = useTheme();
   const { t } = useTranslation();
 
   if (state === 'pending') {
     return (
       <StepBody>
-        <ActivityIndicator size="large" color={JaridaPurple[500]} />
-        <Text style={styles.stepTitle}>{t('pairing.pairing')}</Text>
+        <InkSpinner label={t('pairing.pairing')} size={36} />
+        <InkTitle level={2}>{t('pairing.pairing')}</InkTitle>
         <Text style={styles.stepDesc}>{t('pairing.pairingBody')}</Text>
       </StepBody>
     );
@@ -709,8 +715,8 @@ function CompleteStep({
   if (state === 'error') {
     return (
       <StepBody>
-        <GIcon name="x" size={28} color={Semantic.danger} />
-        <Text style={styles.stepTitle}>{t('pairing.failed')}</Text>
+        <GIcon name="x" size={28} color={colors.danger} />
+        <InkTitle level={2}>{t('pairing.failed')}</InkTitle>
         <Text style={styles.stepDesc}>{reason ?? t('pairingErrors.rejected')}</Text>
         <InkButton variant="primary" disabled={retryDisabled} onPress={onRetry}>
           {retryLabel ?? t('common.retry')}
@@ -722,8 +728,8 @@ function CompleteStep({
   // succeeds, so the only states this renders are the wait and the failure.
   return (
     <StepBody>
-      <ActivityIndicator size="large" color={JaridaPurple[500]} />
-      <Text style={styles.stepTitle}>{t('pairing.pairing')}</Text>
+      <InkSpinner label={t('pairing.pairing')} size={36} />
+      <InkTitle level={2}>{t('pairing.pairing')}</InkTitle>
     </StepBody>
   );
 }
@@ -1089,22 +1095,21 @@ const makeStyles = (c: ThemeColors) =>
       marginBottom: 6,
     },
     stepDotActive: { backgroundColor: JaridaPurple[500] },
-    stepDotDone: { backgroundColor: Semantic.success },
+    stepDotDone: { backgroundColor: c.success },
     stepNumber: {
-      fontFamily: FontFamily.heading,
+      ...face('display', 'bold'),
       fontSize: FontSize.sm,
-      fontWeight: FontWeight.bold,
       color: c.textTertiary,
     },
     stepNumberActive: { color: Brand.white },
     stepLabel: {
-      fontFamily: FontFamily.body,
+      ...face('body', 'regular'),
       fontSize: 10,
       color: c.textTertiary,
     },
     stepLabelActive: {
+      ...face('body', 'semibold'),
       color: c.textBrand,
-      fontWeight: FontWeight.semibold,
     },
 
     /* Step content. Left-aligned: a wizard reads as a form, and centred body
@@ -1115,14 +1120,8 @@ const makeStyles = (c: ThemeColors) =>
       paddingHorizontal: Spacing.lg,
       gap: Spacing.lg,
     },
-    stepTitle: {
-      fontFamily: FontFamily.heading,
-      fontSize: FontSize.xl,
-      fontWeight: FontWeight.bold,
-      color: c.text,
-    },
     stepDesc: {
-      fontFamily: FontFamily.body,
+      ...face('body', 'regular'),
       fontSize: FontSize.base,
       color: c.textTertiary,
       lineHeight: FontSize.base * 1.5,
@@ -1140,21 +1139,21 @@ const makeStyles = (c: ThemeColors) =>
     // The fingerprint is read aloud against the Pond's own screen, so it is set
     // in the mono face at a size where each group of four is unambiguous.
     pinPreview: {
-      fontFamily: FontFamily.mono,
+      ...face('mono', 'regular'),
       fontSize: FontSize.lg,
       color: c.text,
       letterSpacing: 1,
     },
     // Copied off a printed card group by group, so every digit keeps a fixed-width column.
     codeInput: {
-      fontFamily: FontFamily.mono,
+      ...face('mono', 'regular'),
       fontSize: FontSize.lg,
       letterSpacing: 1,
     },
     stepError: {
-      fontFamily: FontFamily.body,
+      ...face('body', 'regular'),
       fontSize: FontSize.sm,
-      color: Semantic.danger,
+      color: c.danger,
       lineHeight: FontSize.sm * 1.5,
     },
     scanLink: {
@@ -1164,9 +1163,8 @@ const makeStyles = (c: ThemeColors) =>
       paddingVertical: Spacing.sm,
     },
     scanLinkText: {
-      fontFamily: FontFamily.body,
+      ...face('body', 'semibold'),
       fontSize: FontSize.base,
-      fontWeight: FontWeight.semibold,
       color: c.textBrand,
     },
 
@@ -1191,41 +1189,28 @@ const makeStyles = (c: ThemeColors) =>
     },
     pondInfo: { flex: 1 },
     pondName: {
-      fontFamily: FontFamily.body,
+      ...face('body', 'semibold'),
       fontSize: FontSize.base,
-      fontWeight: FontWeight.semibold,
       color: c.text,
     },
     pondAddr: {
-      fontFamily: FontFamily.body,
+      ...face('body', 'regular'),
       fontSize: FontSize.sm,
       color: c.textTertiary,
     },
 
     /* Input groups */
     inputGroup: { width: '100%' },
-    inputLabel: {
-      fontFamily: FontFamily.body,
-      fontSize: FontSize.sm,
-      fontWeight: FontWeight.semibold,
-      color: c.textSecondary,
-      marginBottom: Spacing.xs,
-    },
-    inputHint: {
-      fontFamily: FontFamily.body,
-      fontSize: FontSize.sm,
-      color: c.textTertiary,
-      lineHeight: FontSize.sm * 1.5,
-      marginTop: Spacing.xs,
-    },
+    // The code fields keep their own input for the mono digits; the frame is Ink's field.
     textInput: {
       backgroundColor: c.card,
-      borderRadius: Radii.lg,
+      borderRadius: Radii.md,
       borderWidth: 1,
-      borderColor: c.border,
-      paddingHorizontal: Spacing.lg,
-      paddingVertical: Spacing.md,
-      fontFamily: FontFamily.body,
+      borderColor: c.borderStrong,
+      minHeight: 44,
+      paddingHorizontal: Spacing.md,
+      paddingVertical: Spacing.sm,
+      ...face('body', 'regular'),
       fontSize: FontSize.base,
       color: c.text,
     },

@@ -8,12 +8,11 @@
  */
 
 import React, { useState } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { InkButton, InkFormField, InkInput, InkNotice, InkSheet, InkText } from '@jarida/ink/native';
 
 import { LabelledCheckbox } from '@/components/patterns/labelled-checkbox';
-import { GSheetBody } from '@/components/ui/g-sheet-body';
 import { confirm, reject } from '@/services/haptics';
 import type { Device } from '@/services/types';
 import { Spacing } from '@/constants/spacing';
@@ -66,42 +65,37 @@ export function RoomSheet({ devices, room, onClose, onSave }: RoomSheetProps) {
 
   return (
     <InkSheet open onClose={onClose} title={room === null ? t('rooms.addTitle') : t('rooms.renameTitle')}>
-      <GSheetBody maxHeightRatio={0.75}>
-        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-          <InkFormField label={t('rooms.name')}>
-            <InkInput value={name} onChange={setName} placeholder={t('rooms.namePlaceholder')} />
-          </InkFormField>
+      <InkFormField label={t('rooms.name')}>
+        <InkInput value={name} onChange={setName} placeholder={t('rooms.namePlaceholder')} />
+      </InkFormField>
 
-          {room === null ? (
-            <>
-              <InkText size="sm" tone="tertiary">{t('rooms.addHint')}</InkText>
-              <View style={styles.devices}>
-                {devices.map((d) => (
-                  <LabelledCheckbox
-                    key={d.id}
-                    checked={chosen.has(d.id)}
-                    onChange={(on) => choose(d.id, on)}
-                    label={t('rooms.deviceInRoom', { device: d.name, room: roomLabel(roomOf(d)) })}
-                  />
-                ))}
-              </View>
-            </>
-          ) : (
-            <InkText size="sm" tone="tertiary">{t('rooms.renameHint')}</InkText>
-          )}
+      {room === null ? (
+        <>
+          <InkText size="sm" tone="tertiary">{t('rooms.addHint')}</InkText>
+          <View style={styles.devices}>
+            {devices.map((d) => (
+              <LabelledCheckbox
+                key={d.id}
+                checked={chosen.has(d.id)}
+                onChange={(on) => choose(d.id, on)}
+                label={t('rooms.deviceInRoom', { device: d.name, room: roomLabel(roomOf(d)) })}
+              />
+            ))}
+          </View>
+        </>
+      ) : (
+        <InkText size="sm" tone="tertiary">{t('rooms.renameHint')}</InkText>
+      )}
 
-          {error ? <InkNotice tone="danger">{error}</InkNotice> : null}
+      {error ? <InkNotice tone="danger">{error}</InkNotice> : null}
 
-          <InkButton variant="primary" block disabled={submitting} onPress={submit}>
-            {room === null ? t('rooms.create') : t('rooms.save')}
-          </InkButton>
-        </ScrollView>
-      </GSheetBody>
+      <InkButton variant="primary" block loading={submitting} onPress={submit}>
+        {room === null ? t('rooms.create') : t('rooms.save')}
+      </InkButton>
     </InkSheet>
   );
 }
 
 const styles = StyleSheet.create({
-  content: { gap: Spacing.lg, paddingBottom: Spacing['2xl'] },
   devices: { gap: Spacing.md },
 });

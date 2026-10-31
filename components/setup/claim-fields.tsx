@@ -8,7 +8,7 @@ import { InkText, inkText, useInkTheme } from '@jarida/ink/native';
 
 import { GIcon } from '@/components/ui/g-icon';
 import { GPressable } from '@/components/ui/g-pressable';
-import { FontFamily } from '@/constants/typography';
+import { face } from '@/constants/typography';
 
 function useFieldStyle(invalid: boolean) {
   const theme = useInkTheme();
@@ -138,5 +138,5 @@ const styles = StyleSheet.create({
   frame: { flexDirection: 'row', alignItems: 'center' },
   fill: { flex: 1 },
   // Copied off a printed card group by group, so every digit keeps a fixed-width column.
-  digits: { flex: 1, fontFamily: FontFamily.mono, letterSpacing: 1 },
+  digits: { flex: 1, ...face('mono', 'regular'), letterSpacing: 1 },
 });

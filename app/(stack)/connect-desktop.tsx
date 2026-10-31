@@ -41,11 +41,12 @@ import {
 } from '@/models/setup-card';
 import { offerPairingPayload, offerSetupCard, offerSetupCode } from '@/services/pairing-handoff';
 import { advanceHold, HOLD_STEADY_MS, LOST_AFTER_MS, type Hold } from '@/models/scan-hold';
-import { Brand, JaridaPurple, Semantic } from '@/constants/colors';
-import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
+import { Brand, JaridaPurple } from '@/constants/colors';
+import { FontSize, face } from '@/constants/typography';
 import { Spacing } from '@/constants/spacing';
 import { Radii } from '@/constants/radii';
 import { useThemedStyles } from '@/hooks/use-themed-styles';
+import { useTheme } from '@/providers/theme-provider';
 import type { ThemeColors } from '@/constants/colors';
 
 const FRAME_SIZE = 240;
@@ -58,6 +59,7 @@ const CORNER_SIZE = 28;
  */
 
 export default function ConnectDesktopScreen() {
+  const { colors } = useTheme();
   const styles = useThemedStyles(makeStyles);
   const { t } = useTranslation();
   const router = useRouter();
@@ -264,7 +266,7 @@ export default function ConnectDesktopScreen() {
 
         {error ? (
           <View style={styles.statusCard}>
-            <GIcon name="warn" size={28} color={Semantic.danger} />
+            <GIcon name="warn" size={28} color={colors.danger} />
             <Text style={styles.statusTitle}>{t('desktop.badCode')}</Text>
             <Text style={styles.statusDesc}>{error}</Text>
             <InkButton variant="primary" onPress={retry}>
@@ -332,7 +334,7 @@ const makeStyles = (c: ThemeColors) =>
   },
   progressFill: {
     height: '100%',
-    backgroundColor: Semantic.success,
+    backgroundColor: c.success,
   },
   corner: {
     position: 'absolute',
@@ -342,23 +344,21 @@ const makeStyles = (c: ThemeColors) =>
   },
   // Brightens the moment a valid code is held, so the frame itself confirms the
   // aim before any text does.
-  cornerHolding: { borderColor: Semantic.success },
+  cornerHolding: { borderColor: c.success },
   cornerTL: { top: 0, left: 0, borderTopWidth: 3, borderLeftWidth: 3, borderTopLeftRadius: Radii.md },
   cornerTR: { top: 0, right: 0, borderTopWidth: 3, borderRightWidth: 3, borderTopRightRadius: Radii.md },
   cornerBL: { bottom: 0, left: 0, borderBottomWidth: 3, borderLeftWidth: 3, borderBottomLeftRadius: Radii.md },
   cornerBR: { bottom: 0, right: 0, borderBottomWidth: 3, borderRightWidth: 3, borderBottomRightRadius: Radii.md },
 
   hint: {
-    fontFamily: FontFamily.body,
+    ...face('body', 'semibold'),
     fontSize: FontSize.base,
-    fontWeight: FontWeight.semibold,
     color: Brand.white,
     textAlign: 'center',
   },
   cancel: {
-    fontFamily: FontFamily.body,
+    ...face('body', 'semibold'),
     fontSize: FontSize.base,
-    fontWeight: FontWeight.semibold,
     color: Brand.white,
     textDecorationLine: 'underline',
   },
@@ -373,21 +373,19 @@ const makeStyles = (c: ThemeColors) =>
     paddingHorizontal: Spacing.xl,
   },
   statusTitle: {
-    fontFamily: FontFamily.heading,
+    ...face('display', 'bold'),
     fontSize: FontSize.lg,
-    fontWeight: FontWeight.bold,
     color: c.text,
   },
   statusDesc: {
-    fontFamily: FontFamily.body,
+    ...face('body', 'regular'),
     fontSize: FontSize.base,
     color: c.textSecondary,
     textAlign: 'center',
   },
   cancelText: {
-    fontFamily: FontFamily.body,
+    ...face('body', 'semibold'),
     fontSize: FontSize.sm,
-    fontWeight: FontWeight.semibold,
     color: c.textTertiary,
   },
 
@@ -401,14 +399,13 @@ const makeStyles = (c: ThemeColors) =>
     backgroundColor: c.background,
   },
   permissionTitle: {
-    fontFamily: FontFamily.heading,
+    ...face('display', 'bold'),
     fontSize: FontSize.xl,
-    fontWeight: FontWeight.bold,
     color: c.text,
     textAlign: 'center',
   },
   permissionDesc: {
-    fontFamily: FontFamily.body,
+    ...face('body', 'regular'),
     fontSize: FontSize.base,
     color: c.textTertiary,
     textAlign: 'center',

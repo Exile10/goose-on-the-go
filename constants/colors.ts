@@ -3,6 +3,8 @@
  * Source: Jarida Brand Heuristics + Goose In A Pond design bundle
  */
 
+import { createTheme } from '@jarida/ink';
+
 export const JaridaPurple = {
   50: '#F4ECFF',
   100: '#E6D6FF',
@@ -133,69 +135,64 @@ export interface ThemeColors {
   iconActive: string;
   tabIconDefault: string;
   tabIconSelected: string;
+  /**
+   * Meaning, as text or a mark on this scheme's surfaces. Not `Semantic`, whose
+   * fixed values are for fills: its red measures about 3.3:1 as text on the dark
+   * card, under the 4.5:1 a sentence needs.
+   */
+  danger: string;
+  success: string;
+  warning: string;
+  info: string;
 }
 
 /** Light theme surface + text colors */
-export const LightColors: ThemeColors = {
-  // Surfaces
-  background: Brand.white,
-  backgroundSecondary: Grey[50],
-  backgroundTertiary: Grey[100],
-  card: Brand.white,
-  cardElevated: Brand.white,
+/**
+ * The theme, read off Ink rather than kept beside it.
+ *
+ * These used to be their own values: a pure white page in light and a neutral
+ * charcoal one in dark, under Ink's warm paper and its purple-black. Every screen
+ * built on this sat beside Ink's cards, sheets and settings pages in a slightly
+ * different colour, worst in dark, where the stack header was grey above a
+ * purple page. Deriving them means a screen and the Ink components on it agree.
+ */
+function fromInk(scheme: 'light' | 'dark'): ThemeColors {
+  const c = createTheme({ scheme, accent: 'Purple' }).color;
+  return {
+    background: c.bg,
+    backgroundSecondary: c.content,
+    backgroundTertiary: c.chrome,
+    card: c.surface,
+    cardElevated: c.surface,
 
-  // Text
-  text: Brand.charcoal,
-  textSecondary: Grey[600],
-  textTertiary: Grey[500],
-  textDisabled: Grey[400],
-  textOnBrand: Brand.white,
-  textBrand: Accent.base,
+    text: c.text,
+    textSecondary: c.textSecondary,
+    textTertiary: c.textTertiary,
+    textDisabled: c.textDisabled,
+    textOnBrand: c.textOnAccent,
+    textBrand: c.accentLine,
 
-  // Borders
-  border: Grey[200],
-  borderStrong: Grey[300],
-  borderBrand: Accent.base,
+    border: c.line,
+    borderStrong: c.lineStrong,
+    borderBrand: c.accentLine,
 
-  // Interactive
-  tint: Accent.base,
-  tintSoft: Accent.soft,
-  icon: Grey[500],
-  iconActive: Accent.base,
-  tabIconDefault: Grey[500],
-  tabIconSelected: Accent.base,
-} as const;
+    tint: c.accent,
+    tintSoft: c.accentSoft,
+    icon: c.textTertiary,
+    iconActive: c.accentLine,
+    tabIconDefault: c.textTertiary,
+    tabIconSelected: scheme === 'dark' ? c.text : c.accentLine,
 
-/** Dark theme surface + text colors */
-export const DarkColors: ThemeColors = {
-  // Surfaces
-  background: Grey[900],
-  backgroundSecondary: Grey[800],
-  backgroundTertiary: Grey[700],
-  card: Grey[800],
-  cardElevated: Grey[700],
+    danger: c.dangerFg,
+    success: c.successFg,
+    warning: c.warningFg,
+    info: c.infoFg,
+  };
+}
 
-  // Text
-  text: '#ECEDEE',
-  textSecondary: Grey[400],
-  textTertiary: Grey[500],
-  textDisabled: Grey[600],
-  textOnBrand: Brand.white,
-  textBrand: Accent.onDark,
+export const LightColors: ThemeColors = fromInk('light');
 
-  // Borders
-  border: Grey[700],
-  borderStrong: Grey[600],
-  borderBrand: Accent.onDark,
-
-  // Interactive
-  tint: Accent.base,
-  tintSoft: Accent.softDark,
-  icon: Grey[400],
-  iconActive: Accent.onDark,
-  tabIconDefault: Grey[500],
-  tabIconSelected: Brand.white,
-} as const;
+export const DarkColors: ThemeColors = fromInk('dark');
 
 export const Colors = {
   light: LightColors,

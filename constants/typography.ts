@@ -5,6 +5,8 @@
  * Loaded via expo-font in the root layout.
  */
 
+import { resolveFont } from '@jarida/ink';
+
 export const FontFamily = {
   display: 'Quicksand',
   heading: 'Quicksand',
@@ -48,3 +50,17 @@ export const LetterSpacing = {
   wide: 0.08,
   wider: 0.12,
 } as const;
+
+/**
+ * The registered file for a weight, as `{ fontFamily }`. Android draws a
+ * `fontWeight` on a custom family in its regular face, so a heading set as
+ * Quicksand at 600 came out thin there; naming the weight's own file is what
+ * Ink's text does, and what keeps these screens the same weight as its controls.
+ */
+export function face(
+  role: 'display' | 'body' | 'mono',
+  weight: keyof typeof FontWeight = 'regular',
+): { fontFamily: string } {
+  const w = Number(FontWeight[weight]) as 400 | 500 | 600 | 700;
+  return { fontFamily: resolveFont('native', { role, weight: w }).fontFamily };
+}

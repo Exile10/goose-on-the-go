@@ -23,7 +23,7 @@
     "@expo-google-fonts/jetbrains-mono": "^0.4.1",
     "@expo-google-fonts/quicksand": "^0.4.1",
     "@expo/vector-icons": "^15.0.3",
-    "@jarida/ink": "^1.0.0",
+    "@jarida/ink": "^1.1.0",
     "@noble/ciphers": "2.4.0",
     "@noble/curves": "2.4.0",
     "@noble/hashes": "2.4.0",

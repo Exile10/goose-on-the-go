@@ -11,69 +11,77 @@
  * add, remove.
  */
 
-import { useTranslation } from 'react-i18next';
 import React, { useCallback, useState } from 'react';
-import { InkButton } from '@jarida/ink/native';
+import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import {
-  ActivityIndicator,
-  RefreshControl,
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TextInput,
-} from 'react-native';
+  InkButton,
+  InkCard,
+  InkEmptyState,
+  InkFormField,
+  InkInput,
+  InkListItem,
+  InkNotice,
+  InkSpinner,
+  InkTitle,
+  inkText,
+  useInkTheme,
+} from '@jarida/ink/native';
 
-import { GIcon } from '@/components/ui/g-icon';
-import { GPressable } from '@/components/ui/g-pressable';
 import { GKeyboardView } from '@/components/ui/g-keyboard-view';
-import { useProfiles } from '@/view-models/use-profiles';
 import { usePullToRefresh } from '@/view-models/use-pull-to-refresh';
-import type { Profile } from '@/services/types';
-import { Grey, JaridaPurple, Brand, Semantic } from '@/constants/colors';
-import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
-import { Spacing } from '@/constants/spacing';
-import { Radii } from '@/constants/radii';
-import { useThemedStyles } from '@/hooks/use-themed-styles';
 import type { ThemeColors } from '@/constants/colors';
+import { Spacing } from '@/constants/spacing';
+import { useThemedStyles } from '@/hooks/use-themed-styles';
+import type { Profile } from '@/services/types';
+import { useProfiles } from '@/view-models/use-profiles';
 
 /** Fallback when a profile has no emoji, so the avatar is never blank. */
 function initial(displayName: string): string {
   return displayName.trim().charAt(0).toUpperCase() || '?';
 }
 
-/** Profile card */
-const ProfileCard = React.memo(function ProfileCard({
+const AVATAR = 40;
+
+/** One person: their emoji or initial, their name, and the way to forget them. */
+const ProfileRow = React.memo(function ProfileRow({
   profile,
   onRemove,
 }: {
   profile: Profile;
   onRemove: (id: string) => void;
 }) {
-  const styles = useThemedStyles(makeStyles);
+  const theme = useInkTheme();
   const { t } = useTranslation();
   const handleRemove = useCallback(() => onRemove(profile.id), [profile.id, onRemove]);
+  const mark = inkText(theme, { size: 'lg', weight: theme.weight.bold, color: theme.color.textOnAccent }).style;
 
   return (
-    <View style={styles.userCard}>
-      <View style={styles.userHeader}>
-        <View style={[styles.avatar, { backgroundColor: JaridaPurple[500] }]}>
-          <Text style={styles.avatarText}>
-            {profile.avatar_emoji || initial(profile.display_name)}
-          </Text>
+    <InkListItem
+      lead={
+        // An emoji is not initials, so this is drawn here rather than by InkAvatar.
+        <View
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
+          style={{
+            width: AVATAR,
+            height: AVATAR,
+            borderRadius: AVATAR / 2,
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: theme.color.accent,
+          }}
+        >
+          <Text style={mark}>{profile.avatar_emoji || initial(profile.display_name)}</Text>
         </View>
-        <View style={styles.userInfo}>
-          <Text style={styles.userName}>{profile.display_name}</Text>
-        </View>
-      </View>
-
-      <View style={styles.actionsRow}>
-        <GPressable style={styles.actionBtn} onPress={handleRemove}>
-          <GIcon name="trash" size={14} color={Semantic.danger} />
-          <Text style={[styles.actionText, { color: Semantic.danger }]}>{t('common.remove')}</Text>
-        </GPressable>
-      </View>
-    </View>
+      }
+      title={profile.display_name}
+      trail={
+        <InkButton size="sm" icon="trash" onPress={handleRemove}>
+          {t('common.remove')}
+        </InkButton>
+      }
+    />
   );
 });
 
@@ -104,73 +112,64 @@ export default function AddUsersScreen() {
       <ScrollView
         style={styles.container}
         contentContainerStyle={styles.scroll}
+        keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl {...pull} />}
       >
-
-        {loading ? <ActivityIndicator color={JaridaPurple[500]} /> : null}
-
-        {error ? <Text style={styles.errorText}>{error}</Text> : null}
+        {loading ? <InkSpinner label={t('people.loading')} /> : null}
+        {error ? <InkNotice tone="danger">{error}</InkNotice> : null}
 
         {!loading && data.profiles.length === 0 ? (
-          <Text style={styles.emptyText}>{t('people.emptyBody')}</Text>
+          <InkEmptyState icon="users" title={t('people.empty')}>
+            {t('people.emptyBody')}
+          </InkEmptyState>
         ) : null}
 
-        {data.profiles.map((p) => (
-          <ProfileCard key={p.id} profile={p} onRemove={actions.remove} />
-        ))}
+        {data.profiles.length > 0 ? (
+          <InkCard raised={false} contentStyle={styles.list}>
+            {data.profiles.map((p) => (
+              <ProfileRow key={p.id} profile={p} onRemove={actions.remove} />
+            ))}
+          </InkCard>
+        ) : null}
 
         {showAdd ? (
-          <View style={styles.inviteCard}>
-            <Text style={styles.inviteTitle}>{t('people.addTitle')}</Text>
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>{t('people.name')}</Text>
-              <TextInput
-                style={styles.textInput}
+          <InkCard contentStyle={styles.form}>
+            <InkTitle level={3}>{t('people.addTitle')}</InkTitle>
+            <InkFormField label={t('people.name')}>
+              <InkInput
+                label={t('people.name')}
                 value={name}
-                onChangeText={setName}
+                onChange={setName}
                 placeholder={t('people.namePlaceholder')}
-                placeholderTextColor={Grey[400]}
-                autoCapitalize="words"
-                editable={!saving}
+                disabled={saving}
+                onSubmit={() => void submit()}
+                inputProps={{ autoCapitalize: 'words', autoFocus: true, returnKeyType: 'next' }}
               />
-            </View>
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>{t('people.emoji')}</Text>
-              <TextInput
-                style={styles.textInput}
+            </InkFormField>
+            <InkFormField label={t('people.emoji')} hint={t('people.emojiHint')}>
+              <InkInput
+                label={t('people.emoji')}
                 value={emoji}
-                onChangeText={setEmoji}
-                placeholder={t('people.emojiHint')}
-                placeholderTextColor={Grey[400]}
-                editable={!saving}
+                onChange={setEmoji}
+                disabled={saving}
+                inputProps={{ maxLength: 4 }}
               />
-            </View>
-            <View style={styles.inviteActions}>
-              <InkButton variant="quiet" onPress={() => setShowAdd(false)}>
+            </InkFormField>
+            <View style={styles.formActions}>
+              <InkButton disabled={saving} onPress={() => setShowAdd(false)}>
                 {t('common.cancel')}
               </InkButton>
-              <InkButton
-                variant="primary"
-                disabled={!name.trim() || saving}
-                onPress={submit}
-              >
+              <InkButton variant="primary" disabled={!name.trim()} loading={saving} onPress={() => void submit()}>
                 {saving ? t('addUsers.adding') : t('common.add')}
               </InkButton>
             </View>
-          </View>
+          </InkCard>
         ) : (
-          <GPressable
-            feedback="lift"
-            style={styles.addBtn}
-            onPress={() => setShowAdd(true)}
-          >
-            <GIcon name="plus" size={18} color={JaridaPurple[500]} />
-            <Text style={styles.addBtnText}>{t('people.add')}</Text>
-          </GPressable>
+          <InkButton icon="plus" block onPress={() => setShowAdd(true)}>
+            {t('people.add')}
+          </InkButton>
         )}
-
-        <View style={{ height: 32 }} />
       </ScrollView>
     </GKeyboardView>
   );
@@ -179,134 +178,8 @@ export default function AddUsersScreen() {
 const makeStyles = (c: ThemeColors) =>
   StyleSheet.create({
     container: { flex: 1, backgroundColor: c.background },
-    scroll: { paddingHorizontal: Spacing.lg, paddingTop: Spacing.lg },
-
-    errorText: {
-      fontFamily: FontFamily.body,
-      fontSize: FontSize.sm,
-      color: Semantic.danger,
-      marginBottom: Spacing.md,
-    },
-    emptyText: {
-      fontFamily: FontFamily.body,
-      fontSize: FontSize.base,
-      color: c.textTertiary,
-      marginBottom: Spacing.md,
-    },
-
-    /* Profile card */
-    userCard: {
-      backgroundColor: c.card,
-      borderRadius: Radii.xl,
-      padding: Spacing.lg,
-      borderWidth: 1,
-      borderColor: c.border,
-      marginBottom: Spacing.md,
-    },
-    userHeader: {
-      flexDirection: 'row',
-      alignItems: 'center',
-    },
-    avatar: {
-      width: 40,
-      height: 40,
-      borderRadius: 20,
-      alignItems: 'center',
-      justifyContent: 'center',
-      marginRight: Spacing.md,
-    },
-    avatarText: {
-      fontFamily: FontFamily.heading,
-      fontSize: FontSize.md,
-      fontWeight: FontWeight.bold,
-      color: Brand.white,
-    },
-    userInfo: { flex: 1 },
-    userName: {
-      fontFamily: FontFamily.heading,
-      fontSize: FontSize.base,
-      fontWeight: FontWeight.bold,
-      color: c.text,
-    },
-
-    /* Actions */
-    actionsRow: {
-      flexDirection: 'row',
-      gap: Spacing.lg,
-      marginTop: Spacing.md,
-      paddingTop: Spacing.md,
-      borderTopWidth: 1,
-      borderTopColor: c.border,
-    },
-    actionBtn: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: Spacing.xs,
-    },
-    actionText: {
-      fontFamily: FontFamily.body,
-      fontSize: FontSize.xs,
-      fontWeight: FontWeight.medium,
-      color: c.textTertiary,
-    },
-
-    /* Add button */
-    addBtn: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: Spacing.sm,
-      paddingVertical: Spacing.lg,
-      borderRadius: Radii.xl,
-      borderWidth: 2,
-      borderStyle: 'dashed',
-      borderColor: JaridaPurple[200],
-      backgroundColor: c.tintSoft,
-    },
-    addBtnText: {
-      fontFamily: FontFamily.body,
-      fontSize: FontSize.base,
-      fontWeight: FontWeight.semibold,
-      color: c.textBrand,
-    },
-
-    /* Add form */
-    inviteCard: {
-      backgroundColor: c.card,
-      borderRadius: Radii.xl,
-      padding: Spacing.lg,
-      borderWidth: 1,
-      borderColor: JaridaPurple[200],
-    },
-    inviteTitle: {
-      fontFamily: FontFamily.heading,
-      fontSize: FontSize.md,
-      fontWeight: FontWeight.bold,
-      color: c.text,
-      marginBottom: Spacing.md,
-    },
-    inputGroup: { marginBottom: Spacing.md },
-    inputLabel: {
-      fontFamily: FontFamily.body,
-      fontSize: FontSize.sm,
-      fontWeight: FontWeight.semibold,
-      color: c.textSecondary,
-      marginBottom: Spacing.xs,
-    },
-    textInput: {
-      backgroundColor: c.backgroundSecondary,
-      borderRadius: Radii.lg,
-      borderWidth: 1,
-      borderColor: c.border,
-      paddingHorizontal: Spacing.md,
-      paddingVertical: Spacing.md,
-      fontFamily: FontFamily.body,
-      fontSize: FontSize.base,
-      color: c.text,
-    },
-    inviteActions: {
-      flexDirection: 'row',
-      justifyContent: 'flex-end',
-      gap: Spacing.sm,
-    },
+    scroll: { padding: Spacing.lg, gap: Spacing.lg, paddingBottom: Spacing['3xl'] },
+    list: { padding: 0, gap: 0, overflow: 'hidden' },
+    form: { gap: Spacing.lg },
+    formActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: Spacing.sm },
   });
