@@ -261,6 +261,13 @@ Five more stack screens aren't in the hub:
   this network, the one in use marked. A pick opens the wizard at that Pond through
   `offerPairingStart`, as the welcome screen does; until 2026-10-17 it went in a
   route param the wizard never read, and the wizard opened on its own search.
+  None of it needs the current Pond to answer, which is why an offline Home card
+  leads here. Set up a new Pond opens first run (`/(onboarding)/welcome`) over the
+  stored pairing, for a new or reset Pond that has not joined the network and so
+  is not on the list: Bluetooth and the setup card live there. Until 2026-10-27
+  first run opened only when nothing was paired, so a phone whose Pond had gone
+  could not set up its replacement. There is one stored Pond, not a list; pairing
+  another replaces it.
 - **Add a device** (`/(stack)/commission-device`) — from the Devices tab and Home.
 - **Wake word** (`/(stack)/wake-word`) — from Home's "Finish setting up" card after owner setup: the phrase and its calibration, saved through the shared settings store.
 - **Connect Desktop** (`/(stack)/connect-desktop`) — the QR scanner opened from

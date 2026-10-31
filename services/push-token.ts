@@ -166,6 +166,18 @@ export async function registerPushToken(): Promise<string | null> {
 }
 
 /**
+ * Forget which token was registered, because the Pond it went to is no longer this phone's.
+ *
+ * The memo exists to spare one Pond's rate limit, and it is not keyed by Pond. Kept across a
+ * sign-out, it made the next pairing in the same process skip its upload: the native token had
+ * not changed, so the new Pond was never given one and could not wake this phone. An upload
+ * already in flight is left to finish; it is addressed to whatever the client points at.
+ */
+export function forgetPushRegistration(): void {
+  lastRegistered = null;
+}
+
+/**
  * Re-register whenever the platform rotates the token. Returns the remover.
  *
  * The listener registers the token the event carries and deliberately does NOT

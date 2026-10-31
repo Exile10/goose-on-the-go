@@ -137,5 +137,10 @@ export function storageFamily(family: StorageFamily) {
     async remove(ids: string[]): Promise<void> {
       if (ids.length > 0) await AsyncStorage.multiRemove(ids.map((id) => prefix + id));
     },
+
+    /** Every record in the family, for a sign-out that keeps nothing of the household. */
+    async clear(): Promise<void> {
+      await this.remove(await this.ids());
+    },
   };
 }

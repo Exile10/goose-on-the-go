@@ -7,7 +7,8 @@ import { forgetAllCards } from '@/services/card-cache';
 import { forgetPondImages } from '@/services/pond-images';
 import { forgetLongTasks } from '@/services/long-task-cache';
 import { forgetKeptAdminKey } from '@/services/kept-admin-key';
-import { Storage, purgeLegacyStorage } from '@/services/storage';
+import { forgetPushRegistration } from '@/services/push-token';
+import { Storage, purgeLegacyStorage, storageFamily } from '@/services/storage';
 import { SecureStorage } from '@/services/secure-storage';
 import { ApiError, api, PondApiClient, type HandshakeResponse, type SpokenCode } from '@/services/api-client';
 import type { PakeCredential } from '@/services/cpace';
@@ -55,7 +56,19 @@ interface ServerContextValue {
   adoptPairing: (profile: ConnectionProfile, pin: string, resp: HandshakeResponse) => Promise<void>;
   /** Ask the staged Pond to read a pairing code aloud; it answers only a phone on its own network. */
   requestSpokenCode: () => Promise<SpokenCode>;
+  /**
+   * Ask the Pond to release this phone, then forget it here. Resolves once both are done, and also
+   * when the Pond refuses the session outright (it has already let this phone go). Rejects, with
+   * the pairing kept, on any other failure: an `ApiError` when the Pond answered but did not
+   * release it, anything else when the Pond could not be reached.
+   */
   unpair: () => Promise<void>;
+  /**
+   * Forget the Pond on this phone only, without telling it: for a Pond that cannot be reached and
+   * may never be again. The Pond still lists this phone until someone removes it there. Callers
+   * must have asked first; this is never a silent fallback for `unpair`.
+   */
+  forgetLocally: () => Promise<void>;
   /** Per-screen mock/real backend flags (dev only) — see MIGRATION_SCREENS. */
   screenModes: ScreenModes;
   /** The screen's toggle in dev, its default in a release build — see `resolveScreenReal`. */
@@ -247,6 +260,7 @@ export function ServerProvider({ children }: PropsWithChildren) {
    * enrolling nodes against an identity the Pond will not accept.
    */
   const forgetPairing = useCallback(async () => {
+    // Stopping the remote transport also ends the foreground service that carries it.
     await cancelRemoteAccess().catch(() => undefined);
     await restoreRemoteAccess('', '').catch(() => undefined);
     operation.current++; staged.current = null; saved.current = null; setHasPairing(false);
@@ -255,13 +269,20 @@ export function ServerProvider({ children }: PropsWithChildren) {
     await SecureStorage.remove('pondIdentity');
     await SecureStorage.remove('sessionToken'); await SecureStorage.remove('refreshToken');
     await Storage.remove('connectionProfile'); await Storage.remove('serverUrl');
+    // When this Pond would drop remote access: a date about it, and wrong for the next one.
+    await Storage.remove('remoteLapsesAt');
     // The tool cards kept from its conversations are the household's too.
     await forgetAllCards().catch(() => undefined);
+    // So are owner setup's unfinished answers and what it left on Home for later.
+    await storageFamily('setupDrafts').clear().catch(() => undefined);
+    await storageFamily('setupChecklist').clear().catch(() => undefined);
     // So are the pictures its cameras showed, held in memory while their list scrolled.
     forgetPondImages();
     forgetLongTasks();
     // A key to My Pond opens only the Pond this phone has just left.
     await forgetKeptAdminKey().catch(() => undefined);
+    // The next Pond has never been given this phone's push token, even though it has not changed.
+    forgetPushRegistration();
     await manager.configure(null);
   }, [manager]);
 
@@ -571,9 +592,19 @@ export function ServerProvider({ children }: PropsWithChildren) {
     // Failure keeps the pairing available for an explicit retry -- except when the Pond
     // refuses the session outright, which means it is already gone there and a retry can
     // only fail the same way.
-    try { await api.handshakeRevoke(); }
-    catch (e) { if (!(e instanceof ApiError && (e.status === 401 || e.status === 403))) throw e; }
+    try {
+      await api.handshakeRevoke();
+      console.info('[unpair] kind=released');
+    } catch (e) {
+      if (!(e instanceof ApiError && (e.status === 401 || e.status === 403))) throw e;
+      console.info('[unpair] kind=already_released status=', e.status);
+    }
     await forgetPairing();
+  }, [forgetPairing]);
+  const forgetLocally = useCallback(async () => {
+    await committing.current?.catch(() => undefined);
+    await forgetPairing();
+    console.info('[unpair] kind=forgotten_locally');
   }, [forgetPairing]);
   const updateRemoteProfile = useCallback(async (url: string | null, control: string, check: () => void) => {
     await committing.current?.catch(() => undefined);
@@ -613,8 +644,8 @@ export function ServerProvider({ children }: PropsWithChildren) {
     refreshToken: identity?.refresh ?? null, pairedPin: identity?.pin ?? null, keepRotatedTokens, connectionState: snapshot.state,
     profileId: identity?.id ?? '', paired: hasPairing, remoteEnabled: saved.current?.profile.remoteAccess?.mode === 'embedded',
     keepLocalOnly, hydrated, screenModes, isScreenReal, setScreenMode,
-    checkHealth, setRemoteEndpoint, recover: manager.recover, revoke: manager.revoke.bind(manager), stagePairing, cancelPairing, pair, adoptPairing, requestSpokenCode, unpair,
-  }), [snapshot, identity, hasPairing, hydrated, screenModes, isScreenReal, setScreenMode, checkHealth, setRemoteEndpoint, keepLocalOnly, keepRotatedTokens, manager, stagePairing, cancelPairing, pair, adoptPairing, requestSpokenCode, unpair]);
+    checkHealth, setRemoteEndpoint, recover: manager.recover, revoke: manager.revoke.bind(manager), stagePairing, cancelPairing, pair, adoptPairing, requestSpokenCode, unpair, forgetLocally,
+  }), [snapshot, identity, hasPairing, hydrated, screenModes, isScreenReal, setScreenMode, checkHealth, setRemoteEndpoint, keepLocalOnly, keepRotatedTokens, manager, stagePairing, cancelPairing, pair, adoptPairing, requestSpokenCode, unpair, forgetLocally]);
   return <ServerContext.Provider value={value}>{children}</ServerContext.Provider>;
 }
 export function useServer(): ServerContextValue {

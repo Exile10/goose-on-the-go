@@ -5,12 +5,22 @@ import { SecureStorage } from '@/services/secure-storage';
 import { Storage } from '@/services/storage';
 import { api, ApiError } from '@/services/api-client';
 import { forgetKeptAdminKey } from '@/services/kept-admin-key';
+import { forgetAllCards } from '@/services/card-cache';
+import { forgetPondImages } from '@/services/pond-images';
+import { forgetPushRegistration } from '@/services/push-token';
 
 jest.mock('@react-native-community/netinfo', () => ({
   configure: jest.fn(), addEventListener: jest.fn(() => () => undefined),
   fetch: jest.fn(async () => ({ type: 'wifi' })),
 }));
-jest.mock('@/services/storage', () => ({ Storage: { set: jest.fn(), remove: jest.fn(), getJSON: jest.fn(async () => null), setJSON: jest.fn() }, purgeLegacyStorage: jest.fn() }));
+const mockFamilyClear = jest.fn(async (_family: string) => undefined);
+jest.mock('@/services/storage', () => ({
+  Storage: { set: jest.fn(), remove: jest.fn(), getJSON: jest.fn(async () => null), setJSON: jest.fn() },
+  purgeLegacyStorage: jest.fn(),
+  storageFamily: (family: string) => ({ clear: () => mockFamilyClear(family) }),
+}));
+jest.mock('@/services/pond-images', () => ({ forgetPondImages: jest.fn() }));
+jest.mock('@/services/push-token', () => ({ forgetPushRegistration: jest.fn() }));
 // Signing out also forgets the tool cards; that store is not what these tests are about.
 jest.mock('@/services/card-cache', () => ({ forgetAllCards: jest.fn(async () => undefined) }));
 jest.mock('@/services/kept-admin-key', () => ({ forgetKeptAdminKey: jest.fn(async () => undefined) }));
@@ -144,5 +154,43 @@ it('still reports a stored pairing while another is being staged', async () => {
   expect(server.paired).toBe(true);
 
   await act(async () => { await server.cancelPairing(); await staging; });
+  await act(async () => { tree.unmount(); });
+});
+
+// "Remove from this phone", for a Pond that cannot be asked: everything a sign-out clears is
+// cleared, and the Pond is not contacted at all, since that is the call that just failed.
+it('forgets the Pond on this phone alone, keeping nothing of the household', async () => {
+  (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+  let server!: ReturnType<typeof useServer>;
+  const Child = () => { server = useServer(); return null; };
+  let tree!: ReactTestRenderer;
+  await act(async () => { tree = create(<ServerProvider><Child /></ServerProvider>); });
+  expect(server.paired).toBe(true);
+
+  jest.mocked(api.handshakeRevoke).mockClear();
+  jest.mocked(SecureStorage.remove).mockClear();
+  jest.mocked(Storage.remove).mockClear();
+  jest.mocked(forgetAllCards).mockClear();
+  jest.mocked(forgetPondImages).mockClear();
+  jest.mocked(forgetPushRegistration).mockClear();
+  mockFamilyClear.mockClear();
+  const info = jest.spyOn(console, 'info').mockImplementation(() => undefined);
+  await act(async () => { await server.forgetLocally(); });
+
+  expect(api.handshakeRevoke).not.toHaveBeenCalled();
+  const secrets = jest.mocked(SecureStorage.remove).mock.calls.map(([key]) => key);
+  expect(secrets).toEqual(expect.arrayContaining(['pondIdentity', 'sessionToken', 'refreshToken']));
+  const stored = jest.mocked(Storage.remove).mock.calls.map(([key]) => key);
+  expect(stored).toEqual(expect.arrayContaining(['connectionProfile', 'serverUrl', 'remoteLapsesAt']));
+  expect(mockFamilyClear.mock.calls.map(([family]) => family)).toEqual(expect.arrayContaining(['setupDrafts', 'setupChecklist']));
+  expect(forgetAllCards).toHaveBeenCalledTimes(1);
+  expect(forgetPondImages).toHaveBeenCalledTimes(1);
+  // Otherwise the next Pond paired in this process is never sent the unchanged push token.
+  expect(forgetPushRegistration).toHaveBeenCalledTimes(1);
+  expect(server.paired).toBe(false);
+  expect(server.profileId).toBe('');
+  expect(info).toHaveBeenCalledWith('[unpair] kind=forgotten_locally');
+  info.mockRestore();
+
   await act(async () => { tree.unmount(); });
 });

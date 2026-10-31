@@ -32,11 +32,14 @@ export interface ConfirmRequest {
 export interface ChoiceOption<T> {
   label: string;
   value: T;
+  /** Paints this answer red, as `ConfirmRequest.destructive` does, and buzzes a warning on open. */
+  destructive?: boolean;
 }
 
 /**
  * A question with more than one way to say yes. The first option is drawn as the primary one,
- * the rest quiet, so the dialog spends one raised button like any other.
+ * the rest quiet, so the dialog spends one raised button like any other. A destructive option is
+ * drawn red wherever it stands.
  */
 export interface ChoiceRequest<T> {
   title: string;
@@ -105,8 +108,12 @@ export function ConfirmProvider({ children }: PropsWithChildren) {
       },
       choose: async <T,>({ title, message, options }: ChoiceRequest<T>) => {
         const index = await ask(
-          { title, message, actions: options.map((o, i) => ({ label: o.label, variant: i === 0 ? 'primary' : 'quiet' })) },
-          false,
+          {
+            title,
+            message,
+            actions: options.map((o, i) => ({ label: o.label, variant: o.destructive ? 'danger' : i === 0 ? 'primary' : 'quiet' })),
+          },
+          options.some((o) => o.destructive),
         );
         return index === null ? null : options[index].value;
       },

@@ -252,6 +252,29 @@ and its ISK and sid chain to `cpace-vectors.json`. Everything native is owed a d
 - **NotificationsProvider** (`providers/notifications-provider.tsx`) — Push registration.
 - **InkProvider** (`@jarida/ink/native`) — Theme context for the ink primitives (#17).
 
+## Unpairing, including from a Pond that is gone
+
+Unpair (the You tab, `view-models/use-unpair.ts`) always asks the Pond first, with
+`POST /api/v1/handshake/revoke`, so the Pond forgets this phone whenever it can be reached. What
+happens next depends on the answer:
+
+| Answer | What the phone does |
+|---|---|
+| Released | Forgets the Pond (`forgetPairing` in `ServerProvider`) and lands on first run. |
+| 401 or 403 | The Pond has already let this phone go: forgets it the same way, with nothing more to ask. |
+| Any other `ApiError` | The Pond answered and did not release it. Offers Try again, or Remove from this phone. |
+| No answer (network, timeout, a different machine at the address) | Offers the same two, explaining that the Pond may be off, away, reset or gone. |
+
+Remove from this phone (`forgetLocally`) is never a silent fallback: it is offered in the app's own
+dialog, which says the Pond will still list this phone until it is removed from the Pond's
+dashboard. It clears exactly what a sign-out clears: the identity and both tokens in SecureStorage,
+the saved addresses, the remote transport and the foreground service that carries it, the
+remote-access lapse date, tool cards, owner setup's drafts and checklist, the camera pictures held
+in memory, and the record of which push token was registered, so the next Pond paired in the same
+process is sent it. The heartbeat and the notification stream stop with the identity. Until
+2026-10-27 a failed revoke was a system alert saying to try again at home, and a phone whose Pond
+had been reset or replaced stayed paired to it for good.
+
 ## Presence: telling the Pond this phone is still here
 
 The Pond does not store whether a device is online. It derives `is_online` at read time from `last_seen` against a **five-minute** threshold, so a paired phone has to keep refreshing its own row, or it ages out and reports itself offline in its own device list while in use. `ServerProvider` does that with `POST /api/v1/devices/{id}/heartbeat`, where `{id}` is the install id sent as `client_id` at pairing. The Pond keys the device row on exactly that id.
