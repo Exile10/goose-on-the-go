@@ -22,6 +22,9 @@ import { useProposals, type ProposalRow } from './use-proposals';
 import { useReminders } from './use-reminders';
 import { useSuggestions, type OfferedPrompt } from './use-suggestions';
 
+/** A prompt the Pond itself offered: it carries the Pond's id, where a fixed starter carries none. */
+export type PondPrompt = OfferedPrompt & { id: string };
+
 /** How many proposals Home shows before it stops and offers the rest behind See all. */
 export const HOME_PROPOSAL_LIMIT = 2;
 
@@ -39,13 +42,19 @@ export interface UseHomeIdeas {
     proposals: ProposalRow[];
     /** How many the Pond is offering in all, so See all can say so. */
     proposalCount: number;
-    prompts: OfferedPrompt[];
+    prompts: PondPrompt[];
     /** Pending reminders, for the one line that leads to them. */
     reminderCount: number;
   };
   /** The id a decision is in flight for, so its card can show it. */
   deciding: string | null;
-  /** Nothing to draw: no proposals, no prompts, no reminders. */
+  /**
+   * Nothing to draw: no proposals, no prompts, no reminders.
+   *
+   * A read that failed is empty here too, and Home draws nothing rather than an error. The
+   * section is a glance at what the Pond thought of; the connection banner already says when the
+   * Pond cannot be reached, and a second complaint under it would be the noise #196 removed.
+   */
   empty: boolean;
   actions: {
     approve: (id: string) => Promise<void>;
@@ -69,18 +78,22 @@ export function useHomeIdeas(): UseHomeIdeas {
   // section ever being absent. A starter carries no id; anything the Pond composed or templated
   // does.
   const prompts = useMemo(
-    () => suggestions.data.prompts.filter((p) => p.id !== null).slice(0, HOME_PROMPT_LIMIT),
+    () => suggestions.data.prompts.filter((p): p is PondPrompt => p.id !== null).slice(0, HOME_PROMPT_LIMIT),
     [suggestions.data.prompts],
   );
 
+  // On the functions, not on the `actions` objects around them: both hooks build a fresh literal
+  // every render, so depending on those would rebuild this every render and memoise nothing.
+  const { decide, refresh } = proposals.actions;
+  const { taken } = suggestions.actions;
   const actions = useMemo(
     () => ({
-      approve: (id: string) => proposals.actions.decide(id, 'approve'),
-      decline: (id: string) => proposals.actions.decide(id, 'reject'),
-      taken: suggestions.actions.taken,
-      refresh: proposals.actions.refresh,
+      approve: (id: string) => decide(id, 'approve'),
+      decline: (id: string) => decide(id, 'reject'),
+      taken,
+      refresh,
     }),
-    [proposals.actions, suggestions.actions],
+    [decide, refresh, taken],
   );
 
   return {

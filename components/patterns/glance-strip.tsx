@@ -12,7 +12,6 @@
 
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
-import { useTranslation } from 'react-i18next';
 import { InkText } from '@jarida/ink/native';
 
 import { useThemedStyles } from '@/hooks/use-themed-styles';
@@ -27,14 +26,20 @@ export interface Figure {
 
 export function GlanceStrip({ figures }: { figures: Figure[] }) {
   const styles = useThemedStyles(makeStyles);
-  const { t } = useTranslation();
 
   if (figures.length === 0) return null;
 
   return (
-    <View style={styles.strip} accessibilityRole="summary" accessibilityLabel={t('home.rightNowTitle')}>
+    <View style={styles.strip}>
       {figures.map((figure) => (
-        <View key={figure.key} style={styles.figure}>
+        // One element per figure, labelled with both its lines: read apart, "4" and "on now" are
+        // two announcements that say nothing on their own.
+        <View
+          key={figure.key}
+          style={styles.figure}
+          accessible
+          accessibilityLabel={`${figure.value} ${figure.label}`}
+        >
           <InkText size="lg" weight="semibold">{figure.value}</InkText>
           <InkText size="sm" tone="tertiary" numberOfLines={1}>{figure.label}</InkText>
         </View>

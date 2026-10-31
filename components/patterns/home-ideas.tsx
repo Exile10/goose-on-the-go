@@ -26,8 +26,7 @@ import { useThemedStyles } from '@/hooks/use-themed-styles';
 import type { ThemeColors } from '@/constants/colors';
 import { Spacing } from '@/constants/spacing';
 import { selectionTick } from '@/services/haptics';
-import { HOME_PROPOSAL_LIMIT, useHomeIdeas } from '@/view-models/use-home-ideas';
-import type { OfferedPrompt } from '@/view-models/use-suggestions';
+import { useHomeIdeas, type PondPrompt } from '@/view-models/use-home-ideas';
 
 export function HomeIdeas() {
   const { t } = useTranslation();
@@ -39,7 +38,7 @@ export function HomeIdeas() {
 
   const more = data.proposalCount - data.proposals.length;
 
-  const ask = (prompt: OfferedPrompt) => {
+  const ask = (prompt: PondPrompt) => {
     void selectionTick();
     actions.taken(prompt);
     router.push({ pathname: '/conversation', params: { ask: prompt.prompt } });
@@ -86,8 +85,8 @@ export function HomeIdeas() {
 
       {data.prompts.length > 0 ? (
         <View style={styles.chips}>
-          {data.prompts.map((prompt, i) => (
-            <InkChip key={prompt.id ?? `starter-${i}`} onPress={() => ask(prompt)}>
+          {data.prompts.map((prompt) => (
+            <InkChip key={prompt.id} onPress={() => ask(prompt)}>
               {prompt.prompt}
             </InkChip>
           ))}
@@ -104,9 +103,6 @@ export function HomeIdeas() {
     </>
   );
 }
-
-/** Kept beside the component so a reader sees the limit the heading's count is against. */
-export const SHOWN = HOME_PROPOSAL_LIMIT;
 
 const makeStyles = (_c: ThemeColors) =>
   StyleSheet.create({

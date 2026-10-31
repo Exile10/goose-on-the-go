@@ -22,10 +22,15 @@ Verify before you reuse any of this: grep the symbol, the paths below will drift
 - **Location, once, for a ride fare** (`view-models/use-ride.ts`): a foreground, high-accuracy
   fix, sent to the Pond and on to the ride company. This is the only location the app reads.
 
-No background work exists. There is no `expo-task-manager`, `expo-background-fetch`,
-`expo-calendar` or `expo-contacts` in `package.json`. The only foreground service is remote
-access's `PondNetworkService` (type `connectedDevice`, declared by `plugins/with-pond-tls.js`),
-which holds network access for the tunnel and reads nothing from the phone.
+The only background work is a push wake-up. `expo-task-manager` arrived with #155, and
+`services/background-notifications.ts` registers one task: a notification the Pond pushes wakes
+the phone long enough to receive it. It reads nothing from the phone, so it is not a context
+source. There is still no `expo-background-fetch`, `expo-calendar` or `expo-contacts` in
+`package.json` -- nothing that would let the phone gather on its own schedule.
+
+The only foreground service is remote access's `PondNetworkService` (type `connectedDevice`,
+declared by `plugins/with-pond-tls.js`), which holds network access for the tunnel and reads
+nothing from the phone.
 
 The connection manager already knows how it reached the Pond: `services/connection-manager.ts`
 types a route as `'local' | 'remote'`, the home network or the embedded tailnet.
