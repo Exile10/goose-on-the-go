@@ -1658,8 +1658,7 @@
     "appearanceSystem": "System",
     "appearanceLight": "Light",
     "appearanceDark": "Dark",
-    "unpairFailed": "This phone is still paired. Try again while you are on your Pond's home network.",
-    "unpairFailedTitle": "Could not unpair"
+    "unpairFailed": "This phone is still paired. Try again while you are on your Pond's home network."
   },
   "models": {
     "serving": "Serving now",
@@ -2269,8 +2268,7 @@
       "showAll": "Shows everything this run produced",
       "showLess": "Shows only the start of what this run produced",
       "statusSkipped": "Skipped",
-      "caughtUp": "Ran late (due {{when}})",
-      "duration": "{{ms}} ms"
+      "caughtUp": "Ran late (due {{when}})"
     },
     "form": {
       "scheduleTitle": "New schedule",
@@ -3195,11 +3193,6 @@
       "waiting": "Waiting for a picture",
       "idle": "No picture while the camera is not running",
       "stale": "The last picture did not arrive. Trying again."
-    },
-    "ago": {
-      "seconds": "{{count}} s",
-      "minutes": "{{count}} min",
-      "hours": "{{count}} h"
     }
   },
   "faces": {
