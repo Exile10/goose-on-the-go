@@ -23,6 +23,8 @@ const KEYS = {
   remoteLapsesAt: '@goose/remote-lapses-at',
   /** The pin of the Pond whose admin key this phone keeps behind its biometrics. Not the key. */
   adminKeyFor: '@goose/admin-key-for',
+  /** The order of Home's widgets: how this phone's owner arranged it, so it outlives a Pond. */
+  homeLayout: '@goose/home-layout',
 } as const;
 
 /**

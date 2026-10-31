@@ -34,7 +34,7 @@ Each figure is its own read, settled independently, so a Pond that cannot list i
 
 ## Home
 
-Home answers two questions in order: whether the Pond wants anything from you, then what is happening at home. The suggestion cards are its only raised surface; everything else sits on hairlines.
+Home answers two questions in order: whether the Pond wants anything from you, then what is happening at home. Under the greeting, everything is a widget on one board (`components/patterns/widget-board.tsx`), in two staggered columns and in an order the phone's owner can change: a long press, or Edit Home at the foot, folds every widget to one line, and a widget is dragged to its new place. The order is kept on the phone (`homeLayout` in `services/storage.ts`), not on the Pond. Only a waiting suggestion is raised and only Now playing is filled; the rest sit on hairlines.
 
 | Shown | Source | When it is not shown |
 |---|---|---|
@@ -43,15 +43,16 @@ Home answers two questions in order: whether the Pond wants anything from you, t
 | "Connected to …" line | `useServer()`: the Pond's address, leading to Switch Pond | while connecting or unreachable, when the Pond card says so instead |
 | From your Pond: suggestions | `GET /api/v1/proposals`, the first one, with Accept and Decline in place (`POST /proposals/{id}/decide`). Deciding in place is acceptable because a yes runs nothing: `executed` is always false. | when none are offered; "N more" leads to the Suggestions screen |
 | From your Pond: an agent | `GET /api/v1/agents/suggestions`, the first one, leading to the Agents screen | when none fits this Pond, or the read failed |
-| Ask row | `GET /api/v1/suggestions`, only the prompts the Pond offered (they carry an id), at most three; then Ask Goose, always. A prompt opens a new conversation and asks it. | the Pond's prompts, when it offers none; the fixed starters are never shown here |
-| "Nothing needs you right now." | both the suggestion and reminder reads answered, and neither had anything | when either read failed: unknown is not quiet |
-| Right now: Playing | `GET /api/v1/music/now-playing` (`nowPlayingOf`), while Spotify reports playback | with nothing playing, no Spotify account, a refusal, or a claim of playback with no track |
-| Right now: Next | `GET /api/v1/schedules/upcoming?limit=5`: the first schedule that is not paused and has a valid `next_run` (`nextRoutineOf`), with how long until it (`untilOf`; a time already passed reads "Due now") | when no routine will run |
-| Right now: Devices | the device list the grid below shows, as "N of M online", so the two cannot disagree | while that list is loading or failed, or empty |
-| Right now: Outside | `GET /api/v1/weather` → `temp` and `location_name`. **Celsius**: the Pond asks open-meteo for `temperature_unit=celsius`. The place is where the Pond is set up, which is not always where the reader is. | when no location is configured (`enabled: false`), or the read failed |
-| Right now: Remember | `GET /api/v1/reminders`: the first one, and how many more | when none are pending |
+| "Nothing needs you right now." | both the suggestion and reminder reads answered, and neither had anything; said inside the From your Pond widget | when either read failed: unknown is not quiet |
+| Ask | `GET /api/v1/suggestions`, only the prompts the Pond offered (they carry an id), at most three; then Ask Goose, always. A prompt opens a new conversation and asks it. | the Pond's prompts, when it offers none; the fixed starters are never shown here |
+| Now playing | `GET /api/v1/music/now-playing` (`nowPlayingOf`): the track and artist while Spotify reports playback, "Nothing playing" when it reports none | with no Spotify account, a refusal, or a claim of playback with no track |
+| Next routine | `GET /api/v1/schedules/upcoming?limit=5`: the first schedule that is not paused and has a valid `next_run` (`nextRoutineOf`), with how long until it (`untilText`; a time already passed reads "Due now") | when no routine will run |
+| Outside | `GET /api/v1/weather` → `temp` and `location_name`. **Celsius**: the Pond asks open-meteo for `temperature_unit=celsius`. The place is where the Pond is set up, which is not always where the reader is. | when no location is configured (`enabled: false`), or the read failed |
+| Remember | `GET /api/v1/reminders`: the first one, and how many more | when none are pending |
+| Conversations | the three most recent sessions | never: an empty or failed read says which |
+| Devices | the device list, six of it, with "N of M online" from the same list so the two cannot disagree | the count, while that list is loading or failed, or empty |
 
-With no line, the Right now heading is not drawn. The lines are built by `homeLedger()` in `view-models/home-ledger.ts`; the four idea sources are read once for the screen by `useHomeIdeas()`.
+A widget with nothing to say is left off the board rather than drawn empty, and keeps its place in the order for when it has. The four idea sources are read once for the screen by `useHomeIdeas()`.
 
 Suggestions and the Ask row's prompts are read under a random `gotg-home-…` session label, never a real conversation: the Pond binds an unattributed session to the device's member on read, so borrowing one from the recent list would claim it.
 
@@ -59,7 +60,7 @@ The **Meeting** and **Locked** chips were removed rather than wired: nothing in 
 
 `/schedules/upcoming` sends the Pond's `Schedule` as stored: `label`, `paused`, `next_run`, and no `name`. The line reads it through `UpcomingSchedule` in `services/types.ts`, which describes what is actually on the wire, rather than through the mismatched shared `Schedule` noted under Known gaps.
 
-Playing, Next and Outside each have their own reader in `view-models/use-right-now.ts`: `readOutdoor()`, `readNowPlaying()` and `readNextRoutine()`. None of them ever rejects, and each runs on its own cadence (below). `readRightNow()` composes the three for one-shot use.
+Now playing, Next routine and Outside each have their own reader in `view-models/use-right-now.ts`: `readOutdoor()`, `readNowPlaying()` and `readNextRoutine()`. None of them ever rejects, and each runs on its own cadence (below). `readRightNow()` composes the three for one-shot use.
 
 ## Keeping it current
 

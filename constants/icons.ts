@@ -15,7 +15,7 @@ import {
   Check, ChevronDown, ChevronLeft, ChevronRight, ChevronsUpDown, CircleCheck, Clock, Cloud, CloudDrizzle,
   CloudFog, CloudLightning, CloudRain, CloudSnow, CloudSun, Copy, Cpu, Download, Droplet,
   Ear, Eye, EyeOff, FileText, HardDrive, Info, Palette, SlidersHorizontal,
-  Ellipsis, ExternalLink, File, Filter, Folder, Frame, Globe, House, Image,
+  Ellipsis, ExternalLink, File, Filter, Folder, Frame, Globe, GripVertical, House, Image,
   Key, Keyboard, Lightbulb, Link, ListFilter, Lock, LockOpen, MessageCircle, MessageSquareText, Mic, Minus,
   MonitorSmartphone, Moon, Music, Package, Pause, Pencil, Play, Plug, Plus,
   Power, RefreshCw, RotateCcw, ScanFace, ScrollText, Search, Send, Server,
@@ -66,6 +66,8 @@ export const ICONS = {
   fog: CloudFog,
   folder: Folder,
   globe: Globe,
+  /** A widget's handle while Home is being rearranged. */
+  grip: GripVertical,
   home: House,
   info: Info,
   key: Key,

@@ -14,6 +14,7 @@ import { useRef, useState } from 'react';
 
 import { useServer } from '@/providers/server-provider';
 import { api, type PondApiClient } from '@/services/api-client';
+import i18n from '@/services/i18n';
 import type { NowPlayingResponse, UpcomingSchedule } from '@/services/types';
 import { useLive } from './use-live';
 
@@ -108,6 +109,15 @@ export function untilOf(at: Date, now: Date): Until {
   const hours = Math.round(minutes / 60);
   if (hours < 24) return { unit: 'hours', count: hours };
   return { unit: 'days', count: Math.round(hours / 24) };
+}
+
+/** How far off `at` is, as Home says it: "in 2 h", or "due now" once it has passed. */
+export function untilText(at: Date, now: Date): string {
+  const until = untilOf(at, now);
+  if (until.unit === 'now') return i18n.t('home.dueNow');
+  if (until.unit === 'minutes') return i18n.t('home.inMinutes', { count: until.count });
+  if (until.unit === 'hours') return i18n.t('home.inHours', { count: until.count });
+  return i18n.t('home.inDays', { count: until.count });
 }
 
 type RightNowReader = Pick<PondApiClient, 'weather' | 'nowPlaying' | 'upcomingSchedules'>;

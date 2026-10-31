@@ -1,7 +1,6 @@
 /**
- * Home's ideas and its Right now ledger, drawn: nothing where there is nothing, a decision that
- * reaches its handler and holds both buttons while it is out, and a line that leads somewhere only
- * when it has somewhere to lead.
+ * Home's ideas, drawn: nothing where there is nothing, a decision that reaches its handler and
+ * holds both buttons while it is out, and Ask Goose whatever the Pond offers.
  */
 
 import React from 'react';
@@ -11,11 +10,9 @@ import { InkButton, InkChip } from '@jarida/ink/native';
 
 import { GPressable } from '@/components/ui/g-pressable';
 import i18n from '@/services/i18n';
-import type { LedgerEntry } from '@/view-models/home-ledger';
 import type { ProposalRow } from '@/view-models/use-proposals';
 
 import { AskRow, HomeIdeas, type HomeIdeasProps } from '../home-ideas';
-import { RightNowLedger } from '../right-now-ledger';
 
 // lucide ships ES modules Jest does not transform; the glyph is not under test.
 jest.mock('@/components/ui/g-icon', () => ({ GIcon: () => null }));
@@ -119,27 +116,5 @@ describe('AskRow', () => {
     const tree = await render(<AskRow prompts={[prompt]} onAsk={onAsk} onAskGoose={jest.fn()} />);
     act(() => tree.root.findAllByType(InkChip)[0].props.onPress());
     expect(onAsk).toHaveBeenCalledWith(prompt);
-  });
-});
-
-describe('RightNowLedger', () => {
-  const LINES: LedgerEntry[] = [
-    { kind: 'outside', value: '18°C in Nairobi', detail: null },
-    { kind: 'devices', value: '4 of 9 online', detail: null },
-  ];
-
-  it('draws nothing with no lines', async () => {
-    const tree = await render(<RightNowLedger entries={[]} onOpen={{}} />);
-    expect(tree.toJSON()).toBeNull();
-  });
-
-  it('makes a line a button only where it leads somewhere', async () => {
-    const devices = jest.fn();
-    const tree = await render(<RightNowLedger entries={LINES} onOpen={{ devices }} />);
-    const links = tree.root.findAllByType(GPressable);
-    expect(links).toHaveLength(1);
-    expect(links[0].props.accessibilityLabel).toBe(`${i18n.t('home.ledger.devicesLabel')}, 4 of 9 online`);
-    act(() => links[0].props.onPress());
-    expect(devices).toHaveBeenCalled();
   });
 });

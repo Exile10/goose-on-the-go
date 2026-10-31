@@ -72,7 +72,6 @@
     "shortcuts": "SHORTCUTS",
     "seeAll": "See all",
     "recentConversations": "RECENT CONVERSATIONS",
-    "rightNowTitle": "Right now",
     "connectedTo": "Connected to {{host}}",
     "ideas": {
       "title": "From your Pond",
@@ -81,18 +80,23 @@
       "agent": "Try the {{title}} agent",
       "agentLabel": "Agent idea: {{title}}, {{when}}"
     },
-    "ledger": {
-      "playingLabel": "Playing",
-      "nextLabel": "Next",
-      "devicesLabel": "Devices",
-      "outsideLabel": "Outside",
-      "rememberLabel": "Remember",
-      "playingBy": "{{track}} by {{artist}}",
-      "routineAt": "{{label}} at {{time}}",
-      "devicesOnline": "{{online}} of {{total}} online",
-      "outside": "{{temp}}°C",
-      "outsideIn": "{{temp}}°C in {{place}}",
-      "more": "{{count}} more"
+    "nowPlaying": "Now playing",
+    "nothingPlaying": "Nothing playing",
+    "nextRoutine": "Next routine",
+    "widgets": {
+      "outside": "Outside",
+      "temp": "{{temp}}°C",
+      "remember": "Remember",
+      "more": "{{count}} more",
+      "online": "{{online}} of {{total}} online"
+    },
+    "board": {
+      "edit": "Edit Home",
+      "hint": "Drag a widget to move it.",
+      "reset": "Reset",
+      "moveEarlier": "Move earlier",
+      "moveLater": "Move later",
+      "moveHint": "Use the actions to move it."
     }
   },
   "chat": {
