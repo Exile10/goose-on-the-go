@@ -8,6 +8,7 @@ import { forgetPondImages } from '@/services/pond-images';
 import { forgetLongTasks } from '@/services/long-task-cache';
 import { forgetKeptAdminKey } from '@/services/kept-admin-key';
 import { forgetPushRegistration } from '@/services/push-token';
+import { forgetAllThreads } from '@/services/chat-threads';
 import { Storage, purgeLegacyStorage, storageFamily } from '@/services/storage';
 import { SecureStorage } from '@/services/secure-storage';
 import { ApiError, api, PondApiClient, type HandshakeResponse, type SpokenCode } from '@/services/api-client';
@@ -283,6 +284,8 @@ export function ServerProvider({ children }: PropsWithChildren) {
     await forgetKeptAdminKey().catch(() => undefined);
     // The next Pond has never been given this phone's push token, even though it has not changed.
     forgetPushRegistration();
+    // So are the conversations and drafts held in memory.
+    forgetAllThreads();
     await manager.configure(null);
   }, [manager]);
 

@@ -93,6 +93,7 @@
     "newConversation": "New conversation",
     "toLatest": "Go to the latest message",
     "toLatestUnseen": "New messages below. Go to the latest message",
+    "reading": "Reading this conversation",
     "starters": {
       "capabilities": "What can you do?",
       "memory": "What do you remember about me?",

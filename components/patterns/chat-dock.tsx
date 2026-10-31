@@ -25,7 +25,9 @@
  *
  * The dock holds its own draft and attachments. Lifting them into the screen
  * would re-render every message on each keystroke, and nothing above here
- * needs to know what is half-written.
+ * needs to know what is half-written. It starts from `initialDraft` and reports
+ * each edit through `onDraftChange`, so the screen can keep the draft with its
+ * conversation without re-rendering for it.
  */
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
@@ -79,6 +81,10 @@ export interface ChatDockProps {
   research?: ResearchOffer;
   /** The conversation on screen; research mode ends when it changes. */
   conversation?: string | null;
+  /** What was half-written here last time. Read once, when the dock mounts. */
+  initialDraft?: string;
+  /** Each edit to the draft, sending included. */
+  onDraftChange?: (text: string) => void;
 }
 
 export function ChatDock({
@@ -89,10 +95,19 @@ export function ChatDock({
   bottomInset = 0,
   research = 'hidden',
   conversation = null,
+  initialDraft = '',
+  onDraftChange,
 }: ChatDockProps) {
   const theme = useInkTheme();
   const { t } = useTranslation();
-  const [draft, setDraft] = useState('');
+  const [draft, setDraftState] = useState(initialDraft);
+  const setDraft = useCallback(
+    (text: string) => {
+      setDraftState(text);
+      onDraftChange?.(text);
+    },
+    [onDraftChange],
+  );
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [menu, setMenu] = useState(false);
   const [keyboard, setKeyboard] = useState(false);
@@ -141,7 +156,7 @@ export function ChatDock({
     onSend(draft, attachments, asResearch ? { research: true, answer: mode.answer } : undefined);
     setDraft('');
     setAttachments([]);
-  }, [attachments, draft, hasContent, mode, onSend]);
+  }, [attachments, draft, hasContent, mode, onSend, setDraft]);
 
   const startResearch = useCallback(() => {
     if (!mode.start(attachments.length)) return;

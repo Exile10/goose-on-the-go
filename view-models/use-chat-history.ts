@@ -26,6 +26,7 @@ import { useTranslation } from 'react-i18next';
 import { useServer } from '@/providers/server-provider';
 import { api } from '@/services/api-client';
 import { forgetCards } from '@/services/card-cache';
+import { forgetThreads } from '@/services/chat-threads';
 import { Storage } from '@/services/storage';
 import { matchesQuery } from '@/utils/search';
 import type { SessionSummary } from '@/services/types';
@@ -506,8 +507,9 @@ export function useChatHistory(): UseChatHistory {
       setSessions((all) => all?.filter((s) => s.id !== id) ?? all);
       try {
         await api.deleteSession(id);
-        // The cards this phone kept for it go with it.
+        // The cards, thread and draft this phone kept for it go with it.
         void forgetCards([id]);
+        forgetThreads([id]);
         return true;
       } catch {
         setActionError(t('chat.history.deleteFailed'));
@@ -533,6 +535,7 @@ export function useChatHistory(): UseChatHistory {
         DELETE_CONCURRENCY,
       );
       void forgetCards(fulfilled);
+      forgetThreads(fulfilled);
       if (rejected.length > 0) {
         setActionError(t('chat.history.deleteManyFailed', { count: rejected.length }));
       }
