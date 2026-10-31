@@ -11,7 +11,7 @@
  */
 
 import {
-  Activity, Archive, ArrowRight, AudioLines, Bell, Bluetooth, Bot, Boxes, Brain, Calendar, Camera,
+  Activity, Archive, ArrowDown, ArrowRight, AudioLines, Bell, Bluetooth, Bot, Boxes, Brain, Calendar, Camera,
   Check, ChevronDown, ChevronLeft, ChevronRight, ChevronsUpDown, CircleCheck, Clock, Cloud, CloudDrizzle,
   CloudFog, CloudLightning, CloudRain, CloudSnow, CloudSun, Copy, Cpu, Download, Droplet,
   Ear, Eye, EyeOff, FileText, HardDrive, Info, Palette, SlidersHorizontal,
@@ -31,6 +31,7 @@ export const ICONS = {
   appliance: Plug,
   agent: Bot,
   arrow: ArrowRight,
+  'arrow-down': ArrowDown,
   bell: Bell,
   bluetooth: Bluetooth,
   bolt: Zap,
