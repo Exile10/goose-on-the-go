@@ -16,6 +16,7 @@ import React, { useCallback, useState } from 'react';
 import { InkButton } from '@jarida/ink/native';
 import {
   ActivityIndicator,
+  RefreshControl,
   View,
   Text,
   StyleSheet,
@@ -27,6 +28,7 @@ import { GIcon } from '@/components/ui/g-icon';
 import { GPressable } from '@/components/ui/g-pressable';
 import { GKeyboardView } from '@/components/ui/g-keyboard-view';
 import { useProfiles } from '@/view-models/use-profiles';
+import { usePullToRefresh } from '@/view-models/use-pull-to-refresh';
 import type { Profile } from '@/services/types';
 import { Grey, JaridaPurple, Brand, Semantic } from '@/constants/colors';
 import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
@@ -79,6 +81,7 @@ export default function AddUsersScreen() {
   const styles = useThemedStyles(makeStyles);
   const { t } = useTranslation();
   const { data, loading, error, actions } = useProfiles();
+  const pull = usePullToRefresh(actions.refresh);
   const [showAdd, setShowAdd] = useState(false);
   const [name, setName] = useState('');
   const [emoji, setEmoji] = useState('');
@@ -102,6 +105,7 @@ export default function AddUsersScreen() {
         style={styles.container}
         contentContainerStyle={styles.scroll}
         showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl {...pull} />}
       >
 
         {loading ? <ActivityIndicator color={JaridaPurple[500]} /> : null}

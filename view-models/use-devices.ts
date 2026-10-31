@@ -18,10 +18,11 @@ import { ApiError, api, type PondApiClient } from '@/services/api-client';
 import type { Device, DeviceEvent, DeviceStatePatch, MatterStatus, UpdateDeviceRequest } from '@/services/types';
 import { ago } from '@/models/elapsed';
 import { COMMAND_MAX_WAIT_MS, commandKey, enqueue, sortWaiting, type WaitingCommand } from './command-queue';
-import { describeApiError } from './describe-error';
+import { describeApiError, logFailure } from './describe-error';
 import { useLive } from './use-live';
 import { useScreenActive } from './use-screen-active';
 import i18n from '@/services/i18n';
+import { showSnackbar } from '@/services/snackbar';
 
 /**
  * Read a device's power state out of `get_device_state`'s text.
@@ -231,6 +232,12 @@ export interface UseDevices {
     staleFor: string | null;
   };
   loading: boolean;
+  /** No read of the list has worked yet and the last one failed: the list is unknown, not empty. */
+  failed: boolean;
+  /**
+   * Why the last read or commission failed. A refused switch or removal is said in the snackbar,
+   * with Try again, since it is about the card just touched rather than the list.
+   */
   error: string | null;
   actions: {
     refresh: () => Promise<void>;
@@ -322,6 +329,8 @@ export function useDevices(): UseDevices {
   // When the list was last read, and when a read last failed after that.
   const [updatedAt, setUpdatedAt] = useState<number | null>(null);
   const [failedAt, setFailedAt] = useState<number | null>(null);
+  // Nothing to show at all, as against a stale list: the two read differently on screen.
+  const [failed, setFailed] = useState(false);
   // When this screen last changed something itself, so a poll that began earlier cannot undo it.
   const powerChangedAt = useRef<Record<string, number>>({});
   const listChangedAt = useRef(0);
@@ -382,7 +391,8 @@ export function useDevices(): UseDevices {
    * Rendering the request rather than the result is a bug this protocol has already had once.
    *
    * `unreachable` is a failure that says nothing about the command, on a Pond that will know its key
-   * when it comes again. Every other failure is reported.
+   * when it comes again. A refusal is said in the snackbar, with a Try again, rather than as a
+   * banner: the switch has already gone back, and that alone reads as a missed tap.
    */
   const send = useCallback(async (command: WaitingCommand): Promise<'done' | 'unreachable' | 'refused'> => {
     try {
@@ -398,7 +408,18 @@ export function useDevices(): UseDevices {
       return 'done';
     } catch (e) {
       if (!(e instanceof ApiError) && honoursKeys.current) return 'unreachable';
-      setError(describeDeviceError(e));
+      logFailure('devices', 'state change refused', e);
+      showSnackbar({
+        message: describeDeviceError(e) ?? i18n.t('errors.deviceNotSaved'),
+        tone: 'danger',
+        action: {
+          label: i18n.t('common.retry'),
+          onPress: () => {
+            const device = devicesRef.current.find((d) => d.id === command.deviceId);
+            if (device) void retry.current.setState(device, command.patch);
+          },
+        },
+      });
       return 'refused';
     }
   }, []);
@@ -455,11 +476,15 @@ export function useDevices(): UseDevices {
         setError(null);
         setUpdatedAt(Date.now());
         setFailedAt(null);
+        setFailed(false);
         void readPower(list, startedAt);
       } catch (e) {
         setFailedAt(Date.now());
-        if (loud || !loaded.current) setError(describeDeviceError(e));
-        else console.warn('[devices] refresh failed; showing the last list', e instanceof ApiError ? e.status : 'network');
+        if (loud || !loaded.current) {
+          setError(describeDeviceError(e));
+          logFailure('devices', 'read failed', e);
+        } else logFailure('devices', 'refresh failed; showing the last list', e);
+        if (!loaded.current) setFailed(true);
       } finally {
         setLoading(false);
       }
@@ -545,6 +570,16 @@ export function useDevices(): UseDevices {
 
   const refresh = useCallback(() => load(true), [load]);
 
+  // What the snackbar's Try again calls: the current switch and removal, set below once made.
+  // `send` is made once, so the Try again below reads the list through a ref rather than a closure.
+  const devicesRef = useRef<Device[]>([]);
+  devicesRef.current = devices;
+
+  const retry = useRef<Pick<UseDevices['actions'], 'setState' | 'remove'>>({
+    setState: async () => {},
+    remove: async () => {},
+  });
+
   /**
    * Send a patch, and show the device's new state only once the Pond has read it back. Until then
    * the asked-for power is waiting, not shown as the device's state. The read-back is the
@@ -602,7 +637,12 @@ export function useDevices(): UseDevices {
         await api.deleteDevice(device.id);
       } catch (e) {
         setDevices(previous);
-        setError(describeDeviceError(e));
+        logFailure('devices', 'remove refused', e);
+        showSnackbar({
+          message: describeDeviceError(e) ?? i18n.t('errors.generic'),
+          tone: 'danger',
+          action: { label: i18n.t('common.retry'), onPress: () => void retry.current.remove(device) },
+        });
       } finally {
         // Again once the server has answered: a poll that began while the delete was still out
         // read a list the server had not yet changed.
@@ -611,6 +651,10 @@ export function useDevices(): UseDevices {
     },
     [devices],
   );
+
+  useEffect(() => {
+    retry.current = { setState, remove };
+  }, [setState, remove]);
 
   const edit = useCallback(async (edits: DeviceEdit[]) => {
     if (edits.length === 0) return null;
@@ -650,6 +694,7 @@ export function useDevices(): UseDevices {
       staleFor: staleFor(updatedAt, failedAt),
     },
     loading,
+    failed,
     error,
     actions: { refresh, setState, cancel, commission, remove, edit },
   };

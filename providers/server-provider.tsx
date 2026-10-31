@@ -39,6 +39,8 @@ interface ServerContextValue {
    * for callers whose failure is not evidence the transport is down.
    */
   recover: (quiet?: boolean) => Promise<string | null>;
+  /** Re-select an endpoint now, skipping the automatic back-off: for a person who asked. */
+  retryNow: () => Promise<string | null>;
   /** Announce that the Pond has stopped recognising this phone. Terminal. */
   revoke: () => void;
   profileId: string;
@@ -642,7 +644,7 @@ export function ServerProvider({ children }: PropsWithChildren) {
     refreshToken: identity?.refresh ?? null, pairedPin: identity?.pin ?? null, keepRotatedTokens, connectionState: snapshot.state,
     profileId: identity?.id ?? '', paired: hasPairing, remoteEnabled: saved.current?.profile.remoteAccess?.mode === 'embedded',
     keepLocalOnly, hydrated, screenModes, isScreenReal, setScreenMode,
-    checkHealth, setRemoteEndpoint, recover: manager.recover, revoke: manager.revoke.bind(manager), stagePairing, cancelPairing, pair, adoptPairing, requestSpokenCode, unpair, forgetLocally,
+    checkHealth, setRemoteEndpoint, recover: manager.recover, retryNow: manager.retryNow, revoke: manager.revoke.bind(manager), stagePairing, cancelPairing, pair, adoptPairing, requestSpokenCode, unpair, forgetLocally,
   }), [snapshot, identity, hasPairing, hydrated, screenModes, isScreenReal, setScreenMode, checkHealth, setRemoteEndpoint, keepLocalOnly, keepRotatedTokens, manager, stagePairing, cancelPairing, pair, adoptPairing, requestSpokenCode, unpair, forgetLocally]);
   return <ServerContext.Provider value={value}>{children}</ServerContext.Provider>;
 }

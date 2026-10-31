@@ -14,7 +14,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ScrollView, StyleSheet } from 'react-native';
+import { RefreshControl, ScrollView, StyleSheet } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { InkSegmented } from '@jarida/ink/native';
 
@@ -23,6 +23,7 @@ import { ScheduleTab } from '@/components/patterns/schedule-tab';
 import { useThemedStyles } from '@/hooks/use-themed-styles';
 import { linkedScheduleId } from '@/models/schedule';
 import { selectionTick } from '@/services/haptics';
+import { PullSectionsProvider, usePullSections, usePullToRefresh } from '@/view-models/use-pull-to-refresh';
 import type { ThemeColors } from '@/constants/colors';
 import { Spacing } from '@/constants/spacing';
 
@@ -35,6 +36,9 @@ export default function ScheduleScreen() {
   const router = useRouter();
   const { schedule_id } = useLocalSearchParams<{ schedule_id?: string }>();
   const linked = linkedScheduleId(schedule_id);
+  // The scroll is this screen's and the list is the tab's: a pull reads whichever tab is shown.
+  const { registry, reload } = usePullSections();
+  const pull = usePullToRefresh(reload);
 
   useEffect(() => {
     if (!linked) return;
@@ -49,6 +53,7 @@ export default function ScheduleScreen() {
       contentContainerStyle={styles.scroll}
       showsVerticalScrollIndicator={false}
       keyboardShouldPersistTaps="handled"
+      refreshControl={<RefreshControl {...pull} />}
     >
       <InkSegmented
         label={t('schedule.tabs.label')}
@@ -62,7 +67,9 @@ export default function ScheduleScreen() {
           setTab(next);
         }}
       />
-      {tab === 'schedules' ? <ScheduleTab /> : <AutomationsTab />}
+      <PullSectionsProvider value={registry}>
+        {tab === 'schedules' ? <ScheduleTab /> : <AutomationsTab />}
+      </PullSectionsProvider>
     </ScrollView>
   );
 }

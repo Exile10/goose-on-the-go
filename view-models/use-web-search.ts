@@ -21,6 +21,7 @@ import { BRAVE_DASHBOARD_URL } from '@/models/web-search';
 import { useServer } from '@/providers/server-provider';
 import { ApiError, api } from '@/services/api-client';
 import i18n from '@/services/i18n';
+import { showSnackbar } from '@/services/snackbar';
 import type {
   PondSettings,
   WebSearchKeyResult,
@@ -144,11 +145,12 @@ export interface UseWebSearch {
   };
   /** The first read is out and nothing is known yet. */
   loading: boolean;
-  /** A read somebody asked for is out, over a status already on screen. */
-  refreshing: boolean;
   saving: boolean;
   removing: boolean;
-  /** A read or a removal failed, in words. Null also when the connection banner already said it. */
+  /**
+   * A read failed, in words. Null also when the connection banner already said it. A refused
+   * removal is said in the snackbar, with Try again.
+   */
   error: string | null;
   /** Why the last save did not go through, for the field: Brave's refusal, or the Pond's trouble. */
   keyError: string | null;
@@ -301,11 +303,13 @@ export function useWebSearch(): UseWebSearch {
     }
   }, [draft, removing, saving, source]);
 
+  // What the snackbar's Try again calls: the current `remove`, set below once it is made.
+  const retryRemove = useRef<() => Promise<boolean>>(async () => false);
+
   /** The key is gone once the Pond says so: a refused removal must not look done. */
   const remove = useCallback(async () => {
     if (removing || saving) return false;
     setRemoving(true);
-    setError(null);
     try {
       await source.remove();
       if (current.current !== source) return false;
@@ -315,12 +319,20 @@ export function useWebSearch(): UseWebSearch {
       setKeyError(null);
       return true;
     } catch (e) {
-      setError(describeApiError(e) ?? i18n.t('errors.generic'));
+      console.warn('[web-search] removal refused', e instanceof ApiError ? e.status : 'network');
+      showSnackbar({
+        message: describeApiError(e) ?? i18n.t('errors.generic'),
+        tone: 'danger',
+        action: { label: i18n.t('common.retry'), onPress: () => void retryRemove.current() },
+      });
       return false;
     } finally {
       setRemoving(false);
     }
   }, [removing, saving, source]);
+  useEffect(() => {
+    retryRemove.current = remove;
+  }, [remove]);
 
   const setNearby = useCallback(
     async (enabled: boolean) => {
@@ -368,7 +380,6 @@ export function useWebSearch(): UseWebSearch {
       canToggleNearby: nearby !== null && !nearbySaving && (nearby.enabled || nearby.town !== null),
     },
     loading: reading && state === null,
-    refreshing: reading && state !== null,
     saving,
     removing,
     error,

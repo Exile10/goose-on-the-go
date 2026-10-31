@@ -110,7 +110,6 @@ export function ModelStep({ setup }: { setup: UseOwnerSetup }) {
         <InkTitle level={2}>{t('setup.model.title')}</InkTitle>
         <InkText tone="secondary">{t('setup.model.lead')}</InkText>
       </View>
-      {library.notice ? <InkNotice tone="danger">{library.notice.text}</InkNotice> : null}
       {body}
     </>
   );

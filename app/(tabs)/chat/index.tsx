@@ -32,13 +32,13 @@ import { useTranslation } from 'react-i18next';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   InkEmptyState,
-  InkNotice,
   InkText,
   InkTitle,
   useReduceMotion,
 } from '@jarida/ink/native';
 
 import { ChromePill } from '@/components/patterns/chrome-pill';
+import { ContentUnavailable } from '@/components/patterns/content-unavailable';
 import { ChromePuck, PUCK_SIZE } from '@/components/patterns/chrome-puck';
 import { ConversationList } from '@/components/patterns/conversation-list';
 import { ConversationWall, WALL_GUTTER } from '@/components/patterns/conversation-wall';
@@ -51,11 +51,13 @@ import {
   useChromeRestore,
   useChromeScroll,
 } from '@/providers/chrome-provider';
-import { useServer } from '@/providers/server-provider';
 import { caution, confirm, reject, selectionTick } from '@/services/haptics';
 import type { TranslationKey } from '@/services/i18n';
 import type { ThemeColors } from '@/constants/colors';
 import { Spacing } from '@/constants/spacing';
+import { isUnavailable } from '@/models/content-state';
+import { useContentState } from '@/view-models/use-content-state';
+import { usePullToRefresh } from '@/view-models/use-pull-to-refresh';
 import {
   useChatHistory,
   type HistoryFilter,
@@ -85,7 +87,6 @@ export default function ConversationsScreen() {
   const router = useRouter();
   const reduced = useReduceMotion();
   const history = useChatHistory();
-  const { online, hydrated } = useServer();
   const chrome = useChromeScroll();
   const restoreChrome = useChromeRestore();
   const barInset = useBottomBarInset();
@@ -260,12 +261,12 @@ export default function ConversationsScreen() {
     return () => sub.remove();
   }, [confirmingMany, selecting, stopSelecting]);
 
-  const offline = hydrated && !online;
-  const subtitle = history.loading
-    ? null
-    : total === 0
-      ? t('chat.history.subtitleEmpty')
-      : t('chat.history.subtitle', { count: total });
+  const state = useContentState({ loading: history.loading, failed: history.failed, hasContent: total > 0 });
+  const pull = usePullToRefresh(refresh);
+  const unavailable = isUnavailable(state);
+  // A count, or nothing. "Nothing here yet" above a list that failed to load was a claim nobody
+  // made, and above an empty one it said what the empty state below already says.
+  const subtitle = state === 'ready' ? t('chat.history.subtitle', { count: total }) : null;
 
   const header = (
     <View style={styles.head}>
@@ -277,13 +278,13 @@ export default function ConversationsScreen() {
           </InkText>
         ) : null}
       </View>
-      {offline ? <InkNotice tone="warning">{t('chat.history.offlineBody')}</InkNotice> : null}
-      {history.error ? <InkNotice tone="danger">{history.error}</InkNotice> : null}
     </View>
   );
 
   const searched = query.trim();
-  const empty = searched ? (
+  const empty = unavailable ? (
+    <ContentUnavailable state={state} reason={history.error} onRetry={refresh} />
+  ) : searched ? (
     <InkEmptyState icon="search" title={t('chat.history.noMatch', { query: searched })}>
       {t('chat.history.noMatchBody')}
     </InkEmptyState>
@@ -294,7 +295,7 @@ export default function ConversationsScreen() {
     >
       {t('chat.history.noneBody')}
     </InkEmptyState>
-  ) : history.error ? null : (
+  ) : (
     <InkEmptyState icon="chat" title={t('home.noConversations')}>
       {t('home.noConversationsBody')}
     </InkEmptyState>
@@ -314,8 +315,7 @@ export default function ConversationsScreen() {
     onDelete: deleteCard,
     onKeep: keep,
     onToggle: toggleSelected,
-    refreshing: history.refreshing,
-    onRefresh: () => void refresh('pull'),
+    ...pull,
     onScroll: chrome.onScroll,
     scrollEventThrottle: chrome.scrollEventThrottle,
     bottomInset: barInset + DOCK_GAP + PUCK_SIZE + Spacing.lg,

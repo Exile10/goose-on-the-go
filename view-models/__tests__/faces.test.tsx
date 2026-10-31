@@ -139,7 +139,7 @@ describe('reading', () => {
     const m = await mountFaces();
 
     expect(m.vm.failed).toBe(true);
-    expect(m.vm.error).toBe('Your Pond is busy. Try again in a moment.');
+    expect(m.vm.error).toBe('Your Pond is busy right now.');
   });
 
   it('keeps the last list when a quiet refresh fails', async () => {
@@ -150,7 +150,7 @@ describe('reading', () => {
 
     expect(m.vm.data.people).toHaveLength(2);
     expect(m.vm.failed).toBe(false);
-    expect(m.vm.error).toBe('Your Pond is busy. Try again in a moment.');
+    expect(m.vm.error).toBe('Your Pond is busy right now.');
   });
 
   it('reports a pond with no face model as unavailable, naming the household from its profiles', async () => {
@@ -205,7 +205,7 @@ describe('forgetting a face', () => {
       refused = await m.vm.actions.forget(person());
     });
 
-    expect(refused).toBe('Your Pond is busy. Try again in a moment.');
+    expect(refused).toBe('Your Pond is busy right now.');
     expect(pond.listFaces).not.toHaveBeenCalled();
   });
 
@@ -257,7 +257,7 @@ describe('strictness', () => {
       refused = await m.vm.actions.setStrictness(person(), 2);
     });
 
-    expect(refused).toBe('Your Pond could not complete that request.');
+    expect(refused).toBe('Your Pond could not finish that.');
   });
 });
 

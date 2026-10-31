@@ -201,7 +201,7 @@ describe('rebuilding', () => {
     });
     expect(ok).toBe(false);
     expect(m.vm.notice).toBeNull();
-    expect(m.vm.error).toBe('Your Pond is busy. Try again in a moment.');
+    expect(m.vm.error).toBe('Your Pond is busy right now.');
     expect(m.vm.rebuilding).toBeNull();
     await m.unmount();
   });
@@ -263,7 +263,7 @@ describe('suggestions', () => {
       await pending;
     });
     expect(m.vm.data.suggestions).toEqual([GATE]);
-    expect(m.vm.suggestionErrors[GATE.template]).toBe('Your Pond is busy. Try again in a moment.');
+    expect(m.vm.suggestionErrors[GATE.template]).toBe('Your Pond is busy right now.');
     await m.unmount();
   });
 });

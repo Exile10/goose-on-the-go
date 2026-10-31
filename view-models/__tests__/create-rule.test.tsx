@@ -73,7 +73,7 @@ it('has a sentence for a refusal that carries none', async () => {
   pond.createRule.mockRejectedValue(new TypeError('Network request failed'));
   const m = await mount();
 
-  await expect(m.create(REQUEST)).resolves.toBe('Your Pond could not create it. Try again in a moment.');
+  await expect(m.create(REQUEST)).resolves.toBe('Your Pond could not create it.');
 });
 
 it('keeps nothing on mock, where there is no Pond to keep it', async () => {

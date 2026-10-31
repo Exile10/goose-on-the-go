@@ -10,6 +10,10 @@ import { StyleSheet, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { InkButton, InkEmptyState, InkNotice, InkSpinner, InkText } from '@jarida/ink/native';
 
+import { ContentUnavailable } from '@/components/patterns/content-unavailable';
+import { isUnavailable } from '@/models/content-state';
+import { useContentState } from '@/view-models/use-content-state';
+import { useReloadOnPull } from '@/view-models/use-pull-to-refresh';
 import { ScheduleCard } from '@/components/patterns/schedule-card';
 import { ScheduleFormSheet } from '@/components/patterns/schedule-form-sheet';
 import { deviceTimeZone, pondAsksIfMissed } from '@/models/schedule';
@@ -24,6 +28,12 @@ export function ScheduleTab() {
   const { isScreenReal } = useServer();
   const real = isScreenReal('schedule');
   const { data, loading, error, failed, actions } = useSchedules();
+  // The scroll, and so the pull, is the Schedule screen's.
+  useReloadOnPull(actions.refresh);
+  // A refused refresh with the list still on screen is said above it; a list that never arrived is
+  // said once, in its place.
+  const state = useContentState({ loading, failed: failed || error !== null, hasContent: data.schedules.length > 0 });
+  const unavailable = isUnavailable(state);
   const [creating, setCreating] = useState(false);
   const [phoneZone] = useState(deviceTimeZone);
   const router = useRouter();
@@ -49,19 +59,14 @@ export function ScheduleTab() {
 
       {loading ? <InkSpinner label={t('schedule.list.loading')} /> : null}
 
-      {/* A failed read can have no sentence of its own (the connection banner
-          already says why), but the list is still unknown and worth a retry. */}
-      {error || failed ? (
-        <View style={styles.notice}>
-          <InkNotice tone="danger">{error ?? t('schedule.list.schedulesFailed')}</InkNotice>
-          <InkButton variant="quiet" icon="refresh" onPress={actions.refresh}>
-            {t('common.retry')}
-          </InkButton>
-        </View>
+      {unavailable ? (
+        <ContentUnavailable state={state} reason={error} onRetry={actions.refresh} />
+      ) : error ? (
+        <InkNotice tone="danger">{error}</InkNotice>
       ) : null}
 
       {/* A list that failed to load is unknown, not empty. */}
-      {!loading && !error && !failed && data.schedules.length === 0 ? (
+      {state === 'empty' ? (
         <InkEmptyState icon="schedule" title={t('schedule.list.noSchedulesTitle')}>
           <InkText>{t('schedule.list.noSchedulesBody')}</InkText>
         </InkEmptyState>
@@ -92,5 +97,4 @@ export function ScheduleTab() {
 const styles = StyleSheet.create({
   body: { gap: Spacing.md },
   header: { flexDirection: 'row', justifyContent: 'flex-end' },
-  notice: { gap: Spacing.sm },
 });

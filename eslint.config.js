@@ -76,7 +76,8 @@ module.exports = defineConfig([
         'object-properties': {
           include: ['label', 'title', 'desc', 'description', 'detail', 'subtitle', 'hint', 'message', 'placeholder', 'headerTitle', 'text'],
         },
-        callees: { exclude: ['console.*', 'require', 'Error', 'i18n.t', 't'] },
+        // `logFailure` writes a log line, like `console.*`: its words are for engineers.
+        callees: { exclude: ['console.*', 'logFailure', 'require', 'Error', 'i18n.t', 't'] },
         // Only attributes that render as copy. Left unrestricted this also flags
         // `variant="primary"` and `name="camera"`, and a rule that cries wolf is a rule
         // somebody switches off.

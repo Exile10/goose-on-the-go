@@ -12,8 +12,8 @@
  * same wrapped row as Edit it read as a stray.
  */
 
-import React, { useEffect, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, View } from 'react-native';
+import React, { useCallback, useEffect, useState } from 'react';
+import { Alert, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import {
@@ -25,6 +25,10 @@ import {
   InkText,
 } from '@jarida/ink/native';
 
+import { ContentUnavailable } from '@/components/patterns/content-unavailable';
+import { isUnavailable } from '@/models/content-state';
+import { useContentState } from '@/view-models/use-content-state';
+import { usePullToRefresh } from '@/view-models/use-pull-to-refresh';
 import { LabelledSwitch } from '@/components/patterns/labelled-switch';
 import { RunRow } from '@/components/patterns/schedule-run-row';
 import { ScheduleFormSheet } from '@/components/patterns/schedule-form-sheet';
@@ -39,6 +43,7 @@ import {
   promptOf,
   routineDevices,
 } from '@/models/schedule';
+import { useConfirm } from '@/providers/confirm-provider';
 import { useServer } from '@/providers/server-provider';
 import { api } from '@/services/api-client';
 import { toggle } from '@/services/haptics';
@@ -88,38 +93,41 @@ export default function ScheduleDetailScreen() {
   const params = useLocalSearchParams<{ id?: string }>();
   const id = linkedScheduleId(params.id) ?? '';
   const { schedule, loading, missing, error, failed, notice, runs, actions } = useScheduleDetail(id);
+  const state = useContentState({ loading, failed: failed || error !== null, hasContent: schedule !== null });
+  const runsState = useContentState({
+    loading: runs.loading,
+    failed: runs.failed || runs.error !== null,
+    hasContent: runs.data.runs.length > 0,
+  });
+  // A pull reads both halves of the page: the schedule and its recent runs.
+  const reloadAll = useCallback(() => {
+    actions.refreshRuns();
+    return actions.refresh();
+  }, [actions]);
+  const pull = usePullToRefresh(reloadAll);
   const [editing, setEditing] = useState(false);
   const [phoneZone] = useState(deviceTimeZone);
+  const ask = useConfirm();
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (!schedule) return;
-    Alert.alert(t('schedule.detail.deleteTitle'), t('schedule.detail.deleteBody', { name: schedule.label }), [
-      { text: t('common.cancel'), style: 'cancel' },
-      {
-        text: t('schedule.detail.delete'),
-        style: 'destructive',
-        onPress: () => {
-          void actions.remove().then((gone) => {
-            if (gone) router.back();
-          });
-        },
-      },
-    ]);
+    const yes = await ask({
+      title: t('schedule.detail.deleteTitle'),
+      message: t('schedule.detail.deleteBody', { name: schedule.label }),
+      confirmLabel: t('schedule.detail.delete'),
+      destructive: true,
+    });
+    if (yes && (await actions.remove())) router.back();
   };
 
   if (!schedule) {
     return (
-      <ScrollView style={styles.container} contentContainerStyle={styles.scroll}>
+      <ScrollView style={styles.container} contentContainerStyle={styles.scroll} refreshControl={<RefreshControl {...pull} />}>
         {loading ? <InkSpinner label={t('schedule.detail.loading')} /> : null}
-        {error || failed ? (
-          <View style={styles.gap}>
-            <InkNotice tone="danger">{error ?? t('schedule.detail.failed')}</InkNotice>
-            <InkButton variant="quiet" icon="refresh" onPress={actions.refresh}>
-              {t('common.retry')}
-            </InkButton>
-          </View>
+        {isUnavailable(state) ? (
+          <ContentUnavailable state={state} reason={error} onRetry={actions.refresh} />
         ) : null}
-        {!loading && !error && !failed && (missing || !id) ? (
+        {state === 'empty' && (missing || !id) ? (
           <InkNotice tone="warning">{t('schedule.errors.gone')}</InkNotice>
         ) : null}
       </ScrollView>
@@ -132,7 +140,7 @@ export default function ScheduleDetailScreen() {
   const oneOff = isOneOff(schedule);
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.scroll}>
+    <ScrollView style={styles.container} contentContainerStyle={styles.scroll} refreshControl={<RefreshControl {...pull} />}>
       <View style={styles.gap}>
         <InkText size="xl" weight="semibold">{schedule.label}</InkText>
         {schedule.currently_running ? <InkBadge tone="brand">{t('schedule.card.running')}</InkBadge> : null}
@@ -229,10 +237,10 @@ export default function ScheduleDetailScreen() {
       <View style={styles.gap}>
         <InkText weight="semibold">{t('schedule.runs.title')}</InkText>
         {runs.loading ? <InkSpinner label={t('schedule.runs.title')} /> : null}
-        {runs.error || runs.failed ? (
-          <InkNotice tone="danger">{runs.error ?? t('schedule.runs.failed')}</InkNotice>
+        {isUnavailable(runsState) ? (
+          <ContentUnavailable compact state={runsState} reason={runs.error} onRetry={actions.refreshRuns} />
         ) : null}
-        {!runs.loading && !runs.error && !runs.failed && runs.data.runs.length === 0 ? (
+        {runsState === 'empty' ? (
           <InkText tone="secondary">{t('schedule.runs.none')}</InkText>
         ) : null}
         {runs.data.runs.map((run) => (
@@ -241,7 +249,7 @@ export default function ScheduleDetailScreen() {
       </View>
 
       <View style={styles.dangerZone}>
-        <InkButton variant="danger" icon="trash" block onPress={confirmDelete}>
+        <InkButton variant="danger" icon="trash" block onPress={() => void confirmDelete()}>
           {t('schedule.detail.delete')}
         </InkButton>
       </View>

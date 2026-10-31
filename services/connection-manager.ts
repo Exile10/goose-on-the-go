@@ -131,6 +131,16 @@ export class ConnectionManager {
     // A route that was working stays on screen while it is re-checked; only a failed check is news.
     void this.recover(this.snapshot.state === 'local' || this.snapshot.state === 'remote');
   }
+  /**
+   * Re-select an endpoint now, for someone who asked: a pull to refresh, or the screen reader's
+   * action on the connection strip. The automatic back-off stops recovery from hammering a Pond
+   * that is down, but a person pulling expects an attempt, so this clears the wait and starts the
+   * retry count afresh. An attempt already in flight is shared, as with `recover`.
+   */
+  retryNow = (): Promise<string | null> => {
+    if (!this.flight) { this.retryAfter = 0; this.attempts = 0; }
+    return this.recover();
+  };
   recover = (quiet = false): Promise<string | null> => {
     if (!this.active || !this.profile || this.revoked) return Promise.resolve(null);
     if (this.flight) return this.flight;

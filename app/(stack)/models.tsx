@@ -4,16 +4,19 @@
  */
 
 import React, { useMemo } from 'react';
-import { RefreshControl, View } from 'react-native';
+import { RefreshControl } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { InkButton, InkSpinner } from '@jarida/ink/native';
+import { InkSpinner } from '@jarida/ink/native';
 
+import { ContentUnavailable } from '@/components/patterns/content-unavailable';
+import { isUnavailable } from '@/models/content-state';
+import { useContentState } from '@/view-models/use-content-state';
+import { usePullToRefresh } from '@/view-models/use-pull-to-refresh';
 import { DownloadRow, ModelRow } from '@/components/settings/model-rows';
-import { SettingsGroup, SettingsHeader, SettingsMessage, SettingsRow, TILE_INSET } from '@/components/settings/settings-list';
-import { SettingsNotice, SettingsScroll } from '@/components/settings/settings-scroll';
+import { SettingsGroup, SettingsHeader, SettingsRow, TILE_INSET } from '@/components/settings/settings-list';
+import { SettingsScroll } from '@/components/settings/settings-scroll';
 import { voiceName } from '@/components/settings/special-rows';
-import { Spacing } from '@/constants/spacing';
 import {
   downloadsByModel,
   formatBytes,
@@ -49,7 +52,9 @@ export default function ModelsScreen() {
   const { t } = useTranslation();
   const router = useRouter();
   const lib = useModelLibrary();
+  const state = useContentState({ loading: !lib.readFailed, failed: lib.readFailed, hasContent: lib.loaded });
   const { settings } = usePondSettings();
+  const pull = usePullToRefresh(lib.actions.refresh);
 
   const downloads = useMemo(() => downloadsByModel(lib.downloads).filter((d) => d.status !== 'done' && d.status !== 'cancelled'), [lib.downloads]);
   const onPond = useMemo(() => lib.models.filter(isDownloaded), [lib.models]);
@@ -75,7 +80,7 @@ export default function ModelsScreen() {
   const budget = formatMegabytes(lib.memory?.budget_mb);
 
   return (
-    <SettingsScroll refreshControl={<RefreshControl refreshing={lib.loading && lib.loaded} onRefresh={() => void lib.actions.refresh()} />}>
+    <SettingsScroll refreshControl={<RefreshControl {...pull} />}>
       <SettingsHeader
         icon="models"
         tile="purple"
@@ -85,18 +90,9 @@ export default function ModelsScreen() {
           .join(' ')}
       />
 
-      {lib.notice ? (
-        <SettingsNotice tone={lib.notice.tone === 'danger' ? 'danger' : 'neutral'}>{lib.notice.text}</SettingsNotice>
-      ) : null}
-
       {!lib.loaded ? (
-        lib.error ? (
-          <View style={{ alignItems: 'center', gap: Spacing.md }}>
-            <SettingsMessage tone="danger">{lib.error}</SettingsMessage>
-            <InkButton variant="quiet" icon="refresh" onPress={() => void lib.actions.refresh()}>
-              {t('common.retry')}
-            </InkButton>
-          </View>
+        isUnavailable(state) ? (
+          <ContentUnavailable state={state} reason={lib.error} onRetry={lib.actions.refresh} />
         ) : (
           <InkSpinner label={t('settings.loading')} />
         )

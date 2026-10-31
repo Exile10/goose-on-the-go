@@ -13,6 +13,7 @@ import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 
 import { secretLabelKey, isValidSecretKey } from '@/models/secrets';
 import { ApiError, api } from '@/services/api-client';
+import { currentSnackbar, resetSnackbar } from '@/services/snackbar';
 import { useSecrets, type UseSecrets } from '@/view-models/use-secrets';
 
 jest.mock('@/services/pond-trust', () => ({ assertPondTrust: jest.fn().mockResolvedValue(undefined) }));
@@ -84,6 +85,7 @@ beforeAll(() => {
 });
 
 beforeEach(() => {
+  resetSnackbar();
   jest.resetAllMocks();
   pond.listSecretKeys.mockResolvedValue(['SPOTIFY_CLIENT_ID', 'MY_KEY']);
   pond.setSecret.mockResolvedValue({ restarted: [], restartFailed: [] });
@@ -155,7 +157,7 @@ describe('adding a secret', () => {
     expect(pond.setSecret).toHaveBeenCalledWith('NEW_KEY', VALUE);
     expect(m.vm.data.keys.map((r) => r.key)).toEqual(['MY_KEY', 'NEW_KEY', 'SPOTIFY_CLIENT_ID']);
     expect(m.vm.data.form).toBeNull();
-    expect(m.vm.notice).toBe('NEW_KEY is saved on your Pond.');
+    expect(currentSnackbar()).toMatchObject({ tone: 'neutral', message: 'NEW_KEY is saved on your Pond.' });
     await m.unmount();
   });
 
@@ -187,7 +189,7 @@ describe('adding a secret', () => {
     });
 
     expect(saved).toBe(false);
-    expect(m.vm.formError).toBe('Your Pond is busy. Try again in a moment.');
+    expect(m.vm.formError).toBe('Your Pond is busy right now.');
     expect(m.vm.data.form).toEqual({ kind: 'add' });
     expect(m.vm.data.draftKey).toBe('NEW_KEY');
     expect(m.vm.data.draftValue).toBe('');
@@ -296,7 +298,7 @@ describe('replacing a value', () => {
     });
 
     expect(pond.setSecret).toHaveBeenCalledWith('SPOTIFY_CLIENT_ID', VALUE);
-    expect(m.vm.notice).toBe('Spotify client ID is saved on your Pond.');
+    expect(currentSnackbar()).toMatchObject({ tone: 'neutral', message: 'Spotify client ID is saved on your Pond.' });
     expect(everything(m.vm)).not.toContain(VALUE);
     await m.unmount();
   });
@@ -310,7 +312,10 @@ describe('replacing a value', () => {
       await m.vm.actions.save();
     });
 
-    expect(m.vm.notice).toBe('Spotify client ID is saved, but these extensions could not restart to use it: music.');
+    expect(currentSnackbar()).toMatchObject({
+      tone: 'danger',
+      message: 'Spotify client ID is saved, but these extensions could not restart to use it: music.',
+    });
     await m.unmount();
   });
 
@@ -338,7 +343,7 @@ describe('deleting a secret', () => {
     expect(gone).toBe(true);
     expect(pond.deleteSecret).toHaveBeenCalledWith('MY_KEY');
     expect(m.vm.data.keys.map((r) => r.key)).toEqual(['SPOTIFY_CLIENT_ID']);
-    expect(m.vm.notice).toBe('MY_KEY is deleted from your Pond.');
+    expect(currentSnackbar()).toMatchObject({ tone: 'neutral', message: 'MY_KEY is deleted from your Pond.' });
     await m.unmount();
   });
 
@@ -352,7 +357,24 @@ describe('deleting a secret', () => {
 
     expect(gone).toBe(false);
     expect(m.vm.data.keys.map((r) => r.key)).toEqual(['MY_KEY', 'SPOTIFY_CLIENT_ID']);
-    expect(m.vm.error).toMatch(/managed only on the Pond itself/);
+    expect(m.vm.error).toBeNull();
+    expect(currentSnackbar()?.tone).toBe('danger');
+    expect(currentSnackbar()?.message).toMatch(/managed only on the Pond itself/);
+    // The Pond decided; asking again would get the same answer.
+    expect(currentSnackbar()?.action).toBeUndefined();
+    await m.unmount();
+  });
+
+  it('offers Try again when the deletion failed for a reason that may pass', async () => {
+    pond.deleteSecret.mockRejectedValueOnce(refusal(500)).mockResolvedValueOnce();
+    const m = await mount();
+    await act(async () => {
+      await m.vm.actions.remove('MY_KEY');
+    });
+    expect(currentSnackbar()?.tone).toBe('danger');
+    await act(async () => currentSnackbar()?.action?.onPress());
+    expect(pond.deleteSecret).toHaveBeenCalledTimes(2);
+    expect(m.vm.data.keys.map((r) => r.key)).toEqual(['SPOTIFY_CLIENT_ID']);
     await m.unmount();
   });
 });

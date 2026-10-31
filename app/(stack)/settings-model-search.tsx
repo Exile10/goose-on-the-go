@@ -8,7 +8,7 @@ import { useTranslation } from 'react-i18next';
 import { InkSpinner } from '@jarida/ink/native';
 
 import { SettingsGroup, SettingsHeader, SettingsMessage, SettingsRow } from '@/components/settings/settings-list';
-import { SettingsNotice, SettingsScroll } from '@/components/settings/settings-scroll';
+import { SettingsScroll } from '@/components/settings/settings-scroll';
 import {
   useSettingsColors,
   useSettingsStyles,
@@ -20,6 +20,7 @@ import { GIcon } from '@/components/ui/g-icon';
 import { Spacing } from '@/constants/spacing';
 import { formatBytes, formatMegabytes } from '@/models/model-library';
 import { useChoice } from '@/providers/confirm-provider';
+import { useSnackbar } from '@/providers/snackbar-provider';
 import { confirm, selectionTick, tap } from '@/services/haptics';
 import type { HfModelFile } from '@/services/types';
 import { useModelLibrary, useModelSearch } from '@/view-models/use-model-library';
@@ -31,7 +32,7 @@ export default function ModelSearchScreen() {
   const choose = useChoice();
   const lib = useModelLibrary();
   const search = useModelSearch();
-  const [started, setStarted] = React.useState<string | null>(null);
+  const snackbar = useSnackbar();
 
   const picturesNote = (file: HfModelFile) => {
     if (!file.pictures) return null;
@@ -56,7 +57,7 @@ export default function ModelSearchScreen() {
     if (pictures === null) return;
     if (!(await lib.actions.downloadFile(file, pictures))) return;
     void confirm();
-    setStarted(file.filename);
+    snackbar.show({ message: t('models.library.started') });
   };
 
   return (
@@ -81,8 +82,6 @@ export default function ModelSearchScreen() {
         </Pressable>
       </View>
 
-      {started ? <SettingsNotice tone="success">{t('models.library.started')}</SettingsNotice> : null}
-      {lib.notice ? <SettingsNotice tone="danger">{lib.notice.text}</SettingsNotice> : null}
       {search.searching ? <InkSpinner label={t('models.library.searchButton')} /> : null}
       {search.error ? <SettingsMessage tone="danger">{search.error}</SettingsMessage> : null}
 

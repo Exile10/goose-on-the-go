@@ -20,7 +20,7 @@
  */
 
 import React, { useState } from 'react';
-import { Alert, Platform, ScrollView, StyleSheet, useWindowDimensions } from 'react-native';
+import { Platform, ScrollView, StyleSheet, useWindowDimensions } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import {
   InkButton,
@@ -39,6 +39,7 @@ import {
 import { sourceKey } from '@/components/patterns/automation-card';
 import { GSheetBody } from '@/components/ui/g-sheet-body';
 import { describeSignal, fractionFromPercent, measureOfSignal, percentText, type Measure } from '@/models/vision';
+import { useConfirm } from '@/providers/confirm-provider';
 import { confirm, reject } from '@/services/haptics';
 import type { TranslationKey } from '@/services/i18n';
 import type { Rule, RuleRequest, TriggerAction, TriggerCondition, TriggerSource } from '@/services/types';
@@ -164,6 +165,7 @@ function CameraFields({
 
 export function AutomationForm({ onClose, rule, prefill, onSubmit, onDelete }: Omit<AutomationFormSheetProps, 'open'>) {
   const { t } = useTranslation();
+  const ask = useConfirm();
   const { data } = useDevices();
   const switchable = data.devices.filter((d) => supports(d, 'power'));
   // An edit opens on the rule; a new one on what it was prefilled with, or on nothing.
@@ -271,24 +273,22 @@ export function AutomationForm({ onClose, rule, prefill, onSubmit, onDelete }: O
 
   const confirmDelete = () => {
     if (!rule || !onDelete) return;
-    Alert.alert(t('schedule.list.deleteAutomationTitle'), t('schedule.list.deleteAutomationBody', { name: rule.name }), [
-      { text: t('common.cancel'), style: 'cancel' },
-      {
-        text: t('schedule.form.delete'),
-        style: 'destructive',
-        onPress: () => {
-          void onDelete().then((refused) => {
-            if (refused) {
-              void reject();
-              setError(refused);
-              return;
-            }
-            void confirm();
-            onClose();
-          });
-        },
-      },
-    ]);
+    void ask({
+      title: t('schedule.list.deleteAutomationTitle'),
+      message: t('schedule.list.deleteAutomationBody', { name: rule.name }),
+      confirmLabel: t('schedule.form.delete'),
+      destructive: true,
+    }).then(async (yes) => {
+      if (!yes) return;
+      const refused = await onDelete();
+      if (refused) {
+        void reject();
+        setError(refused);
+        return;
+      }
+      void confirm();
+      onClose();
+    });
   };
 
   const devices = [

@@ -10,6 +10,7 @@ import { ApiError, api } from '@/services/api-client';
 import { confirm, reject } from '@/services/haptics';
 import i18n from '@/services/i18n';
 import { Storage } from '@/services/storage';
+import { showSnackbar } from '@/services/snackbar';
 import type {
   DiskUsage,
   DownloadAction,
@@ -21,7 +22,7 @@ import type {
   ModelRole,
 } from '@/services/types';
 import { holderOf, isLive, roleOf, rollbackTarget, routeCategory } from '@/models/model-library';
-import { describeApiError } from './describe-error';
+import { describeApiError, logFailure } from './describe-error';
 import { useLive } from './use-live';
 
 const LIBRARY_MS = 60_000;
@@ -31,14 +32,15 @@ const IDLE_DOWNLOADS_MS = 15_000;
 interface Library {
   models: ModelEntry[];
   loaded: boolean;
-  loading: boolean;
+  /** The first read, or the last one somebody asked for, failed. */
+  readFailed: boolean;
+  /** Words for that failure, when there are any beyond the shared ones. */
   error: string | null;
   downloads: DownloadEntry[];
   disk: DiskUsage | null;
   memory: ModelMemoryStatus | null;
   /** The model a change is being made to, so its row can say so. */
   busy: string | null;
-  notice: { tone: 'neutral' | 'danger'; text: string } | null;
   /** The model each job had before its last change, by id: what a switch back goes to. */
   lastWorking: Partial<Record<ModelRole, string>>;
 }
@@ -46,13 +48,12 @@ interface Library {
 const EMPTY: Library = {
   models: [],
   loaded: false,
-  loading: true,
+  readFailed: false,
   error: null,
   downloads: [],
   disk: null,
   memory: null,
   busy: null,
-  notice: null,
   lastWorking: {},
 };
 
@@ -91,7 +92,7 @@ function rememberLastWorking(role: ModelRole, id: string): void {
 
 async function loadModels(loud: boolean): Promise<void> {
   void readLastWorking();
-  if (loud) set({ loading: true, error: null });
+  if (loud) set({ readFailed: false, error: null });
   const mine = ++reads;
   try {
     const [models, memory, disk] = await Promise.all([
@@ -100,10 +101,12 @@ async function loadModels(loud: boolean): Promise<void> {
       api.diskUsage().catch(() => library.disk),
     ]);
     if (mine !== reads) return;
-    set({ models, memory, disk, loaded: true, loading: false, error: null });
+    set({ models, memory, disk, loaded: true, readFailed: false, error: null });
   } catch (e) {
     if (mine !== reads) return;
-    set({ loading: false, error: loud || !library.loaded ? describeApiError(e) ?? i18n.t('models.failed') : library.error });
+    const said = loud || !library.loaded;
+    logFailure('models', said ? 'read failed' : 'refresh failed; showing the last list', e);
+    if (said) set({ readFailed: true, error: describeApiError(e) });
   }
 }
 
@@ -124,13 +127,26 @@ function failure(e: unknown, fallback: string): string {
   return describeApiError(e) ?? fallback;
 }
 
+/**
+ * Say that a change did not take, at the foot of the screen, with Try again when trying again is
+ * the same request. Every Models page and the setup step share this store, so the message has to
+ * live outside any one of them; the engineer's half goes to the log.
+ */
+function refused(scope: string, e: unknown, text: string, retry?: () => void): void {
+  logFailure('models', `${scope} failed`, e);
+  showSnackbar({
+    message: text,
+    tone: 'danger',
+    action: retry ? { label: i18n.t('common.retry'), onPress: retry } : undefined,
+  });
+}
+
 async function activate(model: ModelEntry): Promise<boolean> {
   const role = roleOf(model);
   const previous = library.models;
   const before = holderOf(previous, role);
   set({
     busy: model.id,
-    notice: null,
     models: previous.map((m) => (roleOf(m) === role ? { ...m, active: m.id === model.id } : m)),
   });
   try {
@@ -142,7 +158,8 @@ async function activate(model: ModelEntry): Promise<boolean> {
     return true;
   } catch (e) {
     void reject();
-    set({ busy: null, models: previous, notice: { tone: 'danger', text: failure(e, i18n.t('models.library.useFailed')) } });
+    set({ busy: null, models: previous });
+    refused('activate', e, failure(e, i18n.t('models.library.useFailed')), () => void activate(model));
     return false;
   }
 }
@@ -154,26 +171,28 @@ async function rollBack(role: ModelRole): Promise<boolean> {
 }
 
 async function download(model: ModelEntry, pictures: boolean): Promise<void> {
-  set({ busy: model.id, notice: null });
+  set({ busy: model.id });
   try {
     await api.downloadModel(routeCategory(model), model.name, pictures);
     set({ busy: null });
     await loadDownloads();
   } catch (e) {
     void reject();
-    set({ busy: null, notice: { tone: 'danger', text: failure(e, i18n.t('models.library.downloadFailed')) } });
+    set({ busy: null });
+    refused('download', e, failure(e, i18n.t('models.library.downloadFailed')), () => void download(model, pictures));
   }
 }
 
 async function addPictures(model: ModelEntry): Promise<void> {
-  set({ busy: model.id, notice: null });
+  set({ busy: model.id });
   try {
     await api.addPictureSupport(routeCategory(model), model.name);
     set({ busy: null });
     await loadDownloads();
   } catch (e) {
     void reject();
-    set({ busy: null, notice: { tone: 'danger', text: failure(e, i18n.t('models.library.downloadFailed')) } });
+    set({ busy: null });
+    refused('add_pictures', e, failure(e, i18n.t('models.library.downloadFailed')), () => void addPictures(model));
   }
 }
 
@@ -183,12 +202,12 @@ async function control(modelId: string, action: DownloadAction): Promise<void> {
     await loadDownloads();
   } catch (e) {
     void reject();
-    set({ notice: { tone: 'danger', text: failure(e, i18n.t('models.library.controlFailed')) } });
+    refused(`download_${action}`, e, failure(e, i18n.t('models.library.controlFailed')), () => void control(modelId, action));
   }
 }
 
 async function remove(model: ModelEntry): Promise<boolean> {
-  set({ busy: model.id, notice: null });
+  set({ busy: model.id });
   try {
     await api.deleteModel(routeCategory(model), model.name);
     void confirm();
@@ -197,21 +216,22 @@ async function remove(model: ModelEntry): Promise<boolean> {
     return true;
   } catch (e) {
     void reject();
-    const text = e instanceof ApiError && e.status === 409 ? i18n.t('models.library.inUse') : failure(e, i18n.t('models.library.deleteFailed'));
-    set({ busy: null, notice: { tone: 'danger', text } });
+    set({ busy: null });
+    // A model in use stays in use however often the same request is sent, so that one has no Try again.
+    if (e instanceof ApiError && e.status === 409) refused('delete', e, i18n.t('models.library.inUse'));
+    else refused('delete', e, failure(e, i18n.t('models.library.deleteFailed')), () => void remove(model));
     return false;
   }
 }
 
 async function downloadFile(file: HfModelFile, pictures: boolean): Promise<boolean> {
-  set({ notice: null });
   try {
     await api.downloadModelFile(file, pictures);
     await loadDownloads();
     return true;
   } catch (e) {
     void reject();
-    set({ notice: { tone: 'danger', text: failure(e, i18n.t('models.library.downloadFailed')) } });
+    refused('download_file', e, failure(e, i18n.t('models.library.downloadFailed')), () => void downloadFile(file, pictures));
     return false;
   }
 }
@@ -226,7 +246,6 @@ export interface UseModelLibrary extends Library {
     control: (modelId: string, action: DownloadAction) => Promise<void>;
     remove: (model: ModelEntry) => Promise<boolean>;
     downloadFile: (file: HfModelFile, pictures: boolean) => Promise<boolean>;
-    dismissNotice: () => void;
   };
 }
 
@@ -239,7 +258,6 @@ const ACTIONS: UseModelLibrary['actions'] = {
   control,
   remove,
   downloadFile,
-  dismissNotice: () => set({ notice: null }),
 };
 
 export function useModelLibrary(): UseModelLibrary {
@@ -289,7 +307,8 @@ export function useModelSearch(): UseModelSearch {
     try {
       setResults(await api.searchModels(q));
     } catch (e) {
-      setError(describeApiError(e) ?? (e instanceof Error ? e.message : i18n.t('models.library.searchFailed')));
+      logFailure('models', 'search failed', e);
+      setError(describeApiError(e) ?? i18n.t('models.library.searchFailed'));
     } finally {
       setSearching(false);
     }
@@ -301,7 +320,8 @@ export function useModelSearch(): UseModelSearch {
       const items = await api.modelFiles(repo);
       setFiles({ repo, items, loading: false, error: null });
     } catch (e) {
-      setFiles({ repo, items: [], loading: false, error: describeApiError(e) ?? (e instanceof Error ? e.message : i18n.t('models.library.searchFailed')) });
+      logFailure('models', 'file list failed', e);
+      setFiles({ repo, items: [], loading: false, error: describeApiError(e) ?? i18n.t('models.library.searchFailed') });
     }
   }, []);
 

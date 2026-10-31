@@ -136,7 +136,7 @@ describe('following a task', () => {
   it('says it could not read a task it has never seen, and keeps trying at the slow pace', async () => {
     pond.longTask.mockRejectedValue(new ApiError('GET → 503', 503, null));
     const m = await mount();
-    expect(m.vm.error).toBe('Your Pond is busy. Try again in a moment.');
+    expect(m.vm.error).toBe('Your Pond is busy right now.');
     await advance(29_999);
     expect(pond.longTask).toHaveBeenCalledTimes(1);
     await advance(1);
@@ -183,7 +183,7 @@ describe('stopping a task', () => {
     await act(async () => {
       await m.vm.actions.stop();
     });
-    expect(m.vm.stopError).toBe('Your Pond is busy. Try again in a moment.');
+    expect(m.vm.stopError).toBe('Your Pond is busy right now.');
     expect(m.vm.task?.state).toBe('running');
     await m.unmount();
   });

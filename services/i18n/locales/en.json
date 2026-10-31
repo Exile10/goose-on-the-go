@@ -21,7 +21,9 @@
     "back": "Back",
     "scanAgain": "Scan again",
     "searchAgain": "Search again",
-    "goHome": "Go to Home"
+    "goHome": "Go to Home",
+    "ok": "OK",
+    "dismissHint": "Dismisses the message."
   },
   "tabs": {
     "label": "Main navigation",
@@ -51,7 +53,9 @@
     "onThisNetwork": "On this network",
     "discoveryFailed": "Discovery could not run. You can still enter an address by hand.",
     "setUpNew": "Set up a new Pond",
-    "setUpNewBody": "A new or reset Pond is not on this network yet. Set it up over Bluetooth or with its setup card. The Pond you use now does not have to be reachable."
+    "setUpNewBody": "A new or reset Pond is not on this network yet. Set it up over Bluetooth or with its setup card. The Pond you use now does not have to be reachable.",
+    "yours": "Your Pond",
+    "waitingBody": "Goose, your conversations and your devices show up here once your Pond can answer."
   },
   "home": {
     "conversations": "Conversations",
@@ -115,7 +119,6 @@
       "title": "Conversations",
       "subtitle_one": "{{count}} on your Pond, and nowhere else.",
       "subtitle_other": "{{count}} on your Pond, and nowhere else.",
-      "subtitleEmpty": "Nothing here yet.",
       "back": "All conversations",
       "untitled": "Untitled",
       "yesterday": "Yesterday",
@@ -163,9 +166,7 @@
       "done": "Done",
       "noChats": "No chats yet",
       "noRoutines": "No routines yet",
-      "noneBody": "Choose All to see every conversation.",
-      "failed": "Could not load your conversations.",
-      "offlineBody": "Your conversations live on your Pond, so this needs it reachable."
+      "noneBody": "Choose All to see every conversation."
     },
     "busy": "Your Pond is answering too much at once. Try again in a moment.",
     "lostConnection": "The connection dropped mid-answer. This is what your Pond saved.",
@@ -1326,7 +1327,6 @@
       "hint": "So schedules land at the right hour.",
       "search": "Search time zones",
       "useDevice": "Use this phone's time zone",
-      "loadFailed": "Could not load the time zones.",
       "none": "No time zone matches."
     },
     "location": {
@@ -1648,7 +1648,9 @@
     "appearance": "Appearance",
     "appearanceSystem": "System",
     "appearanceLight": "Light",
-    "appearanceDark": "Dark"
+    "appearanceDark": "Dark",
+    "unpairFailed": "This phone is still paired. Try again while you are on your Pond's home network.",
+    "unpairFailedTitle": "Could not unpair"
   },
   "models": {
     "serving": "Serving now",
@@ -1793,8 +1795,6 @@
     "empty": "Nothing here yet",
     "emptyBody": "What Goose does around the house shows up here.",
     "loading": "Reading your Pond's activity",
-    "failed": "Could not read your Pond's activity.",
-    "problemsFailed": "Could not read your Pond's problems.",
     "setupRequired": "Finish setting up your Pond to see its activity.",
     "forbidden": "Your Pond did not let this phone read its activity.",
     "event": {
@@ -1839,7 +1839,7 @@
       "exporting": "Preparing the log",
       "noShare": "This phone can't share files from Goose.",
       "noLog": "Your Pond isn't keeping a log, so there's nothing to export.",
-      "failed": "Couldn't export the log. Check your Pond is reachable, then try again."
+      "failed": "Couldn't export the log. Check that your Pond is reachable."
     },
     "clear": {
       "button": "Clear activity",
@@ -1849,7 +1849,7 @@
       "confirm": "Clear activity",
       "done_one": "Cleared {{count}} event.",
       "done_other": "Cleared {{count}} events.",
-      "failed": "Couldn't clear activity. Check your Pond is reachable, then try again."
+      "failed": "Couldn't clear activity. Check that your Pond is reachable."
     }
   },
   "pairing": {
@@ -2020,7 +2020,6 @@
     "installing": "Installing…",
     "noneTitle": "No extensions yet",
     "noneBody": "Your Pond has no extensions installed, and none to add.",
-    "loadFailed": "Your Pond could not be reached for its extension list.",
     "status": {
       "connected": "Connected",
       "error": "Error",
@@ -2076,7 +2075,6 @@
   "secrets": {
     "intro": "Keys, tokens and client IDs your Pond uses for outside services. Your Pond never sends a value back, so a value can be replaced but not shown.",
     "loading": "Reading the secrets your Pond holds…",
-    "loadFailed": "Your Pond could not be reached for its secrets.",
     "storedTitle": "Stored on your Pond",
     "empty": "Your Pond holds no secrets yet.",
     "add": "Add a secret",
@@ -2242,8 +2240,6 @@
       "noRulesBody": "An automation has Goose act when a sensor or device reports something.",
       "polling": "Live updates are paused. This list refreshes every 30 seconds.",
       "rulesNote": "Automations run when a reading matches, so they have no Run now.",
-      "schedulesFailed": "Could not load your schedules.",
-      "rulesFailed": "Could not load your automations.",
       "deleteAutomationTitle": "Delete this automation?",
       "deleteAutomationBody": "“{{name}}” will be removed from your Pond and will stop reacting."
     },
@@ -2263,7 +2259,8 @@
       "showAll": "Shows everything this run produced",
       "showLess": "Shows only the start of what this run produced",
       "statusSkipped": "Skipped",
-      "caughtUp": "Ran late (due {{when}})"
+      "caughtUp": "Ran late (due {{when}})",
+      "duration": "{{ms}} ms"
     },
     "form": {
       "scheduleTitle": "New schedule",
@@ -2351,12 +2348,12 @@
       "valueRequired": "A condition needs a number to compare against.",
       "actionIncomplete": "Finish the action: it is missing something it needs.",
       "cooldownInvalid": "The wait has to be a whole number of seconds.",
-      "createFailed": "Your Pond could not create it. Try again in a moment.",
+      "createFailed": "Your Pond could not create it.",
       "gone": "That one is no longer on your Pond.",
       "noScheduler": "Your Pond is running without its scheduler, so it cannot keep schedules.",
       "timeBound": "Use a 24-hour time such as 18:30.",
-      "saveFailed": "Your Pond could not save the change. Try again in a moment.",
-      "deleteFailed": "Your Pond could not delete it. Try again in a moment."
+      "saveFailed": "Your Pond could not save the change.",
+      "deleteFailed": "Your Pond could not delete it."
     },
     "cron": {
       "everyDay": "Every day at {{time}}",
@@ -2443,12 +2440,13 @@
     "reconnecting": "Reconnecting to your Pond",
     "connected": "Connected",
     "offline": "Disconnected",
-    "disconnected": "Pond is unavailable. Check its connection and remote access status.",
+    "disconnected": "Cannot reach your Pond",
     "unpaired": "Pair with your Pond at home",
-    "upgrade": "Scan a new QR code at home to enable secure connections.",
-    "revoked": "Your Pond no longer recognises this phone. Tap to pair again at home.",
+    "upgrade": "Secure connections need a new pairing at home",
+    "revoked": "Your Pond no longer recognises this phone",
     "trust": "Could not verify this Pond. Check its fingerprint on the Pond before pairing again.",
-    "unsupported": "Secure Pond connections require an Android or iOS development or release build."
+    "unsupported": "Secure Pond connections require an Android or iOS development or release build.",
+    "actionPair": "Pair"
   },
   "modal": {
     "title": "This is a modal",
@@ -2602,8 +2600,8 @@
     }
   },
   "errors": {
-    "busy": "Your Pond is busy. Try again in a moment.",
-    "generic": "Your Pond could not complete that request.",
+    "busy": "Your Pond is busy right now.",
+    "generic": "Your Pond could not finish that.",
     "deviceGone": "That device is no longer registered with your Pond.",
     "bridgedEndpoint": "Your Pond will not remove a bridged endpoint on its own.",
     "noModelCatalogue": "This Pond does not expose a model catalogue.",
@@ -2675,7 +2673,6 @@
       "add": "Add memory",
       "all": "All",
       "loading": "Loading memories…",
-      "failed": "Could not load memories from your Pond.",
       "emptyTitle": "No memories yet",
       "emptyBody": "Goose learns from your conversations, or you can add something it should know."
     },
@@ -3071,7 +3068,6 @@
     "dismissBody": "It leaves the list for good. The Pond cannot bring it back.",
     "list": {
       "loading": "Loading reminders",
-      "failed": "Could not load reminders.",
       "emptyTitle": "No reminders",
       "emptyBody": "When a conversation mentions something with a date, the Pond keeps it here."
     },
@@ -3083,7 +3079,7 @@
     },
     "errors": {
       "gone": "That reminder was already gone, so the list has been refreshed.",
-      "dismissFailed": "Could not dismiss that reminder. Try again."
+      "dismissFailed": "Could not dismiss that reminder."
     }
   },
   "proposals": {
@@ -3092,7 +3088,6 @@
     "declined": "Declined. It is off your list.",
     "list": {
       "loading": "Loading suggestions",
-      "failed": "Could not load suggestions.",
       "emptyTitle": "No suggestions",
       "emptyBody": "When the Pond notices something it could help with, it asks here first."
     },
@@ -3107,7 +3102,7 @@
       "unaddressed": "The Pond cannot tell which household member this phone belongs to, so it cannot show suggestions meant for one person. Pair this phone to a member from the Pond to see yours.",
       "gone": "That suggestion has expired or was already decided, so the list has been refreshed.",
       "conflict": "The Pond would not record that decision. The list has been refreshed.",
-      "decideFailed": "Could not save that decision. Try again."
+      "decideFailed": "Could not save that decision."
     }
   },
   "promptNotes": {
@@ -3115,7 +3110,6 @@
     "everyTurn": "Every note that is on is read again on every turn, so long notes slow down the small model on your Pond. Keep each one to a sentence or two.",
     "add": "Add a note",
     "loading": "Loading notes",
-    "failed": "Couldn't load the notes from your Pond.",
     "emptyTitle": "No notes yet",
     "emptyBody": "Add one to have Goose follow it in every conversation.",
     "deleteTitle": "Delete \"{{name}}\"?",
@@ -3191,13 +3185,17 @@
       "waiting": "Waiting for a picture",
       "idle": "No picture while the camera is not running",
       "stale": "The last picture did not arrive. Trying again."
+    },
+    "ago": {
+      "seconds": "{{count}} s",
+      "minutes": "{{count}} min",
+      "hours": "{{count}} h"
     }
   },
   "faces": {
     "intro": "Your Pond can learn who is who from their face, so Goose can greet people by name and automations can tell them apart.",
     "privacy": "Face data stays on your Pond. It is never sent to the cloud.",
     "loading": "Reading who your Pond knows",
-    "failed": "Could not read the faces your Pond knows.",
     "recognitionOff": "Face recognition is switched off, so your Pond is not looking for faces right now. You can still add samples.",
     "switchOn": "Switch it on",
     "unavailableTitle": "Face recognition isn't set up on your Pond",
@@ -3275,8 +3273,6 @@
     "unacknowledged_one": "{{count}} not acknowledged yet",
     "unacknowledged_other": "{{count}} not acknowledged yet",
     "loading": "Loading what the camera saw…",
-    "failed": "Could not load vision events from your Pond.",
-    "settingsFailed": "Could not read which camera your Pond watches.",
     "emptyTitle": "Nothing seen yet",
     "emptyBody": "When the camera notices something, it shows up here.",
     "noMatchTitle": "Nothing matches",
@@ -3340,7 +3336,7 @@
       "back": "Back to the event"
     },
     "errors": {
-      "acknowledgeFailed": "Could not acknowledge that event. Try again."
+      "acknowledgeFailed": "Could not acknowledge that event."
     }
   },
   "visionAutomations": {
@@ -3351,10 +3347,9 @@
     "adding": "Adding",
     "new": "New vision automation",
     "loading": "Reading your Pond's automations",
-    "failed": "Could not load your automations.",
     "emptyTitle": "No vision automations yet",
     "emptyBody": "An automation has Goose or your phone react when the camera sees something. Add one above, or build your own.",
-    "addFailed": "Your Pond could not add that one. Try again in a moment.",
+    "addFailed": "Your Pond could not add that one.",
     "starter": {
       "unknownFace": {
         "title": "Tell me when someone your Pond doesn't know is seen",
@@ -3988,5 +3983,12 @@
       "channel": "Background connection",
       "channelDescription": "Shown while this phone keeps a connection to your Pond open in the background."
     }
+  },
+  "contentState": {
+    "waitingTitle": "Waiting for your Pond",
+    "waitingBody": "This fills in as soon as your Pond is back.",
+    "failedTitle": "This did not load",
+    "failedBody": "Your Pond had trouble answering.",
+    "pullHint": "Pull down to try again"
   }
 }

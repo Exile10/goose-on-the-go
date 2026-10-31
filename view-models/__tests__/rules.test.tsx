@@ -8,6 +8,7 @@ import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 
 import { ApiError, api } from '@/services/api-client';
 import i18n from '@/services/i18n';
+import { currentSnackbar, resetSnackbar } from '@/services/snackbar';
 import type { Rule, RuleRequest } from '@/services/types';
 import { useRules, type UseRules } from '@/view-models/use-rules';
 
@@ -15,7 +16,14 @@ jest.mock('@/services/api-client', () => {
   const actual = jest.requireActual('@/services/api-client');
   return {
     ...actual,
-    api: { listRules: jest.fn(), createRule: jest.fn(), updateRule: jest.fn(), deleteRule: jest.fn() },
+    api: {
+      listRules: jest.fn(),
+      createRule: jest.fn(),
+      updateRule: jest.fn(),
+      deleteRule: jest.fn(),
+      pauseRule: jest.fn(),
+      resumeRule: jest.fn(),
+    },
   };
 });
 
@@ -80,6 +88,7 @@ beforeAll(() => {
 
 beforeEach(() => {
   jest.resetAllMocks();
+  resetSnackbar();
   pond.listRules.mockResolvedValue([WARM]);
 });
 
@@ -147,5 +156,23 @@ describe('deleting a rule', () => {
     });
     expect(refused).toBe(i18n.t('schedule.errors.deleteFailed'));
     expect(m.vm.data.rules).toEqual([WARM]);
+  });
+});
+
+describe('pausing a rule', () => {
+  it('puts the switch back and says why, with Try again, when the Pond refuses', async () => {
+    pond.pauseRule.mockRejectedValueOnce(new ApiError('x', 503, null)).mockResolvedValueOnce();
+    const m = await mount();
+    await act(async () => {
+      await m.vm.actions.setPaused(WARM, true);
+    });
+    expect(m.vm.data.rules[0].paused).toBe(WARM.paused);
+    // The list loaded; one switch failing does not make it a failed page.
+    expect(m.vm.error).toBeNull();
+    expect(currentSnackbar()).toMatchObject({ tone: 'danger', message: i18n.t('schedule.errors.noScheduler') });
+
+    await act(async () => currentSnackbar()?.action?.onPress());
+    expect(pond.pauseRule).toHaveBeenCalledTimes(2);
+    expect(m.vm.data.rules[0].paused).toBe(true);
   });
 });

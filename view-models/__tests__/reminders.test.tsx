@@ -7,6 +7,7 @@ import React from 'react';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 
 import { ApiError, api } from '@/services/api-client';
+import { currentSnackbar, resetSnackbar } from '@/services/snackbar';
 import type { Reminder } from '@/services/types';
 import { toReminderRow, useReminders, type UseReminders } from '@/view-models/use-reminders';
 
@@ -76,6 +77,7 @@ beforeAll(() => {
 });
 
 beforeEach(() => {
+  resetSnackbar();
   jest.resetAllMocks();
   jest.spyOn(console, 'warn').mockImplementation(() => {});
   jest.spyOn(console, 'info').mockImplementation(() => {});
@@ -141,7 +143,7 @@ describe('dismissing', () => {
     expect(pond.dismissReminder).toHaveBeenCalledWith('r1');
     expect(pond.listReminders).toHaveBeenCalledTimes(2);
     expect(m.vm.data.rows).toEqual([]);
-    expect(m.vm.actionError).toBeNull();
+    expect(currentSnackbar()).toBeNull();
     expect(m.vm.dismissing).toBeNull();
     await m.unmount();
   });
@@ -153,7 +155,8 @@ describe('dismissing', () => {
 
     await act(async () => m.vm.actions.dismiss('r1'));
 
-    expect(m.vm.actionError).toBe('That reminder was already gone, so the list has been refreshed.');
+    expect(currentSnackbar()).toMatchObject({ tone: 'neutral', message: 'That reminder was already gone, so the list has been refreshed.' });
+    expect(currentSnackbar()?.action).toBeUndefined();
     expect(pond.listReminders).toHaveBeenCalledTimes(2);
     expect(m.vm.data.rows).toEqual([]);
     await m.unmount();
@@ -166,8 +169,12 @@ describe('dismissing', () => {
 
     await act(async () => m.vm.actions.dismiss('r1'));
 
-    expect(m.vm.actionError).toBe('Could not dismiss that reminder. Try again.');
+    expect(currentSnackbar()).toMatchObject({ tone: 'danger', message: 'Could not dismiss that reminder.' });
     expect(m.vm.data.rows.map((r) => r.id)).toEqual(['r1']);
+
+    pond.dismissReminder.mockResolvedValue();
+    await act(async () => currentSnackbar()?.action?.onPress());
+    expect(pond.dismissReminder).toHaveBeenCalledTimes(2);
     await m.unmount();
   });
 });

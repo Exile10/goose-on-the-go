@@ -8,6 +8,10 @@ import { StyleSheet, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { InkButton, InkEmptyState, InkNotice, InkSpinner, InkText } from '@jarida/ink/native';
 
+import { ContentUnavailable } from '@/components/patterns/content-unavailable';
+import { isUnavailable } from '@/models/content-state';
+import { useContentState } from '@/view-models/use-content-state';
+import { useReloadOnPull } from '@/view-models/use-pull-to-refresh';
 import { AutomationCard } from '@/components/patterns/automation-card';
 import { AutomationFormSheet } from '@/components/patterns/automation-form-sheet';
 import type { Rule } from '@/services/types';
@@ -17,6 +21,12 @@ import { Spacing } from '@/constants/spacing';
 export function AutomationsTab() {
   const { t } = useTranslation();
   const { data, loading, error, failed, actions } = useRules();
+  // The scroll, and so the pull, is the Schedule screen's.
+  useReloadOnPull(actions.refresh);
+  // A refused refresh with the list still on screen is said above it; a list that never arrived is
+  // said once, in its place.
+  const state = useContentState({ loading, failed: failed || error !== null, hasContent: data.rules.length > 0 });
+  const unavailable = isUnavailable(state);
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState<Rule | null>(null);
 
@@ -30,17 +40,13 @@ export function AutomationsTab() {
 
       {loading ? <InkSpinner label={t('schedule.list.loading')} /> : null}
 
-      {/* A failed read with no sentence of its own still leaves the list unknown. */}
-      {error || failed ? (
-        <View style={styles.notice}>
-          <InkNotice tone="danger">{error ?? t('schedule.list.rulesFailed')}</InkNotice>
-          <InkButton variant="quiet" icon="refresh" onPress={actions.refresh}>
-            {t('common.retry')}
-          </InkButton>
-        </View>
+      {unavailable ? (
+        <ContentUnavailable state={state} reason={error} onRetry={actions.refresh} />
+      ) : error ? (
+        <InkNotice tone="danger">{error}</InkNotice>
       ) : null}
 
-      {!loading && !error && !failed && data.rules.length === 0 ? (
+      {state === 'empty' ? (
         <InkEmptyState icon="bolt" title={t('schedule.list.noRulesTitle')}>
           <InkText>{t('schedule.list.noRulesBody')}</InkText>
         </InkEmptyState>
@@ -71,5 +77,4 @@ export function AutomationsTab() {
 const styles = StyleSheet.create({
   body: { gap: Spacing.md },
   header: { flexDirection: 'row', justifyContent: 'flex-end' },
-  notice: { gap: Spacing.sm },
 });

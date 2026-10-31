@@ -13,7 +13,7 @@
  */
 
 import React, { useCallback, useMemo, useState } from 'react';
-import { RefreshControl, StyleSheet, ScrollView, Text, View } from 'react-native';
+import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -36,7 +36,11 @@ import { useThemedStyles } from '@/hooks/use-themed-styles';
 import { selectionTick, toggle } from '@/services/haptics';
 import { deviceStyle } from '@/constants/device-style';
 import { ALL_ROOMS, UNASSIGNED_ROOM, roomLabel, supports, useDevices } from '@/view-models/use-devices';
+import { ContentUnavailable } from '@/components/patterns/content-unavailable';
 import { DeviceEditSheet } from '@/components/patterns/device-edit-sheet';
+import { isUnavailable } from '@/models/content-state';
+import { useContentState } from '@/view-models/use-content-state';
+import { usePullToRefresh } from '@/view-models/use-pull-to-refresh';
 import type { Device } from '@/services/types';
 import { Grey } from '@/constants/colors';
 import type { ThemeColors } from '@/constants/colors';
@@ -117,7 +121,7 @@ export default function DevicesTab() {
   const styles = useThemedStyles(makeStyles);
   const { t } = useTranslation();
   const router = useRouter();
-  const { data, loading, error, actions } = useDevices();
+  const { data, loading, failed, error, actions } = useDevices();
   // A pull draws its own spinner at the top of the list, so the one in the
   // list body stands down while it runs rather than showing two.
   const [pulling, setPulling] = useState(false);
@@ -169,6 +173,9 @@ export default function DevicesTab() {
   }, []);
 
   const total = data.devices.length;
+  const state = useContentState({ loading, failed, hasContent: total > 0 });
+  const unavailable = isUnavailable(state);
+  const pull = usePullToRefresh(actions.refresh);
   const nothingReachable = total > 0 && data.onlineCount === 0;
 
   return (
@@ -280,15 +287,18 @@ export default function DevicesTab() {
 
         {loading && !pulling ? <InkSpinner label={t('pond.checking')} /> : null}
 
-        {error ? (
+        {/* A pull that failed with the grid already on screen. A list that did not load is said
+            once, in place of the grid; a switch the Pond refused is said in the snackbar. */}
+        {!unavailable && error ? (
           <View style={styles.notice}>
             <InkNotice tone="danger">{error}</InkNotice>
           </View>
         ) : null}
 
-        {/* A list that failed to load is unknown, not empty: the notice above
-            says so, and "No devices yet" would be a claim nobody made. */}
-        {!loading && !error && total === 0 ? (
+        {/* A list that failed to load is unknown, not empty: "No devices yet" would be a claim
+            nobody made. */}
+        {unavailable ? <ContentUnavailable state={state} reason={error} onRetry={actions.refresh} /> : null}
+        {state === 'empty' ? (
           <InkEmptyState
             icon="device"
             title={t('devices.noneTitle')}

@@ -11,6 +11,7 @@ import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { SAMPLE_MEMORIES } from '@/models/memory';
 import { ApiError, CONSOLIDATION_NOT_BUILT, ONBOARDING_REQUIRED, api } from '@/services/api-client';
 import i18n from '@/services/i18n';
+import { currentSnackbar, resetSnackbar } from '@/services/snackbar';
 import type { ConsolidationEvent, MemoryFragment } from '@/services/types';
 import { describeConsolidationError, useConsolidation, type UseConsolidation } from '@/view-models/use-consolidation';
 import { describeMemoryError, useMemories, type UseMemories } from '@/view-models/use-memories';
@@ -90,6 +91,7 @@ async function mount<T>(hook: () => T) {
 }
 
 beforeEach(() => {
+  resetSnackbar();
   jest.clearAllMocks();
   server.hydrated = true;
   server.real = true;
@@ -194,7 +196,12 @@ describe('useMemories, on the real Pond', () => {
       await m.vm.actions.remove(memory);
     });
     expect(m.vm.data.memories).toEqual([memory]);
-    expect(m.vm.error).toBe(i18n.t('errors.generic'));
+    expect(m.vm.error).toBeNull();
+    expect(currentSnackbar()).toMatchObject({ tone: 'danger', message: i18n.t('errors.generic') });
+
+    pond.deleteMemory.mockResolvedValue();
+    await act(async () => currentSnackbar()?.action?.onPress());
+    expect(pond.deleteMemory).toHaveBeenCalledTimes(2);
   });
 
   it('says plainly when the Pond refuses this phone the memory routes', async () => {
@@ -284,13 +291,16 @@ describe('useConsolidation', () => {
 
     await act(async () => m.vm.actions.stop());
     expect(pond.stopConsolidation).toHaveBeenCalledTimes(1);
-    expect(m.vm.stopError).toBeNull();
+    expect(currentSnackbar()).toBeNull();
 
     const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
     pond.stopConsolidation.mockRejectedValue(new TypeError('Network request failed'));
     await act(async () => m.vm.actions.stop());
     await flush();
-    expect(m.vm.stopError).toBe(i18n.t('memories.consolidate.stopFailed'));
+    expect(currentSnackbar()).toMatchObject({ tone: 'danger', message: i18n.t('memories.consolidate.stopFailed') });
+    await act(async () => currentSnackbar()?.action?.onPress());
+    await flush();
+    expect(pond.stopConsolidation).toHaveBeenCalledTimes(3);
     warn.mockRestore();
     await m.unmount();
   });

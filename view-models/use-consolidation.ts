@@ -15,13 +15,13 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useServer } from '@/providers/server-provider';
 import { ApiError, CONSOLIDATION_NOT_BUILT, api } from '@/services/api-client';
 import i18n from '@/services/i18n';
+import { showSnackbar } from '@/services/snackbar';
 import { consolidationStep, type ConsolidationProgress } from '@/models/memory';
 import { describeMemoryError } from './use-memories';
 
 export interface UseConsolidation {
+  /** The run's own state, which the card keeps: how a run ended is not about a button. */
   progress: ConsolidationProgress;
-  /** Why the last Stop did not reach the Pond, or null. The run may still be going. */
-  stopError: string | null;
   /** Whether this screen can start a run at all: only against a real Pond. */
   available: boolean;
   actions: {
@@ -45,12 +45,26 @@ export function describeConsolidationError(e: unknown): string | null {
   return describeMemoryError(e);
 }
 
+/**
+ * Ask the Pond to stop the run. The run ends with the Pond's `cancelled` frame, not here: Stop only
+ * asks, and a Stop that did not reach the Pond is said in the snackbar -- the run may still be going.
+ */
+function askToStop(): void {
+  api.stopConsolidation().catch((e) => {
+    console.warn('[consolidation] stop failed', e instanceof ApiError ? e.status : 'network');
+    showSnackbar({
+      message: describeConsolidationError(e) ?? i18n.t('memories.consolidate.stopFailed'),
+      tone: 'danger',
+      action: { label: i18n.t('common.retry'), onPress: askToStop },
+    });
+  });
+}
+
 /** `onFinished` runs after a run that may have changed the store, so the list can reload. */
 export function useConsolidation(onFinished: () => void): UseConsolidation {
   const { isScreenReal } = useServer();
   const available = isScreenReal('memory');
   const [progress, setProgress] = useState<ConsolidationProgress>({ status: 'idle' });
-  const [stopError, setStopError] = useState<string | null>(null);
   const abort = useRef<AbortController | null>(null);
 
   // A screen that leaves closes the stream; the run itself carries on on the Pond.
@@ -60,7 +74,6 @@ export function useConsolidation(onFinished: () => void): UseConsolidation {
     if (!available || abort.current) return;
     const controller = new AbortController();
     abort.current = controller;
-    setStopError(null);
     // Running from the tap, before the Pond's first frame; its count is 0 until then.
     let current = consolidationStep({ status: 'idle' }, { type: 'started', memory_count: 0 });
     setProgress(current);
@@ -84,14 +97,5 @@ export function useConsolidation(onFinished: () => void): UseConsolidation {
       });
   }, [available, onFinished]);
 
-  // The run ends with the Pond's `cancelled` frame, not here: Stop only asks.
-  const stop = useCallback(() => {
-    setStopError(null);
-    api.stopConsolidation().catch((e) => {
-      console.warn('[consolidation] stop failed', e instanceof ApiError ? e.status : 'network');
-      setStopError(describeConsolidationError(e) ?? i18n.t('memories.consolidate.stopFailed'));
-    });
-  }, []);
-
-  return { progress, stopError, available, actions: { start, stop } };
+  return { progress, available, actions: { start, stop: askToStop } };
 }

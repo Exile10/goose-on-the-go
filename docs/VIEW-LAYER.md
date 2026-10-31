@@ -455,6 +455,128 @@ The root stack draws no header for it (`headerShown: false` in
 `app/_layout.tsx`); the screen draws Ink's navbar, which carries its own way
 back to the wall.
 
+## Failure, offline and empty
+
+Every screen whose content comes from the Pond is in one of five states, chosen
+by `contentState` in `models/content-state.ts` (`useContentState` reads the
+connection for it). Each state has one owner, and nothing says a thing twice.
+
+| State | When | Who says it |
+|---|---|---|
+| `ready` | There is content, from this read or an earlier one | The screen. A later read that fails keeps it on screen and is logged |
+| `loading` | Nothing yet, a read in flight | The screen's spinner or ghosts |
+| `unreachable` | Nothing to show, and the connection indicator is up | The indicator says why. The screen shows `ContentUnavailable` in its waiting form: no cause, no button |
+| `failed` | Nothing to show, the connection is fine, the read failed | `ContentUnavailable`: a title, one sentence, and "Pull down to try again" |
+| `empty` | The read worked and found nothing | The screen's own `InkEmptyState`, never styled as a failure |
+
+**Connectivity is said once**, by `ConnectionStatus` at the top of the app. It
+is quiet -- a hairline strip on the secondary surface, an icon and a sentence --
+and it is not a retry button. Its only control is Pair, where only pairing can
+help (`connectionActionIsPairing`). It has no "Checking" state of its own: a
+pull's spinner shows the attempt, and the attempt turns the strip to
+"Reconnecting" once it outlasts the grace period. Screens do not add their own
+"your Pond is unreachable" notice. Home's Pond card, which is a status card,
+drops its reachability title and badge while the indicator is up.
+
+**Trying again is a pull, everywhere.** Every screen of Pond content carries a
+`RefreshControl` fed by `usePullToRefresh(reload)`
+(`view-models/use-pull-to-refresh.ts`), and no screen holds a `refreshing` flag
+of its own. A pull first asks the connection manager to look for the Pond when
+the strip is up for a reason another attempt can help (not for an unpaired,
+outdated or revoked phone, where a token-less probe would report success and
+change nothing), then runs the screen's `reload`. The spinner stays until both
+settle; a second pull meanwhile is ignored; a reload that throws is logged
+(`[pull-to-refresh] refresh failed kind=...`) and the spinner still goes. A
+screen with several reads passes one `reload` that makes them all (Home reads
+recent conversations and devices). A section that reads its own content inside
+a scroll another component owns -- the Schedules and Automations tabs, the
+camera status card and the voice list on a settings page, the account row on
+the You tab -- registers its read with `useReloadOnPull`, and the screen wraps
+it in `PullSectionsProvider` with the registry from `usePullSections`, so the
+pull reaches it. No screen adds a Refresh or Try again button beside the pull;
+Devices' header Refresh went for that reason.
+
+A screen reader cannot easily pull to refresh, so both places that used to
+carry Try again keep it as an accessibility action instead: the strip's
+sentence (while another attempt can help) and the failed form's hint each have
+an `activate` action labelled Try again. TalkBack and VoiceOver read them as
+actionable, and a double tap runs the same retry. A sighted tap does nothing.
+
+**`ContentUnavailable`** (`components/patterns/content-unavailable.tsx`) goes
+in place of the content, never above it, and always inside the scrollable that
+carries the screen's `RefreshControl` -- a `ListEmptyComponent`, or a child of
+the `ScrollView` -- or the hint under it promises a pull there is nothing to
+pull. Where it is the whole screen, put it in a `ScrollView` whose
+`contentContainerStyle` has `flexGrow: 1` so it can centre and still be pulled
+(the wake word screen does this). It takes the view-model's sentence as
+`reason` when that sentence says something specific (busy, a feature the Pond
+is too old for), and the shared one otherwise. When the connection comes back
+it reads again by itself, and keeps its waiting form until that read settles,
+so nobody sees "did not load" for content already on its way. `compact` fits it
+into one section of a longer screen.
+
+**A view-model reports a failed read as a flag** (`failed`, or `readFailed` in
+a store), never by whether it has a sentence for it. `describeApiError` returns
+null for a request that got no answer, so a screen that took "no error text" to
+mean "loaded" drew a failure as an empty list -- which is how Devices said "No
+devices yet" with the Pond down.
+
+**A failed action** -- a save, a delete -- is not a failed screen. A view-model
+keeps `error` and `failed` for its reads only; what an action came to is said
+as "Feedback for actions" below has it. Never `Alert.alert`, which draws the
+platform's dialog in the platform's theme rather than the app's.
+
+**Technical detail is for the log.** A status code, a route or an exception's
+text never reaches a reader. `describeApiError` turns a failure into words or
+into nothing (when the indicator already covers it), and `logFailure` writes the
+engineer's half: `[scope] what kind=http_500`.
+
+## Feedback for actions
+
+What a tap came to -- saved, started, refused -- is not a fact about the page,
+so it does not become a box in the page that stays there. Four homes, chosen by
+what the sentence is about:
+
+| The sentence is about | Where it goes |
+|---|---|
+| An action the user just took that worked: saved, run started, deleted, download started | The snackbar, neutral |
+| An action the user just took that failed: a switch the Pond refused, a delete, a run | The snackbar, danger, with Try again when sending the same request again is meaningful and cheap |
+| A field, or a form still open | Inline, beside the field or the form's button, so the typed values and the reason stay together |
+| A standing condition: a feature off or unavailable, a setup state, a warning about what an option does, a page that did not load | Inline (`InkNotice`, or `ContentUnavailable` for content) |
+
+The app's own dialog (`useConfirm` / `useInform`) is for a question before an
+action, or a failure the user must read before going on; a screen that chose a
+dialog keeps it.
+
+**The snackbar** is `providers/snackbar-provider.tsx`, mounted once inside
+`InkProvider`. A component asks with `useSnackbar().show(...)`; a view-model or
+a module-level store calls `showSnackbar(...)` from `services/snackbar.ts`
+directly, since a store cannot call a hook.
+
+    show({ message, tone?: 'neutral' | 'danger', action?: { label, onPress } })
+
+It follows Material 3's snackbar and the HIG. One at a time: a new message
+replaces the one showing. It goes by itself after about 4 s (longer for a long
+sentence, by Ink's `readingTime`), at least 8 s when it carries an action, and
+not at all while a screen reader is on and it carries an action. A tap or the
+screen reader's escape puts it away. It is announced once
+(`announceForAccessibility`), sits above the safe area, the tab bar (which
+reports its height with `useSnackbarClearance` while it is in front) and the
+keyboard, and appears without a slide under Reduce Motion. An inverse surface
+for neutral, the danger fill for danger; no border, no icon. The message is
+one short sentence from the catalogue: a status code or a route belongs to
+`logFailure` and `console.warn`, which every failure site still writes.
+
+Try again calls the action as it is now, not the closure the failure was
+caught in: a hook keeps a ref to its current action, set in an effect, and the
+snackbar's `onPress` reads the ref. (A hook cannot name its own `useCallback`
+inside it; the React lint rejects that.)
+
+**One limit:** the snackbar draws under a `Modal`, so anything said while an
+`InkSheet` stays open stays in the sheet (the face sheet's samples, the event
+sheet's "automation added"). A sheet that closes on success can use the
+snackbar, because the sheet is gone by the time it shows.
+
 ## Shared surfaces
 
 `components/patterns/pond-list.tsx` draws the Ponds on the network. First run and

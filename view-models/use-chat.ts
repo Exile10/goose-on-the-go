@@ -57,6 +57,7 @@ import {
 import { composeMessage, type Attachment } from '@/services/media';
 import { StreamStalledError } from '@/services/sse';
 import type { AnswerShape, ChatFrame, ChatStreamRequest, SessionMessage } from '@/services/types';
+import { describeApiError, logFailure } from '@/view-models/describe-error';
 import { createTurnQueue } from '@/view-models/turn-queue';
 import { MOCK_RESEARCH_REPLY, MOCK_TASK_REPLY } from '@/models/long-tasks-mock';
 import { mockTaskStart } from '@/view-models/use-long-task';
@@ -94,7 +95,14 @@ function isDrop(e: unknown): boolean {
   return e instanceof TypeError || (e instanceof Error && /network|connection|socket/i.test(e.message));
 }
 
+/**
+ * What the reader is told about a turn that failed. Never the failure's own text: an ApiError's
+ * message is the route and status (`POST /api/v1/agent/chat/stream → 500`) and a dropped
+ * connection's is the platform's ("Network request failed"), and both used to land on screen.
+ * They go to the log instead.
+ */
 export function describeTurnError(e: unknown, t: TFunction): string {
+  logFailure('chat', 'turn failed', e);
   const research = researchRefusal(e);
   if (research === 'off') return t('chat.research.refusedOff');
   if (research === 'unidentified') return t('chat.research.unidentified');
@@ -102,10 +110,10 @@ export function describeTurnError(e: unknown, t: TFunction): string {
     if (e.status === 503) return t('chat.busy');
     if (e.status === 413) return t('chat.composer.tooLarge');
     if (e.status === 415) return t('chat.composer.unsupported');
-    return e.message;
+    return describeApiError(e) ?? t('chat.failed');
   }
   if (isAbort(e)) return t('chat.timedOut');
-  return e instanceof Error ? e.message : t('chat.failed');
+  return t('chat.failed');
 }
 
 /** A tool row's `content` parsed as the JSON blob it stores, or null for an older, bare row. */

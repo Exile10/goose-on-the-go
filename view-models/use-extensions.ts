@@ -8,11 +8,12 @@
  * it belongs in the installed list instead (#92).
  */
 
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { useServer } from '@/providers/server-provider';
 import { ApiError, api } from '@/services/api-client';
 import i18n from '@/services/i18n';
+import { showSnackbar } from '@/services/snackbar';
 import type { Extension, MarketplaceExtension, SecretRequirement } from '@/services/types';
 import { describeApiError } from './describe-error';
 import { useLive } from './use-live';
@@ -37,6 +38,10 @@ export interface UseExtensions {
     marketplace: MarketplaceExtension[];
   };
   loading: boolean;
+  /**
+   * Why the last read failed, in words. A refused toggle, install, save or removal is said in the
+   * snackbar instead: it is about the control just used, not about the list.
+   */
   error: string | null;
   /** The first read failed and nothing has loaded, so an empty list says nothing about the Pond. */
   failed: boolean;
@@ -102,6 +107,12 @@ export function useExtensions(): UseExtensions {
     return marketplace.filter((m) => !installedNames.has(m.id));
   }, [installed, marketplace]);
 
+  // What the snackbar's Try again calls: the current toggle and removal, set below once made.
+  const retry = useRef<Pick<UseExtensions['actions'], 'setEnabled' | 'remove'>>({
+    setEnabled: async () => {},
+    remove: async () => {},
+  });
+
   const setEnabled = useCallback(
     async (name: string, enabled: boolean) => {
       const previous = installed;
@@ -110,7 +121,13 @@ export function useExtensions(): UseExtensions {
         await api.setExtensionEnabled(name, enabled);
       } catch (e) {
         setInstalled(previous);
-        setError(describeApiError(e));
+        console.warn('[extensions] toggle refused', name, e instanceof ApiError ? e.status : 'network');
+        // The switch has gone back; say why rather than let it look like a missed tap.
+        showSnackbar({
+          message: describeApiError(e) ?? i18n.t('errors.generic'),
+          tone: 'danger',
+          action: { label: i18n.t('common.retry'), onPress: () => void retry.current.setEnabled(name, enabled) },
+        });
       }
     },
     [installed],
@@ -118,15 +135,16 @@ export function useExtensions(): UseExtensions {
 
   const install = useCallback(
     async (item: MarketplaceExtension, secrets?: Record<string, string>) => {
-      setError(null);
       try {
         await api.installMarketplaceExtension(item.id, secrets);
         await load(true);
         return true;
       } catch (e) {
-        // A timed-out install is no ApiError, so `describeApiError` has nothing to say,
-        // and minutes of "Installing" must not end in silence.
-        setError(describeApiError(e) ?? i18n.t('errors.generic'));
+        console.warn('[extensions] install refused', item.id, e instanceof ApiError ? e.status : 'network');
+        // A timed-out install is no ApiError, so `describeApiError` has nothing to say, and
+        // minutes of "Installing" must not end in silence. No Try again: an install can take
+        // minutes, and the Install button is still there.
+        showSnackbar({ message: describeApiError(e) ?? i18n.t('errors.generic'), tone: 'danger' });
         return false;
       }
     },
@@ -135,16 +153,20 @@ export function useExtensions(): UseExtensions {
 
   const saveSecrets = useCallback(
     async (name: string, secrets: Record<string, string>) => {
-      setError(null);
       try {
         const result = await api.setExtensionSecrets(name, secrets);
         await load(false);
         // Stored either way, but an extension that did not restart still runs on the old values.
-        if (result?.restart_error) setError(i18n.t('extensions.restartFailed'));
+        if (result?.restart_error) {
+          console.warn('[extensions] saved, restart failed', name);
+          showSnackbar({ message: i18n.t('extensions.restartFailed'), tone: 'danger' });
+        }
         return true;
       } catch (e) {
-        // A restart can run as long as an install, and a timeout is no ApiError.
-        setError(describeApiError(e) ?? i18n.t('errors.generic'));
+        console.warn('[extensions] credentials refused', name, e instanceof ApiError ? e.status : 'network');
+        // A restart can run as long as an install, and a timeout is no ApiError. The form stays
+        // open with what was typed, so its Save button is the way to try again.
+        showSnackbar({ message: describeApiError(e) ?? i18n.t('errors.generic'), tone: 'danger' });
         return false;
       }
     },
@@ -153,14 +175,21 @@ export function useExtensions(): UseExtensions {
 
   /** Taken off the list only once the Pond confirms: a refused removal must not look done. */
   const remove = useCallback(async (name: string) => {
-    setError(null);
     try {
       await api.removeExtension(name);
       setInstalled((current) => current.filter((e) => e.name !== name));
     } catch (e) {
-      setError(describeApiError(e));
+      console.warn('[extensions] removal refused', name, e instanceof ApiError ? e.status : 'network');
+      showSnackbar({
+        message: describeApiError(e) ?? i18n.t('errors.generic'),
+        tone: 'danger',
+        action: { label: i18n.t('common.retry'), onPress: () => void retry.current.remove(name) },
+      });
     }
   }, []);
+  useEffect(() => {
+    retry.current = { setEnabled, remove };
+  }, [setEnabled, remove]);
 
   return {
     data: { installed, available, marketplace },

@@ -8,6 +8,9 @@
  *     const confirm = useConfirm();
  *     if (await confirm({ title, message, confirmLabel, destructive: true })) remove(item);
  *
+ * `useInform()` is the same dialog with nothing to decide: one message about something that already
+ * happened -- an action that failed -- and a single button that puts it away.
+ *
  * Only one question is on screen at a time. A second one asked while the first is open answers
  * the first as Cancel: the newer question is the one the user just caused, and leaving the older
  * promise unsettled would leak whatever its caller was holding.
@@ -17,6 +20,7 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useR
 
 import { ConfirmDialog, type ConfirmDialogAction } from '@/components/ui/confirm-dialog';
 import { caution } from '@/services/haptics';
+import i18n from '@/services/i18n';
 
 /** A yes-or-no question. `destructive` paints the answer red and buzzes a warning on open. */
 export interface ConfirmRequest {
@@ -52,11 +56,22 @@ export type ConfirmFn = (request: ConfirmRequest) => Promise<boolean>;
 /** Resolves with the chosen option's value, or null on Cancel, the backdrop or back. */
 export type ChooseFn = <T>(request: ChoiceRequest<T>) => Promise<T | null>;
 
+/** Something that already happened, said in the app's own dialog. */
+export interface InformRequest {
+  title: string;
+  message: string;
+}
+
+/** Resolves once the dialog is put away, by its button, the backdrop or back. */
+export type InformFn = (request: InformRequest) => Promise<void>;
+
 interface Question {
   title: string;
   message: string;
   cancelLabel?: string;
   actions: readonly ConfirmDialogAction[];
+  /** The dismiss button's label, when it is not Cancel. */
+  dismissLabel?: string;
   /** The index of the action chosen, or null for every way of cancelling. */
   settle: (index: number | null) => void;
 }
@@ -64,6 +79,7 @@ interface Question {
 interface ConfirmApi {
   confirm: ConfirmFn;
   choose: ChooseFn;
+  inform: InformFn;
 }
 
 const ConfirmContext = createContext<ConfirmApi | null>(null);
@@ -117,6 +133,11 @@ export function ConfirmProvider({ children }: PropsWithChildren) {
         );
         return index === null ? null : options[index].value;
       },
+      inform: async ({ title, message }) => {
+        // Nothing to choose between, so no answer but the one that puts it away -- and that one is
+        // OK rather than Cancel, because there is nothing to cancel.
+        await ask({ title, message, actions: [], dismissLabel: i18n.t('common.ok') }, false);
+      },
     }),
     [ask],
   );
@@ -130,6 +151,7 @@ export function ConfirmProvider({ children }: PropsWithChildren) {
         message={question?.message ?? ''}
         cancelLabel={question?.cancelLabel}
         actions={question?.actions ?? []}
+        dismissLabel={question?.dismissLabel}
         onAction={(index) => question?.settle(index)}
         onCancel={() => question?.settle(null)}
       />
@@ -151,4 +173,9 @@ export function useConfirm(): ConfirmFn {
 /** Ask a question with several answers in the app's own dialog. */
 export function useChoice(): ChooseFn {
   return useConfirmApi('useChoice').choose;
+}
+
+/** Say that something went wrong, in the app's own dialog, with one button to put it away. */
+export function useInform(): InformFn {
+  return useConfirmApi('useInform').inform;
 }

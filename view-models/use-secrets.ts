@@ -11,12 +11,13 @@
  * that answered "saved" to anything would be the one thing a credentials screen must not do.
  */
 
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { isReservedRefusal, isValidSecretKey, secretLabelKey } from '@/models/secrets';
 import { useServer } from '@/providers/server-provider';
 import { ApiError, api } from '@/services/api-client';
 import i18n, { type TranslationKey } from '@/services/i18n';
+import { showSnackbar } from '@/services/snackbar';
 import { describeApiError } from './describe-error';
 import { useLive } from './use-live';
 
@@ -50,17 +51,16 @@ export interface UseSecrets {
   };
   /** The first read is out and nothing is known yet. */
   loading: boolean;
-  /** A read somebody asked for is out, over a list already on screen. */
-  refreshing: boolean;
   saving: boolean;
   /** The key a deletion is out for, or null. */
   deleting: string | null;
-  /** A read or a deletion failed, in words. */
+  /**
+   * A read failed, in words. What a save or a deletion came to -- and a refused deletion -- is said
+   * in the snackbar instead.
+   */
   error: string | null;
   /** Why the last save did not go through, for the form. */
   formError: string | null;
-  /** What the last save or deletion did, in words, until the next action. */
-  notice: string | null;
   /** The first read failed and nothing has loaded, so an empty list says nothing about the Pond. */
   failed: boolean;
   actions: {
@@ -118,7 +118,8 @@ export function useSecrets(): UseSecrets {
   const [draftKey, setDraftKeyText] = useState('');
   const [draftValue, setDraftValueText] = useState('');
   const [formError, setFormError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
+  // What the snackbar's Try again calls: the current `remove`, set below once it is made.
+  const retryRemove = useRef<(key: string) => Promise<boolean>>(async () => false);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
 
@@ -164,14 +165,12 @@ export function useSecrets(): UseSecrets {
 
   const startAdd = useCallback(() => {
     closeForm();
-    setNotice(null);
     setForm({ kind: 'add' });
   }, [closeForm]);
 
   const startReplace = useCallback(
     (key: string) => {
       closeForm();
-      setNotice(null);
       setForm({ kind: 'replace', key });
     },
     [closeForm],
@@ -210,17 +209,21 @@ export function useSecrets(): UseSecrets {
     setDraftValueText('');
     setSaving(true);
     setFormError(null);
-    setNotice(null);
     try {
       const result = await api.setSecret(key, value);
       writes.current += 1;
       setKeys((known) => sorted([...(known ?? []).map((row) => row.key), key]));
       const name = secretName(rowFor(key));
-      setNotice(
-        result.restartFailed.length > 0
-          ? i18n.t('secrets.savedRestartFailed', { name, extensions: result.restartFailed.join(', ') })
-          : i18n.t('secrets.saved', { name }),
-      );
+      if (result.restartFailed.length > 0) {
+        console.warn('[secrets] saved, restart failed', { extensions: result.restartFailed.length });
+        // Stored, but an extension still running on the old value is something to act on.
+        showSnackbar({
+          message: i18n.t('secrets.savedRestartFailed', { name, extensions: result.restartFailed.join(', ') }),
+          tone: 'danger',
+        });
+      } else {
+        showSnackbar({ message: i18n.t('secrets.saved', { name }) });
+      }
       setForm(null);
       setDraftKeyText('');
       return true;
@@ -239,18 +242,22 @@ export function useSecrets(): UseSecrets {
     async (key: string) => {
       if (busy) return false;
       setDeleting(key);
-      setError(null);
-      setNotice(null);
       try {
         await api.deleteSecret(key);
         writes.current += 1;
         setKeys((known) => (known ?? []).filter((row) => row.key !== key));
         if (form?.kind === 'replace' && form.key === key) closeForm();
-        setNotice(i18n.t('secrets.deleted', { name: secretName(rowFor(key)) }));
+        showSnackbar({ message: i18n.t('secrets.deleted', { name: secretName(rowFor(key)) }) });
         return true;
       } catch (e) {
         console.warn('[secrets] delete failed', { status: statusOf(e) });
-        setError(refusal(e) ?? i18n.t('errors.generic'));
+        // A refusal (403) is the Pond's decision, not a hiccup: asking again gets the same answer.
+        const refusedOutright = e instanceof ApiError && e.status === 403;
+        showSnackbar({
+          message: refusal(e) ?? i18n.t('errors.generic'),
+          tone: 'danger',
+          action: refusedOutright ? undefined : { label: i18n.t('common.retry'), onPress: () => void retryRemove.current(key) },
+        });
         return false;
       } finally {
         setDeleting(null);
@@ -258,16 +265,17 @@ export function useSecrets(): UseSecrets {
     },
     [busy, closeForm, form],
   );
+  useEffect(() => {
+    retryRemove.current = remove;
+  }, [remove]);
 
   return {
     data: { keys: keys ?? [], form, draftKey, draftValue, canSave },
     loading: reading && keys === null,
-    refreshing: reading && keys !== null,
     saving,
     deleting,
     error,
     formError,
-    notice,
     failed,
     actions: { refresh, startAdd, startReplace, cancel: closeForm, setDraftKey, setDraftValue, save, remove },
   };

@@ -136,6 +136,18 @@ response ink's own controls already have.
 6. **Add navigation entry** in `constants/navigation.ts` if it should appear in the Profile hub,
    with `labelKey` a `TranslationKey`. See [NAVIGATION.md](./NAVIGATION.md#every-route-has-to-lead-somewhere).
 
+## Feedback for actions
+
+What a tap came to goes in the snackbar, not in a notice that stays on the
+page: `useSnackbar().show({ message, tone, action })` from
+`providers/snackbar-provider.tsx` in a component, `showSnackbar` from
+`services/snackbar.ts` in a view-model or store. Confirmations are neutral;
+failures are danger, with a Try again action when sending the request again
+is cheap. A field's error, a form still open, and a standing condition stay
+inline with `InkNotice`; content that did not load is `ContentUnavailable`. The
+full rule, and the snackbar's timing, placement and accessibility, are in
+"Feedback for actions" in [VIEW-LAYER.md](./VIEW-LAYER.md).
+
 ## Existing Components
 
 ### Primitives (@jarida/ink/native)
@@ -150,7 +162,7 @@ See ink's own docs for full prop lists; these are the ones the app leans on.
 | InkRow, InkGroup | Settings-style rows and the group that titles them (the Profile hub) |
 | InkChoice, InkSegmented | Filters and segmented choices |
 | InkSwitch | Toggle switch |
-| InkNotice, InkEmptyState, InkSpinner, InkSkeleton | Status, empty and loading states |
+| InkNotice, InkEmptyState, InkSpinner, InkSkeleton | Standing conditions, field and form errors, empty and loading states. Not for what an action came to: that is the snackbar |
 | InkBadge, InkBubble | Badges; chat bubbles |
 | InkIcon | Ink's icon slot, resolving from the same registry as `GIcon` |
 | InkBottomBar, InkNavbar | The tab bar and screen title bars |
@@ -238,10 +250,19 @@ never saved by the phone. iOS still shows its Passwords key on any
 masked field; nothing here asks it to save one.
 
 ### Patterns (components/patterns/)
+
+Refreshing is a downward swipe on every screen of Pond content, never a button:
+the screen's scrollable takes `refreshControl={<RefreshControl {...pull} />}`
+with `pull = usePullToRefresh(reload)`, which also re-checks the connection when
+the strip says the Pond is unreachable. A section with its own read inside
+another component's scroll registers it with `useReloadOnPull`. See "Failure,
+offline and empty" in [VIEW-LAYER.md](./VIEW-LAYER.md).
+
 | Component | Props | Description |
 |-----------|-------|-------------|
 | ServerStatus | online, label | Whether the Pond is reachable, as a dot and a word |
-| ConnectionStatus | — | The connection banner; sends an unpaired or revoked phone to pairing. Silent until the saved pairing has loaded (`hydrated`), shows reconnecting only after 1.5 s (`RECONNECT_GRACE_MS`), and stays off first run, the pairing wizard and the scanner (`bannerHiddenOn`), which are the pairing it would offer |
+| ConnectionStatus | — | The connection banner, and the app's only statement that the Pond cannot be used: an icon and a sentence, with Pair as its one button for an unpaired, outdated or revoked phone (`connectionActionIsPairing`). It carries no Try again: another attempt is the screen's pull to refresh (`usePullToRefresh`), and screen readers get it as the sentence's `activate` action. Silent until the saved pairing has loaded (`hydrated`), shows reconnecting only after 1.5 s (`RECONNECT_GRACE_MS`), and stays off first run, the pairing wizard and the scanner (`bannerHiddenOn`), which are the pairing it would offer |
+| ContentUnavailable | state, reason?, onRetry, compact? | In place of content that did not arrive: a quiet waiting line while the banner is up, or a title, a sentence and the hint "Pull down to try again" when the read failed. No button in either; the hint's `activate` action calls `onRetry` for screen readers. Must sit inside the scrollable with the screen's `RefreshControl`. Chosen by `useContentState`; see "Failure, offline and empty" in [VIEW-LAYER.md](./VIEW-LAYER.md) |
 | RemoteAccessOffer | — | Home's dismissible offer of remote access to a Pond paired without it |
 | PondList | title, ponds, phase, onSelect | The Ponds on this network, shared by first run and Switch Pond; an unclaimed one is badged "Not set up" with its card id |
 | PondGettingReady | — | Home's card for a Pond just set up, until Goose can answer; mounted only then, so Home reads no models otherwise |

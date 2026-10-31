@@ -27,14 +27,8 @@
  * so it is disabled rather than offering a deletion that does nothing.
  */
 
-import React, { useState, useCallback, useMemo } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  FlatList,
-  ScrollView,
-} from 'react-native';
+import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
+import { FlatList, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { useTranslation } from 'react-i18next';
 import {
@@ -62,10 +56,15 @@ import {
   parsePondLogTime,
   type ActivityFilter,
 } from '@/models/log';
+import { ContentUnavailable } from '@/components/patterns/content-unavailable';
+import { isUnavailable } from '@/models/content-state';
 import { describeActivityError, useActivity } from '@/view-models/use-activity';
+import { useContentState } from '@/view-models/use-content-state';
+import { usePullToRefresh } from '@/view-models/use-pull-to-refresh';
 import { useActivitySummary } from '@/view-models/use-activity-summary';
 import { useConversationTelemetry, useConversationTurns } from '@/view-models/use-conversation-telemetry';
 import { useLogExport } from '@/view-models/use-log-export';
+import { useSnackbar } from '@/providers/snackbar-provider';
 import { useProblems } from '@/view-models/use-problems';
 import { formatRelativeTime } from '@/view-models/use-recent-sessions';
 import { Grey, Semantic } from '@/constants/colors';
@@ -165,10 +164,11 @@ export default function ActivityScreen() {
 
   const [confirmingClear, setConfirmingClear] = useState(false);
   const [clearing, setClearing] = useState(false);
-  const [clearResult, setClearResult] = useState<{ tone: 'success' | 'danger'; text: string } | null>(null);
+  const snackbar = useSnackbar();
+  // What the snackbar's Try again calls: the current `clearActivity`, set below once it is made.
+  const retryClear = useRef<() => Promise<void>>(async () => {});
   const askClear = useCallback(() => {
     void caution();
-    setClearResult(null);
     setConfirmingClear(true);
   }, []);
   const clearActivity = useCallback(async () => {
@@ -177,15 +177,24 @@ export default function ActivityScreen() {
     try {
       const purged = await activity.actions.clear();
       void confirm();
-      setClearResult({ tone: 'success', text: t('activity.clear.done', { count: purged }) });
+      snackbar.show({ message: t('activity.clear.done', { count: purged }) });
       void activitySummary.actions.refresh();
     } catch (e) {
-      // Somebody asked for this: a failure is said even when the banner explains why.
-      setClearResult({ tone: 'danger', text: describeActivityError(e) ?? t('activity.clear.failed') });
+      console.warn('[activity] clear failed', e instanceof Error ? e.name : 'unknown');
+      // Somebody asked for this: a failure is said even when the banner explains why. Try again
+      // clears what they already agreed to clear; it does not ask a second time.
+      snackbar.show({
+        message: describeActivityError(e) ?? t('activity.clear.failed'),
+        tone: 'danger',
+        action: { label: t('common.retry'), onPress: () => void retryClear.current() },
+      });
     } finally {
       setClearing(false);
     }
-  }, [activity.actions, activitySummary.actions, t]);
+  }, [activity.actions, activitySummary.actions, snackbar, t]);
+  useEffect(() => {
+    retryClear.current = clearActivity;
+  }, [clearActivity]);
   const [turnsOpen, setTurnsOpen] = useState(false);
   const openTurns = useCallback(() => {
     if (!latest) return;
@@ -196,6 +205,15 @@ export default function ActivityScreen() {
   const { loading, error, actions } = showingProblems ? problems : activity;
   const failed = showingProblems ? problems.failed : activity.failed;
   const data = activity.data;
+  const shownCount = showingProblems ? problems.data.problems.length : data.events.length;
+  const state = useContentState({ loading, failed: failed || error !== null, hasContent: shownCount > 0 });
+  const unavailable = isUnavailable(state);
+  // The feed's pull also reads today's summary above it; the problems tab is its one list.
+  const reloadShown = useCallback(
+    () => (showingProblems ? actions.refresh() : Promise.all([actions.refresh(), activitySummary.actions.refresh()])),
+    [actions, activitySummary.actions, showingProblems],
+  );
+  const pull = usePullToRefresh(reloadShown);
 
   const renderItem = useCallback(
     ({ item }: { item: ActivityEvent }) => <EventRow item={item} showType={activeTab === 'all'} />,
@@ -219,22 +237,14 @@ export default function ActivityScreen() {
           >
             {logExport.exporting ? t('activity.export.exporting') : t('activity.export.button')}
           </InkButton>
-          {logExport.error ? <InkNotice tone="danger">{logExport.error}</InkNotice> : null}
         </View>
       ) : null}
       {!showingProblems && summary && summary.total > 0 ? <TodayStrip summary={summary} /> : null}
       {!showingProblems && latest ? <TelemetryCard latest={latest} onOpen={openTurns} /> : null}
-      {!showingProblems && clearResult ? <InkNotice tone={clearResult.tone}>{clearResult.text}</InkNotice> : null}
       {loading ? <InkSpinner label={t('activity.loading')} /> : null}
-      {/* A failed read with nothing to add still says so: the connection banner gives the cause. */}
-      {error || failed ? (
-        <View style={styles.notice}>
-          <InkNotice tone="danger">{error ?? (showingProblems ? t('activity.problemsFailed') : t('activity.failed'))}</InkNotice>
-          <InkButton variant="quiet" icon="refresh" onPress={actions.refresh}>
-            {t('common.retry')}
-          </InkButton>
-        </View>
-      ) : null}
+      {/* A refused refresh above the list it left in place. A list that never arrived is said
+          once, in the list's own place below. */}
+      {!unavailable && error ? <InkNotice tone="danger">{error}</InkNotice> : null}
     </>
   );
 
@@ -283,9 +293,12 @@ export default function ActivityScreen() {
           renderItem={renderProblem}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
+          refreshControl={<RefreshControl {...pull} />}
           ListHeaderComponent={header}
           ListEmptyComponent={
-            !loading && !error && !failed ? (
+            unavailable ? (
+              <ContentUnavailable state={state} reason={error} onRetry={actions.refresh} />
+            ) : state === 'empty' ? (
               <InkEmptyState icon="check" title={t('activity.noProblems')}>
                 <InkText>{t('activity.noProblemsBody')}</InkText>
               </InkEmptyState>
@@ -301,10 +314,13 @@ export default function ActivityScreen() {
           maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
+          refreshControl={<RefreshControl {...pull} />}
           ListHeaderComponent={header}
           // A list that failed to load is unknown, not empty.
           ListEmptyComponent={
-            !loading && !error && !failed ? (
+            unavailable ? (
+              <ContentUnavailable state={state} reason={error} onRetry={actions.refresh} />
+            ) : state === 'empty' ? (
               <InkEmptyState icon="logs" title={t('activity.empty')}>
                 <InkText>{t('activity.emptyBody')}</InkText>
               </InkEmptyState>

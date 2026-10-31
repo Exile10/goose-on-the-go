@@ -4,16 +4,18 @@
  */
 
 import React from 'react';
+import { RefreshControl } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 
 import { RadioRow } from '@/components/settings/setting-controls';
 import { SettingsGroup, SettingsHeader, SettingsRow, TILE_INSET } from '@/components/settings/settings-list';
-import { SettingsNotice, SettingsScroll } from '@/components/settings/settings-scroll';
+import { SettingsScroll } from '@/components/settings/settings-scroll';
 import { candidatesFor, formatMegabytes, MODEL_ROLES, rollbackTarget, titleOf } from '@/models/model-library';
 import { selectionTick } from '@/services/haptics';
 import type { ModelRole } from '@/services/types';
 import { roleAboutKey, roleLabelKey, useModelLibrary } from '@/view-models/use-model-library';
+import { usePullToRefresh } from '@/view-models/use-pull-to-refresh';
 
 export default function ModelRoleScreen() {
   const { t } = useTranslation();
@@ -21,13 +23,13 @@ export default function ModelRoleScreen() {
   const params = useLocalSearchParams<{ role?: string }>();
   const role: ModelRole = MODEL_ROLES.includes(params.role as ModelRole) ? (params.role as ModelRole) : 'chat';
   const lib = useModelLibrary();
+  const pull = usePullToRefresh(lib.actions.refresh);
   const candidates = candidatesFor(lib.models, role);
   const lastWorking = rollbackTarget(lib.models, role, lib.lastWorking[role]);
 
   return (
-    <SettingsScroll>
+    <SettingsScroll refreshControl={<RefreshControl {...pull} />}>
       <SettingsHeader icon="models" tile="purple" title={t(roleLabelKey(role))} description={t(roleAboutKey(role))} />
-      {lib.notice ? <SettingsNotice tone={lib.notice.tone === 'danger' ? 'danger' : 'neutral'}>{lib.notice.text}</SettingsNotice> : null}
       {lastWorking ? (
         <SettingsGroup inset={TILE_INSET}>
           <SettingsRow

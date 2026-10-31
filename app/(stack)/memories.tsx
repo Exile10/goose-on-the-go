@@ -7,10 +7,14 @@
  */
 
 import React, { useCallback, useState } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { InkButton, InkChip, InkEmptyState, InkNotice, InkSpinner, InkText } from '@jarida/ink/native';
 
+import { ContentUnavailable } from '@/components/patterns/content-unavailable';
+import { isUnavailable } from '@/models/content-state';
+import { useContentState } from '@/view-models/use-content-state';
+import { usePullToRefresh } from '@/view-models/use-pull-to-refresh';
 import { ConsolidationCard } from '@/components/patterns/consolidation-card';
 import { MemoryCard } from '@/components/patterns/memory-card';
 import { MemorySheet } from '@/components/patterns/memory-sheet';
@@ -28,6 +32,11 @@ export default function MemoriesScreen() {
   const styles = useThemedStyles(makeStyles);
   const confirm = useConfirm();
   const { data, loading, error, failed, actions } = useMemories();
+  // A refused refresh with the list still on screen is said above it; a list that never arrived is
+  // said once, in its place.
+  const state = useContentState({ loading, failed: failed || error !== null, hasContent: data.memories.length > 0 });
+  const pull = usePullToRefresh(actions.refresh);
+  const unavailable = isUnavailable(state);
   const consolidation = useConsolidation(actions.refresh);
   const [filter, setFilter] = useState<MemorySegment | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -66,10 +75,10 @@ export default function MemoriesScreen() {
       contentContainerStyle={styles.scroll}
       showsVerticalScrollIndicator={false}
       keyboardShouldPersistTaps="handled"
+      refreshControl={<RefreshControl {...pull} />}
     >
       <ConsolidationCard
         progress={consolidation.progress}
-        stopError={consolidation.stopError}
         available={consolidation.available}
         onStart={consolidation.actions.start}
         onStop={consolidation.actions.stop}
@@ -96,17 +105,13 @@ export default function MemoriesScreen() {
 
       {loading ? <InkSpinner label={t('memories.list.loading')} /> : null}
 
-      {/* A failed read with no sentence of its own still leaves the list unknown. */}
-      {error || failed ? (
-        <View style={styles.notice}>
-          <InkNotice tone="danger">{error ?? t('memories.list.failed')}</InkNotice>
-          <InkButton variant="quiet" icon="refresh" onPress={actions.refresh}>
-            {t('common.retry')}
-          </InkButton>
-        </View>
+      {unavailable ? (
+        <ContentUnavailable state={state} reason={error} onRetry={actions.refresh} />
+      ) : error ? (
+        <InkNotice tone="danger">{error}</InkNotice>
       ) : null}
 
-      {!loading && !error && !failed && data.memories.length === 0 ? (
+      {state === 'empty' ? (
         <InkEmptyState icon="sparkle" title={t('memories.list.emptyTitle')}>
           <InkText>{t('memories.list.emptyBody')}</InkText>
         </InkEmptyState>
@@ -135,5 +140,4 @@ const makeStyles = (c: ThemeColors) =>
     scroll: { padding: Spacing.lg, gap: Spacing.md, paddingBottom: Spacing['4xl'] },
     header: { flexDirection: 'row', justifyContent: 'flex-end' },
     chips: { gap: Spacing.sm },
-    notice: { gap: Spacing.sm },
   });

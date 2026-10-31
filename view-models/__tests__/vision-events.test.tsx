@@ -8,6 +8,7 @@ import React from 'react';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 
 import { ApiError, api } from '@/services/api-client';
+import { currentSnackbar, resetSnackbar } from '@/services/snackbar';
 import type { CameraEvent } from '@/services/types';
 import {
   STREAM_RETRY_MAX_MS,
@@ -108,6 +109,7 @@ beforeAll(() => {
 });
 
 beforeEach(() => {
+  resetSnackbar();
   jest.resetAllMocks();
   server.hydrated = true;
   screen.active = true;
@@ -179,7 +181,7 @@ describe('reading', () => {
     const m = await mount('camera-1');
 
     expect(m.vm.failed).toBe(true);
-    expect(m.vm.error).toBe('Your Pond is busy. Try again in a moment.');
+    expect(m.vm.error).toBe('Your Pond is busy right now.');
     expect(m.vm.data.events).toEqual([]);
     await m.unmount();
   });
@@ -202,7 +204,7 @@ describe('reading', () => {
 
     await act(async () => m.vm.actions.refresh());
 
-    expect(m.vm.error).toBe('Your Pond is busy. Try again in a moment.');
+    expect(m.vm.error).toBe('Your Pond is busy right now.');
     expect(m.vm.failed).toBe(false);
     expect(m.vm.data.events).toHaveLength(1);
     await m.unmount();
@@ -251,7 +253,7 @@ describe('acknowledging', () => {
     await m.unmount();
   });
 
-  it('a refusal leaves the event new, says so, and is not wiped by a read-back', async () => {
+  it('a refusal leaves the event new, and says so with Try again', async () => {
     pond.listCameraEvents.mockResolvedValue([event({ id: 7 })]);
     pond.acknowledgeCameraEvent.mockRejectedValue(new TypeError('Network request failed'));
     const m = await mount('camera-1');
@@ -259,8 +261,13 @@ describe('acknowledging', () => {
     await act(async () => m.vm.actions.acknowledge(m.vm.data.events[0]));
 
     expect(m.vm.data.events[0].acknowledged).toBe(false);
-    expect(m.vm.error).toBe('Could not acknowledge that event. Try again.');
+    expect(m.vm.error).toBeNull();
+    expect(currentSnackbar()).toMatchObject({ tone: 'danger', message: 'Could not acknowledge that event.' });
     expect(pond.listCameraEvents).toHaveBeenCalledTimes(1);
+
+    pond.acknowledgeCameraEvent.mockResolvedValue();
+    await act(async () => currentSnackbar()?.action?.onPress());
+    expect(pond.acknowledgeCameraEvent).toHaveBeenCalledTimes(2);
     await m.unmount();
   });
 });

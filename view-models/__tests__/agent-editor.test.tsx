@@ -202,7 +202,7 @@ describe('saving a change', () => {
     await act(async () => m.vm.actions.setField('instructions', 'New words.'));
     expect(await save(m)).toBeNull();
     expect(pond.updateRecipe).not.toHaveBeenCalled();
-    expect(m.vm.error).toBe('Your Pond is busy. Try again in a moment.');
+    expect(m.vm.error).toBe('Your Pond is busy right now.');
     expect(m.vm.data.form.instructions).toBe('New words.');
     await m.unmount();
   });

@@ -30,7 +30,7 @@ import i18n from '@/services/i18n';
 export function describeApiError(e: unknown): string | null {
   // Not an ApiError means the request never got an answer, which is a statement
   // about the connection rather than about this screen's operation. The banner
-  // already says "Pond is unavailable", and the failure that produced this also
+  // already says "Cannot reach your Pond", and the failure that produced this also
   // drove the recovery that put it there, so a screen repeating it underneath
   // is the same fact twice.
   if (!(e instanceof ApiError)) return null;
@@ -48,4 +48,21 @@ export function refusalReason(e: unknown): string | null {
   if (!(e instanceof ApiError)) return null;
   const reason = (e.body as { reason?: unknown } | null)?.reason;
   return typeof reason === 'string' && reason ? reason : null;
+}
+
+/**
+ * What kind of failure `e` was, for a log line and never for a screen: `http_<status>` for a
+ * refusal, `busy_<status>` for one worth retrying, `network` for a request that got no answer.
+ */
+export function failureKind(e: unknown): string {
+  if (e instanceof ApiError) return `${e.isRetryable ? 'busy' : 'http'}_${e.status}`;
+  return 'network';
+}
+
+/**
+ * The engineer's half of a failure the reader is told about in words: one warn line, tagged with
+ * where it happened and `kind=`, so the status code and cause are in the log rather than on screen.
+ */
+export function logFailure(scope: string, what: string, e: unknown): void {
+  console.warn(`[${scope}] ${what} kind=${failureKind(e)}`);
 }

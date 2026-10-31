@@ -13,6 +13,10 @@ import { RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'r
 import { useTranslation } from 'react-i18next';
 import { InkButton, InkCard, InkNotice, InkSpinner, InkText, InkTitle, inkText, useInkTheme } from '@jarida/ink/native';
 
+import { ContentUnavailable } from '@/components/patterns/content-unavailable';
+import { isUnavailable } from '@/models/content-state';
+import { useContentState } from '@/view-models/use-content-state';
+import { usePullToRefresh } from '@/view-models/use-pull-to-refresh';
 import { GKeyboardView } from '@/components/ui/g-keyboard-view';
 import { Semantic } from '@/constants/colors';
 import type { ThemeColors } from '@/constants/colors';
@@ -31,9 +35,13 @@ export default function SecretsScreen() {
   const theme = useInkTheme();
   // Not `confirm`: that name is the success haptic here.
   const ask = useConfirm();
-  const { data, loading, refreshing, saving, deleting, error, formError, notice, failed, actions } = useSecrets();
+  const { data, loading, saving, deleting, error, formError, failed, actions } = useSecrets();
+  const pull = usePullToRefresh(actions.refresh);
 
   const busy = saving || deleting !== null;
+  // The page is a form over what the Pond holds, so it has content once a read has worked.
+  const state = useContentState({ loading, failed, hasContent: !loading && !failed });
+  const unavailable = isUnavailable(state);
   const form = data.form;
 
   const handleSave = useCallback(async () => {
@@ -56,8 +64,6 @@ export default function SecretsScreen() {
     [actions, ask, t],
   );
 
-  const handleRefresh = useCallback(() => void actions.refresh(), [actions]);
-
   const errorText = inkText(theme, { size: 'sm', weight: theme.weight.medium, color: theme.color.dangerFg });
   const replacing = form?.kind === 'replace' ? data.keys.find((row) => row.key === form.key) ?? { key: form.key, labelKey: null } : null;
 
@@ -68,7 +74,7 @@ export default function SecretsScreen() {
         contentContainerStyle={styles.scroll}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
+        refreshControl={<RefreshControl {...pull} />}
       >
         <InkText size="sm" tone="secondary">
           {t('secrets.intro')}
@@ -76,20 +82,10 @@ export default function SecretsScreen() {
 
         {loading ? <InkSpinner label={t('secrets.loading')} /> : null}
 
-        {/* Polite, so a save or a deletion is announced as the line appears. */}
-        <View accessibilityLiveRegion="polite">
-          {notice ? <InkNotice tone="success">{notice}</InkNotice> : null}
-        </View>
-
-        {error ? <InkNotice tone="danger">{error}</InkNotice> : null}
-
-        {failed ? (
-          <View style={styles.notice}>
-            {error ? null : <InkNotice tone="danger">{t('secrets.loadFailed')}</InkNotice>}
-            <InkButton variant="quiet" icon="refresh" onPress={handleRefresh}>
-              {t('common.retry')}
-            </InkButton>
-          </View>
+        {unavailable ? (
+          <ContentUnavailable state={state} reason={error} onRetry={actions.refresh} />
+        ) : error ? (
+          <InkNotice tone="danger">{error}</InkNotice>
         ) : null}
 
         {!loading && !failed ? (
@@ -213,7 +209,6 @@ const makeStyles = (c: ThemeColors) =>
   StyleSheet.create({
     container: { flex: 1, backgroundColor: c.background },
     scroll: { padding: Spacing.lg, gap: Spacing.lg, paddingBottom: Spacing['3xl'] },
-    notice: { gap: Spacing.sm },
     card: { gap: Spacing.md },
     row: { gap: Spacing.xs },
     rowText: { gap: Spacing.xs },

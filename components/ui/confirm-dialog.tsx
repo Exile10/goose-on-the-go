@@ -10,7 +10,7 @@
  * Every way out that is not one of the actions is Cancel: the Cancel button, a tap on the
  * backdrop, Android's back button and the iOS two-finger scrub.
  *
- * Callers do not render this directly; `useConfirm()` and `useChoice()` from
+ * Callers do not render this directly; `useConfirm()`, `useChoice()` and `useInform()` from
  * `providers/confirm-provider.tsx` do, so a call site reads as `if (await confirm(...))`.
  */
 
@@ -32,12 +32,14 @@ export interface ConfirmDialogProps {
   /** The safe answer's words; Cancel when left out. */
   cancelLabel?: string;
   actions: readonly ConfirmDialogAction[];
+  /** What the dismiss button says, when it is not Cancel: OK, for a dialog with nothing to decide. */
+  dismissLabel?: string;
   /** The index into `actions` of the answer chosen. */
   onAction: (index: number) => void;
   onCancel: () => void;
 }
 
-export function ConfirmDialog({ open, title, message, cancelLabel, actions, onAction, onCancel }: ConfirmDialogProps) {
+export function ConfirmDialog({ open, title, message, cancelLabel, actions, dismissLabel, onAction, onCancel }: ConfirmDialogProps) {
   const { t } = useTranslation();
   const theme = useInkTheme();
   const titleRef = useRef<Text>(null);
@@ -110,7 +112,7 @@ export function ConfirmDialog({ open, title, message, cancelLabel, actions, onAc
                   }}
                 >
                   <InkButton variant="quiet" onPress={onCancel}>
-                    {cancelLabel ?? t('common.cancel')}
+                    {cancelLabel ?? dismissLabel ?? t('common.cancel')}
                   </InkButton>
                   {actions.map((action, index) => (
                     <InkButton key={action.label} variant={action.variant} onPress={() => onAction(index)}>

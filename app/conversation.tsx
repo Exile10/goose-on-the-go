@@ -333,12 +333,6 @@ export default function ChatScreen() {
           ]}
         />
 
-        {!online && hydrated ? (
-          <View style={styles.notice}>
-            <InkNotice tone="warning">{t('chat.offlineBody')}</InkNotice>
-          </View>
-        ) : null}
-
         {shown ? (
           <GPressable
             feedback="tint"

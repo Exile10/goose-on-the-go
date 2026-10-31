@@ -9,15 +9,19 @@
  */
 
 import React, { useCallback, useState } from 'react';
-import { Text, View } from 'react-native';
+import { RefreshControl, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { InkButton, InkEmptyState, InkNotice, InkSpinner, InkText } from '@jarida/ink/native';
+import { InkButton, InkEmptyState, InkSpinner, InkText } from '@jarida/ink/native';
 
+import { ContentUnavailable } from '@/components/patterns/content-unavailable';
+import { isUnavailable } from '@/models/content-state';
+import { useContentState } from '@/view-models/use-content-state';
+import { usePullToRefresh } from '@/view-models/use-pull-to-refresh';
 import { AutomationCard } from '@/components/patterns/automation-card';
 import { AutomationFormSheet } from '@/components/patterns/automation-form-sheet';
-import { SettingsGroup, SettingsHeader, SettingsMessage, SettingsRow } from '@/components/settings/settings-list';
-import { SettingsScroll } from '@/components/settings/settings-scroll';
+import { SettingsGroup, SettingsHeader, SettingsRow } from '@/components/settings/settings-list';
+import { SettingsNotice, SettingsScroll } from '@/components/settings/settings-scroll';
 import { useSettingsStyles, type SettingsType } from '@/components/settings/settings-theme';
 import { Spacing } from '@/constants/spacing';
 import type { PeopleBlock, Starter } from '@/models/vision';
@@ -45,7 +49,10 @@ export default function VisionAutomationsScreen() {
   const { t } = useTranslation();
   const router = useRouter();
   const styles = useSettingsStyles(makeStyles);
-  const { data, loading, error, failed, adding, addError, actions } = useVisionAutomations();
+  const { data, loading, error, failed, adding, actions } = useVisionAutomations();
+  const state = useContentState({ loading, failed: failed || error !== null, hasContent: data.rules.length > 0 });
+  const unavailable = isUnavailable(state);
+  const pull = usePullToRefresh(actions.refresh);
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState<Rule | null>(null);
 
@@ -74,7 +81,7 @@ export default function VisionAutomationsScreen() {
   ) : null;
 
   return (
-    <SettingsScroll>
+    <SettingsScroll refreshControl={<RefreshControl {...pull} />}>
       <SettingsHeader icon="bolt" tile="amber" title={t('screens.visionAutomations')} description={t('visionAutomations.intro')} />
 
       <View style={styles.actions}>
@@ -82,12 +89,6 @@ export default function VisionAutomationsScreen() {
           {t('visionAutomations.new')}
         </InkButton>
       </View>
-
-      {addError ? (
-        <View style={styles.block}>
-          <InkNotice tone="danger">{addError}</InkNotice>
-        </View>
-      ) : null}
 
       {data.starters.length > 0 || blockedNote ? (
         <SettingsGroup title={t('visionAutomations.startersTitle')} footer={blockedNote}>
@@ -108,17 +109,13 @@ export default function VisionAutomationsScreen() {
 
       {loading ? <InkSpinner label={t('visionAutomations.loading')} /> : null}
 
-      {/* A failed read with no sentence of its own still leaves the list unknown. */}
-      {error || failed ? (
-        <View style={styles.block}>
-          <SettingsMessage tone="danger">{error ?? t('visionAutomations.failed')}</SettingsMessage>
-          <InkButton variant="quiet" icon="refresh" onPress={actions.refresh}>
-            {t('common.retry')}
-          </InkButton>
-        </View>
+      {unavailable ? (
+        <ContentUnavailable state={state} reason={error} onRetry={actions.refresh} />
+      ) : error ? (
+        <SettingsNotice tone="danger">{error}</SettingsNotice>
       ) : null}
 
-      {!loading && !error && !failed && data.rules.length === 0 ? (
+      {state === 'empty' ? (
         <InkEmptyState icon="bolt" title={t('visionAutomations.emptyTitle')}>
           <InkText>{t('visionAutomations.emptyBody')}</InkText>
         </InkEmptyState>
@@ -163,7 +160,6 @@ export default function VisionAutomationsScreen() {
 
 const makeStyles = (_c: unknown, type: SettingsType) => ({
   actions: { flexDirection: 'row' as const, justifyContent: 'flex-start' as const, marginBottom: Spacing.xl },
-  block: { gap: Spacing.sm, marginBottom: Spacing.xl },
   list: { gap: Spacing.md },
   footer: { gap: Spacing.xs, alignItems: 'flex-start' as const, marginTop: Spacing.sm },
   title: type.eyebrow,

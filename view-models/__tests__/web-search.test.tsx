@@ -15,6 +15,7 @@ import * as WebBrowser from 'expo-web-browser';
 
 import { BRAVE_DASHBOARD_URL } from '@/models/web-search';
 import { ApiError, api } from '@/services/api-client';
+import { currentSnackbar, resetSnackbar } from '@/services/snackbar';
 import type { WebSearchState, WebSearchStatus } from '@/services/types';
 import { nearbyNote, statusLabel, useWebSearch, type UseWebSearch } from '@/view-models/use-web-search';
 
@@ -112,6 +113,7 @@ beforeAll(() => {
 
 beforeEach(() => {
   jest.resetAllMocks();
+  resetSnackbar();
   jest.mocked(WebBrowser.openBrowserAsync).mockResolvedValue({ type: 'opened' } as never);
   server.hydrated = true;
   server.real = true;
@@ -308,11 +310,11 @@ describe('saving a key', () => {
   });
 
   it.each<[string, unknown, string]>([
-    ['a busy Pond', refusal(503), 'Your Pond is busy. Try again in a moment.'],
-    ['a rate limit', refusal(429), 'Your Pond is busy. Try again in a moment.'],
+    ['a busy Pond', refusal(503), 'Your Pond is busy right now.'],
+    ['a rate limit', refusal(429), 'Your Pond is busy right now.'],
     // The connection banner says a 401 already, and an action just taken must still not be silent.
-    ['a refused session', refusal(401), 'Your Pond could not complete that request.'],
-    ['no answer at all', new TypeError('Network request failed'), 'Your Pond could not complete that request.'],
+    ['a refused session', refusal(401), 'Your Pond could not finish that.'],
+    ['no answer at all', new TypeError('Network request failed'), 'Your Pond could not finish that.'],
   ])('says so, in words, on %s', async (_name, failure, sentence) => {
     web.setWebSearchKey.mockRejectedValue(failure);
     const m = await mount();
@@ -436,7 +438,11 @@ describe('removing the key', () => {
     expect(removed).toBe(false);
     expect(m.vm.data.configured).toBe(true);
     expect(m.vm.data.status).toBe('ok');
-    expect(m.vm.error).toBe('Your Pond is busy. Try again in a moment.');
+    // The page loaded; only the removal failed, so the page is not drawn as failed.
+    expect(m.vm.error).toBeNull();
+    expect(currentSnackbar()).toMatchObject({ tone: 'danger', message: 'Your Pond is busy right now.' });
+    await act(async () => currentSnackbar()?.action?.onPress());
+    expect(web.removeWebSearchKey).toHaveBeenCalledTimes(2);
     await m.unmount();
   });
 
@@ -482,7 +488,7 @@ describe('when the read does not go to plan', () => {
     const m = await mount();
 
     expect(m.vm.failed).toBe(true);
-    expect(m.vm.error).toBe('Your Pond is busy. Try again in a moment.');
+    expect(m.vm.error).toBe('Your Pond is busy right now.');
     expect(m.vm.data.status).toBeNull();
 
     web.webSearchState.mockResolvedValue(stored('ok'));
@@ -554,7 +560,7 @@ describe('when the read does not go to plan', () => {
     await m.unmount();
   });
 
-  it('marks a pull to refresh over a status already on screen, rather than a first load', async () => {
+  it('keeps a status already on screen while it is read again, rather than going back to loading', async () => {
     web.webSearchState.mockResolvedValueOnce(stored('ok'));
     const m = await mount();
     const again = deferred<WebSearchState>();
@@ -565,14 +571,13 @@ describe('when the read does not go to plan', () => {
       reading = m.vm.actions.refresh();
     });
 
-    expect(m.vm.refreshing).toBe(true);
     expect(m.vm.loading).toBe(false);
 
     await act(async () => {
       again.resolve(stored('ok'));
       await reading;
     });
-    expect(m.vm.refreshing).toBe(false);
+    expect(m.vm.loading).toBe(false);
     await m.unmount();
   });
 });

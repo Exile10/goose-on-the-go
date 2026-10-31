@@ -8,10 +8,11 @@
  * settings and the faces have been read, so nothing flashes in and then goes.
  */
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { buildStarters, cameraRules, peopleBlock, type PeopleBlock, type Starter } from '@/models/vision';
 import i18n from '@/services/i18n';
+import { showSnackbar } from '@/services/snackbar';
 import type { Rule, RuleRequest } from '@/services/types';
 import { useFaces } from './use-faces';
 import { usePondSettings } from './use-pond-settings';
@@ -29,10 +30,8 @@ export interface UseVisionAutomations {
   loading: boolean;
   error: string | null;
   failed: boolean;
-  /** Starter ids with an add on its way to the Pond. */
+  /** Starter ids with an add on its way to the Pond. A refusal is said in the snackbar. */
   adding: ReadonlySet<string>;
-  /** Why the last add was refused, or null. */
-  addError: string | null;
   actions: {
     refresh: () => Promise<void>;
     /** One tap: resolves to whether the Pond kept it. */
@@ -49,7 +48,8 @@ export function useVisionAutomations(): UseVisionAutomations {
   const faces = useFaces();
   const settings = usePondSettings();
   const [adding, setAdding] = useState<ReadonlySet<string>>(() => new Set());
-  const [addError, setAddError] = useState<string | null>(null);
+  // What the snackbar's Try again calls: the current `add`, set below once it is made.
+  const retry = useRef<(starter: Starter) => Promise<boolean>>(async () => false);
 
   const mine = useMemo(() => cameraRules(rules.data.rules), [rules.data.rules]);
   const s = settings.settings;
@@ -75,18 +75,26 @@ export function useVisionAutomations(): UseVisionAutomations {
   const add = useCallback(
     async (starter: Starter) => {
       setAdding((current) => new Set(current).add(starter.id));
-      setAddError(null);
       const refused = await create(starter.request);
       setAdding((current) => {
         const next = new Set(current);
         next.delete(starter.id);
         return next;
       });
-      if (refused) setAddError(refused || i18n.t('visionAutomations.addFailed'));
+      if (refused !== null) {
+        showSnackbar({
+          message: refused || i18n.t('visionAutomations.addFailed'),
+          tone: 'danger',
+          action: { label: i18n.t('common.retry'), onPress: () => void retry.current(starter) },
+        });
+      }
       return refused === null;
     },
     [create],
   );
+  useEffect(() => {
+    retry.current = add;
+  }, [add]);
 
   return {
     data: { rules: mine, starters, peopleBlock: block, nameOf: faces.nameOf },
@@ -94,7 +102,6 @@ export function useVisionAutomations(): UseVisionAutomations {
     error: rules.error,
     failed: rules.failed,
     adding,
-    addError,
     actions: { ...rules.actions, add },
   };
 }
