@@ -1,6 +1,8 @@
 # Home — carrying the Pond's ideas, and reading denser
 
-Status: **proposal**, written 2026-10-31. Nothing here is built.
+Status: **proposal**, written 2026-10-31, and built in #214. Two constraints below were wrong
+when first written and are corrected in place: today's counts need no change to the Developer
+toggle, and the fixed starters do not belong on Home.
 
 The question it answers: can Home carry the ideas the Pond already composes, and say more per
 screenful, without the household learning anything new and without a new dependency.
@@ -120,11 +122,11 @@ These are the things that will cost a day each if they are met at the end rather
    this — `sessionLabel()` mints `gotg-suggestions-<32 hex>`, which satisfies the not-blank rule
    and names no session. Home does the same, once per visit, and never reuses a real id.
 
-2. **Today's counts are behind the Developer toggle.** `useActivitySummary` gates its source on
-   `isScreenReal('logs')` and falls back to `SAMPLE_SUMMARY`. On Home that gate is wrong — a
-   household would see sample numbers. Either the summary comes out from behind the toggle, or
-   Home gets its own read of `GET /activity/summary?window=day`. This is a decision, not a detail:
-   it makes the counts a household-facing surface.
+2. **Today's counts need no change.** `useActivitySummary` gates its source on
+   `isScreenReal('logs')`, which reads like a Developer-only surface and is not one: `logs` is in
+   `REAL_BY_DEFAULT`, and `resolveScreenReal` returns the default in any build where `__DEV__` is
+   false. A household already reads the real Pond. The hook can be used as it stands; only a dev
+   build with the toggle flipped to mock shows `SAMPLE_SUMMARY`, which is what that toggle is for.
 
 3. **There is no forecast route, and this is the one item that cannot be built from the phone.**
    `GET /api/v1/weather` answers `{ enabled, temp, location_name }` — a current temperature and
@@ -135,18 +137,24 @@ These are the things that will cost a day each if they are met at the end rather
    with its location name; a high and low is a Pond-side change, and it is separable from
    everything else here.
 
-4. **Dismissal is final**, so Home links to reminders rather than dismissing them inline.
+4. **The fixed starters do not belong on Home.** `useSuggestions` keeps them on screen when the
+   Pond has none, which is right in a conversation about to be started: a row of chips that
+   empties reads as broken. On Home it would mean the same three chips every day under "Ideas
+   from your Pond", and the section could never be absent. Home shows only prompts carrying a
+   Pond id.
 
-5. **Strings carried as data are `TranslationKey`, not `string`**, and `t()` is never called at
+5. **Dismissal is final**, so Home links to reminders rather than dismissing them inline.
+
+6. **Strings carried as data are `TranslationKey`, not `string`**, and `t()` is never called at
    module scope — a constant is evaluated at import, before i18next has a language, and freezes
-   there. New keys go under `home.*`, which already holds `chipOnline` and `chipOutdoorTemp`.
+   there. New keys go under `home.*`, beside the greetings and the section headings.
 
-6. **The bottom bar reserves its own strip.** Home already clears it with
+7. **The bottom bar reserves its own strip.** Home already clears it with
    `paddingBottom: useBottomBarInset()`. A new section must not reintroduce a hardcoded spacer.
 
-7. **`InkCard` already has a face and a plate.** A proposal card's own style carries layout only.
+8. **`InkCard` already has a face and a plate.** A proposal card's own style carries layout only.
 
-8. **A read that failed is not an empty list.** Home already distinguishes them — today with an
+9. **A read that failed is not an empty list.** Home already distinguishes them — today with an
    `InkNotice tone="danger"` against an `InkEmptyState`, and with the `ContentUnavailable` pattern
    once #196 lands. The new section follows whichever is current: a failed read of proposals must
    not read as "no ideas".
