@@ -1,5 +1,6 @@
 // Deep research from the composer, against the contract in goose-in-a-pond's feat/deep-research: what
-// the menu offers, what the stream is sent, what a refusal says, and that the card finds the task.
+// the menu offers, what the stream is sent, what a refusal says, and that the card finds the task. How
+// much it writes is feat/answer-shape's `deep_research_answer`.
 
 import React from 'react';
 import type { TFunction } from 'i18next';
@@ -12,8 +13,16 @@ import i18n from '@/services/i18n';
 import type { SessionMessage } from '@/services/types';
 import { taskEyebrow } from '@/view-models/long-task-words';
 import { applyFrame, describeTurnError, fromHistory, streamBody } from '@/view-models/use-chat';
-import { researchItem, researchRefusal, useResearchMode, useResearchOffer, type ResearchMode } from '@/view-models/use-deep-research';
-import { mockTaskStart } from '@/view-models/use-long-task';
+import {
+  RESEARCH_ANSWERS,
+  researchAnswerWords,
+  researchItem,
+  researchRefusal,
+  useResearchMode,
+  useResearchOffer,
+  type ResearchMode,
+} from '@/view-models/use-deep-research';
+import { mockLongTasks, mockTaskStart, resetMockLongTasks } from '@/view-models/use-long-task';
 
 jest.mock('@/services/pond-trust', () => ({ assertPondTrust: jest.fn().mockResolvedValue(undefined) }));
 const server = { hydrated: true, online: true, profileId: 'pond-a', isScreenReal: () => true };
@@ -165,6 +174,52 @@ describe('the composer in research mode', () => {
     await m.unmount();
   });
 
+  it('asks the Pond to decide how much to write until the person picks', async () => {
+    const m = await mount('s1');
+    expect(m.mode.answer).toBe('auto');
+    await act(async () => {
+      m.mode.start(0);
+    });
+    expect(m.mode.answer).toBe('auto');
+    await m.unmount();
+  });
+
+  it('keeps the pick for the next research, in this conversation or another, while the composer is up', async () => {
+    const m = await mount('s1');
+    await act(async () => {
+      m.mode.start(0);
+    });
+    await act(async () => m.mode.choose('short'));
+    expect(m.mode.answer).toBe('short');
+    await act(async () => {
+      m.mode.take();
+    });
+    expect(m.mode.on).toBe(false);
+    expect(m.mode.answer).toBe('short');
+
+    await act(async () => {
+      m.mode.start(0);
+    });
+    await act(async () => m.mode.clear());
+    await m.move('s2');
+    expect(m.mode.answer).toBe('short');
+    await m.unmount();
+
+    const again = await mount('s2');
+    expect(again.mode.answer).toBe('auto');
+    await again.unmount();
+  });
+
+  it('offers the three in order, each with its words', () => {
+    expect(RESEARCH_ANSWERS).toEqual(['auto', 'short', 'report']);
+    expect(RESEARCH_ANSWERS.map((a) => [t(researchAnswerWords(a).labelKey), t(researchAnswerWords(a).hintKey)])).toEqual([
+      ['Pond decides', 'Short for a quick question, a report for a big one.'],
+      ['Short answer', 'A few sentences, here in the chat.'],
+      ['Full report', 'Sections with sources, to read and export.'],
+    ]);
+    expect(t('chat.research.answer.label')).toBe('How much to write');
+  });
+
   it('will not turn on while pictures or files wait to be sent', async () => {
     const m = await mount(null);
     let started = true;
@@ -187,6 +242,28 @@ describe('sending a research question', () => {
       deep_research: true,
     });
     expect('deep_research' in streamBody('Hello', [], {}, null)).toBe(false);
+  });
+
+  it('says how much to write for a short answer or a report, and leaves it to the Pond otherwise', () => {
+    expect(streamBody('Is it worth it?', [], { research: true, answer: 'short' }, 's1')).toMatchObject({
+      deep_research: true,
+      deep_research_answer: 'short',
+    });
+    expect(streamBody('Compare the three', [], { research: true, answer: 'report' }, 's1')).toMatchObject({
+      deep_research: true,
+      deep_research_answer: 'report',
+    });
+    expect('deep_research_answer' in streamBody('Which?', [], { research: true, answer: 'auto' }, 's1')).toBe(false);
+    expect('deep_research_answer' in streamBody('Which?', [], { research: true }, 's1')).toBe(false);
+  });
+
+  it('never says how much to write on a turn that is not research', () => {
+    for (const answer of RESEARCH_ANSWERS) {
+      const body = streamBody('Hello', [], { answer }, 's1');
+      expect('deep_research' in body).toBe(false);
+      expect('deep_research_answer' in body).toBe(false);
+    }
+    expect('deep_research_answer' in streamBody('Hello', [], { voice: true, answer: 'short' }, null)).toBe(false);
   });
 
   it("says the Pond's two refusals in words, and leaves other refusals alone", () => {
@@ -250,5 +327,14 @@ describe('the card a research question starts', () => {
     const call = mockTaskStart('Solar panels for a flat roof', 'research');
     expect(call.id.startsWith('deep-research-')).toBe(true);
     expect(startedTaskId(call)).not.toBeNull();
+  });
+
+  it('is a short answer in the mock when the person asked for one', async () => {
+    resetMockLongTasks();
+    const short = startedTaskId(mockTaskStart('Is a flat roof fine for panels?', 'research', 'short'))!;
+    const report = startedTaskId(mockTaskStart('Compare panels for a flat roof', 'research'))!;
+    expect((await mockLongTasks().task(short)).answer).toBe('short');
+    expect((await mockLongTasks().task(report)).answer).toBe('auto');
+    resetMockLongTasks();
   });
 });

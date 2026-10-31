@@ -10,7 +10,7 @@ import { useServer } from '@/providers/server-provider';
 import { ApiError, api } from '@/services/api-client';
 import i18n from '@/services/i18n';
 import { endedTask, keepEndedTask } from '@/services/long-task-cache';
-import type { LongTask, LongTaskKind } from '@/services/types';
+import type { AnswerShape, LongTask, LongTaskKind } from '@/services/types';
 import { describeApiError } from './describe-error';
 import { useLive } from './use-live';
 
@@ -39,8 +39,8 @@ export function useLongTasksSource(): LongTasksSource {
 }
 
 /** The mock chat's `task_start` call, with a task to follow; research takes the Pond's `deep-research-` id. */
-export function mockTaskStart(goal: string, kind: LongTaskKind = 'general'): ToolCall {
-  const id = mockLongTasks().start(goal, kind);
+export function mockTaskStart(goal: string, kind: LongTaskKind = 'general', answer: AnswerShape = 'auto'): ToolCall {
+  const id = mockLongTasks().start(goal, kind, { answer });
   const call = kind === 'research' ? `deep-research-${id}` : `mock-call-${id}`;
   return { id: call, name: 'giap-tasks__task_start', args: JSON.stringify({ goal }), status: 'ok', result: mockStartResult(id) };
 }

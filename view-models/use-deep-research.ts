@@ -1,5 +1,6 @@
 // Deep research from the composer: whether the Pond offers it, asked once per Pond, and the composer's
-// research mode, which lasts one message and never outlives the conversation it was chosen in.
+// research mode, which lasts one message and never outlives the conversation it was chosen in. How much
+// it writes is the person's pick, kept for as long as the composer is up.
 
 import { useCallback, useEffect, useState } from 'react';
 
@@ -7,6 +8,7 @@ import { researchOffer, type ResearchOffer } from '@/models/long-tasks';
 import { useServer } from '@/providers/server-provider';
 import { ApiError } from '@/services/api-client';
 import type { TranslationKey } from '@/services/i18n';
+import type { AnswerShape } from '@/services/types';
 import { useLongTasksSource } from './use-long-task';
 
 /** The Pond's refusal of a research turn before it saved anything, by the `reason` it names. */
@@ -60,8 +62,25 @@ export function researchItem(offer: ResearchOffer, attachments: number): Researc
   return { shown: true, disabled: false, noteKey: null };
 }
 
+/** The composer's choices of how much research writes, in the order it offers them. */
+export const RESEARCH_ANSWERS: readonly AnswerShape[] = ['auto', 'short', 'report'];
+
+export function researchAnswerWords(answer: AnswerShape): { labelKey: TranslationKey; hintKey: TranslationKey } {
+  switch (answer) {
+    case 'short':
+      return { labelKey: 'chat.research.answer.short', hintKey: 'chat.research.answer.shortHint' };
+    case 'report':
+      return { labelKey: 'chat.research.answer.report', hintKey: 'chat.research.answer.reportHint' };
+    case 'auto':
+      return { labelKey: 'chat.research.answer.auto', hintKey: 'chat.research.answer.autoHint' };
+  }
+}
+
 export interface ResearchMode {
   on: boolean;
+  /** How much the research writes. Outlasts the message and the conversation, so a pick is made once. */
+  answer: AnswerShape;
+  choose: (answer: AnswerShape) => void;
   /** Turns it on; refused while pictures or files wait to be sent, which research cannot take. */
   start: (attachments: number) => boolean;
   /** The chip's remove. */
@@ -73,6 +92,7 @@ export interface ResearchMode {
 /** The composer's research mode. `conversation` changing (another one opened, or a new one) ends it. */
 export function useResearchMode(conversation: string | null): ResearchMode {
   const [on, setOn] = useState(false);
+  const [answer, choose] = useState<AnswerShape>('auto');
   const [seen, setSeen] = useState(conversation);
   if (seen !== conversation) {
     setSeen(conversation);
@@ -90,5 +110,5 @@ export function useResearchMode(conversation: string | null): ResearchMode {
     return on;
   }, [on]);
 
-  return { on, start, clear, take };
+  return { on, answer, choose, start, clear, take };
 }

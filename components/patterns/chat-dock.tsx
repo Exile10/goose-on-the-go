@@ -29,12 +29,12 @@
  */
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Keyboard, Platform, Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { Keyboard, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Image } from 'expo-image';
 import { useTranslation } from 'react-i18next';
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { glassLift, hitSlop } from '@jarida/ink';
-import { InkChip, InkEdge, inkText, useInkTheme, useReduceMotion } from '@jarida/ink/native';
+import { InkChip, InkEdge, InkEyebrow, InkSegmented, inkText, useInkTheme, useReduceMotion } from '@jarida/ink/native';
 
 import {
   AnsweringLight,
@@ -50,7 +50,8 @@ import { GPressable } from '@/components/ui/g-pressable';
 import { selectionTick, tap } from '@/services/haptics';
 import type { Attachment, AttachSource } from '@/services/media';
 import type { ResearchOffer } from '@/models/long-tasks';
-import { researchItem, useResearchMode } from '@/view-models/use-deep-research';
+import type { SendOptions } from '@/view-models/use-chat';
+import { RESEARCH_ANSWERS, researchAnswerWords, researchItem, useResearchMode } from '@/view-models/use-deep-research';
 import { Spacing } from '@/constants/spacing';
 
 /** The controls' diameter, and the field's height on one line: the touch floor. */
@@ -65,7 +66,7 @@ function fieldHeight(content: number): number {
 export const MAX_ATTACHMENTS = 4;
 
 export interface ChatDockProps {
-  onSend: (text: string, attachments: Attachment[], options?: { research?: boolean }) => void;
+  onSend: (text: string, attachments: Attachment[], options?: Pick<SendOptions, 'research' | 'answer'>) => void;
   /** Open voice mode. */
   onVoice: () => void;
   /** Ask for pictures or a file. Resolves with what was chosen, or nothing. */
@@ -137,7 +138,7 @@ export function ChatDock({
     if (!hasContent) return;
     void tap();
     const asResearch = mode.take();
-    onSend(draft, attachments, asResearch ? { research: true } : undefined);
+    onSend(draft, attachments, asResearch ? { research: true, answer: mode.answer } : undefined);
     setDraft('');
     setAttachments([]);
   }, [attachments, draft, hasContent, mode, onSend]);
@@ -170,6 +171,7 @@ export function ChatDock({
     borderWidth: theme.edge.hairlineWidth,
   };
   const field = inkText(theme, { size: 'md' });
+  const hint = inkText(theme, { size: 'sm', color: theme.color.textSecondary });
   const placeholder = mode.on ? t('chat.research.placeholder') : busy ? t('chat.queuePlaceholder') : t('chat.placeholder');
   // Clear of the keyboard by a full step, not half of one. Vendor keyboards
   // (Samsung's among them) draw a toolbar row of their own inside the height
@@ -184,10 +186,21 @@ export function ChatDock({
   return (
     <Animated.View pointerEvents="box-none" style={[styles.dock, padded]}>
       {mode.on ? (
-        <View style={styles.strip}>
+        <View style={styles.research}>
           <InkChip icon="search" onRemove={mode.clear}>
             {t('chat.research.chip')}
           </InkChip>
+          <InkEyebrow>{t('chat.research.answer.label')}</InkEyebrow>
+          <InkSegmented
+            label={t('chat.research.answer.label')}
+            value={mode.answer}
+            options={RESEARCH_ANSWERS.map((answer) => ({ value: answer, label: t(researchAnswerWords(answer).labelKey) }))}
+            onChange={(answer) => {
+              void selectionTick();
+              mode.choose(answer);
+            }}
+          />
+          <Text style={hint.style}>{t(researchAnswerWords(mode.answer).hintKey)}</Text>
         </View>
       ) : null}
 
@@ -343,6 +356,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   strip: { flexDirection: 'row', gap: Spacing.sm, paddingLeft: CONTROL + Spacing.sm },
+  research: { alignItems: 'flex-start', gap: Spacing.sm, paddingLeft: CONTROL + Spacing.sm },
   thumb: { width: 60, height: 60, overflow: 'hidden' },
   thumbImage: { width: '100%', height: '100%' },
   fileThumb: { flex: 1, alignItems: 'center', justifyContent: 'center' },

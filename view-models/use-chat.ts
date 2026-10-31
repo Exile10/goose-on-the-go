@@ -39,7 +39,7 @@ import { ApiError, api } from '@/services/api-client';
 import { cardsFor, rememberCard, type CardsByCall } from '@/services/card-cache';
 import { composeMessage, type Attachment } from '@/services/media';
 import { StreamStalledError } from '@/services/sse';
-import type { ChatFrame, ChatStreamRequest, SessionMessage } from '@/services/types';
+import type { AnswerShape, ChatFrame, ChatStreamRequest, SessionMessage } from '@/services/types';
 import { createTurnQueue } from '@/view-models/turn-queue';
 import { MOCK_RESEARCH_REPLY, MOCK_TASK_REPLY } from '@/models/long-tasks-mock';
 import { researchRefusal } from '@/view-models/use-deep-research';
@@ -300,6 +300,8 @@ export interface SendOptions {
   voice?: boolean;
   /** A research question: the Pond starts a long task on it rather than answering in the turn. */
   research?: boolean;
+  /** How much the research should write; read only with `research`. */
+  answer?: AnswerShape;
   /** The reply so far, each time it grows — voice mode speaks it as it comes. */
   onText?: (text: string) => void;
 }
@@ -362,6 +364,7 @@ export function streamBody(
     voice_mode: Boolean(options.voice),
     resumable: true,
     ...(options.research ? { deep_research: true } : {}),
+    ...(options.research && options.answer && options.answer !== 'auto' ? { deep_research_answer: options.answer } : {}),
   };
 }
 
@@ -514,7 +517,7 @@ export function useChat(): UseChat {
         await new Promise((resolve) => setTimeout(resolve, 700));
         // Research, or a message asking for a long task, starts one in the mock Pond, so its card can be seen.
         const tools = options.research
-          ? [mockTaskStart(trimmed, 'research')]
+          ? [mockTaskStart(trimmed, 'research', options.answer)]
           : /\blong task\b/i.test(trimmed)
             ? [mockTaskStart(trimmed)]
             : undefined;

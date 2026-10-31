@@ -366,6 +366,10 @@ voice mode. What is worth knowing:
     stays picked, so trying again is one press.
   - Nothing shows at the front of the line, once the task has ended, or
     from an older Pond that sends no `queue`.
+  - A finished task whose `answer` is `short` shows its `answer_text` whole,
+    as chat Markdown, in place of the result line and Read the result: a
+    short answer is read in the conversation, not opened as a report. Any
+    other task, or an older Pond's, keeps the line and the button.
 - **A long task's report is read on its own page** (`/(stack)/task-report`).
   - It is the whole report from `GET /long-tasks/{id}/report`, cut at its
     headings so a row of section chips can jump between them.
@@ -386,6 +390,11 @@ voice mode. What is worth knowing:
   - Choosing it puts a removable "Deep research" chip over the field. The
     next message goes with `deep_research: true`, then the mode ends; it
     also ends if the conversation changes.
+  - Under the chip, "How much to write" offers Pond decides, Short answer
+    and Full report, with the pick's hint below. Short and report go as
+    `deep_research_answer`; Pond decides leaves the field out, so the Pond
+    reads it from the question. The pick outlasts the message and the
+    conversation while the composer is mounted.
   - Research takes a question on its own, so the picture sources wait while
     it is on, and it cannot be chosen with pictures waiting.
   - The Pond answers with the same `task_start` frames a model call makes,

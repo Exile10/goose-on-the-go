@@ -11,6 +11,7 @@ import {
   queueChoices,
   readLongTask,
   resultArtifact,
+  shortAnswer,
   startedTaskId,
   taskIdFromResult,
 } from '@/models/long-tasks';
@@ -93,6 +94,35 @@ describe('reading a task', () => {
   });
 });
 
+describe('how much a task writes', () => {
+  const raw = { id: ID, goal: 'Is a flat roof fine for panels?', state: 'completed', steps: [], artifacts: [] };
+  const TEXT = 'Yes, if it takes a tilted frame. [Guide](https://example.org/flat-roofs)';
+
+  it("reads the Pond's shape and a short answer's text", () => {
+    const task = readLongTask({ ...raw, answer: 'short', answer_text: TEXT })!;
+    expect(task.answer).toBe('short');
+    expect(task.answer_text).toBe(TEXT);
+    expect(readLongTask({ ...raw, answer: 'report', answer_text: null })).toMatchObject({ answer: 'report', answer_text: null });
+  });
+
+  it('leaves the shape out for an older Pond, or one this phone does not know', () => {
+    expect('answer' in readLongTask(raw)!).toBe(false);
+    expect('answer' in readLongTask({ ...raw, answer: 'essay' })!).toBe(false);
+    expect(readLongTask({ ...raw, answer_text: 42 })!.answer_text).toBeNull();
+  });
+
+  it('is read whole only once a short answer has finished with text', () => {
+    const done = readLongTask({ ...raw, answer: 'short', answer_text: TEXT })!;
+    expect(shortAnswer(done)).toBe(TEXT);
+    expect(shortAnswer({ ...done, state: 'running' })).toBeNull();
+    expect(shortAnswer({ ...done, answer: 'report' })).toBeNull();
+    expect(shortAnswer({ ...done, answer: 'auto' })).toBeNull();
+    expect(shortAnswer({ ...done, answer: undefined })).toBeNull();
+    expect(shortAnswer({ ...done, answer_text: '  \n' })).toBeNull();
+    expect(shortAnswer({ ...done, answer_text: null })).toBeNull();
+  });
+});
+
 describe('where a task waits', () => {
   const raw = { id: ID, goal: 'Plan a weekend away', state: 'planning', steps: [], artifacts: [] };
   const queue = {
@@ -154,6 +184,19 @@ describe('the mock Pond', () => {
     expect(done.state).toBe('completed');
     expect(done.result_artifact_id).not.toBeNull();
     expect((await pond.artifact(id, done.result_artifact_id!)).body).toMatch(/^## /);
+    expect(done.answer_text).toBeNull();
+  });
+
+  it('finishes a short answer with its text on the task, and in its artifact', async () => {
+    const c = clock();
+    const pond = createMockLongTasks(c.now);
+    const id = pond.start('Is a flat roof fine for panels?', 'research', { answer: 'short' });
+    expect((await pond.task(id)).answer_text).toBeNull();
+    c.advance(MOCK_PLANNING_MS + 3 * MOCK_STEP_MS);
+    const done = await pond.task(id);
+    expect(done.answer).toBe('short');
+    expect(shortAnswer(done)).toBeTruthy();
+    expect((await pond.artifact(id, done.result_artifact_id!)).body).toBe(done.answer_text);
   });
 
   it('stops a running task, and refuses to stop one that has ended', async () => {

@@ -77,7 +77,7 @@ import {
   hasUnseen,
   type LatestButton,
 } from '@/view-models/latest-button';
-import { positionsFor, useChat } from '@/view-models/use-chat';
+import { positionsFor, useChat, type SendOptions } from '@/view-models/use-chat';
 import { useResearchOffer } from '@/view-models/use-deep-research';
 import { useGreetingName } from '@/view-models/use-greeting';
 import { useSuggestions, type OfferedPrompt } from '@/view-models/use-suggestions';
@@ -233,7 +233,7 @@ export default function ChatScreen() {
   );
 
   const onSend = useCallback(
-    (text: string, attachments: Attachment[], options?: { research?: boolean }) => {
+    (text: string, attachments: Attachment[], options?: Pick<SendOptions, 'research' | 'answer'>) => {
       if (!withinTurnLimit(attachments)) {
         setNotice(t('chat.composer.turnTooLarge'));
         return;
