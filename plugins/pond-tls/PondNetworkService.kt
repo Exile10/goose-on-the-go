@@ -1,5 +1,6 @@
 package io.jarida.pondtls
 
+import android.annotation.SuppressLint
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -27,14 +28,23 @@ import android.os.IBinder
  * The notification is not a formality to satisfy the platform. It is the only outward sign
  * that the app is holding a connection open on the user's behalf, so it says what the
  * connection is actually doing and opens the app when tapped. A permanent notification
- * that reads "Goose is running" would be a cost with no return.
+ * that reads "Goose is running" would be a cost with no return. What it says comes from
+ * [RemoteNotice]: connecting, connected only once the Pond has answered, or unable to reach
+ * it, and [refresh] keeps it current as requests to the Pond succeed and fail.
  */
 class PondNetworkService : Service() {
   override fun onBind(intent: Intent?): IBinder? = null
 
   override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-    val state = intent?.getStringExtra(EXTRA_STATE) ?: STATE_CONNECTING
-    val notification = build(this, state)
+    nodeState = intent?.getStringExtra(EXTRA_STATE) ?: STATE_CONNECTING
+    // Set before the notice is built, so an answer recorded meanwhile reaches it through
+    // [refresh] rather than falling between the two.
+    running = this
+    val notification = synchronized(Companion) {
+      val notice = current()
+      shown = notice
+      build(this, notice)
+    }
     try {
       if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
         startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE)
@@ -53,6 +63,8 @@ class PondNetworkService : Service() {
       // Android 14 raises this when the type's prerequisite permission is missing.
       refuse(REFUSED_START, error)
       return START_NOT_STICKY
+    }
+    refusal = null
     }
     refusal = null
     // The node is restarted by PondNetwork, not by the system: a service recreated without
@@ -89,6 +101,7 @@ class PondNetworkService : Service() {
   }
 
   override fun onDestroy() {
+    running = null
     stopForeground(STOP_FOREGROUND_REMOVE)
     super.onDestroy()
   }
@@ -111,6 +124,39 @@ class PondNetworkService : Service() {
      */
     @Volatile var refusal: String? = null
       private set
+
+    /** The service while it holds the foreground, so [refresh] never posts a notice without it. */
+    @Volatile private var running: PondNetworkService? = null
+
+    /** The node state [PondNetwork] last handed over. */
+    @Volatile private var nodeState = STATE_CONNECTING
+
+    /** What the notification says now, so an unchanged notice is not re-posted. */
+    private var shown: RemoteNotice? = null
+
+    private fun current() = RemoteNotice.of(nodeState == STATE_RUNNING, PondNetwork.answers())
+
+    /**
+     * Re-post the notification if what it should say has changed: whether the Pond answers
+     * moves with every request, which is far more often than the node's state.
+     *
+     * A notify on the service's own id, which Android documents as the way to change a
+     * foreground service's notification, rather than another [start]: most of these changes
+     * happen with the app in the background, where Android 12 and later refuse a start. The
+     * channel is low importance and the notice alerts only once, so an update never sounds.
+     * Does nothing while the service is not running.
+     */
+    fun refresh() {
+      val service = running ?: return
+      val notice = synchronized(this) {
+        val next = current()
+        if (next == shown) return
+        shown = next
+        next
+      }
+      service.getSystemService(NotificationManager::class.java).notify(NOTIFICATION_ID, build(service, notice))
+      android.util.Log.i("PondNetwork", "kind=remote_notice state=${notice.name}")
+    }
 
     /**
      * Start or update the service.
@@ -150,7 +196,33 @@ class PondNetworkService : Service() {
       }
     }
 
-    private fun build(context: Context, state: String): Notification {
+    /**
+     * The status-bar silhouette expo-notifications installs from app.json's `icon` (prebuild
+     * writes it as `drawable/notification_icon`), so this notice wears the same icon as every
+     * other one the app posts. It used to pass the launcher icon, which Android flattens to a
+     * faint white blob, so the status bar switched between that and the bold icon as this
+     * notification and the others came and went.
+     *
+     * Looked up by name, because a build without that config has no such resource; the
+     * launcher icon is then the fallback, as in `PondPresence`.
+     */
+    @SuppressLint("DiscouragedApi") // A name lookup is the point: see above.
+    private fun smallIcon(context: Context): Int {
+      val installed = context.resources.getIdentifier("notification_icon", "drawable", context.packageName)
+      return if (installed != 0) installed else context.applicationInfo.icon
+    }
+
+    /**
+     * The brand colour expo-notifications writes beside that icon (`color/notification_icon_color`,
+     * from app.json's `color`), or null where the build has none, which leaves the system tint.
+     */
+    @SuppressLint("DiscouragedApi")
+    private fun accent(context: Context): Int? {
+      val id = context.resources.getIdentifier("notification_icon_color", "color", context.packageName)
+      return if (id != 0) context.getColor(id) else null
+    }
+
+    private fun build(context: Context, notice: RemoteNotice): Notification {
       val manager = context.getSystemService(NotificationManager::class.java)
       if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && manager.getNotificationChannel(CHANNEL) == null) {
         // Low importance: this is a status line, not an interruption. It cannot be
@@ -166,16 +238,13 @@ class PondNetworkService : Service() {
       val pending = open?.let {
         PendingIntent.getActivity(context, 0, it, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
       }
-      val connected = state == STATE_RUNNING
       val builder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) Notification.Builder(context, CHANNEL)
                     else @Suppress("DEPRECATION") Notification.Builder(context)
       return builder
-        .setContentTitle(if (connected) "Connected to your Pond" else "Reconnecting to your Pond")
-        .setContentText(
-          if (connected) "Remote access is on, so you can reach your Pond from anywhere."
-          else "Remote access is on. Looking for your Pond."
-        )
-        .setSmallIcon(context.applicationInfo.icon)
+        .setContentTitle(notice.title)
+        .setContentText(notice.body)
+        .setSmallIcon(smallIcon(context))
+        .also { accent(context)?.let(it::setColor) }
         // Not marked ongoing, so nothing here asks the platform to pin it.
         //
         // That is as far as an app can go. NotificationManagerService owns the flags on a

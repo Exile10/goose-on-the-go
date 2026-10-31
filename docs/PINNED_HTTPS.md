@@ -746,9 +746,29 @@ aimed at process lifetime would have addressed nothing.
 when `stage()` brings a node up, stopped in `stopTransport()`. A profile that never enables
 remote access never starts a node, so a local-only user never sees the notification.
 
-The notification reports what the connection is actually doing -- connected, or reconnecting
--- and opens the app when tapped, because a permanent notification reading "Goose is
-running" would be a cost with no return.
+The notification reports what the connection is actually doing and opens the app when
+tapped, because a permanent notification reading "Goose is running" would be a cost with no
+return. `RemoteNotice` decides the text from two signals:
+
+- **The node's state**, from `PondNetwork.status()`. "Running" means the node has joined the
+  tailnet, and nothing more. Until then the notice says *Connecting to your Pond*.
+- **Whether the Pond answers.** `PondTls`'s interceptor reports every request to a pinned
+  Pond origin to `PondNetwork.observe`: any HTTP response is an answer, since only the Pond can
+  complete the pinned handshake, and an exception is not, unless the app cancelled the call.
+  The last outcome is kept per origin. Any origin answering reads *Connected to your Pond*; at
+  home that is the local address, away the tailnet one. Every origin tried and failing reads
+  *Can't reach your Pond*. A running node with nothing tried yet is still *Connecting*.
+
+Until 2026-10-27 the notice followed the node alone, and said "Connected to your Pond" on a
+phone with no Pond in reach, because a node that has joined the tailnet is not a Pond that
+answers. A change of outcome re-posts the notification with `notify` on the service's id
+(`PondNetworkService.refresh`), not with another service start, which Android 12 and later
+refuse from the background; an unchanged notice is not re-posted, and the channel is low
+importance, so updates never sound. The strings are still English in Kotlin, as they were:
+the service starts from native code with no JavaScript to hand it translated text.
+
+`RemoteNoticeTest.kt` covers the mapping on the JVM; with-pond-tls.js copies it into the
+generated `app/src/test` beside `PondTlsTest`.
 
 ### The service type, and what happens when Android refuses it (2026-10-23)
 

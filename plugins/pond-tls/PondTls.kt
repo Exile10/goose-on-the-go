@@ -93,12 +93,16 @@ object PondTls {
             if (!request.url.isHttps || pins[origin(request.url)] == null)
               throw SSLPeerUnverifiedException("Pond HTTPS trust is not configured")
           }
+          val pond = pins.containsKey(origin(request.url))
           try {
             val result = chain.proceed(request)
             trustFailures.remove(origin(request.url))
+            if (pond) PondNetwork.observe(request.url, true)
             result
           } catch (error: Exception) {
-            if (request.header(MARKER) == "1" || pins.containsKey(origin(request.url))) {
+            // A cancelled call is the app hanging up (a stream being replaced), not the Pond.
+            if (pond && !chain.call().isCanceled()) PondNetwork.observe(request.url, false)
+            if (request.header(MARKER) == "1" || pond) {
               var cause: Throwable? = error
               while (cause != null) {
                 if (cause is SSLException || cause is CertificateException) {
