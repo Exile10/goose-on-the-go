@@ -42,6 +42,7 @@ jest.mock('@/services/api-client', () => {
 jest.mock('@/services/card-cache', () => ({
   cardsFor: jest.fn().mockResolvedValue({}),
   rememberCard: jest.fn().mockResolvedValue(undefined),
+  forgetCalls: jest.fn().mockResolvedValue(undefined),
 }));
 jest.mock('@/providers/server-provider', () => ({
   useServer: () => ({ hydrated: true, isScreenReal: () => true }),

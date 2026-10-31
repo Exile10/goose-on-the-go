@@ -10,6 +10,7 @@ import {
   MAX_CONVERSATIONS,
   cardsFor,
   forgetAllCards,
+  forgetCalls,
   forgetCards,
   rememberCard,
 } from '@/services/card-cache';
@@ -65,6 +66,27 @@ describe('card-cache', () => {
     expect(await cardsFor('s1')).toEqual({});
     expect(await stored('s1')).toBeNull();
     expect(await cardsFor('s2')).toEqual({ c2: clock });
+  });
+
+  it('forgets single calls, from storage and from this launch, and keeps the rest', async () => {
+    const search = { type: 'search', data: { query: 'q', results: [{ title: 'T', url: 'https://a.example/' }] } };
+    await rememberCard('s1', 'c1', search);
+    await rememberCard('s1', 'c2', weather);
+    await rememberCard('s2', 'c1', clock);
+    await forgetCalls('s1', ['c1']);
+    expect(await cardsFor('s1')).toEqual({ c2: weather });
+    expect((await stored('s1'))?.cards).toEqual({ c2: weather });
+    expect(await cardsFor('s2')).toEqual({ c1: clock });
+  });
+
+  it('writes nothing when there is nothing to forget', async () => {
+    await rememberCard('s1', 'c2', weather);
+    const before = await stored('s1');
+    await forgetCalls('s1', []);
+    await forgetCalls('s1', ['absent']);
+    await forgetCalls('never-kept', ['c1']);
+    expect(await stored('s1')).toEqual(before);
+    expect(await stored('never-kept')).toBeNull();
   });
 
   it('forgets every card on sign-out, and nothing else the app stored', async () => {

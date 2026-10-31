@@ -10,7 +10,7 @@
 
 import type { InkNoticeProps } from '@jarida/ink/native';
 
-import type { WebSearchState, WebSearchStatus } from '@/services/types';
+import type { WebSearchLocalResults, WebSearchState, WebSearchStatus } from '@/services/types';
 
 /** Brave's dashboard, where a household gets a key. The one place the screen sends a person to. */
 export const BRAVE_DASHBOARD_URL = 'https://api-dashboard.search.brave.com';
@@ -43,14 +43,31 @@ function isStatus(value: unknown): value is WebSearchStatus {
  */
 export function readWebSearch(raw: unknown): WebSearchState | null {
   if (typeof raw !== 'object' || raw === null) return null;
-  const { configured, status } = raw as Record<string, unknown>;
+  const { configured, status, local_results } = raw as Record<string, unknown>;
   if (typeof configured !== 'boolean') return null;
-  if (!configured) return { provider: 'brave', configured, status: 'not_configured' };
+  const local = readLocalResults(local_results);
+  const withLocal = local ? { local_results: local } : {};
+  if (!configured) return { provider: 'brave', configured, status: 'not_configured', ...withLocal };
   return {
     provider: 'brave',
     configured,
     status: isStatus(status) && status !== 'not_configured' ? status : 'unverified',
+    ...withLocal,
   };
+}
+
+/** The nearby-places report, or undefined from a Pond that predates it. A blank town is no town. */
+function readLocalResults(raw: unknown): WebSearchLocalResults | undefined {
+  if (typeof raw !== 'object' || raw === null) return undefined;
+  const { enabled, town } = raw as Record<string, unknown>;
+  if (typeof enabled !== 'boolean') return undefined;
+  const name = typeof town === 'string' ? town.trim() : '';
+  return { enabled, town: name || null };
+}
+
+/** The town each search sends to Brave right now, or null when it sends none. */
+export function townSent(local: WebSearchLocalResults | null | undefined): string | null {
+  return local?.enabled && local.town ? local.town : null;
 }
 
 /**

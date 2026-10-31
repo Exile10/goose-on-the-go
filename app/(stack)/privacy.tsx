@@ -1,7 +1,8 @@
 /**
  * PrivacyScreen — what happens to a household's data, what can be done from here, and what
  * this app is built from. The content is in `constants/privacy.ts`, verified against the Pond;
- * `docs/PRIVACY-SCREEN.md` keeps the evidence for each statement.
+ * `docs/PRIVACY-SCREEN.md` keeps the evidence for each statement. The one live line is the
+ * town web search sends, which the Pond reports while Nearby places is on.
  */
 
 import React, { useState } from 'react';
@@ -23,9 +24,10 @@ import { Radii } from '@/constants/radii';
 import { APP_LICENSES, DATA_RIGHT_KEYS, PRIVACY_SECTIONS, type PrivacySection } from '@/constants/privacy';
 import { useThemedStyles } from '@/hooks/use-themed-styles';
 import type { ThemeColors } from '@/constants/colors';
+import { usePrivacy } from '@/view-models/use-privacy';
 
-/** Expandable section */
-function ExpandableSection({ section }: { section: PrivacySection }) {
+/** Expandable section. `extra` is a live sentence after the fixed copy. */
+function ExpandableSection({ section, extra }: { section: PrivacySection; extra?: string | null }) {
   const styles = useThemedStyles(makeStyles);
   const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
@@ -44,7 +46,7 @@ function ExpandableSection({ section }: { section: PrivacySection }) {
         </View>
       </View>
       {expanded && (
-        <Text style={styles.sectionContent}>{t(section.bodyKey)}</Text>
+        <Text style={styles.sectionContent}>{extra ? `${t(section.bodyKey)} ${extra}` : t(section.bodyKey)}</Text>
       )}
     </GPressable>
   );
@@ -53,6 +55,8 @@ function ExpandableSection({ section }: { section: PrivacySection }) {
 export default function PrivacyScreen() {
   const styles = useThemedStyles(makeStyles);
   const { t } = useTranslation();
+  const { data } = usePrivacy();
+  const townLine = data.nearbyTown ? t('webSearch.townSentence', { town: data.nearbyTown }) : null;
 
   return (
     <ScrollView
@@ -63,7 +67,7 @@ export default function PrivacyScreen() {
       {/* Privacy sections */}
       <InkTitle level={3}>{t('privacy.policyHeading')}</InkTitle>
       {PRIVACY_SECTIONS.map((s) => (
-        <ExpandableSection key={s.id} section={s} />
+        <ExpandableSection key={s.id} section={s} extra={s.id === 'network' ? townLine : null} />
       ))}
 
       {/* Data rights */}

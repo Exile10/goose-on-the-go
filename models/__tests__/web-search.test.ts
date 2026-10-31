@@ -6,7 +6,7 @@
  * and the sentence above it off the other.
  */
 
-import { readWebSearch, webSearchTone } from '@/models/web-search';
+import { readWebSearch, townSent, webSearchTone } from '@/models/web-search';
 import type { WebSearchStatus } from '@/services/types';
 
 describe('readWebSearch', () => {
@@ -45,6 +45,44 @@ describe('readWebSearch', () => {
     expect(readWebSearch('<!doctype html>')).toBeNull();
     expect(readWebSearch({})).toBeNull();
     expect(readWebSearch({ configured: 'yes', status: 'ok' })).toBeNull();
+  });
+});
+
+describe('nearby places in the answer', () => {
+  it('reads the switch and the town', () => {
+    expect(readWebSearch({ configured: true, status: 'ok', local_results: { enabled: true, town: 'Nairobi' } })).toEqual({
+      provider: 'brave',
+      configured: true,
+      status: 'ok',
+      local_results: { enabled: true, town: 'Nairobi' },
+    });
+    expect(readWebSearch({ configured: false, local_results: { enabled: false, town: null } })?.local_results).toEqual({
+      enabled: false,
+      town: null,
+    });
+  });
+
+  it('reads a blank or missing town as no town', () => {
+    expect(readWebSearch({ configured: false, local_results: { enabled: true, town: '  ' } })?.local_results?.town).toBeNull();
+    expect(readWebSearch({ configured: false, local_results: { enabled: true } })?.local_results?.town).toBeNull();
+    expect(readWebSearch({ configured: false, local_results: { enabled: true, town: 7 } })?.local_results?.town).toBeNull();
+  });
+
+  /** An older Pond sends no `local_results`, and a malformed one is no report either. */
+  it('leaves it out when the Pond does not report it', () => {
+    expect(readWebSearch({ configured: true, status: 'ok' })).not.toHaveProperty('local_results');
+    expect(readWebSearch({ configured: true, status: 'ok', local_results: null })).not.toHaveProperty('local_results');
+    expect(readWebSearch({ configured: true, local_results: { enabled: 'yes', town: 'Nairobi' } })).not.toHaveProperty(
+      'local_results',
+    );
+  });
+
+  it('names a town as sent only while the switch is on and a town is set', () => {
+    expect(townSent({ enabled: true, town: 'Nairobi' })).toBe('Nairobi');
+    expect(townSent({ enabled: false, town: 'Nairobi' })).toBeNull();
+    expect(townSent({ enabled: true, town: null })).toBeNull();
+    expect(townSent(undefined)).toBeNull();
+    expect(townSent(null)).toBeNull();
   });
 });
 

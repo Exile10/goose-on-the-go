@@ -11,14 +11,17 @@ import type { TFunction } from 'i18next';
 
 import en from '@/services/i18n/locales/en.json';
 import { GREETINGS_PER_PERIOD, SUBTITLES, THINKING_QUIPS, WORKING_QUIPS, periodOf } from '@/constants/quips';
-import { bareToolName, humanizeTool, sourcesOf } from '@/constants/tools';
+import { bareToolName, humanizeTool, keptLine, readSearch, sourcesOf } from '@/constants/tools';
+import i18n from '@/services/i18n';
 import type { Message } from '@/models/chat';
 import type { SessionMessage } from '@/services/types';
 import {
   applyFrame,
   cardOf,
+  cardToKeep,
   derivedTitle,
   fromHistory,
+  keptStubOf,
   statusFor,
   titleFromThread,
   toolResultText,
@@ -144,15 +147,82 @@ describe('cardOf', () => {
   });
 });
 
-describe('fromHistory', () => {
-  const row = (r: Partial<SessionMessage>): SessionMessage => ({
-    id: r.id ?? 'id',
-    session_id: 's',
-    role: r.role ?? 'user',
-    content: r.content ?? '',
-    created_at: '2026-09-24T09:00:00+00:00',
-    ...r,
+describe('cardToKeep', () => {
+  const search = { card_type: 'search', data: { query: 'q', results: [{ title: 'T', url: 'https://a.example/' }] } };
+
+  /** Brave's terms allow search results only transient storage, so the phone keeps no copy. */
+  it('keeps no card for a result the Pond marks transient', () => {
+    expect(cardToKeep({ type: 'tool_result', id: 'c1', transient: true, ui: search })).toBeUndefined();
   });
+
+  it('keeps every other card', () => {
+    expect(cardToKeep({ type: 'tool_result', id: 'c1', ui: search })).toEqual({ type: 'search', data: search.data });
+    expect(cardToKeep({ type: 'tool_result', id: 'c1', transient: false, ui: search })).toEqual({
+      type: 'search',
+      data: search.data,
+    });
+  });
+
+  /** On screen the turn still draws it: only keeping it is refused. */
+  it('still lets the live turn draw a transient card', () => {
+    const reply = applyFrame(applyFrame(empty(), { type: 'tool_call', tool: 'giap-knowledge__search_web', id: 'c1' }), {
+      type: 'tool_result',
+      tool: 'giap-knowledge__search_web',
+      id: 'c1',
+      transient: true,
+      content: 'Web results for: q',
+      ui: search,
+    });
+    expect(reply.tools?.[0].card).toEqual({ type: 'search', data: search.data });
+  });
+});
+
+const row = (r: Partial<SessionMessage>): SessionMessage => ({
+  id: r.id ?? 'id',
+  session_id: 's',
+  role: r.role ?? 'user',
+  content: r.content ?? '',
+  created_at: '2026-09-24T09:00:00+00:00',
+  ...r,
+});
+
+const STUB = 'Web search results are not kept after the turn. Sources: kenyapower.co.ke, nation.africa.';
+
+/** The row as `GET /sessions/{id}/messages` returns it: the stored row as JSON, the marker inside. */
+const keptRow = (callId: string, extra: Partial<SessionMessage> = {}) =>
+  row({
+    id: `t-${callId}`,
+    role: 'tool',
+    tool_call_id: callId,
+    content: JSON.stringify({
+      tool_call_id: callId,
+      tool: 'giap-knowledge__search_web',
+      content: STUB,
+      arguments: '{"question":"power outage Nairobi"}',
+      transient: true,
+    }),
+    ...extra,
+  });
+
+describe('keptStubOf', () => {
+  it('reads the stub from inside the stored row', () => {
+    expect(keptStubOf(keptRow('c1'))).toBe(STUB);
+  });
+
+  it('accepts the marker on the message, with the stub as its content', () => {
+    expect(keptStubOf(row({ role: 'tool', tool_call_id: 'c1', content: ` ${STUB} `, transient: true }))).toBe(STUB);
+  });
+
+  it('is null for a row that holds its whole result, an empty stub, or a row that is not a tool row', () => {
+    expect(keptStubOf(row({ role: 'tool', content: JSON.stringify({ content: '23C', transient: false }) }))).toBeNull();
+    expect(keptStubOf(row({ role: 'tool', content: 'bare result' }))).toBeNull();
+    expect(keptStubOf(row({ role: 'tool', content: JSON.stringify({ content: '  ', transient: true }) }))).toBeNull();
+    expect(keptStubOf(row({ role: 'tool', content: '[1,2]' }))).toBeNull();
+    expect(keptStubOf(row({ role: 'assistant', content: JSON.stringify({ content: STUB, transient: true }) }))).toBeNull();
+  });
+});
+
+describe('fromHistory', () => {
 
   it('folds each stored result into the call that asked for it, results first', () => {
     const messages = fromHistory([
@@ -211,6 +281,28 @@ describe('fromHistory', () => {
     expect(answer.tools?.map((tool) => tool.result)).toEqual(['Mainly clear', '13:18']);
   });
 
+  it('brings a result the Pond did not keep back as its stub, never as a result or a card', () => {
+    const search = { type: 'search', data: { query: 'q', results: [{ title: 'Kept before', url: 'https://a.example/' }] } };
+    const [, answer] = fromHistory(
+      [
+        row({ id: 'u', role: 'user', content: 'Is there an outage?' }),
+        keptRow('c1'),
+        row({
+          id: 'a',
+          role: 'assistant',
+          content: 'Kenya Power lists one in Westlands.',
+          tool_calls: [{ id: 'c1', name: 'giap-knowledge__search_web', arguments: '{}' }],
+        }),
+      ],
+      // A card this phone kept before the Pond marked the result transient is not drawn.
+      { c1: search },
+    );
+    expect(answer.tools).toEqual([
+      { id: 'c1', name: 'giap-knowledge__search_web', args: '{}', status: 'ok', result: undefined, kept: STUB },
+    ]);
+    expect(sourcesOf(answer.tools)).toEqual([]);
+  });
+
   it('carries pictures as Pond paths, to be fetched with the bearer header', () => {
     const [m] = fromHistory([
       row({
@@ -222,6 +314,81 @@ describe('fromHistory', () => {
     expect(m.images).toEqual([
       { id: 'i1', uri: '/api/v1/sessions/s/attachments/i1', local: false, mimeType: 'image/jpeg' },
     ]);
+  });
+});
+
+describe('readSearch', () => {
+  it('reads the pages, titled, and never a link that is not the web', () => {
+    const card = readSearch({
+      query: ' museum hours ',
+      results: [
+        { title: 'Opening hours', url: 'https://www.museums.or.ke/visit', domain: 'museums.or.ke', snippet: 'Open 9 to 5.' },
+        { title: '', url: 'https://example.com/a' },
+        { title: 'Sneaky', url: 'javascript:alert(1)' },
+        null,
+        'not an entry',
+        { title: '', url: '' },
+      ],
+    });
+    expect(card).toEqual({
+      query: 'museum hours',
+      pages: [
+        { title: 'Opening hours', url: 'https://www.museums.or.ke/visit', site: 'museums.or.ke', snippet: 'Open 9 to 5.' },
+        { title: 'example.com', url: 'https://example.com/a', site: 'example.com', snippet: '' },
+        { title: 'Sneaky', url: null, site: '', snippet: '' },
+      ],
+      places: [],
+    });
+  });
+
+  /** The Pond's contract (small-model-tools.md section 8.10.3): a place's `url` may be "". */
+  it('reads the places, a link only when the address is http(s), and drops one with no name', () => {
+    const { places } = readSearch({
+      query: 'What time does Java House at Junction close?',
+      results: [],
+      places: [
+        { name: 'Java House Junction', url: 'https://www.javahouseafrica.com/junction', snippet: 'day: Monday; hours: 7 am - 10 pm' },
+        { name: 'Artcaffe Junction', url: '', snippet: '' },
+        { name: 'Somewhere', url: 'file:///etc/passwd', snippet: 'x' },
+        { name: '  ', url: 'https://nameless.example/' },
+        { url: 'https://nameless.example/' },
+      ],
+    });
+    expect(places).toEqual([
+      {
+        title: 'Java House Junction',
+        url: 'https://www.javahouseafrica.com/junction',
+        site: 'javahouseafrica.com',
+        snippet: 'day: Monday; hours: 7 am - 10 pm',
+      },
+      { title: 'Artcaffe Junction', url: null, site: '', snippet: '' },
+      { title: 'Somewhere', url: null, site: '', snippet: 'x' },
+    ]);
+  });
+
+  it('draws nothing from a card that is not one', () => {
+    expect(readSearch({})).toEqual({ query: '', pages: [], places: [] });
+    expect(readSearch({ query: 7, results: 'x', places: { name: 'n' } })).toEqual({ query: '', pages: [], places: [] });
+  });
+});
+
+describe('keptLine', () => {
+  const tool = (name: string, kept: string) => ({ id: 'c1', name, args: '{}', status: 'ok' as const, kept });
+
+  /** The desktop's wording, so a reloaded conversation reads the same on both. */
+  it('names the tool and the sources the stub names', () => {
+    expect(keptLine(tool('giap-knowledge__search_web', STUB), i18n.t)).toBe(
+      "Web search: results aren't kept after the turn. Sources: kenyapower.co.ke, nation.africa.",
+    );
+  });
+
+  it('says so without sources when the stub names none', () => {
+    expect(keptLine(tool('giap-knowledge__search_web', 'Not kept.'), i18n.t)).toBe(
+      "Web search: results aren't kept after the turn.",
+    );
+    expect(keptLine(tool('acme__lookup_things', 'Not kept.'), i18n.t)).toBe(
+      "Lookup things: results aren't kept after the turn.",
+    );
   });
 });
 
@@ -268,32 +435,18 @@ describe('tool names and sources', () => {
     expect(sources.map((s) => s.site)).toEqual(['Wikipedia', 'Wolfram Alpha']);
   });
 
-  it('lists a web search by page, titled, and never a link that is not the web', () => {
+  /** The search card draws its own pages, so they are not listed a second time under it. */
+  it('leaves a web search\'s pages to its own card', () => {
     const sources = sourcesOf([
       {
         id: '1',
         name: 'giap-knowledge__search_web',
         args: '{}',
         status: 'ok',
-        card: {
-          type: 'search',
-          data: {
-            query: 'museum hours',
-            results: [
-              { title: 'Opening hours', url: 'https://www.museums.or.ke/visit', domain: 'museums.or.ke' },
-              { title: '', url: 'https://example.com/a' },
-              { title: 'Sneaky', url: 'javascript:alert(1)' },
-              null,
-              { title: 'Opening hours again', url: 'https://www.museums.or.ke/visit' },
-            ],
-          },
-        },
+        card: { type: 'search', data: { query: 'q', results: [{ title: 'T', url: 'https://www.museums.or.ke/visit' }] } },
       },
     ]);
-    expect(sources).toEqual([
-      { title: 'Opening hours', site: 'museums.or.ke', url: 'https://www.museums.or.ke/visit' },
-      { title: 'example.com', site: 'example.com', url: 'https://example.com/a' },
-    ]);
+    expect(sources).toEqual([]);
   });
 
   it('titles a live Wikipedia source with its article', () => {

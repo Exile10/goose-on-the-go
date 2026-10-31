@@ -190,6 +190,12 @@ export interface SessionMessage {
   thinking?: string[];
   /** `true` liked, `false` disliked, absent/null no vote. */
   liked?: boolean | null;
+  /**
+   * A `tool` row holding only the stub of a result the Pond does not keep. The
+   * Pond puts the marker inside the JSON in `content`; this is the other place
+   * a client accepts it.
+   */
+  transient?: boolean;
 }
 
 /**
@@ -240,6 +246,12 @@ export interface ChatFrame {
   input?: unknown;
   /** `tool_result`: a card hint, live only — history keeps just the text. */
   ui?: { card_type?: string; data?: Record<string, unknown> };
+  /**
+   * `tool_result`: the result is the turn's only. History keeps a stub in its
+   * place (Brave's terms allow search results only transient storage), so the
+   * phone must not keep its card either.
+   */
+  transient?: boolean;
   run_id?: string;
   session_id?: string;
   epoch?: number | string;
@@ -1065,11 +1077,21 @@ export interface OAuthProvider {
  */
 export type WebSearchStatus = 'ok' | 'not_configured' | 'rejected' | 'quota' | 'unverified';
 
-/** `GET /api/v1/web-search`. */
+/**
+ * Nearby places: whether each search sends the household's town to Brave, and the town it would
+ * send, which is null while no place name is set. Never coordinates.
+ */
+export interface WebSearchLocalResults {
+  enabled: boolean;
+  town: string | null;
+}
+
+/** `GET /api/v1/web-search`. `local_results` is absent from a Pond that predates nearby places. */
 export interface WebSearchState {
   provider: 'brave';
   configured: boolean;
   status: WebSearchStatus;
+  local_results?: WebSearchLocalResults;
 }
 
 /**
@@ -1298,6 +1320,8 @@ export interface PondSettings {
   ext_context_enabled: boolean;
   tool_selection_mode: string;
   searxng_url: string | null;
+  /** Nearby places in web search. Off by default; absent from a Pond that predates it. */
+  web_search_local_results?: boolean;
 
   // Automations
   schedule_max_concurrent: number;

@@ -3,17 +3,18 @@
  *
  * Two shapes. A tool whose answer is a fact a person wants to see — the
  * weather now or for the week, the devices it found, the time, the article it
- * read — draws that fact, from the card the tool itself described
- * (`ui.card_type` on the live stream). A card whose payload holds nothing it
- * can draw stays a chip rather than an empty frame. Everything else is a
- * chip: the tool's name, whether it is still running, and its raw answer one
- * tap away, because that answer was written for the model and is best kept
- * out of the reader's way until asked for.
+ * read, the pages and places a web search found — draws that fact, from the
+ * card the tool itself described (`ui.card_type` on the live stream). A card
+ * whose payload holds nothing it can draw stays a chip rather than an empty
+ * frame. Everything else is a chip: the tool's name, whether it is still
+ * running, and its raw answer one tap away, because that answer was written
+ * for the model and is best kept out of the reader's way until asked for.
  *
  * It all lies flat on a hairline under the answer, which is what the turn is
  * for; a tool card wearing the plate would outrank it. A reopened conversation
  * has no card hints — the Pond strips them before saving — so its tools come
- * back as chips, with the text their card would have drawn from.
+ * back as chips, with the text their card would have drawn from. A result the
+ * Pond did not keep at all comes back as one quiet line naming its sources.
  */
 
 import React, { useState } from 'react';
@@ -25,7 +26,15 @@ import { InkEdge, InkEyebrow, inkText, useInkTheme } from '@jarida/ink/native';
 import { LongTaskCard } from '@/components/patterns/long-task-card';
 import { GIcon } from '@/components/ui/g-icon';
 import { GPressable } from '@/components/ui/g-pressable';
-import { humanizeTool, sourcesOf, toolIcon, toolWords } from '@/constants/tools';
+import {
+  humanizeTool,
+  keptLine,
+  readSearch,
+  sourcesOf,
+  toolIcon,
+  toolWords,
+  type SearchEntry,
+} from '@/constants/tools';
 import type { ToolCall } from '@/models/chat';
 import { startedTaskId } from '@/models/long-tasks';
 import {
@@ -231,6 +240,111 @@ function Memories({ data }: { data: Data }) {
   );
 }
 
+/** A chat bubble's worth: the desktop's chat chip shows three of each too. */
+const SEARCH_SHOWN = 3;
+
+function SearchRow({ entry, first }: { entry: SearchEntry; first: boolean }) {
+  const theme = useInkTheme();
+  const { t } = useTranslation();
+  const title = inkText(theme, { size: 'base', weight: theme.weight.semibold, leading: 'snug' });
+  const site = inkText(theme, { role: 'mono', size: 'xs', color: theme.color.textTertiary });
+  const body = inkText(theme, { size: 'sm', color: theme.color.textSecondary });
+  const rule = first ? null : { borderTopWidth: theme.edge.hairlineWidth, borderTopColor: theme.color.line };
+  const words = (
+    <View style={styles.sourceText}>
+      <Text style={title.style} numberOfLines={2}>
+        {entry.title}
+      </Text>
+      {entry.site && entry.site !== entry.title ? (
+        <Text style={site.style} numberOfLines={1}>
+          {entry.site}
+        </Text>
+      ) : null}
+      {entry.snippet ? (
+        <Text style={body.style} numberOfLines={2}>
+          {entry.snippet}
+        </Text>
+      ) : null}
+    </View>
+  );
+  const url = entry.url;
+  if (!url) return <View style={[styles.searchRow, rule]}>{words}</View>;
+  return (
+    <GPressable
+      feedback="tint"
+      onPress={() => void WebBrowser.openBrowserAsync(url)}
+      accessibilityRole="link"
+      accessibilityLabel={t('chat.tools.openSource', { source: entry.title })}
+      style={[styles.searchRow, rule]}
+    >
+      {words}
+      <GIcon name="external" size={13} color={theme.color.textTertiary} />
+    </GPressable>
+  );
+}
+
+function SearchLabel({ icon, children }: { icon: 'pin' | 'globe'; children: string }) {
+  const theme = useInkTheme();
+  return (
+    <View style={styles.row}>
+      <GIcon name={icon} size={12} color={theme.color.textTertiary} />
+      <InkEyebrow>{children}</InkEyebrow>
+    </View>
+  );
+}
+
+// Drawn live only: a transient result's card is never kept, so a saved turn shows its stub instead.
+function Search({ data }: { data: Data }) {
+  const theme = useInkTheme();
+  const { t } = useTranslation();
+  const [all, setAll] = useState(false);
+  const { query, pages, places } = readSearch(data);
+  const shownPlaces = places.slice(0, SEARCH_SHOWN);
+  const shownPages = all ? pages : pages.slice(0, SEARCH_SHOWN);
+  const heading = inkText(theme, { size: 'md', weight: theme.weight.semibold, leading: 'snug' });
+  const quiet = inkText(theme, { size: 'sm', color: theme.color.textSecondary });
+  const more = inkText(theme, { size: 'sm', weight: theme.weight.medium, color: theme.color.accentLine });
+  return (
+    <View style={styles.cardBody}>
+      <View style={styles.row}>
+        <GIcon name="search" size={14} color={theme.color.textSecondary} />
+        <Text style={[heading.style, styles.shrink]} numberOfLines={2}>
+          {query || t('chat.tools.webSearch')}
+        </Text>
+      </View>
+      {shownPlaces.length > 0 ? (
+        <View>
+          <SearchLabel icon="pin">{t('chat.tools.nearbyPlaces')}</SearchLabel>
+          {shownPlaces.map((place, i) => (
+            <SearchRow key={`${place.url ?? place.title}-${i}`} entry={place} first={i === 0} />
+          ))}
+        </View>
+      ) : null}
+      {shownPages.length > 0 ? (
+        <View>
+          {shownPlaces.length > 0 ? <SearchLabel icon="globe">{t('chat.tools.pages')}</SearchLabel> : null}
+          {shownPages.map((page, i) => (
+            <SearchRow key={`${page.url ?? page.title}-${i}`} entry={page} first={i === 0} />
+          ))}
+          {!all && pages.length > SEARCH_SHOWN ? (
+            <Pressable
+              onPress={() => {
+                void selectionTick();
+                setAll(true);
+              }}
+              accessibilityRole="button"
+              style={styles.searchRow}
+            >
+              <Text style={more.style}>{t('chat.tools.moreSources', { count: pages.length - SEARCH_SHOWN })}</Text>
+            </Pressable>
+          ) : null}
+        </View>
+      ) : null}
+      {pages.length === 0 && places.length === 0 ? <Text style={quiet.style}>{t('chat.tools.noPages')}</Text> : null}
+    </View>
+  );
+}
+
 const CARDS: Record<string, React.ComponentType<{ data: Data }>> = {
   weather: Weather,
   devices: Devices,
@@ -238,6 +352,7 @@ const CARDS: Record<string, React.ComponentType<{ data: Data }>> = {
   knowledge: Article,
   wolfram: Article,
   memory: Memories,
+  search: Search,
 };
 
 /**
@@ -332,6 +447,22 @@ function ResultPanel({ tool }: { tool: ToolCall }) {
   );
 }
 
+function KeptLine({ tool }: { tool: ToolCall }) {
+  const theme = useInkTheme();
+  const { t } = useTranslation();
+  const text = inkText(theme, { size: 'xs', color: theme.color.textSecondary });
+  return (
+    <View style={styles.kept}>
+      <View style={styles.keptIcon}>
+        <GIcon name="not-kept" size={12} color={theme.color.textSecondary} />
+      </View>
+      <Text style={[text.style, styles.shrink]} selectable>
+        {keptLine(tool, t)}
+      </Text>
+    </View>
+  );
+}
+
 /** Enough to judge where an answer came from without a search's whole first page. */
 const SOURCES_SHOWN = 3;
 
@@ -402,7 +533,9 @@ export const ToolTrail = React.memo(function ToolTrail({ tools, done }: { tools:
     const taskId = startedTaskId(tool);
     return taskId ? [{ call: tool.id, taskId }] : [];
   });
-  const chips = tools.filter((tool) => !hasFact(tool) && !tasks.some((task) => task.call === tool.id));
+  const chips = tools.filter(
+    (tool) => !hasFact(tool) && !tool.kept && !tasks.some((task) => task.call === tool.id),
+  );
   const open = chips.find((tool) => tool.id === openId && expandable(tool));
   return (
     <View style={styles.trail}>
@@ -426,6 +559,7 @@ export const ToolTrail = React.memo(function ToolTrail({ tools, done }: { tools:
         </View>
       ) : null}
       {open ? <ResultPanel tool={open} /> : null}
+      {tools.map((tool) => (tool.kept ? <KeptLine key={tool.id} tool={tool} /> : null))}
     </View>
   );
 });
@@ -451,8 +585,11 @@ const styles = StyleSheet.create({
     maxWidth: '100%',
   },
   result: { padding: 10 },
+  kept: { flexDirection: 'row', alignItems: 'flex-start', gap: 5 },
+  keptIcon: { marginTop: 2 },
   sourceCard: { paddingVertical: 4 },
   sourceHead: { paddingHorizontal: 14, paddingTop: 10, paddingBottom: 2 },
   source: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 10 },
   sourceText: { flex: 1, gap: 2 },
+  searchRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8 },
 });

@@ -278,6 +278,11 @@
       "openSource": "Open {{source}}",
       "moreSources_one": "{{count}} more source",
       "moreSources_other": "{{count}} more sources",
+      "nearbyPlaces": "Nearby places",
+      "pages": "Pages",
+      "noPages": "No pages came back for this search.",
+      "notKept": "{{tool}}: results aren't kept after the turn.",
+      "notKeptSources": "{{tool}}: results aren't kept after the turn. Sources: {{sources}}.",
       "taskStart": "Long task",
       "doingTaskStart": "Starting a long task",
       "taskStatus": "Long task",
@@ -1947,7 +1952,7 @@
     "storageTitle": "How it is stored",
     "storageBody": "API keys you give your Pond are encrypted on disk. Its other data — conversations, memories, profiles and face templates — is not encrypted by the Pond, so protect the computer it runs on as you would any device holding personal information.",
     "networkTitle": "What reaches the internet",
-    "networkBody": "Some features need the internet: weather comes from Open-Meteo, encyclopedia lookups from Wikipedia, and music from Spotify once you connect it. Keys you add turn on more: Wolfram|Alpha for calculations, and Brave for web search, which sends your question to Brave and reads the top result pages from their own sites. Your Pond keeps a record of every outbound call it makes, and can be set to refuse sensitive destinations or to stay offline entirely.",
+    "networkBody": "Some features need the internet: weather comes from Open-Meteo, encyclopedia lookups from Wikipedia, and music from Spotify once you connect it. Keys you add turn on more: Wolfram|Alpha for calculations, and Brave for web search, which sends your question to Brave and reads the top result pages from their own sites. If you turn on nearby places, each search also sends your town, never your exact location. Your Pond keeps a record of every outbound call it makes, and can be set to refuse sensitive destinations or to stay offline entirely.",
     "voiceTitle": "Voice",
     "voiceBody": "Speech is transcribed on your Pond by default, and the recording is not kept afterwards. What you said is kept as text, as part of the conversation. The wake word is detected on your Pond, not on this phone.",
     "facesTitle": "Faces",
@@ -2049,7 +2054,17 @@
     "removing": "Removing…",
     "removeConfirmTitle": "Remove the Brave key?",
     "removeConfirmBody": "Goose will stop searching the web until a key is added again.",
-    "privacy": "When the Pond searches the web, your question is sent to Brave, and the top pages are read from their sites."
+    "nearby": {
+      "label": "Nearby places",
+      "sends": "Sends your town ({{town}}) to Brave with each search, so it can find places near you. Your exact location is never sent.",
+      "needsLocation": "Needs your location first. Set it under Your home, then come back to turn this on.",
+      "noTown": "Your location is not set, so no town is sent. Set it under Your home.",
+      "oldPond": "This Pond cannot look for nearby places yet. Update it, then open this screen again.",
+      "failed": "Could not save this setting. Try again in a moment.",
+      "setLocation": "Set your location"
+    },
+    "privacy": "When the Pond searches the web, your question is sent to Brave, and the top pages are read from their sites.",
+    "townSentence": "Each web search sends {{town}} to Brave, so the results can include places near you."
   },
   "secrets": {
     "intro": "Keys, tokens and client IDs your Pond uses for outside services. Your Pond never sends a value back, so a value can be replaced but not shown.",

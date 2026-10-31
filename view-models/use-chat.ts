@@ -44,7 +44,7 @@ import type { CardHint, Message, ToolCall } from '@/models/chat';
 import { toolWords, humanizeTool } from '@/constants/tools';
 import { useServer } from '@/providers/server-provider';
 import { ApiError, api } from '@/services/api-client';
-import { cardsFor, rememberCard, type CardsByCall } from '@/services/card-cache';
+import { cardsFor, forgetCalls, rememberCard, type CardsByCall } from '@/services/card-cache';
 import {
   changed,
   keepThread,
@@ -108,15 +108,33 @@ export function describeTurnError(e: unknown, t: TFunction): string {
   return e instanceof Error ? e.message : t('chat.failed');
 }
 
+/** A tool row's `content` parsed as the JSON blob it stores, or null for an older, bare row. */
+function readRow(content: string): Record<string, unknown> | null {
+  try {
+    const blob: unknown = JSON.parse(content);
+    return typeof blob === 'object' && blob !== null && !Array.isArray(blob) ? (blob as Record<string, unknown>) : null;
+  } catch {
+    return null;
+  }
+}
+
 /** A tool row's `content` is a JSON blob around the result; this is the result. */
 export function toolResultText(content: string): string {
-  try {
-    const blob = JSON.parse(content) as { content?: unknown };
-    if (blob && typeof blob.content === 'string') return blob.content;
-  } catch {
-    // Not the blob: an older row that stored the result bare.
-  }
-  return content;
+  const blob = readRow(content);
+  return typeof blob?.content === 'string' ? blob.content : content;
+}
+
+/**
+ * The stub a tool row holds in place of a result the Pond does not keep, or
+ * null for a row holding its whole result. The marker sits inside the stored
+ * JSON, and the Pond's contract also allows it on the message itself.
+ */
+export function keptStubOf(m: SessionMessage): string | null {
+  if (m.role !== 'tool') return null;
+  const blob = readRow(m.content);
+  if (blob?.transient !== true && m.transient !== true) return null;
+  const stub = (typeof blob?.content === 'string' ? blob.content : m.content).trim();
+  return stub || null;
 }
 
 /**
@@ -156,11 +174,16 @@ export function toMessage(m: SessionMessage): Message | null {
  * nothing, and is left out.
  *
  * The Pond saves no cards, so `cards` is what this phone kept of them, by call.
+ * A result the Pond kept only as a stub comes back as that stub, with no card.
  */
 export function fromHistory(rows: SessionMessage[], cards: CardsByCall = {}): Message[] {
   const results = new Map<string, string>();
+  const stubs = new Map<string, string>();
   for (const row of rows) {
-    if (row.role === 'tool' && row.tool_call_id) results.set(row.tool_call_id, toolResultText(row.content));
+    if (row.role !== 'tool' || !row.tool_call_id) continue;
+    const stub = keptStubOf(row);
+    if (stub) stubs.set(row.tool_call_id, stub);
+    else results.set(row.tool_call_id, toolResultText(row.content));
   }
 
   const out: Message[] = [];
@@ -178,6 +201,11 @@ export function fromHistory(rows: SessionMessage[], cards: CardsByCall = {}): Me
           status: 'ok',
           result: results.get(call.id),
         };
+        const stub = stubs.get(call.id);
+        if (stub) {
+          tool.kept = stub;
+          return tool;
+        }
         const card = cards[call.id];
         if (card) tool.card = card;
         return tool;
@@ -244,6 +272,11 @@ export function titleFromThread(messages: Message[]): string | null {
 /** The card a tool result asks to be drawn as, when it asks. */
 export function cardOf(frame: ChatFrame): CardHint | undefined {
   return frame.ui?.card_type && frame.ui.data ? { type: frame.ui.card_type, data: frame.ui.data } : undefined;
+}
+
+/** The card worth keeping on this phone: none for a result the Pond marks transient. */
+export function cardToKeep(frame: ChatFrame): CardHint | undefined {
+  return frame.transient === true ? undefined : cardOf(frame);
 }
 
 /**
@@ -525,6 +558,11 @@ export function useChat(): UseChat {
         const [rows, cards] = await Promise.all([api.listSessionMessages(id, HISTORY_LIMIT), cardsFor(id)]);
         if (th.turn || th.left || th.turns !== turns) return;
         th.messages = fromHistory(rows, cards);
+        // A card kept before the Pond marked its result transient goes too.
+        const stale = rows.flatMap((row) =>
+          row.tool_call_id && cards[row.tool_call_id] && keptStubOf(row) ? [row.tool_call_id] : [],
+        );
+        void forgetCalls(id, stale);
         keepThread(th);
         changed(th);
       } catch (e) {
@@ -586,8 +624,8 @@ export function useChat(): UseChat {
       };
 
       // Cards reach the phone on the stream and nowhere else, so each is kept
-      // as it lands. One that lands before the Pond has named a new
-      // conversation waits for the name.
+      // as it lands, unless the result is transient. One that lands before the
+      // Pond has named a new conversation waits for the name.
       const unnamed = new Map<string, CardHint>();
       const keep = (callId: string, card: CardHint) => {
         if (th.session) void rememberCard(th.session, callId, card);
@@ -633,7 +671,7 @@ export function useChat(): UseChat {
         const before = reply.content;
         reply = applyFrame(reply, frame);
         if (frame.type === 'tool_result' && frame.id) {
-          const card = cardOf(frame);
+          const card = cardToKeep(frame);
           if (card) keep(frame.id, card);
         }
         if (reply.content !== before) options.onText?.(reply.content);
