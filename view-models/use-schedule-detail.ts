@@ -34,7 +34,7 @@ export interface UseScheduleDetail {
   /** A read failed before anything loaded, so the schedule is unknown, not missing. */
   failed: boolean;
   /** What the last change did, for a line on screen; cleared by the next one. */
-  notice: 'saved' | 'runStarted' | null;
+  notice: 'saved' | 'runStarted' | 'missedSkipped' | null;
   runs: UseScheduleRuns;
   actions: {
     refresh: () => Promise<void>;
@@ -42,6 +42,8 @@ export interface UseScheduleDetail {
     update: (req: UpdateScheduleRequest) => Promise<string | null>;
     setPaused: (paused: boolean) => Promise<void>;
     runNow: () => Promise<void>;
+    /** Settles the missed run the Pond is asking about. */
+    answerMissed: (answer: 'run' | 'skip') => Promise<void>;
     /** Resolves to true once the Pond no longer has it. */
     remove: () => Promise<boolean>;
   };
@@ -209,6 +211,34 @@ export function useScheduleDetail(id: string): UseScheduleDetail {
     }
   }, [real, id]);
 
+  // An answer not yet settled; the first answer from any phone settles it, so a second tap is moot.
+  const answering = useRef(false);
+  const answerMissed = useCallback(
+    async (answer: 'run' | 'skip') => {
+      if (!real || answering.current) return;
+      answering.current = true;
+      setNotice(null);
+      setError(null);
+      try {
+        await api.answerMissedRun(id, answer);
+        setNotice(answer === 'run' ? 'runStarted' : 'missedSkipped');
+      } catch (e) {
+        // A 409 is another phone answering first: not a failure, and the read below shows what it chose.
+        setError(
+          e instanceof ApiError && e.status === 409
+            ? i18n.t('schedule.missed.answered')
+            : describeScheduleError(e) ?? i18n.t('schedule.errors.saveFailed'),
+        );
+      } finally {
+        answering.current = false;
+      }
+      changes.current += 1;
+      setRunsVersion((v) => v + 1);
+      await load(false);
+    },
+    [real, id, load],
+  );
+
   const remove = useCallback(async () => {
     setNotice(null);
     setError(null);
@@ -240,6 +270,6 @@ export function useScheduleDetail(id: string): UseScheduleDetail {
     failed,
     notice,
     runs,
-    actions: { refresh, update, setPaused, runNow, remove },
+    actions: { refresh, update, setPaused, runNow, answerMissed, remove },
   };
 }

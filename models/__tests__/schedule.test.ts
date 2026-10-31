@@ -6,6 +6,7 @@
 
 import {
   createRequest,
+  describeRoutine,
   describeCron,
   draftCron,
   describeWhen,
@@ -17,11 +18,12 @@ import {
   linkedScheduleId,
   oneOffCron,
   repeatFrom,
+  pondAsksIfMissed,
   timedSchedules,
   updateRequest,
   type ScheduleDraft,
 } from '@/models/schedule';
-import type { Schedule } from '@/services/types';
+import type { Schedule, ScheduleRun } from '@/services/types';
 
 function schedule(overrides: Partial<Schedule>): Schedule {
   return {
@@ -261,7 +263,9 @@ describe('the schedule form', () => {
   it('opens an edit on the schedule as the Pond has it', () => {
     expect(draftFrom(brief)).toEqual({
       name: 'Daily Brief',
+      does: 'prompt',
       prompt: 'Brief me',
+      devices: {},
       timing: 'daily',
       date: null,
       time: { hour: 7, minute: 0 },
@@ -271,6 +275,7 @@ describe('the schedule form', () => {
       dayOfMonth: 1,
       cron: '0 0 7 * * *',
       timezone: 'Africa/Nairobi',
+      askIfMissed: null,
     });
     const at = new Date(2026, 9, 24, 18, 5);
     const oneOff = schedule({ cron: '@once', fire_at: at.toISOString() });
@@ -437,5 +442,117 @@ describe('the repeat presets', () => {
       ok: true,
       req: { name: 'Renamed' },
     });
+  });
+});
+
+describe('asking about a missed run', () => {
+  const now = new Date(2026, 9, 24, 12, 0);
+  const daily = schedule({ label: 'Morning', cron: '0 30 6 * * *', ask_if_missed: false });
+  const repeat = (over: Partial<ScheduleDraft> = {}): ScheduleDraft => ({
+    ...emptyDraft('Africa/Nairobi', true),
+    name: 'Morning',
+    prompt: 'Lights on',
+    timing: 'custom',
+    cron: '0 30 6 * * *',
+    ...over,
+  });
+
+  it('is offered only by a Pond whose schedules say whether they ask', () => {
+    expect(pondAsksIfMissed([schedule({})])).toBe(false);
+    expect(pondAsksIfMissed([schedule({}), daily])).toBe(true);
+    expect(emptyDraft('UTC').askIfMissed).toBeNull();
+    expect(emptyDraft('UTC', true).askIfMissed).toBe(true);
+  });
+
+  it('is sent for a new repeat, and never for a one-off or by an older Pond', () => {
+    expect(createRequest(repeat(), now)).toMatchObject({ ok: true, req: { ask_if_missed: true } });
+    const once = repeat({ timing: 'once', date: { year: 2026, month: 10, day: 25 }, time: { hour: 6, minute: 30 } });
+    const built = createRequest(once, now);
+    expect(built.ok && 'ask_if_missed' in built.req).toBe(false);
+    const older = createRequest(repeat({ askIfMissed: null }), now);
+    expect(older.ok && 'ask_if_missed' in older.req).toBe(false);
+  });
+
+  it('is sent on an edit only when it changed', () => {
+    expect(draftFrom(daily).askIfMissed).toBe(false);
+    expect(updateRequest(daily, draftFrom(daily), now)).toEqual({ ok: true, req: {} });
+    expect(updateRequest(daily, { ...draftFrom(daily), askIfMissed: true }, now)).toEqual({
+      ok: true,
+      req: { ask_if_missed: true },
+    });
+  });
+});
+
+describe('routines', () => {
+  const now = new Date(2026, 9, 24, 12, 0);
+  const routine = (over: Partial<ScheduleDraft> = {}): ScheduleDraft => ({
+    ...emptyDraft('Africa/Nairobi', true),
+    name: 'Morning',
+    does: 'routine',
+    devices: { 'kitchen-lights': true, 'water-heater': true },
+    timing: 'custom',
+    cron: '0 30 6 * * *',
+    ...over,
+  });
+  const morning = schedule({
+    label: 'Morning',
+    cron: '0 30 6 * * *',
+    ask_if_missed: true,
+    kind: {
+      type: 'routine',
+      actions: [
+        { type: 'device_power', device_id: 'kitchen-lights', on: true },
+        { type: 'notify', title: 'Morning', body: 'Kettle is on' },
+      ],
+    },
+  });
+
+  it('sends its devices as actions, with no prompt', () => {
+    const built = createRequest(routine(), now);
+    expect(built).toMatchObject({
+      ok: true,
+      req: {
+        kind: {
+          type: 'routine',
+          actions: [
+            { type: 'device_power', device_id: 'kitchen-lights', on: true },
+            { type: 'device_power', device_id: 'water-heater', on: true },
+          ],
+        },
+      },
+    });
+    expect(built.ok && 'prompt' in built.req).toBe(false);
+  });
+
+  it('needs at least one device', () => {
+    expect(createRequest(routine({ devices: {} }), now)).toEqual({ ok: false, error: 'schedule.errors.devicesRequired' });
+  });
+
+  it('opens an edit on its devices, and sends them only when they changed', () => {
+    const d = draftFrom(morning);
+    expect(d).toMatchObject({ does: 'routine', devices: { 'kitchen-lights': true } });
+    expect(updateRequest(morning, d, now)).toEqual({ ok: true, req: {} });
+  });
+
+  it('keeps what the form cannot show when its devices change', () => {
+    const built = updateRequest(morning, { ...draftFrom(morning), devices: { 'kitchen-lights': false } }, now);
+    expect(built).toEqual({
+      ok: true,
+      req: {
+        kind: {
+          type: 'routine',
+          actions: [
+            { type: 'device_power', device_id: 'kitchen-lights', on: false },
+            { type: 'notify', title: 'Morning', body: 'Kettle is on' },
+          ],
+        },
+      },
+    });
+  });
+
+  it('says what it sets by name, and by id when the name is unknown', () => {
+    expect(describeRoutine({ 'kitchen-lights': true, 'water-heater': false }, { 'kitchen-lights': 'Kitchen lights' })).toBe(
+      'Kitchen lights on, water-heater off',
+    );
   });
 });

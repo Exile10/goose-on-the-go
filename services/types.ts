@@ -610,6 +610,8 @@ export type TriggerAction =
 export type TaskKind =
   | { type: 'agent_prompt'; prompt: string }
   | { type: 'webhook'; webhook_url: string }
+  /** A fixed list of actions the Pond runs itself, without Goose: a morning routine. */
+  | { type: 'routine'; actions: TriggerAction[] }
   | {
       type: 'sensor_trigger';
       source: TriggerSource;
@@ -632,6 +634,13 @@ export interface Schedule {
   last_run: string | null;
   next_run: string | null;
   created_at: string;
+  /**
+   * Whether a run missed while the Pond was off is asked about rather than skipped. Absent on a
+   * Pond that cannot ask, which is how the form knows not to offer it.
+   */
+  ask_if_missed?: boolean;
+  /** A missed run waiting for somebody to say run it or skip it. */
+  missed_run?: { due_at: string } | null;
 }
 
 /** `POST /schedules`. `name` is the label; `once` removes it after its first run. */
@@ -643,6 +652,7 @@ export interface CreateScheduleRequest {
   timezone?: string;
   kind?: TaskKind;
   once?: boolean;
+  ask_if_missed?: boolean;
 }
 
 /** `PUT /schedules/{id}`. Absent fields are left as they are. */
@@ -653,17 +663,26 @@ export interface UpdateScheduleRequest {
   prompt?: string;
   fire_at?: string;
   once?: boolean;
+  ask_if_missed?: boolean;
+  /** A routine's new actions. Only a routine's kind is ever sent. */
+  kind?: TaskKind;
 }
 
 export interface ScheduleRun {
   id: string;
   schedule_id: string;
-  status: 'running' | 'completed' | 'failed';
+  /**
+   * `skipped` is a run missed while the Pond was off that nobody chose to run:
+   * `started_at` is when it was due and `result` says why. Older Ponds never send it.
+   */
+  status: 'running' | 'completed' | 'failed' | 'skipped';
   result: string | null;
   error: string | null;
   started_at: string;
   finished_at: string | null;
   duration_ms: number | null;
+  /** Set on a missed run somebody chose to run late: when it was originally due. */
+  caught_up_from?: string | null;
 }
 
 /** One frame of `GET /schedules/events`: a run starting or finishing. */

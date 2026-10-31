@@ -86,6 +86,16 @@ function press(tree: ReactTestRenderer) {
 }
 
 describe('RunRow', () => {
+  it('marks a missed run nobody chose to run as skipped, not failed', async () => {
+    const tree = await render(<RunRow run={run({ status: 'skipped' })} />);
+    expect(texts(tree).join('\n')).toContain('Skipped');
+  });
+
+  it('says when a late run was due', async () => {
+    const tree = await render(<RunRow run={run({ caught_up_from: '2026-10-28T06:30:00Z' })} />);
+    expect(texts(tree).join('\n')).toMatch(/Ran late/);
+  });
+
   it('shows a plain preview with no markdown markers while closed', async () => {
     const tree = await render(<RunRow run={run({ result: WEATHER })} />);
     const drawn = texts(tree).join('\n');

@@ -1,5 +1,6 @@
 /**
- * ScheduleFormSheet — a new schedule, or an edit to one, that runs a prompt.
+ * ScheduleFormSheet — a new schedule, or an edit to one, that runs a prompt
+ * or, on a Pond that can run one, a routine that switches devices.
  *
  * "Once" is a date and a time. The repeats are the dashboard's: hourly, daily,
  * weekly on chosen days, monthly on a day, or a custom cron typed by hand;
@@ -8,6 +9,9 @@
  * edit sends, is `createRequest` and `updateRequest` in `models/schedule.ts`.
  * Checks that would otherwise come back as a 400 run there first, so the
  * person hears what to fix before anything is sent.
+ *
+ * A repeat can ask about a run missed while the Pond was off, on a Pond that
+ * can ask. It is never run late on its own: somebody says run it or skip it.
  */
 
 import React, { useState } from 'react';
@@ -30,6 +34,8 @@ import {
 } from '@jarida/ink/native';
 import type { CivilDate } from '@jarida/ink';
 
+import { LabelledSwitch } from '@/components/patterns/labelled-switch';
+import { RoutineDevices } from '@/components/patterns/routine-devices';
 import { GSheetBody } from '@/components/ui/g-sheet-body';
 import {
   CRON_WEEKDAYS,
@@ -57,6 +63,8 @@ export type ScheduleFormSheetProps = {
   | {
       /** Resolves to why it was refused, or null once it exists. */
       onCreate: (req: CreateScheduleRequest) => Promise<string | null>;
+      /** Whether the Pond can ask about a missed run, so the form offers it. */
+      asksIfMissed: boolean;
       schedule?: undefined;
     }
   | {
@@ -95,7 +103,10 @@ export function ScheduleFormSheet(props: ScheduleFormSheetProps) {
   const editing = props.schedule;
   const { t } = useTranslation();
   const [phoneZone] = useState(deviceTimeZone);
-  const [draft, setDraft] = useState<ScheduleDraft>(() => (editing ? draftFrom(editing) : emptyDraft(phoneZone)));
+  const asksIfMissed = !editing && props.asksIfMissed;
+  const [draft, setDraft] = useState<ScheduleDraft>(() =>
+    editing ? draftFrom(editing) : emptyDraft(phoneZone, asksIfMissed),
+  );
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -109,6 +120,8 @@ export function ScheduleFormSheet(props: ScheduleFormSheetProps) {
       setDraft(draftFrom(editing));
       setError(null);
     }
+    // The list that says whether the Pond can ask may have loaded after this form was made.
+    if (open && asksIfMissed && draft.askIfMissed === null) setDraft((d) => ({ ...d, askIfMissed: true }));
   }
 
   const set =
@@ -150,7 +163,7 @@ export function ScheduleFormSheet(props: ScheduleFormSheetProps) {
     void confirm();
     // Only a created schedule clears the form. A stray tap on the backdrop
     // closes the sheet too, and it should not cost the draft.
-    if (!editing) setDraft(emptyDraft(phoneZone));
+    if (!editing) setDraft(emptyDraft(phoneZone, asksIfMissed));
     onClose();
   };
 
@@ -163,6 +176,9 @@ export function ScheduleFormSheet(props: ScheduleFormSheetProps) {
   const today = todayCivil();
   // A webhook has no prompt to edit; see `updateRequest`.
   const hasPrompt = !editing || promptOf(editing) != null;
+  // Routines came to the Pond with asking about missed runs, so one says the other is there.
+  // What a schedule does is chosen once: an edit keeps it.
+  const offersRoutine = !editing && asksIfMissed;
   // The zone is offered only where there is a choice: the schedule's own, or this phone's.
   const zones = editing && editing.timezone !== phoneZone ? [editing.timezone, phoneZone] : null;
   // When it will run, in words, as the dashboard previews it. Nothing until the
@@ -196,6 +212,20 @@ export function ScheduleFormSheet(props: ScheduleFormSheetProps) {
               onChange={set('name')}
             />
           </InkFormField>
+
+          {offersRoutine ? (
+            <InkFormField label={t('schedule.form.does')}>
+              <InkSegmented
+                label={t('schedule.form.does')}
+                value={draft.does}
+                options={[
+                  { value: 'prompt', label: t('schedule.form.doesPrompt') },
+                  { value: 'routine', label: t('schedule.form.doesRoutine') },
+                ]}
+                onChange={set('does')}
+              />
+            </InkFormField>
+          ) : null}
 
           <InkFormField label={t('schedule.form.timing')}>
             <View style={styles.chips}>
@@ -290,6 +320,16 @@ export function ScheduleFormSheet(props: ScheduleFormSheetProps) {
                 />
               </InkFormField>
               <InkText size="sm" tone="tertiary">{t('schedule.form.cronHint')}</InkText>
+              {draft.askIfMissed !== null ? (
+                <>
+                  <LabelledSwitch
+                    label={t('schedule.form.askIfMissed')}
+                    checked={draft.askIfMissed}
+                    onChange={set('askIfMissed')}
+                  />
+                  <InkText size="sm" tone="tertiary">{t('schedule.form.askIfMissedHint')}</InkText>
+                </>
+              ) : null}
             </>
           ) : null}
 
@@ -307,7 +347,10 @@ export function ScheduleFormSheet(props: ScheduleFormSheetProps) {
           ) : null}
           <InkText size="sm" tone="tertiary">{t('schedule.form.phoneZone', { zone: phoneZone })}</InkText>
 
-          {hasPrompt ? (
+          {draft.does === 'routine' ? (
+            // Only while open, so the device list is not read behind a closed sheet.
+            open ? <RoutineDevices value={draft.devices} onChange={set('devices')} /> : null
+          ) : hasPrompt ? (
             <InkFormField label={t('schedule.form.prompt')}>
               <InkTextArea
                 label={t('schedule.form.prompt')}

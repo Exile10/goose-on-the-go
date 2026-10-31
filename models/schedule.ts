@@ -13,12 +13,12 @@
  * has a tab for each.
  */
 
-import type { CivilDate, CivilTime } from '@jarida/ink';
+import type { CivilDate, CivilTime, InkTone } from '@jarida/ink';
 
 import i18n from '@/services/i18n';
 import type { TranslationKey } from '@/services/i18n';
 import { decodeEntities, parseReply, type MarkedToken, type Token } from '@/services/markdown';
-import type { CreateScheduleRequest, Rule, Schedule, UpdateScheduleRequest } from '@/services/types';
+import type { CreateScheduleRequest, Rule, Schedule, TriggerAction, UpdateScheduleRequest } from '@/services/types';
 
 /** A sensor rule, which `GET /schedules` returns alongside the timed schedules. */
 export function isRule(schedule: Schedule): boolean {
@@ -370,10 +370,16 @@ export function weekdayShortName(day: number): string {
   return dayName(day, 'short');
 }
 
+/** What a schedule does: ask Goose with a prompt, or set devices as a routine. */
+export type Does = 'prompt' | 'routine';
+
 /** What the create and edit form holds, as typed. */
 export interface ScheduleDraft {
   name: string;
+  does: Does;
   prompt: string;
+  /** A routine's devices: on or off by device id. A device not listed is left as it is. */
+  devices: Record<string, boolean>;
   timing: Timing;
   /** The day a one-off runs. */
   date: CivilDate | null;
@@ -390,22 +396,66 @@ export interface ScheduleDraft {
   /** Custom: the cron as typed. */
   cron: string;
   timezone: string;
+  /** Ask before running a missed repeat, or skip it. Null on a Pond that cannot ask. */
+  askIfMissed: boolean | null;
+}
+
+/** Whether this Pond can ask about missed runs: it says so on every schedule once it can. */
+export function pondAsksIfMissed(schedules: Schedule[]): boolean {
+  return schedules.some((s) => s.ask_if_missed !== undefined);
 }
 
 /** The request, or the key of the sentence that says what to fix. */
 export type DraftResult<T> = { ok: true; req: T } | { ok: false; error: TranslationKey };
 
-/** The prompt a schedule runs, or null for a webhook, which has none. */
+/** The prompt a schedule runs, or null for a webhook or a routine, which have none. */
 export function promptOf(schedule: Schedule): string | null {
   return schedule.kind.type === 'agent_prompt' ? schedule.kind.prompt : null;
+}
+
+/** A routine's devices as the form holds them, or null when it is not a routine. */
+export function routineDevices(schedule: Schedule): Record<string, boolean> | null {
+  if (schedule.kind.type !== 'routine') return null;
+  const devices: Record<string, boolean> = {};
+  for (const a of schedule.kind.actions) if (a.type === 'device_power') devices[a.device_id] = a.on;
+  return devices;
+}
+
+/** What a routine sets, in words: "Kitchen lights on, Water heater off". An unknown device shows its id. */
+export function describeRoutine(devices: Record<string, boolean>, names: Record<string, string>): string {
+  return Object.entries(devices)
+    .map(([id, on]) => i18n.t(on ? 'schedule.detail.deviceOn' : 'schedule.detail.deviceOff', { name: names[id] ?? id }))
+    .join(', ');
+}
+
+/**
+ * A routine's actions from the form's devices. Anything it did besides switching devices is kept
+ * as it was, after them, since the form has no way to show or change it.
+ */
+function routineActions(devices: Record<string, boolean>, original?: Schedule): TriggerAction[] {
+  const kept = original?.kind.type === 'routine' ? original.kind.actions.filter((a) => a.type !== 'device_power') : [];
+  const set = Object.entries(devices).map(([device_id, on]): TriggerAction => ({ type: 'device_power', device_id, on }));
+  return [...set, ...kept];
 }
 
 /** What the repeat fields hold before anything is chosen; the dashboard's defaults. */
 const REPEAT_DEFAULTS = { everyHours: 1, minute: 0, weekdays: [1], dayOfMonth: 1 };
 
-/** An empty form for a new schedule, in the phone's zone. */
-export function emptyDraft(timezone: string): ScheduleDraft {
-  return { name: '', prompt: '', timing: 'once', date: null, time: null, ...REPEAT_DEFAULTS, cron: '', timezone };
+/** An empty form for a new schedule, in the phone's zone. Asking about a missed run starts on, where it can. */
+export function emptyDraft(timezone: string, asksIfMissed = false): ScheduleDraft {
+  return {
+    name: '',
+    does: 'prompt',
+    prompt: '',
+    devices: {},
+    timing: 'once',
+    date: null,
+    time: null,
+    ...REPEAT_DEFAULTS,
+    cron: '',
+    timezone,
+    askIfMissed: asksIfMissed ? true : null,
+  };
 }
 
 const whole = (n: number, min: number, max: number) => Number.isInteger(n) && n >= min && n <= max;
@@ -479,7 +529,7 @@ export function presetCron(d: ScheduleDraft): DraftResult<string> {
 }
 
 /** The repeat fields of a draft: everything but its name, prompt and zone. */
-type RepeatFields = Omit<ScheduleDraft, 'name' | 'prompt' | 'timezone'>;
+type RepeatFields = Omit<ScheduleDraft, 'name' | 'prompt' | 'timezone' | 'does' | 'devices' | 'askIfMissed'>;
 
 /**
  * The choice a repeating cron opens on: the preset whose builder writes this
@@ -515,7 +565,7 @@ export function repeatFrom(cron: string): RepeatFields {
   }
   for (const candidate of candidates) {
     if (candidate.time && !(whole(candidate.time.hour, 0, 23) && whole(candidate.time.minute, 0, 59))) continue;
-    const built = presetCron({ ...candidate, name: '', prompt: '', timezone: '' });
+    const built = presetCron({ ...candidate, name: '', prompt: '', timezone: '', does: 'prompt', devices: {}, askIfMissed: null });
     if (built.ok && built.req === fields.join(' ')) return { ...candidate, cron };
   }
   return custom;
@@ -527,7 +577,15 @@ export function repeatFrom(cron: string): RepeatFields {
  * repeat opens on its preset, or as custom (see `repeatFrom`).
  */
 export function draftFrom(schedule: Schedule): ScheduleDraft {
-  const base = { name: schedule.label, prompt: promptOf(schedule) ?? '', timezone: schedule.timezone };
+  const devices = routineDevices(schedule);
+  const base = {
+    name: schedule.label,
+    does: devices ? ('routine' as const) : ('prompt' as const),
+    prompt: promptOf(schedule) ?? '',
+    devices: devices ?? {},
+    timezone: schedule.timezone,
+    askIfMissed: schedule.ask_if_missed ?? null,
+  };
   if (isOneOff(schedule) && schedule.fire_at) {
     const at = new Date(schedule.fire_at);
     return {
@@ -575,19 +633,21 @@ export function draftCron(d: ScheduleDraft): string | null {
  */
 export function createRequest(d: ScheduleDraft, now = new Date()): DraftResult<CreateScheduleRequest> {
   if (!d.name.trim()) return { ok: false, error: 'schedule.errors.nameRequired' };
-  if (!d.prompt.trim()) return { ok: false, error: 'schedule.errors.promptRequired' };
+  const routine = d.does === 'routine';
+  if (!routine && !d.prompt.trim()) return { ok: false, error: 'schedule.errors.promptRequired' };
+  if (routine && Object.keys(d.devices).length === 0) return { ok: false, error: 'schedule.errors.devicesRequired' };
   const timing = checkTiming(d, now);
   if (!timing.ok) return timing;
-  return {
-    ok: true,
-    req: {
-      name: d.name.trim(),
-      cron: timing.req.cron,
-      prompt: d.prompt.trim(),
-      timezone: d.timezone,
-      once: d.timing === 'once',
-    },
+  const req: CreateScheduleRequest = {
+    name: d.name.trim(),
+    cron: timing.req.cron,
+    ...(routine ? { kind: { type: 'routine', actions: routineActions(d.devices) } } : { prompt: d.prompt.trim() }),
+    timezone: d.timezone,
+    once: d.timing === 'once',
   };
+  // Only a repeat can be missed: a one-off the Pond slept through still fires late.
+  if (d.timing !== 'once' && d.askIfMissed !== null) req.ask_if_missed = d.askIfMissed;
+  return { ok: true, req };
 }
 
 /**
@@ -626,12 +686,17 @@ export function updateRequest(
   now = new Date(),
 ): DraftResult<UpdateScheduleRequest> {
   const prompt = promptOf(original);
+  const devices = routineDevices(original);
   if (!d.name.trim()) return { ok: false, error: 'schedule.errors.nameRequired' };
   if (prompt != null && !d.prompt.trim()) return { ok: false, error: 'schedule.errors.promptRequired' };
+  if (devices && Object.keys(d.devices).length === 0) return { ok: false, error: 'schedule.errors.devicesRequired' };
 
   const req: UpdateScheduleRequest = {};
   if (d.name.trim() !== original.label) req.name = d.name.trim();
   if (prompt != null && d.prompt.trim() !== prompt) req.prompt = d.prompt.trim();
+  if (devices && !sameDevices(d.devices, devices)) {
+    req.kind = { type: 'routine', actions: routineActions(d.devices, original) };
+  }
   if (d.timezone !== original.timezone) req.timezone = d.timezone;
 
   if (timingChanged(original, d)) {
@@ -640,7 +705,15 @@ export function updateRequest(
     if (timing.req.at) req.fire_at = timing.req.at.toISOString();
     else req.cron = timing.req.cron;
   }
+  if (d.timing !== 'once' && d.askIfMissed !== null && d.askIfMissed !== (original.ask_if_missed ?? null)) {
+    req.ask_if_missed = d.askIfMissed;
+  }
   return { ok: true, req };
+}
+
+function sameDevices(a: Record<string, boolean>, b: Record<string, boolean>): boolean {
+  const ids = Object.keys(a);
+  return ids.length === Object.keys(b).length && ids.every((id) => b[id] === a[id]);
 }
 
 // ── Mock data ────────────────────────────────────────────────────────────────

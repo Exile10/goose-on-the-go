@@ -2192,6 +2192,7 @@
       "enabled": "On",
       "kindPrompt": "Prompt",
       "kindWebhook": "Webhook",
+      "kindRoutine": "Routine",
       "lastFired": "Last fired {{when}}",
       "neverFired": "Never fired",
       "cooldown": "Waits {{seconds}}s between firings",
@@ -2232,7 +2233,9 @@
       "durationHours": "{{h}} h",
       "durationHoursMinutes": "{{h}} h {{m}} min",
       "showAll": "Shows everything this run produced",
-      "showLess": "Shows only the start of what this run produced"
+      "showLess": "Shows only the start of what this run produced",
+      "statusSkipped": "Skipped",
+      "caughtUp": "Ran late (due {{when}})"
     },
     "form": {
       "scheduleTitle": "New schedule",
@@ -2259,7 +2262,16 @@
       "previewCron": "Runs on the cron above ({{zone}}).",
       "cron": "Cron expression",
       "cronHint": "Six fields, seconds first: second minute hour day month weekday. 0 0 9 * * 1-5 is 9:00 on weekdays.",
+      "askIfMissed": "Ask me if it's missed",
+      "askIfMissedHint": "If your Pond is off when this is due, it asks your household's phones whether to run it late. It never runs late on its own.",
       "prompt": "What should Goose do?",
+      "does": "What it does",
+      "doesPrompt": "Ask Goose",
+      "doesRoutine": "Set devices",
+      "devices": "Devices",
+      "leave": "Leave",
+      "noSwitchable": "Your Pond has no devices it can switch on and off yet.",
+      "devicesLoading": "Loading your devices",
       "promptPlaceholder": "Summarise my calendar and the weather.",
       "create": "Create",
       "source": "Listen to",
@@ -2301,6 +2313,7 @@
     "errors": {
       "nameRequired": "Give it a name.",
       "promptRequired": "Say what Goose should do.",
+      "devicesRequired": "Choose at least one device to turn on or off.",
       "whenRequired": "Choose a date and a time.",
       "timeRequired": "Choose a time.",
       "daysRequired": "Choose at least one day.",
@@ -2339,6 +2352,9 @@
       "prompt": "Prompt",
       "webhook": "Calls a webhook",
       "webhookNote": "This schedule calls a webhook. Its address can only be changed on the Pond itself.",
+      "routine": "Sets",
+      "deviceOn": "{{name}} on",
+      "deviceOff": "{{name}} off",
       "when": "When",
       "cron": "Cron",
       "timezone": "Time zone",
@@ -2355,7 +2371,14 @@
       "deleteTitle": "Delete this schedule?",
       "deleteBody": "“{{name}}” will be removed from your Pond and will not run again.",
       "saved": "Saved on your Pond.",
-      "runStarted": "Your Pond has started a run."
+      "runStarted": "Your Pond has started a run.",
+      "missedSkipped": "Skipped. It runs again at its next time."
+    },
+    "missed": {
+      "question": "This didn't run at {{when}} because your Pond was off. Run it now?",
+      "run": "Run now",
+      "skip": "Skip",
+      "answered": "Someone has already answered this, so it has been refreshed."
     }
   },
   "remote": {

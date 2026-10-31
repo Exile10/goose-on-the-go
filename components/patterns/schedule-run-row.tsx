@@ -42,6 +42,8 @@ function runStatus(run: ScheduleRun): { tone: InkTone; key: TranslationKey } {
       return { tone: 'success', key: 'schedule.runs.statusCompleted' };
     case 'failed':
       return { tone: 'danger', key: 'schedule.runs.statusFailed' };
+    case 'skipped':
+      return { tone: 'warning', key: 'schedule.runs.statusSkipped' };
   }
 }
 
@@ -76,6 +78,11 @@ export const RunRow = React.memo(function RunRow({ run }: { run: ScheduleRun }) 
           ) : null}
         </View>
       </View>
+      {run.caught_up_from ? (
+        <InkText size="sm" tone="secondary">
+          {t('schedule.runs.caughtUp', { when: formatScheduleTime(run.caught_up_from) })}
+        </InkText>
+      ) : null}
       {preview && !open ? (
         <Text style={snippetText.style} selectable={!canOpen}>
           {preview.text}
