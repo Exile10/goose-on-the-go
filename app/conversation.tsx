@@ -114,6 +114,7 @@ export default function ChatScreen() {
   const insets = useSafeAreaInsets();
   const { data, error, actions } = useChat();
   const { online, hydrated } = useServer();
+  const router = useRouter();
   const { messages, queued, streaming, status, turnSeed, sessionId, title } = data;
   const name = useGreetingName();
   const suggestions = useSuggestions(sessionId);
@@ -125,7 +126,11 @@ export default function ChatScreen() {
   // for it; without an id the screen opens a new conversation, which is what
   // the wall's compose button means. The ref is what stops a re-render
   // re-reading a conversation already on screen.
-  const { session, title: linkedTitle } = useLocalSearchParams<{ session?: string; title?: string }>();
+  const {
+    session,
+    title: linkedTitle,
+    ask,
+  } = useLocalSearchParams<{ session?: string; title?: string; ask?: string }>();
   const openedRef = useRef<string | null>(null);
   const { open, unqueue } = actions;
   useEffect(() => {
@@ -200,6 +205,17 @@ export default function ChatScreen() {
     },
     [actions, t],
   );
+
+  // A question Home handed over, asked once on arrival as picking one here would. Clearing the
+  // param stops a remount asking it again: Android recreates the activity on a return to the app.
+  const askedRef = useRef(false);
+  useEffect(() => {
+    const prompt = ask?.trim();
+    if (!hydrated || askedRef.current || !prompt) return;
+    askedRef.current = true;
+    router.setParams({ ask: undefined });
+    void actions.send(prompt);
+  }, [hydrated, ask, actions, router]);
 
   const onPick = useCallback(
     (prompt: OfferedPrompt) => {
