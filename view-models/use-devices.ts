@@ -6,16 +6,21 @@
  * it back from the device: an optimistic switch could say a heater was off while
  * it was still on. A Matter round trip is slow enough that an unacknowledged tap
  * reads as a broken switch, so the tap is shown at once as waiting instead.
+ *
+ * On a Pond with a device event stream, changes arrive as they happen and the
+ * full read drops to a rare check, which is most of this screen's mobile data.
  */
 
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { useServer } from '@/providers/server-provider';
 import { ApiError, api, type PondApiClient } from '@/services/api-client';
-import type { Device, DeviceStatePatch, MatterStatus, UpdateDeviceRequest } from '@/services/types';
+import type { Device, DeviceEvent, DeviceStatePatch, MatterStatus, UpdateDeviceRequest } from '@/services/types';
 import { ago } from '@/models/elapsed';
+import { COMMAND_MAX_WAIT_MS, commandKey, enqueue, sortWaiting, type WaitingCommand } from './command-queue';
 import { describeApiError } from './describe-error';
 import { useLive } from './use-live';
+import { useScreenActive } from './use-screen-active';
 import i18n from '@/services/i18n';
 
 /**
@@ -216,6 +221,8 @@ export interface UseDevices {
     powerById: Record<string, boolean>;
     /** The power asked for by device id, while the Pond has not yet confirmed it. */
     waitingById: Record<string, boolean>;
+    /** Commands tapped while the Pond was out of reach, to be sent when it is back. */
+    queued: WaitingCommand[];
     matter: MatterStatus | null;
     /**
      * How old what is on screen is, when the Pond could not be read since: "5 min". Null while
@@ -228,6 +235,8 @@ export interface UseDevices {
   actions: {
     refresh: () => Promise<void>;
     setState: (device: Device, patch: DeviceStatePatch) => Promise<void>;
+    /** Take back a command still waiting for the Pond. */
+    cancel: (deviceId: string) => void;
     commission: (code: string, name?: string) => Promise<string | null>;
     remove: (device: Device) => Promise<void>;
     /** Resolves to why some or all of the edits were refused, or null once every one is saved. */
@@ -242,6 +251,18 @@ export interface UseDevices {
  * expensive poll in the app and it runs slower than Now Playing for that reason.
  */
 export const DEVICES_MS = 15_000;
+
+/** The full read while the event stream is open: only a check that nothing was missed. */
+export const DEVICES_STREAMING_MS = 5 * 60_000;
+/** The first wait before opening a dropped stream again, doubling up to the second. */
+export const DEVICES_STREAM_RETRY_MS = 5_000;
+export const DEVICES_STREAM_RETRY_MAX_MS = 60_000;
+
+/** The device list with one `device` event applied. */
+export function applyDeviceChange(devices: Device[], event: Extract<DeviceEvent, { type: 'device' }>): Device[] {
+  const others = devices.filter((d) => d.id !== event.device.id);
+  return event.change === 'removed' ? others : [...others, event.device];
+}
 
 /**
  * Fold a poll's power readings in without undoing anything changed after that poll began.
@@ -308,6 +329,20 @@ export function useDevices(): UseDevices {
   // Whether a read has ever succeeded. Before that a failure is the screen's news; after it, a
   // failed poll keeps the last list rather than replacing it with an error.
   const loaded = useRef(false);
+  // Commands waiting for the Pond (see command-queue.ts): read by the poll, copied to state for the screen.
+  const queue = useRef<WaitingCommand[]>([]);
+  const [queued, setQueued] = useState<WaitingCommand[]>([]);
+  // Whether this Pond has echoed a command's key, so a command can be sent again without running twice.
+  const honoursKeys = useRef(false);
+  const replaying = useRef(false);
+
+  const setQueue = useCallback((next: WaitingCommand[]) => {
+    queue.current = next;
+    setQueued(next);
+  }, []);
+  const stopWaiting = useCallback((deviceId: string) => {
+    setWaitingById(({ [deviceId]: _settled, ...rest }) => rest);
+  }, []);
 
   /**
    * Read power state for the devices that have it.
@@ -342,6 +377,61 @@ export function useDevices(): UseDevices {
   const { hydrated } = useServer();
 
   /**
+   * One attempt at a command, and the device's state read back once it lands. The read-back is the
+   * confirmation, because devices quantise and clamp — asking for 37% brightness may land on 40.
+   * Rendering the request rather than the result is a bug this protocol has already had once.
+   *
+   * `unreachable` is a failure that says nothing about the command, on a Pond that will know its key
+   * when it comes again. Every other failure is reported.
+   */
+  const send = useCallback(async (command: WaitingCommand): Promise<'done' | 'unreachable' | 'refused'> => {
+    try {
+      const answer = await api.setDeviceState(command.deviceId, command.patch, command.key);
+      if (answer.idempotency_key === command.key) honoursKeys.current = true;
+      const actual = parsePowerState((await api.getDeviceState(command.deviceId)).content);
+      if (actual !== undefined) {
+        // The read-back is the newest thing known about this device; a poll already in
+        // flight began before it and must not overwrite it.
+        powerChangedAt.current[command.deviceId] = Date.now();
+        setPowerById((current) => ({ ...current, [command.deviceId]: actual }));
+      }
+      return 'done';
+    } catch (e) {
+      if (!(e instanceof ApiError) && honoursKeys.current) return 'unreachable';
+      setError(describeDeviceError(e));
+      return 'refused';
+    }
+  }, []);
+
+  /** Drop what has waited too long, and once the Pond answers again, send the rest in order. */
+  const replay = useCallback(
+    async (reachable: boolean) => {
+      if (replaying.current || queue.current.length === 0) return;
+      replaying.current = true;
+      try {
+        const { send: due, stale } = sortWaiting(queue.current, Date.now());
+        if (stale.length > 0) {
+          setQueue(queue.current.filter((c) => !stale.includes(c)));
+          for (const c of stale) stopWaiting(c.deviceId);
+          setError(i18n.t('devices.commandsExpired', { count: stale.length, minutes: COMMAND_MAX_WAIT_MS / 60_000 }));
+        }
+        if (!reachable) return;
+        for (const command of due) {
+          const outcome = await send(command);
+          if (outcome === 'unreachable') break;
+          // Cancelled, or replaced by a newer tap, while it was on its way: that one is still waiting.
+          if (!queue.current.includes(command)) continue;
+          setQueue(queue.current.filter((c) => c !== command));
+          stopWaiting(command.deviceId);
+        }
+      } finally {
+        replaying.current = false;
+      }
+    },
+    [send, setQueue, stopWaiting],
+  );
+
+  /**
    * One read of the list, the power states and the controller.
    *
    * `loud` is a read somebody asked for: it shows a spinner and reports a failure. A poll is
@@ -352,12 +442,14 @@ export function useDevices(): UseDevices {
   const load = useCallback(
     async (loud: boolean) => {
       const startedAt = Date.now();
+      let reachable = false;
       if (loud) {
         setLoading(true);
         setError(null);
       }
       try {
         const list = await api.listDevices();
+        reachable = true;
         if (listPollStillCurrent(startedAt, listChangedAt.current)) setDevices(list);
         loaded.current = true;
         setError(null);
@@ -371,6 +463,7 @@ export function useDevices(): UseDevices {
       } finally {
         setLoading(false);
       }
+      void replay(reachable);
       // Matter status is advisory: a Pond with the controller unreachable still
       // lists and controls whatever is already registered, so a failure here must
       // not take the screen down with it.
@@ -380,41 +473,108 @@ export function useDevices(): UseDevices {
         setMatter(null);
       }
     },
-    [readPower],
+    [readPower, replay],
   );
-  useLive(() => load(false), DEVICES_MS, hydrated);
+  // Polling until the stream is open, and while it is down; see the effect below.
+  const [streaming, setStreaming] = useState(false);
+  const delay = useCallback(() => (streaming ? DEVICES_STREAMING_MS : DEVICES_MS), [streaming]);
+  useLive(() => load(false), delay, hydrated);
+  const active = useScreenActive();
+
+  /**
+   * The event stream, opened again whenever it ends, from the last event seen. A Pond without the
+   * route answers 404 and is left to the poll. The first open starts from now, so one read follows
+   * it to cover what changed in between.
+   */
+  useEffect(() => {
+    if (!hydrated || !active) return;
+    const controller = new AbortController();
+    const { signal } = controller;
+    let backoff = DEVICES_STREAM_RETRY_MS;
+    let reopen: ReturnType<typeof setTimeout> | null = null;
+    let lastSeq: number | undefined;
+
+    const onEvent = (event: DeviceEvent) => {
+      // An event is the Pond answering: what is on screen is current.
+      setUpdatedAt(Date.now());
+      setFailedAt(null);
+      if (event.type === 'resync') return void load(false);
+      lastSeq = event.seq;
+      if (event.type === 'device') {
+        listChangedAt.current = Date.now();
+        setDevices((current) => applyDeviceChange(current, event));
+        return;
+      }
+      if (event.key !== 'power' || typeof event.value !== 'boolean') return;
+      const on = event.value;
+      powerChangedAt.current[event.device_id] = Date.now();
+      setPowerById((current) => ({ ...current, [event.device_id]: on }));
+    };
+
+    const open = () => {
+      reopen = null;
+      const resuming = lastSeq;
+      api
+        .streamDeviceEvents(onEvent, signal, () => {
+          backoff = DEVICES_STREAM_RETRY_MS;
+          setStreaming(true);
+          if (resuming == null) void load(false);
+          // The link is back: what was tapped meanwhile can go now, not at the next check.
+          void replay(true);
+        }, resuming)
+        .then(
+          () => true,
+          (e: unknown) => !(e instanceof ApiError && e.status === 404),
+        )
+        .then((again) => {
+          if (signal.aborted) return;
+          setStreaming(false);
+          if (!again) return;
+          reopen = setTimeout(open, backoff);
+          backoff = Math.min(backoff * 2, DEVICES_STREAM_RETRY_MAX_MS);
+        });
+    };
+    open();
+
+    return () => {
+      controller.abort();
+      if (reopen) clearTimeout(reopen);
+      setStreaming(false);
+    };
+  }, [hydrated, active, load, replay]);
 
   const refresh = useCallback(() => load(true), [load]);
 
   /**
-   * Send a patch, and show the device's new state only once the Pond has read it back.
-   *
-   * Until then the asked-for power is waiting, not shown as the device's state. The read-back is
-   * the confirmation, because devices quantise and clamp — asking for 37% brightness may land on
-   * 40. Rendering the request rather than the result is a bug this protocol has already had once.
+   * Send a patch, and show the device's new state only once the Pond has read it back. Until then
+   * the asked-for power is waiting, not shown as the device's state. The read-back is the
+   * confirmation, because devices quantise and clamp — asking for 37% brightness may land on 40.
+   * Rendering the request rather than the result is a bug this protocol has already had once.
+   * A tap the Pond could not be reached for waits in the queue, still shown as waiting, if this
+   * Pond can take it again safely.
    */
   const setState = useCallback(
     async (device: Device, patch: DeviceStatePatch) => {
       if (patch.power !== undefined) {
         setWaitingById((current) => ({ ...current, [device.id]: patch.power as boolean }));
       }
-      try {
-        await api.setDeviceState(device.id, patch);
-        const result = await api.getDeviceState(device.id);
-        const actual = parsePowerState(result.content);
-        if (actual !== undefined) {
-          // The read-back is the newest thing known about this device; a poll already in
-          // flight began before it and must not overwrite it.
-          powerChangedAt.current[device.id] = Date.now();
-          setPowerById((current) => ({ ...current, [device.id]: actual }));
-        }
-      } catch (e) {
-        setError(describeDeviceError(e));
-      } finally {
-        setWaitingById(({ [device.id]: _settled, ...rest }) => rest);
+      const command: WaitingCommand = { deviceId: device.id, patch, key: commandKey(), queuedAt: Date.now() };
+      if ((await send(command)) === 'unreachable') {
+        setQueue(enqueue(queue.current, command));
+        return;
       }
+      stopWaiting(device.id);
     },
-    [],
+    [send, setQueue, stopWaiting],
+  );
+
+  /** One already on its way when this is tapped may still arrive. */
+  const cancel = useCallback(
+    (deviceId: string) => {
+      setQueue(queue.current.filter((c) => c.deviceId !== deviceId));
+      stopWaiting(deviceId);
+    },
+    [setQueue, stopWaiting],
   );
 
   /** Returns the new device's id, or null when commissioning failed. */
@@ -485,12 +645,13 @@ export function useDevices(): UseDevices {
       onlineCount: devices.filter((d) => d.is_online).length,
       powerById,
       waitingById,
+      queued,
       matter,
       staleFor: staleFor(updatedAt, failedAt),
     },
     loading,
     error,
-    actions: { refresh, setState, commission, remove, edit },
+    actions: { refresh, setState, cancel, commission, remove, edit },
   };
 }
 

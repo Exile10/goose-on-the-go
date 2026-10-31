@@ -71,6 +71,7 @@ import type {
   CommissionDeviceResponse,
   CreateDeviceRequest,
   Device,
+  DeviceEvent,
   DeviceSelf,
   DeviceStatePatch,
   EventCategory,
@@ -926,12 +927,20 @@ export class PondApiClient {
    * dispatch path, which is deny-by-default: `DIRECT_DISPATCH_ALLOWLIST` on the
    * server permits `set_device_state` and `get_device_state` and little else, so
    * this is the only shape that works.
+   *
+   * `key` is the tap's idempotency key, sent on every attempt at the same tap so a
+   * Pond that honours keys runs it once. Such a Pond echoes it as `idempotency_key`;
+   * an older one ignores the header and its answer carries none.
    */
-  setDeviceState(deviceId: string, patch: DeviceStatePatch): Promise<ToolCallResult> {
-    return this.post<ToolCallResult>('/api/v1/tools/invoke', {
-      server: 'giap-device-control',
-      tool: 'set_device_state',
-      args: { device_id: deviceId, ...patch },
+  setDeviceState(
+    deviceId: string,
+    patch: DeviceStatePatch,
+    key?: string,
+  ): Promise<ToolCallResult & { idempotency_key?: string }> {
+    return this.request('/api/v1/tools/invoke', {
+      method: 'POST',
+      headers: key ? { 'Idempotency-Key': key } : undefined,
+      body: JSON.stringify({ server: 'giap-device-control', tool: 'set_device_state', args: { device_id: deviceId, ...patch } }),
     });
   }
 
@@ -948,6 +957,36 @@ export class PondApiClient {
       tool: 'get_device_state',
       args: { device_id: deviceId },
     });
+  }
+
+  /**
+   * What changes on the Pond's devices, as it happens, instead of reading every device again.
+   * `afterSeq` resumes after the last event seen; without it the stream starts from now. Resolves
+   * when the stream ends; a Pond without the route refuses it with a 404.
+   */
+  async streamDeviceEvents(
+    onEvent: (event: DeviceEvent) => void,
+    signal?: AbortSignal,
+    onOpen?: () => void,
+    afterSeq?: number,
+  ): Promise<void> {
+    const query = afterSeq != null ? `?after_seq=${afterSeq}` : '';
+    const res = await this.open(`/api/v1/devices/events${query}`, {
+      headers: { Accept: 'text/event-stream' },
+      signal,
+    });
+    onOpen?.();
+    await readSse(
+      res,
+      (event) => {
+        try {
+          onEvent({ type: event.event, ...JSON.parse(event.data || '{}') } as DeviceEvent);
+        } catch {
+          // A frame that is not JSON carries nothing to act on.
+        }
+      },
+      { idleMs: STREAM_IDLE_MS },
+    );
   }
 
   // ── Chat ────────────────────────────────────────────────────
