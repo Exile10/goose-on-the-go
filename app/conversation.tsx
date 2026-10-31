@@ -142,7 +142,12 @@ export default function ChatScreen() {
   // for it; without an id the screen opens a new conversation, which is what
   // the wall's compose button means. The ref is what stops a re-render
   // re-reading a conversation already on screen.
-  const { session, title: linkedTitle } = useLocalSearchParams<{ session?: string; title?: string }>();
+  const { session, title: linkedTitle, ask } = useLocalSearchParams<{
+    session?: string;
+    title?: string;
+    /** A prompt handed over from Home's chips, to be asked on arrival. */
+    ask?: string;
+  }>();
   const openedRef = useRef<string | null>(null);
   const { open, unqueue } = actions;
   useEffect(() => {
@@ -261,6 +266,16 @@ export default function ChatScreen() {
     },
     [actions, scrollToFoot, t],
   );
+
+  // A prompt Home handed over: asked once on arrival, exactly as picking one here does. The ref is
+  // what stops a re-render, or a return to this screen, asking it a second time.
+  const askedRef = useRef(false);
+  useEffect(() => {
+    const prompt = ask?.trim();
+    if (!hydrated || askedRef.current || !prompt) return;
+    askedRef.current = true;
+    void actions.send(prompt);
+  }, [hydrated, ask, actions]);
 
   const onPick = useCallback(
     (prompt: OfferedPrompt) => {

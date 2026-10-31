@@ -31,11 +31,14 @@ import { GIcon } from '@/components/ui/g-icon';
 import { GPressable } from '@/components/ui/g-pressable';
 import { EqualizerBars } from '@/components/ui/equalizer-bars';
 import { ContentUnavailable } from '@/components/patterns/content-unavailable';
+import { GlanceStrip, type Figure } from '@/components/patterns/glance-strip';
+import { HomeIdeas } from '@/components/patterns/home-ideas';
 import { FinishSetup } from '@/components/patterns/finish-setup';
 import { AgentsGettingReady } from '@/components/patterns/agents-building';
 import { PondGettingReady } from '@/components/patterns/pond-getting-ready';
 import { RemoteAccessOffer } from '@/components/patterns/remote-access-offer';
 import { isUnavailable } from '@/models/content-state';
+import { useActivitySummary } from '@/view-models/use-activity-summary';
 import { useContentState } from '@/view-models/use-content-state';
 import { usePullToRefresh } from '@/view-models/use-pull-to-refresh';
 import { useRecentSessions } from '@/view-models/use-recent-sessions';
@@ -54,7 +57,7 @@ import { Spacing } from '@/constants/spacing';
 import { Radii } from '@/constants/radii';
 
 /** The home grid is a glance, not the full list — that is the Devices tab. */
-const HOME_GRID_LIMIT = 4;
+const HOME_GRID_LIMIT = 6;
 
 /** How often the greeting and the countdowns catch up with the clock. */
 const CLOCK_MS = 60_000;
@@ -261,6 +264,7 @@ export default function HomeScreen() {
   // this phone.
   const member = useMember();
   const rightNow = useRightNow().data;
+  const today = useActivitySummary().data.summary?.total ?? null;
   const router = useRouter();
   const chrome = useChromeScroll();
   const bottomInset = useBottomBarInset();
@@ -292,11 +296,27 @@ export default function HomeScreen() {
   );
   const pull = usePullToRefresh(reloadHome);
 
-  // Only badges with a source. The online count is the list the grid below
-  // shows, so the two cannot disagree, and it is not shown while that list is
-  // unknown.
+  // The online count is the list the grid below shows, so the two cannot
+  // disagree, and it is not stated while that list is unknown.
   const showOnlineCount = devicesState === 'ready' || devicesState === 'empty';
   const showOutdoor = rightNow.outdoorTemp !== null;
+
+  // Only figures with a source behind them; the strip hides when there are none.
+  const figures: Figure[] = [];
+  if (showOnlineCount) {
+    figures.push({ key: 'devices', value: String(devices.data.onlineCount), label: t('home.statDevicesOn') });
+  }
+  if (showOutdoor) {
+    figures.push({
+      key: 'outdoor',
+      value: t('home.statTempValue', { temp: rightNow.outdoorTemp }),
+      // Where the Pond is configured to be, which is not always where the reader is.
+      label: rightNow.outdoorPlace ?? t('home.statOutdoor'),
+    });
+  }
+  if (today !== null) {
+    figures.push({ key: 'today', value: String(today), label: t('home.statToday', { count: today }) });
+  }
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -325,20 +345,7 @@ export default function HomeScreen() {
           </GPressable>
         </View>
 
-        {!offline && (showOnlineCount || showOutdoor) ? (
-          <View style={styles.badges}>
-            {showOnlineCount ? (
-              <InkBadge tone="success">
-                {t('home.chipOnline', { count: devices.data.onlineCount })}
-              </InkBadge>
-            ) : null}
-            {showOutdoor ? (
-              <InkBadge tone="info">
-                {t('home.chipOutdoorTemp', { temp: rightNow.outdoorTemp })}
-              </InkBadge>
-            ) : null}
-          </View>
-        ) : null}
+        {offline ? null : <GlanceStrip figures={figures} />}
 
         <PondCard />
 
@@ -353,6 +360,8 @@ export default function HomeScreen() {
 
         {offline ? null : (
           <>
+        <HomeIdeas />
+
         {/* A card with nothing true to say is not drawn, and a row with no
             cards has no heading. */}
         {nowPlaying || nextRoutine ? (
@@ -385,9 +394,17 @@ export default function HomeScreen() {
             }
           >
             <GIcon name="chat" size={14} color={JaridaPurple[400]} />
-            <Text style={styles.convoText} numberOfLines={1}>
-              {c.text}
-            </Text>
+            <View style={styles.convoWords}>
+              <Text style={styles.convoText} numberOfLines={1}>
+                {c.text}
+              </Text>
+              {/* How it opened, under its name. Null when that is what the line above already says. */}
+              {c.preview ? (
+                <Text style={styles.convoPreview} numberOfLines={1}>
+                  {c.preview}
+                </Text>
+              ) : null}
+            </View>
             <Text style={styles.convoTime}>{c.time}</Text>
           </GPressable>
         ))}
@@ -479,12 +496,6 @@ const makeStyles = (c: ThemeColors) =>
     color: Brand.white,
   },
 
-  badges: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: Spacing.sm,
-    marginBottom: Spacing.md,
-  },
 
   /* The plate sits 4px below the face, so every card reserves room for it. */
   pond: { marginBottom: Spacing.lg },
@@ -549,15 +560,21 @@ const makeStyles = (c: ThemeColors) =>
 
   convoRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    // The icon and the time sit against the first line, not the middle of two.
+    alignItems: 'flex-start',
     gap: Spacing.sm,
     paddingVertical: Spacing.sm,
   },
+  convoWords: { flex: 1, gap: 1 },
   convoText: {
-    flex: 1,
     ...face('body', 'regular'),
     fontSize: FontSize.base,
     color: c.text,
+  },
+  convoPreview: {
+    ...face('body', 'regular'),
+    fontSize: FontSize.sm,
+    color: c.textSecondary,
   },
   convoTime: {
     ...face('body', 'regular'),

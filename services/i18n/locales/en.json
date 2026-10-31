@@ -69,8 +69,6 @@
     "greetingMorning": "Good morning",
     "greetingAfternoon": "Good afternoon",
     "greetingEvening": "Good evening",
-    "chipOnline": "{{count}} online",
-    "chipOutdoorTemp": "{{temp}}°C outside",
     "nothingPlaying": "Nothing playing",
     "askPlaceholder": "Ask Goose anything…",
     "rightNow": "RIGHT NOW",
@@ -83,7 +81,18 @@
     "shortcuts": "SHORTCUTS",
     "seeAll": "See all",
     "recentConversations": "RECENT CONVERSATIONS",
-    "rightNowTitle": "Right now"
+    "rightNowTitle": "Right now",
+    "ideasTitle": "Ideas from your Pond",
+    "ideasAsk": "Worth asking",
+    "ideasSeeAll_one": "See 1 more",
+    "ideasSeeAll_other": "See {{count}} more",
+    "remindersWaiting_one": "{{count}} reminder waiting",
+    "remindersWaiting_other": "{{count}} reminders waiting",
+    "statDevicesOn": "on now",
+    "statOutdoor": "outside",
+    "statToday_one": "event today",
+    "statToday_other": "events today",
+    "statTempValue": "{{temp}}°"
   },
   "chat": {
     "connecting": "Connecting",
