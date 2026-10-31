@@ -34,22 +34,32 @@ Each figure is its own read, settled independently, so a Pond that cannot list i
 
 ## Home
 
+Home answers two questions in order: whether the Pond wants anything from you, then what is happening at home. The suggestion cards are its only raised surface; everything else sits on hairlines.
+
 | Shown | Source | When it is not shown |
 |---|---|---|
 | Greeting | the phone's clock: morning from 5 until 12, afternoon until 17, evening after that (`greetingFor`) | |
 | Name and avatar | `readMember()`, above | no name when nobody has claimed the device |
-| "N online" chip | the device list the grid below shows, so the two cannot disagree | while that list is loading or failed |
-| "N°C outside" chip | `GET /api/v1/weather` → `temp`. **Celsius**: the Pond asks open-meteo for `temperature_unit=celsius`. "Outside", because it is outdoor weather where the Pond is set up, not a thermostat. | when no location is configured (`enabled: false`), or the read failed |
-| Now Playing | `GET /api/v1/music/now-playing` (`nowPlayingOf`). Track and artist while Spotify reports playback. "Nothing playing" only when the Pond says `connected: true, playing: false`. | with no Spotify account, when Spotify refused (`error` set), or when a claim of playback carries no track |
-| Next routine | `GET /api/v1/schedules/upcoming?limit=5`: the first schedule that is not paused and has a valid `next_run` (`nextRoutineOf`). A time already passed reads "Due now" (`untilOf`). | when no routine will run |
+| "Connected to …" line | `useServer()`: the Pond's address, leading to Switch Pond | while connecting or unreachable, when the Pond card says so instead |
+| From your Pond: suggestions | `GET /api/v1/proposals`, the first one, with Accept and Decline in place (`POST /proposals/{id}/decide`). Deciding in place is acceptable because a yes runs nothing: `executed` is always false. | when none are offered; "N more" leads to the Suggestions screen |
+| From your Pond: an agent | `GET /api/v1/agents/suggestions`, the first one, leading to the Agents screen | when none fits this Pond, or the read failed |
+| Ask row | `GET /api/v1/suggestions`, only the prompts the Pond offered (they carry an id), at most three; then Ask Goose, always. A prompt opens a new conversation and asks it. | the Pond's prompts, when it offers none; the fixed starters are never shown here |
+| "Nothing needs you right now." | both the suggestion and reminder reads answered, and neither had anything | when either read failed: unknown is not quiet |
+| Right now: Playing | `GET /api/v1/music/now-playing` (`nowPlayingOf`), while Spotify reports playback | with nothing playing, no Spotify account, a refusal, or a claim of playback with no track |
+| Right now: Next | `GET /api/v1/schedules/upcoming?limit=5`: the first schedule that is not paused and has a valid `next_run` (`nextRoutineOf`), with how long until it (`untilOf`; a time already passed reads "Due now") | when no routine will run |
+| Right now: Devices | the device list the grid below shows, as "N of M online", so the two cannot disagree | while that list is loading or failed, or empty |
+| Right now: Outside | `GET /api/v1/weather` → `temp` and `location_name`. **Celsius**: the Pond asks open-meteo for `temperature_unit=celsius`. The place is where the Pond is set up, which is not always where the reader is. | when no location is configured (`enabled: false`), or the read failed |
+| Right now: Remember | `GET /api/v1/reminders`: the first one, and how many more | when none are pending |
 
-With neither card, the Right Now heading is not drawn over an empty row.
+With no line, the Right now heading is not drawn. The lines are built by `homeLedger()` in `view-models/home-ledger.ts`; the four idea sources are read once for the screen by `useHomeIdeas()`.
 
-The **Meeting** and **Locked** chips were removed rather than wired: nothing in the Pond answers either question. **Next Event became Next routine.** There is no calendar integration, so the card shows the Pond's own schedules and is labelled as a routine, never as an event.
+Suggestions and the Ask row's prompts are read under a random `gotg-home-…` session label, never a real conversation: the Pond binds an unattributed session to the device's member on read, so borrowing one from the recent list would claim it.
 
-`/schedules/upcoming` sends the Pond's `Schedule` as stored: `label`, `paused`, `next_run`, and no `name`. The card reads it through `UpcomingSchedule` in `services/types.ts`, which describes what is actually on the wire, rather than through the mismatched shared `Schedule` noted under Known gaps.
+The **Meeting** and **Locked** chips were removed rather than wired: nothing in the Pond answers either question. **Next Event became Next routine.** There is no calendar integration, so the line shows the Pond's own schedules and is labelled as a routine, never as an event.
 
-Each card has its own reader in `view-models/use-right-now.ts`: `readOutdoorTemp()`, `readNowPlaying()` and `readNextRoutine()`. None of them ever rejects, and each runs on its own cadence (below). `readRightNow()` composes the three for one-shot use.
+`/schedules/upcoming` sends the Pond's `Schedule` as stored: `label`, `paused`, `next_run`, and no `name`. The line reads it through `UpcomingSchedule` in `services/types.ts`, which describes what is actually on the wire, rather than through the mismatched shared `Schedule` noted under Known gaps.
+
+Playing, Next and Outside each have their own reader in `view-models/use-right-now.ts`: `readOutdoor()`, `readNowPlaying()` and `readNextRoutine()`. None of them ever rejects, and each runs on its own cadence (below). `readRightNow()` composes the three for one-shot use.
 
 ## Keeping it current
 
@@ -79,10 +89,13 @@ The Pond rate-limits per IP (600 requests a minute for API traffic), and a runaw
 | Activity in the last day | 60s | `SUMMARY_MS` | A day's counts move slowly. A failed read keeps the last counts. |
 | Latest conversation | 60s | `SUMMARY_MS` | Two requests: the conversation list, to find the newest, then its telemetry summary. Its turns are read only when the sheet opens, and not polled. |
 | Weather | 10 min | `WEATHER_MS` | The Pond caches it for 15 min, so asking more often only re-reads that cache. |
+| Suggestions, reminders | 60s | `PROPOSALS_MS`, `REMINDERS_MS` | A suggestion lives for hours, and reminders arrive with a batch pass over conversations. A decision re-reads at once. |
+| Agent ideas | 10 min | `AGENT_IDEAS_MS` | What the Pond can run changes with its devices and extensions. |
+| Ask row prompts | once per visit | | The Pond composes them while idle; one read per arrival on Home is enough. |
 | Member | 5 min | `MEMBER_MS` | An attribution changes only when a pairing code says so. |
 | Home clock | 60s | `CLOCK_MS` | Moves the greeting and the countdowns with the time. |
 
-With Home in front that comes to about 15 requests a minute.
+With Home in front that comes to about 17 requests a minute.
 
 **A poll is quiet.** It never shows a spinner, and on failure it keeps what is on screen rather than replacing it with an error or a dash. A first load, or a refresh somebody asked for, still reports its failure, and the connection banner reports whether the Pond is reachable at all. For the household, `mergeHousehold()` keeps each figure a failed read did not return and takes every one it did, including a real zero and a real "nobody has claimed this device".
 

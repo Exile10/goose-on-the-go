@@ -28,9 +28,15 @@ export interface NextRoutine {
 
 export type Until = { unit: 'now' } | { unit: 'minutes' | 'hours' | 'days'; count: number };
 
+/** Degrees Celsius outside, and the place they are for: the Pond's location, not the reader's. */
+export interface Outdoor {
+  temp: number;
+  place: string | null;
+}
+
 export interface RightNow {
-  /** Degrees Celsius outside, or null: no location configured, or the read failed. */
-  outdoorTemp: number | null;
+  /** Null when no location is configured, or the read failed. */
+  outdoor: Outdoor | null;
   nowPlaying: NowPlaying | null;
   nextRoutine: NextRoutine | null;
 }
@@ -106,11 +112,12 @@ export function untilOf(at: Date, now: Date): Until {
 
 type RightNowReader = Pick<PondApiClient, 'weather' | 'nowPlaying' | 'upcomingSchedules'>;
 
-/** Degrees Celsius outside, or null: no location configured, or the read failed. */
-export async function readOutdoorTemp(client: Pick<RightNowReader, 'weather'> = api): Promise<number | null> {
+/** What it is like outside, or null: no location configured, or the read failed. */
+export async function readOutdoor(client: Pick<RightNowReader, 'weather'> = api): Promise<Outdoor | null> {
   try {
     const w = await client.weather();
-    return w.enabled && typeof w.temp === 'number' ? w.temp : null;
+    if (!w.enabled || typeof w.temp !== 'number') return null;
+    return { temp: w.temp, place: w.location_name?.trim() || null };
   } catch {
     return null;
   }
@@ -147,12 +154,12 @@ export async function readNextRoutine(client: Pick<RightNowReader, 'upcomingSche
 
 /** Read the row in one pass. Never rejects: a card whose read fails is absent, not wrong. */
 export async function readRightNow(client: RightNowReader = api): Promise<RightNow> {
-  const [outdoorTemp, playing, nextRoutine] = await Promise.all([
-    readOutdoorTemp(client),
+  const [outdoor, playing, nextRoutine] = await Promise.all([
+    readOutdoor(client),
     readNowPlaying(client),
     readNextRoutine(client),
   ]);
-  return { outdoorTemp, nowPlaying: playing.card, nextRoutine };
+  return { outdoor, nowPlaying: playing.card, nextRoutine };
 }
 
 /**
@@ -163,7 +170,7 @@ export async function readRightNow(client: RightNowReader = api): Promise<RightN
  * a track sit a minute after it ended.
  */
 export function useRightNow(): UseRightNow {
-  const [outdoorTemp, setOutdoorTemp] = useState<number | null>(null);
+  const [outdoor, setOutdoor] = useState<Outdoor | null>(null);
   const [nowPlaying, setNowPlaying] = useState<NowPlaying | null>(null);
   const [nextRoutine, setNextRoutine] = useState<NextRoutine | null>(null);
   const lastPlaying = useRef<NowPlayingReading>({ card: null, backOff: false });
@@ -181,8 +188,8 @@ export function useRightNow(): UseRightNow {
     () => nowPlayingDelay(lastPlaying.current),
     hydrated,
   );
-  useLive(async () => setOutdoorTemp(await readOutdoorTemp()), WEATHER_MS, hydrated);
+  useLive(async () => setOutdoor(await readOutdoor()), WEATHER_MS, hydrated);
   useLive(async () => setNextRoutine(await readNextRoutine()), ROUTINE_MS, hydrated);
 
-  return { data: { outdoorTemp, nowPlaying, nextRoutine } };
+  return { data: { outdoor, nowPlaying, nextRoutine } };
 }

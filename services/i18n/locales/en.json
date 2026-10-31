@@ -63,13 +63,8 @@
     "greetingMorning": "Good morning",
     "greetingAfternoon": "Good afternoon",
     "greetingEvening": "Good evening",
-    "chipOnline": "{{count}} online",
-    "chipOutdoorTemp": "{{temp}}°C outside",
-    "nothingPlaying": "Nothing playing",
     "askPlaceholder": "Ask Goose anything…",
     "rightNow": "RIGHT NOW",
-    "nowPlaying": "Now Playing",
-    "nextRoutine": "Next routine",
     "dueNow": "Due now",
     "inMinutes": "In {{count}} min",
     "inHours": "In {{count}} h",
@@ -77,7 +72,28 @@
     "shortcuts": "SHORTCUTS",
     "seeAll": "See all",
     "recentConversations": "RECENT CONVERSATIONS",
-    "rightNowTitle": "Right now"
+    "rightNowTitle": "Right now",
+    "connectedTo": "Connected to {{host}}",
+    "ideas": {
+      "title": "From your Pond",
+      "more": "{{count}} more",
+      "quiet": "Nothing needs you right now.",
+      "agent": "Try the {{title}} agent",
+      "agentLabel": "Agent idea: {{title}}, {{when}}"
+    },
+    "ledger": {
+      "playingLabel": "Playing",
+      "nextLabel": "Next",
+      "devicesLabel": "Devices",
+      "outsideLabel": "Outside",
+      "rememberLabel": "Remember",
+      "playingBy": "{{track}} by {{artist}}",
+      "routineAt": "{{label}} at {{time}}",
+      "devicesOnline": "{{online}} of {{total}} online",
+      "outside": "{{temp}}°C",
+      "outsideIn": "{{temp}}°C in {{place}}",
+      "more": "{{count}} more"
+    }
   },
   "chat": {
     "connecting": "Connecting",

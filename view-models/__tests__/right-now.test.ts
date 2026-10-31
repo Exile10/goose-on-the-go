@@ -106,7 +106,7 @@ describe('untilOf', () => {
 describe('readRightNow', () => {
   function pond(overrides: Partial<Parameters<typeof readRightNow>[0]> = {}) {
     return {
-      weather: async () => ({ enabled: true, temp: 22 }),
+      weather: async () => ({ enabled: true, temp: 22, location_name: 'Nairobi' }),
       nowPlaying: async () => ({ connected: true, playing: false }),
       upcomingSchedules: async () => [{ id: 's', label: 'Morning briefing', next_run: '2026-09-23T04:00:00Z', paused: false }],
       ...overrides,
@@ -115,7 +115,7 @@ describe('readRightNow', () => {
 
   it('reads all three cards', async () => {
     await expect(readRightNow(pond())).resolves.toEqual({
-      outdoorTemp: 22,
+      outdoor: { temp: 22, place: 'Nairobi' },
       nowPlaying: { state: 'idle' },
       nextRoutine: { label: 'Morning briefing', nextRun: new Date('2026-09-23T04:00:00Z') },
     });
@@ -126,13 +126,13 @@ describe('readRightNow', () => {
   // mutation dropping that check confirmed.
   it('shows no temperature from a Pond with no location set, whatever else it sent', async () => {
     const r = await readRightNow(pond({ weather: async () => ({ enabled: false, temp: 99 }) }));
-    expect(r.outdoorTemp).toBeNull();
+    expect(r.outdoor).toBeNull();
   });
 
   it('loses only the card whose read failed', async () => {
     const r = await readRightNow(pond({ nowPlaying: async () => { throw new ApiError('bad gateway', 502, null); } }));
     expect(r.nowPlaying).toBeNull();
-    expect(r.outdoorTemp).toBe(22);
+    expect(r.outdoor).toEqual({ temp: 22, place: 'Nairobi' });
     expect(r.nextRoutine).not.toBeNull();
   });
 });

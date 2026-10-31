@@ -1,11 +1,11 @@
 /**
- * HomeScreen — what the Pond is doing right now.
+ * HomeScreen — whether the Pond wants anything from you, and what is happening at home.
  *
- * The app is inert without a Pond, so its reachability is the first thing on
- * the screen rather than a grey line under the fold. Everything below it is
- * something the Pond actually told us: what is playing, the next routine,
- * conversations it is holding, devices it can see. A card with nothing true to
- * say is not drawn. Surfaces are Ink's printed plate, not a shadow.
+ * In that order: the suggestions it is waiting on and the questions it offers come before the
+ * facts, because they are the part that needs a person. Everything is something the Pond actually
+ * told us, and a section with nothing true to say is not drawn. The raised edge is spent on the
+ * suggestions alone; the facts, conversations and devices sit on hairlines, so the screen can hold
+ * more of them without every one shouting.
  */
 
 import React, { useCallback, useState } from 'react';
@@ -18,6 +18,8 @@ import {
   InkSwitch,
   InkText,
   InkTitle,
+  inkText,
+  useInkTheme,
 } from '@jarida/ink/native';
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -30,28 +32,31 @@ import type { ThemeColors } from '@/constants/colors';
 
 import { GIcon } from '@/components/ui/g-icon';
 import { GPressable } from '@/components/ui/g-pressable';
-import { EqualizerBars } from '@/components/ui/equalizer-bars';
 import { FinishSetup } from '@/components/patterns/finish-setup';
 import { AgentsGettingReady } from '@/components/patterns/agents-building';
 import { PondGettingReady } from '@/components/patterns/pond-getting-ready';
 import { RemoteAccessOffer } from '@/components/patterns/remote-access-offer';
+import { AskRow, HomeIdeas } from '@/components/patterns/home-ideas';
+import { RightNowLedger } from '@/components/patterns/right-now-ledger';
+import { homeLedger } from '@/view-models/home-ledger';
+import { useHomeIdeas, type PondPrompt } from '@/view-models/use-home-ideas';
 import { useRecentSessions } from '@/view-models/use-recent-sessions';
 import { supports, useDevices } from '@/view-models/use-devices';
 import { initialOf, useMember } from '@/view-models/use-household';
-import { untilOf, useRightNow, type NextRoutine, type NowPlaying } from '@/view-models/use-right-now';
+import { useRightNow } from '@/view-models/use-right-now';
 import { useLive } from '@/view-models/use-live';
 import { useServer } from '@/providers/server-provider';
 import { hostOf } from '@/services/discovery';
 import { deviceStyle } from '@/constants/device-style';
 import { toggle } from '@/services/haptics';
 import type { Device } from '@/services/types';
-import { Brand, Grey, JaridaPurple } from '@/constants/colors';
+import { Brand, Grey, JaridaPurple, Semantic } from '@/constants/colors';
 import { FontFamily, FontSize, FontWeight } from '@/constants/typography';
 import { Spacing } from '@/constants/spacing';
 import { Radii } from '@/constants/radii';
 
-/** The home grid is a glance, not the full list — that is the Devices tab. */
-const HOME_GRID_LIMIT = 4;
+/** The home grid is a glance, not the full list — that is the Devices tab. Three rows of two. */
+const HOME_GRID_LIMIT = 6;
 
 /** How often the greeting and the countdowns catch up with the clock. */
 const CLOCK_MS = 60_000;
@@ -70,13 +75,14 @@ function greetingKey(hour: number) {
 }
 
 /**
- * The Pond's reachability, as the page's opening statement.
+ * The Pond, while it is not plainly there.
  *
  * Three states, not two: until `hydrated` the stored URL has not been read
  * back, so claiming "unreachable" would be reporting a race rather than a
  * fact. A reconnect in progress is the same kind of not-yet: it said
  * "unreachable" for the six seconds a cold start on cellular takes to bring the
- * tailnet up, beside a banner saying it was reconnecting.
+ * tailnet up, beside a banner saying it was reconnecting. Connected, it is the
+ * line under the name (`PondLine`), and this draws nothing.
  */
 function PondCard() {
   const styles = useThemedStyles(makeStyles);
@@ -103,111 +109,54 @@ function PondCard() {
     );
   }
 
+  if (online) return null;
+
   return (
     <InkCard style={styles.pond}>
       <View style={styles.pondTop}>
-        <InkTitle level={2}>{t(online ? 'pond.connected' : 'pond.unreachable')}</InkTitle>
-        <InkBadge tone={online ? 'success' : 'danger'}>
-          {t(online ? 'common.online' : 'common.offline')}
-        </InkBadge>
+        <InkTitle level={2}>{t('pond.unreachable')}</InkTitle>
+        <InkBadge tone="danger">{t('common.offline')}</InkBadge>
       </View>
       <InkText>{hostOf(serverUrl)}</InkText>
       <View style={styles.pondActions}>
-        {online ? (
-          <>
-            <InkButton
-              variant="primary"
-              icon="chat"
-              onPress={() => router.push('/conversation')}
-            >
-              {t('pond.askGoose')}
-            </InkButton>
-            <InkButton
-              variant="quiet"
-              icon="server"
-              onPress={() => router.push('/(stack)/switch-pond')}
-            >
-              {t('pond.switch')}
-            </InkButton>
-          </>
-        ) : (
-          <>
-            <InkButton variant="primary" disabled={checking} onPress={retry}>
-              {t(checking ? 'pond.checking' : 'common.retry')}
-            </InkButton>
-            <InkButton variant="quiet" onPress={() => router.push('/(stack)/switch-pond')}>
-              {t('pond.switch')}
-            </InkButton>
-          </>
-        )}
+        <InkButton variant="primary" disabled={checking} onPress={retry}>
+          {t(checking ? 'pond.checking' : 'common.retry')}
+        </InkButton>
+        <InkButton variant="quiet" onPress={() => router.push('/(stack)/switch-pond')}>
+          {t('pond.switch')}
+        </InkButton>
       </View>
     </InkCard>
   );
 }
 
 /**
- * What is playing. Idle is said in words; the bars move only while something
- * plays, because bars over silence would say music is on. They hold still
- * under Reduce Motion and when Home is not in front.
+ * The Pond, connected: one line under the name rather than a card. It took a third of the screen
+ * to say "connected" and offer two buttons; Ask Goose is now in the Ask row, and this line is the
+ * way to another Pond.
  */
-function NowPlayingCard({ playing }: { playing: NowPlaying }) {
+function PondLine() {
+  const theme = useInkTheme();
   const styles = useThemedStyles(makeStyles);
   const { t } = useTranslation();
+  const { online, serverUrl, hydrated, connectionState } = useServer();
+  const router = useRouter();
+
+  if (!hydrated || !online || connectionState === 'reconnecting') return null;
 
   return (
-    <InkCard style={styles.rightNowCard} contentStyle={styles.rightNowFace}>
-      <Text style={styles.cardEyebrow}>{t('home.nowPlaying')}</Text>
-      {playing.state === 'playing' ? (
-        <>
-          <Text style={styles.cardTitle} numberOfLines={2}>
-            {playing.track}
-          </Text>
-          {playing.artist ? (
-            <Text style={styles.cardDetail} numberOfLines={1}>
-              {playing.artist}
-            </Text>
-          ) : null}
-          <View style={styles.waveformRow}>
-            <EqualizerBars color={JaridaPurple[400]} />
-          </View>
-        </>
-      ) : (
-        <Text style={styles.cardTitle}>{t('home.nothingPlaying')}</Text>
-      )}
-    </InkCard>
-  );
-}
-
-/**
- * The soonest routine that will actually run. Labelled a routine, never an
- * event: the data is the Pond's own schedules, not a calendar.
- */
-function NextRoutineCard({ routine, now }: { routine: NextRoutine; now: Date }) {
-  const styles = useThemedStyles(makeStyles);
-  const { t } = useTranslation();
-  const until = untilOf(routine.nextRun, now);
-
-  return (
-    <InkCard style={styles.rightNowCard} contentStyle={styles.rightNowFace}>
-      <Text style={styles.cardEyebrow}>{t('home.nextRoutine')}</Text>
-      <Text style={styles.cardTitle} numberOfLines={2}>
-        {routine.label}
+    <GPressable
+      style={styles.pondLine}
+      hitSlop={8}
+      onPress={() => router.push('/(stack)/switch-pond')}
+      accessibilityRole="button"
+      accessibilityHint={t('pond.switch')}
+    >
+      <View style={styles.pondDot} />
+      <Text style={inkText(theme, { size: 'sm', color: theme.color.textSecondary }).style} numberOfLines={1}>
+        {t('home.connectedTo', { host: hostOf(serverUrl) })}
       </Text>
-      <Text style={styles.cardDetail}>
-        {routine.nextRun.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
-      </Text>
-      <View style={styles.routineBadge}>
-        <InkBadge tone="warning">
-          {until.unit === 'now'
-            ? t('home.dueNow')
-            : until.unit === 'minutes'
-              ? t('home.inMinutes', { count: until.count })
-              : until.unit === 'hours'
-                ? t('home.inHours', { count: until.count })
-                : t('home.inDays', { count: until.count })}
-        </InkBadge>
-      </View>
-    </InkCard>
+    </GPressable>
   );
 }
 
@@ -239,7 +188,7 @@ const DeviceGridItem = React.memo(function DeviceGridItem({
   );
 
   return (
-    <InkCard style={styles.deviceCard}>
+    <InkCard raised={false} style={styles.deviceCard}>
       <View style={styles.deviceCardTop}>
         <View style={[styles.deviceIconWrap, { backgroundColor: color + '1F' }]}>
           <GIcon name={icon} size={17} color={on && device.is_online ? color : Grey[500]} />
@@ -274,6 +223,8 @@ export default function HomeScreen() {
   // this phone.
   const member = useMember();
   const rightNow = useRightNow().data;
+  // One read of the Pond's ideas for the whole screen; the sections below take their parts.
+  const ideas = useHomeIdeas();
   const router = useRouter();
   const chrome = useChromeScroll();
   const bottomInset = useBottomBarInset();
@@ -284,7 +235,6 @@ export default function HomeScreen() {
   useLive(async () => setNow(new Date()), CLOCK_MS);
 
   const initial = member ? initialOf(member.displayName) : null;
-  const { nowPlaying, nextRoutine } = rightNow;
 
   const handleDeviceToggle = useCallback(
     (device: Device, on: boolean) => void devices.actions.setState(device, { power: on }),
@@ -293,11 +243,23 @@ export default function HomeScreen() {
 
   const shown = devices.data.devices.slice(0, HOME_GRID_LIMIT);
 
-  // Only badges with a source. The online count is the list the grid below
-  // shows, so the two cannot disagree, and it is not shown while that list is
-  // unknown.
-  const showOnlineCount = !devices.loading && !devices.error;
-  const showOutdoor = rightNow.outdoorTemp !== null;
+  // The online count is the list the grid below shows, so the two cannot
+  // disagree, and it is not stated while that list is unknown.
+  const devicesKnown = !devices.loading && !devices.error;
+  const ledger = homeLedger({
+    ...rightNow,
+    now,
+    devices: devicesKnown ? { online: devices.data.onlineCount, total: devices.data.devices.length } : null,
+    reminders: ideas.data.reminders,
+  });
+
+  const ask = useCallback(
+    (prompt: PondPrompt) => {
+      ideas.actions.taken(prompt);
+      router.push({ pathname: '/conversation', params: { ask: prompt.prompt } });
+    },
+    [ideas.actions, router],
+  );
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -310,6 +272,7 @@ export default function HomeScreen() {
           <View style={styles.greetingText}>
             <Text style={styles.greetingLabel}>{t(greetingKey(now.getHours()))}</Text>
             <InkTitle level={1}>{firstName(member?.displayName) ?? t('home.you')}</InkTitle>
+            <PondLine />
           </View>
           <GPressable feedback="lift"
             style={styles.avatar}
@@ -325,21 +288,6 @@ export default function HomeScreen() {
           </GPressable>
         </View>
 
-        {!offline && (showOnlineCount || showOutdoor) ? (
-          <View style={styles.badges}>
-            {showOnlineCount ? (
-              <InkBadge tone="success">
-                {t('home.chipOnline', { count: devices.data.onlineCount })}
-              </InkBadge>
-            ) : null}
-            {showOutdoor ? (
-              <InkBadge tone="info">
-                {t('home.chipOutdoorTemp', { temp: rightNow.outdoorTemp })}
-              </InkBadge>
-            ) : null}
-          </View>
-        ) : null}
-
         <PondCard />
 
         {/* Offered once per pairing, and declinable. It draws nothing unless
@@ -353,17 +301,40 @@ export default function HomeScreen() {
 
         {offline ? null : (
           <>
-        {/* A card with nothing true to say is not drawn, and a row with no
-            cards has no heading. */}
-        {nowPlaying || nextRoutine ? (
+        {/* "Nothing needs you" only once both reads have answered; a failed one is unknown, not quiet. */}
+        {ideas.quiet && !ideas.data.agent && !ideas.outcome ? (
+          <InkText size="sm" tone="secondary" style={styles.quiet}>
+            {t('home.ideas.quiet')}
+          </InkText>
+        ) : (
+          <HomeIdeas
+            proposals={ideas.data.proposals}
+            moreProposals={ideas.data.moreProposals}
+            agent={ideas.data.agent}
+            deciding={ideas.deciding}
+            outcome={ideas.outcome}
+            onAccept={(id) => void ideas.actions.approve(id)}
+            onDecline={(id) => void ideas.actions.decline(id)}
+          />
+        )}
+
+        <AskRow prompts={ideas.data.prompts} onAsk={ask} onAskGoose={() => router.push('/conversation')} />
+
+        {/* A line with nothing true to say is not drawn, and a ledger with no
+            lines has no heading. */}
+        {ledger.length > 0 ? (
           <>
             <InkTitle level={3} style={styles.section}>
               {t('home.rightNowTitle')}
             </InkTitle>
-            <View style={styles.rightNowRow}>
-              {nowPlaying ? <NowPlayingCard playing={nowPlaying} /> : null}
-              {nextRoutine ? <NextRoutineCard routine={nextRoutine} now={now} /> : null}
-            </View>
+            <RightNowLedger
+              entries={ledger}
+              onOpen={{
+                next: () => router.push('/(stack)/schedule'),
+                devices: () => router.push('/(tabs)/devices'),
+                remember: () => router.push('/(stack)/reminders'),
+              }}
+            />
           </>
         ) : null}
 
@@ -485,12 +456,15 @@ const makeStyles = (c: ThemeColors) =>
     color: Brand.white,
   },
 
-  badges: {
+  pondLine: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: Spacing.sm,
-    marginBottom: Spacing.md,
+    alignItems: 'center',
+    gap: Spacing.xs + 2,
+    marginTop: Spacing.xs,
+    alignSelf: 'flex-start',
   },
+  pondDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: Semantic.success },
+  quiet: { marginBottom: Spacing.lg },
 
   /* The plate sits 4px below the face, so every card reserves room for it. */
   pond: { marginBottom: Spacing.lg },
@@ -521,39 +495,6 @@ const makeStyles = (c: ThemeColors) =>
     fontWeight: FontWeight.semibold,
     color: c.textBrand,
   },
-
-  /* Right now. InkCard draws its own face and plate; its style is layout only. */
-  rightNowRow: {
-    flexDirection: 'row',
-    gap: Spacing.md,
-    marginBottom: Spacing.lg,
-  },
-  rightNowCard: { flex: 1 },
-  // The row stretches both cards to the taller one, but InkCard's raised plate
-  // fills that height while its face only wraps its content — so the card with
-  // less to say showed a slab of bare ink below it. The face takes the height
-  // too, and the pair reads as one row again.
-  rightNowFace: { flex: 1 },
-  cardEyebrow: {
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.xs,
-    color: c.textTertiary,
-    marginBottom: Spacing.xs,
-  },
-  cardTitle: {
-    fontFamily: FontFamily.heading,
-    fontSize: FontSize.md,
-    fontWeight: FontWeight.bold,
-    color: c.text,
-  },
-  cardDetail: {
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.sm,
-    color: c.textSecondary,
-    marginTop: 2,
-  },
-  waveformRow: { marginTop: 'auto', paddingTop: Spacing.md },
-  routineBadge: { alignSelf: 'flex-start', marginTop: 'auto', paddingTop: Spacing.md },
 
   convoRow: {
     flexDirection: 'row',
