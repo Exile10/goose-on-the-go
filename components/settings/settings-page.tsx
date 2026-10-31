@@ -3,7 +3,7 @@
  */
 
 import React, { useCallback, useMemo, useState, type ReactElement } from 'react';
-import { Platform, RefreshControl, View } from 'react-native';
+import { Platform, RefreshControl } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';

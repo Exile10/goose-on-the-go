@@ -78,7 +78,6 @@ export default function WebSearchScreen() {
     actions.openDashboard();
   }, [actions]);
 
-  const handleRefresh = useCallback(() => void actions.refresh(), [actions]);
 
   const handleNearby = useCallback(
     async (next: boolean) => {

@@ -20,7 +20,7 @@
  */
 
 import React, { useState } from 'react';
-import { Alert, Platform, ScrollView, StyleSheet, useWindowDimensions } from 'react-native';
+import { Platform, ScrollView, useWindowDimensions } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import {
   InkButton,

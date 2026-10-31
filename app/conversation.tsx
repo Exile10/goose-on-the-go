@@ -130,7 +130,7 @@ export default function ChatScreen() {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const { data, loading, error, actions } = useChat();
-  const { online, hydrated } = useServer();
+  const { hydrated } = useServer();
   const { messages, queued, streaming, status, turnSeed, sessionId, title } = data;
   const name = useGreetingName();
   const suggestions = useSuggestions(sessionId);

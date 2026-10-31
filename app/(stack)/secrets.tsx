@@ -61,7 +61,6 @@ export default function SecretsScreen() {
     [actions, ask, t],
   );
 
-  const handleRefresh = useCallback(() => void actions.refresh(), [actions]);
 
   const replacing = form?.kind === 'replace' ? data.keys.find((row) => row.key === form.key) ?? { key: form.key, labelKey: null } : null;
 

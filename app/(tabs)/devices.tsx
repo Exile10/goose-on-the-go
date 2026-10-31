@@ -40,7 +40,6 @@ import { ContentUnavailable } from '@/components/patterns/content-unavailable';
 import { DeviceEditSheet } from '@/components/patterns/device-edit-sheet';
 import { isUnavailable } from '@/models/content-state';
 import { useContentState } from '@/view-models/use-content-state';
-import { usePullToRefresh } from '@/view-models/use-pull-to-refresh';
 import type { Device } from '@/services/types';
 import { Grey } from '@/constants/colors';
 import type { ThemeColors } from '@/constants/colors';
@@ -175,7 +174,6 @@ export default function DevicesTab() {
   const total = data.devices.length;
   const state = useContentState({ loading, failed, hasContent: total > 0 });
   const unavailable = isUnavailable(state);
-  const pull = usePullToRefresh(actions.refresh);
   const nothingReachable = total > 0 && data.onlineCount === 0;
 
   return (

@@ -4,7 +4,7 @@
  */
 
 import React, { useCallback, useMemo, useState } from 'react';
-import { Alert, Keyboard, Pressable, RefreshControl, ScrollView, Text, TextInput, View } from 'react-native';
+import { Keyboard, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -32,7 +32,6 @@ import { useServer } from '@/providers/server-provider';
 import { hostOf } from '@/services/discovery';
 import { hapticsEnabled, saveHapticsPreference, selectionTick } from '@/services/haptics';
 import { initialOf, useHousehold } from '@/view-models/use-household';
-import { logFailure } from '@/view-models/describe-error';
 import { usePondSettings } from '@/view-models/use-pond-settings';
 import { PullSectionsProvider, useReloadOnPull, usePullSections, usePullToRefresh } from '@/view-models/use-pull-to-refresh';
 import { summarize, useSummaryExtras } from '@/view-models/use-settings-extras';

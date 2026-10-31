@@ -211,36 +211,6 @@ export function ScheduleFormSheet(props: ScheduleFormSheetProps) {
       </InkFormField>
 
 
-      {draft.timing === 'once' ? (
-        <>
-          <InkFormField label={t('schedule.form.date')}>
-            <InkDatePicker
-              label={t('schedule.form.date')}
-              placeholder={t('schedule.form.datePlaceholder')}
-              value={draft.date}
-              onChange={set('date')}
-              today={today}
-              min={today}
-            />
-          </InkFormField>
-          <InkFormField label={t('schedule.form.time')}>
-            <InkTimePicker label={t('schedule.form.time')} value={draft.time} onChange={set('time')} />
-          </InkFormField>
-        </>
-      ) : (
-        <>
-          <InkFormField label={t('schedule.form.cron')}>
-            <InkInput
-              label={t('schedule.form.cron')}
-              placeholder="0 0 9 * * 1-5"
-              value={draft.cron}
-              onChange={set('cron')}
-            />
-          </InkFormField>
-          <InkText size="sm" tone="tertiary">{t('schedule.form.cronHint')}</InkText>
-        </>
-      )}
-
           {offersRoutine ? (
             <InkFormField label={t('schedule.form.does')}>
               <InkSegmented
@@ -362,6 +332,18 @@ export function ScheduleFormSheet(props: ScheduleFormSheetProps) {
           ) : null}
 
           {preview ? <InkText size="sm" tone="secondary">{preview}</InkText> : null}
+
+          {zones ? (
+            <InkFormField label={t('schedule.form.timezone')}>
+              <InkSegmented
+                label={t('schedule.form.timezone')}
+                value={draft.timezone}
+                options={zones.map((zone) => ({ value: zone, label: zone }))}
+                onChange={set('timezone')}
+              />
+            </InkFormField>
+          ) : null}
+          <InkText size="sm" tone="tertiary">{t('schedule.form.phoneZone', { zone: phoneZone })}</InkText>
 
       {error ? <InkNotice tone="danger">{error}</InkNotice> : null}
 
