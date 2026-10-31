@@ -121,6 +121,20 @@ async function keepSetupKey(pin: string | null, key: string | undefined): Promis
   }
 }
 
+/**
+ * Setup ends in the owner's interview, so Goose asks about them while they are still holding the phone.
+ * Starting it writes the first question; a failure leaves it to Home's offer.
+ */
+async function openingInterview(profileId: string): Promise<UseOwnerSetup['interview']> {
+  try {
+    const { sessionId } = await api.startInterview(profileId);
+    return sessionId ? { profileId, sessionId } : null;
+  } catch {
+    console.warn('[setup] the interview did not start; Home offers it');
+    return null;
+  }
+}
+
 /** What the step a skip leaves behind is set to: the defaults, so nothing it requires is left empty. */
 function skipped(step: SetupStep, draft: SetupDraft): SetupDraft {
   const base = defaultDraft(draft.timezone);
@@ -140,6 +154,8 @@ export interface UseOwnerSetup {
   notice: string | null;
   /** The Pond refused to finish because it has no chat model; the model step chooses one. */
   noChatModel: boolean;
+  /** The owner's setup interview, started as setup finished, for the screen to open in its place. */
+  interview: { profileId: string; sessionId: string } | null;
   system: SystemInfo | null;
   canContinue: boolean;
   place: { busy: boolean; note: string | null; tone: 'neutral' | 'danger' };
@@ -165,6 +181,7 @@ export function useOwnerSetup(): UseOwnerSetup {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [noChatModel, setNoChatModel] = useState(false);
+  const [interview, setInterview] = useState<UseOwnerSetup['interview']>(null);
   const [system, setSystem] = useState<SystemInfo | null>(null);
   const [attempt, setAttempt] = useState(0);
   const [place, setPlace] = useState<UseOwnerSetup['place']>({ busy: false, note: null, tone: 'neutral' });
@@ -295,6 +312,7 @@ export function useOwnerSetup(): UseOwnerSetup {
           });
           void drafts.remove([profileId]).catch(() => {});
         }
+        if (result.interview) setInterview(await openingInterview(result.interview.profileId));
         setPhase('finished');
         return true;
       }
@@ -361,6 +379,7 @@ export function useOwnerSetup(): UseOwnerSetup {
     error,
     notice,
     noChatModel,
+    interview,
     system,
     canContinue: canContinue(step, draft),
     place,

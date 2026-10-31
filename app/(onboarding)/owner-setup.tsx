@@ -1,12 +1,13 @@
 /**
  * Owner setup, for a Pond with no screen: who you are and where, how Goose talks, and a model only
  * when the Pond has none. Opened after a claim or a pairing to a Pond that is not set up, and on
- * launch while it is not. It ends on Home, which says whether Goose can answer yet.
+ * launch while it is not. It ends in the owner's interview, opened over Home, or on Home itself, which
+ * says whether Goose can answer yet.
  */
 
-import React, { useCallback } from 'react';
+import React, { useCallback, useEffect } from 'react';
 import { BackHandler, ScrollView, StyleSheet, View } from 'react-native';
-import { Redirect, Stack, useFocusEffect } from 'expo-router';
+import { Redirect, Stack, useFocusEffect, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { InkButton, InkEmptyState, InkEyebrow, InkMeter, InkNotice, InkSpinner } from '@jarida/ink/native';
@@ -39,8 +40,16 @@ export default function OwnerSetupScreen() {
   const setup = useOwnerSetup();
   // The model step counts only once the Pond has asked for it.
   const count = setup.noChatModel ? SETUP_STEPS.length : SETUP_STEPS.indexOf('model');
-  const { index, phase } = setup;
+  const { index, phase, interview } = setup;
   const back = setup.actions.back;
+  const router = useRouter();
+
+  // Home goes underneath, so leaving the interview lands where setup would have.
+  useEffect(() => {
+    if (phase !== 'finished' || !interview) return;
+    router.replace('/(tabs)');
+    router.push({ pathname: '/conversation', params: { session: interview.sessionId, interview: interview.profileId } });
+  }, [interview, phase, router]);
 
   // Back is the wizard's own step back; leaving mid-setup would land on a screen that cannot work yet.
   useFocusEffect(
@@ -53,6 +62,7 @@ export default function OwnerSetupScreen() {
     }, [phase, index, back]),
   );
 
+  if (setup.phase === 'finished' && interview) return null;
   if (setup.phase === 'alreadyDone' || setup.phase === 'finished') return <Redirect href="/(tabs)" />;
   if (setup.phase === 'unpaired') return <Redirect href="/(onboarding)/welcome" />;
 

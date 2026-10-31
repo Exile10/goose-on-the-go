@@ -1385,9 +1385,52 @@ export interface OnboardStatus {
 
 /** `POST /api/v1/onboard/complete`: done, or the settings it refused to finish without. */
 export type OnboardCompletion =
-  /** `adminKey`: My Pond's key for the phone that claimed the Pond, given once on this call only. */
-  | { completed: true; adminKey?: string }
+  /**
+   * `adminKey`: My Pond's key for the phone that claimed the Pond, given once on this call only.
+   * `interview`: the owner's setup interview, from a Pond that has one (goose-in-a-pond#731).
+   */
+  | { completed: true; adminKey?: string; interview?: InterviewOffer }
   | { completed: false; missing: string[] };
+
+/** Where a member's setup interview stands. `not_started` is the only state with no session yet. */
+export type InterviewStatus = 'not_started' | 'in_progress' | 'awaiting_approval' | 'done' | 'stopped';
+
+export type InterviewTopicStatus = 'pending' | 'answered' | 'skipped';
+
+export interface InterviewTopic {
+  id: string;
+  label: string;
+  status: InterviewTopicStatus;
+}
+
+/** A note the interview wants to keep, one per topic, keyed `me_*`; the answers behind it never leave the Pond. */
+export interface InterviewDraftNote {
+  key: string;
+  topic: string;
+  instruction: string;
+}
+
+/** `GET` and `POST /api/v1/profiles/{id}/interview`. */
+export interface ProfileInterview {
+  profileId: string;
+  status: InterviewStatus;
+  /** The conversation the questions are asked in; null only before it starts. */
+  sessionId: string | null;
+  topics: InterviewTopic[];
+  draft: InterviewDraftNote[];
+}
+
+/** The owner's interview as `/onboard/complete` offers it. */
+export interface InterviewOffer {
+  profileId: string;
+  status: InterviewStatus;
+}
+
+/** `GET /api/v1/profiles/{id}/notes`: the member's own notes, and how much of the shared budget is used. */
+export interface MemberNotes {
+  notes: PromptExtra[];
+  limits: { maxNotes: number; maxTotalChars: number; usedChars: number } | null;
+}
 
 /** `GET /api/v1/warmup`: whether the chat model has been primed for a first message. */
 export interface WarmupStatus {

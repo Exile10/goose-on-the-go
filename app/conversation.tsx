@@ -30,6 +30,10 @@
  * The header reports reachability only when it is bad. A green dot reading
  * "Connected" above every conversation is chrome; an explicit line when the
  * Pond cannot be reached is the thing a reader actually needs.
+ *
+ * Linked with `interview`, the conversation is the member's setup interview:
+ * the topics covered sit under the bar, and the notes Goose drafts arrive at
+ * the foot of the thread to be saved with a tap or changed by answering.
  */
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -48,6 +52,7 @@ import { InkNavbar, InkNotice, useInkTheme } from '@jarida/ink/native';
 
 import { ChatDock } from '@/components/patterns/chat-dock';
 import { GreetingCard } from '@/components/patterns/greeting-card';
+import { InterviewDraft, InterviewProgress, InterviewSaved } from '@/components/patterns/interview-panels';
 import { MessageRow } from '@/components/patterns/message-row';
 import { VoiceDock } from '@/components/patterns/voice-dock';
 import { GIcon } from '@/components/ui/g-icon';
@@ -64,6 +69,7 @@ import { Spacing } from '@/constants/spacing';
 import { positionsFor, useChat } from '@/view-models/use-chat';
 import { useResearchOffer } from '@/view-models/use-deep-research';
 import { useGreetingName } from '@/view-models/use-greeting';
+import { useInterview } from '@/view-models/use-interview';
 import { useSuggestions, type OfferedPrompt } from '@/view-models/use-suggestions';
 import type { BubblePosition } from '@jarida/ink/native';
 
@@ -125,7 +131,11 @@ export default function ChatScreen() {
   // for it; without an id the screen opens a new conversation, which is what
   // the wall's compose button means. The ref is what stops a re-render
   // re-reading a conversation already on screen.
-  const { session, title: linkedTitle } = useLocalSearchParams<{ session?: string; title?: string }>();
+  const { session, title: linkedTitle, interview: interviewOf } = useLocalSearchParams<{
+    session?: string;
+    title?: string;
+    interview?: string;
+  }>();
   const openedRef = useRef<string | null>(null);
   const { open, unqueue } = actions;
   useEffect(() => {
@@ -133,6 +143,38 @@ export default function ChatScreen() {
     openedRef.current = session;
     open(session, linkedTitle);
   }, [session, linkedTitle, open]);
+
+  // The interview moves on a turn at a time, so it is read again as each reply ends.
+  const interview = useInterview(interviewOf ?? null, Boolean(interviewOf));
+  const { refresh: refreshInterview, approve } = interview.actions;
+  const wasStreaming = useRef(false);
+  useEffect(() => {
+    if (wasStreaming.current && !streaming && interviewOf) void refreshInterview();
+    wasStreaming.current = streaming;
+  }, [interviewOf, refreshInterview, streaming]);
+  const [saving, setSaving] = useState(false);
+  const [saveFailed, setSaveFailed] = useState(false);
+  const saveDraft = useCallback(async () => {
+    setSaving(true);
+    setSaveFailed(false);
+    const saved = await approve();
+    setSaving(false);
+    setSaveFailed(saved === null);
+  }, [approve]);
+  const router = useRouter();
+  const seeNotes = useCallback(() => router.push('/(stack)/settings-prompt-notes'), [router]);
+  const current = interviewOf ? interview.data.interview : null;
+  const asking = current?.status === 'in_progress' || current?.status === 'stopped' || current?.status === 'awaiting_approval';
+  const interviewFoot =
+    current?.status === 'awaiting_approval' && current.draft.length > 0 ? (
+      <View style={styles.foot}>
+        <InterviewDraft interview={current} saving={saving} error={saveFailed ? t('interview.saveFailed') : null} onSave={saveDraft} />
+      </View>
+    ) : current?.status === 'done' ? (
+      <View style={styles.foot}>
+        <InterviewSaved onSeeNotes={seeNotes} />
+      </View>
+    ) : null;
 
   // This screen is outside the tabs, so it has no shared bar to follow. The
   // title bar reads the list's own scroll through Ink's state machine, and
@@ -268,6 +310,8 @@ export default function ChatScreen() {
           ]}
         />
 
+        {asking && current ? <InterviewProgress interview={current} /> : null}
+
         {!online && hydrated ? (
           <View style={styles.notice}>
             <InkNotice tone="warning">{t('chat.offlineBody')}</InkNotice>
@@ -301,6 +345,8 @@ export default function ChatScreen() {
               keyboardDismissMode="interactive"
               keyboardShouldPersistTaps="handled"
               contentContainerStyle={styles.listContent}
+              // The list is inverted, so its header sits under the newest message.
+              ListHeaderComponent={interviewFoot}
             />
           ) : (
             <View style={styles.opening}>
@@ -351,6 +397,7 @@ const makeStyles = (c: ThemeColors) =>
     },
 
     notice: { paddingHorizontal: Spacing.lg, paddingBottom: Spacing.sm },
+    foot: { paddingTop: Spacing.md },
 
     opening: {
       flex: 1,
