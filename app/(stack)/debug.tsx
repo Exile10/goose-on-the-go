@@ -294,6 +294,12 @@ function DebugScreenContent() {
         })}
       </SettingsGroup>
 
+      {/* The Pond's own telemetry for the latest conversation, which the log cannot show: the
+          tools a turn used, behind a tap. */}
+      <SettingsGroup title={t('debug.timings.title')} footer={t('debug.timings.footer')}>
+        {latest ? <TelemetryCard latest={latest} onOpen={openTurns} /> : <SettingsRow label={t('debug.timings.none')} />}
+      </SettingsGroup>
+
       <Text style={styles.sectionTitle}>{t('debug.timing.title')}</Text>
       <View style={styles.card}>
         {debug.data.timings.length === 0 ? (
@@ -302,12 +308,6 @@ function DebugScreenContent() {
           <TimingTable timings={debug.data.timings} />
         )}
       </View>
-
-      {/* The Pond's own telemetry for the latest conversation, which the log cannot show: the
-          tools a turn used, behind a tap. */}
-      <SettingsGroup title={t('debug.timings.title')} footer={t('debug.timings.footer')}>
-        {latest ? <TelemetryCard latest={latest} onOpen={openTurns} /> : <SettingsRow label={t('debug.timings.none')} />}
-      </SettingsGroup>
 
       <View style={styles.logHeader}>
         <Text style={styles.sectionTitle}>{t('debug.log.title')}</Text>
