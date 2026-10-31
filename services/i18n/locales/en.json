@@ -579,7 +579,8 @@
       "retention": "How long your Pond keeps things before it deletes them.",
       "appearance": "How this app looks on this phone. Your Pond never sees it.",
       "advanced": "Tuning for how Goose thinks and runs. Safe to leave alone.",
-      "speaking": "How Goose sounds when it answers out loud: the voice, its pace and how clear it is."
+      "speaking": "How Goose sounds when it answers out loud: the voice, its pace and how clear it is.",
+      "phoneNotifications": "How this phone hears from your Pond when the app is closed."
     },
     "section": {
       "nameAndManner": "Name and manner",
@@ -647,7 +648,8 @@
       "engine": "Where Goose runs. Leave these alone unless you run models somewhere other than your Pond.",
       "cost": "What a cloud service would charge, so your Pond can show what it saved you.",
       "watchesFor": "Your Pond records only the kinds you leave on. The pause and how sure it must be apply to all of them.",
-      "faces": "Face data stays on your Pond. It is never sent to the cloud."
+      "faces": "Face data stays on your Pond. It is never sent to the cloud.",
+      "stayConnected": "Keeps a connection to your Pond open after you leave the app, so notices arrive straight away. Android shows an ongoing notification while it is on, and it uses some battery. With it off, your Pond still wakes the phone with a push, which can arrive later when the phone is idle."
     },
     "link": {
       "whatItRemembers": "What Goose remembers",
@@ -1515,6 +1517,10 @@
         "label": "Faces it doesn't know",
         "hint": "A face matches nobody."
       }
+    },
+    "stayConnected": {
+      "label": "Stay connected in the background",
+      "ios": "iPhone does not let apps hold a connection open in the background. Your Pond wakes this phone with a push instead, and iOS decides how soon that arrives."
     }
   },
   "screens": {
@@ -1583,7 +1589,8 @@
     "pondCaches": "Caches",
     "pondTasks": "Tasks and reports",
     "pondHealth": "Health",
-    "pondPower": "Power"
+    "pondPower": "Power",
+    "settingsPhoneNotifications": "Notifications"
   },
   "nav": {
     "goose": "Goose",
@@ -3962,6 +3969,24 @@
       "today": "today {{time}}",
       "yesterday": "yesterday {{time}}",
       "dateTime": "{{date}} {{time}}"
+    }
+  },
+  "notifications": {
+    "background": {
+      "connecting": {
+        "title": "Connecting to your Pond",
+        "body": "Notices from your Pond arrive here once this phone reaches it. You can turn this off in Settings."
+      },
+      "connected": {
+        "title": "Connected to your Pond",
+        "body": "Notices from your Pond arrive here straight away. You can turn this off in Settings."
+      },
+      "unreachable": {
+        "title": "Can't reach your Pond",
+        "body": "Your Pond keeps its notices until this phone reaches it again. You can turn this off in Settings."
+      },
+      "channel": "Background connection",
+      "channelDescription": "Shown while this phone keeps a connection to your Pond open in the background."
     }
   }
 }

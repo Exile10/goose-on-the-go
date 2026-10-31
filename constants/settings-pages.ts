@@ -649,6 +649,18 @@ const appearance: SettingsPage = {
   ],
 };
 
+/** How this phone hears from its Pond while the app is closed. Stored on the phone, not the Pond. */
+const phoneNotifications: SettingsPage = {
+  id: 'phoneNotifications',
+  icon: 'bell',
+  tile: 'red',
+  titleKey: 'screens.settingsPhoneNotifications',
+  descriptionKey: 'settings.page.phoneNotifications',
+  sections: [
+    { footerKey: 'settings.footer.stayConnected', items: [{ kind: 'special', id: 'stayConnected' }] },
+  ],
+};
+
 const advanced: SettingsPage = {
   id: 'advanced',
   icon: 'sliders',
@@ -720,5 +732,6 @@ export const SETTINGS_PAGES: Record<SettingsPageId, SettingsPage> = {
   privacy,
   retention,
   appearance,
+  phoneNotifications,
   advanced,
 };

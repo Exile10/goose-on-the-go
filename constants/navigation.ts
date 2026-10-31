@@ -89,6 +89,7 @@ export const PROFILE_NAV: NavGroup[] = [
     groupKey: 'settings.menu.phone',
     items: [
       { id: 'appearance', labelKey: 'screens.settingsAppearance', icon: 'palette', tile: 'slate', route: '/(stack)/settings-appearance', summary: 'appearance' },
+      { id: 'phoneNotifications', labelKey: 'screens.settingsPhoneNotifications', icon: 'bell', tile: 'red', route: '/(stack)/settings-phone-notifications' },
     ],
   },
   {

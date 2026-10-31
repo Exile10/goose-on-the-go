@@ -16,6 +16,8 @@ const KEYS = {
   themePreference: '@goose/theme-preference',
   /** Whether this phone plays haptic feedback. A preference of the phone, not of the Pond. */
   hapticsEnabled: '@goose/haptics-enabled',
+  /** Whether this phone keeps its notification stream open in the background (Android). Not a secret. */
+  stayConnected: '@goose/stay-connected',
   onboardingDone: '@goose/onboarding-done',
   chatHistoryView: '@goose/chat-history-view',
   remoteOfferDismissed: '@goose/remote-offer-dismissed',

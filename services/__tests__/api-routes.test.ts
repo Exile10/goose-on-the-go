@@ -57,6 +57,28 @@ describe('envelope unwrapping', () => {
   });
 });
 
+describe('pending notifications', () => {
+  /** The contract allows either shape; the wake-up must not care which one the Pond sends. */
+  it('reads the list bare or wrapped, and acknowledges by id', async () => {
+    const calls: string[] = [];
+    const bodies = ['[{"id":"a"}]', '{"notifications":[{"id":"b"}]}', ''];
+    setFetch(async (url: string, init: { method?: string }) => {
+      calls.push(`${init.method ?? 'GET'} ${url}`);
+      return reply(bodies.shift() ?? '');
+    });
+    const api = new PondApiClient('https://pond.test:4000');
+
+    await expect(api.pendingNotifications()).resolves.toEqual([{ id: 'a' }]);
+    await expect(api.pendingNotifications()).resolves.toEqual([{ id: 'b' }]);
+    await expect(api.ackNotification('n/1')).resolves.toBeUndefined();
+    expect(calls).toEqual([
+      'GET https://pond.test:4000/api/v1/notifications/pending',
+      'GET https://pond.test:4000/api/v1/notifications/pending',
+      'POST https://pond.test:4000/api/v1/notifications/n%2F1/ack',
+    ]);
+  });
+});
+
 describe('empty bodies', () => {
   /**
    * DELETE answers 204. `res.json()` throws on an empty body, so without this
