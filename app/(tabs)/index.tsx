@@ -35,6 +35,8 @@ import { AgentsGettingReady } from '@/components/patterns/agents-building';
 import { PondGettingReady } from '@/components/patterns/pond-getting-ready';
 import { RemoteAccessOffer } from '@/components/patterns/remote-access-offer';
 import { AskRow, HomeIdeas } from '@/components/patterns/home-ideas';
+import { GlanceStrip, type Figure } from '@/components/patterns/glance-strip';
+import { PondSays } from '@/components/patterns/pond-says';
 import {
   ConversationsWidget,
   DevicesWidget,
@@ -214,7 +216,8 @@ export default function HomeScreen() {
   // The online count is the list the grid shows, so the two cannot disagree, and it is not stated
   // while that list is unknown.
   const devicesKnown = devicesState === 'ready' || devicesState === 'empty';
-  const hasIdeas = ideas.data.proposals.length > 0 || !!ideas.data.agent || ideas.quiet;
+  // Quiet is said above the board, by the Pond's own line; the widget is for what comes after it.
+  const hasIdeas = ideas.data.proposals.length > 0 || !!ideas.data.agent;
 
   // Built in the saved order; a widget with nothing to say is left out rather than drawn empty.
   const widgets = useMemo(() => {
@@ -232,7 +235,6 @@ export default function HomeScreen() {
                 moreProposals={ideas.data.moreProposals}
                 agent={ideas.data.agent}
                 deciding={ideas.deciding}
-                quiet={ideas.quiet}
                 onAccept={(id) => void ideas.actions.approve(id)}
                 onDecline={(id) => void ideas.actions.decline(id)}
               />
@@ -349,6 +351,17 @@ export default function HomeScreen() {
 
   const shown = widgets.map((w) => w.key);
 
+  // Only phrases with a source behind them; the line hides when there are none.
+  const figures: Figure[] = [];
+  if (devicesKnown) {
+    figures.push({ key: 'devices', phrase: t('home.lineDevicesOn', { count: devices.data.onlineCount }) });
+  }
+  if (rightNow.outdoor) {
+    const { temp, place } = rightNow.outdoor;
+    // Where the Pond is configured to be, which is not always where the reader is.
+    figures.push({ key: 'outdoor', phrase: place ? t('home.lineOutdoorPlace', { temp, place }) : t('home.lineOutdoor', { temp }) });
+  }
+
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <ScrollView
@@ -379,6 +392,19 @@ export default function HomeScreen() {
             )}
           </GPressable>
         </View>
+
+        {offline ? null : (
+          <PondSays
+            lead={ideas.data.lead}
+            reminderCount={ideas.data.reminderCount}
+            quiet={ideas.quiet}
+            deciding={ideas.deciding}
+            onAccept={(id) => void ideas.actions.approve(id)}
+            onDecline={(id) => void ideas.actions.decline(id)}
+          />
+        )}
+
+        {offline ? null : <GlanceStrip figures={figures} />}
 
         <PondCard />
 

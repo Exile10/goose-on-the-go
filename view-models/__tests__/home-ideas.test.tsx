@@ -137,12 +137,21 @@ afterEach(() => {
 });
 
 describe('useHomeIdeas', () => {
-  it('states the first suggestions and counts the rest for the link to them', async () => {
+  it('leads with the first suggestion, puts the next on the board and counts the rest', async () => {
     pond.listProposals.mockResolvedValue(['p1', 'p2', 'p3', 'p4'].map(proposal));
     const m = await mount();
 
-    expect(m.vm.data.proposals.map((p) => p.id)).toEqual(['p1', 'p2', 'p3', 'p4'].slice(0, HOME_PROPOSAL_LIMIT));
-    expect(m.vm.data.moreProposals).toBe(4 - HOME_PROPOSAL_LIMIT);
+    expect(m.vm.data.lead?.id).toBe('p1');
+    expect(m.vm.data.proposals.map((p) => p.id)).toEqual(['p2', 'p3', 'p4'].slice(0, HOME_PROPOSAL_LIMIT));
+    expect(m.vm.data.moreProposals).toBe(3 - HOME_PROPOSAL_LIMIT);
+    await m.unmount();
+  });
+
+  it('has no lead and nothing behind it when the Pond proposed nothing', async () => {
+    const m = await mount();
+    expect(m.vm.data.lead).toBeNull();
+    expect(m.vm.data.proposals).toEqual([]);
+    expect(m.vm.data.moreProposals).toBe(0);
     await m.unmount();
   });
 
@@ -172,6 +181,7 @@ describe('useHomeIdeas', () => {
 
     expect(m.vm.data.reminders?.first.text).toBe('Call the plumber');
     expect(m.vm.data.reminders?.more).toBe(2);
+    expect(m.vm.data.reminderCount).toBe(3);
     await m.unmount();
   });
 
@@ -219,6 +229,7 @@ describe('useHomeIdeas', () => {
       await m.vm.actions.approve('p1');
     });
     expect(pond.decideProposal).toHaveBeenCalledWith('p1', expect.stringMatching(/^gotg-suggestions-/), 'approve');
+    expect(m.vm.data.lead).toBeNull();
     expect(m.vm.data.proposals).toEqual([]);
     expect(m.vm.quiet).toBe(true);
     await m.unmount();

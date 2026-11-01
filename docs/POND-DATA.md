@@ -34,16 +34,17 @@ Each figure is its own read, settled independently, so a Pond that cannot list i
 
 ## Home
 
-Home answers two questions in order: whether the Pond wants anything from you, then what is happening at home. Under the greeting, everything is a widget on one board (`components/patterns/widget-board.tsx`), in two staggered columns and in an order the phone's owner can change: a long press, or Edit Home at the foot, folds every widget to one line, and a widget is dragged to its new place. The order is kept on the phone (`homeLayout` in `services/storage.ts`), not on the Pond. Only a waiting suggestion is raised and only Now playing is filled; the rest sit on hairlines.
+Home answers two questions in order: whether the Pond wants anything from you, then what is happening at home. Under the greeting the Pond speaks first, in one sentence (`components/patterns/pond-says.tsx`), with a line of plain facts under it (`glance-strip.tsx`). Below those, everything is a widget on one board (`components/patterns/widget-board.tsx`), in two staggered columns and in an order the phone's owner can change: a long press, or Edit Home at the foot, folds every widget to one line, and a widget is dragged to its new place. The order is kept on the phone (`homeLayout` in `services/storage.ts`), not on the Pond. Only a waiting suggestion is raised and only Now playing is filled; the rest sit on hairlines.
 
 | Shown | Source | When it is not shown |
 |---|---|---|
 | Greeting | the phone's clock: morning from 5 until 12, afternoon until 17, evening after that (`greetingFor`) | |
 | Name and avatar | `readMember()`, above | no name when nobody has claimed the device |
 | "Connected to …" line | `useServer()`: the Pond's address, leading to Switch Pond | while connecting or unreachable, when the Pond card says so instead |
-| From your Pond: suggestions | `GET /api/v1/proposals`, the first one, with Accept and Decline in place (`POST /proposals/{id}/decide`). Deciding in place is acceptable because a yes runs nothing: `executed` is always false. | when none are offered; "N more" leads to the Suggestions screen |
+| The Pond's sentence | `GET /api/v1/proposals`: the first suggestion, in the display title, with its reason and Accept and Decline in place (`POST /proposals/{id}/decide`). Deciding in place is acceptable because a yes runs nothing: `executed` is always false. With none, how many reminders wait, leading to them; with neither, "Nothing needs you right now." | while the Pond cannot be reached; and "nothing needs you" when either read failed, since unknown is not quiet |
+| Glance line | "N devices on" from the device list, and the temperature with the place it is for | a phrase with no answer behind it is left out, and the line with it |
+| From your Pond: suggestions | the suggestion after the one the sentence states, so the board never repeats it | when no second one is offered; "N more" leads to the Suggestions screen |
 | From your Pond: an agent | `GET /api/v1/agents/suggestions`, the first one, leading to the Agents screen | when none fits this Pond, or the read failed |
-| "Nothing needs you right now." | both the suggestion and reminder reads answered, and neither had anything; said inside the From your Pond widget | when either read failed: unknown is not quiet |
 | Ask | `GET /api/v1/suggestions`, only the prompts the Pond offered (they carry an id), at most three; then Ask Goose, always. A prompt opens a new conversation and asks it. | the Pond's prompts, when it offers none; the fixed starters are never shown here |
 | Now playing | `GET /api/v1/music/now-playing` (`nowPlayingOf`): the track and artist while Spotify reports playback, "Nothing playing" when it reports none | with no Spotify account, a refusal, or a claim of playback with no track |
 | Next routine | `GET /api/v1/schedules/upcoming?limit=5`: the first schedule that is not paused and has a valid `next_run` (`nextRoutineOf`), with how long until it (`untilText`; a time already passed reads "Due now") | when no routine will run |

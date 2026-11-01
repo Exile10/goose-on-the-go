@@ -29,7 +29,8 @@ export interface WidgetHeaderProps {
   title: string;
   /** A count or a state, said after the title and quieter than it. */
   meta?: string | null;
-  action?: { label: string; onPress: () => void } | null;
+  /** `name` is what a screen reader hears: two "See all" on one screen do not say which list each opens. */
+  action?: { label: string; name?: string; onPress: () => void } | null;
   onAccent?: boolean;
 }
 
@@ -51,7 +52,7 @@ export function WidgetHeader({ icon, title, meta, action, onAccent = false }: Wi
       ) : null}
       <View style={styles.spacer} />
       {action ? (
-        <GPressable hitSlop={12} accessibilityRole="button" onPress={action.onPress}>
+        <GPressable hitSlop={12} accessibilityRole="button" accessibilityLabel={action.name} onPress={action.onPress}>
           <Text style={styles.link}>{action.label}</Text>
         </GPressable>
       ) : null}
@@ -182,12 +183,24 @@ export function ConversationsWidget({ sessions, state, error, onRetry, onOpen, o
 
   return (
     <View>
-      <WidgetHeader icon="chat" title={t('home.conversations')} action={{ label: t('common.seeAll'), onPress: onSeeAll }} />
+      <WidgetHeader
+        icon="chat"
+        title={t('home.conversations')}
+        action={{ label: t('common.seeAll'), name: t('home.seeAllConversations'), onPress: onSeeAll }}
+      />
       {sessions.map((c, i) => (
         <GPressable key={c.id} style={[styles.row, i > 0 && styles.divided]} onPress={() => onOpen(c)}>
-          <Text style={styles.rowText} numberOfLines={1}>
-            {c.text}
-          </Text>
+          <View style={styles.rowWords}>
+            <Text style={styles.rowText} numberOfLines={1}>
+              {c.text}
+            </Text>
+            {/* How it opened, under its name. Null when that is what the line above already says. */}
+            {c.preview ? (
+              <Text style={styles.rowPreview} numberOfLines={1}>
+                {c.preview}
+              </Text>
+            ) : null}
+          </View>
           <Text style={styles.rowTime}>{c.time}</Text>
         </GPressable>
       ))}
@@ -227,7 +240,7 @@ export function DevicesWidget({ devices, powerById, online, state, error, onRetr
         icon="device"
         title={t('home.devices')}
         meta={online && online.total > 0 ? t('home.widgets.online', { online: online.count, total: online.total }) : null}
-        action={{ label: t('common.seeAll'), onPress: onSeeAll }}
+        action={{ label: t('common.seeAll'), name: t('home.seeAllDevices'), onPress: onSeeAll }}
       />
       {devices.length > 0 ? (
         <View style={styles.grid}>
@@ -318,7 +331,9 @@ const makeStyles = (theme: Theme) =>
 
     row: { flexDirection: 'row', alignItems: 'center', gap: theme.space[3], minHeight: theme.rowHeight.md },
     divided: { borderTopWidth: theme.edge.hairlineWidth, borderTopColor: theme.color.line },
-    rowText: { ...inkText(theme, { size: 'md' }).style, flex: 1 },
+    rowWords: { flex: 1, gap: 1, paddingVertical: theme.space[2] },
+    rowText: inkText(theme, { size: 'md' }).style,
+    rowPreview: inkText(theme, { size: 'sm', color: theme.color.textSecondary }).style,
     rowTime: { ...inkText(theme, { size: 'sm', color: theme.color.textTertiary }).style, fontVariant: ['tabular-nums'] },
 
     grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: theme.space[2] },

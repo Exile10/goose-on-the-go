@@ -50,12 +50,17 @@ export interface HomeReminders {
 
 export interface UseHomeIdeas {
   data: {
+    /** The suggestion Home leads with, in the Pond's own voice above the board. */
+    lead: ProposalRow | null;
+    /** The suggestions after the lead, for the board's widget. */
     proposals: ProposalRow[];
     /** How many are offered beyond the ones on Home, for the link to the rest. */
     moreProposals: number;
     prompts: PondPrompt[];
     agent: AgentIdea | null;
     reminders: HomeReminders | null;
+    /** Pending reminders, for the sentence Home leads with when nothing is proposed. */
+    reminderCount: number;
   };
   deciding: string | null;
   /**
@@ -132,11 +137,14 @@ export function useHomeIdeas(): UseHomeIdeas {
 
   return {
     data: {
-      proposals: rows.slice(0, HOME_PROPOSAL_LIMIT),
-      moreProposals: Math.max(0, rows.length - HOME_PROPOSAL_LIMIT),
+      lead: rows[0] ?? null,
+      // After the lead, so the board never repeats the suggestion stated above it.
+      proposals: rows.slice(1, 1 + HOME_PROPOSAL_LIMIT),
+      moreProposals: Math.max(0, rows.length - 1 - HOME_PROPOSAL_LIMIT),
       prompts,
       agent,
       reminders: pending.length > 0 ? { first: pending[0], more: pending.length - 1 } : null,
+      reminderCount: pending.length,
     },
     deciding: proposals.deciding,
     quiet: settled(proposals) && settled(reminders) && rows.length === 0 && pending.length === 0,
