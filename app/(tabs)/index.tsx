@@ -8,7 +8,7 @@
  * say is not drawn. Surfaces are Ink's printed plate, not a shadow.
  */
 
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   InkBadge,
   InkButton,
@@ -17,6 +17,8 @@ import {
   InkSwitch,
   InkText,
   InkTitle,
+  inkText,
+  useInkTheme,
 } from '@jarida/ink/native';
 import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -31,11 +33,15 @@ import { GIcon } from '@/components/ui/g-icon';
 import { GPressable } from '@/components/ui/g-pressable';
 import { EqualizerBars } from '@/components/ui/equalizer-bars';
 import { ContentUnavailable } from '@/components/patterns/content-unavailable';
+import { GlanceStrip, type Figure } from '@/components/patterns/glance-strip';
+import { HomeIdeas } from '@/components/patterns/home-ideas';
+import { PondSays } from '@/components/patterns/pond-says';
 import { FinishSetup } from '@/components/patterns/finish-setup';
 import { AgentsGettingReady } from '@/components/patterns/agents-building';
 import { PondGettingReady } from '@/components/patterns/pond-getting-ready';
 import { RemoteAccessOffer } from '@/components/patterns/remote-access-offer';
 import { isUnavailable } from '@/models/content-state';
+import { useHomeIdeas } from '@/view-models/use-home-ideas';
 import { useContentState } from '@/view-models/use-content-state';
 import { usePullToRefresh } from '@/view-models/use-pull-to-refresh';
 import { useRecentSessions } from '@/view-models/use-recent-sessions';
@@ -48,28 +54,56 @@ import { hostOf } from '@/services/discovery';
 import { deviceStyle } from '@/constants/device-style';
 import { toggle } from '@/services/haptics';
 import type { Device } from '@/services/types';
-import { Brand, Grey, JaridaPurple } from '@/constants/colors';
+import { Brand, Grey } from '@/constants/colors';
 import { FontSize, face } from '@/constants/typography';
 import { Spacing } from '@/constants/spacing';
 import { Radii } from '@/constants/radii';
 
+/**
+ * The type the Right now cards are set in, from Ink's own scale rather than by hand.
+ *
+ * The eyebrow is the mono micro-label the tracking scale was built for: at 0.14em it separates
+ * the card's label from its content without a rule or a box. Sentence case, not caps -- the
+ * tracking is what does the separating, and a tracked-out capital label above every heading is
+ * the commonest tell of a page nobody chose the type for. The title is display at -0.02em,
+ * because a bold face reads looser the larger it is set and the negative tracking is what takes
+ * that back. Leading tightens as the size grows, for the same reason.
+ */
+function useCardType() {
+  const theme = useInkTheme();
+  return useMemo(
+    () => ({
+      eyebrow: inkText(theme, {
+        role: 'mono',
+        size: 'xs',
+        tracking: 'eyebrow',
+        color: theme.color.textTertiary,
+      }).style,
+      title: inkText(theme, {
+        role: 'display',
+        size: 'md',
+        weight: theme.weight.bold,
+        tracking: 'title',
+        leading: 'tight',
+      }).style,
+      detail: inkText(theme, { size: 'sm', color: theme.color.textSecondary }).style,
+    }),
+    [theme],
+  );
+}
+
 /** The home grid is a glance, not the full list — that is the Devices tab. */
-const HOME_GRID_LIMIT = 4;
+const HOME_GRID_LIMIT = 6;
 
 /** How often the greeting and the countdowns catch up with the clock. */
 const CLOCK_MS = 60_000;
 
-/** A greeting uses the name someone is called, not their full record. */
-function firstName(displayName: string | undefined): string | null {
-  const first = displayName?.trim().split(/\s+/)[0];
-  return first || null;
-}
 
 function greetingKey(hour: number) {
-  if (hour < 5) return 'greeting.night' as const;
-  if (hour < 12) return 'greeting.morning' as const;
-  if (hour < 18) return 'greeting.afternoon' as const;
-  return 'greeting.evening' as const;
+  if (hour < 5) return 'home.greetingNight' as const;
+  if (hour < 12) return 'home.greetingMorning' as const;
+  if (hour < 18) return 'home.greetingAfternoon' as const;
+  return 'home.greetingEvening' as const;
 }
 
 /**
@@ -140,26 +174,28 @@ function PondCard() {
 function NowPlayingCard({ playing }: { playing: NowPlaying }) {
   const styles = useThemedStyles(makeStyles);
   const { t } = useTranslation();
+  const theme = useInkTheme();
+  const type = useCardType();
 
   return (
     <InkCard style={styles.rightNowCard} contentStyle={styles.rightNowFace}>
-      <Text style={styles.cardEyebrow}>{t('home.nowPlaying')}</Text>
+      <Text style={[styles.cardEyebrow, type.eyebrow]}>{t('home.nowPlaying')}</Text>
       {playing.state === 'playing' ? (
         <>
-          <Text style={styles.cardTitle} numberOfLines={2}>
+          <Text style={type.title} numberOfLines={2}>
             {playing.track}
           </Text>
           {playing.artist ? (
-            <Text style={styles.cardDetail} numberOfLines={1}>
+            <Text style={type.detail} numberOfLines={1}>
               {playing.artist}
             </Text>
           ) : null}
           <View style={styles.waveformRow}>
-            <EqualizerBars color={JaridaPurple[400]} />
+            <EqualizerBars color={theme.color.accentLine} />
           </View>
         </>
       ) : (
-        <Text style={styles.cardTitle}>{t('home.nothingPlaying')}</Text>
+        <Text style={type.title}>{t('home.nothingPlaying')}</Text>
       )}
     </InkCard>
   );
@@ -172,15 +208,16 @@ function NowPlayingCard({ playing }: { playing: NowPlaying }) {
 function NextRoutineCard({ routine, now }: { routine: NextRoutine; now: Date }) {
   const styles = useThemedStyles(makeStyles);
   const { t } = useTranslation();
+  const type = useCardType();
   const until = untilOf(routine.nextRun, now);
 
   return (
     <InkCard style={styles.rightNowCard} contentStyle={styles.rightNowFace}>
-      <Text style={styles.cardEyebrow}>{t('home.nextRoutine')}</Text>
-      <Text style={styles.cardTitle} numberOfLines={2}>
+      <Text style={[styles.cardEyebrow, type.eyebrow]}>{t('home.nextRoutine')}</Text>
+      <Text style={type.title} numberOfLines={2}>
         {routine.label}
       </Text>
-      <Text style={styles.cardDetail}>
+      <Text style={[type.detail, styles.cardClock]}>
         {routine.nextRun.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
       </Text>
       <View style={styles.routineBadge}>
@@ -252,6 +289,7 @@ const DeviceGridItem = React.memo(function DeviceGridItem({
 export default function HomeScreen() {
   const styles = useThemedStyles(makeStyles);
   const { t } = useTranslation();
+  const theme = useInkTheme();
   const { online, hydrated } = useServer();
   const offline = hydrated && !online;
   const recent = useRecentSessions();
@@ -261,6 +299,8 @@ export default function HomeScreen() {
   // this phone.
   const member = useMember();
   const rightNow = useRightNow().data;
+  // One read for both the sentence at the top and the chips below it.
+  const ideas = useHomeIdeas();
   const router = useRouter();
   const chrome = useChromeScroll();
   const bottomInset = useBottomBarInset();
@@ -292,11 +332,25 @@ export default function HomeScreen() {
   );
   const pull = usePullToRefresh(reloadHome);
 
-  // Only badges with a source. The online count is the list the grid below
-  // shows, so the two cannot disagree, and it is not shown while that list is
-  // unknown.
+  // The online count is the list the grid below shows, so the two cannot
+  // disagree, and it is not stated while that list is unknown.
   const showOnlineCount = devicesState === 'ready' || devicesState === 'empty';
   const showOutdoor = rightNow.outdoorTemp !== null;
+
+  // Only phrases with a source behind them; the line hides when there are none.
+  const figures: Figure[] = [];
+  if (showOnlineCount) {
+    figures.push({ key: 'devices', phrase: t('home.lineDevicesOn', { count: devices.data.onlineCount }) });
+  }
+  if (showOutdoor) {
+    figures.push({
+      key: 'outdoor',
+      // Where the Pond is configured to be, which is not always where the reader is.
+      phrase: rightNow.outdoorPlace
+        ? t('home.lineOutdoorPlace', { temp: rightNow.outdoorTemp, place: rightNow.outdoorPlace })
+        : t('home.lineOutdoor', { temp: rightNow.outdoorTemp }),
+    });
+  }
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -309,7 +363,6 @@ export default function HomeScreen() {
         <View style={styles.greetingRow}>
           <View style={styles.greetingText}>
             <Text style={styles.greetingLabel}>{t(greetingKey(now.getHours()))}</Text>
-            <InkTitle level={1}>{firstName(member?.displayName) ?? t('home.you')}</InkTitle>
           </View>
           <GPressable feedback="lift"
             style={styles.avatar}
@@ -325,20 +378,17 @@ export default function HomeScreen() {
           </GPressable>
         </View>
 
-        {!offline && (showOnlineCount || showOutdoor) ? (
-          <View style={styles.badges}>
-            {showOnlineCount ? (
-              <InkBadge tone="success">
-                {t('home.chipOnline', { count: devices.data.onlineCount })}
-              </InkBadge>
-            ) : null}
-            {showOutdoor ? (
-              <InkBadge tone="info">
-                {t('home.chipOutdoorTemp', { temp: rightNow.outdoorTemp })}
-              </InkBadge>
-            ) : null}
-          </View>
-        ) : null}
+        {offline ? null : (
+          <PondSays
+            lead={ideas.data.lead}
+            reminderCount={ideas.data.reminderCount}
+            deciding={ideas.deciding}
+            onAccept={(id) => void ideas.actions.approve(id)}
+            onDecline={(id) => void ideas.actions.decline(id)}
+          />
+        )}
+
+        {offline ? null : <GlanceStrip figures={figures} />}
 
         <PondCard />
 
@@ -353,6 +403,8 @@ export default function HomeScreen() {
 
         {offline ? null : (
           <>
+        <HomeIdeas />
+
         {/* A card with nothing true to say is not drawn, and a row with no
             cards has no heading. */}
         {nowPlaying || nextRoutine ? (
@@ -369,7 +421,12 @@ export default function HomeScreen() {
 
         <View style={styles.sectionHeader}>
           <InkTitle level={3}>{t('home.conversations')}</InkTitle>
-          <GPressable onPress={() => router.push('/(tabs)/chat')}>
+          <GPressable
+            onPress={() => router.push('/(tabs)/chat')}
+            hitSlop={12}
+            accessibilityRole="button"
+            accessibilityLabel={t('home.seeAllConversations')}
+          >
             <Text style={styles.seeAllText}>{t('common.seeAll')}</Text>
           </GPressable>
         </View>
@@ -384,10 +441,18 @@ export default function HomeScreen() {
               })
             }
           >
-            <GIcon name="chat" size={14} color={JaridaPurple[400]} />
-            <Text style={styles.convoText} numberOfLines={1}>
-              {c.text}
-            </Text>
+            <GIcon name="chat" size={14} color={theme.color.accentLine} />
+            <View style={styles.convoWords}>
+              <Text style={styles.convoText} numberOfLines={1}>
+                {c.text}
+              </Text>
+              {/* How it opened, under its name. Null when that is what the line above already says. */}
+              {c.preview ? (
+                <Text style={styles.convoPreview} numberOfLines={1}>
+                  {c.preview}
+                </Text>
+              ) : null}
+            </View>
             <Text style={styles.convoTime}>{c.time}</Text>
           </GPressable>
         ))}
@@ -402,7 +467,12 @@ export default function HomeScreen() {
 
         <View style={styles.sectionHeader}>
           <InkTitle level={3}>{t('home.devices')}</InkTitle>
-          <GPressable onPress={() => router.push('/(tabs)/devices')}>
+          <GPressable
+            onPress={() => router.push('/(tabs)/devices')}
+            hitSlop={12}
+            accessibilityRole="button"
+            accessibilityLabel={t('home.seeAllDevices')}
+          >
             <Text style={styles.seeAllText}>{t('common.seeAll')}</Text>
           </GPressable>
         </View>
@@ -466,10 +536,11 @@ const makeStyles = (c: ThemeColors) =>
     color: c.textTertiary,
   },
   avatar: {
+    // Ink's `touch.tapMin`: the floor a finger can hit, which is also the size this reads best at.
     width: 44,
     height: 44,
-    borderRadius: 22,
-    backgroundColor: JaridaPurple[500],
+    borderRadius: Radii.pill,
+    backgroundColor: c.tint,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -479,12 +550,6 @@ const makeStyles = (c: ThemeColors) =>
     color: Brand.white,
   },
 
-  badges: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: Spacing.sm,
-    marginBottom: Spacing.md,
-  },
 
   /* The plate sits 4px below the face, so every card reserves room for it. */
   pond: { marginBottom: Spacing.lg },
@@ -527,37 +592,28 @@ const makeStyles = (c: ThemeColors) =>
   // less to say showed a slab of bare ink below it. The face takes the height
   // too, and the pair reads as one row again.
   rightNowFace: { flex: 1 },
-  cardEyebrow: {
-    ...face('body', 'regular'),
-    fontSize: FontSize.xs,
-    color: c.textTertiary,
-    marginBottom: Spacing.xs,
-  },
-  cardTitle: {
-    ...face('display', 'bold'),
-    fontSize: FontSize.md,
-    color: c.text,
-  },
-  cardDetail: {
-    ...face('body', 'regular'),
-    fontSize: FontSize.sm,
-    color: c.textSecondary,
-    marginTop: 2,
-  },
+  cardEyebrow: { marginBottom: Spacing.xs },
+  cardClock: { fontVariant: ['tabular-nums'], marginTop: Spacing.xs },
   waveformRow: { marginTop: 'auto', paddingTop: Spacing.md },
   routineBadge: { alignSelf: 'flex-start', marginTop: 'auto', paddingTop: Spacing.md },
 
   convoRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    // The icon and the time sit against the first line, not the middle of two.
+    alignItems: 'flex-start',
     gap: Spacing.sm,
     paddingVertical: Spacing.sm,
   },
+  convoWords: { flex: 1, gap: 1 },
   convoText: {
-    flex: 1,
     ...face('body', 'regular'),
     fontSize: FontSize.base,
     color: c.text,
+  },
+  convoPreview: {
+    ...face('body', 'regular'),
+    fontSize: FontSize.sm,
+    color: c.textSecondary,
   },
   convoTime: {
     ...face('body', 'regular'),

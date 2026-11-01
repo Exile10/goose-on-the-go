@@ -14,7 +14,6 @@
  * how often to honour it.
  */
 
-import * as TaskManager from 'expo-task-manager';
 import { Platform } from 'react-native';
 
 import { api } from './api-client';
@@ -24,9 +23,30 @@ import { ensurePondSession } from './pond-session';
 
 export const WAKE_TASK = 'giap-notification-wake';
 
+/**
+ * expo-task-manager, or null where its native side is not in this build.
+ *
+ * This file is imported for its side effect from `index.ts`, ahead of expo-router, so an import
+ * that throws takes the whole app down before a screen mounts. A development build made before
+ * this dependency landed does exactly that: `Cannot find native module 'ExpoTaskManager'`, and
+ * the app shows a red box instead of itself. The wake-up is one capability and the app is the
+ * app, so a build without the module says so and carries on. Rebuilding the dev client restores
+ * it; a release build always has it, because the dependency is in `package.json`.
+ */
+function loadTaskManager(): typeof import('expo-task-manager') | null {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    return require('expo-task-manager') as typeof import('expo-task-manager');
+  } catch {
+    console.warn('[wake] expo-task-manager is not in this build: the push wake-up is off until the dev client is rebuilt');
+    return null;
+  }
+}
+
+const TaskManager = loadTaskManager();
 const Notifications = notifications;
 // Expo Go has no expo-notifications (see notifications-module.ts) and web has no push.
-if (Notifications && (Platform.OS === 'android' || Platform.OS === 'ios')) {
+if (Notifications && TaskManager && (Platform.OS === 'android' || Platform.OS === 'ios')) {
   TaskManager.defineTask(WAKE_TASK, async ({ data, error }) => {
     if (error) {
       console.warn('[wake] task error', { kind: 'notification_wake', error: error.message });

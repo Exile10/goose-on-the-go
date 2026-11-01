@@ -38,6 +38,11 @@ Without one the screen reads the Pond's list for it, because the Pond has no
 route for a single conversation (`/sessions/{id}` answers only PATCH and
 DELETE).
 
+Home's idea chips link with `?ask=<prompt>` and no id: a new conversation that
+asks that prompt on arrival, as picking one inside a conversation does. The
+screen clears the param once it has asked, so the activity being recreated on a
+return to the app cannot send it twice.
+
 A root-stack screen is outside `ChromeProvider`, so its hooks answer their
 defaults: no bar height to clear and no shared stage. The conversation clears
 the home indicator with `useSafeAreaInsets()` and drives its title bar with its
