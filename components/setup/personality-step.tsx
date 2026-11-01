@@ -1,14 +1,15 @@
-// How Goose talks: style, a personality hint, its name, and the same voice picker Settings uses.
+// How Goose talks: style, a personality hint, standing notes, its name, and the same voice picker Settings uses.
 
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { InkFormField, InkInput, InkRadioGroup, InkSpinner, InkText, InkTextArea, InkTitle } from '@jarida/ink/native';
+import { InkFormField, InkInput, InkNotice, InkRadioGroup, InkSpinner, InkText, InkTextArea, InkTitle } from '@jarida/ink/native';
 
 import { SettingsGroup } from '@/components/settings/settings-list';
 import { VoicePickerView } from '@/components/settings/voice-picker';
 import { Spacing } from '@/constants/spacing';
 import { PROMPT_STYLES, type PromptStyle } from '@/models/owner-setup';
+import { ADVISED_NOTE_LENGTH, MAX_NOTE_LENGTH } from '@/models/prompt-extras';
 import type { TranslationKey } from '@/services/i18n';
 import type { UseOwnerSetup } from '@/view-models/use-owner-setup';
 import { usePondVoiceSample } from '@/view-models/use-pond-voice-sample';
@@ -57,6 +58,19 @@ export function PersonalityStep({ setup }: { setup: UseOwnerSetup }) {
           onChange={(personality) => actions.patch({ personality })}
         />
       </InkFormField>
+      <InkFormField label={t('setup.personality.notes')} hint={t('setup.personality.notesBody')}>
+        <View style={styles.notes}>
+          <InkTextArea
+            label={t('setup.personality.notes')}
+            placeholder={t('setup.personality.notesPlaceholder')}
+            rows={3}
+            maxRows={8}
+            value={draft.notes}
+            onChange={(notes) => actions.patch({ notes: notes.slice(0, MAX_NOTE_LENGTH) })}
+          />
+          {draft.notes.trim().length > ADVISED_NOTE_LENGTH ? <InkNotice tone="warning">{t('promptNotes.form.tooLong')}</InkNotice> : null}
+        </View>
+      </InkFormField>
       <InkFormField label={t('setup.personality.name')} required>
         <InkInput label={t('setup.personality.name')} value={draft.assistantName} onChange={(assistantName) => actions.patch({ assistantName })} />
       </InkFormField>
@@ -87,5 +101,6 @@ export function PersonalityStep({ setup }: { setup: UseOwnerSetup }) {
 
 const styles = StyleSheet.create({
   head: { gap: Spacing.sm },
+  notes: { gap: Spacing.sm },
   loading: { padding: Spacing.lg },
 });

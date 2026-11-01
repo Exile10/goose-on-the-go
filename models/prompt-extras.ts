@@ -17,10 +17,13 @@ import type { TranslationKey } from '@/services/i18n';
 import type { PromptExtra } from '@/services/types';
 
 /**
- * The phone's own advice, not a Pond limit: the Pond accepts any length. About two sentences, which
- * is what a standing note needs and little enough that the small model on a Jetson barely notices.
+ * The phone's own advice, well under the Pond's limit. About two sentences, which is what a standing
+ * note needs and little enough that the small model on a Jetson barely notices.
  */
 export const ADVISED_NOTE_LENGTH = 280;
+
+/** The Pond refuses a longer note: `MAX_INSTRUCTION_CHARS` in pond-core's `prompt_extra.rs`. */
+export const MAX_NOTE_LENGTH = 1000;
 
 /** Long enough for any name a household would give a note; the Pond sets no limit here either. */
 export const MAX_KEY_LENGTH = 64;

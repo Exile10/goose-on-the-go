@@ -2855,7 +2855,7 @@
     },
     "personality": {
       "title": "How Goose talks",
-      "lead": "Choose how Goose answers, and give your assistant a name and a voice.",
+      "lead": "Choose how Goose answers and what it should keep in mind, and give your assistant a name and a voice.",
       "style": "Conversation style",
       "styles": {
         "balanced": "Balanced",
@@ -2869,6 +2869,9 @@
       },
       "hint": "Personality",
       "hintBody": "Optional. A few words to shape Goose's character, such as “curious and warm”.",
+      "notes": "Assistant notes",
+      "notesBody": "Optional. Anything Goose should always keep in mind, such as “Always answer in Swahili”. You can change these later in Assistant notes.",
+      "notesPlaceholder": "The kids go to bed at eight. Keep answers short in the morning.",
       "name": "Assistant name",
       "voice": "Voice",
       "voiceLoading": "Asking your Pond about its voices",

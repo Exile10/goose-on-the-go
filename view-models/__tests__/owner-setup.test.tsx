@@ -32,6 +32,7 @@ jest.mock('@/services/api-client', () => {
       detectLocation: jest.fn(),
       listDevices: jest.fn(),
       updateDevice: jest.fn(),
+      savePromptExtra: jest.fn(),
     },
   };
 });
@@ -83,6 +84,7 @@ beforeEach(async () => {
   pond.setProfilePrefs.mockResolvedValue({ id: 'owner-1', display_name: 'Amina', preferences: {} });
   pond.listDevices.mockResolvedValue([{ id: 'install-1', name: 'iPhone', is_online: true, room: 'Kitchen' }]);
   pond.updateDevice.mockImplementation(async (id, req) => ({ id, is_online: true, ...req }));
+  pond.savePromptExtra.mockResolvedValue(undefined);
 });
 
 it('reads the record with GET, and writes nothing to read it', async () => {
@@ -207,6 +209,67 @@ it('finishes from How Goose talks, saving it first, and leaves the rest for Home
   expect(pond.recordOnboardStep).toHaveBeenLastCalledWith('GooseIdentity');
   expect(JSON.parse((await AsyncStorage.getItem('@goose/setup-checklist/pairing-1')) ?? '{}')).toEqual({ open: ['wake', 'review'] });
   m.unmount();
+});
+
+describe('Assistant notes from How Goose talks', () => {
+  const finishWith = async (notes: string) => {
+    pond.onboardStatus.mockResolvedValue(status('Location'));
+    pond.completeOnboarding.mockResolvedValue({ completed: true });
+    const m = await mount();
+    await act(async () => m.vm.actions.patch({ notes }));
+    await act(async () => {
+      await m.vm.actions.finish();
+      await new Promise((r) => setTimeout(r, 0));
+    });
+    return m;
+  };
+
+  it('saves them only once the Pond has finished setup, since it keeps no notes before', async () => {
+    const m = await finishWith('Always answer in Swahili. ');
+    expect(m.vm.phase).toBe('finished');
+    expect(pond.savePromptExtra).toHaveBeenCalledWith({ key: 'house_notes', instruction: 'Always answer in Swahili.', active: true, sort_order: 0 });
+    expect(pond.completeOnboarding.mock.invocationCallOrder[0]).toBeLessThan(pond.savePromptExtra.mock.invocationCallOrder[0]);
+    m.unmount();
+  });
+
+  it('saves nothing when none were written', async () => {
+    const m = await finishWith('   ');
+    expect(pond.savePromptExtra).not.toHaveBeenCalled();
+    m.unmount();
+  });
+
+  it('saves nothing when setup was refused', async () => {
+    pond.onboardStatus.mockResolvedValue(status('Location'));
+    pond.completeOnboarding.mockResolvedValue({ completed: false, missing: ['user_name'] });
+    const m = await mount();
+    await act(async () => m.vm.actions.patch({ notes: 'Always answer in Swahili.' }));
+    await act(async () => {
+      await m.vm.actions.finish();
+    });
+    expect(pond.savePromptExtra).not.toHaveBeenCalled();
+    m.unmount();
+  });
+
+  it('still finishes when the Pond refuses them, and does not ask again', async () => {
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    pond.savePromptExtra.mockRejectedValue(new ApiError('POST /api/v1/agent/extras → 404', 404, null));
+    const m = await finishWith('Always answer in Swahili.');
+    expect(m.vm.phase).toBe('finished');
+    expect(pond.savePromptExtra).toHaveBeenCalledTimes(1);
+    warn.mockRestore();
+    m.unmount();
+  });
+
+  it('drops them, with the rest of the step, when How Goose talks is skipped', async () => {
+    pond.onboardStatus.mockResolvedValue(status('Location'));
+    pond.completeOnboarding.mockResolvedValue({ completed: true });
+    const m = await mount();
+    await act(async () => m.vm.actions.patch({ notes: 'Always answer in Swahili.' }));
+    await act(async () => m.vm.actions.skip());
+    expect(m.vm.phase).toBe('finished');
+    expect(pond.savePromptExtra).not.toHaveBeenCalled();
+    m.unmount();
+  });
 });
 
 it('renames a phone paired as plain “iPhone” after its owner, once setup is done', async () => {
