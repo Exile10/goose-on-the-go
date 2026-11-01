@@ -20,10 +20,12 @@ import { resetAdminGates, useAdminUnlock } from '@/view-models/use-admin-gate';
 import { ADMIN_STATUS_MS, useMyPond } from '@/view-models/use-my-pond';
 
 jest.mock('@/services/pond-trust', () => ({ assertPondTrust: jest.fn().mockResolvedValue(undefined) }));
+// The real hook also re-runs, cleanup first, when the navigation object changes, as a header change does.
+const mockNavigation = { generation: 0 };
 jest.mock('expo-router', () => ({
   useFocusEffect: (effect: () => void | (() => void)) => {
     const { useEffect: run } = jest.requireActual('react');
-    run(effect, [effect]);
+    run(effect, [effect, mockNavigation.generation]);
   },
 }));
 const PIN = `sha256/${'P'.repeat(43)}=`;
@@ -278,6 +280,32 @@ describe('opening with the kept key', () => {
     await m.unmount();
   });
 
+  it('does not ask after this phone’s own Lock, only on the next arrival', async () => {
+    keepKey();
+    const tab = await mount(useMyPond);
+    const opening = await mount(useAdminUnlock);
+    expect(tab.vm.gate.phase).toBe('unlocked');
+    await opening.unmount();
+    await act(async () => {
+      await tab.vm.actions.lock();
+    });
+    // The lock mounts fresh once My Pond is locked, as the screen draws it, and the header loses Lock.
+    const lock = await mount(useAdminUnlock);
+    mockNavigation.generation++;
+    await act(async () => {
+      await tab.vm.actions.refresh();
+    });
+    expect(tab.vm.gate.phase).toBe('locked');
+    expect(keychain.read).toHaveBeenCalledTimes(1);
+    await lock.unmount();
+
+    const later = await mount(useAdminUnlock);
+    expect(keychain.read).toHaveBeenCalledTimes(2);
+    expect(tab.vm.gate.phase).toBe('unlocked');
+    await later.unmount();
+    await tab.unmount();
+  });
+
   it('asks again on a later arrival, once', async () => {
     keepKey();
     keychain.read.mockRejectedValue(new Error('User canceled the operation.'));
@@ -424,7 +452,7 @@ describe('forgetting it on this phone', () => {
       expect(await m.vm.actions.forgetKey()).toBe(true);
     });
     expect(pond.adminForgetKey).toHaveBeenCalledTimes(1);
-    expect(keychain.forget).toHaveBeenCalledTimes(1);
+    expect(keychain.forget).toHaveBeenCalledWith(PIN);
     expect(m.vm.kept).toBe(false);
     expect(m.vm.gate.phase).toBe('locked');
     await m.unmount();

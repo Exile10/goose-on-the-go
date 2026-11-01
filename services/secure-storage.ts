@@ -51,7 +51,10 @@ function warnOnceOnWeb(): void {
 }
 
 /** Kept apart from `KEYS`: read only behind the phone's own biometrics, never alongside the tokens. */
-const ADMIN_KEY = 'goose.adminKey';
+const ADMIN_KEYS = { pond: 'goose.adminKey', mock: 'goose.adminKey.mock' } as const;
+
+/** Whose key a slot holds: the paired Pond's, or the Developer toggle's mock Pond's. */
+export type AdminKeySlot = keyof typeof ADMIN_KEYS;
 
 function adminKeyOptions(prompt?: string): SecureStore.SecureStoreOptions {
   return {
@@ -76,22 +79,22 @@ export const AdminKeyKeychain = {
     }
   },
 
-  async save(key: string, prompt: string): Promise<void> {
+  async save(key: string, prompt: string, slot: AdminKeySlot): Promise<void> {
     if (isWeb) throw new Error('A browser cannot keep the admin key');
     // Updating a kept item asks for biometrics on iOS; a fresh one is written without asking.
-    await SecureStore.deleteItemAsync(ADMIN_KEY, adminKeyOptions()).catch(() => undefined);
-    await SecureStore.setItemAsync(ADMIN_KEY, key, adminKeyOptions(prompt));
+    await SecureStore.deleteItemAsync(ADMIN_KEYS[slot], adminKeyOptions()).catch(() => undefined);
+    await SecureStore.setItemAsync(ADMIN_KEYS[slot], key, adminKeyOptions(prompt));
   },
 
   /** Asks for the phone's biometrics. Null when nothing is kept or the system invalidated it; throws on a refusal. */
-  async read(prompt: string): Promise<string | null> {
+  async read(prompt: string, slot: AdminKeySlot): Promise<string | null> {
     if (isWeb) return null;
-    return SecureStore.getItemAsync(ADMIN_KEY, adminKeyOptions(prompt));
+    return SecureStore.getItemAsync(ADMIN_KEYS[slot], adminKeyOptions(prompt));
   },
 
-  async forget(): Promise<void> {
+  async forget(slot: AdminKeySlot): Promise<void> {
     if (isWeb) return;
-    await SecureStore.deleteItemAsync(ADMIN_KEY, adminKeyOptions());
+    await SecureStore.deleteItemAsync(ADMIN_KEYS[slot], adminKeyOptions());
   },
 };
 

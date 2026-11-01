@@ -64,6 +64,8 @@ class GateStore {
   keyEpoch = 0;
   /** One biometric read at a time, however many screens under My Pond are showing the lock. */
   readingKey = false;
+  /** Locked by this phone's own Lock: the lock waits for a tap, or Face ID would open it again at once. */
+  lockedByHand = false;
 
   get = () => this.state;
 
@@ -89,12 +91,19 @@ class GateStore {
     });
   }
 
+  /** This phone's own Lock: the lock then waits for a tap, or Face ID would open it again at once. */
+  lockedHere() {
+    this.lockedByHand = true;
+    this.locked();
+  }
+
   locked() {
     const status = this.state.status;
     this.set({ phase: 'locked', status: status ? { ...status, unlocked: false, expires_at: null } : null });
   }
 
   unlocked(expiresAt: string | null) {
+    this.lockedByHand = false;
     const base: AdminStatus = this.state.status ?? {
       card: 'present',
       unlocked: true,
@@ -148,7 +157,7 @@ export interface UseAdminGate {
   noteFailure: (e: unknown) => boolean;
   /** For a screen whose admin request succeeded, which renewed the unlock. */
   touch: () => void;
-  /** The Pond took a lock. */
+  /** This phone's Lock was taken; the lock then waits for a tap until the person leaves and comes back. */
   noteLocked: () => void;
   /** After asking the Pond to restart, which locks everyone. */
   noteRestart: () => void;
@@ -199,7 +208,7 @@ export function useAdminGate(): UseAdminGate {
       store.status(status, Date.now());
       // The Pond already revoked it: the card was rotated, or the phone removed or forgotten elsewhere.
       if (!status.key && (await isAdminKeyKeptFor(pin)) && epoch === store.keyEpoch) {
-        await forgetKeptAdminKey();
+        await forgetKeptAdminKey(pin);
         store.set({ kept: false });
       }
       return true;
@@ -212,7 +221,7 @@ export function useAdminGate(): UseAdminGate {
   }, [noteFailure, pin, source, store]);
 
   const touch = useCallback(() => store.touched(Date.now()), [store]);
-  const noteLocked = useCallback(() => store.locked(), [store]);
+  const noteLocked = useCallback(() => store.lockedHere(), [store]);
   const noteRestart = useCallback(() => {
     store.locked();
     store.set({ restarting: true });
@@ -222,10 +231,10 @@ export function useAdminGate(): UseAdminGate {
     store.keyEpoch++;
     // Revoking also locks this phone on the Pond; unreachable, it is at least asked to lock.
     await source.forgetKey().catch(() => source.lock().catch(() => undefined));
-    await forgetKeptAdminKey();
+    await forgetKeptAdminKey(pin);
     store.set({ kept: false });
     store.locked();
-  }, [source, store]);
+  }, [pin, source, store]);
 
   return { gate, source, readStatus, noteFailure, touch, noteLocked, noteRestart, forgetKept };
 }
@@ -341,9 +350,9 @@ export function useAdminUnlock(): UseAdminUnlock {
   );
 
   const forgetLocally = useCallback(async () => {
-    await forgetKeptAdminKey();
+    await forgetKeptAdminKey(pin);
     store.set({ kept: false });
-  }, [store]);
+  }, [pin, store]);
 
   /** After the card opened My Pond. Nothing here can close it again: a refused save keeps nothing. */
   const keepKey = useCallback(
@@ -360,7 +369,8 @@ export function useAdminUnlock(): UseAdminUnlock {
         await keepAdminKey(keepFor, key, i18n.t('myPond.key.savePrompt'));
         store.set({ kept: true });
       } catch {
-        // Enrolling replaced any older key on the Pond, so whatever was kept before no longer opens.
+        // Enrolling replaced any older key on the Pond, so whatever was kept before no longer opens. The new
+        // one is left there with no copy anywhere: it opens nothing, and revoking it would lock this phone too.
         await forgetLocally();
       } finally {
         store.keyEpoch++;
@@ -438,10 +448,18 @@ export function useAdminUnlock(): UseAdminUnlock {
   const cooling = coolingSecs > 0;
   useFocusEffect(
     useCallback(() => {
-      if (asked.current || !gate.kept || !arrivedLocked) return;
+      if (asked.current || !gate.kept || !arrivedLocked || store.lockedByHand) return;
       asked.current = true;
       if (!cooling) void askRef.current();
-    }, [arrivedLocked, cooling, gate.kept]),
+    }, [arrivedLocked, cooling, gate.kept, store]),
+  );
+  // Leaving unmounts the lock, so the next arrival asks again. Not a focus cleanup: that also runs whenever
+  // the navigation object changes, as it does when locking takes Lock out of the header.
+  useEffect(
+    () => () => {
+      store.lockedByHand = false;
+    },
+    [store],
   );
 
   return {

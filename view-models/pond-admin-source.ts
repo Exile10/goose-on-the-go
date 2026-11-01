@@ -3,8 +3,10 @@
 import { createMockPond, type PondAdminSource } from '@/models/pond-admin-mock';
 import { useServer } from '@/providers/server-provider';
 import { ApiError, api } from '@/services/api-client';
+import { MOCK_POND_PIN } from '@/services/kept-admin-key';
 
 export type { PondAdminSource } from '@/models/pond-admin-mock';
+export { MOCK_POND_PIN };
 
 /** Calls `api` at call time, so a test's mock of the client is the one used. */
 export const POND_ADMIN: PondAdminSource = {
@@ -46,8 +48,6 @@ export function usePondAdminSource(): PondAdminSource {
   return isScreenReal('pond') ? POND_ADMIN : mockPondAdmin();
 }
 
-/** The mock's stand-in for a pin, so a key kept for it is never taken for the paired Pond's. */
-export const MOCK_POND_PIN = 'mock-pond';
 
 /** Whose key this phone may keep: the paired Pond's pin, or the mock's; null when nothing is paired. */
 export function useAdminKeyPin(): string | null {

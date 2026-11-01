@@ -85,7 +85,12 @@
           }
         }
       ],
-      "expo-secure-store",
+      [
+        "expo-secure-store",
+        {
+          "faceIDPermission": "Goose On The Go uses Face ID, when you choose, to open My Pond without typing its admin card."
+        }
+      ],
       "expo-font",
       "expo-image",
       "expo-status-bar",

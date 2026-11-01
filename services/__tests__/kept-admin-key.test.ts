@@ -10,6 +10,7 @@ import {
   keepAdminKey,
   KeptAdminKeyLost,
   keptKeyIsLost,
+  MOCK_POND_PIN,
   keptKeyWasCancelled,
   readKeptAdminKey,
 } from '@/services/kept-admin-key';
@@ -131,6 +132,26 @@ describe('reading', () => {
     expect(keptKeyIsLost(new Error('The key goose.adminKey has been permanently invalidated'))).toBe(true);
     expect(keptKeyIsLost(new Error('Could not Authenticate the user: No biometrics enrolled.'))).toBe(true);
     expect(keptKeyIsLost(new Error('Could not Authenticate the user: Lockout.'))).toBe(false);
+  });
+});
+
+describe('the mock Pond', () => {
+  it('keeps, reads and forgets its key in a slot of its own, leaving the paired Pond’s alone', async () => {
+    mockMarker.set('adminKeyFor', PIN);
+    await keepAdminKey(MOCK_POND_PIN, 'mock-key', 'Keep a key');
+    expect(store.deleteItemAsync).toHaveBeenCalledWith('goose.adminKey.mock', expect.anything());
+    expect(store.setItemAsync).toHaveBeenCalledWith('goose.adminKey.mock', 'mock-key', expect.objectContaining(GUARDED));
+    expect(await isAdminKeyKeptFor(MOCK_POND_PIN)).toBe(true);
+    expect(await isAdminKeyKeptFor(PIN)).toBe(true);
+
+    store.getItemAsync.mockResolvedValue('mock-key');
+    await readKeptAdminKey(MOCK_POND_PIN, 'Unlock My Pond');
+    expect(store.getItemAsync).toHaveBeenCalledWith('goose.adminKey.mock', expect.anything());
+
+    await forgetKeptAdminKey(MOCK_POND_PIN);
+    expect(await isAdminKeyKeptFor(PIN)).toBe(true);
+    const touched = [...store.setItemAsync.mock.calls, ...store.deleteItemAsync.mock.calls, ...store.getItemAsync.mock.calls];
+    expect(touched.map(([slot]) => slot)).not.toContain('goose.adminKey');
   });
 });
 

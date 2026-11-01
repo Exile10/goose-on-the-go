@@ -25,6 +25,8 @@ const KEYS = {
   remoteLapsesAt: '@goose/remote-lapses-at',
   /** The pin of the Pond whose admin key this phone keeps behind its biometrics. Not the key. */
   adminKeyFor: '@goose/admin-key-for',
+  /** The same for the mock Pond, whose key is kept in a slot of its own. */
+  adminKeyForMock: '@goose/admin-key-for-mock',
   /** The model each job had before its last change, by model id, so it can be switched back to. */
   lastWorkingModels: '@goose/last-working-models',
   /** The order of Home's widgets: how this phone's owner arranged it, so it outlives a Pond. */
