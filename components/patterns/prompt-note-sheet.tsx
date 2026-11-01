@@ -21,9 +21,11 @@ export interface PromptNoteSheetProps {
   /** Each resolves to why the note was not saved, or null once the Pond has it. */
   onAdd: (name: string, text: string) => Promise<string | null>;
   onEdit: (extra: PromptExtra, text: string) => Promise<string | null>;
+  /** What the note is called, where its key reads badly as a name, as an interview topic's does. */
+  editingName?: string;
 }
 
-export function PromptNoteSheet({ open, editing, onClose, onAdd, onEdit }: PromptNoteSheetProps) {
+export function PromptNoteSheet({ open, editing, onClose, onAdd, onEdit, editingName }: PromptNoteSheetProps) {
   const { t } = useTranslation();
   // Mounted afresh for each opening (the screen keys it), so this starts from the note, or blank.
   const [name, setName] = useState('');
@@ -52,7 +54,7 @@ export function PromptNoteSheet({ open, editing, onClose, onAdd, onEdit }: Promp
     <InkSheet
       open={open}
       onClose={onClose}
-      title={editing ? t('promptNotes.form.editTitle', { name: noteName(editing.key) }) : t('promptNotes.form.newTitle')}
+      title={editing ? t('promptNotes.form.editTitle', { name: editingName ?? noteName(editing.key) }) : t('promptNotes.form.newTitle')}
     >
       {editing ? null : (
         <>

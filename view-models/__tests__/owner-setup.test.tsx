@@ -33,6 +33,7 @@ jest.mock('@/services/api-client', () => {
       listDevices: jest.fn(),
       updateDevice: jest.fn(),
       savePromptExtra: jest.fn(),
+      startInterview: jest.fn(),
     },
   };
 });
@@ -354,6 +355,45 @@ describe('My Pond’s key from the last call', () => {
     const m = await finishWith({ completed: true });
     expect(keepAdminKey).not.toHaveBeenCalled();
     expect(m.vm.keptAdminKey).toBe(false);
+    m.unmount();
+  });
+});
+
+describe('the interview setup ends in', () => {
+  const finishWith = async (answer: Awaited<ReturnType<typeof api.completeOnboarding>>) => {
+    pond.onboardStatus.mockResolvedValue(status('Location'));
+    pond.completeOnboarding.mockResolvedValue(answer);
+    const m = await mount();
+    await act(async () => {
+      await m.vm.actions.finish();
+    });
+    return m;
+  };
+
+  it('starts the owner’s interview once setup is done, for the screen to open', async () => {
+    pond.startInterview.mockResolvedValue({ profileId: 'owner-1', status: 'in_progress', sessionId: 's-1', topics: [], draft: [] });
+    const m = await finishWith({ completed: true, interview: { profileId: 'owner-1', status: 'not_started' } });
+    expect(pond.startInterview).toHaveBeenCalledWith('owner-1');
+    expect(pond.startInterview.mock.invocationCallOrder[0]).toBeGreaterThan(pond.completeOnboarding.mock.invocationCallOrder[0]);
+    expect(m.vm.phase).toBe('finished');
+    expect(m.vm.interview).toEqual({ profileId: 'owner-1', sessionId: 's-1' });
+    m.unmount();
+  });
+
+  it('still finishes, and leaves the interview to Home, when it will not start', async () => {
+    jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+    pond.startInterview.mockRejectedValue(new ApiError('POST /api/v1/profiles/owner-1/interview → 503', 503, null));
+    const m = await finishWith({ completed: true, interview: { profileId: 'owner-1', status: 'not_started' } });
+    expect(m.vm.phase).toBe('finished');
+    expect(m.vm.interview).toBeNull();
+    expect(m.vm.error).toBeNull();
+    m.unmount();
+  });
+
+  it('starts nothing for a Pond that offers no interview', async () => {
+    const m = await finishWith({ completed: true });
+    expect(pond.startInterview).not.toHaveBeenCalled();
+    expect(m.vm.interview).toBeNull();
     m.unmount();
   });
 });

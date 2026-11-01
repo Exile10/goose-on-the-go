@@ -30,6 +30,7 @@ import type { ThemeColors } from '@/constants/colors';
 import { GIcon } from '@/components/ui/g-icon';
 import { GPressable } from '@/components/ui/g-pressable';
 import { FinishSetup } from '@/components/patterns/finish-setup';
+import { InterviewOffer } from '@/components/patterns/interview-offer';
 import { AgentsGettingReady } from '@/components/patterns/agents-building';
 import { PondGettingReady } from '@/components/patterns/pond-getting-ready';
 import { RemoteAccessOffer } from '@/components/patterns/remote-access-offer';
@@ -388,6 +389,7 @@ export default function HomeScreen() {
         <PondGettingReady />
         <AgentsGettingReady />
         <FinishSetup />
+        <InterviewOffer />
         <RemoteAccessOffer />
 
         {offline ? null : (

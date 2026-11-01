@@ -4,6 +4,7 @@ import { assertPondTrust, PondTrustError, pondTrustFailed } from './pond-trust';
 import { isInsecureDevOrigin, isLocalPairingUrl, normalizePondUrl } from '@/models/connection';
 import { readWebSearch } from '@/models/web-search';
 import { readPrefills } from '@/models/agents';
+import { readInterview, readInterviewOffer, readMemberNotes } from '@/models/interview';
 import { readLongTask, readLongTaskReport, readResearchAvailability, reportFileName } from '@/models/long-tasks';
 import {
   readAdminKey,
@@ -73,6 +74,8 @@ import type {
   Device,
   DeviceEvent,
   DeviceSelf,
+  MemberNotes,
+  ProfileInterview,
   DeviceStatePatch,
   EventCategory,
   Extension,
@@ -2081,8 +2084,10 @@ export class PondApiClient {
   /** A 400 naming `missing_fields` is an answer here, not a failure: it says which steps to revisit. */
   async completeOnboarding(): Promise<OnboardCompletion> {
     try {
-      const adminKey = readAdminKey(await this.post<unknown>('/api/v1/onboard/complete', {}), 'admin_key');
-      return adminKey ? { completed: true, adminKey } : { completed: true };
+      const body = await this.post<unknown>('/api/v1/onboard/complete', {});
+      const adminKey = readAdminKey(body, 'admin_key');
+      const interview = readInterviewOffer(body);
+      return { completed: true, ...(adminKey ? { adminKey } : {}), ...(interview ? { interview } : {}) };
     } catch (e) {
       const fields = e instanceof ApiError && e.status === 400 ? (e.body as { missing_fields?: unknown } | null)?.missing_fields : null;
       if (!Array.isArray(fields)) throw e;
@@ -2126,6 +2131,41 @@ export class PondApiClient {
   /** Which household member this device belongs to, as the Pond sees it. */
   deviceSelf(): Promise<DeviceSelf> {
     return this.get<DeviceSelf>('/api/v1/devices/self');
+  }
+
+  // ── A member's notes and setup interview ────────────────────
+  // Each answers only that member's own device: anyone else gets a 403, and an unknown member a 404.
+
+  async memberNotes(profileId: string): Promise<MemberNotes> {
+    return readMemberNotes(await this.get<unknown>(`/api/v1/profiles/${encodeURIComponent(profileId)}/notes`));
+  }
+
+  /** Upsert by `key`. A refusal is a 400 whose `code` is one of `/agent/extras`'. */
+  async saveMemberNote(profileId: string, note: PromptExtra): Promise<void> {
+    const { key, ...body } = note;
+    await this.put<unknown>(`/api/v1/profiles/${encodeURIComponent(profileId)}/notes/${encodeURIComponent(key)}`, body);
+  }
+
+  async deleteMemberNote(profileId: string, key: string): Promise<void> {
+    await this.del<unknown>(`/api/v1/profiles/${encodeURIComponent(profileId)}/notes/${encodeURIComponent(key)}`);
+  }
+
+  async interview(profileId: string): Promise<ProfileInterview> {
+    return readInterview(await this.get<unknown>(`/api/v1/profiles/${encodeURIComponent(profileId)}/interview`), profileId);
+  }
+
+  /**
+   * Start the interview, take it up again, or begin a new round once one is done. The session it
+   * answers already holds the Pond's question, so the phone opens it and waits for the member.
+   */
+  async startInterview(profileId: string): Promise<ProfileInterview> {
+    return readInterview(await this.post<unknown>(`/api/v1/profiles/${encodeURIComponent(profileId)}/interview`, {}), profileId);
+  }
+
+  /** Save the drafted notes; the keys saved. A 409 `no_draft` means there was nothing waiting. */
+  async approveInterview(profileId: string): Promise<string[]> {
+    const res = await this.post<{ saved?: unknown }>(`/api/v1/profiles/${encodeURIComponent(profileId)}/interview/approve`, {});
+    return Array.isArray(res?.saved) ? res.saved.filter((k): k is string => typeof k === 'string') : [];
   }
 
   /** The Pond's own description of itself: hostname and version. */

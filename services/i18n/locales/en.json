@@ -3165,6 +3165,53 @@
       "unavailable": "This Pond can't keep notes. Update it to add them here."
     }
   },
+  "interview": {
+    "title": "Getting to know you",
+    "progress": "{{settled}} of {{total}} topics",
+    "progressLabel": "Topics covered",
+    "draftTitle": "What Goose will keep",
+    "draftLead": "Goose follows these in your conversations, and nobody else's. Tell it below if anything should change.",
+    "save": "Save these notes",
+    "saveFailed": "Couldn't save the notes. Try again, or say yes to Goose below.",
+    "savedTitle": "Saved",
+    "savedBody": "Goose keeps these in mind from your next conversation. You can change or delete them in Assistant notes.",
+    "seeNotes": "See your notes",
+    "startFailed": "Couldn't start. Check the connection to your Pond and try again.",
+    "offer": {
+      "startTitle": "Tell Goose about you",
+      "startBody": "Goose asks a few questions, one at a time, and keeps what matters as notes for your conversations. Skip anything you'd rather not say.",
+      "start": "Start",
+      "resumeTitle": "Carry on telling Goose about you",
+      "resumeBody": "{{settled}} of {{total}} topics done. Goose picks up where you left off.",
+      "resume": "Carry on",
+      "reviewTitle": "Your notes are ready to check",
+      "reviewBody": "Goose drafted them from what you told it. Nothing is kept until you save them.",
+      "review": "Check them",
+      "dismiss": "Not now"
+    },
+    "notes": {
+      "title": "Your notes",
+      "lead": "Goose follows these only in your conversations. It wrote them from what you told it.",
+      "empty": "Goose doesn't know much about you yet. It can ask a few questions and keep what matters.",
+      "ask": "Let Goose ask",
+      "askAgain": "Answer again",
+      "carryOn": "Carry on",
+      "household": "Everyone's notes",
+      "householdLead": "Goose follows these in every conversation, whoever is talking."
+    },
+    "topics": {
+      "address": "What to call you",
+      "identity": "About you",
+      "language": "Languages",
+      "household": "Your household",
+      "routine": "Your days",
+      "food": "Food",
+      "access": "Hearing, sight and speech",
+      "style": "How Goose talks to you",
+      "avoid": "Topics to avoid",
+      "other": "Anything else"
+    }
+  },
   "vision": {
     "failed": "Could not read what your Pond's camera is doing.",
     "openPrivacy": "Open Privacy",

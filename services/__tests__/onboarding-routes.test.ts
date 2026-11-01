@@ -89,6 +89,16 @@ describe('finishing', () => {
     await expect(api().completeOnboarding()).resolves.toStrictEqual({ completed: true });
   });
 
+  it('carries the owner’s interview when the Pond offers one (goose-in-a-pond#731)', async () => {
+    recordInto([], '{"status":"completed","interview":{"profile_id":"owner-1","status":"not_started","start":"/api/v1/profiles/owner-1/interview"}}');
+    await expect(api().completeOnboarding()).resolves.toStrictEqual({
+      completed: true,
+      interview: { profileId: 'owner-1', status: 'not_started' },
+    });
+    recordInto([], '{"status":"completed","interview":null}');
+    await expect(api().completeOnboarding()).resolves.toStrictEqual({ completed: true });
+  });
+
   it('answers the fields the Pond would not finish without, rather than failing', async () => {
     recordInto(
       [],
@@ -160,5 +170,35 @@ describe('a voice sample on the Pond’s speaker (P4)', () => {
     await expect(api().voiceSample('nope')).rejects.toMatchObject({ status: 404, detail: 'unknown_voice' });
     recordInto([], '{"error":"voice_unavailable"}', 503);
     await expect(api().voiceSample('af_heart')).rejects.toMatchObject({ status: 503, detail: 'voice_unavailable' });
+  });
+});
+
+describe('a member’s notes and interview', () => {
+  it('starts, reads and approves the interview on the member’s own routes', async () => {
+    const seen: Seen[] = [];
+    recordInto(seen, '{"profile_id":"amina","status":"in_progress","session_id":"s-1","topics":[],"draft":[]}');
+    await expect(api().startInterview('amina')).resolves.toMatchObject({ status: 'in_progress', sessionId: 's-1' });
+    await api().interview('amina');
+    expect(seen.map((s) => [s.method ?? 'GET', s.url])).toEqual([
+      ['POST', `${BASE}/profiles/amina/interview`],
+      ['GET', `${BASE}/profiles/amina/interview`],
+    ]);
+    recordInto(seen, '{"saved":["me_food","me_address"]}');
+    await expect(api().approveInterview('amina')).resolves.toEqual(['me_food', 'me_address']);
+    expect(seen[2]).toMatchObject({ url: `${BASE}/profiles/amina/interview/approve`, method: 'POST', auth: 'Bearer session-token' });
+  });
+
+  it('writes a note by key with the rest as its body', async () => {
+    const seen: Seen[] = [];
+    recordInto(seen, '{"key":"me_food","status":"ok"}');
+    await api().saveMemberNote('amina', { key: 'me_food', instruction: 'No pork.', active: false, sort_order: 2 });
+    expect(seen[0]).toMatchObject({
+      url: `${BASE}/profiles/amina/notes/me_food`,
+      method: 'PUT',
+      body: { instruction: 'No pork.', active: false, sort_order: 2 },
+    });
+    recordInto(seen, '{"key":"me_food","status":"deleted"}');
+    await api().deleteMemberNote('amina', 'me_food');
+    expect(seen[1]).toMatchObject({ url: `${BASE}/profiles/amina/notes/me_food`, method: 'DELETE' });
   });
 });
