@@ -27,6 +27,8 @@ const KEYS = {
   adminKeyFor: '@goose/admin-key-for',
   /** The model each job had before its last change, by model id, so it can be switched back to. */
   lastWorkingModels: '@goose/last-working-models',
+  /** The order of Home's widgets: how this phone's owner arranged it, so it outlives a Pond. */
+  homeLayout: '@goose/home-layout',
 } as const;
 
 /**

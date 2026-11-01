@@ -1,96 +1,173 @@
 /**
- * HomeIdeas — the prompts the Pond offers, and the way through to what it has not said yet.
+ * HomeIdeas — what the Pond has thought of, as Home's widget: its suggestion, decided in place, and
+ * an agent it could run. AskRow is the questions it offers, with Ask Goose always last.
  *
- * The one proposal Home states is the sentence at the top (`PondSays`); this is what is left:
- * things worth asking, composed by the Pond from its memories, and a link to any proposals
- * waiting behind the one on show.
- *
- * Only prompts carrying a Pond id appear. `useSuggestions` keeps the fixed starters on screen
- * when the Pond has none, which is right in a conversation about to be started and wrong here --
- * the same three chips every day would be chrome, and would stop this ever being absent.
- *
- * Reminders are a line and never a card with a dismiss: dismissal is final, the Pond has no route
- * that brings one back, and the asking belongs on the screen that already asks. They appear here
- * only when the sentence above is not already carrying them.
+ * Deciding in place is acceptable only because a yes runs nothing: the Pond records it and
+ * `ProposalDecisionResult.executed` is always false. If that changes, the buttons belong back on
+ * the Suggestions screen, which says what a yes does. Home raises this widget's frame while a
+ * suggestion is in it, because it is the one thing on the screen that waits for an answer.
  */
 
 import React from 'react';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { InkChip, InkText, InkTitle, useInkTheme } from '@jarida/ink/native';
+import { InkButton, InkChip, InkText, inkText, useInkTheme } from '@jarida/ink/native';
 
+import { GIcon } from '@/components/ui/g-icon';
 import { GPressable } from '@/components/ui/g-pressable';
-import { selectionTick } from '@/services/haptics';
-import { useHomeIdeas, type PondPrompt } from '@/view-models/use-home-ideas';
+import { selectionTick, tap } from '@/services/haptics';
+import type { AgentIdea, PondPrompt } from '@/view-models/use-home-ideas';
+import type { ProposalRow } from '@/view-models/use-proposals';
+import { WidgetHeader } from './home-widgets';
 
-export function HomeIdeas() {
-  const { t } = useTranslation();
-  const router = useRouter();
+export interface HomeIdeasProps {
+  proposals: ProposalRow[];
+  moreProposals: number;
+  agent: AgentIdea | null;
+  deciding: string | null;
+  /** Both reads answered with nothing: said, so an empty widget is not mistaken for a failed one. */
+  quiet?: boolean;
+  onAccept: (id: string) => void;
+  onDecline: (id: string) => void;
+}
+
+export function HomeIdeas({ proposals, moreProposals, agent, deciding, quiet = false, onAccept, onDecline }: HomeIdeasProps) {
   const theme = useInkTheme();
   const styles = makeStyles(theme);
-  const { data, actions } = useHomeIdeas();
+  const { t } = useTranslation();
+  const router = useRouter();
 
-  // The sentence at the top states a proposal when there is one, and carries the reminders when
-  // there is not. This draws the reminders line only in the case it does not.
-  const showReminders = data.reminderCount > 0 && data.lead !== null;
-
-  if (data.prompts.length === 0 && data.rest === 0 && !showReminders) return null;
-
-  const ask = (prompt: PondPrompt) => {
-    void selectionTick();
-    actions.taken(prompt);
-    router.push({ pathname: '/conversation', params: { ask: prompt.prompt } });
-  };
+  // What a decision came to is said in the app's snackbar, which outlives the suggestion it answered.
+  if (proposals.length === 0 && !agent && !quiet) return null;
 
   return (
-    <View style={styles.block}>
-      {data.prompts.length > 0 ? (
-        <>
-          <InkTitle level={3}>{t('home.ideasAsk')}</InkTitle>
-          <View style={styles.chips}>
-            {data.prompts.map((prompt) => (
-              <InkChip key={prompt.id} onPress={() => ask(prompt)}>
-                {prompt.prompt}
-              </InkChip>
-            ))}
+    <View>
+      <WidgetHeader
+        icon="sparkle"
+        title={t('home.ideas.title')}
+        action={
+          moreProposals > 0
+            ? {
+                label: t('home.ideas.more', { count: moreProposals }),
+                onPress: () => {
+                  void selectionTick();
+                  router.push('/(stack)/suggestions');
+                },
+              }
+            : null
+        }
+      />
+
+      {proposals.map((p, i) => (
+        <View key={p.id} style={[styles.proposal, i > 0 && styles.divided]}>
+          <Text style={styles.summary}>{p.summary}</Text>
+          {p.rationale ? <Text style={styles.why}>{p.rationale}</Text> : null}
+          {/* Against the right edge, where the thumb is, and after the reason: a yes follows what it answers. */}
+          <View style={styles.actions}>
+            <InkButton variant="quiet" disabled={deciding !== null} onPress={() => onDecline(p.id)}>
+              {t('proposals.card.decline')}
+            </InkButton>
+            <InkButton variant="primary" disabled={deciding !== null} onPress={() => onAccept(p.id)}>
+              {deciding === p.id ? t('proposals.card.deciding') : t('proposals.card.accept')}
+            </InkButton>
           </View>
-        </>
+        </View>
+      ))}
+
+      {quiet && proposals.length === 0 && !agent ? (
+        <InkText size="sm" tone="secondary">
+          {t('home.ideas.quiet')}
+        </InkText>
       ) : null}
 
-      {data.rest > 0 ? (
-        <GPressable
-          hitSlop={12}
-          accessibilityRole="button"
-          onPress={() => {
-            void selectionTick();
-            router.push('/(stack)/suggestions');
-          }}
-        >
-          <InkText size="sm" tone="secondary">{t('home.ideasSeeAll', { count: data.rest })}</InkText>
-        </GPressable>
-      ) : null}
+      {agent ? <AgentLine agent={agent} divided={proposals.length > 0} /> : null}
+    </View>
+  );
+}
 
-      {showReminders ? (
-        <GPressable
-          hitSlop={12}
-          accessibilityRole="button"
-          onPress={() => {
-            void selectionTick();
-            router.push('/(stack)/reminders');
-          }}
-        >
-          <InkText size="sm" tone="secondary">
-            {t('home.remindersWaiting', { count: data.reminderCount })}
-          </InkText>
-        </GPressable>
-      ) : null}
+/** An agent the Pond could run. It opens the Agents screen, which explains it and turns it on. */
+function AgentLine({ agent, divided }: { agent: AgentIdea; divided: boolean }) {
+  const theme = useInkTheme();
+  const styles = makeStyles(theme);
+  const { t } = useTranslation();
+  const router = useRouter();
+
+  return (
+    <GPressable
+      style={[styles.agent, divided && styles.divided]}
+      accessibilityRole="button"
+      accessibilityLabel={t('home.ideas.agentLabel', { title: agent.title, when: agent.when })}
+      onPress={() => {
+        void tap();
+        router.push('/(stack)/agents');
+      }}
+    >
+      <View style={styles.agentIcon}>
+        <GIcon name="agent" size={16} color={theme.color.accentLine} />
+      </View>
+      <View style={styles.agentWords}>
+        {/* Named as an agent: an agent's title alone, "Welcome back", reads as a greeting. */}
+        <Text style={styles.agentTitle} numberOfLines={1}>
+          {t('home.ideas.agent', { title: agent.title })}
+        </Text>
+        {agent.when ? (
+          <Text style={styles.why} numberOfLines={1}>
+            {agent.when}
+          </Text>
+        ) : null}
+      </View>
+      <GIcon name="chevron-right" size={16} color={theme.color.textTertiary} strokeWidth={2.5} />
+    </GPressable>
+  );
+}
+
+export interface AskRowProps {
+  prompts: PondPrompt[];
+  onAsk: (prompt: PondPrompt) => void;
+  onAskGoose: () => void;
+}
+
+/**
+ * The Pond's questions, then Ask Goose. No heading: a row of questions says what it is, and with
+ * none offered a heading would stand over one chip.
+ */
+export function AskRow({ prompts, onAsk, onAskGoose }: AskRowProps) {
+  const theme = useInkTheme();
+  const styles = makeStyles(theme);
+  const { t } = useTranslation();
+
+  return (
+    <View style={styles.chips}>
+      {prompts.map((prompt) => (
+        <InkChip key={prompt.id} onPress={() => onAsk(prompt)}>
+          {prompt.prompt}
+        </InkChip>
+      ))}
+      <InkChip icon="chat" onPress={onAskGoose}>
+        {t('pond.askGoose')}
+      </InkChip>
     </View>
   );
 }
 
 const makeStyles = (theme: ReturnType<typeof useInkTheme>) =>
   StyleSheet.create({
-    block: { gap: theme.space[2], marginTop: theme.space[4], marginBottom: theme.space[5] },
+    proposal: { gap: theme.space[1] },
+    divided: { borderTopWidth: theme.edge.hairlineWidth, borderTopColor: theme.color.line, marginTop: theme.space[3], paddingTop: theme.space[3] },
+    summary: inkText(theme, { role: 'display', size: 'lg', weight: theme.weight.bold, tracking: 'snug', leading: 'snug' }).style,
+    why: inkText(theme, { size: 'sm', color: theme.color.textSecondary }).style,
+    actions: { flexDirection: 'row', justifyContent: 'flex-end', gap: theme.space[2], marginTop: theme.space[3] },
+    agent: { flexDirection: 'row', alignItems: 'center', gap: theme.space[3] },
+    agentIcon: {
+      width: 32,
+      height: 32,
+      borderRadius: theme.radius.md,
+      backgroundColor: theme.color.accentSoft,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    agentWords: { flex: 1, gap: 1 },
+    agentTitle: inkText(theme, { size: 'md', weight: theme.weight.semibold }).style,
     chips: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.space[2] },
   });

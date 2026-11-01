@@ -14,6 +14,7 @@ import { useRef, useState } from 'react';
 
 import { useServer } from '@/providers/server-provider';
 import { api, type PondApiClient } from '@/services/api-client';
+import i18n from '@/services/i18n';
 import type { NowPlayingResponse, UpcomingSchedule } from '@/services/types';
 import { useLive } from './use-live';
 
@@ -28,11 +29,15 @@ export interface NextRoutine {
 
 export type Until = { unit: 'now' } | { unit: 'minutes' | 'hours' | 'days'; count: number };
 
+/** Degrees Celsius outside, and the place they are for: the Pond's location, not the reader's. */
+export interface Outdoor {
+  temp: number;
+  place: string | null;
+}
+
 export interface RightNow {
-  /** Degrees Celsius outside, or null: no location configured, or the read failed. */
-  outdoorTemp: number | null;
-  /** Where that temperature is, as the Pond names it, for a reading that says where it is from. */
-  outdoorPlace: string | null;
+  /** Null when no location is configured, or the read failed. */
+  outdoor: Outdoor | null;
   nowPlaying: NowPlaying | null;
   nextRoutine: NextRoutine | null;
 }
@@ -106,28 +111,25 @@ export function untilOf(at: Date, now: Date): Until {
   return { unit: 'days', count: Math.round(hours / 24) };
 }
 
-type RightNowReader = Pick<PondApiClient, 'weather' | 'nowPlaying' | 'upcomingSchedules'>;
-
-/** What is outside: the temperature in Celsius and where it was measured, either of which may be null. */
-export interface Outdoor {
-  temp: number | null;
-  place: string | null;
+/** How far off `at` is, as Home says it: "in 2 h", or "due now" once it has passed. */
+export function untilText(at: Date, now: Date): string {
+  const until = untilOf(at, now);
+  if (until.unit === 'now') return i18n.t('home.dueNow');
+  if (until.unit === 'minutes') return i18n.t('home.inMinutes', { count: until.count });
+  if (until.unit === 'hours') return i18n.t('home.inHours', { count: until.count });
+  return i18n.t('home.inDays', { count: until.count });
 }
 
-/**
- * Degrees Celsius outside and the place it is for. Both null on a Pond with no location
- * configured, which is a setting rather than a failure, and on a read that failed.
- *
- * There is no forecast here because there is no route for one: `GET /weather` answers a single
- * temperature, and `WeatherForecast` is parsed out of a chat tool result (`models/weather-card.ts`).
- */
-export async function readOutdoor(client: Pick<RightNowReader, 'weather'> = api): Promise<Outdoor> {
+type RightNowReader = Pick<PondApiClient, 'weather' | 'nowPlaying' | 'upcomingSchedules'>;
+
+/** What it is like outside, or null: no location configured, or the read failed. */
+export async function readOutdoor(client: Pick<RightNowReader, 'weather'> = api): Promise<Outdoor | null> {
   try {
     const w = await client.weather();
-    if (!w.enabled || typeof w.temp !== 'number') return { temp: null, place: null };
+    if (!w.enabled || typeof w.temp !== 'number') return null;
     return { temp: w.temp, place: w.location_name?.trim() || null };
   } catch {
-    return { temp: null, place: null };
+    return null;
   }
 }
 
@@ -167,7 +169,7 @@ export async function readRightNow(client: RightNowReader = api): Promise<RightN
     readNowPlaying(client),
     readNextRoutine(client),
   ]);
-  return { outdoorTemp: outdoor.temp, outdoorPlace: outdoor.place, nowPlaying: playing.card, nextRoutine };
+  return { outdoor, nowPlaying: playing.card, nextRoutine };
 }
 
 /**
@@ -178,7 +180,7 @@ export async function readRightNow(client: RightNowReader = api): Promise<RightN
  * a track sit a minute after it ended.
  */
 export function useRightNow(): UseRightNow {
-  const [outdoor, setOutdoor] = useState<Outdoor>({ temp: null, place: null });
+  const [outdoor, setOutdoor] = useState<Outdoor | null>(null);
   const [nowPlaying, setNowPlaying] = useState<NowPlaying | null>(null);
   const [nextRoutine, setNextRoutine] = useState<NextRoutine | null>(null);
   const lastPlaying = useRef<NowPlayingReading>({ card: null, backOff: false });
@@ -199,5 +201,5 @@ export function useRightNow(): UseRightNow {
   useLive(async () => setOutdoor(await readOutdoor()), WEATHER_MS, hydrated);
   useLive(async () => setNextRoutine(await readNextRoutine()), ROUTINE_MS, hydrated);
 
-  return { data: { outdoorTemp: outdoor.temp, outdoorPlace: outdoor.place, nowPlaying, nextRoutine } };
+  return { data: { outdoor, nowPlaying, nextRoutine } };
 }

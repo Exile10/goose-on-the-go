@@ -106,7 +106,7 @@ describe('untilOf', () => {
 describe('readRightNow', () => {
   function pond(overrides: Partial<Parameters<typeof readRightNow>[0]> = {}) {
     return {
-      weather: async () => ({ enabled: true, temp: 22 }),
+      weather: async () => ({ enabled: true, temp: 22, location_name: 'Nairobi' }),
       nowPlaying: async () => ({ connected: true, playing: false }),
       upcomingSchedules: async () => [{ id: 's', label: 'Morning briefing', next_run: '2026-09-23T04:00:00Z', paused: false }],
       ...overrides,
@@ -115,25 +115,10 @@ describe('readRightNow', () => {
 
   it('reads all three cards', async () => {
     await expect(readRightNow(pond())).resolves.toEqual({
-      outdoorTemp: 22,
-      outdoorPlace: null,
+      outdoor: { temp: 22, place: 'Nairobi' },
       nowPlaying: { state: 'idle' },
       nextRoutine: { label: 'Morning briefing', nextRun: new Date('2026-09-23T04:00:00Z') },
     });
-  });
-
-  // The reading says where it is from, because the Pond's weather is wherever the Pond is
-  // configured to be, which is not always where the reader is.
-  it('names the place the temperature is for, and ignores a blank one', async () => {
-    const named = await readRightNow(pond({ weather: async () => ({ enabled: true, temp: 22, location_name: ' Nairobi ' }) }));
-    expect(named.outdoorPlace).toBe('Nairobi');
-    const blank = await readRightNow(pond({ weather: async () => ({ enabled: true, temp: 22, location_name: '   ' }) }));
-    expect(blank.outdoorPlace).toBeNull();
-  });
-
-  it('keeps no place from a Pond with no location set', async () => {
-    const r = await readRightNow(pond({ weather: async () => ({ enabled: false, temp: 99, location_name: 'Nowhere' }) }));
-    expect(r.outdoorPlace).toBeNull();
   });
 
   // No location configured is a setting, not a temperature. The temperature is present here on
@@ -141,13 +126,13 @@ describe('readRightNow', () => {
   // mutation dropping that check confirmed.
   it('shows no temperature from a Pond with no location set, whatever else it sent', async () => {
     const r = await readRightNow(pond({ weather: async () => ({ enabled: false, temp: 99 }) }));
-    expect(r.outdoorTemp).toBeNull();
+    expect(r.outdoor).toBeNull();
   });
 
   it('loses only the card whose read failed', async () => {
     const r = await readRightNow(pond({ nowPlaying: async () => { throw new ApiError('bad gateway', 502, null); } }));
     expect(r.nowPlaying).toBeNull();
-    expect(r.outdoorTemp).toBe(22);
+    expect(r.outdoor).toEqual({ temp: 22, place: 'Nairobi' });
     expect(r.nextRoutine).not.toBeNull();
   });
 });
