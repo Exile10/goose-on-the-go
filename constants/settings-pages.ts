@@ -658,6 +658,7 @@ const phoneNotifications: SettingsPage = {
   descriptionKey: 'settings.page.phoneNotifications',
   sections: [
     { footerKey: 'settings.footer.stayConnected', items: [{ kind: 'special', id: 'stayConnected' }] },
+    { footerKey: 'settings.footer.replyNotices', items: [{ kind: 'special', id: 'replyNotices' }] },
   ],
 };
 

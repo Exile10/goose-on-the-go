@@ -19,7 +19,8 @@
  * Turns are resumable. A phone locks, walks out of Wi-Fi range, backgrounds
  * the app; a turn tied to the connection would be cancelled by any of them and
  * its question deleted from the history. A resumable one keeps running on the
- * Pond, and this picks it back up from the last frame it saw.
+ * Pond, and `chat-runs.ts` holds its stream, so leaving the conversation leaves
+ * the turn running and reopening it shows the reply where it has got to.
  *
  * One turn runs at a time, and what is sent meanwhile queues behind it
  * (`turn-queue.ts`) rather than being refused: the composer never has to wait
@@ -28,10 +29,7 @@
  * A conversation's thread is not this hook's. It lives in `chat-threads.ts`,
  * and the hook shows whichever one is open, so a conversation left and reopened
  * comes back as it was while the Pond is read again behind it, and a turn
- * writes into its own thread whichever conversation is on screen by then. A
- * reply given up mid-stream — by leaving the screen or starting another
- * conversation — is picked back up from its last frame when its conversation
- * reopens, rather than waiting until the Pond has saved it.
+ * writes into its own thread whichever conversation is on screen by then.
  */
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
@@ -40,22 +38,14 @@ import type { TFunction } from 'i18next';
 
 import type { BubblePosition } from '@jarida/ink/native';
 
-import type { CardHint, Message, ToolCall } from '@/models/chat';
+import type { Message, ToolCall } from '@/models/chat';
 import { toolWords, humanizeTool } from '@/constants/tools';
 import { useServer } from '@/providers/server-provider';
 import { ApiError, api } from '@/services/api-client';
-import { cardsFor, forgetCalls, rememberCard, type CardsByCall } from '@/services/card-cache';
-import {
-  changed,
-  keepThread,
-  newThread,
-  threadFor,
-  watchThread,
-  type LiveTurn,
-  type Thread,
-} from '@/services/chat-threads';
+import { cardsFor, forgetCalls, type CardsByCall } from '@/services/card-cache';
+import { chatRuns, type TurnHandle } from '@/services/chat-runs';
+import { changed, keepThread, newThread, threadFor, watchThread, type Thread } from '@/services/chat-threads';
 import { composeMessage, type Attachment } from '@/services/media';
-import { StreamStalledError } from '@/services/sse';
 import type { AnswerShape, ChatFrame, ChatStreamRequest, SessionMessage } from '@/services/types';
 import { describeApiError, logFailure } from '@/view-models/describe-error';
 import { createTurnQueue } from '@/view-models/turn-queue';
@@ -65,15 +55,6 @@ import { researchRefusal } from '@/view-models/use-deep-research';
 
 /** How much of a long conversation is worth reading back on open. */
 const HISTORY_LIMIT = 100;
-
-/**
- * How often streamed text reaches the screen. Tokens arrive faster than a
- * reader can see them change, and each state update re-renders the thread.
- */
-const FLUSH_MS = 50;
-
-/** Reattaching after a drop: how many times, and how long to wait before each. */
-const REATTACH_DELAYS_MS = [800, 2000, 4000];
 
 /**
  * Whether a failure is the request being given up on rather than refused.
@@ -86,13 +67,6 @@ function isAbort(e: unknown): boolean {
   if (!(e instanceof Error)) return false;
   if (e.name === 'AbortError') return true;
   return /cancel|abort/i.test(e.message);
-}
-
-/** A dropped connection, as distinct from the Pond refusing: worth reattaching. */
-function isDrop(e: unknown): boolean {
-  if (e instanceof StreamStalledError) return true;
-  if (e instanceof ApiError) return false;
-  return e instanceof TypeError || (e instanceof Error && /network|connection|socket/i.test(e.message));
 }
 
 /**
@@ -170,6 +144,19 @@ export function toMessage(m: SessionMessage): Message | null {
   }
   if (m.thinking?.length) message.thinking = m.thinking;
   return message;
+}
+
+/**
+ * Whether a saved conversation ends in a question nothing has answered yet:
+ * the only kind a turn can still be running in, since the Pond saves the
+ * question before it starts and the answer only once it has finished.
+ */
+export function endsUnanswered(rows: SessionMessage[]): boolean {
+  for (let i = rows.length - 1; i >= 0; i -= 1) {
+    if (rows[i].role === 'user') return true;
+    if (rows[i].role === 'assistant') return false;
+  }
+  return false;
 }
 
 /**
@@ -277,65 +264,6 @@ export function titleFromThread(messages: Message[]): string | null {
   return first ? derivedTitle(first.content) || null : null;
 }
 
-/** The card a tool result asks to be drawn as, when it asks. */
-export function cardOf(frame: ChatFrame): CardHint | undefined {
-  return frame.ui?.card_type && frame.ui.data ? { type: frame.ui.card_type, data: frame.ui.data } : undefined;
-}
-
-/** The card worth keeping on this phone: none for a result the Pond marks transient. */
-export function cardToKeep(frame: ChatFrame): CardHint | undefined {
-  return frame.transient === true ? undefined : cardOf(frame);
-}
-
-/**
- * One frame, folded into the reply it belongs to. Pure, so a turn can be
- * replayed in a test exactly as it arrived.
- */
-export function applyFrame(reply: Message, frame: ChatFrame): Message {
-  switch (frame.type) {
-    case 'text':
-      return frame.content ? { ...reply, content: reply.content + frame.content } : reply;
-    case 'review_revision':
-      // A review pass rewrote the answer; what streamed before is superseded.
-      return typeof frame.content === 'string' ? { ...reply, content: frame.content } : reply;
-    case 'thinking':
-      return frame.content ? { ...reply, thinking: [...(reply.thinking ?? []), frame.content] } : reply;
-    case 'tool_call': {
-      if (!frame.tool || !frame.id) return reply;
-      const tools = reply.tools ?? [];
-      if (tools.some((t) => t.id === frame.id)) return reply;
-      const call: ToolCall = {
-        id: frame.id,
-        name: frame.tool,
-        args: frame.input === undefined || frame.input === null ? '{}' : JSON.stringify(frame.input),
-        status: 'running',
-      };
-      return { ...reply, tools: [...tools, call] };
-    }
-    case 'tool_result': {
-      if (!frame.id) return reply;
-      const tools = reply.tools ?? [];
-      const card = cardOf(frame);
-      const done = (call: ToolCall): ToolCall => ({
-        ...call,
-        status: 'ok',
-        result: frame.content ?? call.result,
-        card: card ?? call.card,
-      });
-      if (tools.some((t) => t.id === frame.id)) {
-        return { ...reply, tools: tools.map((t) => (t.id === frame.id ? done(t) : t)) };
-      }
-      // A result for a call this reply never saw — joined mid-turn. Keep it.
-      return {
-        ...reply,
-        tools: [...tools, done({ id: frame.id, name: frame.tool ?? '', args: '{}', status: 'ok' })],
-      };
-    }
-    default:
-      return reply;
-  }
-}
-
 /**
  * What Goose is doing, in words: under the thinking quips before the answer,
  * and beside the spinner under it after. `review_status` is the Pond reviewing
@@ -414,7 +342,13 @@ export interface UseChat {
     unqueue: (id: string) => void;
     /** Stop the turn in flight and drop what is queued behind it. What already arrived stays. */
     stop: () => void;
+    /** Start afresh. A turn still running carries on where it was asked, unwatched. */
     newConversation: () => void;
+    /**
+     * The conversation is on screen until the returned release is called, so a
+     * turn that ends meanwhile is not announced to the person reading it.
+     */
+    watch: () => () => void;
     /**
      * Read an existing conversation back from the Pond. `title` is what the
      * screen that linked here already calls it, shown until the Pond says
@@ -426,9 +360,11 @@ export interface UseChat {
 }
 
 /**
- * A turn as the queue holds it: a question to ask, or a turn to pick back up
- * where an earlier visit left it. Either belongs to the thread it was made in,
- * whichever conversation is on screen by the time it runs.
+ * A turn as the queue holds it: a question to ask, or a turn already running
+ * that opening the conversation found — asked before the app was last closed.
+ * Either belongs to the thread it was made in, whichever conversation is on
+ * screen by the time it runs, and the second goes through the queue too, so
+ * what is sent meanwhile waits behind it.
  */
 type Job =
   | {
@@ -439,7 +375,15 @@ type Job =
       attachments: Attachment[];
       options: SendOptions;
     }
-  | { kind: 'resume'; thread: Thread };
+  | { kind: 'follow'; thread: Thread; handle: TurnHandle };
+
+const pendingReply = (id: string): Message => ({
+  id,
+  role: 'assistant',
+  content: '',
+  timestamp: Date.now(),
+  pending: true,
+});
 
 /**
  * The question a turn asks, drawn once, when it is sent. A queued one shows as
@@ -480,6 +424,7 @@ export function useChat(): UseChat {
   const [turnSeed, setTurnSeed] = useState(() => Date.now());
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [watched, setWatched] = useState(false);
 
   const localId = useRef(0);
   const nextLocalId = () => `local-${Date.now().toString(36)}-${++localId.current}`;
@@ -493,6 +438,7 @@ export function useChat(): UseChat {
 
   /** The thread a turn run from here is streaming into, if any. */
   const activeRef = useRef<Thread | null>(null);
+  const mountedRef = useRef(true);
 
   const show = useCallback((next: Thread) => {
     viewRef.current = next;
@@ -505,28 +451,34 @@ export function useChat(): UseChat {
   }, []);
 
   // Handed `runJob` below, and handed it again whenever it changes, so a
-  // queued turn runs through the current one.
-  const [queue] = useState(() =>
-    createTurnQueue<Job>((waiting) =>
-      setQueued(waiting.flatMap((w) => (w.kind === 'ask' ? [w.question] : []))),
-    ),
+  // queued turn runs through the current one. Replaced with a new
+  // conversation, so its first question does not wait for the last one's answer.
+  const makeQueue = useCallback(
+    () =>
+      createTurnQueue<Job>((waiting) =>
+        setQueued(waiting.flatMap((w) => (w.kind === 'ask' ? [w.question] : []))),
+      ),
+    [],
   );
+  const [queue, setQueue] = useState(makeQueue);
 
-  // Leaving the screen gives the stream up so the Pond's four slots are not
-  // held by a phone that is not listening. The turn itself is resumable and
-  // carries on; its thread keeps where it was left, so reopening the
-  // conversation picks the reply back up rather than waiting for it to be
-  // saved.
-  //
-  // Not while something is queued behind it. The end of this stream is how the
-  // phone knows to send the next, so giving it up would quietly drop what was
-  // written; the queue finishes in the background instead, into its thread.
-  useEffect(
-    () => () => {
-      if (queue.size === 0) leave(activeRef.current);
-    },
-    [queue],
-  );
+  // Leaving the screen lets the turn go rather than stopping it: it carries on
+  // in `chatRuns`, still writing into its thread, and the wall and the
+  // reopened conversation read it there. What is queued behind it is still
+  // sent, in the background. Only voice mode stops, since nobody is listening.
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      const turn = activeRef.current?.turn;
+      if (turn) chatRuns.mute(turn.key);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!watched || !thread.session) return;
+    return chatRuns.view(thread.session);
+  }, [watched, thread.session]);
 
   /**
    * The Pond's own title for a conversation. It has no route for one
@@ -554,17 +506,18 @@ export function useChat(): UseChat {
    * already says whether the Pond can be reached.
    *
    * A read that a turn overtook is dropped. The turn's own messages are newer
-   * than the history the read began with.
+   * than the history the read began with. Resolves true when the read was
+   * shown and ends in a question nothing has answered yet.
    */
   const reload = useCallback(
-    async (th: Thread, loud: boolean) => {
+    async (th: Thread, loud: boolean): Promise<boolean> => {
       const id = th.session;
-      if (!id) return;
+      if (!id) return false;
       const turns = th.turns;
       if (loud) setLoading(true);
       try {
         const [rows, cards] = await Promise.all([api.listSessionMessages(id, HISTORY_LIMIT), cardsFor(id)]);
-        if (th.turn || th.left || th.turns !== turns) return;
+        if (th.turn || th.turns !== turns) return false;
         th.messages = fromHistory(rows, cards);
         // A card kept before the Pond marked its result transient goes too.
         const stale = rows.flatMap((row) =>
@@ -573,9 +526,11 @@ export function useChat(): UseChat {
         void forgetCalls(id, stale);
         keepThread(th);
         changed(th);
+        return endsUnanswered(rows);
       } catch (e) {
         if (loud) sayFor(th, describeTurnError(e, t));
         else console.warn('[chat] re-reading a kept conversation failed; showing what was kept', e instanceof ApiError ? e.status : 'network');
+        return false;
       } finally {
         if (loud && viewRef.current === th) setLoading(false);
       }
@@ -584,183 +539,75 @@ export function useChat(): UseChat {
   );
 
   /**
-   * Stream one turn into its thread: the first request, reattaching after a
-   * drop, and settling the reply however it ends. `first` is what opens the
-   * stream — asking, or reattaching to a run an earlier visit left.
+   * Draw a turn `chat-runs.ts` holds into its thread until it ends, then settle
+   * the reply however it ended. The thread is written whether or not anyone is
+   * looking at it, so a conversation reopened mid-answer shows the reply as far
+   * as it has got.
    */
   const drive = useCallback(
-    async (
-      th: Thread,
-      start: Message,
-      cursor: { runId: string | null; seq: number; epoch: number | string | undefined },
-      first: (onFrame: (frame: ChatFrame) => void, signal: AbortSignal) => Promise<void>,
-      options: SendOptions,
-    ): Promise<string | null> => {
-      let reply = start;
-      const replyId = start.id;
-      const resuming = cursor.runId !== null;
-      const controller = new AbortController();
+    async (th: Thread, replyId: string, handle: TurnHandle): Promise<string | null> => {
       let finish!: () => void;
-      const turn: LiveTurn = {
-        controller,
-        ...cursor,
+      th.turn = {
+        key: handle.key,
         replyId,
-        left: false,
         done: new Promise<void>((resolve) => {
           finish = resolve;
         }),
       };
-      th.turn = turn;
       th.status = null;
       changed(th);
       activeRef.current = th;
-      const run = { done: false, failed: false };
 
-      const put = (snapshot: Message) => {
-        th.messages = th.messages.map((x) => (x.id === replyId ? snapshot : x));
+      let drawn: unknown = null;
+      // An error frame already said, so a redraw does not bring back one that was dismissed.
+      let said: string | null = null;
+      const draw = () => {
+        const live = chatRuns.get(handle.key);
+        if (!live || live === drawn) return;
+        drawn = live;
+        th.messages = th.messages.map((x) => (x.id === replyId ? { ...live.reply, id: replyId } : x));
+        th.status = live.status ? statusFor(live.status, t) : null;
+        if (live.sessionId && th.session !== live.sessionId) {
+          th.session = live.sessionId;
+          keepThread(th);
+        }
+        if (live.errorText && live.errorText !== said) {
+          said = live.errorText;
+          sayFor(th, live.errorText);
+        }
         changed(th);
       };
+      const unsubscribe = chatRuns.subscribe(draw);
+      draw();
+      const end = await handle.ended;
+      unsubscribe();
 
-      // Tokens land in `reply` immediately and reach the screen in batches.
-      let flushTimer: ReturnType<typeof setTimeout> | null = null;
-      const flush = () => {
-        flushTimer = null;
-        put(reply);
-      };
-      const schedule = () => {
-        if (!flushTimer) flushTimer = setTimeout(flush, FLUSH_MS);
-      };
-
-      // Cards reach the phone on the stream and nowhere else, so each is kept
-      // as it lands, unless the result is transient. One that lands before the
-      // Pond has named a new conversation waits for the name.
-      const unnamed = new Map<string, CardHint>();
-      const keep = (callId: string, card: CardHint) => {
-        if (th.session) void rememberCard(th.session, callId, card);
-        else unnamed.set(callId, card);
-      };
-
-      const named = (session: string | undefined) => {
-        if (!session || th.session === session) return;
-        th.session = session;
+      if (end.error && end.outcome !== 'stopped') sayFor(th, describeTurnError(end.error, t));
+      if (end.error && !end.reply.content && !end.reply.tools?.length) {
+        // Nothing arrived: the reply was never started, so it is not shown.
+        th.messages = th.messages.filter((x) => x.id !== replyId);
+      } else {
+        th.messages = th.messages.map((x) => (x.id === replyId ? { ...end.reply, id: replyId } : x));
+      }
+      if (end.sessionId && th.session !== end.sessionId) {
+        th.session = end.sessionId;
         keepThread(th);
-        changed(th);
-      };
-
-      const onFrame = (frame: ChatFrame) => {
-        if (frame.seq !== undefined) turn.seq = Math.max(turn.seq, frame.seq);
-        if (frame.type === 'run_started') {
-          turn.runId = frame.run_id ?? null;
-          turn.epoch = frame.epoch;
-          named(frame.session_id);
-          return;
-        }
-        const line = statusFor(frame, t);
-        if (line) {
-          th.status = line;
-          changed(th);
-        }
-        if (frame.done) {
-          run.done = true;
-          named(frame.session_id);
-          return;
-        }
-        if (!frame.type && frame.error) {
-          // Terminal when nothing follows it; either way it is the thing to say.
-          run.failed = true;
-          sayFor(th, frame.error);
-          return;
-        }
-        if (frame.type === 'replay_gap' || frame.type === 'run_evicted') {
-          // The Pond no longer has the frames between; the saved turn does.
-          run.failed = true;
-          return;
-        }
-        const before = reply.content;
-        reply = applyFrame(reply, frame);
-        if (frame.type === 'tool_result' && frame.id) {
-          const card = cardToKeep(frame);
-          if (card) keep(frame.id, card);
-        }
-        if (reply.content !== before) options.onText?.(reply.content);
-        if ((frame.type === 'text' || frame.type === 'review_revision') && th.status) {
-          th.status = null;
-          changed(th);
-        }
-        schedule();
-      };
-
-      let lost = false;
-      // The run is gone from the Pond's memory, or its frames are: the saved
-      // turn is the way to the rest of it.
-      let gone = false;
-      try {
-        try {
-          await first(onFrame, controller.signal);
-        } catch (e) {
-          if (resuming && e instanceof ApiError) gone = true;
-          else if (!isDrop(e)) throw e;
-          else lost = true;
-        }
-        // Ended without a `done`: the connection went, not the turn.
-        if (!gone && !run.done && !run.failed && !controller.signal.aborted) lost = true;
-
-        for (const wait of REATTACH_DELAYS_MS) {
-          if (!lost || !turn.runId || controller.signal.aborted) break;
-          await new Promise((resolve) => setTimeout(resolve, wait));
-          if (controller.signal.aborted) break;
-          try {
-            await api.reattachRun(turn.runId, turn.seq, turn.epoch, onFrame, controller.signal);
-            lost = !run.done && !run.failed;
-          } catch (e) {
-            // 404 and 410 mean the run is gone from memory; the saved turn is not.
-            if (e instanceof ApiError) {
-              lost = false;
-              gone = true;
-              break;
-            }
-            if (!isDrop(e)) throw e;
-          }
-        }
-
-        if (lost && !controller.signal.aborted) sayFor(th, t('chat.lostConnection'));
-      } catch (e) {
-        if (!isAbort(e) || !controller.signal.aborted) sayFor(th, describeTurnError(e, t));
-        if (!turn.left && !reply.content && !reply.tools?.length) {
-          // Nothing arrived: the reply was never started, so it is not shown.
-          th.messages = th.messages.filter((x) => x.id !== replyId);
-          changed(th);
-          reply = { ...reply, pending: false };
-          return null;
-        }
-      } finally {
-        if (flushTimer) clearTimeout(flushTimer);
-        if (th.session) for (const [callId, card] of unnamed) void rememberCard(th.session, callId, card);
-        if (turn.left && turn.runId) {
-          // Given up on purpose. The reply stays as far as it got, still
-          // pending, and the thread keeps where to pick it up.
-          th.left = { runId: turn.runId, seq: turn.seq, epoch: turn.epoch, replyId };
-          put(reply);
-        } else {
-          reply = {
-            ...reply,
-            pending: false,
-            // A tool that never answered by the end of the turn did not finish.
-            tools: reply.tools?.map((c) => (c.status === 'running' ? { ...c, status: 'error' } : c)),
-          };
-          put(reply);
-        }
-        th.turn = null;
-        th.status = null;
-        changed(th);
-        if (activeRef.current === th) activeRef.current = null;
-        finish();
+      }
+      th.turn = null;
+      th.status = null;
+      changed(th);
+      if (activeRef.current === th) activeRef.current = null;
+      finish();
+      if (end.outcome === 'done') {
         // A saved turn is when the Pond names a new conversation, and its
         // re-titling job may since have named an old one better.
-        if (run.done) void refreshTitle(th);
-        if (gone || (lost && !controller.signal.aborted) || (run.failed && !run.done)) void reload(th, false);
+        void refreshTitle(th);
+      } else if (end.outcome === 'lost' || end.stale || (end.outcome === 'failed' && !end.error)) {
+        // A run aged out of the Pond's memory has finished; the saved copy is the answer.
+        if (end.outcome === 'lost' && !end.gone) sayFor(th, t('chat.lostConnection'));
+        void reload(th, false);
       }
-      return run.done ? reply.content : null;
+      return end.outcome === 'done' ? end.reply.content : null;
     },
     [refreshTitle, reload, sayFor, t],
   );
@@ -768,38 +615,19 @@ export function useChat(): UseChat {
   const runJob = useCallback(
     async (job: Job): Promise<string | null> => {
       const th = job.thread;
-      // A turn an earlier visit left running in this thread finishes first:
-      // one conversation answers one question at a time.
+      // A turn already running in this thread finishes first: one
+      // conversation answers one question at a time.
       if (th.turn) await th.turn.done;
 
-      if (job.kind === 'resume') {
-        const left = th.left;
-        if (!left) return null;
-        th.left = null;
+      if (job.kind === 'follow') {
+        const replyId = nextLocalId();
         th.turns += 1;
-        let reply = th.messages.find((m) => m.id === left.replyId);
-        if (!reply) {
-          reply = { id: left.replyId, role: 'assistant', content: '', timestamp: Date.now(), pending: true };
-          th.messages = [...th.messages, reply];
-        }
-        return drive(
-          th,
-          reply,
-          { runId: left.runId, seq: left.seq, epoch: left.epoch },
-          (onFrame, signal) => api.reattachRun(left.runId, left.seq, left.epoch, onFrame, signal),
-          {},
-        );
+        th.messages = [...th.messages, pendingReply(replyId)];
+        return drive(th, replyId, job.handle);
       }
 
       const { text: trimmed, attachments, options } = job;
-      const images = attachments.filter((a) => a.kind === 'image' && a.base64);
-      const reply: Message = {
-        id: nextLocalId(),
-        role: 'assistant',
-        content: '',
-        timestamp: Date.now(),
-        pending: true,
-      };
+      const reply = pendingReply(nextLocalId());
       // Stamped when it is asked, which for a queued one is not when it was written.
       const question: Message = { ...job.question, timestamp: Date.now() };
 
@@ -812,12 +640,8 @@ export function useChat(): UseChat {
       if (!isScreenRealRef.current('chat')) {
         let finish!: () => void;
         th.turn = {
-          controller: new AbortController(),
-          runId: null,
-          seq: 0,
-          epoch: undefined,
+          key: `mock-${reply.id}`,
           replyId: reply.id,
-          left: false,
           done: new Promise<void>((resolve) => {
             finish = resolve;
           }),
@@ -842,14 +666,12 @@ export function useChat(): UseChat {
         return content;
       }
 
-      return drive(
-        th,
-        reply,
-        { runId: null, seq: 0, epoch: undefined },
-        (onFrame, signal) =>
-          api.streamChat(streamBody(trimmed, attachments, options, th.session), onFrame, signal),
-        options,
-      );
+      const handle = chatRuns.start({
+        body: streamBody(trimmed, attachments, options, th.session),
+        title: th.title ?? titleFromThread(th.messages),
+        onText: mountedRef.current ? options.onText : undefined,
+      });
+      return drive(th, reply.id, handle);
     },
     [drive, sayFor],
   );
@@ -857,6 +679,21 @@ export function useChat(): UseChat {
   useEffect(() => {
     queue.runWith(runJob);
   }, [queue, runJob]);
+
+  /**
+   * Pick up a turn still running in a conversation that ends in an unanswered
+   * question: one this phone holds, or one asked before the app was last closed.
+   */
+  const pickUp = useCallback(
+    async (th: Thread) => {
+      const id = th.session;
+      if (!id) return;
+      const handle = await chatRuns.resume(id, th.title ?? titleFromThread(th.messages));
+      if (!handle || th.turn) return;
+      void queue.submit({ kind: 'follow', thread: th, handle });
+    },
+    [queue],
+  );
 
   const open = useCallback(
     (id: string, hint?: string) => {
@@ -874,14 +711,11 @@ export function useChat(): UseChat {
       if (!th.title) void refreshTitle(th);
       // A turn is writing into it now: what is kept is already current.
       if (th.turn) return;
-      // A turn was left mid-reply: pick it up where it was left.
-      if (th.left) {
-        void queue.submit({ kind: 'resume', thread: th });
-        return;
-      }
-      void reload(th, th.messages.length === 0);
+      void reload(th, th.messages.length === 0).then((unanswered) => {
+        if (unanswered) void pickUp(th);
+      });
     },
-    [hydrated, queue, refreshTitle, reload, show],
+    [hydrated, pickUp, refreshTitle, reload, show],
   );
 
   const send = useCallback(
@@ -908,24 +742,29 @@ export function useChat(): UseChat {
   const stop = useCallback(() => {
     queue.clear();
     const turn = viewRef.current.turn;
-    if (!turn) return;
-    if (turn.runId) void api.cancelRun(turn.runId).catch(() => {});
-    turn.controller.abort();
+    if (turn) chatRuns.stop(turn.key);
   }, [queue]);
 
   // Starting another conversation is not stopping this one. A reply still being
-  // written is left with its thread to be picked up on return; only what was
-  // queued and not yet asked is dropped, as stopping drops it.
+  // written carries on into its thread; only what was queued and not yet asked
+  // is dropped, as stopping drops it.
   const newConversation = useCallback(() => {
     queue.clear();
-    leave(viewRef.current);
+    setQueue(makeQueue());
+    const turn = viewRef.current.turn;
+    if (turn) chatRuns.mute(turn.key);
     show(newThread());
     setError(null);
     setLoading(false);
     setTurnSeed(Date.now());
-  }, [queue, show]);
+  }, [makeQueue, queue, show]);
 
   const dismissError = useCallback(() => setError(null), []);
+
+  const watch = useCallback(() => {
+    setWatched(true);
+    return () => setWatched(false);
+  }, []);
 
   return {
     data: {
@@ -933,25 +772,12 @@ export function useChat(): UseChat {
       queued,
       sessionId: thread.session,
       title: thread.title ?? titleFromThread(thread.messages),
-      streaming: thread.turn !== null || thread.left !== null,
+      streaming: thread.turn !== null,
       status: thread.status,
       turnSeed,
     },
     loading,
     error,
-    actions: { send, unqueue, stop, newConversation, open, dismissError },
+    actions: { send, unqueue, stop, newConversation, open, dismissError, watch },
   };
-}
-
-/**
- * Give up a thread's stream on purpose, so it can be picked up later. Only a
- * turn the Pond has named a run for can be: before that there is nothing to
- * reattach to, and the stream ends as it did before there was anywhere to keep
- * it — the saved turn is read back when the conversation reopens.
- */
-function leave(th: Thread | null): void {
-  const turn = th?.turn;
-  if (!turn) return;
-  if (turn.runId) turn.left = true;
-  turn.controller.abort();
 }

@@ -39,6 +39,7 @@ import { useTranslation } from 'react-i18next';
 import { InkSkeleton, InkTitle, inkText, useInkTheme } from '@jarida/ink/native';
 
 import {
+  AnsweringMark,
   DeleteOrKeep,
   LONG_PRESS_MS,
   SelectMark,
@@ -167,7 +168,9 @@ export const ConversationRow = React.memo(function ConversationRow({
           <Text style={[text.title, local.title]} numberOfLines={1}>
             {title}
           </Text>
-          {meta ? (
+          {card.answering ? (
+            <AnsweringMark />
+          ) : meta ? (
             <Text style={text.meta} numberOfLines={1}>
               {meta}
             </Text>

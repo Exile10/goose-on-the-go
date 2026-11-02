@@ -18,6 +18,7 @@ const KEYS = {
   hapticsEnabled: '@goose/haptics-enabled',
   /** Whether this phone keeps its notification stream open in the background (Android). Not a secret. */
   stayConnected: '@goose/stay-connected',
+  replyNotices: '@goose/reply-notices',
   onboardingDone: '@goose/onboarding-done',
   chatHistoryView: '@goose/chat-history-view',
   remoteOfferDismissed: '@goose/remote-offer-dismissed',

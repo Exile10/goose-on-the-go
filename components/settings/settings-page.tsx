@@ -24,6 +24,7 @@ import {
 import { useTheme } from '@/providers/theme-provider';
 import { hapticsEnabled, saveHapticsPreference, selectionTick } from '@/services/haptics';
 import { saveStayConnectedPreference, stayConnectedEnabled } from '@/services/background-connection';
+import { replyNoticesEnabled, saveReplyNoticePreference } from '@/services/reply-notices';
 import type { PondSettings } from '@/services/types';
 import { summarize, useSummaryExtras, type Extras } from '@/view-models/use-settings-extras';
 import { usePondSettings, type UsePondSettings } from '@/view-models/use-pond-settings';
@@ -81,6 +82,7 @@ interface Context {
   theme: ReturnType<typeof useTheme>;
   haptics: { on: boolean; set: (next: boolean) => void };
   stayConnected: { on: boolean; set: (next: boolean) => void };
+  replyNotices: { on: boolean; set: (next: boolean) => void };
 }
 
 function noteFor(item: { restart?: boolean }, ctx: Context): string | null {
@@ -240,6 +242,16 @@ function specialRows(id: SpecialId, ctx: Context): ReactElement[] {
       return [
         <SwitchRow key={id} label={t('settings.stayConnected.label')} value={ctx.stayConnected.on} onChange={ctx.stayConnected.set} />,
       ];
+    case 'replyNotices':
+      return [
+        <SwitchRow
+          key={id}
+          label={t('settings.replyNotices.label')}
+          description={t('settings.replyNotices.hint')}
+          value={ctx.replyNotices.on}
+          onChange={ctx.replyNotices.set}
+        />,
+      ];
   }
 }
 
@@ -259,6 +271,7 @@ export function SettingsPageScreen({ page: id }: { page: SettingsPageId }) {
   const extras = useSummaryExtras(summaryIds, vm.settings?.vision_camera_id ?? null);
   const [hapticsOn, setHapticsOn] = useState(hapticsEnabled);
   const [stayConnectedOn, setStayConnectedOn] = useState(stayConnectedEnabled);
+  const [replyNoticesOn, setReplyNoticesOn] = useState(replyNoticesEnabled);
   const phoneOnly = PHONE_PAGES.has(id);
   const settings = vm.settings;
   const state = useContentState({ loading: !vm.failed, failed: vm.failed, hasContent: settings !== null });
@@ -300,6 +313,13 @@ export function SettingsPageScreen({ page: id }: { page: SettingsPageId }) {
         set: (next) => {
           setStayConnectedOn(next);
           void saveStayConnectedPreference(next);
+        },
+      },
+      replyNotices: {
+        on: replyNoticesOn,
+        set: (next) => {
+          setReplyNoticesOn(next);
+          void saveReplyNoticePreference(next);
         },
       },
     };

@@ -30,7 +30,8 @@ jest.mock('@/services/install-id', () => ({
   getInstallId: jest.fn(async () => 'install-1'),
 }));
 
-jest.mock('expo-device', () => ({ isDevice: true }));
+const mockDevice = { isDevice: true };
+jest.mock('expo-device', () => mockDevice);
 
 // The module comes through notifications-module.ts, which decides whether it can be
 // loaded at all; this file tests what push-token does with it once it is.
@@ -72,6 +73,7 @@ async function flushAsync() {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockDevice.isDevice = true;
   mockGetPermissions.mockResolvedValue({ granted: true, canAskAgain: true });
   mockRequest.mockResolvedValue({ ok: true });
   mockGetDevicePushToken.mockResolvedValue({ data: 'token-abc', type: 'android' });
@@ -107,6 +109,18 @@ describe('registerPushToken', () => {
    * one reads it, so a check-then-act guard lets both through — which is
    * exactly what a real device does: two POSTs, 51ms apart, same token.
    */
+  it('asks for permission on a simulator, for the shade, and posts no token from it', async () => {
+    mockDevice.isDevice = false;
+    mockGetPermissions.mockResolvedValue({ granted: false, canAskAgain: true });
+    mockRequestPermissions.mockResolvedValue({ granted: true });
+    const { registerPushToken } = loadModule();
+
+    expect(await registerPushToken()).toBeNull();
+    expect(mockRequestPermissions).toHaveBeenCalledTimes(1);
+    expect(mockGetDevicePushToken).not.toHaveBeenCalled();
+    expect(mockRequest).not.toHaveBeenCalled();
+  });
+
   it('posts once when two callers race at startup', async () => {
     const { registerPushToken } = loadModule();
 

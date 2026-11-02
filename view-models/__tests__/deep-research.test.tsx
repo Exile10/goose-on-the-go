@@ -12,7 +12,8 @@ import { ApiError, api } from '@/services/api-client';
 import i18n from '@/services/i18n';
 import type { SessionMessage } from '@/services/types';
 import { taskEyebrow } from '@/view-models/long-task-words';
-import { applyFrame, describeTurnError, fromHistory, streamBody } from '@/view-models/use-chat';
+import { applyFrame } from '@/services/chat-runs';
+import { describeTurnError, fromHistory, streamBody } from '@/view-models/use-chat';
 import {
   RESEARCH_ANSWERS,
   researchAnswerWords,

@@ -251,7 +251,7 @@ and its ISK and sid chain to `cpace-vectors.json`. Everything native is owed a d
 
 - **ThemeProvider** (`providers/theme-provider.tsx`) — Jarida color tokens resolved for light/dark mode. Access via `useTheme()`.
 - **ServerProvider** (`providers/server-provider.tsx`) — Server connection state and the dev mock/real toggles. Access via `useServer()`.
-- **NotificationsProvider** (`providers/notifications-provider.tsx`) — Push registration, the stream's lifecycle and the background-connection service. See [NOTIFICATIONS.md](./NOTIFICATIONS.md).
+- **NotificationsProvider** (`providers/notifications-provider.tsx`) — Push registration, the stream's lifecycle, the background-connection service, and the phone's own notice that a reply finished (see [Turns that outlive their screen](#turns-that-outlive-their-screen)). See [NOTIFICATIONS.md](./NOTIFICATIONS.md).
 - **InkProvider** (`@jarida/ink/native`) — Theme context for the ink primitives (#17).
 
 ## Unpairing, including from a Pond that is gone
@@ -276,6 +276,42 @@ in memory, and the record of which push token was registered, so the next Pond p
 process is sent it. The heartbeat and the notification stream stop with the identity. Until
 2026-10-27 a failed revoke was a system alert saying to try again at home, and a phone whose Pond
 had been reset or replaced stayed paired to it for good.
+
+## Turns that outlive their screen
+
+A conversation does not own its turn. `services/chat-runs.ts` holds the stream for every turn this
+phone asked, so leaving a conversation, going to another tab or backgrounding the app leaves the
+turn running and still followed. Each turn writes into its conversation's thread in
+`services/chat-threads.ts` whether or not the conversation is on screen, so reopening it shows the
+reply as far as it has got. The wall marks a conversation as answering from `chat-runs.ts`, and the
+end of a turn nobody was watching is announced from there.
+
+What the Pond provides, and what it does not (checked against pond-api, 2026-10-23):
+
+| The Pond | So the phone |
+|---|---|
+| Keeps a `resumable: true` turn running after its reader disconnects | Sends every turn resumable, and never cancels one by leaving it |
+| Replays a run from any frame at `/chat/runs/{id}/events?after_seq=&epoch=`, for two minutes after it ends | Reattaches after a drop from the last `seq` it saw, three tries, none while the app is in the background |
+| Finds a conversation's run at `/sessions/{id}/active-run` | Asks only when a reopened conversation ends in an unanswered question, the one case where a turn can still be running |
+| Says nothing when a turn ends: no notification-stream event, no push | Reads the end off the stream it holds, and presents a local notification |
+
+The last row is the limit. A phone the OS has suspended, as iOS does a few seconds after the app
+leaves the screen, holds no stream, so it learns a turn ended only when it comes back: the
+notification arrives then, not when the Pond finished. Telling a suspended phone needs the Pond to
+send its own notification at the end of a detached run, through the push relay it already has.
+
+The rules:
+
+| Rule | Why |
+|---|---|
+| A finished turn is announced only when its conversation is **not on screen** | The conversation screen registers itself while focused (`useChat().actions.watch`), and an app in the background counts as not on screen. A stopped turn is never announced. |
+| A run the Pond has **forgotten** (404) costs one read of the conversation's last message, and no more | Forgotten means it ended, not how. The saved conversation says whether it was answered. A 410 is a Pond that restarted, which lost the turn, and is not looked up. |
+| A reload after a **lost** turn does not resume | A run whose reattach keeps dropping would otherwise turn reloading into a loop. |
+| **Starting a new conversation** lets the old turn run on | The same as leaving. What was queued behind it is dropped with the conversation it was written for. |
+
+The notices are on by default and can be turned off on this phone under Settings, Phone
+notifications (`services/reply-notices.ts`). Android puts them on their own "Replies" channel, so the phone's
+own settings can quiet them without quieting security alerts.
 
 ## Presence: telling the Pond this phone is still here
 

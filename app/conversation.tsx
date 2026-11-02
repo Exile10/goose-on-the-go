@@ -50,7 +50,7 @@ import {
   type NativeScrollEvent,
   type NativeSyntheticEvent,
 } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NAVBAR_DEFAULTS, NavbarBehaviour, type NavbarStage } from '@jarida/ink/headless';
@@ -158,7 +158,7 @@ export default function ChatScreen() {
     interview?: string;
   }>();
   const openedRef = useRef<string | null>(null);
-  const { open, unqueue } = actions;
+  const { open, unqueue, watch } = actions;
   useEffect(() => {
     if (!session || openedRef.current === session) return;
     openedRef.current = session;
@@ -209,6 +209,8 @@ export default function ChatScreen() {
         <InterviewSaved onSeeNotes={seeNotes} />
       </View>
     ) : null;
+  // While this is on screen, a reply that finishes here is simply read here.
+  useFocusEffect(watch);
 
   // This screen is outside the tabs, so it has no shared bar to follow. The
   // title bar reads the list's own scroll through Ink's state machine, and

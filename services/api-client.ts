@@ -89,6 +89,7 @@ import type {
   TurnMetrics,
   MarketplaceExtension,
   ChatFrame,
+  ActiveRun,
   ChatStreamRequest,
   ChatTurn,
   MatterStatus,
@@ -1088,6 +1089,20 @@ export class PondApiClient {
       { headers: { Accept: 'text/event-stream' }, signal },
     );
     await readSse(res, (event) => deliver(event, onFrame), { idleMs: STREAM_IDLE_MS });
+  }
+
+  /**
+   * The resumable turn the Pond is running, or just ran, for a conversation:
+   * what a phone that lost track of one needs to follow it again. Null when the
+   * Pond holds none for it, which is the ordinary answer.
+   */
+  async activeRun(sessionId: string): Promise<ActiveRun | null> {
+    try {
+      return await this.get<ActiveRun>(`/api/v1/sessions/${encodeURIComponent(sessionId)}/active-run`);
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 404) return null;
+      throw e;
+    }
   }
 
   /**

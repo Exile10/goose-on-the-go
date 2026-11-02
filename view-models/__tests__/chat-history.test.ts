@@ -18,6 +18,7 @@ import {
   isHistoryView,
   isRoutine,
   passesFilter,
+  turnEnded,
   placeOnWall,
   recencyKey,
   relativeWhen,
@@ -451,5 +452,13 @@ describe('toCard', () => {
     const now = at(2026, 9, 24);
     expect(toCard(session(), now, LOCALE, 'Yesterday').updatedAt).toBe(Date.UTC(2026, 8, 22, 9));
     expect(toCard(session({ updated_at: 'soon' }), now, LOCALE, 'Yesterday').updatedAt).toBeNaN();
+  });
+});
+
+describe('turnEnded', () => {
+  it('is true when a conversation stops being answered, and not when one starts', () => {
+    expect(turnEnded(new Set(['a', 'b']), new Set(['b']))).toBe(true);
+    expect(turnEnded(new Set(['a']), new Set(['a', 'b']))).toBe(false);
+    expect(turnEnded(new Set(), new Set())).toBe(false);
   });
 });

@@ -212,12 +212,14 @@ describe('a reply still being written when the screen goes', () => {
     });
   });
 
-  it('is picked up from the last frame seen when the conversation reopens', async () => {
-    const back = deferred<void>();
-    pond.reattachRun.mockImplementationOnce(async (_run, _after, _epoch, onFrame: OnFrame) => {
-      await back.promise;
-      onFrame({ type: 'text', content: 'light is off.', seq: 3 });
-      onFrame({ done: true, session_id: 's2', seq: 4 });
+  it('keeps streaming while the screen is gone, and reopens on the reply so far', async () => {
+    let more!: OnFrame;
+    const end = deferred<void>();
+    pond.streamChat.mockImplementationOnce(async (_body, onFrame: OnFrame) => {
+      more = onFrame;
+      onFrame({ type: 'run_started', run_id: 'r1', session_id: 's2', epoch: 7, seq: 1 });
+      onFrame({ type: 'text', content: 'The porch ', seq: 2 });
+      return end.promise;
     });
     const first = await mount();
     await act(async () => {
@@ -227,26 +229,37 @@ describe('a reply still being written when the screen goes', () => {
     expect(first.vm.data.messages[1]).toMatchObject({ content: 'The porch ', pending: true });
     await first.unmount();
 
-    // Left, not stopped: the Pond keeps running it.
+    // Left, not stopped: the stream is still held, and still writing.
     expect(pond.cancelRun).not.toHaveBeenCalled();
+    await act(async () => more({ type: 'text', content: 'light is ', seq: 3 }));
+    await settle();
 
     const again = await mount();
     await act(async () => again.vm.actions.open('s2'));
-    // What had arrived is there before the stream comes back.
-    expect(again.vm.data.messages.map((m) => m.content)).toEqual(['Is the porch light on?', 'The porch ']);
+    // What arrived while nobody was looking is there at once.
+    expect(again.vm.data.messages.map((m) => m.content)).toEqual(['Is the porch light on?', 'The porch light is ']);
     expect(again.vm.data.streaming).toBe(true);
-    await act(async () => back.resolve());
+    await act(async () => {
+      more({ type: 'text', content: 'off.', seq: 4 });
+      more({ done: true, session_id: 's2', seq: 5 });
+      end.resolve();
+    });
     await settle();
 
-    expect(pond.reattachRun).toHaveBeenCalledWith('r1', 2, 7, expect.any(Function), expect.anything());
     expect(again.vm.data.messages[1]).toMatchObject({ content: 'The porch light is off.', pending: false });
     expect(again.vm.data.streaming).toBe(false);
-    // Picked up, not re-read: the history would not have the reply yet.
+    // Followed throughout: nothing to reattach, and nothing to re-read.
+    expect(pond.reattachRun).not.toHaveBeenCalled();
     expect(pond.listSessionMessages).not.toHaveBeenCalled();
   });
 
   it('is read back from the Pond when the run is no longer in its memory', async () => {
     const { ApiError } = jest.requireActual('@/services/api-client');
+    // The connection goes mid-reply, and by the time it is retried the Pond has restarted.
+    pond.streamChat.mockImplementationOnce(async (_body, onFrame: OnFrame) => {
+      onFrame({ type: 'run_started', run_id: 'r1', session_id: 's2', epoch: 7, seq: 1 });
+      onFrame({ type: 'text', content: 'The porch ', seq: 2 });
+    });
     pond.reattachRun.mockRejectedValueOnce(new ApiError('gone', 410, null, 'gone'));
     pond.listSessionMessages.mockResolvedValue([
       row({ id: 'm1', session_id: 's2', content: 'Is the porch light on?' }),
@@ -259,6 +272,8 @@ describe('a reply still being written when the screen goes', () => {
     });
     await settle();
     await first.unmount();
+    // The first reattach waits 800ms.
+    await act(async () => new Promise((resolve) => setTimeout(resolve, 1000)));
 
     const again = await mount();
     await act(async () => again.vm.actions.open('s2'));
@@ -272,6 +287,14 @@ describe('a reply still being written when the screen goes', () => {
   });
 
   it('stays with its conversation when another is started, rather than being cancelled', async () => {
+    let more!: OnFrame;
+    const end = deferred<void>();
+    pond.streamChat.mockImplementationOnce(async (_body, onFrame: OnFrame) => {
+      more = onFrame;
+      onFrame({ type: 'run_started', run_id: 'r1', session_id: 's2', epoch: 7, seq: 1 });
+      onFrame({ type: 'text', content: 'The porch ', seq: 2 });
+      return end.promise;
+    });
     const screen = await mount();
     await act(async () => {
       void screen.vm.actions.send('Is the porch light on?');
@@ -283,10 +306,44 @@ describe('a reply still being written when the screen goes', () => {
     expect(pond.cancelRun).not.toHaveBeenCalled();
     expect(screen.vm.data.messages).toEqual([]);
     expect(screen.vm.data.sessionId).toBeNull();
+    expect(screen.vm.data.streaming).toBe(false);
 
-    await act(async () => screen.vm.actions.open('s2'));
+    await act(async () => {
+      more({ type: 'text', content: 'light is off.', seq: 3 });
+      more({ done: true, session_id: 's2', seq: 4 });
+      end.resolve();
+    });
     await settle();
+    // The kept thread has the whole reply before the Pond is read again behind it.
+    pond.listSessionMessages.mockReturnValue(new Promise(() => {}));
+    await act(async () => screen.vm.actions.open('s2'));
     expect(screen.vm.data.messages[1]).toMatchObject({ content: 'The porch light is off.', pending: false });
+  });
+
+  it('does not hold up the next conversation behind it', async () => {
+    const end = deferred<void>();
+    pond.streamChat.mockImplementationOnce(async (_body, onFrame: OnFrame) => {
+      onFrame({ type: 'run_started', run_id: 'r1', session_id: 's2', epoch: 7, seq: 1 });
+      return end.promise;
+    });
+    pond.streamChat.mockImplementationOnce(async (_body, onFrame: OnFrame) => {
+      onFrame({ type: 'run_started', run_id: 'r2', session_id: 's3', epoch: 7, seq: 1 });
+      onFrame({ type: 'text', content: 'Yes.', seq: 2 });
+      onFrame({ done: true, session_id: 's3', seq: 3 });
+    });
+    const screen = await mount();
+    await act(async () => {
+      void screen.vm.actions.send('Is the porch light on?');
+    });
+    await settle();
+    await act(async () => screen.vm.actions.newConversation());
+    await act(async () => {
+      void screen.vm.actions.send('Is the door locked?');
+    });
+    await settle();
+    expect(pond.streamChat).toHaveBeenCalledTimes(2);
+    expect(screen.vm.data.messages.map((m) => m.content)).toEqual(['Is the door locked?', 'Yes.']);
+    await act(async () => end.resolve());
   });
 
   it('is still cancelled by stop, which is what stop means', async () => {
@@ -331,15 +388,7 @@ describe('the thread and draft store', () => {
 
   it('is bounded, opened least recently first, and never evicts a thread mid-turn', () => {
     const busy = newThread('busy');
-    busy.turn = {
-      controller: new AbortController(),
-      runId: 'r',
-      seq: 0,
-      epoch: undefined,
-      replyId: 'x',
-      left: false,
-      done: Promise.resolve(),
-    };
+    busy.turn = { key: 'turn-x', replyId: 'x', done: Promise.resolve() };
     keepThread(busy);
     keepThread(newThread('old'));
     for (let i = 0; i < MAX_THREADS; i += 1) keepThread(newThread(`s${i}`));

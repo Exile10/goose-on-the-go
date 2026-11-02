@@ -20,11 +20,13 @@
  * under Today.
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import { useIsFocused } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 
 import { useServer } from '@/providers/server-provider';
 import { api } from '@/services/api-client';
+import { chatRuns } from '@/services/chat-runs';
 import { forgetCards } from '@/services/card-cache';
 import { forgetThreads } from '@/services/chat-threads';
 import { showSnackbar } from '@/services/snackbar';
@@ -75,6 +77,8 @@ export interface HistoryCard {
   weight: CardWeight;
   /** The Pond opened it for itself, for a schedule or a rule. */
   routine: boolean;
+  /** Goose is answering in it now, a turn this phone asked. */
+  answering: boolean;
 }
 
 /**
@@ -368,7 +372,14 @@ export function toCard(
     messageCount: session.message_count ?? 0,
     weight: cardWeight(session),
     routine: isRoutine(session.id),
+    answering: false,
   };
+}
+
+/** Whether a conversation that was being answered no longer is. */
+export function turnEnded(before: ReadonlySet<string>, now: ReadonlySet<string>): boolean {
+  for (const id of before) if (!now.has(id)) return true;
+  return false;
 }
 
 export interface UseChatHistory {
@@ -515,6 +526,17 @@ export function useChatHistory(): UseChatHistory {
     void load();
   }, [hydrated, load]);
 
+  // A finished turn can rename its conversation and gives it a preview, so a
+  // wall on screen reads the list again. One off screen does on its way back.
+  const answering = useSyncExternalStore(chatRuns.subscribe, chatRuns.answering);
+  const focused = useIsFocused();
+  const answeringBefore = useRef(answering);
+  useEffect(() => {
+    const ended = turnEnded(answeringBefore.current, answering);
+    answeringBefore.current = answering;
+    if (ended && focused) void load();
+  }, [answering, focused, load]);
+
   const remove = useCallback(
     async (id: string) => {
       setSessions((all) => all?.filter((s) => s.id !== id) ?? all);
@@ -587,8 +609,11 @@ export function useChatHistory(): UseChatHistory {
   }, [sessions, t, i18n.language]);
 
   const cards = useMemo(
-    () => all.filter((c) => passesFilter(c, filter) && matchesQuery([c.title, c.preview], query)),
-    [all, filter, query],
+    () =>
+      all
+        .filter((c) => passesFilter(c, filter) && matchesQuery([c.title, c.preview], query))
+        .map((c) => (answering.has(c.id) ? { ...c, answering: true } : c)),
+    [all, filter, query, answering],
   );
 
   const sections = useMemo(

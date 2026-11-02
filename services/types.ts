@@ -262,6 +262,22 @@ export interface ChatFrame {
   seq?: number;
 }
 
+/**
+ * `GET /api/v1/sessions/{id}/active-run`: the conversation's latest resumable
+ * turn, while the Pond still holds it (running, or finished in the last two
+ * minutes). `epoch` names the Pond process, so a reattach can tell a restart
+ * from an aged-out run.
+ */
+export interface ActiveRun {
+  run_id: string;
+  session_id: string;
+  state: 'running' | 'finished' | 'failed' | 'cancelled';
+  started_at: string;
+  first_seq: number;
+  last_seq: number;
+  epoch: string;
+}
+
 /** `GET /api/v1/suggestions`: at most four, the Pond's own composed ones first. */
 export interface Suggestion {
   id: string;

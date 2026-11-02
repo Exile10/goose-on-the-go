@@ -3,21 +3,18 @@
  *
  * The conversation screen is pushed over the wall and popped off it again, so
  * every visit used to start from nothing: the thread was read back from the
- * Pond and the screen was empty until it landed, the composer's draft was
- * gone, and a reply still being written was given up on the way out and did
- * not come back until the conversation had been left and reopened once more.
+ * Pond and the screen was empty until it landed, and the composer's draft was
+ * gone.
  *
  * So each conversation's thread lives here rather than in the screen, and the
  * screen shows whichever one it has open:
  *
  * - **Its messages**, shown the moment a conversation reopens while the Pond is
  *   asked again behind them.
- * - **The turn in flight**, if any. A turn keeps writing into its own thread
- *   whoever is looking at it, so a reply that carries on in the background is
- *   still on screen when its conversation comes back into view.
- * - **Where a turn was left**, when its stream was given up — leaving the
- *   screen, or starting a new conversation. The Pond kept running it; this is
- *   the run and the last frame seen, so reopening picks it back up from there.
+ * - **The turn in flight**, if any. Its stream is held in `chat-runs.ts`, and
+ *   it keeps writing into its own thread whoever is looking at it, so a reply
+ *   that carries on in the background is still on screen, as far as it has
+ *   got, when its conversation comes back into view.
  *
  * Drafts are kept beside the threads, by conversation, with one slot for a
  * conversation not yet started (`NEW_DRAFT`).
@@ -29,31 +26,19 @@
 
 import type { Message } from '@/models/chat';
 
+import { chatRuns } from './chat-runs';
+
 /** Threads kept. Past this, the ones opened least recently go first. */
 export const MAX_THREADS = 20;
 
 /** The draft slot for a conversation that has no id yet. */
 export const NEW_DRAFT = '';
 
-/** Where a turn whose stream was given up had got to: enough to reattach. */
-export interface LeftRun {
-  runId: string;
-  /** The last frame seen; reattaching asks for what came after it. */
-  seq: number;
-  epoch: number | string | undefined;
-  /** The reply on screen that the rest of the turn belongs to. */
-  replyId: string;
-}
-
 /** A turn streaming into this thread now. */
-export interface LiveTurn {
-  controller: AbortController;
-  runId: string | null;
-  seq: number;
-  epoch: number | string | undefined;
+export interface ThreadTurn {
+  /** The turn in `chat-runs.ts`, or a mock one that only this thread knows. */
+  key: string;
   replyId: string;
-  /** The stream was given up on purpose, to be picked up again later: not stopped, not failed. */
-  left: boolean;
   /** Settles when the turn has finished with this thread, however it ended. */
   done: Promise<void>;
 }
@@ -64,8 +49,7 @@ export interface Thread {
   messages: Message[];
   /** The Pond's title, or the one the linking screen passed. */
   title: string | null;
-  turn: LiveTurn | null;
-  left: LeftRun | null;
+  turn: ThreadTurn | null;
   /** What Goose says it is doing right now, while a turn runs. */
   status: string | null;
   /** Counts turns started, so a read of history that a turn overtook can tell. */
@@ -82,7 +66,7 @@ const listeners = new Map<Thread, Set<Listener>>();
 
 /** A thread for a conversation not yet saved, or not yet read. */
 export function newThread(session: string | null = null, title: string | null = null): Thread {
-  return { session, messages: [], title, turn: null, left: null, status: null, turns: 0, version: 0 };
+  return { session, messages: [], title, turn: null, status: null, turns: 0, version: 0 };
 }
 
 /** The thread kept for a conversation, marked as just opened. */
@@ -157,7 +141,7 @@ export function forgetThreads(sessions: string[]): void {
 
 /** Signing out: everything here is the household's. */
 export function forgetAllThreads(): void {
-  for (const thread of threads.values()) thread.turn?.controller.abort();
+  chatRuns.dropAll();
   threads.clear();
   drafts.clear();
 }

@@ -128,12 +128,14 @@ export async function registerPushToken(): Promise<string | null> {
   if (!platform) return null;
   const Notifications = notifications;
   if (!Notifications) return null; // Expo Go: see notifications-module.ts
-  if (!Device.isDevice) {
-    console.log('[push] simulator/emulator has no push token; skipping');
-    return null;
-  }
+  // Asked before the device check: the shade needs it for the phone's own notices too, which a
+  // simulator shows without ever having a push token.
   if (!(await ensurePermission(Notifications))) {
     console.log('[push] notification permission not granted; skipping');
+    return null;
+  }
+  if (!Device.isDevice) {
+    console.log('[push] simulator/emulator has no push token; skipping');
     return null;
   }
 

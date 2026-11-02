@@ -92,9 +92,10 @@ export function rideOfferFromData(data: unknown): RideOffer | null {
  * `Notification.data` as `{ open: "schedule", schedule_id, run_id }`, or as
  * `{ open: "devices" }`, `"chat"`, `"models"`, `"extensions"` or
  * `"remote_access"` (the Pond's `OpenScreen` in pond-core's
- * `mcp/ports/notification.rs`).
+ * `mcp/ports/notification.rs`). The phone's own notice that a reply finished
+ * names `{ open: "conversation", session_id }`.
  *
- * Only these six screens are accepted, and only ids of the shape the Pond
+ * Only these seven screens are accepted, and only ids of the shape the Pond
  * mints, so a notification can open one of them and nothing else. An older Pond
  * sends no `open`, and the tap opens the app where it was, as before; a value
  * this app does not know does the same.
@@ -105,7 +106,8 @@ export type OpenRoute =
   | { open: 'chat' }
   | { open: 'models' }
   | { open: 'extensions' }
-  | { open: 'remote_access' };
+  | { open: 'remote_access' }
+  | { open: 'conversation'; sessionId: string };
 
 /** A Pond id: a UUID, optionally prefixed (`timer-...`). Nothing that could be a path. */
 const POND_ID = /^[A-Za-z0-9_-]{1,128}$/;
@@ -140,6 +142,11 @@ export function openRouteFromData(data: unknown): OpenRoute | null {
       return { open: 'extensions' };
     case 'remote_access':
       return { open: 'remote_access' };
+    case 'conversation': {
+      // Without a conversation it can open, the wall is still where it was about.
+      const sessionId = pondId(data.session_id);
+      return sessionId ? { open: 'conversation', sessionId } : { open: 'chat' };
+    }
     default:
       return null;
   }
@@ -153,7 +160,8 @@ type ScreenHref =
   | '/(tabs)/chat'
   | '/(stack)/models'
   | '/(stack)/extensions'
-  | '/(stack)/remote-access';
+  | '/(stack)/remote-access'
+  | { pathname: '/conversation'; params: { session: string } };
 
 /**
  * The expo-router location a route opens. A schedule notification names the
@@ -177,5 +185,7 @@ export function screenPath(route: OpenRoute): ScreenHref {
       return '/(stack)/extensions';
     case 'remote_access':
       return '/(stack)/remote-access';
+    case 'conversation':
+      return { pathname: '/conversation', params: { session: route.sessionId } };
   }
 }

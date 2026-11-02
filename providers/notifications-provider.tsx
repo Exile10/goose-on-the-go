@@ -15,7 +15,9 @@
  *
  * Arrivals are presented in the phone's own notification shade
  * (`services/local-notifications.ts`) rather than as an in-app banner, so a
- * notice outlives the screen the user happened to be on.
+ * notice outlives the screen the user happened to be on. So is the phone's own
+ * notice that a reply finished while nobody was reading it
+ * (`services/reply-notices.ts`), which the Pond does not send.
  *
  * Exposes the received list (newest first, capped), an unread count, and
  * `markAllRead()` for the notifications UI.
@@ -46,10 +48,12 @@ import {
   stayConnectedEnabled,
   stopPresenceService,
 } from '@/services/background-connection';
+import { chatRuns } from '@/services/chat-runs';
 import { getInstallId } from '@/services/install-id';
 import { drainPending, onDelivered } from '@/services/notification-delivery';
 import type { ServerNotification } from '@/services/notification-stream';
 import { registerPushToken, watchPushTokenRotation } from '@/services/push-token';
+import { announceTurn } from '@/services/reply-notices';
 import { configureLocalNotifications, watchLinkTaps } from '@/services/local-notifications';
 import { useServer } from '@/providers/server-provider';
 
@@ -190,6 +194,9 @@ export function NotificationsProvider({ children }: PropsWithChildren) {
 
   // Taps work whether or not a Pond is reachable: a link goes to Uber or a maps app, a screen opens here.
   useEffect(() => watchLinkTaps(), []);
+
+  // The Pond says nothing when a turn ends, so the phone says it, to whoever was not reading.
+  useEffect(() => chatRuns.onAnnounce((notice) => void announceTurn(notice)), []);
 
   const markAllRead = useCallback(() => setUnreadCount(0), []);
 
