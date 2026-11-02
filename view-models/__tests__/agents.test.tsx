@@ -272,7 +272,7 @@ it('runs against the in-memory Pond on mock, sending nothing to the real one', a
   server.real = false;
   const m = await mount();
   expect(m.vm.data.agents.length).toBeGreaterThan(0);
-  expect(m.vm.data.builtIn.length).toBe(4);
+  expect(m.vm.data.builtIn.length).toBe(5);
   expect(pond.listRecipes).not.toHaveBeenCalled();
   expect(pond.agentPrefills).not.toHaveBeenCalled();
   await m.unmount();

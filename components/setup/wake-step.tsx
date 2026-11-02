@@ -4,12 +4,14 @@
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { InkButton, InkCard, InkFormField, InkInput, InkMeter, InkNotice, InkRadioGroup, InkSpinner, InkText, InkTitle } from '@jarida/ink/native';
+import { InkButton, InkCard, InkFormField, InkInput, InkMeter, InkNotice, InkRadioGroup, InkSpinner, InkText, InkTitle, useInkTheme } from '@jarida/ink/native';
 
+import { GIcon } from '@/components/ui/g-icon';
 import { Spacing } from '@/constants/spacing';
 import { WAKE_PRESETS, shortPhraseSuggestion, wakePhrase, wakePhraseProblem, type SetupDraft, type WakePreset } from '@/models/owner-setup';
+import { detectorWords } from '@/models/voice-room';
 import type { TranslationKey } from '@/services/i18n';
-import { useWakeCalibration } from '@/view-models/use-wake-calibration';
+import { useWakeCalibration, type CalibrationResult } from '@/view-models/use-wake-calibration';
 
 function presetKeys(preset: WakePreset): { label: TranslationKey; body: TranslationKey } {
   switch (preset) {
@@ -33,6 +35,29 @@ function problemKey(problem: NonNullable<ReturnType<typeof wakePhraseProblem>>):
     case 'tooShort':
       return 'setup.wake.problem.tooShort';
   }
+}
+
+/** A take's line: whether the Pond's own detector heard it where it runs one, else whether Whisper found the phrase. */
+function TakeResult({ result, step }: { result: CalibrationResult; step: number }) {
+  const { t } = useTranslation();
+  const theme = useInkTheme();
+  const heard = result.detector ?? result.phrase;
+  const verdict =
+    result.detector === null
+      ? t(result.phrase ? 'setup.wake.calibrate.result.phraseHeard' : 'setup.wake.calibrate.result.phraseMissed')
+      : t(result.detector ? 'setup.wake.calibrate.result.detectorHeard' : 'setup.wake.calibrate.result.detectorMissed');
+  return (
+    <View style={styles.result} accessible accessibilityLabel={`${t('setup.wake.calibrate.take', { step, count: step })}. ${verdict}`}>
+      {/* The glyph's shape carries it, not a colour: a check heard, a cross missed. */}
+      <GIcon name={heard ? 'check' : 'x'} size={16} color={theme.color.textSecondary} />
+      <View style={styles.resultText}>
+        <InkText size="sm">{`“${result.prompt}”`}</InkText>
+        <InkText size="sm" tone="secondary">
+          {verdict}
+        </InkText>
+      </View>
+    </View>
+  );
 }
 
 function Calibration({ phrase }: { phrase: string }) {
@@ -61,10 +86,32 @@ function Calibration({ phrase }: { phrase: string }) {
           )}
         </View>
       ) : null}
+      {cal.results.length > 0 ? (
+        <View style={styles.results}>
+          {cal.results.map((result, i) => (
+            <TakeResult key={`${i}-${result.prompt}`} result={result} step={i + 1} />
+          ))}
+        </View>
+      ) : null}
       {cal.state === 'done' ? (
         <InkNotice tone="success">
           {cal.heard.length > 1 ? t('setup.wake.calibrate.done', { count: cal.heard.length }) : t('setup.wake.calibrate.doneOne')}
         </InkNotice>
+      ) : null}
+      {cal.detector && cal.state === 'done' ? (
+        <View style={styles.detector} accessibilityLiveRegion="polite">
+          <InkText weight="semibold">
+            {t('setup.wake.calibrate.detectorChosen', { detector: detectorWords(cal.detector.kind) })}
+          </InkText>
+          <InkText size="sm" tone="secondary">
+            {t('setup.wake.calibrate.detectorScore', { heard: cal.detector.heard, of: cal.detector.of })}
+          </InkText>
+          {cal.detector.reason ? (
+            <InkText size="sm" tone="secondary">
+              {cal.detector.reason}
+            </InkText>
+          ) : null}
+        </View>
       ) : null}
       {cal.error ? <InkNotice tone="warning">{cal.error}</InkNotice> : null}
       <View style={styles.calActions}>
@@ -90,7 +137,7 @@ export function WakeStep({ draft, patch }: { draft: WakeChoice; patch: (change: 
   const typed = draft.wakeWordCustom.trim();
   const problem = custom && typed ? wakePhraseProblem(typed) : null;
   const suggestion = custom && typed ? shortPhraseSuggestion(typed) : null;
-  const preset = (WAKE_PRESETS as readonly string[]).includes(draft.wakeWord) ? (draft.wakeWord as WakePreset) : 'goose';
+  const preset = (WAKE_PRESETS as readonly string[]).includes(draft.wakeWord) ? (draft.wakeWord as WakePreset) : WAKE_PRESETS[0];
   const phrase = problem ? '' : wakePhrase(draft);
 
   return (
@@ -136,4 +183,8 @@ const styles = StyleSheet.create({
   card: { gap: Spacing.md },
   take: { gap: Spacing.sm },
   calActions: { flexDirection: 'row', justifyContent: 'flex-start' },
+  results: { gap: Spacing.sm },
+  result: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.sm },
+  resultText: { flex: 1, gap: 2 },
+  detector: { gap: Spacing.xs },
 });

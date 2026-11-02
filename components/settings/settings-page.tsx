@@ -55,6 +55,7 @@ import { SettingsScroll } from './settings-scroll';
 import { VisionStatusCard, visionEventTypeRows } from './vision-rows';
 import { DebugScreenGroup } from './debug-row';
 import { VoicePicker } from './voice-picker';
+import { RoomInterruptRow, RoomVoiceRows } from './room-voice-rows';
 
 /** Footers that already say a change waits for a restart, so their rows need not say it again. */
 const RESTART_FOOTERS = new Set<TranslationKey>([
@@ -201,6 +202,10 @@ function specialRows(id: SpecialId, ctx: Context): ReactElement[] {
       return [<VoicePicker key={id} vm={ctx.vm} />];
     case 'wakeWordReset':
       return [<WakeWordResetRow key={id} {...props} />];
+    case 'roomVoice':
+      return [<RoomVoiceRows key={id} {...props} />];
+    case 'roomInterrupts':
+      return [<RoomInterruptRow key={id} {...props} />];
     case 'timezone':
       return [<TimezoneRow key={id} {...props} />];
     case 'location':

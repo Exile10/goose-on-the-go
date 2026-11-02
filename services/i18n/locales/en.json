@@ -242,7 +242,6 @@
       "listening": "Listening",
       "hearing": "Go on",
       "thinking": "Thinking",
-      "speaking": "Speaking",
       "tapToTalk": "Start talking",
       "tapToStop": "Stop listening",
       "tapToSend": "Finish and send",
@@ -250,7 +249,8 @@
       "tapToInterrupt": "Interrupt Goose",
       "speakerOn": "Replies are spoken. Mute them",
       "speakerOff": "Replies are muted. Speak them",
-      "keyboard": "Type instead"
+      "keyboard": "Type instead",
+      "speakingAgent": "The Voice agent is answering"
     },
     "tools": {
       "toolGroup": "Tools ready",
@@ -629,7 +629,6 @@
       "soundQuality": "Sound quality",
       "wakeWord": "Wake word",
       "whileItAnswers": "While it answers",
-      "hearingItsName": "Hearing its name",
       "transcription": "Turning speech into text",
       "beforeAnswering": "Before answering",
       "howLong": "How long it may think",
@@ -666,7 +665,9 @@
       "engine": "Engine",
       "costComparison": "Cost comparison",
       "watchesFor": "What your Pond watches for",
-      "faces": "Faces"
+      "faces": "Faces",
+      "inTheRoom": "In this room",
+      "whisperDetector": "Whisper detector"
     },
     "footer": {
       "standingInstructions": "Added to everything Goose already knows, in every conversation.",
@@ -688,7 +689,9 @@
       "cost": "What a cloud service would charge, so your Pond can show what it saved you.",
       "watchesFor": "Your Pond records only the kinds you leave on. The pause and how sure it must be apply to all of them.",
       "faces": "Face data stays on your Pond. It is never sent to the cloud.",
-      "stayConnected": "Keeps a connection to your Pond open after you leave the app, so notices arrive straight away. Android shows an ongoing notification while it is on, and it uses some battery. With it off, your Pond still wakes the phone with a push, which can arrive later when the phone is idle."
+      "stayConnected": "Keeps a connection to your Pond open after you leave the app, so notices arrive straight away. Android shows an ongoing notification while it is on, and it uses some battery. With it off, your Pond still wakes the phone with a push, which can arrive later when the phone is idle.",
+      "voiceAgent": "Everything said out loud, at your Pond or on this phone, is answered by the Voice agent.",
+      "whisperDetector": "These tune Whisper listening for the wake phrase. The “hey goose” detector doesn’t use them. They take effect the next time your Pond starts listening."
     },
     "link": {
       "whatItRemembers": "What Goose remembers",
@@ -1619,7 +1622,9 @@
     "pondTasks": "Tasks and reports",
     "pondHealth": "Health",
     "pondPower": "Power",
-    "settingsPhoneNotifications": "Notifications"
+    "settingsPhoneNotifications": "Notifications",
+    "voiceAgent": "Voice agent",
+    "voiceMatch": "Voice Match"
   },
   "nav": {
     "goose": "Goose",
@@ -2193,7 +2198,8 @@
       "webSearch": "Web search",
       "settings": "Settings",
       "agents": "Agents",
-      "pond": "My Pond"
+      "pond": "My Pond",
+      "voice": "Voice: the room, the Voice agent and Voice Match"
     },
     "devOnly": "This screen is dev-only. It is not linked from the You tab in production builds."
   },
@@ -2900,7 +2906,7 @@
         "goose": "“Goose”",
         "gooseBody": "Short and memorable.",
         "heyGoose": "“Hey Goose”",
-        "heyGooseBody": "Natural call and response.",
+        "heyGooseBody": "Recommended. Your Pond can listen for it with a detector of its own.",
         "okComputer": "“OK Computer”",
         "okComputerBody": "Classic command style.",
         "custom": "Your own phrase",
@@ -2930,7 +2936,15 @@
         "doneOne": "Done. Your Pond now knows how you say it.",
         "nothingHeard": "Your Pond didn't hear that. Say the sentence again, a little closer to the phone.",
         "failed": "Your Pond couldn't check that sentence. Try again.",
-        "noTranscriber": "Your Pond can't listen to recordings yet: its speech-to-text isn't running. Skip this for now."
+        "noTranscriber": "Your Pond can't listen to recordings yet: its speech-to-text isn't running. Skip this for now.",
+        "result": {
+          "phraseHeard": "Your Pond heard the phrase.",
+          "phraseMissed": "Your Pond didn’t hear the phrase.",
+          "detectorHeard": "The “hey goose” detector heard it.",
+          "detectorMissed": "The “hey goose” detector missed it."
+        },
+        "detectorChosen": "Your Pond listens with: {{detector}}",
+        "detectorScore": "The “hey goose” detector heard {{heard}} of {{of}} sentences."
       },
       "save": "Save wake word",
       "saved": "Saved. Goose now answers to “{{phrase}}”.",
@@ -3331,8 +3345,8 @@
       "row": "Forget this face",
       "nothing": "Nothing to forget yet",
       "title": "Forget {{name}}'s face?",
-      "body_one": "Your Pond deletes the {{count}} sample it holds, so it will not recognise {{name}} until you teach it again. Their profile and memories stay.",
-      "body_other": "Your Pond deletes the {{count}} samples it holds, so it will not recognise {{name}} until you teach it again. Their profile and memories stay.",
+      "body_one": "Your Pond deletes the {{count}} sample it holds, so it will not recognise {{name}} until you teach it again. If Voice Match knows {{name}}'s voice, that goes too. Their profile and memories stay.",
+      "body_other": "Your Pond deletes the {{count}} samples it holds, so it will not recognise {{name}} until you teach it again. If Voice Match knows {{name}}'s voice, that goes too. Their profile and memories stay.",
       "confirm": "Forget face",
       "done": "{{name}}'s face is forgotten.",
       "failed": "Your Pond could not forget that face. Try again."
@@ -3541,7 +3555,8 @@
       "worker": "Forager Gosling",
       "verifier": "Sentinel Goose",
       "assistant": "Assistant",
-      "composer": "Nestmaker Goose"
+      "composer": "Nestmaker Goose",
+      "voice": "Voice"
     },
     "suggested": {
       "title": "Suggested for this Pond",
@@ -4063,5 +4078,196 @@
     "failedTitle": "This did not load",
     "failedBody": "Your Pond had trouble answering.",
     "pullHint": "Pull down to try again"
+  },
+  "voiceRoom": {
+    "title": "In this room",
+    "live": "Live",
+    "notLive": "Checked every 15 seconds",
+    "state": {
+      "off": "Not listening in this room.",
+      "starting": "Getting ready to listen.",
+      "wait": "Waiting for the wake phrase.",
+      "listen": "Listening to someone.",
+      "thinking": "Working out an answer.",
+      "speak": "Answering out loud."
+    },
+    "unavailable": {
+      "noMicSpeaker": "Your Pond hasn’t found a microphone and a speaker it can use together. Plug them in and it checks again the next time it starts.",
+      "runningElsewhere": "Voice is running in another app on your Pond, which has the microphone. Close voice there and the room takes it back.",
+      "modelsMissing": "Your Pond needs its speech models before it can listen. Get them from Models.",
+      "unknown": "Your Pond can’t listen in this room right now."
+    },
+    "detector": {
+      "heyGoose": "The “hey goose” detector",
+      "whisper": "Whisper"
+    },
+    "defaultPhrase": "hey goose",
+    "interrupts": {
+      "enrolledOrWake": "Say “{{phrase}}”, or just talk over it if Voice Match knows your voice, and Goose stops to listen.",
+      "wakeOnly": "Say “{{phrase}}” and Goose stops to listen. Once someone is set up in Voice Match, talking over it works too."
+    },
+    "interrupted": {
+      "voice": "Stopped: someone it knows talked over it.",
+      "wakeWord": "Stopped: someone said the wake phrase.",
+      "button": "Stopped from a phone."
+    },
+    "someone": "someone it doesn’t know by voice",
+    "wokeBy": "Woken by {{name}}.",
+    "heard": "Heard: “{{text}}”",
+    "turnError": "That answer ran into a problem. Goose is listening again.",
+    "lastHeard": "Last heard: {{name}}, {{when}}.",
+    "lastHeardNobody": "No one it knows by voice has been heard yet.",
+    "interrupt": "Stop talking",
+    "open": "Open the Voice agent",
+    "homeOff": "Goose isn’t listening in this room. Switch it on from the Voice agent.",
+    "missing": "Your Pond doesn’t listen in the room yet. Update it to use room voice.",
+    "reading": "Asking your Pond.",
+    "loadFailed": "Couldn’t read whether your Pond is listening in this room.",
+    "switchFailed": "Your Pond didn’t switch room voice. Try again.",
+    "interruptFailed": "Your Pond didn’t stop. Try again.",
+    "whisperNote": "Whisper listens for “{{phrase}}”, so the Whisper detector settings apply."
+  },
+  "voiceAgent": {
+    "intro": "Goose answers everything said out loud through this agent: at your Pond, and on this phone.",
+    "loading": "Reading the Voice agent",
+    "missing": "Your Pond doesn’t have a Voice agent yet. Update it to change how Goose answers out loud.",
+    "saved": "Saved. Spoken answers follow it from the next one.",
+    "resetDone": "Back to the Voice agent your Pond shipped with.",
+    "revert": "Undo changes",
+    "error": {
+      "guest": "Only a household member can change the Voice agent. This phone is paired as a guest.",
+      "saveFailed": "Your Pond didn’t save the Voice agent. Try again.",
+      "loadFailed": "Couldn’t read the Voice agent."
+    },
+    "speaks": {
+      "title": "How it speaks",
+      "footer": "Spoken answers are short and plain. Goose follows these words, and the examples below show it the length and tone you want.",
+      "edited": "Changed by your household",
+      "editedBadge": "Edited",
+      "instructions": "Instructions",
+      "instructionsHint": "How Goose talks when it answers out loud."
+    },
+    "examples": {
+      "title": "Examples",
+      "footer": "Something someone might ask, and the answer as you’d want it said.",
+      "none": "No examples. Add one to show the length you want.",
+      "asked": "Question {{number}}",
+      "askedPlaceholder": "What’s the weather like?",
+      "answer": "Answer {{number}}",
+      "answerPlaceholder": "Sunny and warm, about twenty-six degrees.",
+      "remove": "Remove example {{number}}",
+      "add": "Add an example"
+    },
+    "uses": {
+      "title": "What it can use",
+      "footer": "A group switched off stays out of spoken answers. Groups can be taken away here, never added.",
+      "none": "This agent uses no tools.",
+      "maxTurns": "Steps per answer",
+      "maxTurnsHint": "How many tool calls a spoken answer may make before it replies."
+    },
+    "reset": {
+      "title": "Go back to the shipped Voice agent?",
+      "body": "Your instructions, examples and tool choices are replaced by the ones your Pond shipped with.",
+      "confirm": "Go back",
+      "keep": "Keep mine",
+      "footer": "Your household has changed this agent.",
+      "row": "Go back to the shipped agent",
+      "resetting": "Going back"
+    },
+    "sounds": {
+      "title": "How it sounds",
+      "body": "The voice, its pace and how clear it is."
+    },
+    "hears": {
+      "title": "How it hears",
+      "phrase": "Wake phrase",
+      "detector": "Detector",
+      "room": "Listen in this room",
+      "roomHint": "Your Pond listens for the wake phrase through its own microphone and answers through its speaker.",
+      "interrupts": "Stopping it mid-answer"
+    },
+    "knows": {
+      "title": "Who it knows",
+      "footer": "A voice it knows gets that person’s own context. A voice never approves anything.",
+      "count": "{{known}} of {{people}}"
+    },
+    "prefill": {
+      "footer": "Spoken answers start from this copy, so they begin sooner.",
+      "rebuildAsked": "Your Pond builds the Voice agent’s copy again at its next quiet moment."
+    }
+  },
+  "voiceMatch": {
+    "intro": "Your Pond can tell the people in your home apart by voice, and answer each of them with their own context.",
+    "neverApproves": "A voice never approves anything. Drafts, suggestions and rides still need a paired phone, a sign-in or a face.",
+    "privacy": "Recordings go to your Pond, which keeps how a voice sounds and deletes the recording.",
+    "loading": "Reading who your Pond knows by voice",
+    "loadFailed": "Couldn’t read Voice Match.",
+    "missingTitle": "Voice Match isn’t on this Pond yet",
+    "missingBody": "Update your Pond to teach it your household’s voices.",
+    "emptyTitle": "No one to teach yet",
+    "emptyBody": "Add the people in your home, then teach your Pond each voice.",
+    "people": "People",
+    "model": {
+      "title": "Speaker model",
+      "downloading": "Downloading the speaker model",
+      "failed": "The speaker model didn’t download",
+      "missing": "The speaker model isn’t on your Pond",
+      "body": "Your Pond needs it to learn voices. It downloads once.",
+      "failedBody": "Check that your Pond is online, then try again.",
+      "retry": "Download the speaker model",
+      "retryFailed": "Your Pond didn’t start the download. Try again."
+    },
+    "member": {
+      "known": "Known by voice",
+      "partWay": "{{takes}} of {{needed}} sentences read",
+      "notKnown": "Not known by voice",
+      "takes": "{{takes}}/{{needed}}"
+    },
+    "sentences": {
+      "one": "The kettle is on, and the bread is almost ready.",
+      "two": "We walked to the market before the rain started.",
+      "three": "Please remind me to call my sister this evening.",
+      "four": "The children are reading quietly in the next room.",
+      "five": "Turn the lights down a little when the film begins."
+    },
+    "record": {
+      "body": "{{name}} reads {{needed}} short sentences to this phone, in an ordinary voice, somewhere quiet.",
+      "progress": "{{takes}} of {{needed}} sentences recorded.",
+      "take": "Sentence {{step}} of {{count}}",
+      "read": "Read this aloud",
+      "sending": "Your Pond is learning this one",
+      "done": "Done. Your Pond knows {{name}}’s voice.",
+      "waitForModel": "Recording starts once the speaker model is on your Pond.",
+      "start": "Start recording",
+      "resume": "Carry on",
+      "again": "Record again"
+    },
+    "again": {
+      "title": "Record {{name}}’s voice again?",
+      "body": "Your Pond forgets the sentences it has for {{name}} and learns from five new ones.",
+      "confirm": "Record again"
+    },
+    "forget": {
+      "title": "Forget {{name}}’s voice?",
+      "body": "Your Pond stops knowing {{name}} by voice. Their face, profile and memories stay.",
+      "confirm": "Forget voice",
+      "keep": "Keep it",
+      "row": "Forget this voice",
+      "nothing": "Your Pond doesn’t know this voice yet.",
+      "done": "Your Pond no longer knows {{name}} by voice.",
+      "failed": "Your Pond didn’t forget the voice. Try again."
+    },
+    "consistency": {
+      "steady": "The sentences sound alike, so your Pond should know this voice well.",
+      "fair": "The sentences sound fairly alike. Recording again somewhere quieter may help.",
+      "uneven": "The sentences sound quite different from each other. Record them again somewhere quiet."
+    },
+    "error": {
+      "noSpeech": "Your Pond didn’t hear speech in that. Read the sentence again, a little closer to the phone.",
+      "modelNotReady": "The speaker model is still on its way to your Pond. Try again once it’s ready.",
+      "unknownPerson": "Your Pond doesn’t have this person any more. Pull down to refresh.",
+      "notAllowed": "Only a household member can teach your Pond a voice.",
+      "failed": "Your Pond couldn’t learn from that sentence. Try again."
+    }
   }
 }

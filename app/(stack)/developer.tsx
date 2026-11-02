@@ -36,6 +36,7 @@ const SCREEN_LABELS: Record<MigrationScreen, TranslationKey> = {
   settings: 'dev.screens.settings',
   agents: 'dev.screens.agents',
   pond: 'dev.screens.pond',
+  voice: 'dev.screens.voice',
 };
 
 export default function DeveloperScreen() {

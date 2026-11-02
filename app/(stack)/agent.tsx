@@ -2,15 +2,15 @@
 // kept as they are; the dashboard changes those.
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { StyleSheet, Text, TextInput, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { Stack, useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { InkButton, InkSpinner, InkText, inkText, useInkTheme } from '@jarida/ink/native';
 
+import { FieldRow } from '@/components/settings/field-row';
 import { radioRows, SwitchRow } from '@/components/settings/setting-controls';
 import { SettingsGroup, SettingsMessage, SettingsRow } from '@/components/settings/settings-list';
 import { SettingsNotice, SettingsScroll } from '@/components/settings/settings-scroll';
-import { useSettingsColors, useSettingsStyles, type SettingsColors, type SettingsMetrics, type SettingsType } from '@/components/settings/settings-theme';
 import type { IconName } from '@/constants/icons';
 import { Spacing } from '@/constants/spacing';
 import { AGENT_TOOL_GROUPS, canRebuild, DEFAULT_ACTIVATIONS, DEFAULT_RETENTION_DAYS, startsByItself, type Activation } from '@/models/agents';
@@ -27,52 +27,6 @@ const ACTIVATION_ICON: Record<Activation['kind'], IconName> = {
   agent: 'link',
   other: 'info',
 };
-
-/** A field typed on every keystroke, unlike `TextRow`, which saves when typing ends. */
-function FieldRow({
-  label,
-  description,
-  error,
-  value,
-  onChange,
-  placeholder,
-  multiline,
-  numeric,
-  plain,
-  disabled,
-}: {
-  label: string;
-  description?: string | null;
-  error?: string | null;
-  value: string;
-  onChange: (text: string) => void;
-  placeholder?: string;
-  multiline?: boolean;
-  numeric?: boolean;
-  /** A name, not words: no capitals, no corrections. */
-  plain?: boolean;
-  disabled?: boolean;
-}) {
-  const styles = useSettingsStyles(makeStyles);
-  const colors = useSettingsColors();
-  return (
-    <SettingsRow label={label} description={description} error={error}>
-      <TextInput
-        value={value}
-        onChangeText={onChange}
-        placeholder={placeholder}
-        placeholderTextColor={colors.textTertiary}
-        multiline={multiline}
-        editable={!disabled}
-        keyboardType={numeric ? 'number-pad' : 'default'}
-        autoCapitalize={plain ? 'none' : 'sentences'}
-        autoCorrect={!plain}
-        accessibilityLabel={label}
-        style={[multiline ? styles.area : styles.input, error ? { borderColor: colors.danger } : null]}
-      />
-    </SettingsRow>
-  );
-}
 
 export default function AgentScreen() {
   const { t } = useTranslation();
@@ -353,32 +307,6 @@ export default function AgentScreen() {
     </SettingsScroll>
   );
 }
-
-const makeStyles = (c: SettingsColors, type: SettingsType, m: SettingsMetrics) => ({
-  input: {
-    ...type.body,
-    marginTop: Spacing.sm,
-    borderRadius: m.radius.md,
-    borderWidth: m.hairline,
-    borderColor: c.edge,
-    backgroundColor: c.group,
-    paddingHorizontal: m.gap,
-    paddingVertical: Spacing.sm,
-    minHeight: 44,
-  },
-  area: {
-    ...type.body,
-    marginTop: Spacing.sm,
-    minHeight: 160,
-    textAlignVertical: 'top' as const,
-    borderRadius: m.radius.md,
-    borderWidth: m.hairline,
-    borderColor: c.edge,
-    backgroundColor: c.group,
-    paddingHorizontal: m.gap,
-    paddingVertical: Spacing.sm,
-  },
-});
 
 const styles = StyleSheet.create({
   centre: { alignItems: 'center', gap: Spacing.md },

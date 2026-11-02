@@ -104,12 +104,15 @@ function BuiltInRow({
   rebuilding,
   busy,
   onRebuild,
+  onOpen,
 }: {
   prefill: AgentPrefill;
   retentionDays: number;
   rebuilding: boolean;
   busy: boolean;
   onRebuild: () => void;
+  /** Only the Voice agent has a page of its own; the long-task helpers are not edited from here. */
+  onOpen?: () => void;
 }) {
   const { t } = useTranslation();
   const colors = useSettingsColors();
@@ -120,8 +123,11 @@ function BuiltInRow({
       // Only where the status alone does not say what happens next.
       description={prefill.status === 'idle' || prefill.status === 'failed' ? prefillDetail(prefill.status, retentionDays) : null}
       value={rebuilding ? t('agents.prefill.rebuilding') : prefillLabel(prefill.status)}
+      accessory={onOpen ? 'next' : 'none'}
+      onPress={onOpen}
+      // A row that opens a page is one control: its Rebuild is on that page, not a button inside this one.
       trailing={
-        canRebuild(prefill) ? (
+        !onOpen && canRebuild(prefill) ? (
           <Pressable
             onPress={onRebuild}
             disabled={busy}
@@ -266,6 +272,14 @@ export default function AgentsScreen() {
                       rebuilding={rebuilding === p.agent}
                       busy={busy}
                       onRebuild={() => void rebuild(p.agent)}
+                      onOpen={
+                        p.agent === 'voice'
+                          ? () => {
+                              void selectionTick();
+                              router.push('/(stack)/voice-agent');
+                            }
+                          : undefined
+                      }
                     />
                   ))}
                 </SettingsGroup>

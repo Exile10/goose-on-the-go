@@ -274,7 +274,7 @@ Five more stack screens aren't in the hub:
   could not set up its replacement. There is one stored Pond, not a list; pairing
   another replaces it.
 - **Add a device** (`/(stack)/commission-device`) — from the Devices tab and Home.
-- **Wake word** (`/(stack)/wake-word`) — from Home's "Finish setting up" card after owner setup: the phrase and its calibration, saved through the shared settings store.
+- **Wake word** (`/(stack)/wake-word`) — from Home's "Finish setting up" card after owner setup and from the Voice agent: the phrase and its calibration, saved through the shared settings store.
 - **Connect Desktop** (`/(stack)/connect-desktop`) — the QR scanner opened from
   Pond Pairing. It reads the pairing QR and a Pond's printed setup card
   (`pond://setup`), and hands either back through `services/pairing-handoff.ts`.
@@ -354,7 +354,7 @@ expo-router resolves routes at runtime, so a menu row pointing at a deleted scre
 
 The third is this app's rule, not expo-router's. The stack sets `headerShown: true`, and a screen the layout does not register gets its route name as its header. That is how Remote Access shipped headed `remote-access`, lowercase and untranslated, until the guard caught it. So a new screen needs its `<Stack.Screen name="..." options={{ title: t('screens....') }} />` line, and removing a screen means removing its file, its registration and its menu row together.
 
-Backup and Restore were removed rather than wired (#64): the Pond exposes no backup API, and a screen reporting a backup that never ran is worse than no screen. Biometrics went for the same reason: it showed face recognition as enrolled from a hardcoded state and "enrolled" voice recognition on a two-second timer, with no call to the Pond -- which has no voice biometrics at all. Photos and Videos and Upload for Analysis went too: they showed analyses of household photos that never ran, and the Pond exposes no image analysis. Their hub group, Media and data, went with them rather than stay as an empty heading.
+Backup and Restore were removed rather than wired (#64): the Pond exposes no backup API, and a screen reporting a backup that never ran is worse than no screen. Biometrics went for the same reason: it showed face recognition as enrolled from a hardcoded state and "enrolled" voice recognition on a two-second timer, with no call to the Pond, which had no voice biometrics then. Faces and Voice Match replaced it, on the Pond's own routes. Photos and Videos and Upload for Analysis went too: they showed analyses of household photos that never ran, and the Pond exposes no image analysis. Their hub group, Media and data, went with them rather than stay as an empty heading.
 
 ## Notification taps (2026-10-27)
 
@@ -384,7 +384,49 @@ fails `tsc`.
 
 There is no separate listening overlay. Voice mode belongs to the conversation:
 the composer's speak control swaps `ChatDock` for `VoiceDock`, in the same place,
-and the orb in it is `VoiceOrb`.
+and the orb in it is `VoiceOrb`. A reply is sent to `/tts` a clause at a time
+(`takeSpeechUnits` in `services/speech.ts`), and while it speaks the caption names
+the Voice agent, which answers every spoken turn.
+
+Everything else about voice is against goose-in-a-pond's room voice, Voice agent
+and Voice Match contract, behind the Developer toggle `voice` (real by default;
+the mock is `models/voice-mock.ts`). On a Pond without those routes each screen
+says the Pond needs an update, where the mock would show a made-up household.
+
+- **The Voice agent** (`/(stack)/voice-agent`, `view-models/use-voice-agent.ts`),
+  from Agents' built-in Voice row and from the first row of Settings > Voice. The
+  shipped agent that answers everything said out loud, at the Pond and on this
+  phone. How it speaks (instructions and examples) and what it can use (tool groups
+  it can only lose, and steps per answer) are held on the phone and saved with one
+  button through `PUT /agents/voice`, which sends only what changed; a refusal is
+  shown under the field its path names, a guest is told it cannot change it, and Go
+  back to the shipped agent (`DELETE /agents/voice`) asks first. How it sounds links
+  to Speaking. How it hears shows the wake phrase (to Wake word), the detector in use
+  and why, Listen in this room (`PUT /voice/room`) and how a reply is stopped, then
+  links to Listening. Who it knows links to Voice Match. Its start-up copy is its
+  prefill, with Rebuild. Leaving with unsaved changes asks first.
+- **In this room** is the first thing on the Voice agent page: what the Pond's own
+  microphone and speaker are doing, who woke it, what it heard and is saying, who it
+  last heard by name, and Stop talking (`POST /voice/room/interrupt`). It folds
+  `GET /voice/room/events` into what it shows while the page is in front, and reads
+  `GET /voice/room` every 15 s besides. Home has a card with the state, who was last
+  heard and Stop talking, shown only where the Pond can listen in the room; it reads
+  the status alone, because a stream held open for as long as Home is on screen keeps
+  the radio awake for a glance.
+- **Voice Match** (`/(stack)/voice-match`, `view-models/use-voice-prints.ts`)
+  mirrors Faces: a row per member with how many of the five sentences the Pond holds.
+  It says first that a voice never approves anything and that recordings are deleted
+  once learnt. The speaker model downloads on its own, with its progress and its
+  CC BY 4.0 credit. A person's sheet records five plain sentences of three to five
+  seconds on this phone, with the wake calibration's recorder
+  (`view-models/use-take-recorder.ts`), one `POST /voice/prints/{id}/takes` each, and
+  says how alike they sounded. Record again forgets the old print first, and Forget
+  this voice (`DELETE /voice/prints/{id}`) asks with Keep it as the safe answer.
+- **Wake word** shows, take by take, whether the Pond's "hey goose" detector heard
+  each sentence, and after the last which detector the Pond chose and why.
+- **Listening** leads with In this room: the room switch, the detector and how a
+  reply is stopped. The `voice_kws_*` fields sit under Whisper detector, because only
+  Whisper reads them. **Speaking** leads with how a reply is stopped.
 
 ## First run
 

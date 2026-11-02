@@ -132,7 +132,7 @@ describe('filling the draft back in', () => {
   it('reads the wake phrase the Pond holds as a preset or a phrase of its own', () => {
     expect(wakeDraftFrom('hey duck')).toEqual({ wakeWord: 'custom', wakeWordCustom: 'hey duck' });
     expect(wakeDraftFrom('ok computer')).toEqual({ wakeWord: 'ok computer', wakeWordCustom: '' });
-    expect(wakeDraftFrom(null)).toEqual({ wakeWord: 'goose', wakeWordCustom: '' });
+    expect(wakeDraftFrom(null)).toEqual({ wakeWord: 'hey goose', wakeWordCustom: '' });
     expect(wakeChoiceValid({ wakeWord: 'custom', wakeWordCustom: 'a' })).toBe(false);
   });
 });
