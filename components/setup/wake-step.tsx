@@ -1,15 +1,18 @@
-// The wake phrase, and teaching the Pond how this person says it, from takes recorded on this phone.
-// Owner setup leaves it for later; Home's "Finish setting up" card opens it on its own screen.
+// The wake phrase, and a way into teaching the Pond how this person says it. Owner setup leaves it
+// for later; Home's "Finish setting up" card opens it on its own screen.
 
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { InkButton, InkCard, InkFormField, InkInput, InkMeter, InkNotice, InkRadioGroup, InkSpinner, InkText, InkTitle } from '@jarida/ink/native';
+import { useRouter } from 'expo-router';
+import { InkButton, InkCard, InkFormField, InkInput, InkRadioGroup, InkText, InkTitle } from '@jarida/ink/native';
 
 import { Spacing } from '@/constants/spacing';
 import { WAKE_PRESETS, shortPhraseSuggestion, wakePhrase, wakePhraseProblem, type SetupDraft, type WakePreset } from '@/models/owner-setup';
+import { detectorWords, wakeReasonWords } from '@/models/voice-room';
+import { selectionTick } from '@/services/haptics';
 import type { TranslationKey } from '@/services/i18n';
-import { useWakeCalibration } from '@/view-models/use-wake-calibration';
+import { useVoiceRoom } from '@/view-models/use-voice-room';
 
 function presetKeys(preset: WakePreset): { label: TranslationKey; body: TranslationKey } {
   switch (preset) {
@@ -35,48 +38,42 @@ function problemKey(problem: NonNullable<ReturnType<typeof wakePhraseProblem>>):
   }
 }
 
-function Calibration({ phrase }: { phrase: string }) {
+/**
+ * Teaching opens "Teach Goose your voice" with the phrase chosen here, which it saves before the
+ * first sentence. Below it, the detector the Pond listens with now and why.
+ */
+function TeachCard({ phrase }: { phrase: string }) {
   const { t } = useTranslation();
-  const cal = useWakeCalibration(phrase);
-  const active = cal.state === 'listening' || cal.state === 'recording' || cal.state === 'sending';
-  const startLabel = cal.state === 'done' ? t('setup.wake.calibrate.again') : cal.taken > 0 ? t('setup.wake.calibrate.resume') : t('setup.wake.calibrate.start');
+  const router = useRouter();
+  const room = useVoiceRoom();
+  const wake = room.room?.wake;
 
   return (
     <InkCard raised={false} contentStyle={styles.card}>
-      <InkTitle level={3}>{t('setup.wake.calibrate.title')}</InkTitle>
-      <InkText tone="secondary">{t('setup.wake.calibrate.body')}</InkText>
-      {active && cal.prompt ? (
-        <View style={styles.take} accessibilityLiveRegion="polite">
-          <InkText size="sm" tone="tertiary">
-            {t('setup.wake.calibrate.take', { step: Math.min(cal.taken + 1, cal.target), count: cal.target })}
-          </InkText>
-          <InkText size="sm" tone="secondary">
-            {t('setup.wake.calibrate.say')}
-          </InkText>
-          <InkText size="lg" weight="semibold">{`“${cal.prompt}”`}</InkText>
-          {cal.state === 'sending' ? (
-            <InkSpinner label={t('setup.wake.calibrate.sending')} />
-          ) : (
-            <InkMeter value={cal.level} label={t('setup.wake.calibrate.listening')} />
-          )}
+      <InkTitle level={3}>{t('setup.wake.teach.title')}</InkTitle>
+      <InkText tone="secondary">{t('setup.wake.teach.body')}</InkText>
+      {wake ? (
+        <View style={styles.detector}>
+          <InkText weight="semibold">{t('setup.wake.teach.listensWith', { detector: detectorWords(wake.detector) })}</InkText>
+          {wakeReasonWords(wake.reason) ? (
+            <InkText size="sm" tone="secondary">
+              {wakeReasonWords(wake.reason)}
+            </InkText>
+          ) : null}
         </View>
       ) : null}
-      {cal.state === 'done' ? (
-        <InkNotice tone="success">
-          {cal.heard.length > 1 ? t('setup.wake.calibrate.done', { count: cal.heard.length }) : t('setup.wake.calibrate.doneOne')}
-        </InkNotice>
-      ) : null}
-      {cal.error ? <InkNotice tone="warning">{cal.error}</InkNotice> : null}
       <View style={styles.calActions}>
-        {active ? (
-          <InkButton variant="quiet" icon="stop" onPress={cal.stop}>
-            {t('setup.wake.calibrate.stop')}
-          </InkButton>
-        ) : (
-          <InkButton variant="quiet" icon="mic" disabled={!phrase} onPress={() => void cal.start()}>
-            {startLabel}
-          </InkButton>
-        )}
+        <InkButton
+          variant="quiet"
+          icon="mic"
+          disabled={!phrase}
+          onPress={() => {
+            void selectionTick();
+            router.push({ pathname: '/teach-voice', params: { phrase, from: 'wake' } });
+          }}
+        >
+          {t('setup.wake.teach.start')}
+        </InkButton>
       </View>
     </InkCard>
   );
@@ -90,7 +87,7 @@ export function WakeStep({ draft, patch }: { draft: WakeChoice; patch: (change: 
   const typed = draft.wakeWordCustom.trim();
   const problem = custom && typed ? wakePhraseProblem(typed) : null;
   const suggestion = custom && typed ? shortPhraseSuggestion(typed) : null;
-  const preset = (WAKE_PRESETS as readonly string[]).includes(draft.wakeWord) ? (draft.wakeWord as WakePreset) : 'goose';
+  const preset = (WAKE_PRESETS as readonly string[]).includes(draft.wakeWord) ? (draft.wakeWord as WakePreset) : WAKE_PRESETS[0];
   const phrase = problem ? '' : wakePhrase(draft);
 
   return (
@@ -125,8 +122,7 @@ export function WakeStep({ draft, patch }: { draft: WakeChoice; patch: (change: 
           />
         </InkFormField>
       ) : null}
-      {/* A different phrase is a different calibration, so it starts again from nothing. */}
-      <Calibration key={phrase} phrase={phrase} />
+      <TeachCard phrase={phrase} />
     </>
   );
 }
@@ -134,6 +130,6 @@ export function WakeStep({ draft, patch }: { draft: WakeChoice; patch: (change: 
 const styles = StyleSheet.create({
   head: { gap: Spacing.sm },
   card: { gap: Spacing.md },
-  take: { gap: Spacing.sm },
   calActions: { flexDirection: 'row', justifyContent: 'flex-start' },
+  detector: { gap: Spacing.xs },
 });

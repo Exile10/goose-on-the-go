@@ -20,6 +20,7 @@ jest.mock('@/services/api-client', () => {
       listFaces: jest.fn(),
       listProfiles: jest.fn(),
       forgetFace: jest.fn(),
+      forgetFaceSamples: jest.fn(),
       setFaceThreshold: jest.fn(),
       clearFaceThreshold: jest.fn(),
       registerFaceFromCamera: jest.fn(),
@@ -180,8 +181,8 @@ describe('reading', () => {
 });
 
 describe('forgetting a face', () => {
-  it('asks the pond to, then reads the list back', async () => {
-    pond.forgetFace.mockResolvedValue({ profile_id: 'amina', face_embeddings_deleted: 4 });
+  it('forgets the face alone, then reads the list back', async () => {
+    pond.forgetFaceSamples.mockResolvedValue({ faces_deleted: 4 });
     const m = await mountFaces();
     pond.listFaces.mockResolvedValue(overview({ people: [person({ enrollments: 0 })] }));
 
@@ -190,13 +191,36 @@ describe('forgetting a face', () => {
       refused = await m.vm.actions.forget(person());
     });
 
-    expect(pond.forgetFace).toHaveBeenCalledWith('amina');
+    expect(pond.forgetFaceSamples).toHaveBeenCalledWith('amina');
+    expect(pond.forgetFace).not.toHaveBeenCalled();
     expect(refused).toBeNull();
     expect(m.vm.data.known).toBe(0);
+    expect(m.vm.data.faceOnly).toBe(true);
+  });
+
+  it('on a Pond without the face-only route, forgets nothing until asked to forget the voice too', async () => {
+    pond.forgetFaceSamples.mockRejectedValue(refusal(405));
+    pond.forgetFace.mockResolvedValue({ profile_id: 'amina', face_embeddings_deleted: 4, voice_prints_deleted: 1 });
+    const m = await mountFaces();
+
+    let first: string | null = 'unset';
+    await act(async () => {
+      first = await m.vm.actions.forget(person());
+    });
+    expect(first).toBe('needs_both');
+    expect(pond.forgetFace).not.toHaveBeenCalled();
+    expect(m.vm.data.faceOnly).toBe(false);
+
+    let second: string | null = 'unset';
+    await act(async () => {
+      second = await m.vm.actions.forgetWithVoice(person());
+    });
+    expect(second).toBeNull();
+    expect(pond.forgetFace).toHaveBeenCalledWith('amina');
   });
 
   it('says why the pond refused, and does not read the list back', async () => {
-    pond.forgetFace.mockRejectedValue(refusal(503));
+    pond.forgetFaceSamples.mockRejectedValue(refusal(503));
     const m = await mountFaces();
     pond.listFaces.mockClear();
 
@@ -210,7 +234,7 @@ describe('forgetting a face', () => {
   });
 
   it('has a sentence for a refusal the shared reading leaves to the banner', async () => {
-    pond.forgetFace.mockRejectedValue(refusal(403));
+    pond.forgetFaceSamples.mockRejectedValue(refusal(403));
     const m = await mountFaces();
 
     let refused: string | null = null;

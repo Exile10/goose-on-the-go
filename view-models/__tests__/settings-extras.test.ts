@@ -33,7 +33,7 @@ describe('menu values', () => {
   it('says how each setting stands', () => {
     expect(summarize('remoteAccess', SAMPLE_SETTINGS, extras, t)).toBe('Off');
     expect(summarize('internet', SAMPLE_SETTINGS, extras, t)).toBe('Open');
-    expect(summarize('voice', SAMPLE_SETTINGS, extras, t)).toBe('“goose”');
+    expect(summarize('voice', SAMPLE_SETTINGS, extras, t)).toBe('“hey goose”');
     expect(summarize('speaking', SAMPLE_SETTINGS, extras, t)).toBe('Heart');
     expect(summarize('speaking', { ...SAMPLE_SETTINGS, voice_tts_voice: '' }, extras, t)).toBe('Heart');
     expect(summarize('tools', SAMPLE_SETTINGS, extras, t)).toBe('7 of 10 on');

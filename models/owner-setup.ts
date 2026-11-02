@@ -63,7 +63,8 @@ export function resumeIndex(backendStep: string | null | undefined): number {
 export const PROMPT_STYLES = ['balanced', 'concise', 'technical', 'warm'] as const;
 export type PromptStyle = (typeof PROMPT_STYLES)[number];
 
-export const WAKE_PRESETS = ['goose', 'hey goose', 'ok computer', 'custom'] as const;
+// "hey goose" first: it is the one phrase the Pond can hear with its own detector rather than Whisper.
+export const WAKE_PRESETS = ['hey goose', 'goose', 'ok computer', 'custom'] as const;
 export type WakePreset = (typeof WAKE_PRESETS)[number];
 
 /** The desktop's language list. Names are each language's own, so they are not translated. */
@@ -145,7 +146,7 @@ export function defaultDraft(deviceZone: string, language = 'en'): SetupDraft {
     assistantName: 'Goose',
     ttsVoice: 'af_heart',
     ttsSpeed: 1,
-    wakeWord: 'goose',
+    wakeWord: 'hey goose',
     wakeWordCustom: '',
     enableMemory: true,
   };
@@ -184,7 +185,7 @@ export function draftFromPond(base: SetupDraft, settings: Partial<PondSettings> 
 /** The wake phrase the Pond holds, as the wake step's preset or custom choice. */
 export function wakeDraftFrom(phrase: string | null | undefined): Pick<SetupDraft, 'wakeWord' | 'wakeWordCustom'> {
   const p = phrase?.trim() ?? '';
-  if (!p) return { wakeWord: 'goose', wakeWordCustom: '' };
+  if (!p) return { wakeWord: 'hey goose', wakeWordCustom: '' };
   return (WAKE_PRESETS as readonly string[]).includes(p) ? { wakeWord: p, wakeWordCustom: '' } : { wakeWord: 'custom', wakeWordCustom: p };
 }
 
@@ -344,12 +345,6 @@ export function firstStepFor(fields: readonly string[]): SetupStep | null {
   const steps = fields.map(stepForMissingField).filter((s): s is SetupStep => s !== null);
   if (steps.length === 0) return null;
   return SETUP_STEPS.find((s) => steps.includes(s)) ?? null;
-}
-
-/** What each calibration take reads: `calibration_prompts` in the Pond's pond-voice text.rs, word for word. */
-export function calibrationPrompts(phrase: string): string[] {
-  const p = phrase.trim();
-  return [p, `Hey ${p}, good morning`, `OK ${p}, what time is it`, `${p}, tell me a joke`, `Thank you ${p}`];
 }
 
 /** A birthday as `YYYY-MM-DD`, or null for a date that cannot exist; it is held back, never rounded. */

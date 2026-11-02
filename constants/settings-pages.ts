@@ -61,6 +61,11 @@ const voice: SettingsPage = {
   titleKey: 'screens.settingsVoice',
   descriptionKey: 'settings.page.voice',
   sections: [
+    // The Voice agent answers everything said out loud; its page holds how it speaks and the room.
+    {
+      footerKey: 'settings.footer.voiceAgent',
+      items: [{ kind: 'link', route: '/(stack)/voice-agent', icon: 'voice', tile: 'pink', labelKey: 'screens.voiceAgent' }],
+    },
     // The speaking voice is a page of its own: its picker would otherwise be most of this one.
     {
       items: [
@@ -97,6 +102,8 @@ const speaking: SettingsPage = {
   titleKey: 'screens.settingsSpeaking',
   descriptionKey: 'settings.page.speaking',
   sections: [
+    // How a reply in the room is stopped comes first: it is what someone looks for here mid-reply.
+    { titleKey: 'settings.section.inTheRoom', items: [{ kind: 'special', id: 'roomInterrupts' }] },
     // The picker carries the voice and its pace, as pond-desktop's does.
     { titleKey: 'settings.section.gooseVoice', items: [{ kind: 'special', id: 'voicePicker' }] },
     {
@@ -128,9 +135,11 @@ const listening: SettingsPage = {
   titleKey: 'screens.settingsListening',
   descriptionKey: 'settings.page.listening',
   sections: [
+    { titleKey: 'settings.section.inTheRoom', items: [{ kind: 'special', id: 'roomVoice' }] },
     {
-      titleKey: 'settings.section.hearingItsName',
-      footerKey: 'settings.footer.restartVoice',
+      // Each of these tunes Whisper listening for the phrase; the "hey goose" detector reads none of them.
+      titleKey: 'settings.section.whisperDetector',
+      footerKey: 'settings.footer.whisperDetector',
       items: [
         { kind: 'number', key: 'voice_kws_energy_threshold', min: 0, max: 1, step: 0.001, restart: true, labelKey: 'settings.field.voice_kws_energy_threshold.label', hintKey: 'settings.field.voice_kws_energy_threshold.hint' },
         { kind: 'number', key: 'voice_kws_post_trigger_silence_ms', min: 0, step: 1, unitKey: 'settings.unit.ms', restart: true, labelKey: 'settings.field.voice_kws_post_trigger_silence_ms.label', hintKey: 'settings.field.voice_kws_post_trigger_silence_ms.hint' },

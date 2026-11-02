@@ -23,8 +23,9 @@ export function FinishSetup() {
 
   const open = (item: ChecklistItem) => {
     void tap();
+    // The flow carries the phrase and a way to change it, so the card goes straight to the sentences.
     if (item === 'wake') {
-      router.push('/(stack)/wake-word');
+      router.push({ pathname: '/teach-voice', params: { from: 'setup' } });
       return;
     }
     // Looking is the whole of this one, so opening Settings is doing it.

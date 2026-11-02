@@ -195,6 +195,7 @@ export function createMockAgents(now: () => number = Date.now): AgentsSource {
   seed('long-task-worker', 'default', 'ready', 2 * HOUR, DAY);
   seed('long-task-verifier', 'default', 'ready', 2 * HOUR, DAY);
   seed('long-task-composer', 'default', 'ready', 2 * HOUR, DAY);
+  seed('voice', 'default', 'ready', 2 * HOUR, HOUR);
   seed('morning-brief', 'member', 'ready', 2 * HOUR, 3 * HOUR);
   seed('trip-planner', 'member', 'idle', null, 20 * DAY);
   seed('welcome-back', 'member', 'failed', null, null);

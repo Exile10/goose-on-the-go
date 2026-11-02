@@ -114,6 +114,8 @@ export default function StackLayout() {
       <Stack.Screen name="pond-health" options={{ title: t('screens.pondHealth') }} />
       <Stack.Screen name="pond-power" options={{ title: t('screens.pondPower') }} />
       <Stack.Screen name="agent" options={{ title: t('screens.agent') }} />
+      <Stack.Screen name="voice-agent" options={{ title: t('screens.voiceAgent') }} />
+      <Stack.Screen name="voice-match" options={{ title: t('screens.voiceMatch') }} />
       <Stack.Screen name="extensions" options={{ title: t('screens.extensions') }} />
       <Stack.Screen name="web-search" options={{ title: t('screens.webSearch') }} />
       <Stack.Screen name="secrets" options={{ title: t('screens.secrets') }} />

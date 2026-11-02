@@ -4,6 +4,7 @@ import { assertPondTrust, PondTrustError, pondTrustFailed } from './pond-trust';
 import { isInsecureDevOrigin, isLocalPairingUrl, normalizePondUrl } from '@/models/connection';
 import { readWebSearch } from '@/models/web-search';
 import { readPrefills } from '@/models/agents';
+import { readRoomVoiceEvent, readVoiceAgent, readVoicePrints, readVoiceRoom, readVoiceTake } from '@/models/voice-room';
 import { readInterview, readInterviewOffer, readMemberNotes } from '@/models/interview';
 import { readLongTask, readLongTaskReport, readResearchAvailability, reportFileName } from '@/models/long-tasks';
 import {
@@ -40,6 +41,12 @@ import { randomBytes } from './secure-random';
 import { timeoutSignal } from './http';
 import { readSse, type SseEvent } from './sse';
 import type {
+  RoomVoiceEvent,
+  VoiceAgent,
+  VoiceAgentPatch,
+  VoicePrints,
+  VoiceTakeResult,
+  VoiceRoom,
   AdminCache,
   AdminCacheId,
   AdminFileListing,
@@ -144,7 +151,6 @@ import type {
   HfModel,
   HfModelFile,
   ModelRole,
-  CalibrationTake,
   OnboardCompletion,
   OnboardStatus,
   ProfilePrefs,
@@ -821,6 +827,10 @@ export class PondApiClient {
         body,
       );
     }
+    // A Pond without the route answers with its dashboard page and a 200: that is a missing route.
+    if (/^text\/html\b/i.test(res.headers.get('content-type') ?? '')) {
+      throw new ApiError(`${init.method ?? 'GET'} ${path} → 404 (the Pond answered with a page)`, 404, null, null, null);
+    }
     return (await parseBody<T>(res)) as T;
   }
 
@@ -1176,12 +1186,112 @@ export class PondApiClient {
       method: 'POST',
       headers: this.headers(),
       body: JSON.stringify({ text }),
-      signal: signal ?? timeoutSignal(VOICE_TIMEOUT_MS),
+      signal: timeoutSignal(VOICE_TIMEOUT_MS, signal),
     });
     if (!res.ok) {
       throw new ApiError(`POST /api/v1/tts → ${res.status}`, res.status, parseRetryAfter(res));
     }
     return res.arrayBuffer();
+  }
+
+  // ── Room voice, the Voice agent and Voice Match ─────────────
+
+  async voiceRoom(): Promise<VoiceRoom> {
+    const room = readVoiceRoom(await this.get<unknown>('/api/v1/voice/room'));
+    if (!room) throw new Error('The Pond answered the room voice status with something unexpected');
+    return room;
+  }
+
+  async setVoiceRoom(enabled: boolean): Promise<VoiceRoom> {
+    const room = readVoiceRoom(await this.put<unknown>('/api/v1/voice/room', { enabled }));
+    if (!room) throw new Error('The Pond answered the room voice switch with something unexpected');
+    return room;
+  }
+
+  /** Stops what the Pond is saying in the room, as talking over it would. */
+  interruptVoiceRoom(): Promise<void> {
+    return this.post<void>('/api/v1/voice/room/interrupt', {});
+  }
+
+  /** The room's voice events until the stream ends; abort `signal` to close it. */
+  async streamVoiceRoom(onEvent: (event: RoomVoiceEvent) => void, signal?: AbortSignal, onOpen?: () => void): Promise<void> {
+    const res = await this.open('/api/v1/voice/room/events', { headers: { Accept: 'text/event-stream' }, signal });
+    onOpen?.();
+    await readSse(
+      res,
+      (frame) => {
+        try {
+          const event = readRoomVoiceEvent(JSON.parse(frame.data));
+          if (event) onEvent(event);
+        } catch {
+          // A frame that is not JSON carries nothing to act on.
+        }
+      },
+      { idleMs: STREAM_IDLE_MS },
+    );
+  }
+
+  async voiceAgent(): Promise<VoiceAgent> {
+    const agent = readVoiceAgent(await this.get<unknown>('/api/v1/agents/voice'));
+    if (!agent) throw new Error('The Pond answered the Voice agent with something unexpected');
+    return agent;
+  }
+
+  /** A 422 carries `errors` as `/recipes/validate` does; a guest is refused with 403. */
+  async updateVoiceAgent(patch: VoiceAgentPatch): Promise<VoiceAgent> {
+    const agent = readVoiceAgent(await this.put<unknown>('/api/v1/agents/voice', patch));
+    if (!agent) throw new Error('The Pond answered the Voice agent save with something unexpected');
+    return agent;
+  }
+
+  /** Back to the agent the Pond shipped. */
+  async resetVoiceAgent(): Promise<VoiceAgent> {
+    const agent = readVoiceAgent(await this.del<unknown>('/api/v1/agents/voice'));
+    if (!agent) throw new Error('The Pond answered the Voice agent reset with something unexpected');
+    return agent;
+  }
+
+  async voicePrints(): Promise<VoicePrints> {
+    const prints = readVoicePrints(await this.get<unknown>('/api/v1/voice/prints'));
+    if (!prints) throw new Error('The Pond answered Voice Match with something unexpected');
+    return prints;
+  }
+
+  /** A 202: the Pond fetches the speaker model again. */
+  retryVoicePrintModel(): Promise<void> {
+    return this.post<void>('/api/v1/voice/prints/model', {});
+  }
+
+  /**
+   * One sentence read while teaching Goose a voice, as a 16 kHz mono WAV. `voiceMatch` false tunes
+   * the wake phrase only and stores no print. 422 `no_speech` and `no_wake_phrase` (with `heard_as`)
+   * and 409 `model_not_ready` are refusals by name.
+   */
+  async voiceTake(take: { fileUri: string; prompt: string; profileId: string | null; voiceMatch: boolean }): Promise<VoiceTakeResult> {
+    const form = new FormData();
+    form.append('audio', new File(take.fileUri), 'take.wav');
+    form.append('prompt', take.prompt);
+    if (take.profileId) form.append('profile_id', take.profileId);
+    form.append('voice_match', take.voiceMatch ? 'true' : 'false');
+    const res = await this.send(`${this.baseUrl}/api/v1/voice/takes`, {
+      method: 'POST',
+      // No Content-Type: the runtime writes the multipart boundary itself.
+      headers: this.token ? { Authorization: `Bearer ${this.token}` } : {},
+      body: form,
+      signal: timeoutSignal(VOICE_TIMEOUT_MS),
+    });
+    if (!res.ok) {
+      const body = await errorBody(res);
+      throw new ApiError(`POST /api/v1/voice/takes → ${res.status}`, res.status, parseRetryAfter(res), detailOf(body), body);
+    }
+    const result = readVoiceTake(await res.json());
+    if (!result) throw new Error('The Pond answered a voice take with something unexpected');
+    return result;
+  }
+
+  /** Forget a member's voice. Their face, profile and memories stay. */
+  forgetVoicePrints(profileId: string): Promise<void> {
+    return this.del<void>(`/api/v1/voice/prints/${encodeURIComponent(profileId)}`);
   }
 
   // ── Sessions ────────────────────────────────────────────────
@@ -1757,9 +1867,14 @@ export class PondApiClient {
     return this.del<FaceThreshold>(`/api/v1/faces/profile/${encodeURIComponent(profileId)}/threshold`);
   }
 
-  /** Forget every sample of a member's face. Their profile and memories stay. */
-  forgetFace(profileId: string): Promise<{ profile_id: string; face_embeddings_deleted: number }> {
-    return this.del<{ profile_id: string; face_embeddings_deleted: number }>(
+  /** Forget a member's face and nothing else. A Pond without the route answers 404 or 405. */
+  forgetFaceSamples(profileId: string): Promise<{ faces_deleted: number }> {
+    return this.del<{ faces_deleted: number }>(`/api/v1/faces/profile/${encodeURIComponent(profileId)}`);
+  }
+
+  /** Forget every sample of a member's face, and their voice print. Their profile and memories stay. */
+  forgetFace(profileId: string): Promise<{ profile_id: string; face_embeddings_deleted: number; voice_prints_deleted?: number }> {
+    return this.del<{ profile_id: string; face_embeddings_deleted: number; voice_prints_deleted?: number }>(
       `/api/v1/users/${encodeURIComponent(profileId)}/biometrics`,
     );
   }
@@ -2112,25 +2227,6 @@ export class PondApiClient {
 
   warmup(): Promise<WarmupStatus> {
     return this.get<WarmupStatus>('/api/v1/warmup');
-  }
-
-  /** One take of the wake phrase, recorded on this phone; the Pond transcribes it and keeps what it heard. */
-  async calibrateWakeWord(fileUri: string, prompt: string): Promise<CalibrationTake> {
-    const form = new FormData();
-    form.append('audio', new File(fileUri), 'sample.wav');
-    form.append('prompt', prompt);
-    const res = await this.send(`${this.baseUrl}/api/v1/voice/calibrate`, {
-      method: 'POST',
-      // No Content-Type: the runtime writes the multipart boundary itself.
-      headers: this.token ? { Authorization: `Bearer ${this.token}` } : {},
-      body: form,
-      signal: timeoutSignal(VOICE_TIMEOUT_MS),
-    });
-    if (!res.ok) {
-      const body = await errorBody(res);
-      throw new ApiError(`POST /api/v1/voice/calibrate → ${res.status}`, res.status, parseRetryAfter(res), detailOf(body), body);
-    }
-    return (await res.json()) as CalibrationTake;
   }
 
   /**

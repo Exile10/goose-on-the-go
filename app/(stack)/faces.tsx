@@ -127,6 +127,8 @@ export default function FacesScreen() {
         onClose={() => setOpenId(null)}
         onChanged={quietRefresh}
         onForget={actions.forget}
+        onForgetWithVoice={actions.forgetWithVoice}
+        faceOnly={data.faceOnly}
         onStrictness={actions.setStrictness}
         onOpenCameras={openCameras}
       />

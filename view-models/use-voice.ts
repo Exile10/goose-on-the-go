@@ -41,6 +41,7 @@ import {
   rms,
   takeSpeechUnits,
 } from '@/services/speech';
+import { TTS_LIMITS, createSpeechLine } from '@/services/speech-line';
 import {
   beginVoiceSession,
   cacheFile,
@@ -170,7 +171,7 @@ export function useVoice(chat: {
 
   // The reply being spoken: clauses waiting, and the one playing.
   const voice = useRef({
-    queue: [] as string[],
+    line: createSpeechLine((text, signal) => api.speak(text, signal), TTS_LIMITS),
     pumping: false,
     stopPlaying: null as null | (() => void),
     turnDone: false,
@@ -237,7 +238,8 @@ export function useVoice(chat: {
   const stopSpeaking = useCallback(() => {
     const v = voice.current;
     v.generation += 1;
-    v.queue = [];
+    // Cancels what is still rendering, so the Pond stops on what nobody will hear.
+    v.line.clear();
     v.stopPlaying?.();
     v.stopPlaying = null;
   }, []);
@@ -288,33 +290,19 @@ export function useVoice(chat: {
   }, [setState, t]);
 
   /**
-   * Speak whatever is queued, in order. While one clause plays the next is
-   * already being synthesised, because `/tts` renders a whole request before
-   * it sends a byte and the gap would otherwise fall between every clause.
+   * Speak whatever is queued, in order. While one clause plays the next ones
+   * are already being synthesised, because `/tts` renders a whole request
+   * before it sends a byte and the gap would otherwise fall between clauses.
    */
   const pump = useCallback(async () => {
     const v = voice.current;
     if (v.pumping) return;
     v.pumping = true;
     const generation = v.generation;
-    const fetchAudio = (unit: string) => {
-      const audio = api.speak(unit);
-      // An interrupted reply abandons its prefetch; that is not an error.
-      audio.catch(() => {});
-      return audio;
-    };
-    let ahead: Promise<ArrayBuffer> | null = null;
     try {
       while (generation === v.generation) {
-        let audio = ahead;
-        ahead = null;
-        if (!audio) {
-          const unit = v.queue.shift();
-          if (!unit) break;
-          audio = fetchAudio(unit);
-        }
-        const following = v.queue.shift();
-        if (following) ahead = fetchAudio(following);
+        const audio = v.line.next();
+        if (!audio) break;
         const bytes = await audio;
         if (generation !== v.generation) break;
         const wav = new Uint8Array(bytes);
@@ -331,12 +319,15 @@ export function useVoice(chat: {
         discardFile(uri);
       }
     } catch {
-      if (generation === v.generation) setError(t('chat.voice.speakFailed'));
+      if (generation === v.generation) {
+        setError(t('chat.voice.speakFailed'));
+        v.line.clear();
+      }
     } finally {
       v.pumping = false;
       setLevel(0);
       // The reply is fully spoken: the conversation's turn passes back.
-      if (generation === v.generation && v.turnDone && v.queue.length === 0 && alive.current) {
+      if (generation === v.generation && v.turnDone && v.line.pending === 0 && alive.current) {
         void listen();
       }
     }
@@ -376,12 +367,12 @@ export function useVoice(chat: {
     async (text: string) => {
       const v = voice.current;
       v.turnDone = false;
-      v.queue = [];
+      v.line.clear();
       let cursor = 0;
       setState('thinking');
       const enqueue = (units: string[]) => {
         if (!speakerRef.current || units.length === 0) return;
-        v.queue.push(...units);
+        v.line.push(units);
         void pump();
       };
       const reply = await sendRef.current(text, [], {
@@ -396,7 +387,7 @@ export function useVoice(chat: {
       v.turnDone = true;
       if (reply) enqueue(takeSpeechUnits(reply, cursor, true).units);
       // Nothing to say aloud, or the speaker is off: listen again now.
-      if (!v.pumping && v.queue.length === 0) {
+      if (!v.pumping && v.line.pending === 0) {
         setLevel(0);
         void listen();
       }

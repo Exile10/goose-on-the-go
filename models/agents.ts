@@ -237,11 +237,17 @@ export function slugifyAgentName(input: string): string {
 export type NameProblem = 'empty' | 'tooLong' | 'shape' | 'taken';
 
 /** Saving over an existing name replaces that recipe, so a clash is refused before the request. */
+/**
+ * Names a shipped agent keeps: the Pond stores a household's edit of the Voice agent as a recipe
+ * under its name, so it is listed with the built-ins and no new agent may take it.
+ */
+export const SHIPPED_AGENT_NAMES: readonly string[] = ['voice'];
+
 export function agentNameProblem(name: string, taken: readonly string[]): NameProblem | null {
   if (name === '') return 'empty';
   if (name.length > MAX_AGENT_NAME) return 'tooLong';
   if (!/^[a-z0-9][a-z0-9_-]*$/.test(name)) return 'shape';
-  if (taken.includes(name)) return 'taken';
+  if (taken.includes(name) || SHIPPED_AGENT_NAMES.includes(name)) return 'taken';
   return null;
 }
 
@@ -337,7 +343,7 @@ export interface AgentRow {
 export function agentRows(recipes: readonly AgentRecipe[], prefills: readonly AgentPrefill[] | null): AgentRow[] {
   const byName = new Map((prefills ?? []).map((p) => [p.agent, p]));
   return recipes
-    .filter((r) => isAgentYaml(r.yaml))
+    .filter((r) => isAgentYaml(r.yaml) && !SHIPPED_AGENT_NAMES.includes(r.name))
     .map((r) => {
       const reading = readAgent(r.yaml, r.description ?? '');
       const readable = isReadable(reading);

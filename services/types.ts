@@ -1318,6 +1318,8 @@ export interface PondSettings {
   voice_tts_quality: string;
   voice_thinking_tone_enabled: boolean;
   voice_max_turns: number;
+  /** The Pond listens through its own microphone, where it has a microphone and a speaker. */
+  voice_room_enabled: boolean;
 
   // Models and generation
   chat_provider: string;
@@ -1555,17 +1557,127 @@ export interface ProfilePrefs {
   preferences: Record<string, string>;
 }
 
-/** `POST /api/v1/voice/calibrate`: what the Pond heard in one take. */
-export interface CalibrationTake {
-  transcript: string;
-  normalized: string;
-  /** The wake phrase as heard in this take; null when the take did not contain it. */
-  heard: string | null;
-  new_variant: boolean;
-  all_variants: string[];
-  sample_count: number;
-  target_count: number;
-  complete: boolean;
+/** The Pond's own wake detector, or Whisper listening for the phrase in what it transcribes. */
+export type WakeDetectorKind = 'hey_goose' | 'whisper';
+
+/** Why the Pond listens with the detector it does; null for a reason this phone does not know. */
+export type WakeDetectorReason = 'chosen' | 'calibrated' | 'not_calibrated' | 'custom_phrase' | 'no_ear';
+
+export interface WakeDetectorVerdict {
+  kind: WakeDetectorKind;
+  /** Takes the "hey goose" detector heard, of the takes recorded. */
+  heard: number;
+  of: number;
+  reason: WakeDetectorReason | null;
+}
+
+export type RoomVoiceState = 'off' | 'starting' | 'wait' | 'listen' | 'thinking' | 'speak';
+
+export type RoomVoiceUnavailable = 'no_mic_speaker_pair' | 'voice_running_elsewhere' | 'models_missing';
+
+/** `GET /api/v1/voice/room`: the Pond listening through its own microphone. */
+export interface VoiceRoom {
+  enabled: boolean;
+  /** False when the Pond cannot run it here, whatever `enabled` says; `unavailable_reason` says why. */
+  available: boolean;
+  unavailable_reason: RoomVoiceUnavailable | null;
+  state: RoomVoiceState;
+  wake: { phrase: string; detector: WakeDetectorKind; reason: WakeDetectorReason | null };
+  /** `enrolled_or_wake`: a voice Voice Match knows, talking over the reply, or the wake word. */
+  interrupts: 'enrolled_or_wake' | 'wake_only';
+  last_heard: { profile_id: string; name: string; at: string } | null;
+  session_id: string | null;
+}
+
+export interface VoiceSpeaker {
+  profile_id: string;
+  name: string;
+}
+
+/** One `data:` line of `GET /api/v1/voice/room/events`, as `chat --voice --json-events` writes it. */
+export type RoomVoiceEvent =
+  | { event: 'state'; state: RoomVoiceState }
+  | { event: 'transcript'; text: string }
+  | { event: 'token'; content: string }
+  | { event: 'tool_call'; tool: string; id: string }
+  | { event: 'tool_result'; tool: string; id: string; content: string }
+  | { event: 'turn_complete'; session_id: string }
+  | { event: 'error'; message: string }
+  | { event: 'wake'; who: VoiceSpeaker | null }
+  | { event: 'interrupt'; why: 'voice' | 'wake_word' | 'button' };
+
+export interface VoiceAgentExample {
+  brief: string;
+  answer: string;
+}
+
+export interface VoiceAgentToolGroup {
+  group: string;
+  label: string;
+  on: boolean;
+}
+
+/** `GET /api/v1/agents/voice`: the shipped agent that answers every spoken turn, as this household has it. */
+export interface VoiceAgent {
+  name: 'voice';
+  title: string;
+  /** The household has changed it; reset goes back to the shipped one. */
+  edited: boolean;
+  instructions: string;
+  shipped_instructions: string;
+  examples: VoiceAgentExample[];
+  tool_groups: VoiceAgentToolGroup[];
+  /** The household's own cap on tool calls per spoken answer; null leaves it to `shipped_max_turns`. */
+  max_turns: number | null;
+  /** The Pond's `voice_max_turns` setting, where 0 is no cap of its own; null when it could not read it. */
+  shipped_max_turns: number | null;
+  prefill: AgentPrefill;
+}
+
+/** `PUT /api/v1/agents/voice`. Tools only narrow: a group can be turned off, never one added. */
+export interface VoiceAgentPatch {
+  instructions?: string;
+  examples?: VoiceAgentExample[];
+  tool_groups_off?: string[];
+  /** Null drops the household's cap. */
+  max_turns?: number | null;
+}
+
+export type VoicePrintModelState = 'missing' | 'downloading' | 'ready' | 'failed';
+
+export interface VoicePrintMember {
+  profile_id: string;
+  name: string;
+  takes: number;
+  needed: number;
+  enrolled: boolean;
+  /** How alike the takes sound to each other, 0 to 1; null before there are two. */
+  consistency: number | null;
+  updated_at: string | null;
+}
+
+/** `GET /api/v1/voice/prints`. */
+export interface VoicePrints {
+  model: { state: VoicePrintModelState; progress: number | null; credit: string };
+  members: VoicePrintMember[];
+}
+
+/**
+ * `POST /api/v1/voice/takes`: one sentence read while teaching Goose a voice. It tunes the wake
+ * phrase, and adds to the person's voice print unless Voice Match is off for the run.
+ */
+export interface VoiceTakeResult {
+  /** Takes the Pond has accepted in this run, this one included. */
+  take: number;
+  of: number;
+  /**
+   * `heard`: Whisper found the wake phrase at the start, heard as `heard_as`. `new_detector`: the
+   * "hey goose" detector fired on this take.
+   */
+  wake: { heard: boolean; heard_as: string | null; new_detector: boolean };
+  voice_match: { stored: boolean; enrolled: boolean; consistency: number | null } | null;
+  /** The household's verdict across every taught member's latest run, not this run's. */
+  wake_detector: WakeDetectorVerdict;
 }
 
 /**

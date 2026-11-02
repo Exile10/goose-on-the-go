@@ -32,6 +32,7 @@ import { GPressable } from '@/components/ui/g-pressable';
 import { FinishSetup } from '@/components/patterns/finish-setup';
 import { InterviewOffer } from '@/components/patterns/interview-offer';
 import { AgentsGettingReady } from '@/components/patterns/agents-building';
+import { RoomVoiceHome } from '@/components/patterns/room-voice';
 import { PondGettingReady } from '@/components/patterns/pond-getting-ready';
 import { RemoteAccessOffer } from '@/components/patterns/remote-access-offer';
 import { AskRow, HomeIdeas } from '@/components/patterns/home-ideas';
@@ -414,6 +415,7 @@ export default function HomeScreen() {
         {/* Whether Goose can answer yet matters more than reaching it from away, so it comes first. */}
         <PondGettingReady />
         <AgentsGettingReady />
+        {offline ? null : <RoomVoiceHome />}
         <FinishSetup />
         <InterviewOffer />
         <RemoteAccessOffer />

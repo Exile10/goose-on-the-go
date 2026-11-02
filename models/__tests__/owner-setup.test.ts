@@ -5,7 +5,6 @@
 
 import {
   birthdayOf,
-  calibrationPrompts,
   canContinue,
   defaultDraft,
   draftFromPond,
@@ -132,7 +131,7 @@ describe('filling the draft back in', () => {
   it('reads the wake phrase the Pond holds as a preset or a phrase of its own', () => {
     expect(wakeDraftFrom('hey duck')).toEqual({ wakeWord: 'custom', wakeWordCustom: 'hey duck' });
     expect(wakeDraftFrom('ok computer')).toEqual({ wakeWord: 'ok computer', wakeWordCustom: '' });
-    expect(wakeDraftFrom(null)).toEqual({ wakeWord: 'goose', wakeWordCustom: '' });
+    expect(wakeDraftFrom(null)).toEqual({ wakeWord: 'hey goose', wakeWordCustom: '' });
     expect(wakeChoiceValid({ wakeWord: 'custom', wakeWordCustom: 'a' })).toBe(false);
   });
 });
@@ -178,16 +177,6 @@ describe('the wake phrase', () => {
     expect(shortPhraseSuggestion('hey goose')).toBe('');
     expect(shortPhraseSuggestion('good morning pond')).toBeNull();
     expect(shortPhraseSuggestion('hey goose 2')).toBeNull();
-  });
-
-  it('reads the Pond’s own five calibration sentences', () => {
-    expect(calibrationPrompts(' goose ')).toEqual([
-      'goose',
-      'Hey goose, good morning',
-      'OK goose, what time is it',
-      'goose, tell me a joke',
-      'Thank you goose',
-    ]);
   });
 });
 

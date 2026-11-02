@@ -23,7 +23,9 @@ type Player = import('expo-audio').AudioPlayer;
 function load(): Audio | null {
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    return require('expo-audio') as Audio;
+    const mod = require('expo-audio') as Audio;
+    // The web build has expo-audio without its PCM stream: voice is off there, not a crash.
+    return typeof (mod.AudioModule as { AudioStream?: unknown } | undefined)?.AudioStream === 'function' ? mod : null;
   } catch {
     return null;
   }

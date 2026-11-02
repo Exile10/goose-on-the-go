@@ -36,7 +36,7 @@ const CAPTIONS: Record<VoiceState, TranslationKey> = {
   wait: 'chat.voice.listening',
   recording: 'chat.voice.hearing',
   thinking: 'chat.voice.thinking',
-  speaking: 'chat.voice.speaking',
+  speaking: 'chat.voice.speakingAgent',
   error: 'chat.voice.idle',
 };
 

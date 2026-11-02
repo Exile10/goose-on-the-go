@@ -10,11 +10,16 @@
  * static methods at all — `AbortSignal.timeout` is `undefined` on device.
  * Calling it threw a TypeError that `health()` then swallowed in its own catch,
  * so the probe reported every Pond unreachable and never once returned ok.
+ *
+ * It also aborts when `parent` does, so a caller can cancel a request without
+ * losing its ceiling: that `AbortSignal` has no `any()` either.
  */
-export function timeoutSignal(ms: number): AbortSignal {
+export function timeoutSignal(ms: number, parent?: AbortSignal): AbortSignal {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), ms);
   // Node tests should not remain alive solely for a React Native request timer.
   (timer as unknown as { unref?: () => void }).unref?.();
+  if (parent?.aborted) controller.abort();
+  else parent?.addEventListener('abort', () => controller.abort(), { once: true });
   return controller.signal;
 }

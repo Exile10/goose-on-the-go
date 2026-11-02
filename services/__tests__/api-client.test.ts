@@ -128,6 +128,16 @@ describe('request()', () => {
 
     await expect(client.request('/api/v1/thing')).resolves.toEqual({ ok: true });
   });
+
+  it('takes the dashboard page a Pond serves for a route it lacks as a missing route', async () => {
+    setFetch(jest.fn(async () => new Response('<!doctype html><html></html>', { status: 200, headers: { 'Content-Type': 'text/html' } })));
+    const client = new PondApiClient('https://pond.test');
+
+    const error = (await client.request('/api/v1/agents/voice', { method: 'PUT' }).catch((e) => e)) as ApiError;
+
+    expect(error).toBeInstanceOf(ApiError);
+    expect(error.status).toBe(404);
+  });
 });
 
 

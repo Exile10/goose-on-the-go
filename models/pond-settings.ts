@@ -87,6 +87,8 @@ export type SettingItem =
 /** Controls drawn by their own component, because they read more than one field or another route. */
 export type SpecialId =
   | 'voicePicker'
+  | 'roomVoice'
+  | 'roomInterrupts'
   | 'wakeWordReset'
   | 'timezone'
   | 'location'
@@ -194,7 +196,7 @@ export const SAMPLE_SETTINGS: PondSettings = {
   prompt_style: 'balanced',
   prompt_addendum: '',
   custom_system_prompt: null,
-  voice_wake_word: 'goose',
+  voice_wake_word: 'hey goose',
   voice_wake_word_transcriptions: [],
   voice_kws_energy_threshold: 0.003,
   voice_kws_post_trigger_silence_ms: 400,
@@ -206,6 +208,7 @@ export const SAMPLE_SETTINGS: PondSettings = {
   voice_tts_quality: 'q8',
   voice_thinking_tone_enabled: true,
   voice_max_turns: 0,
+  voice_room_enabled: true,
   chat_provider: '',
   chat_model: '',
   llm_provider: '',
