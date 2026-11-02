@@ -57,7 +57,7 @@ const accepted = (take: number, heard: number, fired = true): VoiceTakeResult =>
   of: 5,
   wake: { heard: true, heard_as: 'hey goose', new_detector: fired },
   voice_match: { stored: true, enrolled: take >= 5, consistency: take >= 2 ? 0.8 : null },
-  wake_detector: { kind: 'hey_goose', heard, of: take, reason: '' },
+  wake_detector: { kind: 'hey_goose', heard, of: take, reason: 'calibrated' },
 });
 
 const trees: ReactTestRenderer[] = [];

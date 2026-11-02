@@ -9,7 +9,7 @@ import { InkButton, InkCard, InkFormField, InkInput, InkRadioGroup, InkText, Ink
 
 import { Spacing } from '@/constants/spacing';
 import { WAKE_PRESETS, shortPhraseSuggestion, wakePhrase, wakePhraseProblem, type SetupDraft, type WakePreset } from '@/models/owner-setup';
-import { detectorWords } from '@/models/voice-room';
+import { detectorWords, wakeReasonWords } from '@/models/voice-room';
 import { selectionTick } from '@/services/haptics';
 import type { TranslationKey } from '@/services/i18n';
 import { useVoiceRoom } from '@/view-models/use-voice-room';
@@ -55,9 +55,9 @@ function TeachCard({ phrase }: { phrase: string }) {
       {wake ? (
         <View style={styles.detector}>
           <InkText weight="semibold">{t('setup.wake.teach.listensWith', { detector: detectorWords(wake.detector) })}</InkText>
-          {wake.reason ? (
+          {wakeReasonWords(wake.reason) ? (
             <InkText size="sm" tone="secondary">
-              {wake.reason}
+              {wakeReasonWords(wake.reason)}
             </InkText>
           ) : null}
         </View>

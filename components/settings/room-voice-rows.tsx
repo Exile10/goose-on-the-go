@@ -8,7 +8,7 @@ import { useTranslation } from 'react-i18next';
 
 import { SwitchRow } from '@/components/settings/setting-controls';
 import { RowSeparator, SettingsRow } from '@/components/settings/settings-list';
-import { detectorWords, interruptWords, unavailableWords } from '@/models/voice-room';
+import { detectorWords, interruptWords, unavailableWords, wakeReasonWords } from '@/models/voice-room';
 import { reject } from '@/services/haptics';
 import type { PondSettings } from '@/services/types';
 import type { UsePondSettings } from '@/view-models/use-pond-settings';
@@ -53,7 +53,7 @@ export function RoomVoiceRows({ settings, vm }: Props) {
       <SettingsRow
         label={t('voiceAgent.hears.detector')}
         value={detectorWords(room.wake.detector)}
-        description={room.wake.reason || null}
+        description={wakeReasonWords(room.wake.reason)}
         note={room.wake.detector === 'whisper' ? t('voiceRoom.whisperNote', { phrase: room.wake.phrase || settings.voice_wake_word }) : null}
       />
       <RowSeparator />

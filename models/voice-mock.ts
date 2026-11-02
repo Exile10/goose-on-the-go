@@ -109,7 +109,7 @@ export function createMockVoice(
   // A run of takes, which ends at the fifth: its second sentence is refused once, so the refusal can
   // be seen without a Pond. The detector's verdict is the household's, across runs.
   let run = { taken: 0, tries: 0 };
-  let detector: WakeDetectorVerdict = { kind: 'whisper', heard: 0, of: 0, reason: '' };
+  let detector: WakeDetectorVerdict = { kind: 'whisper', heard: 0, of: 0, reason: 'not_calibrated' };
 
   const anyEnrolled = () => members.some((m) => m.enrolled);
 
@@ -132,7 +132,7 @@ export function createMockVoice(
       available: true,
       unavailable_reason: null,
       state,
-      wake: { phrase: 'hey goose', detector: 'whisper', reason: 'The "hey goose" detector heard 2 of your 5 calibration takes, so Whisper listens for it.' },
+      wake: { phrase: 'hey goose', detector: 'whisper', reason: 'not_calibrated' },
       interrupts: anyEnrolled() ? 'enrolled_or_wake' : 'wake_only',
       last_heard: lastHeard,
       session_id: 'mock-room',
@@ -264,9 +264,7 @@ export function createMockVoice(
         kind: heyGoose && heard * 5 >= of * 4 ? 'hey_goose' : 'whisper',
         heard,
         of,
-        reason: heyGoose
-          ? `The "hey goose" detector heard ${heard} of ${of} sentences; it listens in the room once it hears 4 of 5.`
-          : 'Custom phrases are heard by Whisper.',
+        reason: !heyGoose ? 'custom_phrase' : heard * 5 >= of * 4 ? 'calibrated' : 'not_calibrated',
       };
       let match: VoiceTakeResult['voice_match'] = null;
       if (m) {
@@ -286,7 +284,7 @@ export function createMockVoice(
     },
     resetCalibration: async () => {
       run = { taken: 0, tries: 0 };
-      detector = { kind: 'whisper', heard: 0, of: 0, reason: '' };
+      detector = { kind: 'whisper', heard: 0, of: 0, reason: 'not_calibrated' };
     },
     forget: async (profileId) => {
       const m = member(profileId);

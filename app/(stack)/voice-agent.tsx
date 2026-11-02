@@ -16,7 +16,7 @@ import { SettingsGroup, SettingsHeader, SettingsMessage, SettingsRow } from '@/c
 import { SettingsNotice, SettingsScroll } from '@/components/settings/settings-scroll';
 import { Spacing } from '@/constants/spacing';
 import { canRebuild, DEFAULT_RETENTION_DAYS } from '@/models/agents';
-import { detectorWords, interruptWords, unavailableWords } from '@/models/voice-room';
+import { detectorWords, interruptWords, unavailableWords, wakeReasonWords } from '@/models/voice-room';
 import { useConfirm } from '@/providers/confirm-provider';
 import { confirm, reject, selectionTick, tap } from '@/services/haptics';
 import { prefillDetail, prefillLabel, prefillTimes } from '@/view-models/agent-words';
@@ -289,7 +289,7 @@ export default function VoiceAgentScreen() {
                 key="detector"
                 label={t('voiceAgent.hears.detector')}
                 value={detectorWords(room.room.wake.detector)}
-                description={room.room.wake.reason || null}
+                description={wakeReasonWords(room.room.wake.reason)}
               />,
               <SwitchRow
                 key="room"

@@ -23,7 +23,7 @@ import { SwitchRow } from '@/components/settings/setting-controls';
 import { SettingsGroup, SettingsRow } from '@/components/settings/settings-list';
 import { GIcon } from '@/components/ui/g-icon';
 import { Spacing } from '@/constants/spacing';
-import { consistencyWords } from '@/models/voice-room';
+import { consistencyWords, wakeReasonWords } from '@/models/voice-room';
 import { useConfirm } from '@/providers/confirm-provider';
 import { selectionTick, tap } from '@/services/haptics';
 import { useMember } from '@/view-models/use-household';
@@ -265,7 +265,7 @@ function Done({ vm, member, handed, onDone }: { vm: UseTeachVoice; member: Teach
           {d ? (
             <InkText>{d.kind === 'hey_goose' ? t('teachVoice.done.listensHeyGoose') : t('teachVoice.done.whisper', { phrase: vm.phrase })}</InkText>
           ) : null}
-          {d?.reason ? <InkText tone="secondary">{d.reason}</InkText> : null}
+          {d && wakeReasonWords(d.reason) ? <InkText tone="secondary">{wakeReasonWords(d.reason)}</InkText> : null}
         </View>
         <View style={styles.lines}>
           {vm.results.map((r, i) => (

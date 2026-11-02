@@ -24,6 +24,7 @@ import type {
   VoiceSpeaker,
   VoiceTakeResult,
   WakeDetectorKind,
+  WakeDetectorReason,
   WakeDetectorVerdict,
 } from '@/services/types';
 
@@ -32,6 +33,7 @@ import { readPrefills } from './agents';
 const ROOM_STATES: readonly RoomVoiceState[] = ['off', 'starting', 'wait', 'listen', 'thinking', 'speak'];
 const UNAVAILABLE: readonly RoomVoiceUnavailable[] = ['no_mic_speaker_pair', 'voice_running_elsewhere', 'models_missing'];
 const MODEL_STATES: readonly VoicePrintModelState[] = ['missing', 'downloading', 'ready', 'failed'];
+const WAKE_REASONS: readonly WakeDetectorReason[] = ['chosen', 'calibrated', 'not_calibrated', 'custom_phrase', 'no_ear'];
 
 type Raw = Record<string, unknown>;
 
@@ -55,6 +57,10 @@ function detector(value: unknown): WakeDetectorKind {
   return value === 'hey_goose' ? 'hey_goose' : 'whisper';
 }
 
+function wakeReason(value: unknown): WakeDetectorReason | null {
+  return WAKE_REASONS.includes(value as WakeDetectorReason) ? (value as WakeDetectorReason) : null;
+}
+
 function speaker(raw: unknown): VoiceSpeaker | null {
   const r = record(raw);
   return r && typeof r.profile_id === 'string' && r.profile_id !== '' ? { profile_id: r.profile_id, name: text(r.name) } : null;
@@ -72,7 +78,7 @@ export function readVoiceRoom(raw: unknown): VoiceRoom | null {
     available: r.available === true,
     unavailable_reason: reason,
     state: r.state as RoomVoiceState,
-    wake: { phrase: text(wake.phrase), detector: detector(wake.detector), reason: text(wake.reason) },
+    wake: { phrase: text(wake.phrase), detector: detector(wake.detector), reason: wakeReason(wake.reason) },
     interrupts: r.interrupts === 'enrolled_or_wake' ? 'enrolled_or_wake' : 'wake_only',
     last_heard: heard && typeof heard.profile_id === 'string' ? { profile_id: heard.profile_id, name: text(heard.name), at: text(heard.at) } : null,
     session_id: typeof r.session_id === 'string' && r.session_id !== '' ? r.session_id : null,
@@ -254,6 +260,24 @@ export function detectorWords(kind: WakeDetectorKind): string {
   return kind === 'hey_goose' ? i18n.t('voiceRoom.detector.heyGoose') : i18n.t('voiceRoom.detector.whisper');
 }
 
+/** Why the Pond listens with the detector it does, or null when it gave no reason this phone knows. */
+export function wakeReasonWords(reason: WakeDetectorReason | null): string | null {
+  switch (reason) {
+    case 'chosen':
+      return i18n.t('voiceRoom.reason.chosen');
+    case 'calibrated':
+      return i18n.t('voiceRoom.reason.calibrated');
+    case 'not_calibrated':
+      return i18n.t('voiceRoom.reason.notCalibrated');
+    case 'custom_phrase':
+      return i18n.t('voiceRoom.reason.customPhrase');
+    case 'no_ear':
+      return i18n.t('voiceRoom.reason.noEar');
+    case null:
+      return null;
+  }
+}
+
 /** How someone stops a reply in the room, by the rule the Pond is using. */
 export function interruptWords(rule: VoiceRoom['interrupts'], phrase: string): string {
   const said = phrase.trim() || i18n.t('voiceRoom.defaultPhrase');
@@ -356,7 +380,7 @@ export function teachSentences(phrase: string): string[] {
 function verdict(raw: unknown): WakeDetectorVerdict | null {
   const v = record(raw);
   if (!v) return null;
-  return { kind: detector(v.kind), heard: count(v.heard), of: count(v.of), reason: text(v.reason) };
+  return { kind: detector(v.kind), heard: count(v.heard), of: count(v.of), reason: wakeReason(v.reason) };
 }
 
 /** One take's answer; null for a body that is not one, which the screen says rather than guess. */

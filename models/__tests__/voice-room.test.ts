@@ -17,6 +17,7 @@ import {
   readVoiceTake,
   teachSentences,
   voiceAgentField,
+  wakeReasonWords,
 } from '../voice-room';
 
 const ROOM = {
@@ -24,7 +25,7 @@ const ROOM = {
   available: true,
   unavailable_reason: null,
   state: 'wait',
-  wake: { phrase: 'hey goose', detector: 'hey_goose', reason: 'It heard 5 of 5 takes.' },
+  wake: { phrase: 'hey goose', detector: 'hey_goose', reason: 'calibrated' },
   interrupts: 'enrolled_or_wake',
   last_heard: { profile_id: 'p1', name: 'Amina', at: '2026-11-02T10:00:00Z' },
   session_id: 's1',
@@ -46,6 +47,14 @@ describe('reading the room', () => {
     const odd = readVoiceRoom({ ...ROOM, wake: { phrase: 'hey goose', detector: 'cnn2' }, interrupts: 'anyone' });
     expect(odd?.wake.detector).toBe('whisper');
     expect(odd?.interrupts).toBe('wake_only');
+  });
+
+  it('says why the Pond listens with its detector in words, and nothing for a reason it does not know', () => {
+    const nano = readVoiceRoom({ ...ROOM, wake: { phrase: 'goose', detector: 'whisper', reason: 'custom_phrase' }, interrupts: 'wake_only', last_heard: null });
+    expect(nano?.wake).toEqual({ phrase: 'goose', detector: 'whisper', reason: 'custom_phrase' });
+    expect(wakeReasonWords(nano?.wake.reason ?? null)).toMatch(/hey goose/);
+    expect(readVoiceRoom({ ...ROOM, wake: { ...ROOM.wake, reason: 'a new reason' } })?.wake.reason).toBeNull();
+    expect(wakeReasonWords(null)).toBeNull();
   });
 
   it('reads each event the stream sends, and drops the ones the phone has no use for', () => {
@@ -192,7 +201,7 @@ describe('teaching Goose a voice', () => {
       of: 5,
       wake: { heard: true, heard_as: 'hey goose', new_detector: true },
       voice_match: { stored: true, enrolled: false, consistency: null },
-      wake_detector: { kind: 'hey_goose', heard: 2, of: 2, reason: 'Heard both.' },
+      wake_detector: { kind: 'hey_goose', heard: 2, of: 2, reason: 'calibrated' },
     };
     expect(readVoiceTake(take)).toEqual(take);
     expect(readVoiceTake({ ...take, voice_match: null })?.voice_match).toBeNull();

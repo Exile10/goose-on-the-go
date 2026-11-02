@@ -42,7 +42,7 @@ const ROOM: VoiceRoom = {
   available: true,
   unavailable_reason: null,
   state: 'wait',
-  wake: { phrase: 'hey goose', detector: 'whisper', reason: 'It heard 2 of 5.' },
+  wake: { phrase: 'hey goose', detector: 'whisper', reason: 'not_calibrated' },
   interrupts: 'wake_only',
   last_heard: null,
   session_id: 's1',

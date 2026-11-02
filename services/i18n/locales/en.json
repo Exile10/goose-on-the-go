@@ -4088,6 +4088,13 @@
       "heyGoose": "The “hey goose” detector",
       "whisper": "Whisper"
     },
+    "reason": {
+      "chosen": "It was chosen in your Pond’s settings.",
+      "calibrated": "It heard how everyone who taught it says “hey goose”.",
+      "notCalibrated": "The “hey goose” detector takes over once it hears 4 of 5 sentences from everyone who teaches it. Until then, Whisper listens.",
+      "customPhrase": "Your phrase isn’t “hey goose”, the only one the detector knows, so Whisper listens for it.",
+      "noEar": "Your Pond’s ear isn’t running, so Whisper listens on a timer instead of when someone speaks."
+    },
     "defaultPhrase": "hey goose",
     "interrupts": {
       "enrolledOrWake": "Say “{{phrase}}”, or just talk over it if Voice Match knows your voice, and Goose stops to listen.",

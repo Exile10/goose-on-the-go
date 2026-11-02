@@ -1560,13 +1560,15 @@ export interface ProfilePrefs {
 /** The Pond's own wake detector, or Whisper listening for the phrase in what it transcribes. */
 export type WakeDetectorKind = 'hey_goose' | 'whisper';
 
+/** Why the Pond listens with the detector it does; null for a reason this phone does not know. */
+export type WakeDetectorReason = 'chosen' | 'calibrated' | 'not_calibrated' | 'custom_phrase' | 'no_ear';
+
 export interface WakeDetectorVerdict {
   kind: WakeDetectorKind;
   /** Takes the "hey goose" detector heard, of the takes recorded. */
   heard: number;
   of: number;
-  /** Why the Pond chose this detector, in its own words. */
-  reason: string;
+  reason: WakeDetectorReason | null;
 }
 
 export type RoomVoiceState = 'off' | 'starting' | 'wait' | 'listen' | 'thinking' | 'speak';
@@ -1580,7 +1582,7 @@ export interface VoiceRoom {
   available: boolean;
   unavailable_reason: RoomVoiceUnavailable | null;
   state: RoomVoiceState;
-  wake: { phrase: string; detector: WakeDetectorKind; reason: string };
+  wake: { phrase: string; detector: WakeDetectorKind; reason: WakeDetectorReason | null };
   /** `enrolled_or_wake`: a voice Voice Match knows, talking over the reply, or the wake word. */
   interrupts: 'enrolled_or_wake' | 'wake_only';
   last_heard: { profile_id: string; name: string; at: string } | null;
