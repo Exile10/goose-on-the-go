@@ -71,8 +71,11 @@ export function buildSettingsIndex(t: TFunction, groups: NavGroup[] = PROFILE_NA
         if (item.kind === 'special') continue;
         if (item.kind === 'link') {
           if (rowRoutes.has(item.route)) continue;
+          const id = `${item.route}#${item.labelKey}`;
+          // A screen linked from two pages is one place to go: it is listed under the first.
+          if (entries.some((entry) => entry.id === id)) continue;
           entries.push({
-            id: `${item.route}#${item.labelKey}`,
+            id,
             label: t(item.labelKey),
             parent,
             keywords: item.hintKey ? [t(item.hintKey)] : [],
