@@ -827,6 +827,10 @@ export class PondApiClient {
         body,
       );
     }
+    // A Pond without the route answers with its dashboard page and a 200: that is a missing route.
+    if (/^text\/html\b/i.test(res.headers.get('content-type') ?? '')) {
+      throw new ApiError(`${init.method ?? 'GET'} ${path} → 404 (the Pond answered with a page)`, 404, null, null, null);
+    }
     return (await parseBody<T>(res)) as T;
   }
 
