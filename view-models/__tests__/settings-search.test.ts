@@ -35,7 +35,17 @@ it('finds a menu row by part of its name, and puts it first', () => {
 });
 
 it('finds a setting inside a page, and says which page it is on', () => {
-  expect(find('wake word')[0]).toMatchObject({ label: 'Wake word', parent: 'Voice', route: '/(stack)/settings-voice' });
+  expect(find('wake word').map((entry) => entry.route)).toContain('/(stack)/settings-voice');
+  expect(find('transcription service')[0]).toMatchObject({ parent: 'Listening', route: '/(stack)/settings-listening' });
+});
+
+it('finds the wake word screen first, once, under Voice', () => {
+  expect(find('wake word')[0]).toMatchObject({ label: 'Wake word', parent: 'Voice', route: '/(stack)/wake-word' });
+  expect(index.filter((entry) => entry.route === '/(stack)/wake-word')).toHaveLength(1);
+  const linksTo = (id: SettingsPageId) =>
+    SETTINGS_PAGES[id].sections.some((section) => section.items.some((item) => item.kind === 'link' && item.route === '/(stack)/wake-word'));
+  expect(linksTo('voice')).toBe(true);
+  expect(linksTo('listening')).toBe(true);
 });
 
 it('finds a page by the name of one of its choices', () => {

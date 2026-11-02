@@ -1,6 +1,6 @@
 /**
  * The wake word, left out of owner setup because choosing it well takes a quiet room and five
- * recorded sentences. Reached from Home's "Finish setting up" card; Settings > Listening has the bare field.
+ * recorded sentences. Reached from Home's "Finish setting up" card and from Settings > Voice and Listening.
  */
 
 import React from 'react';

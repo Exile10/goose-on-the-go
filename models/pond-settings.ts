@@ -118,6 +118,7 @@ export type SummaryId =
   | 'webSearch'
   | 'assistant'
   | 'voice'
+  | 'wakeWord'
   | 'thinking'
   | 'models'
   | 'memory'

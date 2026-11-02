@@ -740,7 +740,8 @@
         "label": "Sound quality"
       },
       "voice_wake_word": {
-        "label": "Wake word",
+        "label": "Phrase",
+        "hint": "The words that wake Goose. Wake word, above, also teaches it how your household says them.",
         "placeholder": "goose"
       },
       "voice_thinking_tone_enabled": {

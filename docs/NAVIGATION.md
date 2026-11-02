@@ -274,7 +274,7 @@ Five more stack screens aren't in the hub:
   could not set up its replacement. There is one stored Pond, not a list; pairing
   another replaces it.
 - **Add a device** (`/(stack)/commission-device`) — from the Devices tab and Home.
-- **Wake word** (`/(stack)/wake-word`) — from the Voice agent and from Teach Goose your voice's intro: the phrase, saved through the shared settings store, and a way into Teach Goose your voice. Home's "Finish setting up" card opens Teach Goose your voice itself.
+- **Wake word** (`/(stack)/wake-word`) — from Settings > Voice and Settings > Listening, the Voice agent, and Teach Goose your voice's intro: the phrase, saved through the shared settings store, and a way into Teach Goose your voice. Home's "Finish setting up" card opens Teach Goose your voice itself.
 - **Connect Desktop** (`/(stack)/connect-desktop`) — the QR scanner opened from
   Pond Pairing. It reads the pairing QR and a Pond's printed setup card
   (`pond://setup`), and hands either back through `services/pairing-handoff.ts`.
@@ -497,7 +497,7 @@ What the removed screens held, and where it is now:
 | Wizard: Find, Code, Name, Pairing (new Pond) | Find your Pond: inline search, code, claim and errors; the phone's own name |
 | Setup: Welcome | The Pond's name on Find your Pond and Home's Pond card; the progress meter; Switch Pond on Home |
 | Setup: Language and location | Prefilled from the phone on About you; also in Settings (Your home, Time zone) |
-| Setup: Wake word | Home's "Finish setting up" card, which opens Teach Goose your voice (`app/teach-voice.tsx`); the phrase is on `/(stack)/wake-word`, reached from that flow's intro and the Voice agent; Settings > Voice has the bare field |
+| Setup: Wake word | Home's "Finish setting up" card, which opens Teach Goose your voice (`app/teach-voice.tsx`); the phrase is on `/(stack)/wake-word`, reached from that flow's intro, the Voice agent, and a Wake word row in Settings > Voice and Listening; Settings > Voice also has the bare field, labelled Phrase |
 | Setup: All set | Memory stays on (sent with Finish) and is in Settings > Memory; "Look over your choices" on Home opens Settings |
 | Setup: Ready | Home's getting-ready card, shown after every setup until Goose can answer |
 

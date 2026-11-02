@@ -76,7 +76,8 @@ const voice: SettingsPage = {
       titleKey: 'settings.section.wakeWord',
       footerKey: 'settings.footer.wakeWord',
       items: [
-        { kind: 'text', key: 'voice_wake_word', restart: true, labelKey: 'settings.field.voice_wake_word.label', placeholderKey: 'settings.field.voice_wake_word.placeholder' },
+        { kind: 'link', route: '/(stack)/wake-word', icon: 'mic', tile: 'pink', labelKey: 'screens.wakeWord', summary: 'wakeWord' },
+        { kind: 'text', key: 'voice_wake_word', restart: true, labelKey: 'settings.field.voice_wake_word.label', hintKey: 'settings.field.voice_wake_word.hint', placeholderKey: 'settings.field.voice_wake_word.placeholder' },
         { kind: 'special', id: 'wakeWordReset' },
       ],
     },
@@ -135,7 +136,14 @@ const listening: SettingsPage = {
   titleKey: 'screens.settingsListening',
   descriptionKey: 'settings.page.listening',
   sections: [
-    { titleKey: 'settings.section.inTheRoom', items: [{ kind: 'special', id: 'roomVoice' }] },
+    {
+      titleKey: 'settings.section.inTheRoom',
+      items: [
+        { kind: 'special', id: 'roomVoice' },
+        // What the room listens for, so someone tuning how it listens can reach it from here.
+        { kind: 'link', route: '/(stack)/wake-word', icon: 'mic', tile: 'pink', labelKey: 'screens.wakeWord', summary: 'wakeWord' },
+      ],
+    },
     {
       // Each of these tunes Whisper listening for the phrase; the "hey goose" detector reads none of them.
       titleKey: 'settings.section.whisperDetector',

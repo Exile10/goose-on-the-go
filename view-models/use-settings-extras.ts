@@ -144,6 +144,7 @@ export function summarize(id: SummaryId, s: PondSettings | null, x: Extras, t: T
     case 'speaking':
       return describeVoice(voiceInUse(s.voice_tts_voice)).name;
     case 'voice':
+    case 'wakeWord':
       return s.voice_wake_word ? t('settings.summary.wakeWord', { word: s.voice_wake_word }) : null;
     case 'thinking':
       return t(thinkingKey(s.thinking_mode));
