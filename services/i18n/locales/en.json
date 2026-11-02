@@ -675,7 +675,7 @@
       "wakeWord": "A new wake word is heard from the next time your Pond starts listening.",
       "restartVoice": "These take effect the next time your Pond starts listening.",
       "restartReview": "A change here takes effect when your Pond restarts.",
-      "embeddings": "Changing this means memories you already have stop matching until your Pond reads them again. Takes effect when your Pond restarts.",
+      "embeddings": "The model it uses is chosen on Models. A change takes effect straight away, and your Pond reads your memories again in the background.",
       "restartTools": "A change here takes effect when your Pond restarts.",
       "mesh": "Turning this off takes effect when your Pond restarts.",
       "location": "Save a place name and your Pond looks up where it is.",
@@ -858,7 +858,8 @@
         "hint": "How faded a memory must be before it is deleted."
       },
       "embedding_provider": {
-        "label": "Search engine for memories"
+        "label": "Search memories by meaning",
+        "hint": "Find a memory by what it means, not only the words in it, so a question in English can find a fact said in Swahili. Off, your Pond searches by keyword."
       },
       "ext_memory_enabled": {
         "label": "Memories",
@@ -1200,20 +1201,6 @@
         "adversarial": {
           "label": "Three passes",
           "hint": "Slower, and catches more mistakes"
-        }
-      },
-      "embedding_provider": {
-        "gguf": {
-          "label": "On your Pond",
-          "hint": "Runs with the same engine as chat. The one that starts on a Jetson"
-        },
-        "fastembed": {
-          "label": "FastEmbed",
-          "hint": "A separate engine. Does not start on a Jetson"
-        },
-        "none": {
-          "label": "Off",
-          "hint": "Memories are found by matching words only"
         }
       },
       "tool_selection_mode": {

@@ -59,6 +59,19 @@ describe('the catalogue', () => {
     expect(orphaned).toEqual([]);
   });
 
+  it('starts every on/off text field on one of its two values', () => {
+    const stray = items.flatMap((item) =>
+      item.kind === 'toggle' && ![item.on, item.off].includes(SAMPLE_SETTINGS[item.key]) ? [item.key] : [],
+    );
+    expect(stray).toEqual([]);
+  });
+
+  it('switches search by meaning between the values the Pond reads, with no restart', () => {
+    const item = items.find((i) => 'key' in i && i.key === 'embedding_provider');
+    expect(item).toMatchObject({ kind: 'toggle', on: 'auto', off: 'none' });
+    expect(item && 'restart' in item ? item.restart : undefined).toBeUndefined();
+  });
+
   it('shows each field on one page only', () => {
     const keys = pages.flatMap((page) => pageKeys(page));
     expect(keys.filter((key, i) => keys.indexOf(key) !== i)).toEqual([]);
