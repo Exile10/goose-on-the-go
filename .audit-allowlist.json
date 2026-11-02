@@ -3,6 +3,20 @@
   "$policy": "Exceptions are deferrals, not pardons. An entry is only justified when the advisory cannot be fixed without a breaking upgrade AND the exposure does not reach a shipped build or a user's device. Anything reachable from the app bundle gets fixed, not listed.",
   "allow": [
     {
+      "advisory": "GHSA-qr28-fpjm-wq7f",
+      "package": "decode-uri-component",
+      "severity": "high",
+      "reason": "Quadratic replacement of percent-encoded runs. This one is in the bundle: expo-router reads every link's query with query-string 7.1.3, which requires decode-uri-component ^0.2.2. The fixed 0.5.1 is ESM only, which query-string 7's require() cannot load, and npm's only other route is expo-router 58, a new Expo SDK. So it is fixed in place instead: patches/decode-uri-component+0.2.2.patch swaps in 0.5.1's single-pass decoder and keeps 0.2.2's API. npm audit reads only the version, so it still reports 0.2.2. scripts/__tests__/decode-uri-component-patch.test.ts fails if the patch stops applying. Remove this entry when expo-router stops depending on query-string 7.",
+      "reviewBy": "2027-01-31"
+    },
+    {
+      "advisory": "GHSA-vcc3-ghjq-m6fr",
+      "package": "decode-uri-component",
+      "severity": "medium",
+      "reason": "Exponential decoding of malformed percent-encoded input; on a long enough link, 0.2.2 overflows the stack. Fixed by the same patch as GHSA-qr28-fpjm-wq7f; see that entry.",
+      "reviewBy": "2027-01-31"
+    },
+    {
       "advisory": "GHSA-mrhx-c7xc-m3w5",
       "package": "zod",
       "severity": "high",
