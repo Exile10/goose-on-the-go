@@ -5,7 +5,6 @@ import type { VoiceAgent, VoicePrintMember } from '@/services/types';
 import {
   QUIET_ROOM,
   consistencyWords,
-  detectorHeardTake,
   draftOf,
   foldRoomEvent,
   interruptWords,
@@ -191,19 +190,13 @@ describe('teaching Goose a voice', () => {
     const take = {
       take: 2,
       of: 5,
-      wake: { heard: true, heard_as: 'hey goose' },
+      wake: { heard: true, heard_as: 'hey goose', new_detector: true },
       voice_match: { stored: true, enrolled: false, consistency: null },
       wake_detector: { kind: 'hey_goose', heard: 2, of: 2, reason: 'Heard both.' },
     };
     expect(readVoiceTake(take)).toEqual(take);
     expect(readVoiceTake({ ...take, voice_match: null })?.voice_match).toBeNull();
+    expect(readVoiceTake({ ...take, wake: { heard: false, heard_as: null } })?.wake.new_detector).toBe(false);
     expect(readVoiceTake({ ...take, wake_detector: undefined })).toBeNull();
-  });
-
-  it('reads a take as heard by the detector when its count went up with it', () => {
-    expect(detectorHeardTake(null, { kind: 'whisper', heard: 0, of: 1, reason: '' })).toBe(false);
-    expect(detectorHeardTake(null, { kind: 'hey_goose', heard: 1, of: 1, reason: '' })).toBe(true);
-    expect(detectorHeardTake({ kind: 'hey_goose', heard: 1, of: 1, reason: '' }, { kind: 'whisper', heard: 1, of: 2, reason: '' })).toBe(false);
-    expect(detectorHeardTake({ kind: 'whisper', heard: 1, of: 2, reason: '' }, { kind: 'hey_goose', heard: 2, of: 3, reason: '' })).toBe(true);
   });
 });

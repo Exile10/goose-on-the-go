@@ -52,20 +52,23 @@ const PRINTS: VoicePrints = {
   members: [{ profile_id: 'amina', name: 'Amina', takes: 5, needed: 5, enrolled: true, consistency: 0.8, updated_at: null }],
 };
 
-const accepted = (take: number, heard: number): VoiceTakeResult => ({
+const accepted = (take: number, heard: number, fired = true): VoiceTakeResult => ({
   take,
   of: 5,
-  wake: { heard: true, heard_as: 'hey goose' },
+  wake: { heard: true, heard_as: 'hey goose', new_detector: fired },
   voice_match: { stored: true, enrolled: take >= 5, consistency: take >= 2 ? 0.8 : null },
   wake_detector: { kind: 'hey_goose', heard, of: take, reason: '' },
 });
 
 const trees: ReactTestRenderer[] = [];
 
-async function mount(member: { id: string; name: string } | null = { id: 'amina', name: 'Amina' }): Promise<{ readonly vm: UseTeachVoice }> {
+async function mount(
+  member: { id: string; name: string } | null = { id: 'amina', name: 'Amina' },
+  phrase = 'hey goose',
+): Promise<{ readonly vm: UseTeachVoice }> {
   let latest!: UseTeachVoice;
   const Probe = () => {
-    latest = useTeachVoice({ member, phrase: 'hey goose' });
+    latest = useTeachVoice({ member, phrase });
     return null;
   };
   await act(async () => {
@@ -97,14 +100,14 @@ afterEach(async () => {
   });
 });
 
-it('starts from nothing: clears the calibration, and forgets a print it is recording again', async () => {
+it('keeps what the Pond learned about the phrase, and forgets a print it is recording again', async () => {
   const m = await mount();
   expect(m.vm.phase).toBe('intro');
   expect(m.vm.voiceMatch.on).toBe(true);
   await act(async () => {
     await m.vm.actions.start();
   });
-  expect(pond.resetWakeWordCalibration).toHaveBeenCalledTimes(1);
+  expect(pond.resetWakeWordCalibration).not.toHaveBeenCalled();
   expect(pond.forgetVoicePrints).toHaveBeenCalledWith('amina');
   expect(mockSettingsUpdate).not.toHaveBeenCalled();
   expect(m.vm.phase).toBe('takes');
@@ -133,12 +136,12 @@ it('moves on by itself, keeps the sentence when one is refused, and ends after t
   expect(m.vm.index).toBe(1);
   expect(m.vm.said).toContain('hey ghost');
 
-  for (const [take, heard] of [
-    [2, 2],
-    [3, 2],
-    [4, 3],
-  ]) {
-    pond.voiceTake.mockResolvedValueOnce(accepted(take, heard));
+  for (const [take, heard, fired] of [
+    [2, 2, true],
+    [3, 2, false],
+    [4, 3, true],
+  ] as const) {
+    pond.voiceTake.mockResolvedValueOnce(accepted(take, heard, fired));
     await act(async () => {
       await mockRecorder.handlers?.take('file:///n.wav');
     });
@@ -153,6 +156,16 @@ it('moves on by itself, keeps the sentence when one is refused, and ends after t
   expect(m.vm.results.map((r) => r.detector)).toEqual([true, true, false, true, true]);
   expect(m.vm.enrolled).toBe(true);
   expect(finishChecklistItem).toHaveBeenCalledWith('pairing-1', 'wake');
+});
+
+it('clears what the Pond learned about the phrase only when it saves a new phrase', async () => {
+  const m = await mount(undefined, 'jambo bata');
+  await act(async () => {
+    await m.vm.actions.start();
+  });
+  expect(pond.resetWakeWordCalibration).toHaveBeenCalledTimes(1);
+  expect(mockSettingsUpdate).toHaveBeenCalledWith('voice_wake_word', 'jambo bata');
+  expect(pond.resetWakeWordCalibration.mock.invocationCallOrder[0]).toBeLessThan(mockSettingsUpdate.mock.invocationCallOrder[0]);
 });
 
 it('teaches only the wake phrase for a phone that belongs to no one', async () => {

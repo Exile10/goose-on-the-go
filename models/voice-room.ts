@@ -369,16 +369,14 @@ export function readVoiceTake(raw: unknown): VoiceTakeResult | null {
   return {
     take: count(r.take),
     of: count(r.of, VOICE_PRINT_TAKES) || VOICE_PRINT_TAKES,
-    wake: { heard: wake.heard === true, heard_as: typeof wake.heard_as === 'string' && wake.heard_as ? wake.heard_as : null },
+    wake: {
+      heard: wake.heard === true,
+      heard_as: typeof wake.heard_as === 'string' && wake.heard_as ? wake.heard_as : null,
+      new_detector: wake.new_detector === true,
+    },
     voice_match: match ? { stored: match.stored === true, enrolled: match.enrolled === true, consistency: fraction(match.consistency) } : null,
     wake_detector: verdictOf,
   };
-}
-
-/** Whether the detector heard the latest take: its count of heard takes went up with it. */
-export function detectorHeardTake(before: WakeDetectorVerdict | null, after: WakeDetectorVerdict): boolean {
-  const heardBefore = before && before.of < after.of ? before.heard : 0;
-  return after.heard > heardBefore;
 }
 
 /** Known voices first, then those part-way, then everyone else, each by name. */

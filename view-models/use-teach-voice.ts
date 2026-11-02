@@ -4,8 +4,10 @@
  * person's voice print. A take the Pond accepts moves on to the next sentence by itself; one it
  * refuses keeps the same sentence and says why.
  *
- * A run starts from nothing: the Pond's wake calibration is cleared first, and a print being
- * recorded again is forgotten, so five new sentences make it rather than five more.
+ * What the Pond learned about the phrase belongs to the phrase, not the person, so a run adds to it;
+ * it is cleared only when the run saves a different phrase. A print being recorded again is
+ * forgotten first, so five new sentences make it rather than five more. The run counts its own
+ * sentences: the Pond's verdict on the detector is the household's, across every taught member.
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -15,7 +17,7 @@ import { ApiError } from '@/services/api-client';
 import { reject } from '@/services/haptics';
 import i18n from '@/services/i18n';
 import type { VoicePrints, VoiceTakeResult, WakeDetectorVerdict } from '@/services/types';
-import { VOICE_PRINT_TAKES, detectorHeardTake, teachSentences } from '@/models/voice-room';
+import { VOICE_PRINT_TAKES, teachSentences } from '@/models/voice-room';
 import { describeApiError } from './describe-error';
 import { usePondSettings } from './use-pond-settings';
 import { finishChecklistItem } from './use-setup-checklist';
@@ -30,7 +32,7 @@ export interface TeachMember {
   name: string;
 }
 
-/** One accepted sentence, and whether the "hey goose" detector heard it. */
+/** One accepted sentence, and whether the "hey goose" detector fired on it. */
 export interface TeachResult {
   prompt: string;
   detector: boolean;
@@ -125,7 +127,7 @@ export function useTeachVoice({ member, phrase }: { member: TeachMember | null; 
 
   const available = member !== null && !prints.missing;
   const matchOn = wantMatch && available;
-  const run = useRef({ index: 0, detector: null as WakeDetectorVerdict | null, matchOn, sentences });
+  const run = useRef({ index: 0, matchOn, sentences });
   useEffect(() => {
     run.current.matchOn = matchOn;
     run.current.sentences = sentences;
@@ -148,14 +150,12 @@ export function useTeachVoice({ member, phrase }: { member: TeachMember | null; 
         setSaid(words);
         return 'again';
       }
-      const heard = detectorHeardTake(r.detector, result.wake_detector);
-      r.detector = result.wake_detector;
-      r.index = Math.min(result.take, r.sentences.length - 1);
+      r.index += 1;
       setDetector(result.wake_detector);
-      setResults((was) => [...was, { prompt, detector: heard }]);
+      setResults((was) => [...was, { prompt, detector: result.wake.new_detector }]);
       setSaid(null);
       if (result.voice_match) setMatch(result.voice_match);
-      if (result.take >= result.of) {
+      if (r.index >= Math.min(result.of, r.sentences.length)) {
         setPhase('done');
         if (profileId) void finishChecklistItem(profileId, 'wake');
         void prints.actions.refresh();
@@ -175,13 +175,13 @@ export function useTeachVoice({ member, phrase }: { member: TeachMember | null; 
     setSaid(null);
     try {
       await recorder.start(async () => {
-        if (phrase.trim() && phrase.trim() !== saved && !(await update('voice_wake_word', phrase.trim()))) {
-          throw new Error('The wake phrase was not saved');
+        // Another member's pronunciations of the same phrase stay; a new phrase starts the list again.
+        if (phrase.trim() && phrase.trim() !== saved) {
+          await source.resetCalibration();
+          if (!(await update('voice_wake_word', phrase.trim()))) throw new Error('The wake phrase was not saved');
         }
-        await source.resetCalibration();
         if (run.current.matchOn && member && memberTakes > 0) await source.forget(member.id);
         run.current.index = 0;
-        run.current.detector = null;
         setIndex(0);
         setResults([]);
         setDetector(null);

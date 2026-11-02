@@ -4281,10 +4281,11 @@
       "titleMine": "Goose knows your voice",
       "titleOther": "Goose knows {{name}}’s voice",
       "phraseTitle": "Goose knows how you say “{{phrase}}”",
-      "heyGoose": "The “hey goose” detector heard {{heard}} of {{of}} sentences, so your Pond listens with it.",
       "whisper": "Your Pond listens for “{{phrase}}” with Whisper.",
       "heard": "The “hey goose” detector heard this one.",
-      "missed": "The “hey goose” detector missed this one."
+      "missed": "The “hey goose” detector missed this one.",
+      "runHeard": "The “hey goose” detector heard {{heard}} of these {{of}} sentences.",
+      "listensHeyGoose": "Your Pond listens for “hey goose” with its own detector."
     }
   }
 }

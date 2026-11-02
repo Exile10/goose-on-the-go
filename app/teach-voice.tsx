@@ -3,8 +3,8 @@
  * in Ink's material. An intro says what Goose learns and that recordings are not kept, with
  * Recognise my voice on by default. Then five sentences, one at a time, on the theme's ground: "Say"
  * over the sentence, which rests muted and rises to full ink on its offset while the phone hears
- * speech. There is no glow, because state is elevation, not hue. A done screen names the person and
- * whether the "hey goose" detector heard them.
+ * speech. There is no glow, because state is elevation, not hue. A done screen names the person, says
+ * which of their sentences the "hey goose" detector heard, and which detector the Pond now uses and why.
  *
  * Opened from Home's setup card, the Wake word screen and Voice Match, over everything, with no
  * header: the close control is its own. Leaving once a sentence is recorded asks first; Set up later
@@ -254,21 +254,19 @@ function Done({ vm, member, handed, onDone }: { vm: UseTeachVoice; member: Teach
       ? t('teachVoice.done.titleOther', { name })
       : t('teachVoice.done.titleMine');
   const steadiness = vm.voiceMatch.on ? consistencyWords(vm.consistency) : null;
+  const firedCount = vm.results.filter((r) => r.detector).length;
 
   return (
     <>
       <ScrollView contentContainerStyle={styles.introScroll}>
         <InkTitle level={1}>{title}</InkTitle>
-        {d ? (
-          <View style={styles.lines} accessibilityLiveRegion="polite">
-            <InkText weight="semibold">
-              {d.kind === 'hey_goose'
-                ? t('teachVoice.done.heyGoose', { heard: d.heard, of: d.of })
-                : t('teachVoice.done.whisper', { phrase: vm.phrase })}
-            </InkText>
-            {d.reason ? <InkText tone="secondary">{d.reason}</InkText> : null}
-          </View>
-        ) : null}
+        <View style={styles.lines} accessibilityLiveRegion="polite">
+          <InkText weight="semibold">{t('teachVoice.done.runHeard', { heard: firedCount, of: vm.results.length })}</InkText>
+          {d ? (
+            <InkText>{d.kind === 'hey_goose' ? t('teachVoice.done.listensHeyGoose') : t('teachVoice.done.whisper', { phrase: vm.phrase })}</InkText>
+          ) : null}
+          {d?.reason ? <InkText tone="secondary">{d.reason}</InkText> : null}
+        </View>
         <View style={styles.lines}>
           {vm.results.map((r, i) => (
             <View

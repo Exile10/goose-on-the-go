@@ -49,15 +49,23 @@ it('downloads its speaker model before it learns a voice, refuses one sentence, 
   expect(((await take().catch((e: unknown) => e)) as ApiError).status).toBe(409);
 
   c.advance(MOCK_MODEL_MS);
-  await pond.resetCalibration();
-  expect((await take()).take).toBe(1);
+  const fired: boolean[] = [];
+  const one = await take();
+  expect(one.take).toBe(1);
+  fired.push(one.wake.new_detector);
   const refused = (await take().catch((e: unknown) => e)) as ApiError;
   expect(refused.status).toBe(422);
   expect(refused.body).toEqual({ error: 'no_wake_phrase', heard_as: 'hey ghost' });
-  let last = await take();
-  for (let i = 0; i < 3; i += 1) last = await take();
+  let last = one;
+  for (let i = 0; i < 4; i += 1) {
+    last = await take();
+    fired.push(last.wake.new_detector);
+  }
+  expect(fired).toEqual([true, true, false, true, true]);
   expect(last).toMatchObject({ take: 5, of: 5, voice_match: { stored: true, enrolled: true } });
   expect(last.wake_detector).toMatchObject({ kind: 'hey_goose', heard: 4, of: 5 });
+  // The next run adds to the household's verdict rather than starting it again.
+  expect((await take()).take).toBe(1);
 
   await pond.forget('mock-zawadi');
   expect((await pond.prints()).members.find((m) => m.profile_id === 'mock-zawadi')).toMatchObject({ takes: 0, enrolled: false });

@@ -106,8 +106,10 @@ export function createMockVoice(
 
   let edits: { instructions: string; examples: VoiceAgentExample[]; off: string[]; maxTurns: number } | null = null;
 
-  // A run of takes: the second sentence is refused once, so the refusal can be seen without a Pond.
-  let run = { taken: 0, tries: 0, detector: { kind: 'whisper', heard: 0, of: 0, reason: '' } as WakeDetectorVerdict };
+  // A run of takes, which ends at the fifth: its second sentence is refused once, so the refusal can
+  // be seen without a Pond. The detector's verdict is the household's, across runs.
+  let run = { taken: 0, tries: 0 };
+  let detector: WakeDetectorVerdict = { kind: 'whisper', heard: 0, of: 0, reason: '' };
 
   const anyEnrolled = () => members.some((m) => m.enrolled);
 
@@ -247,6 +249,7 @@ export function createMockVoice(
     take: async ({ prompt, profileId, voiceMatch }) => {
       const m = voiceMatch ? member(profileId ?? '') : null;
       if (m && model().state !== 'ready') throw new ApiError('mock take → 409', 409, null, null, { error: 'model_not_ready' });
+      if (run.taken >= VOICE_PRINT_TAKES) run = { taken: 0, tries: 0 };
       run.tries += 1;
       if (run.taken === 1 && run.tries === 2) {
         throw new ApiError('mock take → 422', 422, null, null, { error: 'no_wake_phrase', heard_as: 'hey ghost' });
@@ -254,16 +257,15 @@ export function createMockVoice(
       run.taken += 1;
       // The detector misses the third sentence, and hears only "hey goose", as the Pond's own does.
       const heyGoose = /^hey goose\b/i.test(prompt.trim());
-      const heard = heyGoose && run.taken !== 3;
-      const of = run.taken;
-      const heardCount = run.detector.heard + (heard ? 1 : 0);
-      const kind = heyGoose && heardCount >= Math.ceil((of * 3) / 5) ? 'hey_goose' : 'whisper';
-      run.detector = {
-        kind,
-        heard: heardCount,
+      const fired = heyGoose && run.taken !== 3;
+      const heard = detector.heard + (fired ? 1 : 0);
+      const of = detector.of + 1;
+      detector = {
+        kind: heyGoose && heard * 5 >= of * 4 ? 'hey_goose' : 'whisper',
+        heard,
         of,
         reason: heyGoose
-          ? `The "hey goose" detector heard ${heardCount} of ${of} sentences.`
+          ? `The "hey goose" detector heard ${heard} of ${of} sentences; it listens in the room once it hears 4 of 5.`
           : 'Custom phrases are heard by Whisper.',
       };
       let match: VoiceTakeResult['voice_match'] = null;
@@ -274,10 +276,17 @@ export function createMockVoice(
         m.updated_at = new Date(now()).toISOString();
         match = { stored: true, enrolled: m.enrolled, consistency: m.consistency };
       }
-      return { take: run.taken, of: VOICE_PRINT_TAKES, wake: { heard: true, heard_as: prompt.split(',')[0] }, voice_match: match, wake_detector: { ...run.detector } };
+      return {
+        take: run.taken,
+        of: VOICE_PRINT_TAKES,
+        wake: { heard: true, heard_as: prompt.split(',')[0], new_detector: fired },
+        voice_match: match,
+        wake_detector: { ...detector },
+      };
     },
     resetCalibration: async () => {
-      run = { taken: 0, tries: 0, detector: { kind: 'whisper', heard: 0, of: 0, reason: '' } };
+      run = { taken: 0, tries: 0 };
+      detector = { kind: 'whisper', heard: 0, of: 0, reason: '' };
     },
     forget: async (profileId) => {
       const m = member(profileId);

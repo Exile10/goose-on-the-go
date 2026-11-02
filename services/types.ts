@@ -1664,9 +1664,13 @@ export interface VoiceTakeResult {
   /** Takes the Pond has accepted in this run, this one included. */
   take: number;
   of: number;
-  /** Whether the wake phrase was heard at the start, and what it was heard as. */
-  wake: { heard: boolean; heard_as: string | null };
+  /**
+   * `heard`: Whisper found the wake phrase at the start, heard as `heard_as`. `new_detector`: the
+   * "hey goose" detector fired on this take.
+   */
+  wake: { heard: boolean; heard_as: string | null; new_detector: boolean };
   voice_match: { stored: boolean; enrolled: boolean; consistency: number | null } | null;
+  /** The household's verdict across every taught member's latest run, not this run's. */
   wake_detector: WakeDetectorVerdict;
 }
 
