@@ -1186,7 +1186,7 @@ export class PondApiClient {
       method: 'POST',
       headers: this.headers(),
       body: JSON.stringify({ text }),
-      signal: signal ?? timeoutSignal(VOICE_TIMEOUT_MS),
+      signal: timeoutSignal(VOICE_TIMEOUT_MS, signal),
     });
     if (!res.ok) {
       throw new ApiError(`POST /api/v1/tts → ${res.status}`, res.status, parseRetryAfter(res));
