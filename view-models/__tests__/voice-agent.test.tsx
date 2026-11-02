@@ -129,8 +129,9 @@ it('puts each refusal under the field its path names', async () => {
   await act(async () => {
     await m.vm.actions.save();
   });
-  expect(m.vm.fieldErrors.examples).toBe('is empty');
-  expect(m.vm.otherErrors).toEqual([{ path: 'colour', message: 'is not a field of the Voice agent' }]);
+  expect(m.vm.exampleErrors).toEqual({ '0.answer': 'Answer 1 is empty.' });
+  expect(m.vm.fieldErrors.examples).toBeUndefined();
+  expect(m.vm.otherErrors).toEqual([{ path: 'colour', message: '`colour` is not a field of the Voice agent.' }]);
   expect(m.vm.draft?.examples[0]).toEqual({ brief: 'Weather?', answer: '' });
 });
 

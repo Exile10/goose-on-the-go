@@ -368,6 +368,38 @@ export function voiceAgentField(path: string): 'instructions' | 'examples' | 'to
   return null;
 }
 
+/** The example field a refusal is about, as `0.answer`, so it shows under that field. */
+export function voiceAgentExampleField(path: string): string | null {
+  const m = /^(?:giap_role\.)?(?:context\.)?examples\[(\d+)\]\.(brief|answer)$/.exec(path);
+  return m ? `${m[1]}.${m[2]}` : null;
+}
+
+/** A refusal as a sentence. The Pond's message is what follows its path ("is empty"), so the path's thing leads. */
+export function voiceAgentProblem(path: string, message: string): string {
+  const p = path.replace(/^giap_role\./, '').replace(/^context\./, '');
+  const example = /^examples\[(\d+)\](?:\.(brief|answer))?$/.exec(p);
+  const number = example ? Number(example[1]) + 1 : 0;
+  const subject = example
+    ? example[2] === 'brief'
+      ? i18n.t('voiceAgent.examples.asked', { number })
+      : example[2] === 'answer'
+        ? i18n.t('voiceAgent.examples.answer', { number })
+        : i18n.t('voiceAgent.problem.example', { number })
+    : p === 'instructions'
+      ? i18n.t('voiceAgent.problem.instructions')
+      : p === 'examples'
+        ? i18n.t('voiceAgent.problem.examples')
+        : p === 'max_turns'
+          ? i18n.t('voiceAgent.problem.maxTurns')
+          : null;
+  const words = subject
+    ? `${subject} ${message}`
+    : p && /^[a-z]/.test(message)
+      ? `\`${p}\` ${message}`
+      : message.charAt(0).toUpperCase() + message.slice(1);
+  return /[.!?]$/.test(words) ? words : `${words}.`;
+}
+
 // ── Voice Match ─────────────────────────────────────────────
 
 /** Takes the Pond asks for; it says its own number in each answer. */
