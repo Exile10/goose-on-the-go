@@ -7,7 +7,7 @@
  * Pond answered oddly rather than drawing an empty household.
  */
 
-import i18n, { type TranslationKey } from '@/services/i18n';
+import i18n from '@/services/i18n';
 import type {
   AgentPrefill,
   RoomVoiceEvent,
@@ -22,7 +22,9 @@ import type {
   VoicePrints,
   VoiceRoom,
   VoiceSpeaker,
+  VoiceTakeResult,
   WakeDetectorKind,
+  WakeDetectorVerdict,
 } from '@/services/types';
 
 import { readPrefills } from './agents';
@@ -330,20 +332,53 @@ export function voiceAgentField(path: string): 'instructions' | 'examples' | 'to
 /** Takes the Pond asks for; it says its own number in each answer. */
 export const VOICE_PRINT_TAKES = 5;
 
-/**
- * Plain sentences of three to five seconds, read in an ordinary voice. Not the wake phrase: a print
- * made of one phrase knows how a person says that phrase, not how they sound.
- */
-export const ENROL_SENTENCES: readonly TranslationKey[] = [
-  'voiceMatch.sentences.one',
-  'voiceMatch.sentences.two',
-  'voiceMatch.sentences.three',
-  'voiceMatch.sentences.four',
-  'voiceMatch.sentences.five',
-];
+/** The phrase as said to start a sentence: "hey goose" begins "Hey goose, ...". */
+function opening(phrase: string): string {
+  const p = phrase.trim() || i18n.t('voiceRoom.defaultPhrase');
+  return p.charAt(0).toUpperCase() + p.slice(1);
+}
 
-export function enrolSentence(take: number): string {
-  return i18n.t(ENROL_SENTENCES[Math.min(Math.max(take, 0), ENROL_SENTENCES.length - 1)]);
+/**
+ * The five sentences read while teaching Goose a voice: each starts with the household's wake
+ * phrase and asks for something Goose does. Never music, which Spotify's terms keep off voice.
+ */
+export function teachSentences(phrase: string): string[] {
+  const p = opening(phrase);
+  return [
+    i18n.t('teachVoice.sentences.weather', { phrase: p }),
+    i18n.t('teachVoice.sentences.timer', { phrase: p }),
+    i18n.t('teachVoice.sentences.reminder', { phrase: p }),
+    i18n.t('teachVoice.sentences.calendar', { phrase: p }),
+    i18n.t('teachVoice.sentences.question', { phrase: p }),
+  ];
+}
+
+function verdict(raw: unknown): WakeDetectorVerdict | null {
+  const v = record(raw);
+  if (!v) return null;
+  return { kind: detector(v.kind), heard: count(v.heard), of: count(v.of), reason: text(v.reason) };
+}
+
+/** One take's answer; null for a body that is not one, which the screen says rather than guess. */
+export function readVoiceTake(raw: unknown): VoiceTakeResult | null {
+  const r = record(raw);
+  const wake = record(r?.wake);
+  const verdictOf = verdict(r?.wake_detector);
+  if (!r || typeof r.take !== 'number' || !wake || !verdictOf) return null;
+  const match = record(r.voice_match);
+  return {
+    take: count(r.take),
+    of: count(r.of, VOICE_PRINT_TAKES) || VOICE_PRINT_TAKES,
+    wake: { heard: wake.heard === true, heard_as: typeof wake.heard_as === 'string' && wake.heard_as ? wake.heard_as : null },
+    voice_match: match ? { stored: match.stored === true, enrolled: match.enrolled === true, consistency: fraction(match.consistency) } : null,
+    wake_detector: verdictOf,
+  };
+}
+
+/** Whether the detector heard the latest take: its count of heard takes went up with it. */
+export function detectorHeardTake(before: WakeDetectorVerdict | null, after: WakeDetectorVerdict): boolean {
+  const heardBefore = before && before.of < after.of ? before.heard : 0;
+  return after.heard > heardBefore;
 }
 
 /** Known voices first, then those part-way, then everyone else, each by name. */

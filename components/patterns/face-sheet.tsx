@@ -36,7 +36,11 @@ export interface FaceSheetProps {
   onClose: () => void;
   /** Reads the list again, once the pond holds a sample or has forgotten them. */
   onChanged: () => Promise<void>;
-  onForget: (person: FacePerson) => Promise<string | null>;
+  /** `needs_both` is a Pond that can forget the face only with the voice; the sheet asks again first. */
+  onForget: (person: FacePerson) => Promise<string | null | 'needs_both'>;
+  onForgetWithVoice: (person: FacePerson) => Promise<string | null>;
+  /** False once this Pond has shown it forgets a face only with the voice, so the first question says so. */
+  faceOnly: boolean | null;
   /** `null` goes back to the pond's own strictness. Resolves to why the pond refused, or null once saved. */
   onStrictness: (person: FacePerson, threshold: number | null) => Promise<string | null>;
   /** Leaves for Cameras and vision, where a camera that is not running is put right. */
@@ -57,6 +61,8 @@ function FaceBody({
   defaultThreshold,
   onChanged,
   onForget,
+  onForgetWithVoice,
+  faceOnly,
   onStrictness,
   onOpenCameras,
 }: Omit<FaceSheetProps, 'person' | 'onClose'> & { person: FacePerson }) {
@@ -92,23 +98,47 @@ function FaceBody({
     [onStrictness, person],
   );
 
+  const askBoth = useCallback(
+    () =>
+      ask({
+        title: t('faces.forget.bothTitle', { name: person.name }),
+        message: t('faces.forget.bothBody', { name: person.name }),
+        confirmLabel: t('faces.forget.bothConfirm'),
+        destructive: true,
+      }),
+    [ask, person.name, t],
+  );
+
   const forget = useCallback(async () => {
-    const yes = await ask({
-      title: t('faces.forget.title', { name: person.name }),
-      message: t('faces.forget.body', { count: person.enrollments, name: person.name }),
-      confirmLabel: t('faces.forget.confirm'),
-      destructive: true,
-    });
+    const both = faceOnly === false;
+    const yes = both
+      ? await askBoth()
+      : await ask({
+          title: t('faces.forget.title', { name: person.name }),
+          message: t('faces.forget.body', { count: person.enrollments, name: person.name }),
+          confirmLabel: t('faces.forget.confirm'),
+          destructive: true,
+        });
     if (!yes) return;
-    const refused = await onForget(person);
+    let refused = both ? await onForgetWithVoice(person) : await onForget(person);
+    let forgotVoice = both;
+    // A Pond from before the face-only route forgets the voice with the face: that needs its own yes.
+    if (refused === 'needs_both') {
+      if (!(await askBoth())) return;
+      refused = await onForgetWithVoice(person);
+      forgotVoice = true;
+    }
     if (refused) {
       void reject();
       setForgetNote({ tone: 'danger', text: refused });
     } else {
       void confirmed();
-      setForgetNote({ tone: 'success', text: t('faces.forget.done', { name: person.name }) });
+      setForgetNote({
+        tone: 'success',
+        text: forgotVoice ? t('faces.forget.bothDone', { name: person.name }) : t('faces.forget.done', { name: person.name }),
+      });
     }
-  }, [ask, onForget, person, t]);
+  }, [ask, askBoth, faceOnly, onForget, onForgetWithVoice, person, t]);
 
   const capture = useCallback(async () => {
     setForgetNote(null);

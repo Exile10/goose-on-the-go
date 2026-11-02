@@ -36,6 +36,8 @@ export interface UseFaces {
     people: FacePerson[];
     /** How many of them the pond knows by face. */
     known: number;
+    /** False once the Pond has shown it cannot forget a face apart from the voice; null until asked. */
+    faceOnly: boolean | null;
   };
   loading: boolean;
   error: string | null;
@@ -45,8 +47,12 @@ export interface UseFaces {
   nameOf: (profileId: string) => string | null;
   actions: {
     refresh: () => Promise<void>;
-    /** Resolves to why the pond refused, or null once it has forgotten the face. */
-    forget: (person: FacePerson) => Promise<string | null>;
+    /**
+     * Resolves to why the pond refused, or null once it has forgotten the face. `needs_both` is a
+     * Pond that can forget a face only together with the voice, which `forgetWithVoice` does once asked.
+     */
+    forget: (person: FacePerson) => Promise<string | null | 'needs_both'>;
+    forgetWithVoice: (person: FacePerson) => Promise<string | null>;
     /** `null` goes back to the pond's own strictness. Resolves to why the pond refused, or null once saved. */
     setStrictness: (person: FacePerson, threshold: number | null) => Promise<string | null>;
   };
@@ -112,11 +118,32 @@ export function useFaces(): UseFaces {
   const names = useMemo(() => new Map(overview.people.map((p) => [p.profile_id, p.name])), [overview.people]);
   const nameOf = useCallback((profileId: string) => names.get(profileId) ?? null, [names]);
 
-  const forget = useCallback(
+  const [faceOnly, setFaceOnly] = useState<boolean | null>(null);
+
+  const forgetWithVoice = useCallback(
     async (person: FacePerson) => {
       try {
         await api.forgetFace(person.profile_id);
       } catch (e) {
+        console.warn('[faces] forget refused', e instanceof ApiError ? e.status : 'network');
+        return describeApiError(e) ?? i18n.t('faces.forget.failed');
+      }
+      await load(false);
+      return null;
+    },
+    [load],
+  );
+
+  const forget = useCallback(
+    async (person: FacePerson) => {
+      try {
+        await api.forgetFaceSamples(person.profile_id);
+        setFaceOnly(true);
+      } catch (e) {
+        if (e instanceof ApiError && (e.status === 404 || e.status === 405) && refusalReason(e) === null) {
+          setFaceOnly(false);
+          return 'needs_both' as const;
+        }
         console.warn('[faces] forget refused', e instanceof ApiError ? e.status : 'network');
         return describeApiError(e) ?? i18n.t('faces.forget.failed');
       }
@@ -147,12 +174,13 @@ export function useFaces(): UseFaces {
       defaultThreshold: overview.default_threshold,
       people,
       known: knownByFace(overview.people),
+      faceOnly,
     },
     loading,
     error,
     failed,
     nameOf,
-    actions: { refresh, forget, setStrictness },
+    actions: { refresh, forget, forgetWithVoice, setStrictness },
   };
 }
 

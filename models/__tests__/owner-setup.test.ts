@@ -5,7 +5,6 @@
 
 import {
   birthdayOf,
-  calibrationPrompts,
   canContinue,
   defaultDraft,
   draftFromPond,
@@ -178,16 +177,6 @@ describe('the wake phrase', () => {
     expect(shortPhraseSuggestion('hey goose')).toBe('');
     expect(shortPhraseSuggestion('good morning pond')).toBeNull();
     expect(shortPhraseSuggestion('hey goose 2')).toBeNull();
-  });
-
-  it('reads the Pond’s own five calibration sentences', () => {
-    expect(calibrationPrompts(' goose ')).toEqual([
-      'goose',
-      'Hey goose, good morning',
-      'OK goose, what time is it',
-      'goose, tell me a joke',
-      'Thank you goose',
-    ]);
   });
 });
 

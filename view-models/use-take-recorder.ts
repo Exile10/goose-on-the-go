@@ -1,6 +1,6 @@
 /**
- * Recording short spoken takes on the phone, one after another, for the Pond to learn from: the wake
- * phrase's calibration and Voice Match both read sentences to this. A take starts when speech does,
+ * Recording short spoken takes on the phone, one after another, for the Pond to learn from: teaching
+ * Goose a voice reads its sentences to this. A take starts when speech does,
  * ends after a short silence, and is handed over as a 16 kHz mono WAV; what is done with it, and
  * whether another take follows, is the caller's.
  */
@@ -60,6 +60,8 @@ export interface TakeHandlers {
   describe: (e: unknown) => string;
   /** The file name the take is cached under. */
   name: string;
+  /** What to say when the phone heard no speech at all. */
+  silence: string;
 }
 
 export function useTakeRecorder(handlers: TakeHandlers): TakeRecorder {
@@ -157,7 +159,7 @@ export function useTakeRecorder(handlers: TakeHandlers): TakeRecorder {
       micRef.current.stop();
       setLevel(0);
       if (!heardSpeech || !tk.started) {
-        setError(i18n.t('setup.wake.calibrate.nothingHeard'));
+        setError(handlersRef.current.silence);
         end('error');
         return;
       }

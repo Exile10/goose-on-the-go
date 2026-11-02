@@ -12,8 +12,9 @@ import type {
   VoiceAgentPatch,
   VoicePrintMember,
   VoicePrints,
-  VoicePrintTake,
   VoiceRoom,
+  VoiceTakeResult,
+  WakeDetectorVerdict,
 } from '@/services/types';
 
 import { VOICE_PRINT_TAKES } from './voice-room';
@@ -29,7 +30,10 @@ export interface VoiceSource {
   resetAgent(): Promise<VoiceAgent>;
   prints(): Promise<VoicePrints>;
   retryModel(): Promise<void>;
-  addTake(profileId: string, fileUri: string, prompt: string): Promise<VoicePrintTake>;
+  /** One sentence read while teaching Goose a voice (`POST /voice/takes`). */
+  take(take: { fileUri: string; prompt: string; profileId: string | null; voiceMatch: boolean }): Promise<VoiceTakeResult>;
+  /** Clears what earlier runs taught about the wake phrase (`DELETE /voice/calibrate`). */
+  resetCalibration(): Promise<void>;
   forget(profileId: string): Promise<void>;
 }
 
@@ -101,6 +105,9 @@ export function createMockVoice(
   let modelFailed = false;
 
   let edits: { instructions: string; examples: VoiceAgentExample[]; off: string[]; maxTurns: number } | null = null;
+
+  // A run of takes: the second sentence is refused once, so the refusal can be seen without a Pond.
+  let run = { taken: 0, tries: 0, detector: { kind: 'whisper', heard: 0, of: 0, reason: '' } as WakeDetectorVerdict };
 
   const anyEnrolled = () => members.some((m) => m.enrolled);
 
@@ -237,14 +244,40 @@ export function createMockVoice(
       modelFailed = false;
       modelFrom = now();
     },
-    addTake: async (profileId) => {
-      const m = member(profileId);
-      if (model().state !== 'ready') throw new ApiError('mock take → 409', 409, null, null, { error: 'model_not_ready' });
-      m.takes = Math.min(m.takes + 1, m.needed);
-      m.enrolled = m.takes >= m.needed;
-      m.consistency = m.takes >= 2 ? 0.7 + 0.03 * m.takes : null;
-      m.updated_at = new Date(now()).toISOString();
-      return { takes: m.takes, needed: m.needed, enrolled: m.enrolled, consistency: m.consistency };
+    take: async ({ prompt, profileId, voiceMatch }) => {
+      const m = voiceMatch ? member(profileId ?? '') : null;
+      if (m && model().state !== 'ready') throw new ApiError('mock take → 409', 409, null, null, { error: 'model_not_ready' });
+      run.tries += 1;
+      if (run.taken === 1 && run.tries === 2) {
+        throw new ApiError('mock take → 422', 422, null, null, { error: 'no_wake_phrase', heard_as: 'hey ghost' });
+      }
+      run.taken += 1;
+      // The detector misses the third sentence, and hears only "hey goose", as the Pond's own does.
+      const heyGoose = /^hey goose\b/i.test(prompt.trim());
+      const heard = heyGoose && run.taken !== 3;
+      const of = run.taken;
+      const heardCount = run.detector.heard + (heard ? 1 : 0);
+      const kind = heyGoose && heardCount >= Math.ceil((of * 3) / 5) ? 'hey_goose' : 'whisper';
+      run.detector = {
+        kind,
+        heard: heardCount,
+        of,
+        reason: heyGoose
+          ? `The "hey goose" detector heard ${heardCount} of ${of} sentences.`
+          : 'Custom phrases are heard by Whisper.',
+      };
+      let match: VoiceTakeResult['voice_match'] = null;
+      if (m) {
+        m.takes = Math.min(m.takes + 1, m.needed);
+        m.enrolled = m.takes >= m.needed;
+        m.consistency = m.takes >= 2 ? 0.7 + 0.03 * m.takes : null;
+        m.updated_at = new Date(now()).toISOString();
+        match = { stored: true, enrolled: m.enrolled, consistency: m.consistency };
+      }
+      return { take: run.taken, of: VOICE_PRINT_TAKES, wake: { heard: true, heard_as: prompt.split(',')[0] }, voice_match: match, wake_detector: { ...run.detector } };
+    },
+    resetCalibration: async () => {
+      run = { taken: 0, tries: 0, detector: { kind: 'whisper', heard: 0, of: 0, reason: '' } };
     },
     forget: async (profileId) => {
       const m = member(profileId);

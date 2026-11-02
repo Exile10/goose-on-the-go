@@ -145,6 +145,8 @@ function ThemedApp() {
               {/* Over the tabs rather than inside one, so a conversation has the
                   whole screen: no bar under the composer. It draws its own header. */}
               <Stack.Screen name="conversation" options={{ headerShown: false }} />
+              {/* Over everything, with its own close control: five sentences need the whole screen. */}
+              <Stack.Screen name="teach-voice" options={{ headerShown: false, presentation: 'fullScreenModal', gestureEnabled: false }} />
               <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
             </Stack>
             <StatusBar style={isDark ? 'light' : 'dark'} />

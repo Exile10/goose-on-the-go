@@ -38,23 +38,36 @@ it('refuses an empty instruction by its path, and saves and resets the rest', as
   expect(rebuild).toHaveBeenCalledTimes(2);
 });
 
-it('downloads its speaker model before it takes a recording, then learns five', async () => {
+it('downloads its speaker model before it learns a voice, refuses one sentence, then learns five', async () => {
   const c = clock();
   const pond = createMockVoice(c.now);
   const first = await pond.prints();
   expect(first.model.state).toBe('downloading');
   expect(first.model.credit).toContain('CC BY 4.0');
-  const early = await pond.addTake('mock-zawadi', 'file:///t.wav', 'A sentence.').catch((e: unknown) => e);
-  expect((early as ApiError).status).toBe(409);
+  const take = (voiceMatch = true) =>
+    pond.take({ fileUri: 'file:///t.wav', prompt: 'Hey goose, set a timer.', profileId: 'mock-zawadi', voiceMatch });
+  expect(((await take().catch((e: unknown) => e)) as ApiError).status).toBe(409);
 
   c.advance(MOCK_MODEL_MS);
-  expect((await pond.prints()).model.state).toBe('ready');
-  let last = await pond.addTake('mock-zawadi', 'file:///t.wav', 'A sentence.');
-  for (let i = 1; i < 5; i += 1) last = await pond.addTake('mock-zawadi', 'file:///t.wav', 'A sentence.');
-  expect(last).toMatchObject({ takes: 5, needed: 5, enrolled: true });
+  await pond.resetCalibration();
+  expect((await take()).take).toBe(1);
+  const refused = (await take().catch((e: unknown) => e)) as ApiError;
+  expect(refused.status).toBe(422);
+  expect(refused.body).toEqual({ error: 'no_wake_phrase', heard_as: 'hey ghost' });
+  let last = await take();
+  for (let i = 0; i < 3; i += 1) last = await take();
+  expect(last).toMatchObject({ take: 5, of: 5, voice_match: { stored: true, enrolled: true } });
+  expect(last.wake_detector).toMatchObject({ kind: 'hey_goose', heard: 4, of: 5 });
 
   await pond.forget('mock-zawadi');
   expect((await pond.prints()).members.find((m) => m.profile_id === 'mock-zawadi')).toMatchObject({ takes: 0, enrolled: false });
+});
+
+it('tunes the wake phrase alone with Voice Match off, storing no print', async () => {
+  const pond = createMockVoice(clock().now);
+  const result = await pond.take({ fileUri: 'file:///t.wav', prompt: 'Hey duck, set a timer.', profileId: null, voiceMatch: false });
+  expect(result.voice_match).toBeNull();
+  expect(result.wake_detector.kind).toBe('whisper');
 });
 
 it('plays a turn on an open stream and stops when it is closed', async () => {

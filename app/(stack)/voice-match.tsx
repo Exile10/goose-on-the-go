@@ -2,7 +2,7 @@
  * VoiceMatchScreen -- who the Pond knows by voice, and how to teach it.
  *
  * Every household member is here, whether or not the Pond has their voice. A person opens a sheet to
- * read five sentences to this phone, record them again, or have the Pond forget their voice. What a
+ * be taught to the Pond in "Teach Goose your voice", taught again, or forgotten. What a
  * known voice is for is said first, because it is what a household wants to know before it enrols:
  * the Pond answers that person with their own context, and a voice never approves anything.
  *
@@ -26,6 +26,7 @@ import { GIcon } from '@/components/ui/g-icon';
 import { Spacing } from '@/constants/spacing';
 import { isUnavailable } from '@/models/content-state';
 import { memberStatus } from '@/models/voice-room';
+import type { VoicePrintMember } from '@/services/types';
 import { selectionTick } from '@/services/haptics';
 import { useContentState } from '@/view-models/use-content-state';
 import { usePullToRefresh } from '@/view-models/use-pull-to-refresh';
@@ -45,6 +46,13 @@ export default function VoiceMatchScreen() {
   const ready = model?.state === 'ready';
 
   const quietRefresh = useCallback(() => actions.refresh(), [actions]);
+  const teach = useCallback(
+    (member: VoicePrintMember) => {
+      setOpenId(null);
+      router.push({ pathname: '/teach-voice', params: { profile: member.profile_id, name: member.name, from: 'match' } });
+    },
+    [router],
+  );
   const pull = usePullToRefresh(quietRefresh);
 
   return (
@@ -131,7 +139,7 @@ export default function VoiceMatchScreen() {
       {ready && model.credit ? <InkText size="sm" tone="secondary">{model.credit}</InkText> : null}
       {error && !failed ? <InkNotice tone="danger">{error}</InkNotice> : null}
 
-      <VoicePrintSheet member={open} modelReady={ready} onClose={() => setOpenId(null)} onChanged={quietRefresh} onForget={actions.forget} />
+      <VoicePrintSheet member={open} onClose={() => setOpenId(null)} onTeach={teach} onForget={actions.forget} />
     </SettingsScroll>
   );
 }

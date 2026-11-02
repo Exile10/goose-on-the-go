@@ -20,7 +20,8 @@ export const POND_VOICE: VoiceSource = {
   resetAgent: () => api.resetVoiceAgent(),
   prints: () => api.voicePrints(),
   retryModel: () => api.retryVoicePrintModel(),
-  addTake: (profileId, fileUri, prompt) => api.addVoicePrintTake(profileId, fileUri, prompt),
+  take: (take) => api.voiceTake(take),
+  resetCalibration: () => api.resetWakeWordCalibration(),
   forget: (profileId) => api.forgetVoicePrints(profileId),
 };
 

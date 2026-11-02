@@ -1,13 +1,11 @@
-// Voice Match's listing and forgetting, and what each refusal of a take says to do next.
+// Voice Match's listing and forgetting.
 
 import React from 'react';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 
 import { ApiError, api } from '@/services/api-client';
-import i18n from '@/services/i18n';
 import type { VoicePrints } from '@/services/types';
-import { detectorHeardTake } from '@/view-models/use-wake-calibration';
-import { describeTakeError, useVoicePrints, type UseVoicePrints } from '@/view-models/use-voice-prints';
+import { useVoicePrints, type UseVoicePrints } from '@/view-models/use-voice-prints';
 import { resetMockVoice } from '@/view-models/voice-source';
 
 jest.mock('@/services/pond-trust', () => ({ assertPondTrust: jest.fn().mockResolvedValue(undefined) }));
@@ -96,20 +94,4 @@ it('shows a Pond without Voice Match as one that needs an update', async () => {
   const m = await mount();
   expect(m.vm.missing).toBe(true);
   expect(m.vm.failed).toBe(false);
-});
-
-it('says what to do about each refused take', () => {
-  const said = (status: number, body: unknown = null) => describeTakeError(new ApiError(`x → ${status}`, status, null, null, body));
-  expect(said(422, { error: 'no_speech' })).toBe(i18n.t('voiceMatch.error.noSpeech'));
-  expect(said(409, { error: 'model_not_ready' })).toBe(i18n.t('voiceMatch.error.modelNotReady'));
-  expect(said(404)).toBe(i18n.t('voiceMatch.error.unknownPerson'));
-  expect(describeTakeError(new TypeError('network'))).toBe(i18n.t('voiceMatch.error.failed'));
-});
-
-it('reads a take as heard by the detector when its count went up with it', () => {
-  expect(detectorHeardTake(null, undefined)).toBeNull();
-  expect(detectorHeardTake(null, { kind: 'whisper', heard: 0, of: 1, reason: '' })).toBe(false);
-  expect(detectorHeardTake(null, { kind: 'hey_goose', heard: 1, of: 1, reason: '' })).toBe(true);
-  expect(detectorHeardTake({ kind: 'hey_goose', heard: 1, of: 1, reason: '' }, { kind: 'whisper', heard: 1, of: 2, reason: '' })).toBe(false);
-  expect(detectorHeardTake({ kind: 'whisper', heard: 1, of: 2, reason: '' }, { kind: 'hey_goose', heard: 2, of: 3, reason: '' })).toBe(true);
 });

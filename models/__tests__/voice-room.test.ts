@@ -5,6 +5,7 @@ import type { VoiceAgent, VoicePrintMember } from '@/services/types';
 import {
   QUIET_ROOM,
   consistencyWords,
+  detectorHeardTake,
   draftOf,
   foldRoomEvent,
   interruptWords,
@@ -14,6 +15,8 @@ import {
   readVoiceAgent,
   readVoicePrints,
   readVoiceRoom,
+  readVoiceTake,
+  teachSentences,
   voiceAgentField,
 } from '../voice-room';
 
@@ -172,5 +175,35 @@ describe('Voice Match', () => {
   it('says nothing about consistency before there is any', () => {
     expect(consistencyWords(null)).toBeNull();
     expect(consistencyWords(0.9)).not.toBe(consistencyWords(0.3));
+  });
+});
+
+describe('teaching Goose a voice', () => {
+  it('starts every sentence with the household phrase, a custom one too, and never asks for music', () => {
+    const sentences = teachSentences('hey goose');
+    expect(sentences).toHaveLength(5);
+    expect(sentences.every((s) => s.startsWith('Hey goose, '))).toBe(true);
+    expect(teachSentences('jambo bata').every((s) => s.startsWith('Jambo bata, '))).toBe(true);
+    expect(sentences.join(' ')).not.toMatch(/music|song|play|spotify/i);
+  });
+
+  it('reads a take, and refuses a body without the detector verdict', () => {
+    const take = {
+      take: 2,
+      of: 5,
+      wake: { heard: true, heard_as: 'hey goose' },
+      voice_match: { stored: true, enrolled: false, consistency: null },
+      wake_detector: { kind: 'hey_goose', heard: 2, of: 2, reason: 'Heard both.' },
+    };
+    expect(readVoiceTake(take)).toEqual(take);
+    expect(readVoiceTake({ ...take, voice_match: null })?.voice_match).toBeNull();
+    expect(readVoiceTake({ ...take, wake_detector: undefined })).toBeNull();
+  });
+
+  it('reads a take as heard by the detector when its count went up with it', () => {
+    expect(detectorHeardTake(null, { kind: 'whisper', heard: 0, of: 1, reason: '' })).toBe(false);
+    expect(detectorHeardTake(null, { kind: 'hey_goose', heard: 1, of: 1, reason: '' })).toBe(true);
+    expect(detectorHeardTake({ kind: 'hey_goose', heard: 1, of: 1, reason: '' }, { kind: 'whisper', heard: 1, of: 2, reason: '' })).toBe(false);
+    expect(detectorHeardTake({ kind: 'whisper', heard: 1, of: 2, reason: '' }, { kind: 'hey_goose', heard: 2, of: 3, reason: '' })).toBe(true);
   });
 });

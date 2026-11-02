@@ -274,7 +274,7 @@ Five more stack screens aren't in the hub:
   could not set up its replacement. There is one stored Pond, not a list; pairing
   another replaces it.
 - **Add a device** (`/(stack)/commission-device`) — from the Devices tab and Home.
-- **Wake word** (`/(stack)/wake-word`) — from Home's "Finish setting up" card after owner setup and from the Voice agent: the phrase and its calibration, saved through the shared settings store.
+- **Wake word** (`/(stack)/wake-word`) — from the Voice agent and from Teach Goose your voice's intro: the phrase, saved through the shared settings store, and a way into Teach Goose your voice. Home's "Finish setting up" card opens Teach Goose your voice itself.
 - **Connect Desktop** (`/(stack)/connect-desktop`) — the QR scanner opened from
   Pond Pairing. It reads the pairing QR and a Pond's printed setup card
   (`pond://setup`), and hands either back through `services/pairing-handoff.ts`.
@@ -417,13 +417,36 @@ says the Pond needs an update, where the mock would show a made-up household.
   mirrors Faces: a row per member with how many of the five sentences the Pond holds.
   It says first that a voice never approves anything and that recordings are deleted
   once learnt. The speaker model downloads on its own, with its progress and its
-  CC BY 4.0 credit. A person's sheet records five plain sentences of three to five
-  seconds on this phone, with the wake calibration's recorder
-  (`view-models/use-take-recorder.ts`), one `POST /voice/prints/{id}/takes` each, and
-  says how alike they sounded. Record again forgets the old print first, and Forget
-  this voice (`DELETE /voice/prints/{id}`) asks with Keep it as the safe answer.
-- **Wake word** shows, take by take, whether the Pond's "hey goose" detector heard
-  each sentence, and after the last which detector the Pond chose and why.
+  CC BY 4.0 credit. A person's sheet says how alike their sentences sounded, opens
+  Teach Goose your voice for them (so an owner can hand the phone to someone with no
+  phone of their own), and Forget this voice (`DELETE /voice/prints/{id}`) asks with
+  Keep it as the safe answer.
+- **Teach Goose your voice** (`app/teach-voice.tsx`, `view-models/use-teach-voice.ts`)
+  is one full-screen flow for the wake phrase and Voice Match, after Apple's Hey Siri
+  setup in Ink's material. It is a root-stack screen presented over everything, with
+  its own close control and no header. An intro says what Goose learns and that
+  recordings are not kept, with Recognise my voice on by default (off, and greyed, for
+  a phone that belongs to no one or a Pond without Voice Match) and the speaker
+  model's download where it is still coming. Then five sentences, one at a time, each
+  starting with the household's wake phrase (a custom one too) and asking for
+  something Goose does; never music, which Spotify's terms keep off voice. The
+  sentence rests muted and flat, and rises to full ink on its offset while the phone
+  hears speech: no glow, because state is elevation, not hue. Each take is one
+  `POST /voice/takes`; an accepted one moves on by itself, a refused one keeps the
+  sentence and says why ("I heard ... Say it with ... at the start"), and silence
+  stops on Try again. A run starts with `DELETE /voice/calibrate`, and with
+  `DELETE /voice/prints/{id}` when a print is recorded again. The done screen names
+  the person, says whether the "hey goose" detector heard them and in how many
+  sentences, and marks Home's setup item done. Closing once a sentence is recorded
+  asks first; Set up later leaves without asking and Home keeps its card. It opens
+  from Home's setup card, the Wake word screen and Voice Match, and records with
+  `view-models/use-take-recorder.ts`.
+- **Wake word** keeps the phrase choice; its card opens Teach Goose your voice with
+  the phrase chosen, which the flow saves before the first sentence, and says which
+  detector the Pond listens with now and why.
+- **Faces** forgets a face alone (`DELETE /faces/profile/{id}`). A Pond without that
+  route forgets a face only with the voice (`DELETE /users/{id}/biometrics`), so the
+  sheet asks a second time, naming both, before it does.
 - **Listening** leads with In this room: the room switch, the detector and how a
   reply is stopped. The `voice_kws_*` fields sit under Whisper detector, because only
   Whisper reads them. **Speaking** leads with how a reply is stopped.
@@ -471,7 +494,7 @@ What the removed screens held, and where it is now:
 | Wizard: Find, Code, Name, Pairing (new Pond) | Find your Pond: inline search, code, claim and errors; the phone's own name |
 | Setup: Welcome | The Pond's name on Find your Pond and Home's Pond card; the progress meter; Switch Pond on Home |
 | Setup: Language and location | Prefilled from the phone on About you; also in Settings (Your home, Time zone) |
-| Setup: Wake word | Home's "Finish setting up" card, which opens `/(stack)/wake-word` (phrase and calibration); also Settings > Listening |
+| Setup: Wake word | Home's "Finish setting up" card, which opens Teach Goose your voice (`app/teach-voice.tsx`); the phrase is on `/(stack)/wake-word`, reached from that flow's intro and the Voice agent; Settings > Voice has the bare field |
 | Setup: All set | Memory stays on (sent with Finish) and is in Settings > Memory; "Look over your choices" on Home opens Settings |
 | Setup: Ready | Home's getting-ready card, shown after every setup until Goose can answer |
 
@@ -481,7 +504,7 @@ What the removed screens held, and where it is now:
   - The record is read with `GET /settings`, which a paired token may use before setup from goose-in-a-pond#579 (P4) on. An older Pond refuses it with a 403, and then an empty `PUT`, which writes nothing, answers the same record.
   - `GET /profiles` is refused and `PATCH /profiles/{id}` replaces the whole preference map, so the draft is kept on the phone (`storageFamily('setupDrafts')`, by pairing) and every PATCH sends the whole map.
   - Before P4 the voices offered are the installed ones `/voice/tts/apply` reports plus Kokoro's graded catalogue. The picker is Settings' own (`VoicePickerView`). Its play button asks the Pond to speak, and on a Pond without the route the picker says that samples come after setup.
-- **Calibration is recorded on the phone.** `/voice/calibrate` takes an uploaded WAV and the sentence read; the Pond does not listen itself. The wake word screen records the five sentences pond-voice's `calibration_prompts` builds, one take each, and starts each run by clearing the old one.
+- **Calibration is recorded on the phone.** The Pond does not listen itself: Teach Goose your voice records five sentences, each starting with the wake phrase, and sends each to `POST /voice/takes`, after clearing the old calibration with `DELETE /voice/calibrate`.
 - **Finishing.** Finish sends `agent_memory_inject` and `POST /onboard/complete`. A 400 names `missing_fields`: setup goes back to the earliest step that sets one, and says which. `chat_model` alone opens the model step, quietly.
 - **The model step** (`components/setup/model-step.tsx`, `view-models/use-setup-model.ts`) reads the Pond's models, which P4 opens to a paired token before setup.
   - It offers the chat model already chosen or on the Pond, else the Pond's own suggestion, with its size.

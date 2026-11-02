@@ -1557,21 +1557,6 @@ export interface ProfilePrefs {
   preferences: Record<string, string>;
 }
 
-/** `POST /api/v1/voice/calibrate`: what the Pond heard in one take. */
-export interface CalibrationTake {
-  transcript: string;
-  normalized: string;
-  /** The wake phrase as heard in this take; null when the take did not contain it. */
-  heard: string | null;
-  new_variant: boolean;
-  all_variants: string[];
-  sample_count: number;
-  target_count: number;
-  complete: boolean;
-  /** How the "hey goose" detector did on the takes so far, and the detector the room uses for it. Absent on an older Pond. */
-  wake_detector?: WakeDetectorVerdict;
-}
-
 /** The Pond's own wake detector, or Whisper listening for the phrase in what it transcribes. */
 export type WakeDetectorKind = 'hey_goose' | 'whisper';
 
@@ -1671,12 +1656,18 @@ export interface VoicePrints {
   members: VoicePrintMember[];
 }
 
-/** `POST /api/v1/voice/prints/{profile_id}/takes`. */
-export interface VoicePrintTake {
-  takes: number;
-  needed: number;
-  enrolled: boolean;
-  consistency: number | null;
+/**
+ * `POST /api/v1/voice/takes`: one sentence read while teaching Goose a voice. It tunes the wake
+ * phrase, and adds to the person's voice print unless Voice Match is off for the run.
+ */
+export interface VoiceTakeResult {
+  /** Takes the Pond has accepted in this run, this one included. */
+  take: number;
+  of: number;
+  /** Whether the wake phrase was heard at the start, and what it was heard as. */
+  wake: { heard: boolean; heard_as: string | null };
+  voice_match: { stored: boolean; enrolled: boolean; consistency: number | null } | null;
+  wake_detector: WakeDetectorVerdict;
 }
 
 /**

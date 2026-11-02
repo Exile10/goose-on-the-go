@@ -347,12 +347,6 @@ export function firstStepFor(fields: readonly string[]): SetupStep | null {
   return SETUP_STEPS.find((s) => steps.includes(s)) ?? null;
 }
 
-/** What each calibration take reads: `calibration_prompts` in the Pond's pond-voice text.rs, word for word. */
-export function calibrationPrompts(phrase: string): string[] {
-  const p = phrase.trim();
-  return [p, `Hey ${p}, good morning`, `OK ${p}, what time is it`, `${p}, tell me a joke`, `Thank you ${p}`];
-}
-
 /** A birthday as `YYYY-MM-DD`, or null for a date that cannot exist; it is held back, never rounded. */
 export function birthdayOf(parts: { year: string; month: string; day: string }, thisYear: number): string | null {
   if (!parts.year || !parts.month || !parts.day) return null;
