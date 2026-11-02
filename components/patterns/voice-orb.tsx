@@ -29,7 +29,7 @@
  */
 
 import React, { useEffect, useId, useMemo, useRef, useState } from 'react';
-import { Animated, Easing, Pressable, StyleSheet, View } from 'react-native';
+import { Animated, Easing, Platform, Pressable, StyleSheet, View } from 'react-native';
 import Svg, { Circle, Defs, Ellipse, RadialGradient, Stop } from 'react-native-svg';
 import { alpha } from '@jarida/ink';
 import { useInkTheme, useReduceMotion } from '@jarida/ink/native';
@@ -144,10 +144,11 @@ const LOOK_Y: readonly Keyframe[] = [[0, 0], [0.15, -0.15], [0.35, 0.2], [0.55, 
 
 /**
  * Created native, so a `setValue` goes straight to the UI thread instead of
- * re-rendering the views it drives.
+ * re-rendering the views it drives. Web has no native animated module, and a
+ * value created native there throws as soon as a view mounts it.
  */
 function native(at: number) {
-  return new Animated.Value(at, { useNativeDriver: true });
+  return Platform.OS === 'web' ? new Animated.Value(at) : new Animated.Value(at, { useNativeDriver: true });
 }
 
 /** Runs `value` from 0 to 1 forever, entirely on the UI thread, and returns the stop. */
