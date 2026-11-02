@@ -12,7 +12,7 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 import { useServer } from '@/providers/server-provider';
 import { ApiError } from '@/services/api-client';
 import i18n from '@/services/i18n';
-import type { RecipeFieldError, VoiceAgent, VoiceAgentExample } from '@/services/types';
+import type { RecipeFieldError, VoiceAgent, VoiceAgentExample, VoiceThinking } from '@/services/types';
 import { draftOf, patchFrom, voiceAgentExampleField, voiceAgentField, voiceAgentProblem, type VoiceAgentDraft } from '@/models/voice-room';
 import { isMissingRoute, useAgentsSource } from './agents-source';
 import { describeApiError, logFailure } from './describe-error';
@@ -21,7 +21,7 @@ import { useVoiceSource } from './voice-source';
 
 export const VOICE_AGENT_MS = 15_000;
 
-export type VoiceAgentField = 'instructions' | 'examples' | 'tools' | 'maxTurns';
+export type VoiceAgentField = 'instructions' | 'examples' | 'tools' | 'maxTurns' | 'thinking';
 
 export interface UseVoiceAgent {
   agent: VoiceAgent | null;
@@ -50,6 +50,7 @@ export interface UseVoiceAgent {
     removeExample: (index: number) => void;
     setGroup: (group: string, on: boolean) => void;
     setMaxTurns: (turns: number) => void;
+    setThinking: (thinking: VoiceThinking) => void;
     /** Drops the unsaved edits: the form shows what the Pond holds again. */
     revert: () => void;
     save: () => Promise<boolean>;
@@ -262,6 +263,7 @@ export function useVoiceAgent(): UseVoiceAgent {
         edit((d) => ({ ...d, off: on ? d.off.filter((g) => g !== group) : d.off.includes(group) ? d.off : [...d.off, group] })),
       // The Pond takes 1 to 12; 0 hands the cap back to its voice setting.
       setMaxTurns: (turns) => edit((d) => ({ ...d, maxTurns: turns > 0 ? turns : null })),
+      setThinking: (thinking) => edit((d) => ({ ...d, thinking })),
       revert,
       save,
       reset,

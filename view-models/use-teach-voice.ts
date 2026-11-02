@@ -18,7 +18,8 @@ import { reject } from '@/services/haptics';
 import i18n from '@/services/i18n';
 import type { VoicePrints, VoiceTakeResult, WakeDetectorVerdict } from '@/services/types';
 import { VOICE_PRINT_TAKES, teachSentences } from '@/models/voice-room';
-import { describeApiError } from './describe-error';
+import { isMissingRoute } from './agents-source';
+import { describeApiError, logFailure } from './describe-error';
 import { usePondSettings } from './use-pond-settings';
 import { finishChecklistItem } from './use-setup-checklist';
 import { useTakeRecorder } from './use-take-recorder';
@@ -26,6 +27,10 @@ import { useVoicePrints } from './use-voice-prints';
 import { useVoiceSource } from './voice-source';
 
 export type TeachPhase = 'intro' | 'takes' | 'done';
+
+/** Each pause the room is asked for, and how often it is asked again while the flow is open. */
+export const ROOM_PAUSE_SECONDS = 120;
+export const ROOM_PAUSE_RENEW_MS = 90_000;
 
 export interface TeachMember {
   id: string;
@@ -133,6 +138,42 @@ export function useTeachVoice({ member, phrase }: { member: TeachMember | null; 
     run.current.sentences = sentences;
   });
 
+  // Every sentence starts with the wake phrase, so the room would answer each one: it is asked not to
+  // listen from Continue until the flow is done or left. An older Pond has no pause, and the run goes on.
+  const [quiet, setQuiet] = useState(false);
+  const room = useRef({ quiet: false, source });
+  useEffect(() => {
+    room.current.source = source;
+  });
+  const pauseRoom = useCallback(async () => {
+    try {
+      await room.current.source.pauseRoom(ROOM_PAUSE_SECONDS);
+      return true;
+    } catch (e) {
+      if (isMissingRoute(e)) return false;
+      logFailure('teach-voice', 'room pause refused', e);
+      return true;
+    }
+  }, []);
+  const resumeRoom = useCallback(() => {
+    if (!room.current.quiet) return;
+    room.current.quiet = false;
+    setQuiet(false);
+    room.current.source.resumeRoom().catch((e: unknown) => {
+      if (!isMissingRoute(e)) logFailure('teach-voice', 'room resume refused', e);
+    });
+  }, []);
+  useEffect(() => {
+    if (!quiet) return;
+    const timer = setInterval(() => void pauseRoom(), ROOM_PAUSE_RENEW_MS);
+    return () => clearInterval(timer);
+  }, [quiet, pauseRoom]);
+  useEffect(() => {
+    if (phase === 'done') resumeRoom();
+  }, [phase, resumeRoom]);
+  // Close, Set up later and a swipe back all leave by unmounting the screen.
+  useEffect(() => resumeRoom, [resumeRoom]);
+
   const recorder = useTakeRecorder({
     name: 'teach-voice',
     silence: i18n.t('teachVoice.refused.silence'),
@@ -174,6 +215,10 @@ export function useTeachVoice({ member, phrase }: { member: TeachMember | null; 
     setStarting(true);
     setSaid(null);
     try {
+      if (!room.current.quiet && (await pauseRoom())) {
+        room.current.quiet = true;
+        setQuiet(true);
+      }
       await recorder.start(async () => {
         // Another member's pronunciations of the same phrase stay; a new phrase starts the list again.
         if (phrase.trim() && phrase.trim() !== saved) {
@@ -191,7 +236,7 @@ export function useTeachVoice({ member, phrase }: { member: TeachMember | null; 
     } finally {
       setStarting(false);
     }
-  }, [member, memberTakes, phrase, recorder, saved, source, update]);
+  }, [member, memberTakes, pauseRoom, phrase, recorder, saved, source, update]);
 
   const retry = useCallback(async () => {
     setSaid(null);

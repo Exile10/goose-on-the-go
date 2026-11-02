@@ -40,7 +40,7 @@ jest.mock('@/services/api-client', () => {
   const actual = jest.requireActual('@/services/api-client');
   return {
     ...actual,
-    api: { voicePrints: jest.fn(), voiceTake: jest.fn(), resetWakeWordCalibration: jest.fn(), forgetVoicePrints: jest.fn(), retryVoicePrintModel: jest.fn() },
+    api: { voicePrints: jest.fn(), voiceTake: jest.fn(), resetWakeWordCalibration: jest.fn(), forgetVoicePrints: jest.fn(), retryVoicePrintModel: jest.fn(), pauseVoiceRoom: jest.fn(async () => undefined), resumeVoiceRoom: jest.fn(async () => undefined) },
   };
 });
 

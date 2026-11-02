@@ -63,7 +63,7 @@ export function RoomVoicePanel({ voice }: { voice: UseVoiceRoom }) {
       </View>
       <View accessibilityLiveRegion="polite" style={styles.lines}>
         <InkText weight="semibold">{roomStateWords(live.state)}</InkText>
-        {wokeBy && live.state !== 'wait' && live.state !== 'off' ? (
+        {wokeBy && live.state !== 'wait' && live.state !== 'off' && live.state !== 'paused' ? (
           <InkText size="sm" tone="secondary">
             {t('voiceRoom.wokeBy', { name: wokeBy })}
           </InkText>

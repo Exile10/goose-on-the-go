@@ -49,6 +49,7 @@ const AGENT: VoiceAgent = {
   ],
   max_turns: 4,
   shipped_max_turns: 0,
+  thinking: 'auto',
   prefill: { agent: 'voice', kind: 'default', status: 'ready', compiled_at: null, last_used_at: null },
 };
 

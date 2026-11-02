@@ -34,6 +34,7 @@ const ROOM = {
   interrupts: 'enrolled_or_wake',
   last_heard: { profile_id: 'p1', name: 'Amina', at: '2026-11-02T10:00:00Z' },
   session_id: 's1',
+  paused_until: null,
 };
 
 describe('reading the room', () => {
@@ -117,6 +118,7 @@ const AGENT = {
   ],
   max_turns: 4,
   shipped_max_turns: 0,
+  thinking: 'auto',
   prefill: { agent: 'voice', kind: 'default', status: 'ready', compiled_at: '2026-11-02T09:00:00Z', last_used_at: null },
 };
 

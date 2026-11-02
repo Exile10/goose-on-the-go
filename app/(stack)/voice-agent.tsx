@@ -11,7 +11,7 @@ import { InkBadge, InkButton, InkSpinner, InkText, inkText, useInkTheme } from '
 
 import { RoomVoicePanel } from '@/components/patterns/room-voice';
 import { FieldRow } from '@/components/settings/field-row';
-import { NumberRow, SwitchRow } from '@/components/settings/setting-controls';
+import { NumberRow, RadioRow, SwitchRow } from '@/components/settings/setting-controls';
 import { SettingsGroup, SettingsHeader, SettingsMessage, SettingsRow } from '@/components/settings/settings-list';
 import { SettingsNotice, SettingsScroll } from '@/components/settings/settings-scroll';
 import { Spacing } from '@/constants/spacing';
@@ -19,6 +19,8 @@ import { canRebuild, DEFAULT_RETENTION_DAYS } from '@/models/agents';
 import { detectorWords, interruptWords, maxTurnsNote, shownMaxTurns, unavailableWords, wakeReasonWords } from '@/models/voice-room';
 import { useConfirm } from '@/providers/confirm-provider';
 import { confirm, reject, selectionTick, tap } from '@/services/haptics';
+import i18n from '@/services/i18n';
+import type { VoiceThinking } from '@/services/types';
 import { prefillDetail, prefillLabel, prefillTimes } from '@/view-models/agent-words';
 import { usePondSettings } from '@/view-models/use-pond-settings';
 import { useVoiceAgent } from '@/view-models/use-voice-agent';
@@ -115,6 +117,16 @@ export default function VoiceAgentScreen() {
   const busy = vm.saving || vm.resetting;
   // A refusal can be marked a screen above the save button, so the button's own line says so.
   const refused = Object.keys(fieldErrors).length + Object.keys(vm.exampleErrors).length + vm.otherErrors.length > 0;
+  const household = householdThinkingWords(settings.settings?.thinking_mode);
+  const thinkingRows: { value: VoiceThinking; label: string; hint: string }[] = [
+    { value: 'off', label: t('voiceAgent.thinks.off.label'), hint: t('voiceAgent.thinks.off.hint') },
+    {
+      value: 'auto',
+      label: t('voiceAgent.thinks.auto.label'),
+      hint: household ? t('voiceAgent.thinks.auto.hintNow', { choice: household }) : t('voiceAgent.thinks.auto.hint'),
+    },
+    { value: 'on', label: t('voiceAgent.thinks.on.label'), hint: t('voiceAgent.thinks.on.hint') },
+  ];
   const phrase = room.room?.wake.phrase || settings.settings?.voice_wake_word || '';
   const times = agent ? prefillTimes(agent.prefill) : null;
   const known = prints.missing ? null : prints.data.known;
@@ -222,6 +234,31 @@ export default function VoiceAgentScreen() {
               disabled={busy}
             />
           </SettingsGroup>
+
+          {draft.thinking !== null ? (
+            <SettingsGroup
+              title={t('voiceAgent.thinks.title')}
+              footer={
+                fieldErrors.thinking ??
+                (settings.settings?.voice_thinking_tone_enabled === false ? t('voiceAgent.thinks.footerNoTone') : t('voiceAgent.thinks.footer'))
+              }
+            >
+              {thinkingRows.map((row) => (
+                <RadioRow
+                  key={row.value}
+                  label={row.label}
+                  description={row.hint}
+                  selected={draft.thinking === row.value}
+                  disabled={busy}
+                  onSelect={() => {
+                    if (draft.thinking === row.value) return;
+                    void selectionTick();
+                    vm.actions.setThinking(row.value);
+                  }}
+                />
+              ))}
+            </SettingsGroup>
+          ) : null}
 
           {vm.otherErrors.length > 0 ? (
             <SettingsGroup title={t('agents.editor.otherProblems')}>
@@ -360,6 +397,20 @@ export default function VoiceAgentScreen() {
       ) : null}
     </SettingsScroll>
   );
+}
+
+/** The household's own thinking choice, as Settings > Thinking names it; null for one it does not offer. */
+function householdThinkingWords(mode: string | undefined): string | null {
+  switch (mode) {
+    case 'auto':
+      return i18n.t('settings.option.thinking_mode.auto.label');
+    case 'on':
+      return i18n.t('settings.option.thinking_mode.on.label');
+    case 'off':
+      return i18n.t('settings.option.thinking_mode.off.label');
+    default:
+      return null;
+  }
 }
 
 const styles = StyleSheet.create({
