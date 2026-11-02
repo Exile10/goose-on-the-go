@@ -298,16 +298,12 @@ const memoryTuning: SettingsPage = {
       footerKey: 'settings.footer.embeddings',
       items: [
         {
-          kind: 'choice',
+          kind: 'toggle',
           key: 'embedding_provider',
-          display: 'radio',
-          restart: true,
+          on: 'auto',
+          off: 'none',
           labelKey: 'settings.field.embedding_provider.label',
-          options: [
-            { value: 'gguf', labelKey: 'settings.option.embedding_provider.gguf.label', hintKey: 'settings.option.embedding_provider.gguf.hint' },
-            { value: 'fastembed', labelKey: 'settings.option.embedding_provider.fastembed.label', hintKey: 'settings.option.embedding_provider.fastembed.hint' },
-            { value: 'none', labelKey: 'settings.option.embedding_provider.none.label', hintKey: 'settings.option.embedding_provider.none.hint' },
-          ],
+          hintKey: 'settings.field.embedding_provider.hint',
         },
       ],
     },

@@ -115,6 +115,15 @@ function rowsFor(item: SettingItem, i: number, ctx: Context): ReactElement[] {
   switch (item.kind) {
     case 'switch':
       return [<SwitchRow key={item.key} {...common} value={s[item.key]} onChange={(next) => void update(item.key, next)} />];
+    case 'toggle':
+      return [
+        <SwitchRow
+          key={item.key}
+          {...common}
+          value={s[item.key] !== item.off}
+          onChange={(next) => void update(item.key, next ? item.on : item.off)}
+        />,
+      ];
     case 'choice':
       if (item.display === 'menu') {
         return [

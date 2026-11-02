@@ -34,6 +34,13 @@ interface ItemBase {
 export type SettingItem =
   | (ItemBase & { kind: 'switch'; key: BoolSettingKey })
   | (ItemBase & {
+      kind: 'toggle';
+      key: ChoiceSettingKey;
+      /** Written when switched on. Any stored value but `off` reads as on, so older values still do. */
+      on: string;
+      off: string;
+    })
+  | (ItemBase & {
       kind: 'choice';
       key: ChoiceSettingKey;
       options: ChoiceOption[];
@@ -206,7 +213,7 @@ export const SAMPLE_SETTINGS: PondSettings = {
   llm_max_tokens: 4096,
   llm_temperature: 0.7,
   context_window_override: 0,
-  embedding_provider: 'gguf',
+  embedding_provider: 'auto',
   agent_memory_inject: true,
   agent_memory_limit: 5,
   memory_extraction_enabled: true,
