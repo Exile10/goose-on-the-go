@@ -1648,7 +1648,8 @@ export interface VoiceAgentPatch {
   tool_groups_off?: string[];
   /** Null drops the household's cap. */
   max_turns?: number | null;
-  thinking?: VoiceThinking;
+  /** Null is `auto`, as the Pond takes it. */
+  thinking?: VoiceThinking | null;
 }
 
 export type VoicePrintModelState = 'missing' | 'downloading' | 'ready' | 'failed';

@@ -186,3 +186,17 @@ it('edits the mock Pond on mock, and its copy shows on the agents mock', async (
   expect(m.vm.agent?.prefill.status).toBe('queued');
   expect(pond.updateVoiceAgent).not.toHaveBeenCalled();
 });
+
+it('sends a change of whether it thinks first on its own', async () => {
+  pond.updateVoiceAgent.mockResolvedValueOnce({ ...AGENT, edited: true, thinking: 'on' });
+  const m = await mount();
+  expect(m.vm.draft?.thinking).toBe('auto');
+  act(() => m.vm.actions.setThinking('on'));
+  expect(m.vm.changed).toBe(true);
+  await act(async () => {
+    await m.vm.actions.save();
+  });
+  expect(pond.updateVoiceAgent).toHaveBeenCalledWith({ thinking: 'on' });
+  expect(m.vm.draft?.thinking).toBe('on');
+  expect(m.vm.changed).toBe(false);
+});

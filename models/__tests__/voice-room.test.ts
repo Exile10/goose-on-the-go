@@ -17,6 +17,7 @@ import {
   readVoicePrints,
   readVoiceRoom,
   readVoiceTake,
+  roomStateWords,
   shownMaxTurns,
   teachSentences,
   voiceAgentExampleField,
@@ -38,6 +39,14 @@ const ROOM = {
 };
 
 describe('reading the room', () => {
+  it('reads a room paused while a voice is taught, and says so', () => {
+    const paused = readVoiceRoom({ ...ROOM, state: 'paused', paused_until: '2026-11-03T10:02:00Z' });
+    expect(paused).toMatchObject({ state: 'paused', paused_until: '2026-11-03T10:02:00Z' });
+    expect(readVoiceRoom({ ...ROOM, paused_until: '' })?.paused_until).toBeNull();
+    expect(roomStateWords('paused')).toBe('Paused while you teach Goose your voice.');
+    expect(readRoomVoiceEvent({ event: 'state', state: 'paused' })).toEqual({ event: 'state', state: 'paused' });
+  });
+
   it('reads a status as the contract writes it', () => {
     expect(readVoiceRoom(ROOM)).toEqual(ROOM);
   });
@@ -123,6 +132,21 @@ const AGENT = {
 };
 
 describe('the Voice agent', () => {
+  it('reads whether it thinks first, and sends a change of it alone', () => {
+    expect(readVoiceAgent({ ...AGENT, thinking: 'on' })?.thinking).toBe('on');
+    expect(readVoiceAgent({ ...AGENT, thinking: 'sometimes' })?.thinking).toBeNull();
+    const { thinking: _, ...older } = AGENT;
+    const old = readVoiceAgent(older) as VoiceAgent;
+    expect(old.thinking).toBeNull();
+    expect(patchFrom(old, draftOf(old))).toBeNull();
+
+    const agent = readVoiceAgent(AGENT) as VoiceAgent;
+    expect(patchFrom(agent, { ...draftOf(agent), thinking: 'off' })).toEqual({ thinking: 'off' });
+    expect(patchFrom(agent, { ...draftOf(agent), thinking: 'auto' })).toBeNull();
+    expect(voiceAgentField('thinking')).toBe('thinking');
+    expect(voiceAgentProblem('thinking', 'is `sometimes`; it must be off, auto or on')).toBe('Thinking is `sometimes`; it must be off, auto or on.');
+  });
+
   it('reads the agent, and gives a prefill row it cannot read a status it can', () => {
     expect(readVoiceAgent(AGENT)).toEqual(AGENT);
     expect(readVoiceAgent({ ...AGENT, prefill: null })?.prefill).toMatchObject({ agent: 'voice', status: 'not_built' });

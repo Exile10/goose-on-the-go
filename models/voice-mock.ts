@@ -294,8 +294,9 @@ export function createMockVoice(
         next.maxTurns = n;
       }
       if (patch.thinking !== undefined) {
-        if (!THINKING.includes(patch.thinking)) errors.push({ path: 'thinking', message: `is \`${String(patch.thinking)}\`; it must be off, auto or on` });
-        next.thinking = patch.thinking === 'auto' ? null : patch.thinking;
+        const thinking = patch.thinking ?? 'auto';
+        if (!THINKING.includes(thinking)) errors.push({ path: 'thinking', message: `is \`${String(thinking)}\`; it must be off, auto or on` });
+        next.thinking = thinking === 'auto' ? null : thinking;
       }
       if (errors.length > 0) throw new ApiError('mock PUT /agents/voice → 422', 422, null, null, { errors });
       const edited =
