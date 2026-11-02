@@ -3,13 +3,6 @@
   "$policy": "Exceptions are deferrals, not pardons. An entry is only justified when the advisory cannot be fixed without a breaking upgrade AND the exposure does not reach a shipped build or a user's device. Anything reachable from the app bundle gets fixed, not listed.",
   "allow": [
     {
-      "advisory": "GHSA-86w9-cpqp-85rv",
-      "package": "node-forge",
-      "severity": "high",
-      "reason": "RSA PKCS#1 v1.5 signature verification flaw. Reached only through @expo/code-signing-certificates, which the Expo CLI uses to generate and check expo-updates code-signing certificates on a developer's machine. This app ships no node-forge: it is not imported by app code and is not in the bundle. The range is <=1.4.0 and 1.4.0 is the latest release, so there is no fixed version to move to.",
-      "reviewBy": "2026-12-31"
-    },
-    {
       "advisory": "GHSA-mrhx-c7xc-m3w5",
       "package": "zod",
       "severity": "high",
