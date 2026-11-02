@@ -8,7 +8,7 @@
  *   hear      the samples as a 16 kHz WAV, to `/transcribe`.
  *   answer    the words as an ordinary turn with `voice_mode`, so it lands in
  *             the conversation like anything typed — and is shorter.
- *   speak     each sentence of the reply to `/tts` as soon as it is whole,
+ *   speak     each clause of the reply to `/tts` as soon as it is whole,
  *             played in order, the next one fetched while this one plays.
  *
  * Then it listens again, as a conversation would, until eight seconds pass
@@ -39,7 +39,7 @@ import {
   envelope,
   orbLevel,
   rms,
-  takeSentences,
+  takeSpeechUnits,
 } from '@/services/speech';
 import {
   beginVoiceSession,
@@ -168,7 +168,7 @@ export function useVoice(chat: {
     levelAt: 0,
   });
 
-  // The reply being spoken: sentences waiting, and the one playing.
+  // The reply being spoken: clauses waiting, and the one playing.
   const voice = useRef({
     queue: [] as string[],
     pumping: false,
@@ -288,17 +288,17 @@ export function useVoice(chat: {
   }, [setState, t]);
 
   /**
-   * Speak whatever is queued, in order. While one sentence plays the next is
-   * already being synthesised, because `/tts` renders a whole sentence before
-   * it sends a byte and the gap would otherwise fall between every sentence.
+   * Speak whatever is queued, in order. While one clause plays the next is
+   * already being synthesised, because `/tts` renders a whole request before
+   * it sends a byte and the gap would otherwise fall between every clause.
    */
   const pump = useCallback(async () => {
     const v = voice.current;
     if (v.pumping) return;
     v.pumping = true;
     const generation = v.generation;
-    const fetchAudio = (sentence: string) => {
-      const audio = api.speak(sentence);
+    const fetchAudio = (unit: string) => {
+      const audio = api.speak(unit);
       // An interrupted reply abandons its prefetch; that is not an error.
       audio.catch(() => {});
       return audio;
@@ -309,9 +309,9 @@ export function useVoice(chat: {
         let audio = ahead;
         ahead = null;
         if (!audio) {
-          const sentence = v.queue.shift();
-          if (!sentence) break;
-          audio = fetchAudio(sentence);
+          const unit = v.queue.shift();
+          if (!unit) break;
+          audio = fetchAudio(unit);
         }
         const following = v.queue.shift();
         if (following) ahead = fetchAudio(following);
@@ -379,22 +379,22 @@ export function useVoice(chat: {
       v.queue = [];
       let cursor = 0;
       setState('thinking');
-      const enqueue = (sentences: string[]) => {
-        if (!speakerRef.current || sentences.length === 0) return;
-        v.queue.push(...sentences);
+      const enqueue = (units: string[]) => {
+        if (!speakerRef.current || units.length === 0) return;
+        v.queue.push(...units);
         void pump();
       };
       const reply = await sendRef.current(text, [], {
         voice: true,
         onText: (full) => {
-          const { sentences, next } = takeSentences(full, cursor);
+          const { units, next } = takeSpeechUnits(full, cursor);
           cursor = next;
-          enqueue(sentences);
+          enqueue(units);
         },
       });
       if (!alive.current) return;
       v.turnDone = true;
-      if (reply) enqueue(takeSentences(reply, cursor, true).sentences);
+      if (reply) enqueue(takeSpeechUnits(reply, cursor, true).units);
       // Nothing to say aloud, or the speaker is off: listen again now.
       if (!v.pumping && v.queue.length === 0) {
         setLevel(0);

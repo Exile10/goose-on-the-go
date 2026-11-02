@@ -9,7 +9,7 @@ import {
   orbLevel,
   rms,
   speakable,
-  takeSentences,
+  takeSpeechUnits,
 } from '@/services/speech';
 
 describe('encodeWav', () => {
@@ -80,17 +80,101 @@ describe('speakable', () => {
   });
 });
 
-describe('takeSentences', () => {
-  it('hands over each sentence as soon as the next one has begun', () => {
-    const first = takeSentences('It is 23 degrees. The humid', 0);
-    expect(first.sentences).toEqual(['It is 23 degrees.']);
-    const second = takeSentences('It is 23 degrees. The humidity is 34%.', first.next, true);
-    expect(second.sentences).toEqual(['The humidity is 34%.']);
+describe('takeSpeechUnits', () => {
+  /** Feed a reply to the splitter a token at a time, as the chat stream does. */
+  const stream = (tokens: string[]) => {
+    const units: string[] = [];
+    let text = '';
+    let cursor = 0;
+    for (const token of tokens) {
+      text += token;
+      const taken = takeSpeechUnits(text, cursor);
+      units.push(...taken.units);
+      cursor = taken.next;
+    }
+    units.push(...takeSpeechUnits(text, cursor, true).units);
+    return units;
+  };
+
+  it('hands over each sentence as soon as it ends, without waiting for the next token', () => {
+    const first = takeSpeechUnits('It is 23 degrees.', 0);
+    expect(first.units).toEqual(['It is 23 degrees.']);
+    const second = takeSpeechUnits('It is 23 degrees. The humidity is 34%.', first.next, true);
+    expect(second.units).toEqual(['The humidity is 34%.']);
   });
 
-  it('does not split a decimal or wait on the last word while it streams', () => {
-    expect(takeSentences('Version 3.5 is out', 0).sentences).toEqual([]);
-    expect(takeSentences('Done.', 0).sentences).toEqual([]);
-    expect(takeSentences('Done.', 0, true).sentences).toEqual(['Done.']);
+  it('releases the first clause once it has three words', () => {
+    const { units, next } = takeSpeechUnits('It is sunny, and the high is', 0);
+    expect(units).toEqual(['It is sunny,']);
+    expect(takeSpeechUnits('It is sunny, and the high is 26.', next, true).units).toEqual([
+      'and the high is 26.',
+    ]);
+  });
+
+  it('keeps a clause of fewer than three words with what follows', () => {
+    expect(takeSpeechUnits('Sure, it is 23 degrees. The', 0).units).toEqual(['Sure, it is 23 degrees.']);
+  });
+
+  it('caps the first unit at six words when no mark comes, and only the first', () => {
+    const reply =
+      'The weather in Nairobi today is expected to be warm and mostly sunny all afternoon. Then';
+    const { units, next } = takeSpeechUnits(reply, 0);
+    expect(units).toEqual([
+      'The weather in Nairobi today is',
+      'expected to be warm and mostly sunny all afternoon.',
+    ]);
+    expect(reply.slice(next)).toBe(' Then');
+    // A word still being written is not yet a word: "is" could become "isn't".
+    expect(takeSpeechUnits('The weather in Nairobi today is', 0).units).toEqual([]);
+  });
+
+  it('splits later units at clauses as well as sentences', () => {
+    const tokens = ['Yes', '.', ' Tomorrow', ' looks', ' warm', ' and', ' sunny', ','];
+    expect(stream([...tokens, ' with', ' a', ' high', ' of', ' 26', '.'])).toEqual([
+      'Yes.',
+      'Tomorrow looks warm and sunny,',
+      'with a high of 26.',
+    ]);
+  });
+
+  it('cuts a reply streamed a token at a time where it would cut the whole reply', () => {
+    const reply =
+      'Herons hunt by standing still for a long time, then striking fast. ' +
+      'They eat fish, frogs and insects, and some even bait the water with bread. ' +
+      'Dr. Smith counted 1,000 of them at 7:30 a.m. near the lake.';
+    const tokens = reply.match(/\s*\S+/g) ?? [];
+    expect(stream(tokens)).toEqual(takeSpeechUnits(reply, 0, true).units);
+    expect(stream(tokens)).toEqual([
+      'Herons hunt by standing still for',
+      'a long time,',
+      'then striking fast.',
+      'They eat fish,',
+      'frogs and insects,',
+      'and some even bait the water with bread.',
+      'Dr. Smith counted 1,000 of them at 7:30 a.m. near the lake.',
+    ]);
+  });
+
+  it('waits on a number or a link that the next token may continue', () => {
+    expect(takeSpeechUnits('Version 3.5 is out', 0).units).toEqual([]);
+    expect(takeSpeechUnits('It is 25.', 0).units).toEqual([]);
+    expect(takeSpeechUnits('It is 25.', 0, true).units).toEqual(['It is 25.']);
+    expect(takeSpeechUnits('Go to www.example.', 0).units).toEqual([]);
+    expect(takeSpeechUnits('There are 1,000 units, and', 0).units).toEqual(['There are 1,000 units,']);
+  });
+
+  it('does not cut a link or a code block in half', () => {
+    const link = 'See [the forecast for Nairobi, Kenya](https://x.y) for more';
+    expect(takeSpeechUnits(link, 0).units).toEqual(['See the forecast for Nairobi, Kenya']);
+    const code = 'Run this:\n```\nls -la\ncd /tmp\n```\nThen';
+    const { units, next } = takeSpeechUnits(code, 0);
+    expect(units).toEqual(['Run this:']);
+    expect(code.slice(next)).toBe('Then');
+    expect(takeSpeechUnits('Run this:\n```\nls -la, then cd', 0).units).toEqual(['Run this:']);
+  });
+
+  it('speaks the words and not the markdown, and drops units with nothing to say', () => {
+    expect(takeSpeechUnits('**Yes**, see the docs. More', 0).units).toEqual(['Yes, see the docs.']);
+    expect(stream(['Really', '?', '!', ' Yes', '.'])).toEqual(['Really?', 'Yes.']);
   });
 });
