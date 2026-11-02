@@ -80,7 +80,7 @@ function VoicePrintBody({ member, onTeach, onForget }: Omit<VoicePrintSheetProps
         <InkText>{t('voiceMatch.teachBody', { name: member.name })}</InkText>
         <View style={styles.buttons}>
           <InkButton variant="primary" icon="mic" onPress={() => onTeach(member)}>
-            {member.takes > 0 ? t('voiceMatch.teachAgain', { name: member.name }) : t('voiceMatch.teach', { name: member.name })}
+            {member.takes > 0 ? t('voiceMatch.teachAgain') : t('voiceMatch.teach')}
           </InkButton>
         </View>
       </View>

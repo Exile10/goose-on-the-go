@@ -13,7 +13,7 @@ import { useServer } from '@/providers/server-provider';
 import { ApiError } from '@/services/api-client';
 import i18n from '@/services/i18n';
 import type { RecipeFieldError, VoiceAgent, VoiceAgentExample } from '@/services/types';
-import { draftOf, patchFrom, voiceAgentField, type VoiceAgentDraft } from '@/models/voice-room';
+import { draftOf, patchFrom, voiceAgentExampleField, voiceAgentField, voiceAgentProblem, type VoiceAgentDraft } from '@/models/voice-room';
 import { isMissingRoute, useAgentsSource } from './agents-source';
 import { describeApiError, logFailure } from './describe-error';
 import { MIN_POLL_MS, useLive } from './use-live';
@@ -29,6 +29,8 @@ export interface UseVoiceAgent {
   /** The form differs from what the Pond holds. */
   changed: boolean;
   fieldErrors: Partial<Record<VoiceAgentField, string>>;
+  /** Refusals about one example's question or answer, by `0.brief` or `0.answer`. */
+  exampleErrors: Record<string, string>;
   /** Refusals whose path names no field on the form. */
   otherErrors: RecipeFieldError[];
   loading: boolean;
@@ -151,15 +153,19 @@ export function useVoiceAgent(): UseVoiceAgent {
 
   const changed = useMemo(() => (agent && draft ? patchFrom(agent, draft) !== null : false), [agent, draft]);
 
-  const { fieldErrors, otherErrors } = useMemo(() => {
+  const { fieldErrors, exampleErrors, otherErrors } = useMemo(() => {
     const fields: Partial<Record<VoiceAgentField, string>> = {};
+    const examples: Record<string, string> = {};
     const others: RecipeFieldError[] = [];
     for (const e of errors) {
+      const words = voiceAgentProblem(e.path, e.message);
+      const example = voiceAgentExampleField(e.path);
       const field = voiceAgentField(e.path);
-      if (field && !fields[field]) fields[field] = e.message;
-      else if (!field) others.push(e);
+      if (example) examples[example] ??= words;
+      else if (field) fields[field] ??= words;
+      else others.push({ path: e.path, message: words });
     }
-    return { fieldErrors: fields, otherErrors: others };
+    return { fieldErrors: fields, exampleErrors: examples, otherErrors: others };
   }, [errors]);
 
   const save = useCallback(async () => {
@@ -236,6 +242,7 @@ export function useVoiceAgent(): UseVoiceAgent {
     draft,
     changed,
     fieldErrors,
+    exampleErrors,
     otherErrors,
     loading,
     failed,

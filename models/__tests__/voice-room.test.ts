@@ -19,7 +19,9 @@ import {
   readVoiceTake,
   shownMaxTurns,
   teachSentences,
+  voiceAgentExampleField,
   voiceAgentField,
+  voiceAgentProblem,
   wakeReasonWords,
 } from '../voice-room';
 
@@ -169,6 +171,32 @@ describe('the Voice agent', () => {
     expect(voiceAgentField('giap_role.tool_groups[1]')).toBe('tools');
     expect(voiceAgentField('giap_role.max_turns')).toBe('maxTurns');
     expect(voiceAgentField('giap_role.activations')).toBeNull();
+  });
+
+  it('puts an example refusal under that example field', () => {
+    expect(voiceAgentExampleField('examples[0].answer')).toBe('0.answer');
+    expect(voiceAgentExampleField('giap_role.context.examples[3].brief')).toBe('3.brief');
+    expect(voiceAgentExampleField('examples[1]')).toBeNull();
+    expect(voiceAgentExampleField('examples')).toBeNull();
+  });
+
+  it('says a refusal as a sentence that names its field', () => {
+    expect(voiceAgentProblem('examples[0].answer', 'is empty')).toBe('Answer 1 is empty.');
+    expect(voiceAgentProblem('examples[2].brief', 'is 2100 characters; the most is 2000')).toBe(
+      'Question 3 is 2100 characters; the most is 2000.',
+    );
+    expect(voiceAgentProblem('instructions', 'is 4100 characters; the most is 4000, since every spoken turn carries it')).toBe(
+      'The text is 4100 characters; the most is 4000, since every spoken turn carries it.',
+    );
+    expect(voiceAgentProblem('examples', 'has 9 examples; the most is 8, since every spoken turn carries them')).toBe(
+      'This agent has 9 examples; the most is 8, since every spoken turn carries them.',
+    );
+    expect(voiceAgentProblem('max_turns', 'is 13; it must be from 1 to 12')).toBe('The number is 13; it must be from 1 to 12.');
+    expect(voiceAgentProblem('tool_groups_off[0]', '`giap-nope` is never part of a spoken turn')).toBe(
+      '`giap-nope` is never part of a spoken turn.',
+    );
+    expect(voiceAgentProblem('colour', 'is not a field of the Voice agent')).toBe('`colour` is not a field of the Voice agent.');
+    expect(voiceAgentProblem('', 'the body must be a JSON object')).toBe('The body must be a JSON object.');
   });
 });
 

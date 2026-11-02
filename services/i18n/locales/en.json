@@ -4127,6 +4127,13 @@
     "missing": "Your Pond doesn’t have a Voice agent yet. Update it to change how Goose answers out loud.",
     "saved": "Saved. Spoken answers follow it from the next one.",
     "resetDone": "Back to the Voice agent your Pond shipped with.",
+    "notSaved": "Not saved. Your Pond marked what to change above.",
+    "problem": {
+      "instructions": "The text",
+      "examples": "This agent",
+      "example": "Example {{number}}",
+      "maxTurns": "The number"
+    },
     "revert": "Undo changes",
     "error": {
       "guest": "Only a household member can change the Voice agent. This phone is paired as a guest.",
@@ -4163,7 +4170,7 @@
     },
     "reset": {
       "title": "Go back to the shipped Voice agent?",
-      "body": "Your instructions, examples and tool choices are replaced by the ones your Pond shipped with.",
+      "body": "Your instructions, examples, tool choices and steps go back to the ones your Pond shipped with.",
       "confirm": "Go back",
       "keep": "Keep mine",
       "footer": "Your household has changed this agent.",
@@ -4235,8 +4242,8 @@
       "fair": "The sentences sound fairly alike. Recording again somewhere quieter may help.",
       "uneven": "The sentences sound quite different from each other. Record them again somewhere quiet."
     },
-    "teach": "Teach Goose {{name}}’s voice",
-    "teachAgain": "Record {{name}}’s voice again",
+    "teach": "Teach Goose this voice",
+    "teachAgain": "Record this voice again",
     "teachBody": "Hand the phone to {{name}} to read five short sentences."
   },
   "teachVoice": {

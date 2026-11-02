@@ -113,6 +113,8 @@ export default function VoiceAgentScreen() {
 
   const { agent, draft, fieldErrors } = vm;
   const busy = vm.saving || vm.resetting;
+  // A refusal can be marked a screen above the save button, so the button's own line says so.
+  const refused = Object.keys(fieldErrors).length + Object.keys(vm.exampleErrors).length + vm.otherErrors.length > 0;
   const phrase = room.room?.wake.phrase || settings.settings?.voice_wake_word || '';
   const times = agent ? prefillTimes(agent.prefill) : null;
   const known = prints.missing ? null : prints.data.known;
@@ -170,6 +172,7 @@ export default function VoiceAgentScreen() {
                 value={example.brief}
                 onChange={(brief) => vm.actions.setExample(i, { ...example, brief })}
                 placeholder={t('voiceAgent.examples.askedPlaceholder')}
+                error={vm.exampleErrors[`${i}.brief`]}
                 disabled={busy}
               />,
               <FieldRow
@@ -179,6 +182,7 @@ export default function VoiceAgentScreen() {
                 onChange={(answer) => vm.actions.setExample(i, { ...example, answer })}
                 placeholder={t('voiceAgent.examples.answerPlaceholder')}
                 multiline
+                error={vm.exampleErrors[`${i}.answer`]}
                 disabled={busy}
               />,
               <SettingsRow
@@ -236,17 +240,25 @@ export default function VoiceAgentScreen() {
           <View style={styles.footer}>
             <View style={styles.state}>
               <InkText size="sm" tone="secondary">
-                {vm.saving ? t('agents.editor.saving') : vm.changed ? t('agents.editor.unsaved') : t('agents.editor.noChanges')}
+                {vm.saving
+                  ? t('agents.editor.saving')
+                  : refused
+                    ? t('voiceAgent.notSaved')
+                    : vm.changed
+                      ? t('agents.editor.unsaved')
+                      : t('agents.editor.noChanges')}
               </InkText>
             </View>
-            {vm.changed ? (
-              <InkButton variant="quiet" onPress={vm.actions.revert} disabled={busy}>
-                {t('voiceAgent.revert')}
+            <View style={styles.actions}>
+              {vm.changed ? (
+                <InkButton variant="quiet" onPress={vm.actions.revert} disabled={busy}>
+                  {t('voiceAgent.revert')}
+                </InkButton>
+              ) : null}
+              <InkButton variant="primary" icon="check" onPress={() => void save()} disabled={busy || !vm.changed}>
+                {t('common.save')}
               </InkButton>
-            ) : null}
-            <InkButton variant="primary" icon="check" onPress={() => void save()} disabled={busy || !vm.changed}>
-              {t('common.save')}
-            </InkButton>
+            </View>
           </View>
 
           {agent.edited ? (
@@ -354,6 +366,8 @@ const styles = StyleSheet.create({
   block: { marginBottom: Spacing.xl },
   centre: { alignItems: 'center', gap: Spacing.md, marginBottom: Spacing.xl },
   error: { marginBottom: Spacing.md },
-  footer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: Spacing.md, marginBottom: Spacing.xl },
-  state: { flexShrink: 1 },
+  // With Undo and Save both showing, a phone has no room for the note beside them: it takes its own line.
+  footer: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'flex-end', gap: Spacing.md, marginBottom: Spacing.xl },
+  state: { flexGrow: 1, flexBasis: 160 },
+  actions: { flexDirection: 'row', gap: Spacing.md, marginLeft: 'auto' },
 });
