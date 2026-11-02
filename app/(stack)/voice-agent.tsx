@@ -16,7 +16,7 @@ import { SettingsGroup, SettingsHeader, SettingsMessage, SettingsRow } from '@/c
 import { SettingsNotice, SettingsScroll } from '@/components/settings/settings-scroll';
 import { Spacing } from '@/constants/spacing';
 import { canRebuild, DEFAULT_RETENTION_DAYS } from '@/models/agents';
-import { detectorWords, interruptWords, unavailableWords, wakeReasonWords } from '@/models/voice-room';
+import { detectorWords, interruptWords, maxTurnsNote, shownMaxTurns, unavailableWords, wakeReasonWords } from '@/models/voice-room';
 import { useConfirm } from '@/providers/confirm-provider';
 import { confirm, reject, selectionTick, tap } from '@/services/haptics';
 import { prefillDetail, prefillLabel, prefillTimes } from '@/view-models/agent-words';
@@ -208,8 +208,9 @@ export default function VoiceAgentScreen() {
             <NumberRow
               label={t('voiceAgent.uses.maxTurns')}
               description={t('voiceAgent.uses.maxTurnsHint')}
-              value={draft.maxTurns}
-              min={1}
+              note={maxTurnsNote(agent, draft)}
+              value={shownMaxTurns(agent, draft)}
+              min={0}
               max={12}
               step={1}
               error={fieldErrors.maxTurns}

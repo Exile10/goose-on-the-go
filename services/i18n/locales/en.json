@@ -4157,7 +4157,9 @@
       "footer": "A group switched off stays out of spoken answers. Groups can be taken away here, never added.",
       "none": "This agent uses no tools.",
       "maxTurns": "Steps per answer",
-      "maxTurnsHint": "How many tool calls a spoken answer may make before it replies."
+      "maxTurnsHint": "How many tool calls a spoken answer may make before it replies. At 0 the Voice agent sets no cap of its own.",
+      "maxTurnsShipped": "From Steps before answering aloud, in Voice settings.",
+      "maxTurnsNone": "No cap of its own: a spoken answer gets the same steps as a typed one."
     },
     "reset": {
       "title": "Go back to the shipped Voice agent?",

@@ -19,13 +19,26 @@ it('starts listening a moment after it is switched back on', async () => {
   expect((await pond.room()).state).toBe('wait');
 });
 
-it('refuses an empty instruction by its path, and saves and resets the rest', async () => {
+it('refuses a bad group and cap at their paths, as the Pond does, and saves and resets the rest', async () => {
   const rebuild = jest.fn().mockResolvedValue(undefined);
   const pond = createMockVoice(clock().now, async () => null, rebuild);
-  const refusal = await pond.updateAgent({ instructions: ' ' }).catch((e: unknown) => e);
+  const refusal = await pond.updateAgent({ tool_groups_off: ['giap-nope'], max_turns: 0, examples: [{ brief: 'Hi', answer: ' ' }] }).catch((e: unknown) => e);
   expect(refusal).toBeInstanceOf(ApiError);
   expect((refusal as ApiError).status).toBe(422);
-  expect((refusal as ApiError).body).toEqual({ errors: [expect.objectContaining({ path: 'giap_role.instructions' })] });
+  expect(((refusal as ApiError).body as { errors: { path: string }[] }).errors.map((e) => e.path)).toEqual([
+    'examples[0].answer',
+    'tool_groups_off[0]',
+    'max_turns',
+  ]);
+  expect(rebuild).not.toHaveBeenCalled();
+
+  const shipped = await pond.agent();
+  expect(shipped).toMatchObject({ edited: false, examples: [], max_turns: null, shipped_max_turns: 0 });
+  const capped = await pond.updateAgent({ max_turns: 3 });
+  expect(capped).toMatchObject({ edited: true, max_turns: 3 });
+  expect(await pond.updateAgent({ max_turns: null })).toMatchObject({ edited: false, max_turns: null });
+  expect(await pond.updateAgent({ instructions: ' ' })).toMatchObject({ edited: false, instructions: shipped.shipped_instructions });
+  rebuild.mockClear();
 
   const saved = await pond.updateAgent({ instructions: 'Be brief.', tool_groups_off: ['giap-knowledge'] });
   expect(saved).toMatchObject({ edited: true, instructions: 'Be brief.' });

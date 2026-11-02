@@ -1,6 +1,7 @@
 // The voice routes' readers hold the line between a body that is news and one that is not the route's
 // at all; the rest is the words and the form the screens build from them.
 
+import i18n from '@/services/i18n';
 import type { VoiceAgent, VoicePrintMember } from '@/services/types';
 import {
   QUIET_ROOM,
@@ -8,6 +9,7 @@ import {
   draftOf,
   foldRoomEvent,
   interruptWords,
+  maxTurnsNote,
   orderMembers,
   patchFrom,
   readRoomVoiceEvent,
@@ -15,6 +17,7 @@ import {
   readVoicePrints,
   readVoiceRoom,
   readVoiceTake,
+  shownMaxTurns,
   teachSentences,
   voiceAgentField,
   wakeReasonWords,
@@ -111,6 +114,7 @@ const AGENT = {
     { group: 'giap-memory', label: 'Memory', on: false },
   ],
   max_turns: 4,
+  shipped_max_turns: 0,
   prefill: { agent: 'voice', kind: 'default', status: 'ready', compiled_at: '2026-11-02T09:00:00Z', last_used_at: null },
 };
 
@@ -119,6 +123,21 @@ describe('the Voice agent', () => {
     expect(readVoiceAgent(AGENT)).toEqual(AGENT);
     expect(readVoiceAgent({ ...AGENT, prefill: null })?.prefill).toMatchObject({ agent: 'voice', status: 'not_built' });
     expect(readVoiceAgent({ title: 'Voice' })).toBeNull();
+  });
+
+  it('shows the Pond\'s own cap while the household has set none, and 0 hands it back', () => {
+    const unset = readVoiceAgent({ ...AGENT, max_turns: null, shipped_max_turns: 8 }) as VoiceAgent;
+    expect(unset).toMatchObject({ max_turns: null, shipped_max_turns: 8 });
+    const draft = draftOf(unset);
+    expect(shownMaxTurns(unset, draft)).toBe(8);
+    expect(maxTurnsNote(unset, draft)).toBe(i18n.t('voiceAgent.uses.maxTurnsShipped'));
+    expect(maxTurnsNote({ ...unset, shipped_max_turns: 0 }, draft)).toBe(i18n.t('voiceAgent.uses.maxTurnsNone'));
+    expect(patchFrom(unset, { ...draft, maxTurns: 3 })).toEqual({ max_turns: 3 });
+
+    const own = readVoiceAgent(AGENT) as VoiceAgent;
+    expect(maxTurnsNote(own, draftOf(own))).toBeNull();
+    expect(patchFrom(own, { ...draftOf(own), maxTurns: null })).toEqual({ max_turns: null });
+    expect(readVoiceAgent({ ...AGENT, max_turns: 0, shipped_max_turns: 'eight' })).toMatchObject({ max_turns: null, shipped_max_turns: null });
   });
 
   it('sends only what changed, and nothing when nothing did', () => {
@@ -140,6 +159,11 @@ describe('the Voice agent', () => {
   });
 
   it('puts a refusal under the field its path names', () => {
+    expect(voiceAgentField('instructions')).toBe('instructions');
+    expect(voiceAgentField('examples[2].brief')).toBe('examples');
+    expect(voiceAgentField('tool_groups_off[0]')).toBe('tools');
+    expect(voiceAgentField('max_turns')).toBe('maxTurns');
+    expect(voiceAgentField('')).toBeNull();
     expect(voiceAgentField('giap_role.instructions')).toBe('instructions');
     expect(voiceAgentField('giap_role.context.examples[0].answer')).toBe('examples');
     expect(voiceAgentField('giap_role.tool_groups[1]')).toBe('tools');

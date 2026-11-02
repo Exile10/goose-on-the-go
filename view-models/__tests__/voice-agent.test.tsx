@@ -48,6 +48,7 @@ const AGENT: VoiceAgent = {
     { group: 'giap-knowledge', label: 'Web search', on: true },
   ],
   max_turns: 4,
+  shipped_max_turns: 0,
   prefill: { agent: 'voice', kind: 'default', status: 'ready', compiled_at: null, last_used_at: null },
 };
 
@@ -118,19 +119,19 @@ it('puts each refusal under the field its path names', async () => {
   pond.updateVoiceAgent.mockRejectedValueOnce(
     new ApiError('x → 422', 422, null, null, {
       errors: [
-        { path: 'giap_role.instructions', message: 'is empty' },
-        { path: 'giap_role.activations', message: 'cannot be set' },
+        { path: 'examples[0].answer', message: 'is empty' },
+        { path: 'colour', message: 'is not a field of the Voice agent' },
       ],
     }),
   );
   const m = await mount();
-  act(() => m.vm.actions.setInstructions(''));
+  act(() => m.vm.actions.setExample(0, { brief: 'Weather?', answer: '' }));
   await act(async () => {
     await m.vm.actions.save();
   });
-  expect(m.vm.fieldErrors.instructions).toBe('is empty');
-  expect(m.vm.otherErrors).toEqual([{ path: 'giap_role.activations', message: 'cannot be set' }]);
-  expect(m.vm.draft?.instructions).toBe('');
+  expect(m.vm.fieldErrors.examples).toBe('is empty');
+  expect(m.vm.otherErrors).toEqual([{ path: 'colour', message: 'is not a field of the Voice agent' }]);
+  expect(m.vm.draft?.examples[0]).toEqual({ brief: 'Weather?', answer: '' });
 });
 
 it('tells a guest it cannot change the agent', async () => {

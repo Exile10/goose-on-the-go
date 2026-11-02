@@ -51,18 +51,31 @@ Say the answer first, in one or two short sentences. Use plain words a listener 
 no lists, no headings, no links, no symbols to read out. If you need something from them,
 ask one short question.`;
 
-const SHIPPED_EXAMPLES: VoiceAgentExample[] = [
-  { brief: 'What is the weather like?', answer: 'Sunny and warm, about twenty-six degrees, with rain likely after four.' },
-  { brief: 'Set a timer for ten minutes.', answer: 'Done. Ten minutes, starting now.' },
+// The Pond's own labels for the groups a spoken turn may have.
+const GROUPS = [
+  { group: 'giap-memory', label: 'What the household has said' },
+  { group: 'giap-system', label: 'The time and this machine' },
+  { group: 'giap-schedule', label: 'Timers, reminders and schedules' },
+  { group: 'giap-weather', label: 'Weather' },
+  { group: 'giap-knowledge', label: 'Web search and Wikipedia' },
+  { group: 'giap-device-control', label: 'Switching devices' },
 ];
 
-const GROUPS = [
-  { group: 'giap-weather', label: 'Weather' },
-  { group: 'giap-memory', label: 'What it remembers' },
-  { group: 'giap-schedule', label: 'Timers and reminders' },
-  { group: 'giap-device-control', label: 'Lights and devices' },
-  { group: 'giap-knowledge', label: 'Web search' },
-];
+/** The Pond's limits on an edit, which every spoken turn's preamble carries. */
+const MAX_INSTRUCTIONS_CHARS = 4_000;
+const MAX_EXAMPLES = 8;
+const MAX_EXAMPLE_CHARS = 2_000;
+const MAX_TURNS = 12;
+
+/** The household's edit, as the Pond keeps it; null fields are the shipped agent's. */
+interface MockVoiceEdit {
+  instructions: string | null;
+  examples: VoiceAgentExample[];
+  off: string[];
+  maxTurns: number | null;
+}
+
+const UNEDITED: MockVoiceEdit = { instructions: null, examples: [], off: [], maxTurns: null };
 
 /** A turn the mock room plays while its stream is open: someone wakes it, asks, and is answered. */
 function scriptedTurn(who: { profile_id: string; name: string } | null): RoomVoiceEvent[] {
@@ -104,7 +117,7 @@ export function createMockVoice(
   let modelFrom: number | null = null;
   let modelFailed = false;
 
-  let edits: { instructions: string; examples: VoiceAgentExample[]; off: string[]; maxTurns: number } | null = null;
+  let edits: MockVoiceEdit | null = null;
 
   // A run of takes, which ends at the fifth: its second sentence is refused once, so the refusal can
   // be seen without a Pond. The detector's verdict is the household's, across runs.
@@ -155,9 +168,10 @@ export function createMockVoice(
       edited: edits !== null,
       instructions: edits?.instructions ?? SHIPPED_INSTRUCTIONS,
       shipped_instructions: SHIPPED_INSTRUCTIONS,
-      examples: (edits?.examples ?? SHIPPED_EXAMPLES).map((e) => ({ ...e })),
+      examples: (edits?.examples ?? []).map((e) => ({ ...e })),
       tool_groups: GROUPS.map((g) => ({ ...g, on: !off.includes(g.group) })),
-      max_turns: edits?.maxTurns ?? 4,
+      max_turns: edits?.maxTurns ?? null,
+      shipped_max_turns: 0,
       prefill: { ...row },
     };
   };
@@ -213,25 +227,50 @@ export function createMockVoice(
         });
       }),
     agent,
+    // As the Pond's VoiceAgent::patched: a field left out stays, empty text is the shipped text again.
     updateAgent: async (patch) => {
       const errors: RecipeFieldError[] = [];
-      if (patch.instructions !== undefined && patch.instructions.trim() === '') {
-        errors.push({ path: 'giap_role.instructions', message: 'is empty; say how Goose should answer out loud' });
+      const was = edits ?? UNEDITED;
+      const next: MockVoiceEdit = { ...was, examples: was.examples.map((e) => ({ ...e })), off: [...was.off] };
+      if (patch.instructions !== undefined) {
+        const count = [...patch.instructions].length;
+        if (count > MAX_INSTRUCTIONS_CHARS) {
+          errors.push({ path: 'instructions', message: `is ${count} characters; the most is ${MAX_INSTRUCTIONS_CHARS}, since every spoken turn carries it` });
+        }
+        next.instructions = patch.instructions.trim() ? patch.instructions : null;
       }
-      if (patch.max_turns !== undefined && !(Number.isInteger(patch.max_turns) && patch.max_turns >= 1 && patch.max_turns <= 12)) {
-        errors.push({ path: 'giap_role.max_turns', message: 'must be a whole number from 1 to 12' });
+      if (patch.examples !== undefined) {
+        if (patch.examples.length > MAX_EXAMPLES) {
+          errors.push({ path: 'examples', message: `has ${patch.examples.length} examples; the most is ${MAX_EXAMPLES}, since every spoken turn carries them` });
+        }
+        patch.examples.forEach((e, i) => {
+          for (const field of ['brief', 'answer'] as const) {
+            const count = [...e[field]].length;
+            if (!e[field].trim()) errors.push({ path: `examples[${i}].${field}`, message: 'is empty' });
+            else if (count > MAX_EXAMPLE_CHARS) errors.push({ path: `examples[${i}].${field}`, message: `is ${count} characters; the most is ${MAX_EXAMPLE_CHARS}` });
+          }
+        });
+        next.examples = patch.examples.map((e) => ({ ...e }));
       }
-      const unknown = (patch.tool_groups_off ?? []).filter((g) => !GROUPS.some((x) => x.group === g));
-      unknown.forEach((g) => errors.push({ path: 'giap_role.tool_groups', message: `${g} is not a group this agent has` }));
+      if (patch.tool_groups_off !== undefined) {
+        const known = GROUPS.map((g) => g.group);
+        patch.tool_groups_off.forEach((g, i) => {
+          if (!known.includes(g)) errors.push({ path: `tool_groups_off[${i}]`, message: `\`${g}\` is not a tool group; the groups are ${JSON.stringify(known)}` });
+        });
+        next.off = [...new Set(patch.tool_groups_off)];
+      }
+      if (patch.max_turns !== undefined) {
+        const n = patch.max_turns;
+        if (n !== null && !(Number.isInteger(n) && n >= 1 && n <= MAX_TURNS)) {
+          errors.push({ path: 'max_turns', message: `is ${n}; it must be from 1 to ${MAX_TURNS}` });
+        }
+        next.maxTurns = n;
+      }
       if (errors.length > 0) throw new ApiError('mock PUT /agents/voice → 422', 422, null, null, { errors });
-      const current = await agent();
-      edits = {
-        instructions: patch.instructions ?? current.instructions,
-        examples: patch.examples ?? current.examples,
-        off: patch.tool_groups_off ?? current.tool_groups.filter((g) => !g.on).map((g) => g.group),
-        maxTurns: patch.max_turns ?? current.max_turns,
-      };
-      await rebuild();
+      const edited = next.instructions !== null || next.examples.length > 0 || next.off.length > 0 || next.maxTurns !== null;
+      const changed = JSON.stringify(next) !== JSON.stringify(was);
+      edits = edited ? next : null;
+      if (changed) await rebuild();
       return agent();
     },
     resetAgent: async () => {

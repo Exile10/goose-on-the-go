@@ -53,6 +53,10 @@ function count(value: unknown, fallback = 0): number {
   return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? Math.floor(value) : fallback;
 }
 
+function cap(value: unknown): number | null {
+  return typeof value === 'number' && Number.isInteger(value) && value >= 0 ? value : null;
+}
+
 function detector(value: unknown): WakeDetectorKind {
   return value === 'hey_goose' ? 'hey_goose' : 'whisper';
 }
@@ -147,7 +151,8 @@ export function readVoiceAgent(raw: unknown): VoiceAgent | null {
     shipped_instructions: text(r.shipped_instructions),
     examples: examples(r.examples),
     tool_groups: toolGroups(r.tool_groups),
-    max_turns: count(r.max_turns),
+    max_turns: cap(r.max_turns) || null,
+    shipped_max_turns: cap(r.shipped_max_turns),
     prefill,
   };
 }
@@ -309,7 +314,8 @@ export interface VoiceAgentDraft {
   examples: VoiceAgentExample[];
   /** Groups switched off here; the Pond's list says which it offers. */
   off: string[];
-  maxTurns: number;
+  /** Null keeps the Pond's voice setting. */
+  maxTurns: number | null;
 }
 
 export function draftOf(agent: VoiceAgent): VoiceAgentDraft {
@@ -339,6 +345,17 @@ export function patchFrom(agent: VoiceAgent, draft: VoiceAgentDraft): VoiceAgent
   if (!sameSet(draft.off, was.off)) patch.tool_groups_off = [...draft.off];
   if (draft.maxTurns !== was.maxTurns) patch.max_turns = draft.maxTurns;
   return Object.keys(patch).length > 0 ? patch : null;
+}
+
+/** The steps the form shows: the household's own cap, else the Pond's voice setting, where 0 is none. */
+export function shownMaxTurns(agent: VoiceAgent, draft: VoiceAgentDraft): number {
+  return draft.maxTurns ?? agent.shipped_max_turns ?? 0;
+}
+
+/** Where the steps shown come from, when the household has set none of its own. */
+export function maxTurnsNote(agent: VoiceAgent, draft: VoiceAgentDraft): string | null {
+  if (draft.maxTurns !== null) return null;
+  return agent.shipped_max_turns ? i18n.t('voiceAgent.uses.maxTurnsShipped') : i18n.t('voiceAgent.uses.maxTurnsNone');
 }
 
 /** The form's field for a refusal's path, so the problem shows under the field it is about. */

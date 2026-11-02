@@ -1627,7 +1627,10 @@ export interface VoiceAgent {
   shipped_instructions: string;
   examples: VoiceAgentExample[];
   tool_groups: VoiceAgentToolGroup[];
-  max_turns: number;
+  /** The household's own cap on tool calls per spoken answer; null leaves it to `shipped_max_turns`. */
+  max_turns: number | null;
+  /** The Pond's `voice_max_turns` setting, where 0 is no cap of its own; null when it could not read it. */
+  shipped_max_turns: number | null;
   prefill: AgentPrefill;
 }
 
@@ -1636,7 +1639,8 @@ export interface VoiceAgentPatch {
   instructions?: string;
   examples?: VoiceAgentExample[];
   tool_groups_off?: string[];
-  max_turns?: number;
+  /** Null drops the household's cap. */
+  max_turns?: number | null;
 }
 
 export type VoicePrintModelState = 'missing' | 'downloading' | 'ready' | 'failed';

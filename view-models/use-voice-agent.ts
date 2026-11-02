@@ -253,7 +253,8 @@ export function useVoiceAgent(): UseVoiceAgent {
       removeExample: (index) => edit((d) => ({ ...d, examples: d.examples.filter((_, i) => i !== index) })),
       setGroup: (group, on) =>
         edit((d) => ({ ...d, off: on ? d.off.filter((g) => g !== group) : d.off.includes(group) ? d.off : [...d.off, group] })),
-      setMaxTurns: (turns) => edit((d) => ({ ...d, maxTurns: turns })),
+      // The Pond takes 1 to 12; 0 hands the cap back to its voice setting.
+      setMaxTurns: (turns) => edit((d) => ({ ...d, maxTurns: turns > 0 ? turns : null })),
       revert,
       save,
       reset,
