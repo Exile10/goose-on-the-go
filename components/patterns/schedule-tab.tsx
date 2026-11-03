@@ -47,6 +47,7 @@ export function ScheduleTab() {
 
   return (
     <View style={styles.body}>
+      <InkText size="sm" tone="secondary">{t('schedule.list.intro')}</InkText>
       <View style={styles.header}>
         <InkButton variant="primary" icon="plus" onPress={() => setCreating(true)}>
           {t('schedule.list.newSchedule')}
