@@ -1213,6 +1213,15 @@ export class PondApiClient {
     return this.post<void>('/api/v1/voice/room/interrupt', {});
   }
 
+  /** Asks the room not to listen for `seconds`; asking again before it runs out renews it. */
+  pauseVoiceRoom(seconds: number): Promise<void> {
+    return this.post<void>('/api/v1/voice/room/pause', { seconds });
+  }
+
+  resumeVoiceRoom(): Promise<void> {
+    return this.post<void>('/api/v1/voice/room/resume', {});
+  }
+
   /** The room's voice events until the stream ends; abort `signal` to close it. */
   async streamVoiceRoom(onEvent: (event: RoomVoiceEvent) => void, signal?: AbortSignal, onOpen?: () => void): Promise<void> {
     const res = await this.open('/api/v1/voice/room/events', { headers: { Accept: 'text/event-stream' }, signal });

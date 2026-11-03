@@ -14,6 +14,7 @@ import type {
   VoicePrints,
   VoiceRoom,
   VoiceTakeResult,
+  VoiceThinking,
   WakeDetectorVerdict,
 } from '@/services/types';
 
@@ -30,6 +31,10 @@ export interface VoiceSource {
   resetAgent(): Promise<VoiceAgent>;
   prints(): Promise<VoicePrints>;
   retryModel(): Promise<void>;
+  /** Asks the room not to listen for `seconds` (`POST /voice/room/pause`); asking again renews it. */
+  pauseRoom(seconds: number): Promise<void>;
+  /** Lets the room listen again before its pause runs out (`POST /voice/room/resume`). */
+  resumeRoom(): Promise<void>;
   /** One sentence read while teaching Goose a voice (`POST /voice/takes`). */
   take(take: { fileUri: string; prompt: string; profileId: string | null; voiceMatch: boolean }): Promise<VoiceTakeResult>;
   /** Clears what earlier runs taught about the wake phrase (`DELETE /voice/calibrate`). */
@@ -73,9 +78,11 @@ interface MockVoiceEdit {
   examples: VoiceAgentExample[];
   off: string[];
   maxTurns: number | null;
+  thinking: VoiceThinking | null;
 }
 
-const UNEDITED: MockVoiceEdit = { instructions: null, examples: [], off: [], maxTurns: null };
+const UNEDITED: MockVoiceEdit = { instructions: null, examples: [], off: [], maxTurns: null, thinking: null };
+const THINKING: readonly VoiceThinking[] = ['off', 'auto', 'on'];
 
 /** A turn the mock room plays while its stream is open: someone wakes it, asks, and is answered. */
 function scriptedTurn(who: { profile_id: string; name: string } | null): RoomVoiceEvent[] {
@@ -107,6 +114,7 @@ export function createMockVoice(
   let startedAt = now() - MOCK_ROOM_START_MS;
   let state: VoiceRoom['state'] = 'wait';
   let lastHeard: VoiceRoom['last_heard'] = null;
+  let pausedUntil: number | null = null;
   const streams = new Set<(event: RoomVoiceEvent) => void>();
 
   const members: VoicePrintMember[] = [
@@ -127,9 +135,11 @@ export function createMockVoice(
   const anyEnrolled = () => members.some((m) => m.enrolled);
 
   const settleRoom = () => {
+    if (pausedUntil !== null && now() >= pausedUntil) pausedUntil = null;
     if (!enabled) state = 'off';
     else if (now() < startedAt + MOCK_ROOM_START_MS) state = 'starting';
-    else if (state === 'off' || state === 'starting') state = 'wait';
+    else if (pausedUntil !== null) state = 'paused';
+    else if (state === 'off' || state === 'starting' || state === 'paused') state = 'wait';
   };
 
   const emit = (event: RoomVoiceEvent) => {
@@ -149,6 +159,7 @@ export function createMockVoice(
       interrupts: anyEnrolled() ? 'enrolled_or_wake' : 'wake_only',
       last_heard: lastHeard,
       session_id: 'mock-room',
+      paused_until: state === 'paused' && pausedUntil !== null ? new Date(pausedUntil).toISOString() : null,
     };
   };
 
@@ -172,6 +183,7 @@ export function createMockVoice(
       tool_groups: GROUPS.map((g) => ({ ...g, on: !off.includes(g.group) })),
       max_turns: edits?.maxTurns ?? null,
       shipped_max_turns: 0,
+      thinking: edits?.thinking ?? 'auto',
       prefill: { ...row },
     };
   };
@@ -196,6 +208,16 @@ export function createMockVoice(
         emit({ event: 'state', state: 'wait' });
       }
     },
+    pauseRoom: async (seconds) => {
+      pausedUntil = now() + seconds * 1000;
+      settleRoom();
+      emit({ event: 'state', state });
+    },
+    resumeRoom: async () => {
+      pausedUntil = null;
+      settleRoom();
+      emit({ event: 'state', state });
+    },
     streamRoom: (onEvent, signal, onOpen) =>
       new Promise<void>((resolve) => {
         if (signal.aborted) {
@@ -209,6 +231,11 @@ export function createMockVoice(
         let nextTurnAt = now() + 3_000;
         const timer = setInterval(() => {
           settleRoom();
+          if (state === 'paused') {
+            script = [];
+            step = 0;
+            return;
+          }
           if (state === 'off' || state === 'starting') return;
           if (step < script.length) {
             emit(script[step]);
@@ -266,8 +293,14 @@ export function createMockVoice(
         }
         next.maxTurns = n;
       }
+      if (patch.thinking !== undefined) {
+        const thinking = patch.thinking ?? 'auto';
+        if (!THINKING.includes(thinking)) errors.push({ path: 'thinking', message: `is \`${String(thinking)}\`; it must be off, auto or on` });
+        next.thinking = thinking === 'auto' ? null : thinking;
+      }
       if (errors.length > 0) throw new ApiError('mock PUT /agents/voice → 422', 422, null, null, { errors });
-      const edited = next.instructions !== null || next.examples.length > 0 || next.off.length > 0 || next.maxTurns !== null;
+      const edited =
+        next.instructions !== null || next.examples.length > 0 || next.off.length > 0 || next.maxTurns !== null || next.thinking !== null;
       const changed = JSON.stringify(next) !== JSON.stringify(was);
       edits = edited ? next : null;
       if (changed) await rebuild();

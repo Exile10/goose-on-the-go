@@ -23,6 +23,7 @@ import type {
   VoiceRoom,
   VoiceSpeaker,
   VoiceTakeResult,
+  VoiceThinking,
   WakeDetectorKind,
   WakeDetectorReason,
   WakeDetectorVerdict,
@@ -30,7 +31,8 @@ import type {
 
 import { readPrefills } from './agents';
 
-const ROOM_STATES: readonly RoomVoiceState[] = ['off', 'starting', 'wait', 'listen', 'thinking', 'speak'];
+const ROOM_STATES: readonly RoomVoiceState[] = ['off', 'starting', 'wait', 'listen', 'thinking', 'speak', 'paused'];
+const THINKING: readonly VoiceThinking[] = ['off', 'auto', 'on'];
 const UNAVAILABLE: readonly RoomVoiceUnavailable[] = ['no_mic_speaker_pair', 'voice_running_elsewhere', 'models_missing'];
 const MODEL_STATES: readonly VoicePrintModelState[] = ['missing', 'downloading', 'ready', 'failed'];
 const WAKE_REASONS: readonly WakeDetectorReason[] = ['chosen', 'calibrated', 'not_calibrated', 'custom_phrase', 'no_ear'];
@@ -86,6 +88,7 @@ export function readVoiceRoom(raw: unknown): VoiceRoom | null {
     interrupts: r.interrupts === 'enrolled_or_wake' ? 'enrolled_or_wake' : 'wake_only',
     last_heard: heard && typeof heard.profile_id === 'string' ? { profile_id: heard.profile_id, name: text(heard.name), at: text(heard.at) } : null,
     session_id: typeof r.session_id === 'string' && r.session_id !== '' ? r.session_id : null,
+    paused_until: typeof r.paused_until === 'string' && r.paused_until !== '' ? r.paused_until : null,
   };
 }
 
@@ -153,6 +156,7 @@ export function readVoiceAgent(raw: unknown): VoiceAgent | null {
     tool_groups: toolGroups(r.tool_groups),
     max_turns: cap(r.max_turns) || null,
     shipped_max_turns: cap(r.shipped_max_turns),
+    thinking: THINKING.includes(r.thinking as VoiceThinking) ? (r.thinking as VoiceThinking) : null,
     prefill,
   };
 }
@@ -244,6 +248,8 @@ export function roomStateWords(state: RoomVoiceState): string {
       return i18n.t('voiceRoom.state.thinking');
     case 'speak':
       return i18n.t('voiceRoom.state.speak');
+    case 'paused':
+      return i18n.t('voiceRoom.state.paused');
   }
 }
 
@@ -316,6 +322,8 @@ export interface VoiceAgentDraft {
   off: string[];
   /** Null keeps the Pond's voice setting. */
   maxTurns: number | null;
+  /** Null for a Pond without the choice, which is never sent. */
+  thinking: VoiceThinking | null;
 }
 
 export function draftOf(agent: VoiceAgent): VoiceAgentDraft {
@@ -324,6 +332,7 @@ export function draftOf(agent: VoiceAgent): VoiceAgentDraft {
     examples: agent.examples.map((e) => ({ ...e })),
     off: agent.tool_groups.filter((g) => !g.on).map((g) => g.group),
     maxTurns: agent.max_turns,
+    thinking: agent.thinking,
   };
 }
 
@@ -344,6 +353,7 @@ export function patchFrom(agent: VoiceAgent, draft: VoiceAgentDraft): VoiceAgent
   if (!sameExamples(examples, was.examples)) patch.examples = examples;
   if (!sameSet(draft.off, was.off)) patch.tool_groups_off = [...draft.off];
   if (draft.maxTurns !== was.maxTurns) patch.max_turns = draft.maxTurns;
+  if (draft.thinking !== null && draft.thinking !== was.thinking) patch.thinking = draft.thinking;
   return Object.keys(patch).length > 0 ? patch : null;
 }
 
@@ -359,12 +369,13 @@ export function maxTurnsNote(agent: VoiceAgent, draft: VoiceAgentDraft): string 
 }
 
 /** The form's field for a refusal's path, so the problem shows under the field it is about. */
-export function voiceAgentField(path: string): 'instructions' | 'examples' | 'tools' | 'maxTurns' | null {
+export function voiceAgentField(path: string): 'instructions' | 'examples' | 'tools' | 'maxTurns' | 'thinking' | null {
   const p = path.replace(/^giap_role\./, '');
   if (p.startsWith('instructions')) return 'instructions';
   if (p.startsWith('examples') || p.startsWith('context.examples')) return 'examples';
   if (p.startsWith('tool_groups')) return 'tools';
   if (p.startsWith('max_turns')) return 'maxTurns';
+  if (p.startsWith('thinking')) return 'thinking';
   return null;
 }
 
@@ -391,7 +402,9 @@ export function voiceAgentProblem(path: string, message: string): string {
         ? i18n.t('voiceAgent.problem.examples')
         : p === 'max_turns'
           ? i18n.t('voiceAgent.problem.maxTurns')
-          : null;
+          : p === 'thinking'
+            ? i18n.t('voiceAgent.problem.thinking')
+            : null;
   const words = subject
     ? `${subject} ${message}`
     : p && /^[a-z]/.test(message)

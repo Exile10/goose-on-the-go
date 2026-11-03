@@ -7,7 +7,14 @@ import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { ApiError, api } from '@/services/api-client';
 import i18n from '@/services/i18n';
 import type { VoicePrints, VoiceTakeResult } from '@/services/types';
-import { describeTeachError, refusalWords, useTeachVoice, type UseTeachVoice } from '@/view-models/use-teach-voice';
+import {
+  describeTeachError,
+  refusalWords,
+  ROOM_PAUSE_RENEW_MS,
+  ROOM_PAUSE_SECONDS,
+  useTeachVoice,
+  type UseTeachVoice,
+} from '@/view-models/use-teach-voice';
 import type { TakeHandlers } from '@/view-models/use-take-recorder';
 import { finishChecklistItem } from '@/view-models/use-setup-checklist';
 import { resetMockVoice } from '@/view-models/voice-source';
@@ -40,7 +47,7 @@ jest.mock('@/services/api-client', () => {
   const actual = jest.requireActual('@/services/api-client');
   return {
     ...actual,
-    api: { voicePrints: jest.fn(), voiceTake: jest.fn(), resetWakeWordCalibration: jest.fn(), forgetVoicePrints: jest.fn(), retryVoicePrintModel: jest.fn() },
+    api: { voicePrints: jest.fn(), voiceTake: jest.fn(), resetWakeWordCalibration: jest.fn(), forgetVoicePrints: jest.fn(), retryVoicePrintModel: jest.fn(), pauseVoiceRoom: jest.fn(async () => undefined), resumeVoiceRoom: jest.fn(async () => undefined) },
   };
 });
 
@@ -191,4 +198,83 @@ it('says each refusal in plain words, and ends the run on anything else', () => 
   expect(refusalWords(refusal(409, { error: 'model_not_ready' }), 'hey goose')).toBeNull();
   expect(describeTeachError(refusal(409, { error: 'model_not_ready' }))).toBe(i18n.t('teachVoice.error.modelNotReady'));
   expect(describeTeachError(new TypeError('network'))).toBe(i18n.t('teachVoice.error.failed'));
+});
+
+describe('asking the room not to listen while the sentences are read', () => {
+  beforeEach(() => {
+    // Only the renewal's interval is faked: mounting waits on a real timeout.
+    jest.useFakeTimers({ doNotFake: ['setTimeout', 'clearTimeout', 'nextTick', 'setImmediate', 'queueMicrotask'] });
+  });
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it('pauses the room on Continue, renews it while the flow is open, and lets it listen once the run is done', async () => {
+    const m = await mount();
+    expect(pond.pauseVoiceRoom).not.toHaveBeenCalled();
+    await act(async () => {
+      await m.vm.actions.start();
+    });
+    expect(pond.pauseVoiceRoom).toHaveBeenCalledTimes(1);
+    expect(pond.pauseVoiceRoom).toHaveBeenCalledWith(ROOM_PAUSE_SECONDS);
+
+    act(() => {
+      jest.advanceTimersByTime(ROOM_PAUSE_RENEW_MS);
+    });
+    expect(pond.pauseVoiceRoom).toHaveBeenCalledTimes(2);
+    expect(pond.resumeVoiceRoom).not.toHaveBeenCalled();
+
+    for (let take = 1; take <= 5; take += 1) {
+      pond.voiceTake.mockResolvedValueOnce(accepted(take, take));
+      await act(async () => {
+        await mockRecorder.handlers?.take(`file:///${take}.wav`);
+      });
+    }
+    expect(m.vm.phase).toBe('done');
+    expect(pond.resumeVoiceRoom).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      jest.advanceTimersByTime(ROOM_PAUSE_RENEW_MS * 2);
+    });
+    expect(pond.pauseVoiceRoom).toHaveBeenCalledTimes(2);
+    await act(async () => {
+      trees.splice(0).forEach((t) => t.unmount());
+    });
+    expect(pond.resumeVoiceRoom).toHaveBeenCalledTimes(1);
+  });
+
+  it('lets the room listen again when the flow is left part way, and never asks before Continue', async () => {
+    await mount();
+    await act(async () => {
+      trees.splice(0).forEach((t) => t.unmount());
+    });
+    expect(pond.pauseVoiceRoom).not.toHaveBeenCalled();
+    expect(pond.resumeVoiceRoom).not.toHaveBeenCalled();
+
+    const m = await mount();
+    await act(async () => {
+      await m.vm.actions.start();
+    });
+    await act(async () => {
+      trees.splice(0).forEach((t) => t.unmount());
+    });
+    expect(pond.resumeVoiceRoom).toHaveBeenCalledTimes(1);
+  });
+
+  it('carries on without asking again on a Pond that has no pause', async () => {
+    pond.pauseVoiceRoom.mockRejectedValueOnce(new ApiError('x → 404', 404, null));
+    const m = await mount();
+    await act(async () => {
+      await m.vm.actions.start();
+    });
+    expect(m.vm.phase).toBe('takes');
+    act(() => {
+      jest.advanceTimersByTime(ROOM_PAUSE_RENEW_MS * 2);
+    });
+    expect(pond.pauseVoiceRoom).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      trees.splice(0).forEach((t) => t.unmount());
+    });
+    expect(pond.resumeVoiceRoom).not.toHaveBeenCalled();
+  });
 });

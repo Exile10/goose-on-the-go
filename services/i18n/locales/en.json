@@ -4077,7 +4077,8 @@
       "wait": "Waiting for the wake phrase.",
       "listen": "Listening to someone.",
       "thinking": "Working out an answer.",
-      "speak": "Answering out loud."
+      "speak": "Answering out loud.",
+      "paused": "Paused while you teach Goose your voice."
     },
     "unavailable": {
       "noMicSpeaker": "Your Pond hasn’t found a microphone and a speaker it can use together. Plug them in and it checks again the next time it starts.",
@@ -4133,7 +4134,8 @@
       "instructions": "The text",
       "examples": "This agent",
       "example": "Example {{number}}",
-      "maxTurns": "The number"
+      "maxTurns": "The number",
+      "thinking": "Thinking"
     },
     "revert": "Undo changes",
     "error": {
@@ -4168,6 +4170,24 @@
       "maxTurnsHint": "How many tool calls a spoken answer may make before it replies. At 0 the Voice agent sets no cap of its own.",
       "maxTurnsShipped": "From Steps before answering aloud, in Voice settings.",
       "maxTurnsNone": "No cap of its own: a spoken answer gets the same steps as a typed one."
+    },
+    "thinks": {
+      "title": "Think before answering",
+      "off": {
+        "label": "Never",
+        "hint": "Answers straight away."
+      },
+      "auto": {
+        "label": "As Thinking in Settings",
+        "hint": "Follows your Pond’s Thinking setting.",
+        "hintNow": "Follows your Pond’s Thinking setting, now “{{choice}}”."
+      },
+      "on": {
+        "label": "Always",
+        "hint": "Thinks first, even on models that usually skip it."
+      },
+      "footer": "Thinking adds a pause before Goose speaks. The thinking tone plays through it.",
+      "footerNoTone": "Thinking adds a pause before Goose speaks. Sound while it thinks, in Voice settings, fills it with a soft tone."
     },
     "reset": {
       "title": "Go back to the shipped Voice agent?",

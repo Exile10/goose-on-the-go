@@ -46,6 +46,7 @@ const ROOM: VoiceRoom = {
   interrupts: 'wake_only',
   last_heard: null,
   session_id: 's1',
+  paused_until: null,
 };
 
 const trees: ReactTestRenderer[] = [];

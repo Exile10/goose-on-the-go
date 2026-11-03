@@ -112,3 +112,28 @@ it('plays a turn on an open stream and stops when it is closed', async () => {
     jest.useRealTimers();
   }
 });
+
+it('pauses the room until the pause runs out or it is resumed, and plays no turn while paused', async () => {
+  const c = clock();
+  const pond = createMockVoice(c.now);
+  await pond.pauseRoom(120);
+  const paused = await pond.room();
+  expect(paused.state).toBe('paused');
+  expect(paused.paused_until).toBe(new Date(c.now() + 120_000).toISOString());
+  c.advance(120_000);
+  expect(await pond.room()).toMatchObject({ state: 'wait', paused_until: null });
+
+  await pond.pauseRoom(120);
+  await pond.resumeRoom();
+  expect(await pond.room()).toMatchObject({ state: 'wait', paused_until: null });
+});
+
+it('takes thinking first as the Pond does: auto or null is the shipped agent, and a bad value is refused at its path', async () => {
+  const pond = createMockVoice(clock().now);
+  expect(await pond.agent()).toMatchObject({ edited: false, thinking: 'auto' });
+  expect(await pond.updateAgent({ thinking: 'on' })).toMatchObject({ edited: true, thinking: 'on' });
+  expect(await pond.updateAgent({ thinking: null })).toMatchObject({ edited: false, thinking: 'auto' });
+  const refusal = await pond.updateAgent({ thinking: 'sometimes' as never }).catch((e: unknown) => e);
+  expect((refusal as ApiError).status).toBe(422);
+  expect(((refusal as ApiError).body as { errors: { path: string }[] }).errors.map((e) => e.path)).toEqual(['thinking']);
+});

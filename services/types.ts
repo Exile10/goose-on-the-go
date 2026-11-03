@@ -1571,7 +1571,7 @@ export interface WakeDetectorVerdict {
   reason: WakeDetectorReason | null;
 }
 
-export type RoomVoiceState = 'off' | 'starting' | 'wait' | 'listen' | 'thinking' | 'speak';
+export type RoomVoiceState = 'off' | 'starting' | 'wait' | 'listen' | 'thinking' | 'speak' | 'paused';
 
 export type RoomVoiceUnavailable = 'no_mic_speaker_pair' | 'voice_running_elsewhere' | 'models_missing';
 
@@ -1587,6 +1587,8 @@ export interface VoiceRoom {
   interrupts: 'enrolled_or_wake' | 'wake_only';
   last_heard: { profile_id: string; name: string; at: string } | null;
   session_id: string | null;
+  /** When a `paused` room listens again by itself, unless the pause is renewed. */
+  paused_until: string | null;
 }
 
 export interface VoiceSpeaker {
@@ -1617,6 +1619,9 @@ export interface VoiceAgentToolGroup {
   on: boolean;
 }
 
+/** Whether a spoken answer thinks first; `auto` follows the household's thinking setting. */
+export type VoiceThinking = 'off' | 'auto' | 'on';
+
 /** `GET /api/v1/agents/voice`: the shipped agent that answers every spoken turn, as this household has it. */
 export interface VoiceAgent {
   name: 'voice';
@@ -1631,6 +1636,8 @@ export interface VoiceAgent {
   max_turns: number | null;
   /** The Pond's `voice_max_turns` setting, where 0 is no cap of its own; null when it could not read it. */
   shipped_max_turns: number | null;
+  /** Null from a Pond that does not offer the choice. */
+  thinking: VoiceThinking | null;
   prefill: AgentPrefill;
 }
 
@@ -1641,6 +1648,8 @@ export interface VoiceAgentPatch {
   tool_groups_off?: string[];
   /** Null drops the household's cap. */
   max_turns?: number | null;
+  /** Null is `auto`, as the Pond takes it. */
+  thinking?: VoiceThinking | null;
 }
 
 export type VoicePrintModelState = 'missing' | 'downloading' | 'ready' | 'failed';
