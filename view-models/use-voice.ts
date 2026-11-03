@@ -378,7 +378,8 @@ export function useVoice(chat: {
       const reply = await sendRef.current(text, [], {
         voice: true,
         onText: (full) => {
-          const { units, next } = takeSpeechUnits(full, cursor);
+          // Working notes set aside shorten the reply; what is left of it was already said.
+          const { units, next } = takeSpeechUnits(full, Math.min(cursor, full.length));
           cursor = next;
           enqueue(units);
         },

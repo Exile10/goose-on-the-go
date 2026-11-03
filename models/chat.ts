@@ -71,6 +71,13 @@ export interface Message {
   tools?: ToolCall[];
   /** Reasoning passages, when the Pond kept them. */
   thinking?: string[];
+  /**
+   * Live turns only: what Goose wrote while it worked, moved out of the answer
+   * when the Pond marks it as working notes. Never saved, so never reloaded.
+   */
+  steps?: string[];
+  /** Live turns only: where the text since the turn's last tool call begins in `content`. */
+  stepFrom?: number;
   /** Still arriving: text may grow, tools may still be running. */
   pending?: boolean;
 }

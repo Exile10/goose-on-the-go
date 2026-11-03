@@ -244,6 +244,11 @@ export interface ChatFrame {
   id?: string;
   /** `tool_call`: the arguments as an object, or null. */
   input?: unknown;
+  /**
+   * `tool_call`, from a Pond that marks them: the `text` content sent since the
+   * turn's previous tool call. Goose at work, not the answer. Absent when empty.
+   */
+  working_notes?: string;
   /** `tool_result`: a card hint, live only — history keeps just the text. */
   ui?: { card_type?: string; data?: Record<string, unknown> };
   /**

@@ -142,7 +142,7 @@ export const MessageRow = React.memo(function MessageRow({
           {status}
         </Text>
       ) : null}
-      {message.tools?.length ? <ToolTrail tools={message.tools} done={!message.pending} /> : null}
+      {message.tools?.length ? <ToolTrail tools={message.tools} steps={message.steps} done={!message.pending} /> : null}
     </View>
   );
 });

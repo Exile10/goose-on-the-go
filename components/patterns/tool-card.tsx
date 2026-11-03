@@ -521,12 +521,58 @@ function Sources({ tools }: { tools: ToolCall[] }) {
   );
 }
 
+/** What Goose wrote while it worked, folded to one faint line until asked for. */
+function Steps({ steps }: { steps: string[] }) {
+  const theme = useInkTheme();
+  const { t } = useTranslation();
+  const [expanded, setExpanded] = useState(false);
+  const label = inkText(theme, { role: 'mono', size: 'xs', weight: theme.weight.medium, color: theme.color.textTertiary });
+  const note = inkText(theme, { size: 'xs', color: theme.color.textTertiary });
+  return (
+    <View style={styles.steps}>
+      <GPressable
+        feedback="tint"
+        onPress={() => {
+          void selectionTick();
+          setExpanded((value) => !value);
+        }}
+        hitSlop={8}
+        accessibilityRole="button"
+        accessibilityLabel={t('chat.tools.steps')}
+        accessibilityState={{ expanded }}
+        style={styles.stepsToggle}
+      >
+        <Text style={label.style} numberOfLines={1}>
+          {t('chat.tools.steps')}
+        </Text>
+        <GIcon name={expanded ? 'chevron' : 'chevron-right'} size={12} color={theme.color.textTertiary} />
+      </GPressable>
+      {expanded
+        ? steps.map((step, i) => (
+            <Text key={i} style={note.style} selectable>
+              {step}
+            </Text>
+          ))
+        : null}
+    </View>
+  );
+}
+
 /**
  * Everything under an answer, most useful first: the facts a tool drew, the
- * pages it read, then a chip for each step. A chip's raw answer opens below the
- * row at full width, not inside the chip's own narrow column.
+ * pages it read, then what Goose wrote while it worked and a chip for each
+ * step. A chip's raw answer opens below the row at full width, not inside the
+ * chip's own narrow column.
  */
-export const ToolTrail = React.memo(function ToolTrail({ tools, done }: { tools: ToolCall[]; done: boolean }) {
+export const ToolTrail = React.memo(function ToolTrail({
+  tools,
+  steps,
+  done,
+}: {
+  tools: ToolCall[];
+  steps?: string[];
+  done: boolean;
+}) {
   const [openId, setOpenId] = useState<string | null>(null);
   // A long task the turn started is followed live in place of its chip.
   const tasks = tools.flatMap((tool) => {
@@ -546,6 +592,7 @@ export const ToolTrail = React.memo(function ToolTrail({ tools, done }: { tools:
         <FactCard key={tool.id} tool={tool} />
       ))}
       {done ? <Sources tools={tools} /> : null}
+      {steps?.length ? <Steps steps={steps} /> : null}
       {chips.length > 0 ? (
         <View style={styles.chips}>
           {chips.map((tool) => (
@@ -576,6 +623,8 @@ const styles = StyleSheet.create({
   forecastTemp: { minWidth: 34, textAlign: 'right' },
   forecastRain: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 3, minWidth: 48 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  steps: { gap: 4, alignItems: 'flex-start' },
+  stepsToggle: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   chip: {
     flexDirection: 'row',
     alignItems: 'center',

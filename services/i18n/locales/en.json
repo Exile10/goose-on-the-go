@@ -311,6 +311,7 @@
       "more_other": "{{count}} more",
       "recalled_one": "Recalled {{count}} memory",
       "recalled_other": "Recalled {{count}} memories",
+      "steps": "Steps",
       "runningLabel": "{{tool}}, running",
       "failedLabel": "{{tool}}, did not finish",
       "sources": "Sources",
