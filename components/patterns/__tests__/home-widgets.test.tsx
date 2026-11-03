@@ -4,11 +4,13 @@
  */
 
 import React from 'react';
-import { Text } from 'react-native';
+import { StyleSheet, Text } from 'react-native';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
+import { useInkTheme } from '@jarida/ink/native';
 
 import { GPressable } from '@/components/ui/g-pressable';
 import i18n from '@/services/i18n';
+import type { Device } from '@/services/types';
 
 import {
   DevicesWidget,
@@ -100,5 +102,45 @@ describe('DevicesWidget', () => {
     expect(texts(known)).toContain(i18n.t('home.widgets.online', { online: 7, total: 9 }));
     const unknown = await render(<DevicesWidget {...props} online={null} />);
     expect(texts(unknown).some((t) => t.includes('online'))).toBe(false);
+  });
+
+  /** The words under a tile's name, and the colour they are drawn in. */
+  async function tileState(device: Device) {
+    const tree = await render(<DevicesWidget {...props} devices={[device]} state="ready" online={null} />);
+    const node = tree.root.findAllByType(Text).find((t) => {
+      const words = t.props.children;
+      return [i18n.t('devices.app.open'), i18n.t('devices.app.notOpen'), i18n.t('common.offline')].includes(words);
+    });
+    return { words: node?.props.children, color: StyleSheet.flatten(node?.props.style).color };
+  }
+
+  let danger!: string;
+  let quiet!: string;
+  beforeAll(async () => {
+    function Probe() {
+      ({ dangerFg: danger, textTertiary: quiet } = useInkTheme().color);
+      return null;
+    }
+    await render(<Probe />);
+  });
+
+  it('says a closed dashboard is not open, in a quiet colour, not the colour of a fault', async () => {
+    const closed = await tileState({ id: 'dash', name: 'Pond dashboard', device_type: 'desktop', is_online: false });
+    expect(closed.words).toBe(i18n.t('devices.app.notOpen'));
+    expect(closed.color).toBe(quiet);
+    expect(quiet).not.toBe(danger);
+  });
+
+  it('says an open dashboard is open', async () => {
+    const open = await tileState({ id: 'dash', name: 'Pond dashboard', device_type: 'desktop', is_online: true });
+    expect(open.words).toBe(i18n.t('devices.app.open'));
+  });
+
+  it('still calls an unreachable phone or device offline, in the colour of a fault', async () => {
+    for (const device_type of ['gotg', 'light']) {
+      const gone = await tileState({ id: device_type, name: 'Away', device_type, is_online: false });
+      expect(gone.words).toBe(i18n.t('common.offline'));
+      expect(gone.color).toBe(danger);
+    }
   });
 });

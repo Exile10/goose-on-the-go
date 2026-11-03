@@ -10,6 +10,7 @@
 import {
   UNASSIGNED_ROOM,
   groupByRoom,
+  isAppWindow,
   isBridgedEndpoint,
   parsePowerState,
   supports,
@@ -41,6 +42,19 @@ describe('supports', () => {
   it('offers nothing when the device declared no capabilities', () => {
     expect(supports(device({ capabilities: [] }), 'power')).toBe(false);
     expect(supports(device({ capabilities: undefined }), 'power')).toBe(false);
+  });
+});
+
+describe('isAppWindow', () => {
+  it('takes the dashboard and the desktop app, which pair as desktop', () => {
+    expect(isAppWindow(device({ device_type: 'desktop' }))).toBe(true);
+    expect(isAppWindow(device({ device_type: 'Desktop' }))).toBe(true);
+  });
+
+  it('leaves phones and smart-home devices alone', () => {
+    expect(isAppWindow(device({ device_type: 'gotg' }))).toBe(false);
+    expect(isAppWindow(device({ device_type: 'light' }))).toBe(false);
+    expect(isAppWindow(device({ device_type: undefined }))).toBe(false);
   });
 });
 
