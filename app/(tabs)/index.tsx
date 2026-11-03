@@ -34,6 +34,7 @@ import { InterviewOffer } from '@/components/patterns/interview-offer';
 import { AgentsGettingReady } from '@/components/patterns/agents-building';
 import { RoomVoiceHome } from '@/components/patterns/room-voice';
 import { PondGettingReady } from '@/components/patterns/pond-getting-ready';
+import { PondStatusCard } from '@/components/patterns/pond-status-card';
 import { RemoteAccessOffer } from '@/components/patterns/remote-access-offer';
 import { AskRow, HomeIdeas } from '@/components/patterns/home-ideas';
 import { GlanceStrip, type Figure } from '@/components/patterns/glance-strip';
@@ -86,16 +87,16 @@ function greetingKey(hour: number) {
 /**
  * The Pond, while it is not plainly there.
  *
- * Not connected, it says nothing about why: the connection indicator at the top of the app is
- * already saying that, with the action for it. What it keeps is what only it offers -- switching to
- * another Pond -- and a line on what Home will show once the connection is back. Until `hydrated`
- * the stored URL has not been read back, so it says it is looking rather than claiming anything.
- * Connected, it is the line under the name (`PondLine`), and this draws nothing.
+ * Home tells the connection here rather than in the strip above the app: the card names the Pond,
+ * says what is happening and why, when it last answered and when the next check runs, and offers
+ * Try now and Switch Pond (`PondStatusCard`). Until `hydrated` the stored URL has not been read
+ * back, so it says it is looking rather than claiming anything. Connected, it is the line under
+ * the name (`PondLine`), and this draws nothing.
  */
 function PondCard() {
   const styles = useThemedStyles(makeStyles);
   const { t } = useTranslation();
-  const { online, hydrated } = useServer();
+  const { online, hydrated, pondUrls } = useServer();
   const router = useRouter();
 
   if (!hydrated) {
@@ -110,15 +111,11 @@ function PondCard() {
   if (online) return null;
 
   return (
-    <InkCard style={styles.pond}>
-      <InkTitle level={2}>{t('pond.yours')}</InkTitle>
-      <InkText>{t('pond.waitingBody')}</InkText>
-      <View style={styles.pondActions}>
-        <InkButton variant="quiet" icon="server" onPress={() => router.push('/(stack)/switch-pond')}>
-          {t('pond.switch')}
-        </InkButton>
-      </View>
-    </InkCard>
+    <PondStatusCard
+      address={hostOf(pondUrls[0] ?? '')}
+      note={t('pond.waitingBody')}
+      onSwitch={() => router.push('/(stack)/switch-pond')}
+    />
   );
 }
 
@@ -496,12 +493,6 @@ const makeStyles = (c: ThemeColors) =>
 
   /* The plate sits 4px below the face, so every card reserves room for it. */
   pond: { marginBottom: Spacing.lg },
-  pondActions: {
-    flexDirection: 'row',
-    gap: Spacing.sm,
-    marginTop: Spacing.md,
-    flexWrap: 'wrap',
-  },
 
   editBar: {
     flexDirection: 'row',

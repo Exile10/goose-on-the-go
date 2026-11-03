@@ -1,7 +1,6 @@
 import { useEffect, useState, type ReactElement } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import type { TFunction } from 'i18next';
 import { useRouter, useSegments } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useServer } from '@/providers/server-provider';
@@ -13,43 +12,21 @@ import type { IconName } from '@/constants/icons';
 import { Spacing } from '@/constants/spacing';
 import { FontSize, FontWeight } from '@/constants/typography';
 import { useTheme } from '@/providers/theme-provider';
-import {
-  bannerHiddenOn,
-  connectionActionIsPairing,
-  connectionNeedsAttention,
-  type ConnectionState,
-} from '@/models/connection';
+import { connectionSurface, stackScreenSurface, type ConnectionPhase } from '@/models/connection';
+import { useConnectionStatus } from '@/view-models/use-connection-status';
 // The insecure development banner above this one takes the top inset when it is shown.
 
 /**
- * One literal key per state, for the same reason as the steps in
- * app/(stack)/remote-access.tsx: a key built from the state is invisible to the
- * key-completeness test, and this banner is the one piece of UI that is supposed
- * to be trustworthy when everything else is failing.
- */
-function stateLabel(t: TFunction, state: ConnectionState): string {
-  switch (state) {
-    case 'trust': return t('connection.trust');
-    case 'unpaired': return t('connection.unpaired');
-    case 'upgrade': return t('connection.upgrade');
-    case 'reconnecting': return t('connection.reconnecting');
-    case 'local': return t('connection.local');
-    case 'remote': return t('connection.remote');
-    case 'disconnected': return t('connection.disconnected');
-    case 'revoked': return t('connection.revoked');
-  }
-}
-
-/**
- * How long a reconnect may run before the banner says so. The banner pushes every screen down, so
+ * How long a first check may run before the strip says so. The banner pushes every screen down, so
  * showing it for a reconnect that finishes in a few hundred milliseconds -- a network change, a
- * return to the app -- made the whole layout jump for nothing anyone could act on.
+ * return to the app -- made the whole layout jump for nothing anyone could act on. Once a check has
+ * failed the strip stays up through the next ones, rather than leaving and coming back with each.
  */
 const RECONNECT_GRACE_MS = 1_500;
 
 /**
- * Shows `children` once the grace period has passed. It holds no reset of its own: the banner
- * renders nothing between reconnects, so React mounts a fresh one, with a fresh timer, for each.
+ * Shows `children` once the grace period has passed. It holds no reset of its own: the strip
+ * renders nothing between outages, so React mounts a fresh one, with a fresh timer, for each.
  */
 function AfterGrace({ children }: { children: ReactElement }) {
   const [shown, setShown] = useState(false);
@@ -61,38 +38,38 @@ function AfterGrace({ children }: { children: ReactElement }) {
 }
 
 /** The glyph for what kind of problem it is: the connection, the pairing, or trust in the Pond. */
-function stateIcon(state: ConnectionState): IconName {
-  if (connectionActionIsPairing(state)) return 'link';
-  if (state === 'trust') return 'shield';
+function phaseIcon(phase: ConnectionPhase): IconName {
+  if (phase === 'pairing') return 'link';
+  if (phase === 'trust') return 'shield';
   return 'cloud-off';
 }
 
+export interface ConnectionStatusProps {
+  /**
+   * `banner` sits above the navigator and takes the status-bar inset; `inline` sits under a stack
+   * screen's title bar, inside the screen named by `screen`. Each draws only where
+   * `connectionSurface` gives the route to it, so the state is told in one place per screen.
+   */
+  placement?: 'banner' | 'inline';
+  /** The stack screen an inline strip belongs to. */
+  screen?: string;
+}
+
 /**
- * The app's one statement that the Pond cannot be used.
+ * The connection's state where the screen has no card of its own for it: what is happening, why
+ * when the checks say, when the next check runs, and the action that helps -- Try now, or Pair
+ * where only pairing can. A working connection says nothing.
  *
  * Screens do not repeat it: while it is up, content that did not arrive shows only that it will
- * fill in (`ContentUnavailable`), and Home's Pond card drops its own reachability title. That is
- * the whole point of it being one strip rather than a notice per screen -- a Pond that is down was
- * being reported three times on one screen.
+ * fill in (`ContentUnavailable`). Home and Switch Pond tell the same state on the Pond's own card
+ * (`PondStatusCard`), and the strip stays off them.
  *
- * A working connection says nothing (`connectionNeedsAttention`). The strip sits above the
- * navigator, over the notification bar, and pushes every screen down, so paying that permanently
- * to report "Connected locally" spent the status bar on news that nothing is wrong. It is quiet when
- * it does appear -- the secondary surface and a hairline, not a coloured slab.
- *
- * It carries no Try again. Another attempt is a downward swipe on the screen underneath, as it is
- * in most apps (`usePullToRefresh`), which looks for the Pond and reads the screen again in one
- * gesture. The only button left is Pair, where only pairing can help (`connectionActionIsPairing`):
- * that is a different action, not a refresh. There is no "Checking" either: the pull's own spinner
- * shows the attempt where the finger is, and the attempt itself turns the strip to "Reconnecting"
- * once it has run past the grace period, so a third word for it would say the same thing again.
- *
- * A screen reader cannot easily pull to refresh, so where another attempt can help the strip
- * carries it as an accessibility action: TalkBack and VoiceOver read the sentence, the hint says to
- * pull down, and a double tap tries again. A sighted tap on the strip does nothing.
+ * The title and the reason are a polite live region, so a screen reader hears the state change;
+ * the countdown is left out of the region's label, or it would be read out every second.
  */
-export function ConnectionStatus() {
-  const { connectionState, retryNow, hydrated } = useServer();
+export function ConnectionStatus({ placement = 'banner', screen }: ConnectionStatusProps) {
+  const status = useConnectionStatus();
+  const { connectionState, connectionOutage } = useServer();
   const styles = useThemedStyles(makeStyles);
   const { colors } = useTheme();
   const { t } = useTranslation();
@@ -100,37 +77,40 @@ export function ConnectionStatus() {
   const segments = useSegments();
   const insets = useSafeAreaInsets();
 
+  const surface = placement === 'inline' ? stackScreenSurface(screen ?? '') : connectionSurface(segments);
   // Before the saved pairing has loaded, the state is a placeholder, not news.
-  if (!hydrated || !connectionNeedsAttention(connectionState) || bannerHiddenOn(segments)) return null;
-  const pairing = connectionActionIsPairing(connectionState);
-  // A reconnect is already the attempt a pull would make, so it offers nothing to trigger.
-  const retryable = !pairing && connectionState !== 'reconnecting';
-  const label = stateLabel(t, connectionState);
-  const banner = (
-    <View style={[styles.container, { paddingTop: insets.top + Spacing.sm }]}>
-      <View
-        style={styles.statement}
-        accessible
-        accessibilityLiveRegion="polite"
-        accessibilityLabel={label}
-        accessibilityHint={retryable ? t('contentState.pullHint') : undefined}
-        accessibilityActions={retryable ? [{ name: 'activate', label: t('common.retry') }] : undefined}
-        onAccessibilityAction={retryable ? () => void retryNow() : undefined}
-      >
-        <GIcon name={stateIcon(connectionState)} size={16} color={colors.textSecondary} />
-        <Text style={styles.text}>{label}</Text>
+  if (!status.hydrated || status.phase === 'connected' || surface !== placement) return null;
+  const label = status.reason ? `${status.title}. ${status.reason}` : status.title;
+  const detail = [status.reason, status.next].filter(Boolean).join(' · ');
+  const strip = (
+    <View style={[styles.container, placement === 'banner' ? { paddingTop: insets.top + Spacing.sm } : styles.inline]}>
+      <GIcon name={phaseIcon(status.phase)} size={16} color={colors.textSecondary} />
+      <View style={styles.statement} accessible accessibilityLiveRegion="polite" accessibilityLabel={label}>
+        <Text style={styles.title}>{status.title}</Text>
+        {detail ? <Text style={styles.detail}>{detail}</Text> : null}
       </View>
-      {pairing ? (
+      {status.phase === 'pairing' ? (
         <Pressable accessibilityRole="button" hitSlop={Spacing.md} onPress={() => router.push('/(stack)/pond-pairing')}>
           <Text style={styles.action}>{t('connection.actionPair')}</Text>
+        </Pressable>
+      ) : status.retryable ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityState={{ disabled: status.checking }}
+          disabled={status.checking}
+          hitSlop={Spacing.md}
+          onPress={status.tryNow}
+        >
+          <Text style={[styles.action, status.checking && styles.actionIdle]}>{t('connection.tryNow')}</Text>
         </Pressable>
       ) : null}
     </View>
   );
-  return connectionState === 'reconnecting' ? <AfterGrace>{banner}</AfterGrace> : banner;
+  const firstCheck = connectionState === 'reconnecting' && !connectionOutage?.failures;
+  return firstCheck ? <AfterGrace>{strip}</AfterGrace> : strip;
 }
 /*
- * Themed, because this strip is drawn behind the notification bar.
+ * Themed, because the banner is drawn behind the notification bar.
  *
  * The colours were a hardcoded pale lavender on deep purple. The root layout
  * sets the system status bar's content to light in dark mode, so those white
@@ -150,7 +130,10 @@ const makeStyles = (c: ThemeColors) =>
       borderBottomWidth: StyleSheet.hairlineWidth,
       borderBottomColor: c.border,
     },
-    statement: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
-    text: { flex: 1, color: c.text, fontSize: FontSize.sm },
+    inline: { paddingTop: Spacing.sm },
+    statement: { flex: 1, gap: 2 },
+    title: { color: c.text, fontSize: FontSize.sm },
+    detail: { color: c.textSecondary, fontSize: FontSize.xs },
     action: { color: c.textBrand, fontSize: FontSize.sm, fontWeight: FontWeight.semibold },
+    actionIdle: { color: c.textTertiary },
   });

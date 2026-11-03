@@ -206,7 +206,7 @@ it('ignores a remembered route the profile no longer names', async () => {
   const { deps } = fixture();
   const after = new ConnectionManager({ ...deps, routes });
   await after.configure({ ...profile, remoteAccess: { mode: 'local' } }, pin);
-  expect(after.current).toEqual({ state: 'reconnecting', url: null });
+  expect(after.current).toMatchObject({ state: 'reconnecting', url: null });
   before.environment(false, false); after.environment(false, false);
 });
 

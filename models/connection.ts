@@ -46,16 +46,120 @@ export function connectionActionIsPairing(state: ConnectionState): boolean {
   return state === 'unpaired' || state === 'upgrade' || state === 'revoked';
 }
 
-/** Screens that are themselves the pairing the banner would send someone to. */
+/**
+ * Why the latest check found no way to the Pond, from what the connection manager itself tried.
+ * It knows which network the phone is on, whether outside access is set up and whether this
+ * phone's own link for it came up. It does not know why an address did not answer, so no reason
+ * claims to.
+ */
+export type UnreachableReason =
+  /** On Wi-Fi with no outside access: the saved home addresses did not answer. */
+  | 'local'
+  /** On Wi-Fi: neither the home addresses nor outside access answered. */
+  | 'local_and_remote'
+  /** On mobile data: outside access is set up and the Pond did not answer through it. */
+  | 'remote'
+  /** On mobile data: this phone's own link for outside access did not come up. */
+  | 'remote_link'
+  /** On mobile data with no outside access set up: nothing reaches a home address from here. */
+  | 'remote_off';
+
+/** What the remote route came to on one check: not set up, this phone's link never came up, or no answer. */
+export type RemoteOutcome = 'none' | 'node_not_ready' | 'no_answer';
+
+export function unreachableReason(cellular: boolean, remote: RemoteOutcome): UnreachableReason {
+  if (!cellular) return remote === 'none' ? 'local' : 'local_and_remote';
+  if (remote === 'none') return 'remote_off';
+  return remote === 'node_not_ready' ? 'remote_link' : 'remote';
+}
+
+/** What the connection manager knows about a connection that is not working. */
+export interface ConnectionOutage {
+  /** Checks in a row that found no route since the Pond last answered. */
+  failures: number;
+  /** Why the latest of them failed; null before one has. */
+  reason: UnreachableReason | null;
+  /** When the next automatic check runs, in epoch ms; null while one is running or none is planned. */
+  nextCheckAt: number | null;
+  /** When the Pond was last seen answering in this run of the app, in epoch ms, or null. */
+  lastConnectedAt: number | null;
+}
+
+/**
+ * How a connection that is not working is told:
+ *
+ * - `connecting`: nothing has answered yet in this run of the app, and nothing has failed;
+ * - `reconnecting`: it was working and dropped, and the first few checks are still running;
+ * - `unreachable`: those checks failed, or it never answered at all;
+ * - `trust`: an address answered with a key that is not this Pond's;
+ * - `pairing`: only pairing again can help (`connectionActionIsPairing`).
+ */
+export type ConnectionPhase = 'connected' | 'connecting' | 'reconnecting' | 'unreachable' | 'trust' | 'pairing';
+
+/**
+ * Failed checks in a row before a connection that dropped is called unreachable rather than
+ * reconnecting. With the back-off at 1, 2 and 4 s and a check taking up to 3 s, that is about 7 to
+ * 16 seconds: long enough for a network change to settle, short enough that someone waiting is told.
+ */
+export const UNREACHABLE_AFTER = 3;
+
+export function connectionPhase(state: ConnectionState, outage: ConnectionOutage | null): ConnectionPhase {
+  switch (state) {
+    case 'local':
+    case 'remote':
+      return 'connected';
+    case 'trust':
+      return 'trust';
+    case 'unpaired':
+    case 'upgrade':
+    case 'revoked':
+      return 'pairing';
+    case 'reconnecting':
+    case 'disconnected':
+      if (!outage) return state === 'reconnecting' ? 'connecting' : 'unreachable';
+      if (outage.lastConnectedAt === null) return outage.failures === 0 ? 'connecting' : 'unreachable';
+      return outage.failures < UNREACHABLE_AFTER ? 'reconnecting' : 'unreachable';
+  }
+}
+
+/** What happens next: a check is running, one is due in `seconds`, or none is planned. */
+export type NextCheck = { kind: 'checking' } | { kind: 'waiting'; seconds: number } | { kind: 'none' };
+
+export function nextCheck(state: ConnectionState, outage: ConnectionOutage | null, now: number): NextCheck {
+  if (state === 'reconnecting') return { kind: 'checking' };
+  if (!outage || outage.nextCheckAt === null) return { kind: 'none' };
+  const seconds = Math.ceil((outage.nextCheckAt - now) / 1000);
+  // Past due: the timer has fired, and a check at the back-off's cap runs without announcing itself.
+  return seconds > 0 ? { kind: 'waiting', seconds } : { kind: 'checking' };
+}
+
+/** Screens that are themselves the pairing the indicator would send someone to. */
 const PAIRING_SCREENS = ['pond-pairing', 'connect-desktop'];
 
 /**
- * Whether the connection banner stays out of the way on the route `segments` name. First run and
- * pairing say where things stand in their own words, and the banner's title would sit stacked
- * above theirs, saying "pair with your Pond" on the very screen that is doing it.
+ * Where the connection's state is told on the route `segments` name:
+ *
+ * - `banner`: the strip above the app, for the tabs and full-screen routes, which have no title
+ *   bar for it to sit under;
+ * - `inline`: under a stack screen's title bar, inside its content. Drawn above the app it stacked
+ *   over the title bar, which kept its own status-bar inset beneath it, and the two read as two
+ *   headers;
+ * - `own`: the screen tells it itself. Home and Switch Pond carry a card for the Pond with the
+ *   same state and actions; first run and pairing say where things stand in their own words.
  */
-export function bannerHiddenOn(segments: readonly string[]): boolean {
-  return segments[0] === '(onboarding)' || (segments[0] === '(stack)' && PAIRING_SCREENS.includes(segments[1] ?? ''));
+export type ConnectionSurface = 'banner' | 'inline' | 'own';
+
+export function connectionSurface(segments: readonly string[]): ConnectionSurface {
+  const [group, screen] = segments;
+  if (group === '(onboarding)') return 'own';
+  if (group === '(tabs)' && (screen === undefined || screen === 'index')) return 'own';
+  if (group === '(stack)') return screen === 'switch-pond' || PAIRING_SCREENS.includes(screen ?? '') ? 'own' : 'inline';
+  return 'banner';
+}
+
+/** `connectionSurface` for the stack screen named `screen`, as the stack's screen layout knows it. */
+export function stackScreenSurface(screen: string): ConnectionSurface {
+  return connectionSurface(['(stack)', screen]);
 }
 
 export function validPin(pin: string): boolean {

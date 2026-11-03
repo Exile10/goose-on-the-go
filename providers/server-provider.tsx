@@ -17,7 +17,7 @@ import { ConnectionManager, type ConnectionSnapshot } from '@/services/connectio
 import { PondTrustError } from '@/services/pond-trust';
 import { probePond as probe, trustPond as trust } from '@/services/pond-session';
 import { findPondAt, findPondByHost } from '@/services/discovery';
-import { parseConnectionProfile, validPin, isInsecureDevOrigin, isLocalPairingUrl, type ConnectionProfile } from '@/models/connection';
+import { parseConnectionProfile, validPin, isInsecureDevOrigin, isLocalPairingUrl, type ConnectionOutage, type ConnectionProfile } from '@/models/connection';
 import i18n from '@/services/i18n';
 import { cancelRemoteAccess, remoteNodeRunning, restoreRemoteAccess, resumeRemoteAccess } from '@/services/remote-access';
 import { getInstallId } from '@/services/install-id';
@@ -33,6 +33,13 @@ interface ServerContextValue {
   /** Keep a pair a device resume over the setup channel rotated; the old refresh token no longer works. */
   keepRotatedTokens: (session: string, refresh: string) => void;
   connectionState: ConnectionSnapshot['state'];
+  /** What is known about a connection that is not working: failed checks, why, the next one, the last answer. */
+  connectionOutage: ConnectionOutage | null;
+  /**
+   * Every address this phone has for its Pond: the one in use first, then the saved home addresses,
+   * most recently found first. Empty with no pairing.
+   */
+  pondUrls: string[];
   checkHealth: () => Promise<boolean>;
   /**
    * Re-select an endpoint. `quiet` suppresses the "Reconnecting" announcement,
@@ -41,6 +48,11 @@ interface ServerContextValue {
   recover: (quiet?: boolean) => Promise<string | null>;
   /** Re-select an endpoint now, skipping the automatic back-off: for a person who asked. */
   retryNow: () => Promise<string | null>;
+  /**
+   * Try an address the paired Pond was seen announcing, checked under its saved pin and kept only
+   * if it answers. Resolves to the address now in use, or null when nothing answered.
+   */
+  tryAddress: (url: string) => Promise<string | null>;
   /** Announce that the Pond has stopped recognising this phone. Terminal. */
   revoke: () => void;
   profileId: string;
@@ -645,9 +657,11 @@ export function ServerProvider({ children }: PropsWithChildren) {
   const value = useMemo<ServerContextValue>(() => ({
     serverUrl: snapshot.url ?? '', online: !!snapshot.url, token: identity?.session ?? null,
     refreshToken: identity?.refresh ?? null, pairedPin: identity?.pin ?? null, keepRotatedTokens, connectionState: snapshot.state,
+    connectionOutage: snapshot.outage ?? null,
+    pondUrls: [...new Set([...(snapshot.url ? [snapshot.url] : []), ...(manager.savedProfile?.localUrls ?? [])])],
     profileId: identity?.id ?? '', paired: hasPairing, remoteEnabled: saved.current?.profile.remoteAccess?.mode === 'embedded',
     keepLocalOnly, hydrated, screenModes, isScreenReal, setScreenMode,
-    checkHealth, setRemoteEndpoint, recover: manager.recover, retryNow: manager.retryNow, revoke: manager.revoke.bind(manager), stagePairing, cancelPairing, pair, adoptPairing, requestSpokenCode, unpair, forgetLocally,
+    checkHealth, setRemoteEndpoint, recover: manager.recover, retryNow: manager.retryNow, tryAddress: manager.tryAddress, revoke: manager.revoke.bind(manager), stagePairing, cancelPairing, pair, adoptPairing, requestSpokenCode, unpair, forgetLocally,
   }), [snapshot, identity, hasPairing, hydrated, screenModes, isScreenReal, setScreenMode, checkHealth, setRemoteEndpoint, keepLocalOnly, keepRotatedTokens, manager, stagePairing, cancelPairing, pair, adoptPairing, requestSpokenCode, unpair, forgetLocally]);
   return <ServerContext.Provider value={value}>{children}</ServerContext.Provider>;
 }

@@ -8,9 +8,11 @@
  */
 
 import { Stack, useRouter } from 'expo-router';
-import React, { useCallback } from 'react';
+import React, { useCallback, type ReactElement } from 'react';
+import { StyleSheet, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
+import { ConnectionStatus } from '@/components/patterns/connection-status';
 import { GIcon } from '@/components/ui/g-icon';
 import { GPressable } from '@/components/ui/g-pressable';
 import { useTheme } from '@/providers/theme-provider';
@@ -47,12 +49,27 @@ function BackButton() {
   );
 }
 
+/**
+ * Each screen under its title bar, with the connection strip at the top of its content while the
+ * Pond cannot be used. The strip used to sit above the whole app, over this title bar, which kept
+ * its own status-bar inset under it: two headers stacked, and the screen read as broken.
+ */
+function ScreenWithStatus({ route, children }: { route: { name: string }; children: ReactElement }) {
+  return (
+    <View style={styles.screen}>
+      <ConnectionStatus placement="inline" screen={route.name} />
+      {children}
+    </View>
+  );
+}
+
 export default function StackLayout() {
   const { colors } = useTheme();
   const { t } = useTranslation();
 
   return (
     <Stack
+      screenLayout={ScreenWithStatus}
       screenOptions={{
         headerShown: true,
         headerStyle: { backgroundColor: colors.card },
@@ -141,3 +158,5 @@ export default function StackLayout() {
     </Stack>
   );
 }
+
+const styles = StyleSheet.create({ screen: { flex: 1 } });
