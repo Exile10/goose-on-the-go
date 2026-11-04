@@ -1106,6 +1106,13 @@ export interface MarketplaceExtension {
   author: string;
   tools: string[];
   featured: boolean;
+  /**
+   * Set when the Pond already does this extension's job itself (`web_search` for Brave Search):
+   * installing it would only duplicate tools in every prompt, so it is never offered.
+   */
+  built_in?: string;
+  /** For a `built_in` entry, whether the Pond's own capability is ready (sent by newer Ponds). */
+  built_in_state?: 'on' | 'needs_key' | 'knowledge_off';
   required_secrets: SecretRequirement[];
 }
 
