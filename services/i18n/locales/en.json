@@ -2257,6 +2257,7 @@
       "kindPrompt": "Prompt",
       "kindWebhook": "Webhook",
       "kindRoutine": "Routine",
+      "kindPrivate": "Private",
       "lastFired": "Last fired {{when}}",
       "neverFired": "Never fired",
       "cooldown": "Waits {{seconds}}s between firings",
