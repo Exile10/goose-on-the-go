@@ -4,14 +4,14 @@
  */
 
 import React, { useCallback } from 'react';
-import { BackHandler, ScrollView, StyleSheet, View } from 'react-native';
+import { BackHandler, StyleSheet, View } from 'react-native';
 import { Stack, useFocusEffect } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { InkButton, InkEmptyState, InkNotice, InkSpinner, InkText, InkTitle } from '@jarida/ink/native';
 
 import { WifiList } from '@/components/setup/wifi-list';
-import { GKeyboardView } from '@/components/ui/g-keyboard-view';
+import { GKeyboardScrollView } from '@/components/ui/g-keyboard-view';
 import type { ThemeColors } from '@/constants/colors';
 import { Spacing } from '@/constants/spacing';
 import { useThemedStyles } from '@/hooks/use-themed-styles';
@@ -119,14 +119,12 @@ export default function PondWifiScreen() {
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
       <Stack.Screen options={{ gestureEnabled: false }} />
-      <GKeyboardView>
-        <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-          {/* Not an eyebrow: its capitals would print the id unlike the card and the advertised name. */}
-          {cardId ? <InkText size="sm" tone="secondary">{t('bleSetup.find.rowName', { id: cardId })}</InkText> : null}
-          <InkTitle level={1}>{t('bleSetup.wifi.title')}</InkTitle>
-          {body}
-        </ScrollView>
-      </GKeyboardView>
+      <GKeyboardScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+        {/* Not an eyebrow: its capitals would print the id unlike the card and the advertised name. */}
+        {cardId ? <InkText size="sm" tone="secondary">{t('bleSetup.find.rowName', { id: cardId })}</InkText> : null}
+        <InkTitle level={1}>{t('bleSetup.wifi.title')}</InkTitle>
+        {body}
+      </GKeyboardScrollView>
     </SafeAreaView>
   );
 }

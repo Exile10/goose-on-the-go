@@ -9,7 +9,7 @@
  */
 
 import React, { useCallback, useState } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import {
   InkButton,
@@ -24,7 +24,7 @@ import {
 import { useFocusEffect, useRouter } from 'expo-router';
 
 import { GIcon } from '@/components/ui/g-icon';
-import { GKeyboardView } from '@/components/ui/g-keyboard-view';
+import { GKeyboardScrollView } from '@/components/ui/g-keyboard-view';
 import type { ThemeColors } from '@/constants/colors';
 import { Spacing } from '@/constants/spacing';
 import { useThemedStyles } from '@/hooks/use-themed-styles';
@@ -73,48 +73,46 @@ export default function CommissionDeviceScreen() {
   }
 
   return (
-    <GKeyboardView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-        <GIcon name="device" size={28} color={theme.color.accentLine} />
-        <InkTitle level={2}>{t('commission.title')}</InkTitle>
-        <InkText tone="secondary">{t('commission.desc')}</InkText>
+    <GKeyboardScrollView containerStyle={styles.container} contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+      <GIcon name="device" size={28} color={theme.color.accentLine} />
+      <InkTitle level={2}>{t('commission.title')}</InkTitle>
+      <InkText tone="secondary">{t('commission.desc')}</InkText>
 
-        {commissioning ? <InkNotice tone="warning">{t('commission.controllerStarting')}</InkNotice> : null}
+      {commissioning ? <InkNotice tone="warning">{t('commission.controllerStarting')}</InkNotice> : null}
 
-        <InkFormField label={t('commission.setupCode')}>
-          <InkInput
-            label={t('commission.setupCode')}
-            value={code}
-            onChange={setCode}
-            placeholder={t('commission.codePlaceholder')}
-            inputProps={{ autoCapitalize: 'characters', autoCorrect: false, returnKeyType: 'next' }}
-          />
-          {/* A Matter QR payload is around ninety characters of base-38, which is
-              not a thing to read off a box and type. Scanning is the ordinary
-              route; the field stays because the manual code beside the QR exists
-              for exactly the times the camera cannot be used. */}
-          <InkButton size="sm" icon="camera" onPress={() => router.push('/(stack)/connect-desktop?mode=matter')}>
-            {t('commission.scan')}
-          </InkButton>
-        </InkFormField>
-
-        <InkFormField label={t('commission.nameOptional')}>
-          <InkInput
-            label={t('commission.nameOptional')}
-            value={name}
-            onChange={setName}
-            placeholder={t('commission.namePlaceholder')}
-          />
-        </InkFormField>
-
-        {error ? <InkNotice tone="danger">{error}</InkNotice> : null}
-
-        <InkButton variant="primary" block disabled={!looksLikeTypedSetupCode(code) || commissioning} onPress={submit}>
-          {t('commission.addDevice')}
+      <InkFormField label={t('commission.setupCode')}>
+        <InkInput
+          label={t('commission.setupCode')}
+          value={code}
+          onChange={setCode}
+          placeholder={t('commission.codePlaceholder')}
+          inputProps={{ autoCapitalize: 'characters', autoCorrect: false, returnKeyType: 'next' }}
+        />
+        {/* A Matter QR payload is around ninety characters of base-38, which is
+            not a thing to read off a box and type. Scanning is the ordinary
+            route; the field stays because the manual code beside the QR exists
+            for exactly the times the camera cannot be used. */}
+        <InkButton size="sm" icon="camera" onPress={() => router.push('/(stack)/connect-desktop?mode=matter')}>
+          {t('commission.scan')}
         </InkButton>
-        <InkText size="sm" tone="secondary">{t('commission.bluetoothFootnote')}</InkText>
-      </ScrollView>
-    </GKeyboardView>
+      </InkFormField>
+
+      <InkFormField label={t('commission.nameOptional')}>
+        <InkInput
+          label={t('commission.nameOptional')}
+          value={name}
+          onChange={setName}
+          placeholder={t('commission.namePlaceholder')}
+        />
+      </InkFormField>
+
+      {error ? <InkNotice tone="danger">{error}</InkNotice> : null}
+
+      <InkButton variant="primary" block disabled={!looksLikeTypedSetupCode(code) || commissioning} onPress={submit}>
+        {t('commission.addDevice')}
+      </InkButton>
+      <InkText size="sm" tone="secondary">{t('commission.bluetoothFootnote')}</InkText>
+    </GKeyboardScrollView>
   );
 }
 

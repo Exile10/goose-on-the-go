@@ -3,7 +3,7 @@
  * recorded sentences. Reached from Home's "Finish setting up" card and from Settings > Voice and Listening.
  */
 
-import React from 'react';
+import React, { useRef } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -14,7 +14,7 @@ import { isUnavailable } from '@/models/content-state';
 import { useContentState } from '@/view-models/use-content-state';
 import { usePullToRefresh } from '@/view-models/use-pull-to-refresh';
 import { WakeStep } from '@/components/setup/wake-step';
-import { GKeyboardView } from '@/components/ui/g-keyboard-view';
+import { GKeyboardView, useFocusedInputReveal } from '@/components/ui/g-keyboard-view';
 import type { ThemeColors } from '@/constants/colors';
 import { Spacing } from '@/constants/spacing';
 import { useThemedStyles } from '@/hooks/use-themed-styles';
@@ -28,6 +28,8 @@ export default function WakeWordScreen() {
   const state = useContentState({ loading: wake.loading, failed: wake.failed, hasContent: !wake.loading && !wake.failed });
   // Reading the settings again keeps the draft: edits are held apart from what the Pond has.
   const pull = usePullToRefresh(wake.actions.reload);
+  const scroll = useRef<ScrollView>(null);
+  const reveal = useFocusedInputReveal(() => scroll.current);
 
   if (wake.loading) {
     return (
@@ -51,10 +53,11 @@ export default function WakeWordScreen() {
     <SafeAreaView style={styles.safe} edges={['bottom']}>
       <GKeyboardView>
         <ScrollView
+          ref={scroll}
           contentContainerStyle={styles.scroll}
-          keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
           refreshControl={<RefreshControl {...pull} />}
+          {...reveal}
         >
           {saved ? <InkText tone="secondary">{t('setup.wake.current', { phrase: saved })}</InkText> : null}
           <WakeStep draft={draft} patch={wake.actions.patch} />

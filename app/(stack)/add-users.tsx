@@ -12,7 +12,7 @@
  */
 
 import React, { useCallback, useState } from 'react';
-import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { RefreshControl, StyleSheet, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import {
   InkButton,
@@ -28,7 +28,7 @@ import {
   useInkTheme,
 } from '@jarida/ink/native';
 
-import { GKeyboardView } from '@/components/ui/g-keyboard-view';
+import { GKeyboardScrollView } from '@/components/ui/g-keyboard-view';
 import { usePullToRefresh } from '@/view-models/use-pull-to-refresh';
 import type { ThemeColors } from '@/constants/colors';
 import { Spacing } from '@/constants/spacing';
@@ -108,70 +108,67 @@ export default function AddUsersScreen() {
   }, [actions, name, emoji]);
 
   return (
-    <GKeyboardView>
-      <ScrollView
-        style={styles.container}
-        contentContainerStyle={styles.scroll}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl {...pull} />}
-      >
-        {loading ? <InkSpinner label={t('people.loading')} /> : null}
-        {error ? <InkNotice tone="danger">{error}</InkNotice> : null}
+    <GKeyboardScrollView
+      style={styles.container}
+      contentContainerStyle={styles.scroll}
+      showsVerticalScrollIndicator={false}
+      refreshControl={<RefreshControl {...pull} />}
+    >
+      {loading ? <InkSpinner label={t('people.loading')} /> : null}
+      {error ? <InkNotice tone="danger">{error}</InkNotice> : null}
 
-        {!loading && data.profiles.length === 0 ? (
-          <InkEmptyState icon="users" title={t('people.empty')}>
-            {t('people.emptyBody')}
-          </InkEmptyState>
-        ) : null}
+      {!loading && data.profiles.length === 0 ? (
+        <InkEmptyState icon="users" title={t('people.empty')}>
+          {t('people.emptyBody')}
+        </InkEmptyState>
+      ) : null}
 
-        {data.profiles.length > 0 ? (
-          <InkCard raised={false} contentStyle={styles.list}>
-            {data.profiles.map((p) => (
-              <ProfileRow key={p.id} profile={p} onRemove={actions.remove} />
-            ))}
-          </InkCard>
-        ) : null}
+      {data.profiles.length > 0 ? (
+        <InkCard raised={false} contentStyle={styles.list}>
+          {data.profiles.map((p) => (
+            <ProfileRow key={p.id} profile={p} onRemove={actions.remove} />
+          ))}
+        </InkCard>
+      ) : null}
 
-        {showAdd ? (
-          <InkCard contentStyle={styles.form}>
-            <InkTitle level={3}>{t('people.addTitle')}</InkTitle>
-            <InkFormField label={t('people.name')}>
-              <InkInput
-                label={t('people.name')}
-                value={name}
-                onChange={setName}
-                placeholder={t('people.namePlaceholder')}
-                disabled={saving}
-                onSubmit={() => void submit()}
-                inputProps={{ autoCapitalize: 'words', autoFocus: true, returnKeyType: 'next' }}
-              />
-            </InkFormField>
-            <InkFormField label={t('people.emoji')} hint={t('people.emojiHint')}>
-              <InkInput
-                label={t('people.emoji')}
-                value={emoji}
-                onChange={setEmoji}
-                disabled={saving}
-                inputProps={{ maxLength: 4 }}
-              />
-            </InkFormField>
-            <View style={styles.formActions}>
-              <InkButton disabled={saving} onPress={() => setShowAdd(false)}>
-                {t('common.cancel')}
-              </InkButton>
-              <InkButton variant="primary" disabled={!name.trim()} loading={saving} onPress={() => void submit()}>
-                {saving ? t('addUsers.adding') : t('common.add')}
-              </InkButton>
-            </View>
-          </InkCard>
-        ) : (
-          <InkButton icon="plus" block onPress={() => setShowAdd(true)}>
-            {t('people.add')}
-          </InkButton>
-        )}
-      </ScrollView>
-    </GKeyboardView>
+      {showAdd ? (
+        <InkCard contentStyle={styles.form}>
+          <InkTitle level={3}>{t('people.addTitle')}</InkTitle>
+          <InkFormField label={t('people.name')}>
+            <InkInput
+              label={t('people.name')}
+              value={name}
+              onChange={setName}
+              placeholder={t('people.namePlaceholder')}
+              disabled={saving}
+              onSubmit={() => void submit()}
+              inputProps={{ autoCapitalize: 'words', autoFocus: true, returnKeyType: 'next' }}
+            />
+          </InkFormField>
+          <InkFormField label={t('people.emoji')} hint={t('people.emojiHint')}>
+            <InkInput
+              label={t('people.emoji')}
+              value={emoji}
+              onChange={setEmoji}
+              disabled={saving}
+              inputProps={{ maxLength: 4 }}
+            />
+          </InkFormField>
+          <View style={styles.formActions}>
+            <InkButton disabled={saving} onPress={() => setShowAdd(false)}>
+              {t('common.cancel')}
+            </InkButton>
+            <InkButton variant="primary" disabled={!name.trim()} loading={saving} onPress={() => void submit()}>
+              {saving ? t('addUsers.adding') : t('common.add')}
+            </InkButton>
+          </View>
+        </InkCard>
+      ) : (
+        <InkButton icon="plus" block onPress={() => setShowAdd(true)}>
+          {t('people.add')}
+        </InkButton>
+      )}
+    </GKeyboardScrollView>
   );
 }
 
