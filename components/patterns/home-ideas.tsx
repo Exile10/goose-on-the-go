@@ -1,6 +1,6 @@
 /**
  * HomeIdeas — what the Pond has thought of, as Home's widget: its suggestion, decided in place, and
- * an agent it could run. AskRow is the questions it offers, with Ask Goose always last.
+ * an agent it could run. AskRow is Ask Goose: a field that opens a conversation, and the questions it offers.
  *
  * Deciding in place is acceptable only because a yes runs nothing: the Pond records it and
  * `ProposalDecisionResult.executed` is always false. If that changes, the buttons belong back on
@@ -12,12 +12,12 @@ import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { InkButton, InkChip, InkText, inkText, useInkTheme } from '@jarida/ink/native';
+import { InkButton, InkText, inkText, useInkTheme } from '@jarida/ink/native';
 
 import { GIcon } from '@/components/ui/g-icon';
 import { GPressable } from '@/components/ui/g-pressable';
 import { selectionTick, tap } from '@/services/haptics';
-import type { AgentIdea, PondPrompt } from '@/view-models/use-home-ideas';
+import { HOME_PROMPT_LIMIT, type AgentIdea, type PondPrompt } from '@/view-models/use-home-ideas';
 import type { ProposalRow } from '@/view-models/use-proposals';
 import { WidgetHeader } from './home-widgets';
 
@@ -129,24 +129,55 @@ export interface AskRowProps {
 }
 
 /**
- * The Pond's questions, then Ask Goose. No heading: a row of questions says what it is, and with
- * none offered a heading would stand over one chip.
+ * Ask Goose: a field to tap, which opens a conversation, then up to three of the Pond's own
+ * questions as rows under "Try asking". With none offered, the field stands alone.
  */
 export function AskRow({ prompts, onAsk, onAskGoose }: AskRowProps) {
   const theme = useInkTheme();
   const styles = makeStyles(theme);
   const { t } = useTranslation();
+  const offered = prompts.slice(0, HOME_PROMPT_LIMIT);
 
   return (
-    <View style={styles.chips}>
-      {prompts.map((prompt) => (
-        <InkChip key={prompt.id} onPress={() => onAsk(prompt)}>
-          {prompt.prompt}
-        </InkChip>
-      ))}
-      <InkChip icon="chat" onPress={onAskGoose}>
-        {t('pond.askGoose')}
-      </InkChip>
+    <View>
+      <WidgetHeader icon="chat" title={t('pond.askGoose')} />
+
+      <GPressable
+        style={styles.field}
+        accessibilityRole="button"
+        accessibilityLabel={t('pond.askGoose')}
+        accessibilityHint={t('home.ask.openHint')}
+        onPress={onAskGoose}
+      >
+        <Text style={styles.fieldText} numberOfLines={1}>
+          {t('home.askPlaceholder')}
+        </Text>
+        <View style={styles.fieldAction}>
+          <GIcon name="compose" size={16} color={theme.color.textOnAccent} strokeWidth={2.5} />
+        </View>
+      </GPressable>
+
+      {offered.length > 0 ? (
+        <>
+          <Text style={styles.tryLabel}>{t('home.ask.tryAsking')}</Text>
+          {offered.map((prompt, i) => (
+            <GPressable
+              key={prompt.id}
+              style={[styles.suggestion, i > 0 && styles.hairline]}
+              accessibilityRole="button"
+              accessibilityLabel={prompt.prompt}
+              accessibilityHint={t('home.ask.suggestionHint')}
+              onPress={() => onAsk(prompt)}
+            >
+              <GIcon name="prompts" size={16} color={theme.color.accentLine} />
+              <Text style={styles.suggestionText} numberOfLines={2}>
+                {prompt.prompt}
+              </Text>
+              <GIcon name="chevron-right" size={16} color={theme.color.textTertiary} strokeWidth={2.5} />
+            </GPressable>
+          ))}
+        </>
+      ) : null}
     </View>
   );
 }
@@ -169,5 +200,31 @@ const makeStyles = (theme: ReturnType<typeof useInkTheme>) =>
     },
     agentWords: { flex: 1, gap: 1 },
     agentTitle: inkText(theme, { size: 'md', weight: theme.weight.semibold }).style,
-    chips: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.space[2] },
+    field: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: theme.space[2],
+      minHeight: theme.rowHeight.md,
+      paddingLeft: theme.space[4],
+      paddingRight: theme.space[1] + 2,
+      borderRadius: theme.radius.pill,
+      backgroundColor: theme.color.chrome,
+    },
+    fieldText: { ...inkText(theme, { size: 'md', color: theme.color.textSecondary }).style, flex: 1 },
+    fieldAction: {
+      width: 32,
+      height: 32,
+      borderRadius: theme.radius.pill,
+      backgroundColor: theme.color.accent,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    tryLabel: {
+      ...inkText(theme, { size: 'sm', weight: theme.weight.semibold, color: theme.color.textTertiary }).style,
+      marginTop: theme.space[4],
+      marginBottom: theme.space[1],
+    },
+    suggestion: { flexDirection: 'row', alignItems: 'center', gap: theme.space[3], minHeight: theme.rowHeight.md },
+    hairline: { borderTopWidth: theme.edge.hairlineWidth, borderTopColor: theme.color.line },
+    suggestionText: { ...inkText(theme, { size: 'md' }).style, flex: 1, paddingVertical: theme.space[2] },
   });

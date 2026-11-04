@@ -90,11 +90,12 @@ At most **two** proposal cards, each the summary, the rationale beneath it, and 
 **Yes** and **Not now**, deciding in place exactly as `/(stack)/suggestions` does. A count beside
 the heading, and See all into that screen when there are more.
 
-Under them, a wrapped row of ask-chips. Tapping one opens `/conversation` with the prompt as the
-first message, and tells the Pond it was taken so it stops offering it.
+Ask Goose is its own widget: a header, a field to tap that opens `/conversation`, and under
+"Try asking" up to three ask-prompts as rows held to two lines. Tapping one opens `/conversation` with the
+prompt as the first message, and tells the Pond it was taken so it stops offering it.
 
-When there are no proposals, the section is the chips alone, under a quieter heading. When there
-are neither, the section is not drawn — the existing rule, unchanged.
+When there are no ask-prompts, Ask Goose is the field alone, with no empty "Try asking". When there
+are no proposals and no agent idea, the ideas section is not drawn — the existing rule, unchanged.
 
 Pending reminders appear here as a single line, not as cards: *3 reminders waiting*, leading to
 their screen. Dismissal stays where it asks first.

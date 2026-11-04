@@ -1,12 +1,12 @@
 /**
  * Home's ideas, drawn: nothing where there is nothing, a decision that reaches its handler and
- * holds both buttons while it is out, and Ask Goose whatever the Pond offers.
+ * holds both buttons while it is out, and Ask Goose's field whatever the Pond offers.
  */
 
 import React from 'react';
 import { Text } from 'react-native';
 import { act, create, type ReactTestInstance, type ReactTestRenderer } from 'react-test-renderer';
-import { InkButton, InkChip } from '@jarida/ink/native';
+import { InkButton } from '@jarida/ink/native';
 
 import { GPressable } from '@/components/ui/g-pressable';
 import i18n from '@/services/i18n';
@@ -100,20 +100,50 @@ describe('HomeIdeas', () => {
 });
 
 describe('AskRow', () => {
-  it('keeps Ask Goose when the Pond offers no question', async () => {
+  const PROMPTS = [
+    { id: 'a', prompt: 'What did power cost this week?', composed: true },
+    { id: 'b', prompt: 'Who rang the bell today?', composed: true },
+    { id: 'c', prompt: 'Is the porch light still on?', composed: false },
+    { id: 'd', prompt: 'What is on the calendar tomorrow?', composed: true },
+  ];
+
+  const field = (tree: ReactTestRenderer) =>
+    tree.root.findAllByType(GPressable).find((p) => p.props.accessibilityLabel === i18n.t('pond.askGoose'))!;
+  const suggestions = (tree: ReactTestRenderer) =>
+    tree.root.findAllByType(GPressable).filter((p) => p.props.accessibilityHint === i18n.t('home.ask.suggestionHint'));
+
+  it('heads the card and offers the field', async () => {
+    const tree = await render(<AskRow prompts={PROMPTS} onAsk={jest.fn()} onAskGoose={jest.fn()} />);
+    expect(texts(tree)).toEqual(expect.arrayContaining([i18n.t('pond.askGoose'), i18n.t('home.askPlaceholder')]));
+    expect(field(tree).props.accessibilityRole).toBe('button');
+  });
+
+  it('opens a conversation from the field', async () => {
     const onAskGoose = jest.fn();
-    const tree = await render(<AskRow prompts={[]} onAsk={jest.fn()} onAskGoose={onAskGoose} />);
-    const chips = tree.root.findAllByType(InkChip);
-    expect(chips).toHaveLength(1);
-    act(() => chips[0].props.onPress());
+    const tree = await render(<AskRow prompts={PROMPTS} onAsk={jest.fn()} onAskGoose={onAskGoose} />);
+    act(() => field(tree).props.onPress());
     expect(onAskGoose).toHaveBeenCalled();
   });
 
   it('asks the question picked', async () => {
     const onAsk = jest.fn();
-    const prompt = { id: 'a', prompt: 'What did power cost this week?', composed: true };
-    const tree = await render(<AskRow prompts={[prompt]} onAsk={onAsk} onAskGoose={jest.fn()} />);
-    act(() => tree.root.findAllByType(InkChip)[0].props.onPress());
-    expect(onAsk).toHaveBeenCalledWith(prompt);
+    const tree = await render(<AskRow prompts={PROMPTS} onAsk={onAsk} onAskGoose={jest.fn()} />);
+    act(() => suggestions(tree)[1].props.onPress());
+    expect(onAsk).toHaveBeenCalledWith(PROMPTS[1]);
+  });
+
+  it('shows at most three questions, each held to two lines', async () => {
+    const tree = await render(<AskRow prompts={PROMPTS} onAsk={jest.fn()} onAskGoose={jest.fn()} />);
+    const rows = suggestions(tree);
+    expect(rows.map((r) => r.props.accessibilityLabel)).toEqual(PROMPTS.slice(0, 3).map((p) => p.prompt));
+    expect(texts(tree)).not.toContain(PROMPTS[3].prompt);
+    expect(tree.root.findAllByType(Text).filter((t) => t.props.children === PROMPTS[0].prompt)[0].props.numberOfLines).toBe(2);
+  });
+
+  it('leaves out "Try asking" when the Pond offers no question', async () => {
+    const tree = await render(<AskRow prompts={[]} onAsk={jest.fn()} onAskGoose={jest.fn()} />);
+    expect(texts(tree)).not.toContain(i18n.t('home.ask.tryAsking'));
+    expect(suggestions(tree)).toHaveLength(0);
+    expect(field(tree)).toBeDefined();
   });
 });
