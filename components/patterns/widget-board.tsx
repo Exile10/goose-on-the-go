@@ -7,13 +7,22 @@
  *
  * Rearranging folds every widget to one line, so the whole board fits on a screen and any widget
  * can be carried anywhere without the page having to scroll under the finger.
+ *
+ * Where a widget rests, and whether it is drawn at all, is React's style, never an animated value.
+ * Reanimated 4.5 hands a settled animated value back to React only if its JS-thread poll lands in a
+ * one-second window, and drops the value from its registry either way; once dropped unsynced, React's
+ * next commit of that view restores the style it first rendered with. Places used to be animated
+ * values that began hidden and zero-high, so a stalled JS thread blanked the board. Moving between
+ * places is now a layout transition, and the only animated values left are the carry's offset and
+ * lift, which rest at the values they start from.
  */
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { StyleSheet, Text, View, type AccessibilityActionEvent } from 'react-native';
+import { StyleSheet, Text, View, type AccessibilityActionEvent, type ViewStyle } from 'react-native';
+import { useFocusEffect } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
-import Animated, { Easing, useAnimatedStyle, useReducedMotion, useSharedValue, withTiming } from 'react-native-reanimated';
+import Animated, { Easing, LinearTransition, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { scheduleOnRN } from 'react-native-worklets';
 import { InkEdge, inkText, useInkTheme } from '@jarida/ink/native';
 
@@ -50,16 +59,31 @@ const GAP = 8;
 /** A folded widget: one line, tall enough to hold with a thumb. */
 const FOLDED = 52;
 const SETTLE = { duration: 220, easing: Easing.out(Easing.cubic) };
+const GLIDE = LinearTransition.duration(SETTLE.duration).easing(SETTLE.easing);
+
+/** The widget in hand, and the place it was lifted from, where it stays drawn until it is let go. */
+interface Carried {
+  key: string;
+  from: Rect;
+}
 
 export function WidgetBoard({ widgets, editing, onEdit, onMove, onStep }: WidgetBoardProps) {
   const theme = useInkTheme();
   const plate = theme.edge.rest;
   const [width, setWidth] = useState(0);
   const [heights, setHeights] = useState<Record<string, number>>({});
-  const [carried, setCarried] = useState<string | null>(null);
+  const [carried, setCarried] = useState<Carried | null>(null);
+  // Bumped for a widget that a focus pass finds placed but not drawn, which mounts it afresh.
+  const [revived, setRevived] = useState<Record<string, number>>({});
 
   const measure = useCallback((key: string, height: number) => {
     setHeights((known) => (Math.abs((known[key] ?? -1) - height) < 0.5 ? known : { ...known, [key]: height }));
+  }, []);
+
+  // The height each frame was laid out at: what the screen shows, whatever React meant.
+  const drawn = useRef<Record<string, number>>({});
+  const frame = useCallback((key: string, height: number) => {
+    drawn.current[key] = height;
   }, []);
 
   // Placed only once measured: a widget drawn before its height is known would land on another.
@@ -74,16 +98,39 @@ export function WidgetBoard({ widgets, editing, onEdit, onMove, onStep }: Widget
     rects.current = board?.rects ?? {};
   }, [board]);
 
+  useFocusEffect(
+    useCallback(() => {
+      const hidden = Object.keys(rects.current).filter((key) => !((drawn.current[key] ?? 0) >= 1));
+      if (hidden.length === 0) return;
+      for (const key of hidden) {
+        console.warn('[home] a placed widget is not drawn; mounting it again', {
+          kind: 'home_widget_hidden',
+          key,
+          height: rects.current[key].height,
+          drawn: drawn.current[key] ?? null,
+        });
+      }
+      setRevived((known) => ({ ...known, ...Object.fromEntries(hidden.map((key) => [key, (known[key] ?? 0) + 1])) }));
+    }, []),
+  );
+
   // The last widget swapped with, so hovering over it does not swap back and forth every frame.
   const passed = useRef<string | null>(null);
+  // The same as `carried`, for the drag's callbacks, which must not wait for a render to see it.
+  const holding = useRef<Carried | null>(null);
   const lift = useCallback((key: string) => {
+    const from = rects.current[key];
+    if (!from) return;
     passed.current = null;
-    setCarried(key);
+    holding.current = { key, from };
+    setCarried(holding.current);
     void tap();
   }, []);
   const carry = useCallback(
-    (key: string, x: number, y: number) => {
-      const target = tileAt(rects.current, x, y, key);
+    (key: string, dx: number, dy: number) => {
+      const from = holding.current?.key === key ? holding.current.from : null;
+      if (!from) return;
+      const target = tileAt(rects.current, from.x + dx + from.width / 2, from.y + dy + from.height / 2, key);
       if (target === null) passed.current = null;
       else if (target !== passed.current) {
         passed.current = target;
@@ -93,7 +140,10 @@ export function WidgetBoard({ widgets, editing, onEdit, onMove, onStep }: Widget
     },
     [onMove],
   );
-  const drop = useCallback(() => setCarried(null), []);
+  const drop = useCallback(() => {
+    holding.current = null;
+    setCarried(null);
+  }, []);
 
   const shown = widgets.map((w) => w.key);
   const column = (width - GAP) / 2;
@@ -107,13 +157,14 @@ export function WidgetBoard({ widgets, editing, onEdit, onMove, onStep }: Widget
         {width > 0
           ? widgets.map((widget) => (
               <Cell
-                key={widget.key}
+                key={`${widget.key}:${revived[widget.key] ?? 0}`}
                 widget={widget}
                 rect={board?.rects[widget.key] ?? null}
+                held={carried?.key === widget.key ? carried.from : null}
                 pendingWidth={widget.span === 2 ? width : column}
                 editing={editing}
-                lifted={carried === widget.key}
                 onMeasure={measure}
+                onFrame={frame}
                 onEdit={onEdit}
                 onLift={lift}
                 onCarry={carry}
@@ -131,91 +182,73 @@ export function WidgetBoard({ widgets, editing, onEdit, onMove, onStep }: Widget
 interface CellProps {
   widget: BoardWidget;
   rect: Rect | null;
+  /** Where the widget was lifted from, while it is in hand. */
+  held: Rect | null;
   pendingWidth: number;
   editing: boolean;
-  lifted: boolean;
   onMeasure: (key: string, height: number) => void;
+  onFrame: (key: string, height: number) => void;
   onEdit: () => void;
   onLift: (key: string) => void;
-  onCarry: (key: string, x: number, y: number) => void;
+  onCarry: (key: string, dx: number, dy: number) => void;
   onDrop: () => void;
   onStep: (key: string, delta: -1 | 1) => void;
   canStep: { earlier: boolean; later: boolean };
 }
 
-function Cell({ widget, rect, pendingWidth, editing, lifted, onMeasure, onEdit, onLift, onCarry, onDrop, onStep, canStep }: CellProps) {
+function Cell({ widget, rect, held, pendingWidth, editing, onMeasure, onFrame, onEdit, onLift, onCarry, onDrop, onStep, canStep }: CellProps) {
   const theme = useInkTheme();
   const { t } = useTranslation();
-  const reduceMotion = useReducedMotion();
   const plate = theme.edge.rest;
   const styles = useMemo(() => makeStyles(theme), [theme]);
+  const lifted = held !== null;
+
+  // The first place is taken at once and only moves after it glide, or a widget would fly in from the corner.
+  const [settled, setSettled] = useState(rect !== null);
 
   // Worklets copy what they close over, and a widget carries its React content; they get the key alone.
   const key = widget.key;
-  const placed = useRef(false);
-  const x = useSharedValue(0);
-  const y = useSharedValue(0);
-  const w = useSharedValue(pendingWidth);
-  const h = useSharedValue(0);
-  const target = useSharedValue({ x: 0, y: 0 });
   const carrying = useSharedValue(false);
-  const origin = useSharedValue({ x: 0, y: 0 });
-  const offset = useSharedValue({ x: 0, y: 0 });
-  const shown = useSharedValue(false);
+  const dx = useSharedValue(0);
+  const dy = useSharedValue(0);
 
+  // Let go, the offset from the finger runs out while the frame glides from where it was lifted to its place.
   useEffect(() => {
-    if (!rect) {
-      w.set(pendingWidth);
-      return;
-    }
-    const instant = !placed.current || reduceMotion;
-    const to = (v: number) => (instant ? v : withTiming(v, SETTLE));
-    target.set({ x: rect.x, y: rect.y });
-    // The widget in hand follows the finger; it goes to its new place when it is let go.
-    if (!carrying.get()) {
-      x.set(to(rect.x));
-      y.set(to(rect.y));
-    }
-    w.set(to(rect.width));
-    h.set(to(rect.height));
-    shown.set(true);
-    placed.current = true;
-  }, [rect, pendingWidth, reduceMotion, carrying, h, shown, target, w, x, y]);
+    if (lifted) return;
+    dx.set(withTiming(0, SETTLE));
+    dy.set(withTiming(0, SETTLE));
+  }, [lifted, dx, dy]);
 
-  const frame = useAnimatedStyle(() => {
-    const inHand = carrying.get();
-    return {
-      left: inHand ? origin.get().x + offset.get().x : x.get(),
-      top: inHand ? origin.get().y + offset.get().y : y.get(),
-      width: w.get(),
-      height: h.get(),
-      opacity: shown.get() ? 1 : 0,
-      zIndex: inHand ? 10 : 0,
-      transform: [{ scale: withTiming(inHand ? 1.03 : 1, { duration: 120 }) }],
-    };
-  });
+  const at = held ?? rect;
+  const place: ViewStyle = at
+    ? { left: at.x, top: at.y, width: at.width, height: at.height, zIndex: lifted ? 10 : 0 }
+    : { left: 0, top: 0, width: pendingWidth, height: 0, opacity: 0 };
+
+  const motion = useAnimatedStyle(() => ({
+    transform: [
+      { translateX: dx.get() },
+      { translateY: dy.get() },
+      { scale: withTiming(carrying.get() ? 1.03 : 1, { duration: 120 }) },
+    ],
+  }));
 
   const move = Gesture.Pan()
     .enabled(editing)
     .minDistance(2)
     .onStart(() => {
-      origin.set({ x: x.get(), y: y.get() });
-      offset.set({ x: 0, y: 0 });
+      dx.set(0);
+      dy.set(0);
       carrying.set(true);
       scheduleOnRN(onLift, key);
     })
     .onUpdate((e) => {
-      offset.set({ x: e.translationX, y: e.translationY });
-      const middle = { x: origin.get().x + e.translationX + w.get() / 2, y: origin.get().y + e.translationY + h.get() / 2 };
-      scheduleOnRN(onCarry, key, middle.x, middle.y);
+      dx.set(e.translationX);
+      dy.set(e.translationY);
+      scheduleOnRN(onCarry, key, e.translationX, e.translationY);
     })
     .onFinalize(() => {
       if (!carrying.get()) return;
-      x.set(origin.get().x + offset.get().x);
-      y.set(origin.get().y + offset.get().y);
       carrying.set(false);
-      x.set(withTiming(target.get().x, SETTLE));
-      y.set(withTiming(target.get().y, SETTLE));
       scheduleOnRN(onDrop);
     });
   const hold = Gesture.LongPress()
@@ -240,7 +273,13 @@ function Cell({ widget, rect, pendingWidth, editing, lifted, onMeasure, onEdit, 
   return (
     <GestureDetector gesture={Gesture.Race(move, hold)}>
       <Animated.View
-        style={[styles.cell, frame]}
+        style={[styles.cell, place, motion]}
+        layout={settled ? GLIDE : undefined}
+        onLayout={(e) => {
+          const { height } = e.nativeEvent.layout;
+          if (height >= 1) setSettled(true);
+          onFrame(widget.key, height);
+        }}
         accessible={editing}
         accessibilityLabel={editing ? widget.title : undefined}
         accessibilityHint={editing ? t('home.board.moveHint') : undefined}
