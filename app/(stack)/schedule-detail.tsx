@@ -40,6 +40,7 @@ import {
   formatScheduleTime,
   isOneOff,
   linkedScheduleId,
+  privateOwner,
   promptOf,
   routineDevices,
 } from '@/models/schedule';
@@ -82,6 +83,32 @@ function RoutineFact({ devices }: { devices: Record<string, boolean> }) {
     };
   }, []);
   return <Fact label={t('schedule.detail.routine')}>{describeRoutine(devices, names)}</Fact>;
+}
+
+/**
+ * A private reminder, which the Pond lists without what it says. Its owner's name is read once,
+ * like a routine's device names; if the read fails, it says "the person who set it" instead.
+ */
+function PrivateFact({ owner }: { owner: string }) {
+  const { t } = useTranslation();
+  const [name, setName] = useState<string | null>(null);
+  useEffect(() => {
+    let current = true;
+    api
+      .listProfiles()
+      .then((list) => {
+        if (current) setName(list.find((p) => p.id === owner)?.display_name ?? null);
+      })
+      .catch((e: unknown) => console.warn('[schedule-detail] owner name unavailable', e));
+    return () => {
+      current = false;
+    };
+  }, [owner]);
+  return (
+    <Fact label={t('schedule.detail.private')}>
+      {name ? t('schedule.detail.privateNote', { name }) : t('schedule.detail.privateNoteNobody')}
+    </Fact>
+  );
 }
 
 export default function ScheduleDetailScreen() {
@@ -137,6 +164,7 @@ export default function ScheduleDetailScreen() {
   const when = describeWhen(schedule, phoneZone);
   const prompt = promptOf(schedule);
   const devices = routineDevices(schedule);
+  const owner = privateOwner(schedule);
   const oneOff = isOneOff(schedule);
 
   return (
@@ -179,6 +207,8 @@ export default function ScheduleDetailScreen() {
         <View style={styles.gap}>
           {devices ? (
             <RoutineFact devices={devices} />
+          ) : owner != null ? (
+            <PrivateFact owner={owner} />
           ) : prompt != null ? (
             <Fact label={t('schedule.detail.prompt')}>{prompt}</Fact>
           ) : (
