@@ -28,6 +28,7 @@ jest.mock('@/services/api-client', () => {
     ...actual,
     api: {
       listModels: jest.fn(),
+      helperModels: jest.fn().mockResolvedValue([]),
       modelMemoryStatus: jest.fn().mockResolvedValue(null),
       diskUsage: jest.fn().mockResolvedValue(null),
       downloadProgress: jest.fn().mockResolvedValue([]),

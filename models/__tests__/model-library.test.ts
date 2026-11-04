@@ -15,10 +15,14 @@ import {
   roleOf,
   rollbackTarget,
   routeCategory,
+  sectionOf,
+  sectionsOnPond,
   titleOf,
   tooBig,
+  usesOf,
+  withRole,
 } from '@/models/model-library';
-import type { DownloadEntry, ModelEntry } from '@/services/types';
+import type { DownloadEntry, HelperModel, ModelEntry } from '@/services/types';
 
 const model = (patch: Partial<ModelEntry>): ModelEntry => ({
   id: `${patch.category ?? 'gguf'}:${patch.name ?? 'm'}`,
@@ -140,5 +144,85 @@ describe('sizes', () => {
     expect(formatBytes(0)).toBeNull();
     expect(formatBytes(null)).toBeNull();
     expect(formatMegabytes(4300)).toBe('4.2 GB');
+  });
+});
+
+describe('sections', () => {
+  const helper = (patch: Partial<HelperModel>): HelperModel => ({
+    id: 'h',
+    title: null,
+    uses: ['pictures'],
+    section: 'pictures',
+    serves: null,
+    ...patch,
+  });
+
+  it('reads the jobs a row is doing from the Pond, not from its assignment flag', () => {
+    expect(usesOf(model({ category: 'embedding', active: false, roles: ['embedding'] }))).toEqual(['embedding']);
+    expect(usesOf(model({ category: 'gguf', active: true, roles: [] }))).toEqual([]);
+    expect(usesOf(model({ category: 'gguf', roles: ['chat', 'tool'] }))).toEqual(['chat', 'tool']);
+  });
+
+  it('falls back to the assigned category job on a Pond that does not say', () => {
+    expect(usesOf(model({ category: 'whisper', active: true }))).toEqual(['asr']);
+    expect(usesOf(model({ category: 'whisper', active: false }))).toEqual([]);
+  });
+
+  it('leaves off a job this phone has no words for', () => {
+    expect(usesOf(model({ roles: ['chat', 'reranking' as never] }))).toEqual(['chat']);
+  });
+
+  it('lists a row under the Pond’s section, else under its category’s job', () => {
+    expect(sectionOf(model({ category: 'gguf', section: 'other' }))).toBe('other');
+    expect(sectionOf(model({ category: 'whisper' }))).toBe('listening');
+    expect(sectionOf(model({ category: 'tts' }))).toBe('speaking');
+    expect(sectionOf(model({ category: 'embedding' }))).toBe('memory');
+    expect(sectionOf(model({ category: 'gguf' }))).toBe('conversation');
+  });
+
+  it('divides what is on the Pond into sections in order, working rows first, empty ones left out', () => {
+    const groups = sectionsOnPond(
+      [
+        model({ name: 'e2b', section: 'conversation', roles: [] }),
+        model({ name: 'e4b', section: 'conversation', roles: ['chat'] }),
+        model({ category: 'whisper', name: 'base', section: 'listening', roles: ['asr'] }),
+        model({ category: 'tts', name: 'af_heart', section: 'speaking', roles: ['tts'] }),
+        model({ category: 'gguf', name: 'tool', section: 'other', roles: ['tool'] }),
+      ],
+      [helper({ id: 'gguf/e4b#pictures', serves: 'gguf/e4b' })],
+    );
+    expect(groups.map((g) => g.section)).toEqual(['conversation', 'listening', 'speaking', 'pictures', 'other']);
+    expect(groups[0].entries.map((e) => (e.kind === 'model' ? e.model.name : e.helper.id))).toEqual(['e4b', 'e2b']);
+    expect(groups[3].entries).toEqual([{ kind: 'helper', helper: helper({ id: 'gguf/e4b#pictures', serves: 'gguf/e4b' }) }]);
+  });
+
+  it('shows the memory model in use though the Pond fetched it itself and lists no file', () => {
+    const groups = sectionsOnPond(
+      [
+        model({ category: 'embedding', name: 'all-MiniLM-L6-v2', downloaded: false, section: 'memory', roles: ['embedding'] }),
+        model({ category: 'embedding', name: 'bge-small-en-v1.5', downloaded: false, section: 'memory', roles: [] }),
+      ],
+      [],
+    );
+    expect(groups).toHaveLength(1);
+    expect(groups[0].section).toBe('memory');
+    expect(groups[0].entries.map((e) => (e.kind === 'model' ? e.model.name : null))).toEqual(['all-MiniLM-L6-v2']);
+  });
+
+  it('puts a helper from a section this phone does not know under Other', () => {
+    const groups = sectionsOnPond([], [helper({ section: 'reranking' as never })]);
+    expect(groups.map((g) => g.section)).toEqual(['other']);
+  });
+
+  it('finds a job’s holder from the Pond’s roles', () => {
+    const minilm = model({ category: 'embedding', name: 'minilm', active: false, roles: ['embedding'] });
+    expect(holderOf([minilm], 'embedding')).toBe(minilm);
+  });
+
+  it('moves a job between rows before the Pond answers', () => {
+    const held = model({ name: 'a', active: true, roles: ['chat', 'tool'] });
+    expect(withRole(held, 'chat', false)).toMatchObject({ active: false, roles: ['tool'] });
+    expect(withRole(model({ name: 'b', roles: [] }), 'chat', true)).toMatchObject({ active: true, roles: ['chat'] });
+    expect(withRole(model({ name: 'c' }), 'chat', true).roles).toBeUndefined();
   });
 });

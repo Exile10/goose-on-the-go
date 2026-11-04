@@ -15,13 +15,16 @@ import type {
   DiskUsage,
   DownloadAction,
   DownloadEntry,
+  HelperModel,
   HfModel,
   HfModelFile,
   ModelEntry,
   ModelMemoryStatus,
   ModelRole,
+  ModelSection,
+  ModelUse,
 } from '@/services/types';
-import { holderOf, isLive, roleOf, rollbackTarget, routeCategory } from '@/models/model-library';
+import { holderOf, isLive, roleOf, rollbackTarget, routeCategory, withRole } from '@/models/model-library';
 import { describeApiError, logFailure } from './describe-error';
 import { useLive } from './use-live';
 
@@ -31,6 +34,8 @@ const IDLE_DOWNLOADS_MS = 15_000;
 
 interface Library {
   models: ModelEntry[];
+  /** Models in use beside the catalogue rows: picture support, a drafter, the camera's. */
+  helpers: HelperModel[];
   loaded: boolean;
   /** The first read, or the last one somebody asked for, failed. */
   readFailed: boolean;
@@ -47,6 +52,7 @@ interface Library {
 
 const EMPTY: Library = {
   models: [],
+  helpers: [],
   loaded: false,
   readFailed: false,
   error: null,
@@ -95,13 +101,17 @@ async function loadModels(loud: boolean): Promise<void> {
   if (loud) set({ readFailed: false, error: null });
   const mine = ++reads;
   try {
-    const [models, memory, disk] = await Promise.all([
+    const [models, helpers, memory, disk] = await Promise.all([
       api.listModels(),
+      api.helperModels().catch((e) => {
+        logFailure('models', 'helper read failed; showing the last ones', e);
+        return library.helpers;
+      }),
       api.modelMemoryStatus().catch(() => library.memory),
       api.diskUsage().catch(() => library.disk),
     ]);
     if (mine !== reads) return;
-    set({ models, memory, disk, loaded: true, readFailed: false, error: null });
+    set({ models, helpers, memory, disk, loaded: true, readFailed: false, error: null });
   } catch (e) {
     if (mine !== reads) return;
     const said = loud || !library.loaded;
@@ -147,7 +157,7 @@ async function activate(model: ModelEntry): Promise<boolean> {
   const before = holderOf(previous, role);
   set({
     busy: model.id,
-    models: previous.map((m) => (roleOf(m) === role ? { ...m, active: m.id === model.id } : m)),
+    models: previous.map((m) => (roleOf(m) === role ? withRole(m, role, m.id === model.id) : m)),
   });
   try {
     await api.activateModel(routeCategory(model), model.name, role);
@@ -335,8 +345,8 @@ export function useModelSearch(): UseModelSearch {
   };
 }
 
-/** The role names for the Activity of choosing a model, as a household reads the jobs. */
-export function roleLabelKey(role: ModelRole) {
+/** The name of a job, as a household reads it. */
+export function roleLabelKey(role: ModelUse) {
   switch (role) {
     case 'chat':
       return 'models.library.role.chat' as const;
@@ -346,6 +356,34 @@ export function roleLabelKey(role: ModelRole) {
       return 'models.library.role.tts' as const;
     case 'embedding':
       return 'models.library.role.embedding' as const;
+    case 'tool':
+      return 'models.library.role.tool' as const;
+    case 'pictures':
+      return 'models.library.role.pictures' as const;
+    case 'drafter':
+      return 'models.library.role.drafter' as const;
+    case 'camera':
+      return 'models.library.role.camera' as const;
+    case 'faces':
+      return 'models.library.role.faces' as const;
+  }
+}
+
+/** The heading of a section of the Models page. */
+export function sectionLabelKey(section: ModelSection) {
+  switch (section) {
+    case 'conversation':
+      return 'models.library.section.conversation' as const;
+    case 'listening':
+      return 'models.library.section.listening' as const;
+    case 'speaking':
+      return 'models.library.section.speaking' as const;
+    case 'memory':
+      return 'models.library.section.memory' as const;
+    case 'pictures':
+      return 'models.library.section.pictures' as const;
+    case 'other':
+      return 'models.library.section.other' as const;
   }
 }
 

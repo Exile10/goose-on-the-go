@@ -523,6 +523,31 @@ export interface ModelEntry {
   recommended?: { rank: string; reason: string };
   /** Separate downloads that extend the model, such as picture support. */
   companions?: ModelCompanion[];
+  /** The jobs the Pond says this row is doing now, read from its settings. Missing on an older Pond. */
+  roles?: ModelUse[];
+  /** The section the Pond lists this row under. Missing on an older Pond. */
+  section?: ModelSection;
+}
+
+/**
+ * A job a model on the Pond is doing. The first five are held by a catalogue row; the rest by a
+ * model that works beside one (`pictures`, `drafter`) or by a camera model with no row.
+ */
+export type ModelUse = 'chat' | 'tool' | 'asr' | 'tts' | 'embedding' | 'pictures' | 'drafter' | 'camera' | 'faces';
+
+/** The sections the Models page lists, in this order. */
+export const MODEL_SECTIONS = ['conversation', 'listening', 'speaking', 'memory', 'pictures', 'other'] as const;
+export type ModelSection = (typeof MODEL_SECTIONS)[number];
+
+/** A model the Pond has in use that is not a catalogue row: `helpers` of `GET /models/active-roles`. */
+export interface HelperModel {
+  id: string;
+  /** Null when the Pond has no name for it but the job's. */
+  title: string | null;
+  uses: ModelUse[];
+  section: ModelSection;
+  /** The catalogue row it works for, as `{category}/{name}`. */
+  serves: string | null;
 }
 
 export interface ModelCompanion {

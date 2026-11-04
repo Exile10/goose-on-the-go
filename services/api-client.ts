@@ -149,6 +149,7 @@ import type {
   DownloadAction,
   DownloadEntry,
   HfModel,
+  HelperModel,
   HfModelFile,
   ModelRole,
   OnboardCompletion,
@@ -1504,6 +1505,12 @@ export class PondApiClient {
    */
   rollbackModel(): Promise<ModelRollbackResult> {
     return this.post<ModelRollbackResult>('/api/v1/models/rollback', { role: 'chat' });
+  }
+
+  /** The models in use beside the catalogue rows. An older Pond sends none, which reads as none. */
+  async helperModels(): Promise<HelperModel[]> {
+    const roles = await this.get<{ helpers?: HelperModel[] }>('/api/v1/models/active-roles');
+    return Array.isArray(roles?.helpers) ? roles.helpers : [];
   }
 
   /** The chat entry of `GET /models/active-roles`, which `ModelActiveRoles` flattens away. */

@@ -103,6 +103,8 @@ export interface SettingsRowProps {
   value?: string | null;
   /** A control on the right in place of a value, such as a switch. */
   trailing?: ReactNode;
+  /** What a screen reader says for `trailing` when it shows a value, such as badges. */
+  trailingLabel?: string | null;
   /** `next` leads to another page; `menu` opens a list of choices. */
   accessory?: 'next' | 'menu' | 'none';
   /** Under the description: why a change will wait, or why the Pond refused one. */
@@ -127,6 +129,7 @@ export function SettingsRow({
   description,
   value,
   trailing,
+  trailingLabel,
   accessory = 'none',
   note,
   error,
@@ -176,7 +179,7 @@ export function SettingsRow({
       disabled={disabled}
       accessibilityRole={accessibilityRole ?? 'button'}
       accessibilityState={{ disabled, ...accessibilityState }}
-      accessibilityLabel={value ? `${label}, ${value}` : label}
+      accessibilityLabel={[label, value ?? trailingLabel].filter(Boolean).join(', ')}
       accessibilityHint={description ?? undefined}
       // The press shows the instant a finger lands, not when it lifts.
       style={({ pressed }) => (pressed ? { backgroundColor: colors.pressed } : null)}

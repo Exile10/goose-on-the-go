@@ -211,7 +211,7 @@ Android.
 | radioRows, RadioRow | options, value, onChange | A choice with what each option means, one row each |
 | SettingsSlider | value, min, max, step, onCommit | Becomes a drag after 8 px of sideways movement and then tracks 1:1, holding the gesture from the page's scroll; a vertical swipe across it scrolls, a tap sets the value. Drawn as the desktop's pace slider; `InkSlider` reads `locationX` and loses drags to the scroll |
 | SettingsPageScreen | page | Draws one page of `SETTINGS_PAGES` |
-| DownloadRow, ModelRow | download / model | A model's download with its controls, and a model with its size and job |
+| DownloadRow, ModelRow, HelperRow | download / model / helper | A model's download with its controls; a model with its size and an `InkBadge` per job it is doing; a model in use beside the rows (picture support, the camera's detector, a drafter), named by the Pond or by its job. The Models page lists them by section through `sectionsOnPond` |
 | VoicePickerView | voices, current, pace, applying, problem, onChoose, onPace, preview, silentLine | The picker with no store behind it; owner setup drives it with `usePondVoiceSample`, which has the Pond say the sample on its own speaker (P4), and passes `null` on a Pond without that route |
 | VoicePicker | vm | pond-desktop's picker: `VoiceOrb` on an `InkStage` with the voice, its line and play; the accents as a sideways row of `InkChoice` pills; the best six voices as chips with "Show all"; the pace. Previews come from `useVoicePreview`, the line's loudness driving the face |
 | IssuePage, IssueRows, IssueDot | issue, ctx / issues / tone | One entry of `SETTINGS_ISSUES` as a page; the rows for the top of Settings; the dot the row and the You tab carry |

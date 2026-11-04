@@ -1730,7 +1730,13 @@
         "onPond": "On your Pond",
         "getMore": "Get more",
         "facts": "About this model",
-        "actions": "Use it"
+        "actions": "Use it",
+        "conversation": "Conversation",
+        "listening": "Listening",
+        "speaking": "Speaking",
+        "memory": "Memory",
+        "pictures": "Pictures",
+        "other": "Other"
       },
       "footer": {
         "jobs": "Each job is done by one model at a time. Speaking is the voice Goose speaks in.",
@@ -1741,7 +1747,12 @@
         "chat": "Conversation",
         "asr": "Listening",
         "tts": "Speaking",
-        "embedding": "Memory"
+        "embedding": "Memory",
+        "tool": "Tool calls",
+        "pictures": "Pictures",
+        "drafter": "Faster answers",
+        "camera": "Camera",
+        "faces": "Faces"
       },
       "roleHint": {
         "chat": "Answers you",
@@ -1755,6 +1766,7 @@
         "tts": "The voice Goose answers out loud in.",
         "embedding": "The model that lets Goose find what it remembers by meaning, not just by matching words."
       },
+      "serves": "Works with {{name}}",
       "nothing": "Nothing chosen yet",
       "noCandidates": "No model for this job is on your Pond yet.",
       "catalog": "Available to download",
