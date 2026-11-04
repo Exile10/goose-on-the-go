@@ -1,7 +1,7 @@
 /**
  * Owner setup, for a Pond with no screen: who you are and where, how Goose talks, and a model only
  * when the Pond has none. Opened after a claim or a pairing to a Pond that is not set up, and on
- * launch while it is not. It ends in the owner's interview, opened over Home, or on Home itself, which
+ * launch while it is not. It ends in the rooms step, then the owner's interview, opened over Home, or on Home itself, which
  * says whether Goose can answer yet.
  */
 
@@ -44,11 +44,14 @@ export default function OwnerSetupScreen() {
   const back = setup.actions.back;
   const router = useRouter();
 
-  // Home goes underneath, so leaving the interview lands where setup would have.
+  // The rooms step comes next: the Pond answers `/rooms` only now that setup is done. It goes on
+  // to the interview, over Home, when one was started.
   useEffect(() => {
-    if (phase !== 'finished' || !interview) return;
-    router.replace('/(tabs)');
-    router.push({ pathname: '/conversation', params: { session: interview.sessionId, interview: interview.profileId } });
+    if (phase !== 'finished') return;
+    router.replace({
+      pathname: '/(onboarding)/setup-rooms',
+      params: interview ? { session: interview.sessionId, interview: interview.profileId } : {},
+    });
   }, [interview, phase, router]);
 
   // Back is the wizard's own step back; leaving mid-setup would land on a screen that cannot work yet.
@@ -62,8 +65,8 @@ export default function OwnerSetupScreen() {
     }, [phase, index, back]),
   );
 
-  if (setup.phase === 'finished' && interview) return null;
-  if (setup.phase === 'alreadyDone' || setup.phase === 'finished') return <Redirect href="/(tabs)" />;
+  if (setup.phase === 'finished') return null;
+  if (setup.phase === 'alreadyDone') return <Redirect href="/(tabs)" />;
   if (setup.phase === 'unpaired') return <Redirect href="/(onboarding)/welcome" />;
 
   if (setup.phase === 'loading' || setup.phase === 'failed') {

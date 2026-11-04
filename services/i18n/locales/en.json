@@ -2241,6 +2241,50 @@
       "gone": "That room is no longer on your Pond."
     }
   },
+  "setupRooms": {
+    "title": "Your rooms",
+    "lead": "Name the rooms in your home, then put each device in one. Goose uses them when you say “the kitchen lights”.",
+    "done": "Done",
+    "rooms": {
+      "title": "Rooms",
+      "none": "No rooms yet. Add one, or tap a suggestion.",
+      "placeholder": "A room, like Kitchen",
+      "add": "Add",
+      "renameLabel": "Rename {{room}}"
+    },
+    "suggest": {
+      "livingRoom": "Living room",
+      "kitchen": "Kitchen",
+      "bedroom": "Bedroom",
+      "bathroom": "Bathroom",
+      "office": "Office"
+    },
+    "devices": {
+      "title": "Your devices",
+      "loading": "Reading your devices…",
+      "saving": "Saving its room…",
+      "none": "Your Pond has no devices yet. Add some below, or later from the Devices tab."
+    },
+    "found": {
+      "title": "Found nearby",
+      "look": "Look again",
+      "looking": "Looking for devices…",
+      "none": "Nothing new found nearby.",
+      "unavailable": "Your Pond can’t look for devices right now. You can add them later from the Devices tab.",
+      "add": "Add",
+      "codeHint": "Adding a device needs the setup code on it or its box."
+    },
+    "kind": {
+      "light": "Light",
+      "plug": "Plug",
+      "fan": "Fan",
+      "thermostat": "Thermostat",
+      "lock": "Lock",
+      "blind": "Blind",
+      "hub": "Hub",
+      "matter": "Matter device"
+    }
+  },
   "schedule": {
     "tabs": {
       "label": "Show",

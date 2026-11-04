@@ -73,6 +73,7 @@ import type {
   CommissionDeviceResponse,
   CreateDeviceRequest,
   Device,
+  DiscoveredDevice,
   DeviceEvent,
   DeviceSelf,
   MemberNotes,
@@ -939,6 +940,15 @@ export class PondApiClient {
       body: JSON.stringify(req),
       signal: timeoutSignal(COMMISSION_TIMEOUT_MS),
     });
+  }
+
+  /**
+   * `GET /devices/discovered`: what the Pond can see waiting to be added. A Pond from before the
+   * list answers 404; one whose Matter controller is not up answers 502 or 503.
+   */
+  async discoveredDevices(): Promise<DiscoveredDevice[]> {
+    const res = await this.request<{ devices?: DiscoveredDevice[] } | DiscoveredDevice[]>('/api/v1/devices/discovered');
+    return collection<DiscoveredDevice>(res, 'devices');
   }
 
   /** `GET /rooms`. A Pond from before rooms had ids answers 404. */

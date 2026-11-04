@@ -75,6 +75,22 @@ export interface Room {
   created_at?: string;
 }
 
+/**
+ * A device the Pond can see on the network, waiting to be added (`GET /devices/discovered`). Matter
+ * never advertises a setup code, so one of these still needs the code from its box: the entry only
+ * helps match the device in hand to the code.
+ */
+export interface DiscoveredDevice {
+  device_identifier: string;
+  discriminator?: number | null;
+  vendor_id?: number | null;
+  product_id?: number | null;
+  /** Matter's numeric device type, e.g. 0x0101 for a dimmable light. */
+  device_type?: number | null;
+  name?: string | null;
+  addresses?: { ip: string; port: number }[];
+}
+
 /** Fields left out keep their values; `room_id: null` takes the device out of every room. */
 export interface UpdateDeviceRequest {
   name: string;

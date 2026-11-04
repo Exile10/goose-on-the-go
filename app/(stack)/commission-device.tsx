@@ -6,6 +6,9 @@
  *
  * Commissioning is slow — the server allows itself 180 seconds for the radio
  * work — so the screen commits to waiting rather than appearing to hang.
+ *
+ * Opened from setup's rooms step for a device the Pond found, it carries the room chosen there
+ * (`room`, an id) and the name the device gave (`name`), so the device lands where it was put.
  */
 
 import React, { useCallback, useState } from 'react';
@@ -21,7 +24,7 @@ import {
   InkTitle,
   useInkTheme,
 } from '@jarida/ink/native';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 
 import { GIcon } from '@/components/ui/g-icon';
 import { GKeyboardView } from '@/components/ui/g-keyboard-view';
@@ -37,9 +40,10 @@ export default function CommissionDeviceScreen() {
   const theme = useInkTheme();
   const { t } = useTranslation();
   const router = useRouter();
+  const params = useLocalSearchParams<{ room?: string; name?: string }>();
   const { data, error, actions } = useDevices();
   const [code, setCode] = useState('');
-  const [name, setName] = useState('');
+  const [name, setName] = useState(params.name ?? '');
   const [busy, setBusy] = useState(false);
 
   const commissioning = data.matter?.state === 'connecting';
@@ -57,10 +61,10 @@ export default function CommissionDeviceScreen() {
 
   const submit = useCallback(async () => {
     setBusy(true);
-    const id = await actions.commission(code.trim(), name.trim() || undefined);
+    const id = await actions.commission(code.trim(), name.trim() || undefined, params.room || undefined);
     setBusy(false);
     if (id) router.back();
-  }, [actions, code, name, router]);
+  }, [actions, code, name, params.room, router]);
 
   if (busy) {
     return (

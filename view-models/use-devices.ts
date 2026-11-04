@@ -298,7 +298,8 @@ export interface UseDevices {
     setState: (device: Device, patch: DeviceStatePatch) => Promise<void>;
     /** Take back a command still waiting for the Pond. */
     cancel: (deviceId: string) => void;
-    commission: (code: string, name?: string) => Promise<string | null>;
+    /** Adds a Matter device, into `roomId` when one is given. Resolves to its id, or null on failure. */
+    commission: (code: string, name?: string, roomId?: string) => Promise<string | null>;
     remove: (device: Device) => Promise<void>;
     /** Resolves to why some or all of the edits were refused, or null once every one is saved. */
     edit: (edits: DeviceEdit[]) => Promise<string | null>;
@@ -685,10 +686,16 @@ export function useDevices(): UseDevices {
   );
 
   /** Returns the new device's id, or null when commissioning failed. */
-  const commission = useCallback(async (code: string, name?: string) => {
+  const commission = useCallback(async (code: string, name?: string, roomId?: string) => {
     setError(null);
     try {
       const created = await api.commissionDevice({ code, name });
+      if (roomId) {
+        // Added is what matters; a room that did not take is one tap on the Devices tab.
+        await api.updateDevice(created.id, { name: created.name, room_id: roomId }).catch((e: unknown) => {
+          console.warn('[devices] added, but not put in its room', e instanceof ApiError ? e.status : 'network');
+        });
+      }
       const read = await readRooms(api, await api.listDevices());
       // After the read, so a poll that began before it cannot replace this list with an older one.
       listChangedAt.current = Date.now();
