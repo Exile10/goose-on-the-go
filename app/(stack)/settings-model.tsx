@@ -1,6 +1,7 @@
 /**
- * One model: what it is and what it costs, and what can be done with it: give it its job, add
- * picture support, download it, or delete it from the Pond.
+ * One model: what it is and what it costs, what works beside it, and what can be done with it:
+ * give it its job, add picture support, download it, or delete it from the Pond. Whether it is
+ * doing a job is read from the same `roles` the list shows, never from the assignment flag.
  */
 
 import React from 'react';
@@ -8,19 +9,22 @@ import { RefreshControl } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 
-import { askToDownload, DownloadRow } from '@/components/settings/model-rows';
+import { askToDownload, DownloadRow, helperPhrases } from '@/components/settings/model-rows';
 import { SettingsGroup, SettingsHeader, SettingsMessage, SettingsRow } from '@/components/settings/settings-list';
 import { SettingsScroll } from '@/components/settings/settings-scroll';
 import {
   downloadsByModel,
+  fetchedByPond,
   formatBytes,
   formatMegabytes,
+  helpersOf,
   isDownloaded,
   picturesOf,
   pondModelId,
   roleOf,
   titleOf,
   tooBig,
+  usesOf,
 } from '@/models/model-library';
 import { useChoice, useConfirm } from '@/providers/confirm-provider';
 import { tap } from '@/services/haptics';
@@ -47,8 +51,12 @@ export default function ModelScreen() {
   }
 
   const job = t(roleLabelKey(roleOf(model)));
+  const uses = usesOf(model);
+  const working = uses.length > 0;
   const size = formatMegabytes(model.size_mb);
   const downloaded = isDownloaded(model);
+  const builtIn = !downloaded && fetchedByPond(model);
+  const comesWith = helperPhrases(helpersOf(model, lib.helpers), t).join(' · ');
   const pictures = picturesOf(model);
   const download = downloadsByModel(lib.downloads).find((d) => d.modelId === pondModelId(model) && d.status !== 'done' && d.status !== 'cancelled');
   const busy = lib.busy === model.id;
@@ -68,6 +76,7 @@ export default function ModelScreen() {
 
   const facts = [
     { label: t('models.library.facts.job'), value: job },
+    { label: t('models.library.facts.comesWith'), value: comesWith || null },
     { label: t('models.library.facts.size'), value: size },
     { label: t('models.library.facts.memory'), value: formatMegabytes(model.ram_estimate_mb) },
     { label: t('models.library.facts.context'), value: formatContextWindow(model.context_length) },
@@ -86,12 +95,17 @@ export default function ModelScreen() {
       ) : null}
 
       <SettingsGroup title={t('models.library.section.actions')}>
-        {downloaded ? (
+        {working ? (
           <SettingsRow
-            label={model.active ? t('models.library.using', { job }) : t('models.library.use', { job })}
-            action={!model.active}
-            disabled={model.active || busy || !runnable}
-            note={!runnable ? t('models.library.unavailable') : tooBig(model, lib.memory?.budget_mb) ? t('models.library.tooBig') : null}
+            label={t('models.library.using', { job: uses.map((u) => t(roleLabelKey(u))).join(', ') })}
+            note={builtIn ? t('models.library.fetchedByPond') : null}
+          />
+        ) : downloaded || builtIn ? (
+          <SettingsRow
+            label={t('models.library.use', { job })}
+            action
+            disabled={busy || !runnable}
+            note={!runnable ? t('models.library.unavailable') : tooBig(model, lib.memory?.budget_mb) ? t('models.library.tooBig') : builtIn ? t('models.library.fetchedByPond') : null}
             onPress={() => {
               void tap();
               void lib.actions.activate(model);
@@ -121,7 +135,7 @@ export default function ModelScreen() {
             }}
           />
         ) : null}
-        {downloaded ? <SettingsRow label={t('models.library.delete')} destructive disabled={busy || model.active} note={model.active ? t('models.library.inUse') : null} onPress={() => void askDelete()} /> : null}
+        {downloaded ? <SettingsRow label={t('models.library.delete')} destructive disabled={busy || working} note={working ? t('models.library.inUse') : null} onPress={() => void askDelete()} /> : null}
       </SettingsGroup>
 
       <SettingsGroup title={t('models.library.section.facts')}>

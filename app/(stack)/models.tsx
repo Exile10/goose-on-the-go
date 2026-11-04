@@ -146,13 +146,14 @@ export default function ModelsScreen() {
             <SettingsGroup key={section} title={t(sectionLabelKey(section))}>
               {entries.map((entry) =>
                 entry.kind === 'model' ? (
-                  <ModelRow key={entry.model.id} model={entry.model} onPress={() => go('/(stack)/settings-model', { id: entry.model.id })} />
-                ) : (
-                  <HelperRow
-                    key={entry.helper.id}
-                    helper={entry.helper}
-                    servesTitle={entry.helper.serves ? titleFor(entry.helper.serves) : null}
+                  <ModelRow
+                    key={entry.model.id}
+                    model={entry.model}
+                    helpers={entry.helpers}
+                    onPress={() => go('/(stack)/settings-model', { id: entry.model.id })}
                   />
+                ) : (
+                  <HelperRow key={entry.helper.id} helper={entry.helper} onPress={() => go('/(stack)/settings-model-helper', { id: entry.helper.id })} />
                 ),
               )}
             </SettingsGroup>

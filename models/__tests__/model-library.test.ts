@@ -6,9 +6,11 @@
 import {
   candidatesFor,
   downloadsByModel,
+  fetchedByPond,
   formatBytes,
   formatMegabytes,
   fractionDone,
+  helpersOf,
   holderOf,
   pondModelId,
   recommendations,
@@ -58,6 +60,14 @@ describe('jobs', () => {
     expect(candidatesFor(models, 'chat').map((m) => m.name)).toEqual(['here']);
   });
 
+  it('offers a memory model the Pond fetches itself, which never has a file to download', () => {
+    const builtIn = model({ category: 'embedding', name: 'all-MiniLM-L6-v2', downloaded: false, acquire: 'external' });
+    const fetched = model({ category: 'embedding', name: 'gemma-embed', downloaded: false, acquire: 'download' });
+    expect(fetchedByPond(builtIn)).toBe(true);
+    expect(fetchedByPond(fetched)).toBe(false);
+    expect(candidatesFor([builtIn, fetched], 'embedding').map((m) => m.name)).toEqual(['all-MiniLM-L6-v2']);
+  });
+
   it('goes back only to a model that is still on the Pond and not already doing the job', () => {
     const models = [
       model({ name: 'now', active: true }),
@@ -88,6 +98,8 @@ describe('jobs', () => {
       model({ name: 'b', recommended: { rank: 'alternative', reason: '' } }),
       model({ name: 'a', recommended: { rank: 'primary', reason: '' } }),
       model({ name: 'c', active: true, recommended: { rank: 'primary', reason: '' } }),
+      // The Pond's roles decide, not the assignment flag.
+      model({ name: 'd', active: false, roles: ['chat'], recommended: { rank: 'primary', reason: '' } }),
     ];
     expect(recommendations(models).map((m) => m.name)).toEqual(['a', 'b']);
   });
@@ -189,11 +201,38 @@ describe('sections', () => {
         model({ category: 'tts', name: 'af_heart', section: 'speaking', roles: ['tts'] }),
         model({ category: 'gguf', name: 'tool', section: 'other', roles: ['tool'] }),
       ],
-      [helper({ id: 'gguf/e4b#pictures', serves: 'gguf/e4b' })],
+      [helper({ id: 'camera_detector', title: 'YOLOX-Nano', uses: ['camera'] })],
     );
     expect(groups.map((g) => g.section)).toEqual(['conversation', 'listening', 'speaking', 'pictures', 'other']);
     expect(groups[0].entries.map((e) => (e.kind === 'model' ? e.model.name : e.helper.id))).toEqual(['e4b', 'e2b']);
-    expect(groups[3].entries).toEqual([{ kind: 'helper', helper: helper({ id: 'gguf/e4b#pictures', serves: 'gguf/e4b' }) }]);
+    expect(groups[3].entries).toEqual([{ kind: 'helper', helper: helper({ id: 'camera_detector', title: 'YOLOX-Nano', uses: ['camera'] }) }]);
+  });
+
+  it('folds a picture encoder and a drafter into the model they serve, not rows of their own', () => {
+    const encoder = helper({ id: 'gguf/e4b#pictures', serves: 'gguf/e4b' });
+    const drafter = helper({ id: 'mtp-gemma-4-E4B-it', uses: ['drafter'], section: 'other', serves: 'gguf/e4b' });
+    const faces = helper({ id: 'face_recognition', uses: ['faces'] });
+    const groups = sectionsOnPond(
+      [model({ name: 'e4b', section: 'conversation', roles: ['chat'] }), model({ name: 'e2b', section: 'conversation', roles: [] })],
+      [encoder, drafter, faces],
+    );
+    expect(groups.map((g) => g.section)).toEqual(['conversation', 'pictures']);
+    expect(groups[0].entries).toEqual([
+      { kind: 'model', model: expect.objectContaining({ name: 'e4b' }), helpers: [encoder, drafter] },
+      { kind: 'model', model: expect.objectContaining({ name: 'e2b' }), helpers: [] },
+    ]);
+    expect(groups[1].entries).toEqual([{ kind: 'helper', helper: faces }]);
+  });
+
+  it('lists a helper alone when the model it serves is not listed', () => {
+    const encoder = helper({ id: 'gguf/gone#pictures', serves: 'gguf/gone' });
+    expect(sectionsOnPond([], [encoder])).toEqual([{ section: 'pictures', entries: [{ kind: 'helper', helper: encoder }] }]);
+  });
+
+  it('finds the helpers that serve a model by the Pond’s id for it', () => {
+    const encoder = helper({ id: 'enc', serves: 'tts_kokoro/af_heart' });
+    expect(helpersOf(model({ category: 'tts', pond_category: 'tts_kokoro', name: 'af_heart' }), [encoder])).toEqual([encoder]);
+    expect(helpersOf(model({ name: 'other' }), [encoder])).toEqual([]);
   });
 
   it('shows the memory model in use though the Pond fetched it itself and lists no file', () => {

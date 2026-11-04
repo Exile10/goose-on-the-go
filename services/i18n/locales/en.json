@@ -1735,7 +1735,7 @@
         "listening": "Listening",
         "speaking": "Speaking",
         "memory": "Memory",
-        "pictures": "Pictures",
+        "pictures": "Camera and faces",
         "other": "Other"
       },
       "footer": {
@@ -1766,7 +1766,22 @@
         "tts": "The voice Goose answers out loud in.",
         "embedding": "The model that lets Goose find what it remembers by meaning, not just by matching words."
       },
-      "serves": "Works with {{name}}",
+      "included": {
+        "pictures": "Pictures included",
+        "drafter": "Faster answers"
+      },
+      "helperAbout": {
+        "pictures": "Lets the conversation model read the pictures you send it.",
+        "drafter": "A small model that guesses ahead, so the conversation model answers faster.",
+        "camera": "Spots people, animals and things in your cameras' pictures.",
+        "faces": "Recognises the faces of the people your household has named."
+      },
+      "usedBy": {
+        "conversation": "The conversation model",
+        "camera": "Your cameras, and the camera events and automations that watch them",
+        "faces": "Camera events, to say who is there"
+      },
+      "fetchedByPond": "Built in. Your Pond fetches it itself, so there is nothing to download.",
       "nothing": "Nothing chosen yet",
       "noCandidates": "No model for this job is on your Pond yet.",
       "catalog": "Available to download",
@@ -1820,7 +1835,9 @@
         "context": "Memory window",
         "engine": "Runs on",
         "quantization": "Precision",
-        "job": "Job"
+        "job": "Job",
+        "comesWith": "Comes with",
+        "usedBy": "Used by"
       },
       "switchBack": "Switch back to {{name}}",
       "switchBackHint": "The model that had this job before the last change."
