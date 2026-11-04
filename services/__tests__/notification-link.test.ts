@@ -127,6 +127,16 @@ describe('openRouteFromData', () => {
     expect(openRouteFromData({ open: 'schedule', schedule_id: 'x'.repeat(129) })).toEqual({ open: 'schedule' });
   });
 
+  it('opens the conversation a Pond chat hint names, and the wall without a usable one', () => {
+    expect(openRouteFromData({ open: 'chat', session_id: RUN, long_task_id: 't-1' })).toEqual({
+      open: 'conversation',
+      sessionId: RUN,
+    });
+    expect(openRouteFromData({ open: 'chat', session_id: '../settings' })).toEqual({ open: 'chat' });
+    expect(openRouteFromData({ open: 'chat', session_id: '' })).toEqual({ open: 'chat' });
+    expect(openRouteFromData({ open: 'chat', session_id: 42 })).toEqual({ open: 'chat' });
+  });
+
   it('reads the conversation a finished reply names, and lands on the wall without one', () => {
     expect(openRouteFromData({ open: 'conversation', session_id: RUN })).toEqual({ open: 'conversation', sessionId: RUN });
     expect(openRouteFromData({ open: 'conversation', session_id: '../settings' })).toEqual({ open: 'chat' });

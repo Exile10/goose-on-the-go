@@ -61,6 +61,17 @@ place: `giap-alerts` was named "Security alerts" and also carried `action_requir
 2026-11-04. The names and descriptions are in `notifications.channels` in
 `services/i18n/locales/en.json`.
 
+## What a tap opens
+
+`services/notification-link.ts` reads the Pond's `open` hint against an allow-list, and
+`openTapped` in `services/local-notifications.ts` acts on it. The contract is "Route hints" in the
+Pond's `docs/architecture/notifications.md`. A `chat` hint with a `session_id` (a long task done,
+an agent's run, a suggestion from a reminder) becomes the `conversation` route the phone's own
+reply notice uses. Before opening it, the tap asks the Pond for that conversation
+(`GET /sessions/{id}/messages?limit=1`): a 404 (deleted, or another member's) opens the chat tab
+instead, and any other failure opens the conversation, which says itself why it cannot load. A
+missing or malformed id opens the chat tab, as every `chat` hint did before 2026-11-04.
+
 ## Push wake-up
 
 The Pond sends FCM a **data-only** message at high priority, `{ notification_id, category,

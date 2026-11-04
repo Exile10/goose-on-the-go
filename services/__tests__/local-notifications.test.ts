@@ -9,6 +9,19 @@ import { presentLocally, watchLinkTaps } from '@/services/local-notifications';
 
 const mockPush = jest.fn();
 const mockSchedule = jest.fn().mockResolvedValue('id');
+const mockSessionMessages = jest.fn().mockResolvedValue([]);
+jest.mock('@/services/api-client', () => {
+  class ApiError extends Error {
+    readonly status: number;
+    constructor(mockStatus: number) {
+      super(`HTTP ${mockStatus}`);
+      this.status = mockStatus;
+    }
+  }
+  return { ApiError, api: { listSessionMessages: (...args: unknown[]) => mockSessionMessages(...args) } };
+});
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const { ApiError: MockApiError } = require('@/services/api-client');
 jest.mock('expo-router', () => ({ router: { push: (...args: unknown[]) => mockPush(...args) } }));
 
 let mockListener: ((response: unknown) => void) | null = null;
@@ -26,6 +39,9 @@ jest.mock('@/services/notifications-module', () => ({
 }));
 
 let next = 0;
+
+/** Let the tap's check of the conversation settle. */
+const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 /** Tap a notification carrying `data`, under an identifier no earlier tap used. */
 function tap(data: Record<string, unknown>, identifier = `n-${next++}`): void {
@@ -85,9 +101,31 @@ describe('openTapped', () => {
     open.mockRestore();
   });
 
-  it('opens the conversation a finished reply names', () => {
+  it('opens the conversation a finished reply names', async () => {
     tap({ id: 'reply-r1', category: 'reply', open: 'conversation', session_id: 's-1' });
+    await settle();
     expect(mockPush).toHaveBeenCalledWith({ pathname: '/conversation', params: { session: 's-1' } });
+  });
+
+  it('opens the conversation a long task was started from', async () => {
+    tap({ id: 'long-task-t1', category: 'info', open: 'chat', session_id: 'sess-embassies', long_task_id: 't1' });
+    await settle();
+    expect(mockSessionMessages).toHaveBeenLastCalledWith('sess-embassies', 1);
+    expect(mockPush).toHaveBeenCalledWith({ pathname: '/conversation', params: { session: 'sess-embassies' } });
+  });
+
+  it('opens the chat wall when the Pond has no such conversation for this phone', async () => {
+    mockSessionMessages.mockRejectedValueOnce(new MockApiError(404));
+    tap({ open: 'chat', session_id: 'sess-deleted', proposal_id: 'p-1' });
+    await settle();
+    expect(mockPush.mock.calls).toEqual([['/(tabs)/chat']]);
+  });
+
+  it('still opens the conversation when the Pond cannot be asked', async () => {
+    mockSessionMessages.mockRejectedValueOnce(new TypeError('Network request failed'));
+    tap({ open: 'chat', session_id: 'sess-1' });
+    await settle();
+    expect(mockPush).toHaveBeenCalledWith({ pathname: '/conversation', params: { session: 'sess-1' } });
   });
 
   it('acts on one tap once, however many times it is delivered', () => {

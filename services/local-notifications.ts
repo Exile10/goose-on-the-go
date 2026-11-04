@@ -24,9 +24,10 @@ import { Linking, Platform } from 'react-native';
 
 import { router } from 'expo-router';
 
+import { api, ApiError } from './api-client';
 import i18n from './i18n';
 
-import { linkFromData, openRouteFromData, rideOfferFromData, screenPath } from './notification-link';
+import { linkFromData, openRouteFromData, rideOfferFromData, screenPath, type OpenRoute } from './notification-link';
 import type { ServerNotification } from './notification-stream';
 
 /**
@@ -272,14 +273,40 @@ function openTapped(Notifications: NotificationsModule, response: NotificationRe
     return;
   }
   const route = openRouteFromData(data);
-  if (route) router.push(screenPath(route));
+  if (!route) return;
+  if (route.open !== 'conversation') {
+    router.push(screenPath(route));
+    return;
+  }
+  void conversationOrWall(route).then((opened) => router.push(screenPath(opened)));
+}
+
+/**
+ * The conversation a tap names, or the chat wall when the Pond says there is no such
+ * conversation for this phone: deleted since, or another member's, which the Pond answers as
+ * missing too. Any other failure (the Pond out of reach, the app still connecting) opens the
+ * conversation, which says itself why it cannot load and keeps what it had, as before this check.
+ */
+async function conversationOrWall(route: Extract<OpenRoute, { open: 'conversation' }>): Promise<OpenRoute> {
+  try {
+    await api.listSessionMessages(route.sessionId, 1);
+    return route;
+  } catch (e) {
+    if (e instanceof ApiError && e.status === 404) {
+      console.info('[notifications] the conversation a notice named is not there; opening chat', {
+        kind: 'notification_open_fallback',
+      });
+      return { open: 'chat' };
+    }
+    return route;
+  }
 }
 
 /**
  * Open ride and directions links, the ride screen for a ride offer, and the
  * screen the Pond names (schedules, devices, chat, models, extensions or remote
- * access), or the conversation a reply notice names, when their notification is
- * tapped, including the tap that launched the app.
+ * access), or the conversation a Pond notice or a reply notice names, when
+ * their notification is tapped, including the tap that launched the app.
  * Returns the unsubscribe.
  */
 export function watchLinkTaps(): () => void {
