@@ -29,6 +29,38 @@ keeps a notice from being shown twice:
 the stream's `ServerNotification` shape (`id`, `target`, `category`, `title`, `body`, optional
 `data`). An item without an id, title and body is logged and skipped.
 
+## Which notices pop up (2026-11-04)
+
+`services/local-notifications.ts` decides, per category, in its `CHANNELS` table. On Android the
+channel decides whether a notice may pop up as a heads-up banner; only a HIGH-importance channel
+does.
+
+| Category | Channel | Importance | Notices |
+|---|---|---|---|
+| `alert` | `giap-alerts`, "Alerts" | HIGH, with vibration | a failed pairing, a failed run, low disk, remote access down, a device removed |
+| `action_required` | `giap-requests`, "Suggestions and questions" | HIGH | suggestions and reminders, a missed run to answer, a sign-in to redo |
+| `info`, and any category this app does not know | `giap-info-v2`, "Updates" | HIGH | schedule results, a long task done, a device paired, a model downloaded |
+| `reply` (the phone's own) | `giap-replies`, "Replies" | DEFAULT | a reply that finished while nobody was reading it; waits in the shade |
+
+**Why only some popped up before.** The handler that presents a notice while the app is in the
+foreground answered `shouldPlaySound: false` for every notice. expo-notifications then posts the
+notification silent (`setSilent`, in its `ExpoNotificationBuilder`), and Android never pops up a
+silent notification, whatever the channel. A notice presented while the app was in the
+background, where the handler is not consulted, popped up; one that arrived over the stream or the
+pending fetch while the app was open landed silently in the shade. That is why a Daily Brief that
+arrived by push wake-up popped up and a suggestion that arrived while the app was open did not.
+The handler now lets a notice sound exactly when its channel pops up, so the channel decides in
+both cases. Its sound is the channel's, which the phone's settings can turn off while keeping the
+pop-up.
+
+**Changing a channel.** Android keeps a channel's importance once created; the user owns it from
+then on. A category whose importance changes needs a new channel id, and the old id goes in
+`RETIRED_CHANNELS`, which is deleted on every start (deleting a channel that does not exist is a
+no-op). `giap-info` (DEFAULT) is retired that way. A channel's name and description can change in
+place: `giap-alerts` was named "Security alerts" and also carried `action_required` until
+2026-11-04. The names and descriptions are in `notifications.channels` in
+`services/i18n/locales/en.json`.
+
 ## Push wake-up
 
 The Pond sends FCM a **data-only** message at high priority, `{ notification_id, category,

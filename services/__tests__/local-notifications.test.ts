@@ -141,7 +141,7 @@ describe('presentLocally', () => {
 });
 
 // Android shows a heads-up banner only for a HIGH-importance channel, and never raises the
-// importance of a channel that already exists, so Updates moved to a new id.
+// importance of a channel that already exists, so a change of importance needs a new id.
 describe('notification channels', () => {
   // The tap tests above already loaded the module-level mock of notifications-module, and an
   // isolated require reuses a cached mock before it consults a fresh doMock factory.
@@ -151,49 +151,90 @@ describe('notification channels', () => {
     jest.restoreAllMocks();
   });
 
-  function configureOnAndroid() {
-    const setNotificationChannelAsync = jest.fn(async () => null);
-    const deleteNotificationChannelAsync = jest.fn(async () => undefined);
+  type Handler = { handleNotification: (n: unknown) => Promise<{ shouldPlaySound: boolean; shouldShowBanner: boolean }> };
+
+  function configureOn(os: 'android' | 'ios') {
+    const setNotificationChannelAsync = jest.fn(async (_id: string, _channel: unknown) => null);
+    const deleteNotificationChannelAsync = jest.fn(async (_id: string) => undefined);
+    const setNotificationHandler = jest.fn((_handler: Handler) => undefined);
     const fake = {
       AndroidImportance: { DEFAULT: 3, HIGH: 4 },
-      setNotificationHandler: jest.fn(),
+      setNotificationHandler,
       setNotificationChannelAsync,
       deleteNotificationChannelAsync,
+      scheduleNotificationAsync: jest.fn(async () => 'id'),
     };
     let configure: () => Promise<void> = async () => undefined;
+    let present: (n: unknown) => Promise<void> = async () => undefined;
     jest.isolateModules(() => {
-      jest.doMock('react-native', () => ({ Platform: { OS: 'android' }, Linking: { openURL: jest.fn() } }));
+      jest.doMock('react-native', () => ({ Platform: { OS: os }, Linking: { openURL: jest.fn() } }));
       jest.doMock('expo-router', () => ({ router: { push: jest.fn() } }));
       jest.doMock('@/services/notifications-module', () => ({ notifications: fake }));
       // eslint-disable-next-line @typescript-eslint/no-require-imports
-      ({ configureLocalNotifications: configure } = require('@/services/local-notifications'));
+      ({ configureLocalNotifications: configure, presentLocally: present } = require('@/services/local-notifications'));
     });
-    return { configure, setNotificationChannelAsync, deleteNotificationChannelAsync };
+    const handler = async (category: unknown) => {
+      await configure();
+      const installed = setNotificationHandler.mock.calls[0][0];
+      return installed.handleNotification({ request: { content: { data: { category } } } });
+    };
+    return { configure, present, handler, fake, setNotificationChannelAsync, deleteNotificationChannelAsync };
   }
 
-  it('creates Updates at HIGH importance under its new id', async () => {
-    const { configure, setNotificationChannelAsync } = configureOnAndroid();
+  function channel(calls: unknown[][], id: string) {
+    return calls.find(([channelId]) => channelId === id)?.[1];
+  }
+
+  it('pops up alerts, requests and updates, and keeps replies in the shade', async () => {
+    const { configure, setNotificationChannelAsync } = configureOn('android');
     await configure();
-    expect(setNotificationChannelAsync).toHaveBeenCalledWith('giap-info-v2', {
-      name: 'Updates',
+    const calls = setNotificationChannelAsync.mock.calls;
+    expect(channel(calls, 'giap-alerts')).toEqual({
+      name: 'Alerts',
+      description: expect.any(String),
+      importance: 4,
+      vibrationPattern: [0, 250, 250, 250],
+    });
+    expect(channel(calls, 'giap-requests')).toEqual({
+      name: 'Suggestions and questions',
+      description: expect.any(String),
       importance: 4,
     });
-    expect(setNotificationChannelAsync).toHaveBeenCalledWith(
-      'giap-alerts',
-      expect.objectContaining({ importance: 4 }),
-    );
-    expect(setNotificationChannelAsync).not.toHaveBeenCalledWith('giap-info', expect.anything());
-  });
-
-  it('gives replies their own channel, so they can be quieted apart from alerts', async () => {
-    const { configure, setNotificationChannelAsync } = configureOnAndroid();
-    await configure();
-    expect(setNotificationChannelAsync).toHaveBeenCalledWith('giap-replies', { name: 'Replies', importance: 3 });
+    expect(channel(calls, 'giap-info-v2')).toEqual({ name: 'Updates', description: expect.any(String), importance: 4 });
+    expect(channel(calls, 'giap-replies')).toEqual({ name: 'Replies', description: expect.any(String), importance: 3 });
+    expect(channel(calls, 'giap-info')).toBeUndefined();
   });
 
   it('deletes the old DEFAULT-importance Updates channel', async () => {
-    const { configure, deleteNotificationChannelAsync } = configureOnAndroid();
+    const { configure, deleteNotificationChannelAsync } = configureOn('android');
     await configure();
     expect(deleteNotificationChannelAsync).toHaveBeenCalledWith('giap-info');
+  });
+
+  it('posts each category on its own channel, and an unknown one as an update', async () => {
+    const { present, fake } = configureOn('android');
+    const base = { target: 'broadcast', title: 't', body: 'b', timestamp: '2026-11-04T08:00:00Z' };
+    for (const [id, category] of [['1', 'alert'], ['2', 'action_required'], ['3', 'info'], ['4', 'reply'], ['5', 'news'], ['6', 'toString']]) {
+      await present({ ...base, id, category });
+    }
+    const channels = fake.scheduleNotificationAsync.mock.calls.map((c: unknown[]) => (c[0] as { trigger: { channelId: string } }).trigger.channelId);
+    expect(channels).toEqual(['giap-alerts', 'giap-requests', 'giap-info-v2', 'giap-replies', 'giap-info-v2', 'giap-info-v2']);
+  });
+
+  // With the app open, a notice is popped up only if the handler lets it sound: Android never
+  // pops up a notification expo-notifications posted silent, whatever its channel.
+  it('lets every notice that pops up sound while the app is open, and keeps a reply quiet', async () => {
+    const { handler } = configureOn('android');
+    for (const category of ['alert', 'action_required', 'info', 'news', undefined]) {
+      expect(await handler(category)).toMatchObject({ shouldPlaySound: true, shouldShowBanner: true });
+    }
+    expect(await handler('reply')).toMatchObject({ shouldPlaySound: false });
+  });
+
+  it('creates no channels on iOS', async () => {
+    const { configure, setNotificationChannelAsync, deleteNotificationChannelAsync } = configureOn('ios');
+    await configure();
+    expect(setNotificationChannelAsync).not.toHaveBeenCalled();
+    expect(deleteNotificationChannelAsync).not.toHaveBeenCalled();
   });
 });
