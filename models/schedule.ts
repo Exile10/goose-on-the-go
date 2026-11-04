@@ -413,6 +413,11 @@ export function promptOf(schedule: Schedule): string | null {
   return schedule.kind.type === 'agent_prompt' ? schedule.kind.prompt : null;
 }
 
+/** Whose private reminder this is, as a profile id, or null when it is not private. */
+export function privateOwner(schedule: Schedule): string | null {
+  return schedule.kind.type === 'member_reminder' ? schedule.kind.profile_id : null;
+}
+
 /** A routine's devices as the form holds them, or null when it is not a routine. */
 export function routineDevices(schedule: Schedule): Record<string, boolean> | null {
   if (schedule.kind.type !== 'routine') return null;

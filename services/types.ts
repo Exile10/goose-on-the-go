@@ -665,6 +665,11 @@ export type TaskKind =
   | { type: 'webhook'; webhook_url: string }
   /** A fixed list of actions the Pond runs itself, without Goose: a morning routine. */
   | { type: 'routine'; actions: TriggerAction[] }
+  /**
+   * A reminder one person set for themselves, by voice. It runs as them and goes only to their
+   * phones. Lists always carry an empty `prompt`, because the Pond cannot tell who is asking.
+   */
+  | { type: 'member_reminder'; profile_id: string; prompt: string }
   | {
       type: 'sensor_trigger';
       source: TriggerSource;
