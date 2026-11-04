@@ -19,6 +19,12 @@ export interface Device {
   name: string;
   device_type?: string;
   hostname?: string;
+  /** The room it is in, one of `GET /rooms`; null or absent when it is in none. */
+  room_id?: string | null;
+  /**
+   * A Pond from before rooms had ids named a device's room in free text. Read only to show those
+   * rooms; nothing writes it.
+   */
   room?: string;
   is_online: boolean;
   last_seen?: string;
@@ -59,10 +65,21 @@ export interface CreateDeviceRequest {
  * it. The Pond refuses a blank name with 400, and a paired phone's row for any caller but that
  * phone or the host with 403 `device_not_yours`.
  */
+/**
+ * A room the household named (`GET /rooms`). It lasts on its own, so it can be made before any
+ * device is in it; the Pond refuses to delete one that still has devices.
+ */
+export interface Room {
+  id: string;
+  name: string;
+  created_at?: string;
+}
+
+/** Fields left out keep their values; `room_id: null` takes the device out of every room. */
 export interface UpdateDeviceRequest {
   name: string;
   hostname?: string;
-  room?: string;
+  room_id?: string | null;
 }
 
 export interface CommissionDeviceRequest {

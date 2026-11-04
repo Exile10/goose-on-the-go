@@ -2213,10 +2213,11 @@
   "rooms": {
     "add": "Add a room",
     "pairDevice": "Pair another Pond",
-    "footer": "A room is the name its devices share. Add one by moving devices into it; delete one and its devices move to Unassigned.",
+    "footer": "Delete a room and its devices move to Unassigned. The devices themselves stay.",
+    "readOnly": "Update your Pond to add, rename or delete rooms. Until then, these are the rooms your devices name.",
     "deviceCount_one": "{{count}} device",
     "deviceCount_other": "{{count}} devices",
-    "noDevices": "No devices yet. Rooms appear here once devices are in them.",
+    "noDevices": "No rooms yet. Add one, then put devices in it from the Devices tab.",
     "deleteTitle": "Delete {{room}}?",
     "deleteBody_one": "Its {{count}} device moves to Unassigned. The device itself is not removed.",
     "deleteBody_other": "Its {{count}} devices move to Unassigned. The devices themselves are not removed.",
@@ -2226,8 +2227,8 @@
     "renameTitle": "Rename room",
     "name": "Room name",
     "namePlaceholder": "Kitchen",
-    "addHint": "Your Pond keeps a room only while a device is in it, so choose at least one device to move into this room.",
-    "renameHint": "Every device in this room moves to the new name. A name another room already has merges the two.",
+    "addHint": "Choose any devices to move into it now, or leave it empty for later.",
+    "renameHint": "Its devices stay in it.",
     "deviceInRoom": "{{device}} ({{room}})",
     "create": "Create room",
     "save": "Save",
@@ -2235,7 +2236,9 @@
     "pondAddress": "Address",
     "errors": {
       "nameRequired": "Give the room a name.",
-      "pickDevice": "Choose at least one device to move into this room."
+      "nameTaken": "There’s already a room called {{room}}.",
+      "notEmpty": "This room still has devices in it. Move them out, then try again.",
+      "gone": "That room is no longer on your Pond."
     }
   },
   "schedule": {
@@ -3103,7 +3106,8 @@
     "namePlaceholder": "Desk lamp",
     "room": "Room",
     "roomPlaceholder": "No room",
-    "roomHint": "Type a new room, or pick one your devices are already in.",
+    "roomHint": "Pick a room, or type a new one.",
+    "roomReadOnly": "Update your Pond to change a device’s room.",
     "save": "Save"
   },
   "reminders": {

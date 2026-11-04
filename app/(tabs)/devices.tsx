@@ -129,12 +129,11 @@ export default function DevicesTab() {
   const chrome = useChromeScroll();
   const bottomInset = useBottomBarInset();
 
+  // A room with nothing in it has nothing to switch here; Home management is where it is kept.
+  const occupiedRooms = useMemo(() => data.rooms.filter((r) => r.devices.length > 0), [data.rooms]);
   const visibleRooms = useMemo(
-    () =>
-      activeRoom === ALL_ROOMS
-        ? data.rooms
-        : data.rooms.filter((r) => r.name === activeRoom),
-    [activeRoom, data.rooms],
+    () => (activeRoom === ALL_ROOMS ? occupiedRooms : occupiedRooms.filter((r) => r.id === activeRoom)),
+    [activeRoom, occupiedRooms],
   );
 
   const handleToggle = useCallback(
@@ -162,7 +161,7 @@ export default function DevicesTab() {
   }, []);
 
   const namedRooms = useMemo(
-    () => data.rooms.map((r) => r.name).filter((name) => name !== UNASSIGNED_ROOM),
+    () => data.rooms.filter((r) => r.id !== UNASSIGNED_ROOM).map((r) => ({ id: r.id, name: r.name })),
     [data.rooms],
   );
 
@@ -215,8 +214,8 @@ export default function DevicesTab() {
 
       {/* Room tabs, derived from the rooms devices are actually in. The
           view-model returns none when there is only one room to show. A tab
-          is a room id, not a name: "All" and "Unassigned" are ids, and
-          `roomLabel` is what turns any of them into words. */}
+          is a room id, not a name: "All" and "Unassigned" are ids too, and
+          each comes with its words. */}
       {data.roomTabs.length > 0 ? (
         <ScrollView
           horizontal
@@ -226,13 +225,13 @@ export default function DevicesTab() {
         >
           {data.roomTabs.map((tab) => (
             <InkChoice
-              key={tab}
+              key={tab.id}
               role="radio"
               shape="pill"
-              selected={activeRoom === tab}
-              onSelect={() => pickRoom(tab)}
+              selected={activeRoom === tab.id}
+              onSelect={() => pickRoom(tab.id)}
             >
-              {roomLabel(tab)}
+              {tab.label}
             </InkChoice>
           ))}
         </ScrollView>
@@ -314,9 +313,9 @@ export default function DevicesTab() {
         ) : null}
 
         {visibleRooms.map((room) => (
-          <View key={room.name} style={styles.roomSection}>
+          <View key={room.id} style={styles.roomSection}>
             {/* One room needs no heading — the screen is already that room. */}
-            {data.rooms.length > 1 ? <InkTitle level={3}>{roomLabel(room.name)}</InkTitle> : null}
+            {occupiedRooms.length > 1 ? <InkTitle level={3}>{roomLabel(room)}</InkTitle> : null}
             <View style={styles.grid}>
               {room.devices.map((d) => (
                 <DeviceCard
@@ -339,8 +338,10 @@ export default function DevicesTab() {
           key={editing.id}
           device={editing}
           rooms={namedRooms}
+          roomsEditable={data.roomsEditable}
           onClose={() => setEditing(null)}
           onSave={actions.edit}
+          roomNamed={actions.roomNamed}
         />
       ) : null}
     </SafeAreaView>

@@ -1,10 +1,8 @@
 /**
- * RoomSheet — a new name for a room, or a new room and the devices that go into it.
+ * RoomSheet — a new name for a room, or a new room and any devices that go into it.
  *
- * The Pond keeps no list of rooms: a room is the `room` field its devices share. So renaming one
- * renames it on each of its devices, and a new room needs at least one device moved into it, or
- * there would be nothing to hold its name. The sheet says so, rather than offering an empty room
- * that would vanish on the next read.
+ * A room is a record of its own on the Pond, so renaming one leaves its devices in it, and a new
+ * room may start empty. Two rooms may not share a name, as a person reads names.
  */
 
 import React, { useState } from 'react';
@@ -16,25 +14,32 @@ import { LabelledCheckbox } from '@/components/patterns/labelled-checkbox';
 import { confirm, reject } from '@/services/haptics';
 import type { Device } from '@/services/types';
 import { Spacing } from '@/constants/spacing';
-import { roomLabel, roomOf, type DeviceEdit } from '@/view-models/use-devices';
-import { moveIntoRoom, renameRoom } from '@/view-models/rooms';
+import { roomLabel, roomOf, type DeviceRoom } from '@/view-models/use-devices';
 
 export interface RoomSheetProps {
   /** Every device the Pond lists. */
   devices: Device[];
+  /** Every room, to say which one each device is in now. */
+  rooms: DeviceRoom[];
   /** The room being renamed, or null to make a new one. The screen keys the sheet on it. */
-  room: string | null;
+  room: DeviceRoom | null;
   onClose: () => void;
-  /** Resolves to why the Pond refused some of it, or null once every device is moved. */
-  onSave: (edits: DeviceEdit[]) => Promise<string | null>;
+  /** Each resolves to why the Pond refused it, or null once it is done. */
+  onCreate: (name: string, deviceIds: ReadonlySet<string>) => Promise<string | null>;
+  onRename: (room: DeviceRoom, name: string) => Promise<string | null>;
 }
 
-export function RoomSheet({ devices, room, onClose, onSave }: RoomSheetProps) {
+export function RoomSheet({ devices, rooms, room, onClose, onCreate, onRename }: RoomSheetProps) {
   const { t } = useTranslation();
-  const [name, setName] = useState(room ?? '');
+  const [name, setName] = useState(room?.name ?? '');
   const [chosen, setChosen] = useState<ReadonlySet<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  const inRoom = (d: Device) => {
+    const id = roomOf(d, rooms);
+    return roomLabel(rooms.find((r) => r.id === id) ?? { id, name: '' });
+  };
 
   const fail = (message: string) => {
     void reject();
@@ -52,11 +57,9 @@ export function RoomSheet({ devices, room, onClose, onSave }: RoomSheetProps) {
 
   const submit = async () => {
     if (!name.trim()) return fail(t('rooms.errors.nameRequired'));
-    if (room === null && chosen.size === 0) return fail(t('rooms.errors.pickDevice'));
-    const edits = room === null ? moveIntoRoom(devices, chosen, name) : renameRoom(devices, room, name);
     setError(null);
     setSubmitting(true);
-    const refused = await onSave(edits);
+    const refused = room === null ? await onCreate(name, chosen) : await onRename(room, name);
     setSubmitting(false);
     if (refused) return fail(refused);
     void confirm();
@@ -78,7 +81,7 @@ export function RoomSheet({ devices, room, onClose, onSave }: RoomSheetProps) {
                 key={d.id}
                 checked={chosen.has(d.id)}
                 onChange={(on) => choose(d.id, on)}
-                label={t('rooms.deviceInRoom', { device: d.name, room: roomLabel(roomOf(d)) })}
+                label={t('rooms.deviceInRoom', { device: d.name, room: inRoom(d) })}
               />
             ))}
           </View>

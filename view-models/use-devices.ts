@@ -15,10 +15,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { useServer } from '@/providers/server-provider';
 import { ApiError, api, type PondApiClient } from '@/services/api-client';
-import type { Device, DeviceEvent, DeviceStatePatch, MatterStatus, UpdateDeviceRequest } from '@/services/types';
+import type { Device, DeviceEvent, DeviceStatePatch, MatterStatus, Room, UpdateDeviceRequest } from '@/services/types';
 import { ago } from '@/models/elapsed';
 import { COMMAND_MAX_WAIT_MS, commandKey, enqueue, sortWaiting, type WaitingCommand } from './command-queue';
 import { describeApiError, logFailure } from './describe-error';
+import { moveIntoRoom, unassignRoom } from './rooms';
 import { useLive } from './use-live';
 import { useScreenActive } from './use-screen-active';
 import i18n from '@/services/i18n';
@@ -55,16 +56,39 @@ export const UNASSIGNED_ROOM = 'room.unassigned';
 /** The tab shown before any room is chosen. An id, for the same reasons. */
 export const ALL_ROOMS = 'room.all';
 
-/** What a room is called on screen: the app's own buckets as copy, a household's rooms as named. */
-export function roomLabel(name: string): string {
-  if (name === UNASSIGNED_ROOM) return i18n.t('devices.roomUnassigned');
-  if (name === ALL_ROOMS) return i18n.t('devices.roomAll');
-  return name;
-}
-
+/** One room as the screens show it: a room the household named, or Unassigned, with its devices. */
 export interface DeviceRoom {
+  /** The room's id, or `UNASSIGNED_ROOM`. */
+  id: string;
+  /** As the household named it; empty for Unassigned, which `roomLabel` names. */
   name: string;
   devices: Device[];
+}
+
+/** What a room is called on screen: the app's own buckets as copy, a household's rooms as named. */
+export function roomLabel(room: Pick<DeviceRoom, 'id' | 'name'>): string {
+  if (room.id === UNASSIGNED_ROOM) return i18n.t('devices.roomUnassigned');
+  if (room.id === ALL_ROOMS) return i18n.t('devices.roomAll');
+  return room.name;
+}
+
+/**
+ * The rooms a Pond from before `/rooms` named in each device's free-text `room`, one per name, with
+ * the name as its id, and the devices given that id. They can be shown but not changed: that Pond
+ * has nowhere to keep a room of its own.
+ */
+export function legacyRooms(devices: Device[]): { rooms: Room[]; devices: Device[] } {
+  const names = [...new Set(devices.map((d) => d.room?.trim()).filter((n): n is string => !!n))];
+  return {
+    rooms: names.map((name) => ({ id: name, name })),
+    devices: devices.map((d) => (d.room?.trim() ? { ...d, room_id: d.room.trim() } : d)),
+  };
+}
+
+/** Whether another room already has this name, as people read names: trimmed, any case. */
+export function nameTaken(rooms: Room[], name: string, exceptId?: string): boolean {
+  const wanted = name.trim().toLocaleLowerCase();
+  return rooms.some((r) => r.id !== exceptId && r.name.trim().toLocaleLowerCase() === wanted);
 }
 
 /**
@@ -102,48 +126,49 @@ export function byReachability(a: Device, b: Device): number {
   return a.name.localeCompare(b.name);
 }
 
-/** The room a device is in as the screens group it: its trimmed name, or `UNASSIGNED_ROOM`. */
-export function roomOf(device: Device): string {
-  return device.room?.trim() || UNASSIGNED_ROOM;
+/**
+ * The room a device is in as the screens group it: its room's id, or `UNASSIGNED_ROOM` when it is
+ * in none, or in one this phone has not read yet (another phone made it a moment ago).
+ */
+export function roomOf(device: Device, rooms: Room[]): string {
+  const id = device.room_id;
+  return id && rooms.some((r) => r.id === id) ? id : UNASSIGNED_ROOM;
 }
 
-/** Group devices into the rooms the screen renders, in a stable order. */
-export function groupByRoom(devices: Device[]): DeviceRoom[] {
-  const rooms = new Map<string, Device[]>();
+/**
+ * Every room, by name, each with its devices, then Unassigned when a device is in no room. A room
+ * with no devices is listed too: it is still the household's, and Home management offers it. The
+ * Devices tab leaves those out, since there is nothing in them to switch.
+ */
+export function groupByRoom(devices: Device[], rooms: Room[]): DeviceRoom[] {
+  const byRoom = new Map<string, Device[]>();
   for (const d of devices) {
-    const name = roomOf(d);
-    const existing = rooms.get(name);
+    const id = roomOf(d, rooms);
+    const existing = byRoom.get(id);
     if (existing) existing.push(d);
-    else rooms.set(name, [d]);
+    else byRoom.set(id, [d]);
   }
-  return [...rooms.entries()]
-    .map(([name, list]) => ({ name, devices: [...list].sort(byReachability) }))
-    .sort((a, b) => {
-      // Unassigned sits last; it is a fallback, not a room anyone named.
-      if (a.name === UNASSIGNED_ROOM) return 1;
-      if (b.name === UNASSIGNED_ROOM) return -1;
-      return a.name.localeCompare(b.name);
-    });
+  const named = [...rooms]
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .map((r) => ({ id: r.id, name: r.name, devices: [...(byRoom.get(r.id) ?? [])].sort(byReachability) }));
+  const unassigned = byRoom.get(UNASSIGNED_ROOM);
+  // Unassigned sits last; it is a fallback, not a room anyone named.
+  return unassigned ? [...named, { id: UNASSIGNED_ROOM, name: '', devices: [...unassigned].sort(byReachability) }] : named;
 }
 
 /**
  * A change to one device's name and room, the two things `PUT /devices/{id}` lets a person set.
- *
- * `room` null moves the device to Unassigned. The Pond has no rooms of its own: a room is only
- * the `room` field its devices share, so every room operation is a list of these.
+ * `roomId` null moves the device to Unassigned.
  */
 export interface DeviceEdit {
   device: Device;
   name: string;
-  room: string | null;
+  roomId: string | null;
 }
 
-/**
- * The request body for an edit. The hostname is left out, so the Pond keeps it; a blank room is
- * what the Pond reads as "no room" (`device_edit::merge`).
- */
+/** The request body for an edit. The hostname is left out, so the Pond keeps it. */
 export function editRequest(edit: DeviceEdit): UpdateDeviceRequest {
-  return { name: edit.name.trim(), room: edit.room?.trim() ?? '' };
+  return { name: edit.name.trim(), room_id: edit.roomId };
 }
 
 export interface EditFailure {
@@ -207,15 +232,44 @@ export function describeEditOutcome(outcome: EditOutcome, total: number): string
   return i18n.t('errors.someDevicesNotSaved', { count: outcome.failed.length, total, reason });
 }
 
+/** Why a room could not be made, renamed or deleted, in words. */
+export function describeRoomError(e: unknown): string {
+  if (e instanceof ApiError) {
+    if (e.status === 409) return i18n.t('rooms.errors.notEmpty');
+    if (e.status === 404) return i18n.t('rooms.errors.gone');
+    if (e.status === 400) return i18n.t('rooms.errors.nameRequired');
+  }
+  return describeApiError(e) ?? i18n.t('errors.generic');
+}
+
+/**
+ * The household's rooms, or, from a Pond that has no `/rooms`, the ones its devices name in free
+ * text, which can only be shown. Any other failure is the read's to report.
+ */
+export async function readRooms(
+  client: Pick<PondApiClient, 'listRooms'>,
+  devices: Device[],
+): Promise<{ rooms: Room[]; devices: Device[]; editable: boolean }> {
+  try {
+    return { rooms: await client.listRooms(), devices, editable: true };
+  } catch (e) {
+    if (e instanceof ApiError && e.status === 404) return { ...legacyRooms(devices), editable: false };
+    throw e;
+  }
+}
+
 export interface UseDevices {
   data: {
     devices: Device[];
+    /** Every room the household named, empty ones included, then Unassigned if a device is in none. */
     rooms: DeviceRoom[];
     /**
-     * Room names for the filter tabs, derived rather than hardcoded. Empty
-     * when there is only one room: a filter with a single option is chrome.
+     * The filter tabs: All, then each room with a device in it. Empty when there is only one such
+     * room: a filter with a single option is chrome.
      */
-    roomTabs: string[];
+    roomTabs: { id: string; label: string }[];
+    /** False on a Pond from before rooms had ids: its rooms are shown, but cannot be changed. */
+    roomsEditable: boolean;
     /** How many devices the Pond can currently reach. */
     onlineCount: number;
     /** Power state by device id, as the device last confirmed it. Absent means it did not report one. */
@@ -248,6 +302,13 @@ export interface UseDevices {
     remove: (device: Device) => Promise<void>;
     /** Resolves to why some or all of the edits were refused, or null once every one is saved. */
     edit: (edits: DeviceEdit[]) => Promise<string | null>;
+    /** A new room, with the chosen devices moved into it. Resolves to the refusal, or null. */
+    createRoom: (name: string, deviceIds: ReadonlySet<string>) => Promise<string | null>;
+    renameRoom: (room: DeviceRoom, name: string) => Promise<string | null>;
+    /** Moves the room's devices to Unassigned, then deletes it, which the Pond allows only once it is empty. */
+    deleteRoom: (room: DeviceRoom) => Promise<string | null>;
+    /** The room with this name, made if there is none yet: what a typed room in the device sheet means. */
+    roomNamed: (name: string) => Promise<{ id: string } | { error: string }>;
   };
 }
 
@@ -321,6 +382,8 @@ export function staleFor(updatedAt: number | null, failedAt: number | null): str
 
 export function useDevices(): UseDevices {
   const [devices, setDevices] = useState<Device[]>([]);
+  const [roomList, setRoomList] = useState<Room[]>([]);
+  const [roomsEditable, setRoomsEditable] = useState(true);
   const [powerById, setPowerById] = useState<Record<string, boolean>>({});
   const [waitingById, setWaitingById] = useState<Record<string, boolean>>({});
   const [matter, setMatter] = useState<MatterStatus | null>(null);
@@ -469,9 +532,14 @@ export function useDevices(): UseDevices {
         setError(null);
       }
       try {
-        const list = await api.listDevices();
+        const read = await readRooms(api, await api.listDevices());
+        const list = read.devices;
         reachable = true;
-        if (listPollStillCurrent(startedAt, listChangedAt.current)) setDevices(list);
+        if (listPollStillCurrent(startedAt, listChangedAt.current)) {
+          setDevices(list);
+          setRoomList(read.rooms);
+          setRoomsEditable(read.editable);
+        }
         loaded.current = true;
         setError(null);
         setUpdatedAt(Date.now());
@@ -621,10 +689,11 @@ export function useDevices(): UseDevices {
     setError(null);
     try {
       const created = await api.commissionDevice({ code, name });
-      const list = await api.listDevices();
+      const read = await readRooms(api, await api.listDevices());
       // After the read, so a poll that began before it cannot replace this list with an older one.
       listChangedAt.current = Date.now();
-      setDevices(list);
+      setDevices(read.devices);
+      setRoomList(read.rooms);
       return created.id;
     } catch (e) {
       setError(describeCommissionError(e));
@@ -672,16 +741,84 @@ export function useDevices(): UseDevices {
     // phone renamed meanwhile. The rows above already show this phone's own changes, so a read that
     // fails here leaves them standing rather than reporting a second failure.
     try {
-      const list = await api.listDevices();
+      const read = await readRooms(api, await api.listDevices());
       listChangedAt.current = Date.now();
-      setDevices(list);
+      setDevices(read.devices);
+      setRoomList(read.rooms);
     } catch (e) {
       console.warn('[devices] reread after edit failed', e instanceof ApiError ? e.status : 'network');
     }
     return describeEditOutcome(outcome, edits.length);
   }, []);
 
-  const rooms = useMemo(() => groupByRoom(devices), [devices]);
+  const createRoom = useCallback(
+    async (name: string, deviceIds: ReadonlySet<string>) => {
+      if (nameTaken(roomList, name)) return i18n.t('rooms.errors.nameTaken', { room: name.trim() });
+      let room: Room;
+      try {
+        room = await api.createRoom(name.trim());
+      } catch (e) {
+        logFailure('devices', 'room not made', e);
+        return describeRoomError(e);
+      }
+      setRoomList((current) => [...current, room]);
+      return edit(moveIntoRoom(devices, deviceIds, room.id));
+    },
+    [devices, edit, roomList],
+  );
+
+  const renameRoom = useCallback(
+    async (room: DeviceRoom, name: string) => {
+      if (name.trim() === room.name) return null;
+      if (nameTaken(roomList, name, room.id)) return i18n.t('rooms.errors.nameTaken', { room: name.trim() });
+      try {
+        const renamed = await api.renameRoom(room.id, name.trim());
+        setRoomList((current) => current.map((r) => (r.id === renamed.id ? renamed : r)));
+        return null;
+      } catch (e) {
+        logFailure('devices', 'room not renamed', e);
+        return describeRoomError(e);
+      }
+    },
+    [roomList],
+  );
+
+  const deleteRoom = useCallback(
+    async (room: DeviceRoom) => {
+      // Emptied first: the Pond keeps a room that still has a device in it.
+      const refused = await edit(unassignRoom(devices, room.id));
+      if (refused) return refused;
+      try {
+        await api.deleteRoom(room.id);
+        setRoomList((current) => current.filter((r) => r.id !== room.id));
+        return null;
+      } catch (e) {
+        logFailure('devices', 'room not deleted', e);
+        return describeRoomError(e);
+      }
+    },
+    [devices, edit],
+  );
+
+  const roomNamed = useCallback(
+    async (name: string): Promise<{ id: string } | { error: string }> => {
+      const wanted = name.trim().toLocaleLowerCase();
+      const known = roomList.find((r) => r.name.trim().toLocaleLowerCase() === wanted);
+      if (known) return { id: known.id };
+      try {
+        const room = await api.createRoom(name.trim());
+        setRoomList((current) => [...current, room]);
+        return { id: room.id };
+      } catch (e) {
+        logFailure('devices', 'room not made', e);
+        return { error: describeRoomError(e) };
+      }
+    },
+    [roomList],
+  );
+
+  const rooms = useMemo(() => groupByRoom(devices, roomList), [devices, roomList]);
+  const occupied = useMemo(() => rooms.filter((r) => r.devices.length > 0), [rooms]);
 
   return {
     data: {
@@ -689,7 +826,11 @@ export function useDevices(): UseDevices {
       rooms,
       // One room means one destination, and a filter that cannot change what
       // is shown is chrome. The screen renders no tabs at all in that case.
-      roomTabs: rooms.length > 1 ? [ALL_ROOMS, ...rooms.map((r) => r.name)] : [],
+      roomTabs:
+        occupied.length > 1
+          ? [{ id: ALL_ROOMS, name: '' }, ...occupied].map((r) => ({ id: r.id, label: roomLabel(r) }))
+          : [],
+      roomsEditable,
       onlineCount: devices.filter((d) => d.is_online).length,
       powerById,
       waitingById,
@@ -700,7 +841,7 @@ export function useDevices(): UseDevices {
     loading,
     failed,
     error,
-    actions: { refresh, setState, cancel, commission, remove, edit },
+    actions: { refresh, setState, cancel, commission, remove, edit, createRoom, renameRoom, deleteRoom, roomNamed },
   };
 }
 

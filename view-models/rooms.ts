@@ -1,35 +1,25 @@
 /**
- * Room operations, as the device edits that carry them out.
+ * Moving devices between rooms, as the device edits that carry it out.
  *
- * The Pond has no rooms API. A room is the `room` field its devices share, so a room exists only
- * while a device is in it: renaming one changes that field on each of its devices, deleting one
- * clears it, and adding one means moving devices into a new name. Each planner returns the edits
- * for `useDevices().actions.edit`, and none for a device that is already where it would go.
+ * A room is a record of its own on the Pond (`/rooms`), and a device names the one it is in by
+ * `room_id`. Making, renaming and deleting a room are calls of their own; what is here is the part
+ * that moves devices: into a new room, or out of one about to be deleted. Neither returns an edit
+ * for a device that is already where it would go.
  */
 
 import type { Device } from '@/services/types';
-import { UNASSIGNED_ROOM, roomOf, type DeviceEdit } from './use-devices';
+import type { DeviceEdit } from './use-devices';
 
-function moveTo(device: Device, room: string | null): DeviceEdit {
-  return { device, name: device.name, room };
+function moveTo(device: Device, roomId: string | null): DeviceEdit {
+  return { device, name: device.name, roomId };
 }
 
-/** Every device in `from`, moved to `to`. Moving into a room that exists already merges the two. */
-export function renameRoom(devices: Device[], from: string, to: string): DeviceEdit[] {
-  const name = to.trim();
-  if (!name || name === from || from === UNASSIGNED_ROOM) return [];
-  return devices.filter((d) => roomOf(d) === from).map((d) => moveTo(d, name));
+/** The chosen devices, moved into `roomId`. */
+export function moveIntoRoom(devices: Device[], ids: ReadonlySet<string>, roomId: string): DeviceEdit[] {
+  return devices.filter((d) => ids.has(d.id) && d.room_id !== roomId).map((d) => moveTo(d, roomId));
 }
 
-/** Every device in `room`, moved to Unassigned, which is what deleting the room means. */
-export function unassignRoom(devices: Device[], room: string): DeviceEdit[] {
-  if (room === UNASSIGNED_ROOM) return [];
-  return devices.filter((d) => roomOf(d) === room).map((d) => moveTo(d, null));
-}
-
-/** The chosen devices, moved into `room`: how a new room comes to exist. */
-export function moveIntoRoom(devices: Device[], ids: ReadonlySet<string>, room: string): DeviceEdit[] {
-  const name = room.trim();
-  if (!name) return [];
-  return devices.filter((d) => ids.has(d.id) && roomOf(d) !== name).map((d) => moveTo(d, name));
+/** Every device in `roomId`, moved to Unassigned: what has to happen before the room can go. */
+export function unassignRoom(devices: Device[], roomId: string): DeviceEdit[] {
+  return devices.filter((d) => d.room_id === roomId).map((d) => moveTo(d, null));
 }

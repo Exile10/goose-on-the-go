@@ -83,7 +83,7 @@ beforeEach(async () => {
   pond.systemInfo.mockResolvedValue({ hostname: 'nano', version: '0.9.0' });
   pond.createProfile.mockResolvedValue({ id: 'owner-1', display_name: 'Amina', avatar_emoji: '' });
   pond.setProfilePrefs.mockResolvedValue({ id: 'owner-1', display_name: 'Amina', preferences: {} });
-  pond.listDevices.mockResolvedValue([{ id: 'install-1', name: 'iPhone', is_online: true, room: 'Kitchen' }]);
+  pond.listDevices.mockResolvedValue([{ id: 'install-1', name: 'iPhone', is_online: true, room_id: 'kitchen' }]);
   pond.updateDevice.mockImplementation(async (id, req) => ({ id, is_online: true, ...req }));
   pond.savePromptExtra.mockResolvedValue(undefined);
 });
@@ -282,7 +282,8 @@ it('renames a phone paired as plain “iPhone” after its owner, once setup is 
     await m.vm.actions.finish();
     await new Promise((r) => setTimeout(r, 0));
   });
-  expect(pond.updateDevice).toHaveBeenCalledWith('install-1', { name: "Amina's iPhone", hostname: undefined, room: 'Kitchen' });
+  // The room is left out, which keeps it: the phone stays in the room it was in.
+  expect(pond.updateDevice).toHaveBeenCalledWith('install-1', { name: "Amina's iPhone", hostname: undefined });
   m.unmount();
 });
 

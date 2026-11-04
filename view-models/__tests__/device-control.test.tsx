@@ -18,6 +18,7 @@ jest.mock('@/services/api-client', () => {
     ...actual,
     api: {
       listDevices: jest.fn(),
+      listRooms: jest.fn(),
       getDeviceState: jest.fn(),
       setDeviceState: jest.fn(),
       matterStatus: jest.fn(),
@@ -91,6 +92,7 @@ beforeEach(() => {
   jest.resetAllMocks();
   screen.active = false;
   pond.listDevices.mockResolvedValue([HEATER]);
+  pond.listRooms.mockResolvedValue([]);
   pond.getDeviceState.mockResolvedValue(power(true));
   pond.matterStatus.mockRejectedValue(new Error('not needed'));
 });

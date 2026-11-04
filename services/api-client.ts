@@ -62,6 +62,7 @@ import type {
   ActivityPurge,
   RidePoint,
   RideQuote,
+  Room,
   ActivityResponse,
   ActivitySummary,
   ActivityWindow,
@@ -938,6 +939,25 @@ export class PondApiClient {
       body: JSON.stringify(req),
       signal: timeoutSignal(COMMISSION_TIMEOUT_MS),
     });
+  }
+
+  /** `GET /rooms`. A Pond from before rooms had ids answers 404. */
+  async listRooms(): Promise<Room[]> {
+    const res = await this.request<{ rooms?: Room[] } | Room[]>('/api/v1/rooms');
+    return collection<Room>(res, 'rooms');
+  }
+
+  createRoom(name: string): Promise<Room> {
+    return this.post<Room>('/api/v1/rooms', { name });
+  }
+
+  renameRoom(id: string, name: string): Promise<Room> {
+    return this.put<Room>(`/api/v1/rooms/${encodeURIComponent(id)}`, { name });
+  }
+
+  /** `DELETE /rooms/{id}`. Refused with 409 while a device is still in the room. */
+  deleteRoom(id: string): Promise<void> {
+    return this.del<void>(`/api/v1/rooms/${encodeURIComponent(id)}`);
   }
 
   matterStatus(): Promise<MatterStatus> {

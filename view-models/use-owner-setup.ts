@@ -75,7 +75,8 @@ function missingKey(field: string): TranslationKey {
 /**
  * A phone paired as plain "iPhone" becomes "Amina's iPhone" once setup knows who Amina is. Only after
  * setup, since the Pond guards its device routes until then; and only a name nobody has changed since.
- * `PUT /devices/{id}` replaces the host name and room as well, so both are sent back as they were.
+ * The host name is sent back as it was, for a Pond that replaces every field; the room is left out,
+ * which keeps it.
  */
 async function nameThisPhone(owner: string): Promise<void> {
   const generic = genericPhoneName(Device.deviceName, Device.modelName);
@@ -83,7 +84,7 @@ async function nameThisPhone(owner: string): Promise<void> {
   const id = await getInstallId();
   const mine = (await api.listDevices()).find((d) => d.id === id);
   if (!mine || mine.name !== generic) return;
-  await api.updateDevice(id, { name: i18n.t('setup.phoneOf', { name: owner, device: generic }), hostname: mine.hostname, room: mine.room });
+  await api.updateDevice(id, { name: i18n.t('setup.phoneOf', { name: owner, device: generic }), hostname: mine.hostname });
 }
 
 /**

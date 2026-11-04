@@ -18,6 +18,7 @@ jest.mock('@/services/api-client', () => {
     ...actual,
     api: {
       listDevices: jest.fn(),
+      listRooms: jest.fn(),
       getDeviceState: jest.fn(),
       setDeviceState: jest.fn(),
       deleteDevice: jest.fn(),
@@ -75,6 +76,7 @@ beforeEach(() => {
   resetSnackbar();
   jest.spyOn(console, 'warn').mockImplementation(() => {});
   pond.listDevices.mockResolvedValue([LAMP]);
+  pond.listRooms.mockResolvedValue([]);
   pond.getDeviceState.mockResolvedValue({ content: [{ type: 'text', text: '{"power":false}' }] } as never);
   pond.matterStatus.mockResolvedValue(null as never);
 });
