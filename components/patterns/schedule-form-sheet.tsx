@@ -46,6 +46,7 @@ import {
   draftCron,
   draftFrom,
   emptyDraft,
+  privateOwner,
   promptOf,
   updateRequest,
   weekdayShortName,
@@ -360,7 +361,10 @@ export function ScheduleFormSheet(props: ScheduleFormSheetProps) {
                 rows={3}
                 maxRows={6}
               />
+              {editing ? null : <InkText size="sm" tone="tertiary">{t('schedule.form.privateHint')}</InkText>}
             </InkFormField>
+          ) : editing && privateOwner(editing) != null ? (
+            <InkText size="sm" tone="secondary">{t('schedule.form.privateEdit')}</InkText>
           ) : (
             <InkText size="sm" tone="secondary">{t('schedule.detail.webhookNote')}</InkText>
           )}

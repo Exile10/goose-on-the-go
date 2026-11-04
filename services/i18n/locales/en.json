@@ -2336,6 +2336,8 @@
       "noSwitchable": "Your Pond has no devices it can switch on and off yet.",
       "devicesLoading": "Loading your devices",
       "promptPlaceholder": "Summarise my calendar and the weather.",
+      "privateHint": "Everyone on this Pond can see what a schedule says. For a reminder only you see, ask Goose out loud for a private reminder.",
+      "privateEdit": "What this reminder says stays private. You can change its name and time here.",
       "create": "Create",
       "source": "Listen to",
       "device": "Device",
