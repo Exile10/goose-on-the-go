@@ -1,19 +1,32 @@
-import { bannerHiddenOn, connectionActionIsPairing, connectionNeedsAttention, type ConnectionState } from '../connection';
+import { connectionActionIsPairing, connectionNeedsAttention, connectionSurface, stackScreenSurface, type ConnectionState } from '../connection';
 
-describe('where the connection banner stays out of the way', () => {
-  it('stays away from first run, the pairing wizard and the scanner, which are the pairing it offers', () => {
-    expect(bannerHiddenOn(['(onboarding)', 'welcome'])).toBe(true);
-    expect(bannerHiddenOn(['(onboarding)', 'pond-wifi'])).toBe(true);
-    expect(bannerHiddenOn(['(onboarding)', 'owner-setup'])).toBe(true);
-    expect(bannerHiddenOn(['(stack)', 'pond-pairing'])).toBe(true);
-    expect(bannerHiddenOn(['(stack)', 'connect-desktop'])).toBe(true);
+describe('where the connection is told', () => {
+  it('leaves first run, the pairing wizard and the scanner to say it in their own words', () => {
+    expect(connectionSurface(['(onboarding)', 'welcome'])).toBe('own');
+    expect(connectionSurface(['(onboarding)', 'pond-wifi'])).toBe('own');
+    expect(connectionSurface(['(onboarding)', 'owner-setup'])).toBe('own');
+    expect(connectionSurface(['(stack)', 'pond-pairing'])).toBe('own');
+    expect(connectionSurface(['(stack)', 'connect-desktop'])).toBe('own');
   });
 
-  it('shows everywhere else', () => {
-    expect(bannerHiddenOn(['(tabs)'])).toBe(false);
-    expect(bannerHiddenOn(['(stack)', 'settings-voice'])).toBe(false);
-    expect(bannerHiddenOn(['conversation'])).toBe(false);
-    expect(bannerHiddenOn([])).toBe(false);
+  it('leaves Home and Switch Pond to their Pond card', () => {
+    expect(connectionSurface(['(tabs)'])).toBe('own');
+    expect(connectionSurface(['(tabs)', 'index'])).toBe('own');
+    expect(connectionSurface(['(stack)', 'switch-pond'])).toBe('own');
+  });
+
+  it('puts it under the title bar of every other stack screen, never above it', () => {
+    expect(connectionSurface(['(stack)', 'settings-voice'])).toBe('inline');
+    expect(connectionSurface(['(stack)', 'pond'])).toBe('inline');
+    expect(stackScreenSurface('settings-voice')).toBe('inline');
+    expect(stackScreenSurface('switch-pond')).toBe('own');
+  });
+
+  it('puts it in the strip above the app everywhere else', () => {
+    expect(connectionSurface(['(tabs)', 'chat'])).toBe('banner');
+    expect(connectionSurface(['(tabs)', 'devices'])).toBe('banner');
+    expect(connectionSurface(['conversation'])).toBe('banner');
+    expect(connectionSurface([])).toBe('banner');
   });
 });
 

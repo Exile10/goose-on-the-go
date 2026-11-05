@@ -1,8 +1,8 @@
 /**
  * The one way a screen of Pond content is refreshed by hand: a downward swipe.
  *
- * A pull does what the connection strip's Try again and the failed view's Try again did between
- * them, so neither needs a button. When the strip is up for a reason another attempt can help
+ * A pull does what the failed view's Try again did, so it needs no button, and it also checks the
+ * connection, as the strip's Try now does. When the strip is up for a reason another attempt can help
  * (`connectionNeedsAttention` and not `connectionActionIsPairing`), the pull asks the connection
  * manager to look for the Pond first; then, whatever that found, it reads the screen again. A
  * revoked or unpaired phone skips the first step: a probe without a token would report the Pond

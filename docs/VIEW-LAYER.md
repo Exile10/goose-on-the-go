@@ -470,14 +470,31 @@ connection for it). Each state has one owner, and nothing says a thing twice.
 | `failed` | Nothing to show, the connection is fine, the read failed | `ContentUnavailable`: a title, one sentence, and "Pull down to try again" |
 | `empty` | The read worked and found nothing | The screen's own `InkEmptyState`, never styled as a failure |
 
-**Connectivity is said once**, by `ConnectionStatus` at the top of the app. It
-is quiet -- a hairline strip on the secondary surface, an icon and a sentence --
-and it is not a retry button. Its only control is Pair, where only pairing can
-help (`connectionActionIsPairing`). It has no "Checking" state of its own: a
-pull's spinner shows the attempt, and the attempt turns the strip to
-"Reconnecting" once it outlasts the grace period. Screens do not add their own
-"your Pond is unreachable" notice. Home's Pond card, which is a status card,
-drops its reachability title and badge while the indicator is up.
+**Connectivity is said once per screen.** `useConnectionStatus`
+(`view-models/use-connection-status.ts`) turns the connection manager's state
+and outage into words (`view-models/connection-words.ts`): connecting,
+reconnecting, cannot reach your Pond, a Pond that answered with the wrong key,
+or pairing again. Each comes with what happens next -- "Trying again in 8 s",
+counting down, or "Checking now" -- and, once checks have failed, why
+("Not answering on this Wi-Fi", "Outside access is not set up, so mobile data
+cannot reach it") and when the Pond last answered. The reason comes only from
+what the manager tried: which network the phone is on, whether outside access
+is set up and whether this phone's link for it came up. `connectionSurface`
+picks the one place it is drawn: `ConnectionStatus` above the app on the tabs,
+the same strip under the title bar of a stack screen, or the screen's own
+`PondStatusCard` on Home and Switch Pond. The strip used to sit above every
+screen, and on a stack screen the title bar kept its own status-bar inset
+beneath it, so the two read as two headers. Screens do not add their own "your
+Pond is unreachable" notice.
+
+**Try now** is on the strip and the card wherever another check can help (not
+for an unpaired, outdated or revoked phone, where a token-less probe would
+report success and change nothing). It checks at once and starts the back-off
+again. The manager checks on its own after 1, 2, 4, 8 and 16 s, then every 30 s
+while the app is in front, and checks at once with a fresh back-off when the
+network changes or the app comes back to the front. Each scheduled check, reset
+and recovery is logged as `[connection]` with `kind` `route_retry_scheduled`,
+`route_backoff_reset`, `route_retry_now` or `route_recovered`.
 
 **Trying again is a pull, everywhere.** Every screen of Pond content carries a
 `RefreshControl` fed by `usePullToRefresh(reload)`
@@ -494,14 +511,17 @@ a scroll another component owns -- the Schedules and Automations tabs, the
 camera status card and the voice list on a settings page, the account row on
 the You tab -- registers its read with `useReloadOnPull`, and the screen wraps
 it in `PullSectionsProvider` with the registry from `usePullSections`, so the
-pull reaches it. No screen adds a Refresh or Try again button beside the pull;
-Devices' header Refresh went for that reason.
+pull reaches it. No screen adds a Refresh or Try again button for its content
+beside the pull; Devices' header Refresh went for that reason. The connection's
+Try now is not one: it asks for a check of the connection, which a pull also
+makes, and someone looking at "Cannot reach your Pond" should not have to know
+to pull for it.
 
-A screen reader cannot easily pull to refresh, so both places that used to
-carry Try again keep it as an accessibility action instead: the strip's
-sentence (while another attempt can help) and the failed form's hint each have
-an `activate` action labelled Try again. TalkBack and VoiceOver read them as
-actionable, and a double tap runs the same retry. A sighted tap does nothing.
+A screen reader cannot easily pull to refresh, so the failed form's hint
+carries Try again as an `activate` action; TalkBack and VoiceOver read it as
+actionable, and a double tap runs the same retry. The connection's own Try now
+is a button with its role, and the state above it is a polite live region whose
+label leaves out the countdown, so it is not read out every second.
 
 **`ContentUnavailable`** (`components/patterns/content-unavailable.tsx`) goes
 in place of the content, never above it, and always inside the scrollable that

@@ -2,8 +2,8 @@
  * The Ponds on this network.
  *
  * Shared by first run and by switching Pond later, so the same list cannot
- * drift into two shapes. `currentUrl` marks the one in use; leaving it out —
- * first run, when nothing is paired — simply marks none.
+ * drift into two shapes. Every row is a Pond to pair with: Switch Pond shows the
+ * one in use on its own card above the list, not as a row in it.
  */
 
 import React from 'react';
@@ -27,7 +27,6 @@ export interface PondListProps {
   ponds: DiscoveredPond[];
   phase: DiscoveryPhase;
   error?: string | null;
-  currentUrl?: string;
   onSelect: (pond: DiscoveredPond) => void;
 }
 
@@ -36,7 +35,6 @@ export function PondList({
   ponds,
   phase,
   error,
-  currentUrl,
   onSelect,
 }: PondListProps) {
   const styles = useThemedStyles(makeStyles);
@@ -54,50 +52,45 @@ export function PondList({
 
   return (
     <InkGroup title={title}>
-      {ponds.map((pond, i) => {
-        const active = currentUrl === pond.url;
-        return (
-          <GPressable
-            key={pond.id}
-            accessibilityRole="button"
-            onPress={() => {
-              void selectionTick();
-              onSelect(pond);
-            }}
-          >
-            <InkRow
-              divided={i > 0}
-              label={
-                <View style={styles.label}>
-                  <GIcon name="server" size={18} />
-                  <Text style={styles.name} numberOfLines={1}>
-                    {pond.name || pond.id}
-                  </Text>
-                </View>
-              }
-              description={
-                <Text style={styles.addr}>
-                  {/* The card's id, in the card's own lowercase, says which of several new Ponds a card belongs to. */}
-                  {pond.unclaimed && pond.setupId
-                    ? `${pond.address}:${pond.port} · ${t('onboarding.cardId', { id: pond.setupId })}`
-                    : `${pond.address}:${pond.port}`}
+      {ponds.map((pond, i) => (
+        <GPressable
+          key={pond.id}
+          accessibilityRole="button"
+          onPress={() => {
+            void selectionTick();
+            onSelect(pond);
+          }}
+        >
+          <InkRow
+            divided={i > 0}
+            label={
+              <View style={styles.label}>
+                <GIcon name="server" size={18} />
+                <Text style={styles.name} numberOfLines={1}>
+                  {pond.name || pond.id}
                 </Text>
-              }
-            >
-              {active ? (
-                <InkBadge tone="success">{t('common.online')}</InkBadge>
-              ) : pond.unclaimed ? (
-                <View style={styles.trail}>
-                  <InkBadge tone="brand">{t('onboarding.notSetUp')}</InkBadge>
-                  <GIcon name="chevron-right" size={18} />
-                </View>
-              ) : (
+              </View>
+            }
+            description={
+              <Text style={styles.addr}>
+                {/* The card's id, in the card's own lowercase, says which of several new Ponds a card belongs to. */}
+                {pond.unclaimed && pond.setupId
+                  ? `${pond.address}:${pond.port} · ${t('onboarding.cardId', { id: pond.setupId })}`
+                  : `${pond.address}:${pond.port}`}
+              </Text>
+            }
+          >
+            {pond.unclaimed ? (
+              <View style={styles.trail}>
+                <InkBadge tone="brand">{t('onboarding.notSetUp')}</InkBadge>
                 <GIcon name="chevron-right" size={18} />
-              )}
-            </InkRow>
-          </GPressable>
-        );
-      })}
+              </View>
+            ) : (
+              <GIcon name="chevron-right" size={18} />
+            )}
+          </InkRow>
+        </GPressable>
+      ))}
     </InkGroup>
   );
 }

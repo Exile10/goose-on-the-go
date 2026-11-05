@@ -1,9 +1,14 @@
 import { PondTrustError } from './pond-trust';
 /** Shared, bounded endpoint selection for REST and foreground SSE. */
-import type { ConnectionProfile, ConnectionState } from '@/models/connection';
-import { normalizeHttpsUrl, isLocalPairingUrl } from '@/models/connection';
+import type { ConnectionOutage, ConnectionProfile, ConnectionState, UnreachableReason } from '@/models/connection';
+import { normalizeHttpsUrl, isLocalPairingUrl, unreachableReason } from '@/models/connection';
 
-export interface ConnectionSnapshot { state: ConnectionState; url: string | null }
+export interface ConnectionSnapshot {
+  state: ConnectionState;
+  url: string | null;
+  /** Set while the connection is not working (`reconnecting`, `disconnected`, `trust`). */
+  outage?: ConnectionOutage;
+}
 export interface ConnectionDependencies {
   probe: (url: string) => Promise<boolean>;
   discover: (host: string, port: number) => Promise<string | null>;
@@ -64,6 +69,17 @@ export class ConnectionManager {
   private clearTimer() { if (this.timer) clearTimeout(this.timer); this.timer = null; }
   private snapshot: ConnectionSnapshot = { state: 'unpaired', url: null };
   /**
+   * What the screens are told about an outage. `failures` counts checks since the Pond last
+   * answered and, unlike `attempts`, is not reset by a network change or a person asking: those
+   * restart the back-off, not the outage.
+   */
+  private failures = 0;
+  private reason: UnreachableReason | null = null;
+  private nextCheckAt: number | null = null;
+  private lastConnectedAt: number | null = null;
+  /** An address someone chose to try for this Pond, checked under its pin in place of discovery. */
+  private candidate: string | null = null;
+  /**
    * Set once the Pond has refused this phone's credentials outright. It stops
    * `recover` doing anything at all, because what it does -- probe endpoints
    * without a bearer token -- cannot distinguish a Pond that has forgotten this
@@ -72,11 +88,21 @@ export class ConnectionManager {
    */
   private revoked = false;
   constructor(private readonly deps: ConnectionDependencies) {}
+  /** A route answered: the outage, if there was one, is over. */
+  private answered(route: 'local' | 'remote') {
+    if (this.failures > 0) console.info('[connection] reached after failed checks', { kind: 'route_recovered', route, failures: this.failures });
+    this.failures = 0; this.reason = null; this.nextCheckAt = null;
+  }
   private routeKey(): string | null {
     return this.profile ? `${this.pin}|${this.profile.host}:${this.profile.port}` : null;
   }
   private publish(state: ConnectionState, url: string | null = null) {
-    this.snapshot = { state, url };
+    const working = state === 'local' || state === 'remote';
+    if (!working && (this.snapshot.state === 'local' || this.snapshot.state === 'remote')) this.lastConnectedAt = Date.now();
+    const outage = state === 'reconnecting' || state === 'disconnected' || state === 'trust'
+      ? { failures: this.failures, reason: this.reason, nextCheckAt: this.nextCheckAt, lastConnectedAt: this.lastConnectedAt }
+      : undefined;
+    this.snapshot = outage ? { state, url, outage } : { state, url };
     const key = this.routeKey();
     if (key && this.deps.routes) {
       if ((state === 'local' || state === 'remote') && url) this.deps.routes.set(key, this.snapshot);
@@ -99,7 +125,10 @@ export class ConnectionManager {
     this.clearTimer();
     this.generation++; this.flight = null; this.retryAfter = 0; this.attempts = 0; this.localRechecks = 0;
     this.revoked = false;
+    const before = this.routeKey();
     this.profile = profile; this.pin = pin;
+    this.failures = 0; this.reason = null; this.nextCheckAt = null; this.candidate = null;
+    if (this.routeKey() !== before) this.lastConnectedAt = null;
     // A saved pairing is never "unpaired", even for the moment before its first probe.
     const remembered = profile ? this.rememberedRoute(profile) : null;
     if (remembered) this.publish(remembered.state, remembered.url);
@@ -128,6 +157,7 @@ export class ConnectionManager {
     this.clearTimer();
     this.generation++; this.flight = null; this.retryAfter = 0; this.attempts = 0; this.localRechecks = 0;
     if (!active || this.revoked) return;
+    if (this.failures > 0) console.info('[connection] back-off reset', { kind: 'route_backoff_reset', cellular, failures: this.failures });
     // A route that was working stays on screen while it is re-checked; only a failed check is news.
     void this.recover(this.snapshot.state === 'local' || this.snapshot.state === 'remote');
   }
@@ -138,14 +168,28 @@ export class ConnectionManager {
    * retry count afresh. An attempt already in flight is shared, as with `recover`.
    */
   retryNow = (): Promise<string | null> => {
-    if (!this.flight) { this.retryAfter = 0; this.attempts = 0; }
+    if (!this.flight) {
+      this.retryAfter = 0; this.attempts = 0;
+      if (this.profile && !this.revoked) console.info('[connection] check asked for', { kind: 'route_retry_now', failures: this.failures });
+    }
     return this.recover();
+  };
+  /**
+   * Try `url` for this Pond: an address it was seen announcing on this network. It is checked as
+   * a discovered address is, under the saved pin, so an address that answers with any other key is
+   * refused, and kept only once it has answered.
+   */
+  tryAddress = async (url: string): Promise<string | null> => {
+    if (this.flight) await this.flight;
+    this.candidate = url;
+    try { return await this.retryNow(); } finally { this.candidate = null; }
   };
   recover = (quiet = false): Promise<string | null> => {
     if (!this.active || !this.profile || this.revoked) return Promise.resolve(null);
     if (this.flight) return this.flight;
     if (Date.now() < this.retryAfter) return Promise.resolve(null);
     this.clearTimer();
+    this.nextCheckAt = null;
     let trustRejected = false;
     const generation = this.generation;
     const profile = this.profile;
@@ -192,7 +236,7 @@ export class ConnectionManager {
         if (discoveryDone) return;
         void (async () => {
           try {
-            const found = await this.deps.discover(profile.host, profile.port);
+            const found = this.candidate ?? await this.deps.discover(profile.host, profile.port);
             if (settled || !current() || !found || !isLocalPairingUrl(found)) return;
             const url = normalizeHttpsUrl(found);
             await this.deps.trust([...new Set([...profile.localUrls, url, ...(remote ? [remote] : [])])], this.pin);
@@ -226,6 +270,7 @@ export class ConnectionManager {
         try {
           const route = await race();
           if (!current()) return null;
+          if (route) this.answered(route.state);
           if (route?.state === 'local') {
             if (route.discovered) this.profile = { ...profile, localUrls: [...new Set([route.url, ...profile.localUrls])].slice(0, 8) };
             this.clearTimer(); this.attempts = 0; this.localRechecks = 0; this.publish('local', route.url); return route.url;
@@ -250,6 +295,11 @@ export class ConnectionManager {
         });
         this.retryAfter = Date.now() + Math.min(MAX_BACKOFF_MS, 1000 * 2 ** Math.min(this.attempts, BACKOFF_STEPS - 1)) * (0.75 + Math.random() * 0.5);
         this.attempts = Math.min(this.attempts + 1, BACKOFF_STEPS);
+        this.failures++; this.reason = unreachableReason(this.cellular, remoteOutcome); this.nextCheckAt = this.retryAfter;
+        console.info('[connection] next check scheduled', {
+          kind: 'route_retry_scheduled', reason: trustRejected ? 'trust' : this.reason, failures: this.failures,
+          cellular: this.cellular, remote: remoteOutcome, inMs: Math.max(0, Math.round(this.retryAfter - Date.now())),
+        });
         this.publish(trustRejected ? 'trust' : 'disconnected');
         // At the cap the check is quiet: dropping to `reconnecting` every 30 s would swap Home's card
         // and take the banner away and back each time, for as long as the Pond stays down.
