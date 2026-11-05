@@ -83,7 +83,7 @@ export function ConnectionStatus({ placement = 'banner', screen }: ConnectionSta
   const label = status.reason ? `${status.title}. ${status.reason}` : status.title;
   const detail = [status.reason, status.next].filter(Boolean).join(' · ');
   const strip = (
-    <View style={[styles.container, placement === 'banner' ? { paddingTop: insets.top + Spacing.sm } : styles.inline]}>
+    <View style={[styles.container, placement === 'banner' ? { paddingTop: insets.top + Spacing.xs } : styles.inline]}>
       <GIcon name={phaseIcon(status.phase)} size={16} color={colors.textSecondary} />
       <View style={styles.statement} accessible accessibilityLiveRegion="polite" accessibilityLabel={label}>
         <Text style={styles.title}>{status.title}</Text>
@@ -125,12 +125,11 @@ const makeStyles = (c: ThemeColors) =>
       alignItems: 'center',
       gap: Spacing.sm,
       paddingHorizontal: Spacing.lg,
-      paddingBottom: Spacing.sm,
+      // Its own ground sets it apart; a rule under it and a margin round the line framed it twice.
+      paddingBottom: Spacing.xs,
       backgroundColor: c.backgroundSecondary,
-      borderBottomWidth: StyleSheet.hairlineWidth,
-      borderBottomColor: c.border,
     },
-    inline: { paddingTop: Spacing.sm },
+    inline: { paddingTop: Spacing.xs },
     statement: { flex: 1, gap: 2 },
     title: { color: c.text, fontSize: FontSize.sm },
     detail: { color: c.textSecondary, fontSize: FontSize.xs },
