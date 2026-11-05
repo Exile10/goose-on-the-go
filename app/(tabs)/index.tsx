@@ -214,7 +214,7 @@ export default function HomeScreen() {
   // The online count is the list the grid shows, so the two cannot disagree, and it is not stated
   // while that list is unknown.
   const devicesKnown = devicesState === 'ready' || devicesState === 'empty';
-  // Quiet is said above the board, by the Pond's own line; the widget is for what comes after it.
+  // Quiet is said above the board, by the Pond's own line; the widget is for suggestions.
   const hasIdeas = ideas.data.proposals.length > 0 || !!ideas.data.agent;
 
   // Built in the saved order; a widget with nothing to say is left out rather than drawn empty.
@@ -391,15 +391,9 @@ export default function HomeScreen() {
           </GPressable>
         </View>
 
-        {offline ? null : (
-          <PondSays
-            lead={ideas.data.lead}
-            reminderCount={ideas.data.reminderCount}
-            quiet={ideas.quiet}
-            deciding={ideas.deciding}
-            onAccept={(id) => void ideas.actions.approve(id)}
-            onDecline={(id) => void ideas.actions.decline(id)}
-          />
+        {/* Suggestions are the From your Pond widget's alone; the line says only what it cannot. */}
+        {offline || ideas.data.proposals.length > 0 ? null : (
+          <PondSays reminderCount={ideas.data.reminderCount} quiet={ideas.quiet} />
         )}
 
         {offline ? null : <GlanceStrip figures={figures} />}
