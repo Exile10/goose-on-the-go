@@ -35,7 +35,7 @@ import { useBottomBarInset, useChromeScroll } from '@/providers/chrome-provider'
 import { useThemedStyles } from '@/hooks/use-themed-styles';
 import { selectionTick, toggle } from '@/services/haptics';
 import { deviceStyle } from '@/constants/device-style';
-import { ALL_ROOMS, UNASSIGNED_ROOM, roomLabel, supports, useDevices } from '@/view-models/use-devices';
+import { ALL_ROOMS, UNASSIGNED_ROOM, isAppWindow, roomLabel, supports, useDevices } from '@/view-models/use-devices';
 import { ContentUnavailable } from '@/components/patterns/content-unavailable';
 import { DeviceEditSheet } from '@/components/patterns/device-edit-sheet';
 import { isUnavailable } from '@/models/content-state';
@@ -82,15 +82,20 @@ const DeviceCard = React.memo(function DeviceCard({
 
   /**
    * What the device is doing where it says so, and reachability where it does
-   * not. Online is not the same fact as on, and it is labelled as one.
+   * not. Online is not the same fact as on, and it is labelled as one. A
+   * dashboard window is open or not, which is no fault either way.
    */
-  const detail = !device.is_online
-    ? t('common.offline')
-    : waiting !== undefined
-      ? t('devices.waitingForPond')
-      : power === undefined
-      ? t('common.online')
-      : t(power ? 'common.on' : 'common.off');
+  const appWindow = isAppWindow(device);
+  const offline = !device.is_online && !appWindow;
+  const detail = appWindow
+    ? t(device.is_online ? 'devices.app.open' : 'devices.app.notOpen')
+    : offline
+      ? t('common.offline')
+      : waiting !== undefined
+        ? t('devices.waitingForPond')
+        : power === undefined
+          ? t('common.online')
+          : t(power ? 'common.on' : 'common.off');
 
   return (
     <InkCard style={styles.card} pressable onPress={() => onEdit(device)}>
@@ -109,7 +114,7 @@ const DeviceCard = React.memo(function DeviceCard({
       <Text style={styles.name} numberOfLines={1}>
         {device.name}
       </Text>
-      <Text style={[styles.detail, (!device.is_online || waiting !== undefined) && styles.detailMuted]}>
+      <Text style={[styles.detail, (offline || waiting !== undefined) && styles.detailMuted]}>
         {detail}
       </Text>
     </InkCard>

@@ -17,7 +17,7 @@ import { isUnavailable, type ContentState } from '@/models/content-state';
 import type { IconName } from '@/constants/icons';
 import { toggle } from '@/services/haptics';
 import type { Device } from '@/services/types';
-import { supports } from '@/view-models/use-devices';
+import { isAppWindow, supports } from '@/view-models/use-devices';
 import type { HomeReminders } from '@/view-models/use-home-ideas';
 import type { RecentSession } from '@/view-models/use-recent-sessions';
 import { untilText, type NextRoutine, type NowPlaying, type Outdoor } from '@/view-models/use-right-now';
@@ -277,6 +277,8 @@ const DeviceTile = React.memo(function DeviceTile({
   const { t } = useTranslation();
   const { icon, color } = deviceStyle(device);
   const on = power ?? false;
+  const appWindow = isAppWindow(device);
+  const offline = !device.is_online && !appWindow;
   const handleToggle = useCallback(
     (next: boolean) => {
       void toggle();
@@ -298,12 +300,14 @@ const DeviceTile = React.memo(function DeviceTile({
       <Text style={styles.tileName} numberOfLines={1}>
         {device.name}
       </Text>
-      <Text style={[styles.tileState, !device.is_online && { color: theme.color.dangerFg }]}>
-        {!device.is_online
-          ? t('common.offline')
-          : power === undefined
-            ? t('common.online')
-            : t(power ? 'common.on' : 'common.off')}
+      <Text style={[styles.tileState, offline && { color: theme.color.dangerFg }]}>
+        {appWindow
+          ? t(device.is_online ? 'devices.app.open' : 'devices.app.notOpen')
+          : offline
+            ? t('common.offline')
+            : power === undefined
+              ? t('common.online')
+              : t(power ? 'common.on' : 'common.off')}
       </Text>
     </View>
   );

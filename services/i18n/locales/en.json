@@ -549,6 +549,10 @@
     "commandsExpired_other": "{{count}} waiting commands were not sent, because your Pond was out of reach for {{minutes}} minutes.",
     "allOffline": "Nothing is reachable",
     "allOfflineBody": "Your Pond lists these devices but cannot reach any of them right now.",
+    "app": {
+      "open": "Open",
+      "notOpen": "Not open"
+    },
     "addDevice": "Add a device",
     "search": "Search devices",
     "noMatch": "No device matches “{{query}}”",

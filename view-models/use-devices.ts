@@ -91,6 +91,16 @@ export function supports(device: Device, verb: string): boolean {
 }
 
 /**
+ * The Pond's browser dashboard or its desktop app, both paired as `desktop`.
+ *
+ * Its `is_online` says whether a window is open, so unreachable means nobody has
+ * one open, not that something failed.
+ */
+export function isAppWindow(device: Device): boolean {
+  return device.device_type?.toLowerCase() === 'desktop';
+}
+
+/**
  * Reachable devices first, then by name.
  *
  * A household accumulates devices that are unplugged, moved or replaced, and
