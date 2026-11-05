@@ -32,6 +32,8 @@ const KEYS = {
   lastWorkingModels: '@goose/last-working-models',
   /** The order of Home's widgets: how this phone's owner arranged it, so it outlives a Pond. */
   homeLayout: '@goose/home-layout',
+  /** Whether From your Pond is folded to its first suggestion on Home, as this phone's owner left it. */
+  homeIdeasCollapsed: '@goose/home-ideas-collapsed',
 } as const;
 
 /**

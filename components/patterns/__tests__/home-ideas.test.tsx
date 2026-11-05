@@ -26,7 +26,6 @@ const ROW: ProposalRow = { id: 'p1', summary: 'Turn the porch light off at 23:00
 function props(over: Partial<HomeIdeasProps> = {}): HomeIdeasProps {
   return {
     proposals: [],
-    moreProposals: 0,
     agent: null,
     deciding: null,
     onAccept: jest.fn(),
@@ -43,8 +42,14 @@ async function render(element: React.ReactElement) {
   return tree;
 }
 
+// Markdown sets a paragraph's runs as an array of children, so plain runs are joined back into its text.
 const texts = (tree: ReactTestRenderer) =>
-  tree.root.findAllByType(Text).flatMap((t) => (typeof t.props.children === 'string' ? [t.props.children] : []));
+  tree.root.findAllByType(Text).flatMap((t) => {
+    const children: unknown = t.props.children;
+    if (typeof children === 'string') return [children];
+    if (Array.isArray(children) && children.every((c) => typeof c === 'string')) return [children.join('')];
+    return [];
+  });
 
 const button = (tree: ReactTestRenderer, label: string): ReactTestInstance =>
   tree.root.findAllByType(InkButton).find((b) => b.props.children === label)!;
@@ -80,11 +85,54 @@ describe('HomeIdeas', () => {
     expect(buttons.filter((b) => b.props.children === i18n.t('proposals.card.deciding'))).toHaveLength(1);
   });
 
-  it('offers the rest only when there are more', async () => {
-    const tree = await render(<HomeIdeas {...props({ proposals: [ROW], moreProposals: 3 })} />);
-    expect(texts(tree)).toContain(i18n.t('home.ideas.more', { count: 3 }));
-    const solo = await render(<HomeIdeas {...props({ proposals: [ROW] })} />);
-    expect(texts(solo)).not.toContain(i18n.t('home.ideas.more', { count: 0 }));
+  it('shows every suggestion it is given, each with its own answers', async () => {
+    const rows = ['p1', 'p2', 'p3', 'p4'].map((id, i) => ({ ...ROW, id, summary: `Suggestion ${i + 1}` }));
+    const tree = await render(<HomeIdeas {...props({ proposals: rows })} />);
+    expect(texts(tree)).toEqual(expect.arrayContaining(rows.map((r) => r.summary)));
+    expect(tree.root.findAllByType(InkButton)).toHaveLength(rows.length * 2);
+  });
+
+  it('sets a suggestion and its reason as markdown, not as the raw marks', async () => {
+    const tree = await render(
+      <HomeIdeas {...props({ proposals: [{ ...ROW, summary: 'Dim the **porch** light?', rationale: '- Five nights\n- After 23:00' }] })} />,
+    );
+    const shown = texts(tree).join(' ');
+    expect(shown).toContain('porch');
+    expect(shown).not.toContain('**');
+    expect(shown).not.toMatch(/^- /m);
+    expect(texts(tree)).toEqual(expect.arrayContaining(['Five nights', 'After 23:00']));
+  });
+
+  it('folds to the first suggestion and a count of the rest, and back, from its own header', async () => {
+    const onToggleCollapsed = jest.fn();
+    const rows = ['p1', 'p2', 'p3'].map((id, i) => ({ ...ROW, id, summary: `Suggestion ${i + 1}` }));
+    const agent = { template: 'welcome-back', title: 'Welcome back', when: 'When you come home' };
+    const folded = await render(<HomeIdeas {...props({ proposals: rows, agent, collapsed: true, onToggleCollapsed })} />);
+    expect(texts(folded)).toContain('Suggestion 1');
+    expect(texts(folded)).not.toContain('Suggestion 2');
+    expect(texts(folded)).not.toContain(i18n.t('home.ideas.agent', { title: 'Welcome back' }));
+    expect(texts(folded)).toContain(i18n.t('home.ideas.moreWaiting', { count: 3 }));
+    expect(folded.root.findAllByType(InkButton)).toHaveLength(2);
+
+    act(() => folded.root.findAllByType(GPressable).find((p) => p.props.accessibilityLabel === i18n.t('home.ideas.showName'))!.props.onPress());
+    expect(onToggleCollapsed).toHaveBeenCalledTimes(1);
+
+    const open = await render(<HomeIdeas {...props({ proposals: rows, agent, onToggleCollapsed })} />);
+    expect(texts(open)).toContain(i18n.t('home.ideas.hide'));
+    expect(texts(open)).toContain('Suggestion 3');
+    expect(open.root.findAllByType(InkButton)).toHaveLength(6);
+  });
+
+  it('keeps an agent idea that is the only thing in it when folded, and offers no fold for one thing', async () => {
+    const agent = { template: 'welcome-back', title: 'Welcome back', when: 'When you come home' };
+    const tree = await render(<HomeIdeas {...props({ agent, collapsed: true, onToggleCollapsed: jest.fn() })} />);
+    expect(texts(tree)).toContain(i18n.t('home.ideas.agent', { title: 'Welcome back' }));
+    expect(texts(tree)).not.toContain(i18n.t('home.ideas.show'));
+  });
+
+  it('offers no fold while it only says that nothing waits', async () => {
+    const tree = await render(<HomeIdeas {...props({ quiet: true, onToggleCollapsed: jest.fn() })} />);
+    expect(texts(tree)).not.toContain(i18n.t('home.ideas.hide'));
   });
 
   it('leads an agent idea to the Agents screen', async () => {

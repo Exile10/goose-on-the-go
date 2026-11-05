@@ -27,11 +27,20 @@ interface Span {
   size: number;
 }
 
+/**
+ * How large the text is set: a reply's body (`md`), a card's title, or a card's quieter lines in
+ * Ink's own `base` and `sm`. Below `md`, headings shrink with it: a card has no room for a reply's.
+ */
+export type MarkdownSize = 'md' | 'title' | 'base' | 'sm';
+
 /** Where a block sits: a quote recolours what it holds, and a nested list changes its bullet. */
 interface Place {
   theme: Theme;
   tone: string;
   depth: number;
+  size: MarkdownSize;
+  /** Off inside a card: selectable text on Android takes the touch the card is waiting for. */
+  selectable: boolean;
 }
 
 /** Quicksand at 13px, erring wide; every row of a column needs one width, so it is estimated, not measured. */
@@ -127,12 +136,25 @@ function inline(token: MarkedToken, place: Place, span: Span, key: number): Reac
   }
 }
 
-function paragraph(tokens: Token[] | undefined, text: string, place: Place, key: number) {
+function bodySpec(place: Place): InkTextSpec {
   const { theme, tone } = place;
-  const body = inkText(theme, { size: 'md', leading: 'base', color: tone });
-  const span: Span = { role: 'body', weight: theme.weight.regular, italic: false, size: theme.size.md };
+  if (place.size === 'title') {
+    return { role: 'display', size: 'lg', weight: theme.weight.bold, tracking: 'snug', leading: 'snug', color: tone };
+  }
+  return { size: place.size, leading: 'base', color: tone };
+}
+
+function bodySpan(place: Place): Span {
+  const spec = bodySpec(place);
+  const { theme } = place;
+  return { role: spec.role ?? 'body', weight: spec.weight ?? theme.weight.regular, italic: false, size: theme.size[spec.size ?? 'md'] };
+}
+
+function paragraph(tokens: Token[] | undefined, text: string, place: Place, key: number) {
+  const body = inkText(place.theme, bodySpec(place));
+  const span = bodySpan(place);
   return (
-    <Text key={key} selectable style={body.style}>
+    <Text key={key} selectable={place.selectable} style={body.style}>
       {tokens ? spans(tokens, place, span) : decodeEntities(text)}
     </Text>
   );
@@ -141,7 +163,9 @@ function paragraph(tokens: Token[] | undefined, text: string, place: Place, key:
 function heading(token: Tokens.Heading, place: Place, key: number) {
   const { theme, tone } = place;
   const spec: InkTextSpec =
-    token.depth === 1
+    place.size !== 'md'
+      ? { ...bodySpec(place), weight: token.depth <= 3 ? theme.weight.bold : theme.weight.semibold, leading: 'snug' }
+      : token.depth === 1
       ? { role: 'display', size: 'xl', weight: theme.weight.bold, tracking: 'title', leading: 'snug', color: tone }
       : token.depth === 2
         ? { role: 'display', size: 'lg', weight: theme.weight.bold, leading: 'snug', color: tone }
@@ -157,7 +181,7 @@ function heading(token: Tokens.Heading, place: Place, key: number) {
   return (
     <Text
       key={key}
-      selectable
+      selectable={place.selectable}
       accessibilityRole="header"
       style={[inkText(theme, spec).style, key > 0 ? styles.headingGap : null]}
     >
@@ -179,7 +203,7 @@ function code(token: Tokens.Code, place: Place, key: number) {
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={[styles.codeScroll, lang ? styles.codeAfterLang : null]}
       >
-        <Text selectable style={text.style}>
+        <Text selectable={place.selectable} style={text.style}>
           {token.text}
         </Text>
       </ScrollView>
@@ -203,7 +227,7 @@ function marker(token: Tokens.List, item: Tokens.ListItem, index: number, place:
   }
   if (token.ordered) {
     const first = typeof token.start === 'number' ? token.start : 1;
-    const number = inkText(theme, { size: 'md', leading: 'base', color: theme.color.textSecondary });
+    const number = inkText(theme, { ...bodySpec(place), weight: theme.weight.regular, color: theme.color.textSecondary });
     return <Text style={[number.style, styles.number]}>{`${first + index}.`}</Text>;
   }
   const ink = theme.color.textSecondary;
@@ -213,8 +237,7 @@ function marker(token: Tokens.List, item: Tokens.ListItem, index: number, place:
 }
 
 function list(token: Tokens.List, place: Place, key: number) {
-  const { theme } = place;
-  const line = inkText(theme, { size: 'md', leading: 'base' }).style.lineHeight;
+  const line = inkText(place.theme, bodySpec(place)).style.lineHeight;
   const first = typeof token.start === 'number' ? token.start : 1;
   // Wide enough for the longest number, so every item's text starts on one edge.
   const width = token.ordered ? 10 + 8 * String(first + token.items.length - 1).length : 14;
@@ -253,7 +276,7 @@ function table(token: Tokens.Table, place: Place, key: number) {
       >
         {cells.map((cell, c) => (
           <View key={c} style={[styles.cell, { width: widths[c] }]}>
-            <Text selectable style={[text.style, { textAlign: cell.align ?? 'left' }]}>
+            <Text selectable={place.selectable} style={[text.style, { textAlign: cell.align ?? 'left' }]}>
               {spans(cell.tokens, place, span)}
             </Text>
           </View>
@@ -312,14 +335,33 @@ function blocks(tokens: Token[] | undefined, place: Place): React.ReactNode[] {
   return (tokens ?? []).map((token, i) => block(token as MarkedToken, place, i));
 }
 
-export const Markdown = React.memo(function Markdown({ source }: { source: string }) {
+export interface MarkdownProps {
+  source: string;
+  size?: MarkdownSize;
+  tone?: 'primary' | 'secondary' | 'tertiary';
+  selectable?: boolean;
+}
+
+export const Markdown = React.memo(function Markdown({
+  source,
+  size = 'md',
+  tone = 'primary',
+  selectable = true,
+}: MarkdownProps) {
   const theme = useInkTheme();
   const tokens = useMemo(() => parseReply(source), [source]);
-  return <View style={styles.page}>{blocks(tokens, { theme, tone: theme.color.text, depth: 0 })}</View>;
+  const color =
+    tone === 'secondary' ? theme.color.textSecondary : tone === 'tertiary' ? theme.color.textTertiary : theme.color.text;
+  return (
+    <View style={size === 'md' ? styles.page : styles.compact}>
+      {blocks(tokens, { theme, tone: color, depth: 0, size, selectable })}
+    </View>
+  );
 });
 
 const styles = StyleSheet.create({
   page: { gap: 12 },
+  compact: { gap: 6 },
   headingGap: { marginTop: 8 },
   link: { textDecorationLine: 'underline' },
   struck: { textDecorationLine: 'line-through' },

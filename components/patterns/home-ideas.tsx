@@ -1,6 +1,7 @@
 /**
- * HomeIdeas — what the Pond has thought of, as Home's widget: its suggestion, decided in place, and
- * an agent it could run. AskRow is Ask Goose: a field that opens a conversation, and the questions it offers.
+ * HomeIdeas — what the Pond has thought of, as Home's widget: every suggestion, decided in place
+ * and set as markdown, and an agent it could run. The widget grows to hold them all, and folds to
+ * the first one for whoever would rather not scroll past the rest. AskRow is Ask Goose: a field that opens a conversation, and the questions it offers.
  *
  * Deciding in place is acceptable only because a yes runs nothing: the Pond records it and
  * `ProposalDecisionResult.executed` is always false. If that changes, the buttons belong back on
@@ -14,6 +15,8 @@ import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { InkButton, InkText, inkText, useInkTheme } from '@jarida/ink/native';
 
+import { Markdown } from '@/components/patterns/markdown';
+
 import { GIcon } from '@/components/ui/g-icon';
 import { GPressable } from '@/components/ui/g-pressable';
 import { selectionTick, tap } from '@/services/haptics';
@@ -23,23 +26,39 @@ import { WidgetHeader } from './home-widgets';
 
 export interface HomeIdeasProps {
   proposals: ProposalRow[];
-  moreProposals: number;
   agent: AgentIdea | null;
   deciding: string | null;
   /** Both reads answered with nothing: said, so an empty widget is not mistaken for a failed one. */
   quiet?: boolean;
+  /** Folded to the first suggestion, and a count of the rest. */
+  collapsed?: boolean;
+  onToggleCollapsed?: () => void;
   onAccept: (id: string) => void;
   onDecline: (id: string) => void;
 }
 
-export function HomeIdeas({ proposals, moreProposals, agent, deciding, quiet = false, onAccept, onDecline }: HomeIdeasProps) {
+export function HomeIdeas({
+  proposals,
+  agent,
+  deciding,
+  quiet = false,
+  collapsed = false,
+  onToggleCollapsed,
+  onAccept,
+  onDecline,
+}: HomeIdeasProps) {
   const theme = useInkTheme();
   const styles = makeStyles(theme);
   const { t } = useTranslation();
-  const router = useRouter();
 
   // What a decision came to is said in the app's snackbar, which outlives the suggestion it answered.
   if (proposals.length === 0 && !agent && !quiet) return null;
+
+  // Folded, the first thing stays whole and the rest wait behind Show all.
+  const waiting = proposals.length + (agent ? 1 : 0);
+  const shown = collapsed ? proposals.slice(0, 1) : proposals;
+  const showAgent = !!agent && (!collapsed || proposals.length === 0);
+  const hidden = waiting - shown.length - (showAgent ? 1 : 0);
 
   return (
     <View>
@@ -47,22 +66,24 @@ export function HomeIdeas({ proposals, moreProposals, agent, deciding, quiet = f
         icon="sparkle"
         title={t('home.ideas.title')}
         action={
-          moreProposals > 0
+          // Nothing to fold away with one thing in it.
+          onToggleCollapsed && waiting > 1
             ? {
-                label: t('home.ideas.more', { count: moreProposals }),
+                label: t(collapsed ? 'home.ideas.show' : 'home.ideas.hide'),
+                name: t(collapsed ? 'home.ideas.showName' : 'home.ideas.hideName'),
                 onPress: () => {
                   void selectionTick();
-                  router.push('/(stack)/suggestions');
+                  onToggleCollapsed();
                 },
               }
             : null
         }
       />
 
-      {proposals.map((p, i) => (
+      {shown.map((p, i) => (
         <View key={p.id} style={[styles.proposal, i > 0 && styles.divided]}>
-          <Text style={styles.summary}>{p.summary}</Text>
-          {p.rationale ? <Text style={styles.why}>{p.rationale}</Text> : null}
+          <Markdown source={p.summary} size="title" selectable={false} />
+          {p.rationale ? <Markdown source={p.rationale} size="sm" tone="secondary" selectable={false} /> : null}
           {/* Against the right edge, where the thumb is, and after the reason: a yes follows what it answers. */}
           <View style={styles.actions}>
             <InkButton variant="quiet" disabled={deciding !== null} onPress={() => onDecline(p.id)}>
@@ -81,7 +102,15 @@ export function HomeIdeas({ proposals, moreProposals, agent, deciding, quiet = f
         </InkText>
       ) : null}
 
-      {agent ? <AgentLine agent={agent} divided={proposals.length > 0} /> : null}
+      {showAgent && agent ? <AgentLine agent={agent} divided={shown.length > 0} /> : null}
+
+      {hidden > 0 ? (
+        <View style={styles.more}>
+          <InkText size="sm" tone="secondary">
+            {t('home.ideas.moreWaiting', { count: hidden })}
+          </InkText>
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -108,14 +137,8 @@ function AgentLine({ agent, divided }: { agent: AgentIdea; divided: boolean }) {
       </View>
       <View style={styles.agentWords}>
         {/* Named as an agent: an agent's title alone, "Welcome back", reads as a greeting. */}
-        <Text style={styles.agentTitle} numberOfLines={1}>
-          {t('home.ideas.agent', { title: agent.title })}
-        </Text>
-        {agent.when ? (
-          <Text style={styles.why} numberOfLines={1}>
-            {agent.when}
-          </Text>
-        ) : null}
+        <Text style={styles.agentTitle}>{t('home.ideas.agent', { title: agent.title })}</Text>
+        {agent.when ? <Text style={styles.why}>{agent.when}</Text> : null}
       </View>
       <GIcon name="chevron-right" size={16} color={theme.color.textTertiary} strokeWidth={2.5} />
     </GPressable>
@@ -186,9 +209,9 @@ const makeStyles = (theme: ReturnType<typeof useInkTheme>) =>
   StyleSheet.create({
     proposal: { gap: theme.space[1] },
     divided: { borderTopWidth: theme.edge.hairlineWidth, borderTopColor: theme.color.line, marginTop: theme.space[3], paddingTop: theme.space[3] },
-    summary: inkText(theme, { role: 'display', size: 'lg', weight: theme.weight.bold, tracking: 'snug', leading: 'snug' }).style,
     why: inkText(theme, { size: 'sm', color: theme.color.textSecondary }).style,
     actions: { flexDirection: 'row', justifyContent: 'flex-end', gap: theme.space[2], marginTop: theme.space[3] },
+    more: { marginTop: theme.space[3] },
     agent: { flexDirection: 'row', alignItems: 'center', gap: theme.space[3] },
     agentIcon: {
       width: 32,

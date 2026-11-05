@@ -101,7 +101,12 @@
     "lineOutdoor": "{{temp}}° outside",
     "ideas": {
       "title": "From your Pond",
-      "more": "{{count}} more",
+      "hide": "Show less",
+      "show": "Show all",
+      "hideName": "Show only the first thing your Pond suggests",
+      "showName": "Show everything your Pond suggests",
+      "moreWaiting_one": "{{count}} more waiting",
+      "moreWaiting_other": "{{count}} more waiting",
       "quiet": "Nothing needs you right now.",
       "agent": "Try the {{title}} agent",
       "agentLabel": "Agent idea: {{title}}, {{when}}"

@@ -230,9 +230,10 @@ export default function HomeScreen() {
             node: (
               <HomeIdeas
                 proposals={ideas.data.proposals}
-                moreProposals={ideas.data.moreProposals}
                 agent={ideas.data.agent}
                 deciding={ideas.deciding}
+                collapsed={ideas.collapsed}
+                onToggleCollapsed={ideas.actions.toggleCollapsed}
                 onAccept={(id) => void ideas.actions.approve(id)}
                 onDecline={(id) => void ideas.actions.decline(id)}
               />

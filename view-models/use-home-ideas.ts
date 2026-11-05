@@ -8,22 +8,17 @@
  */
 
 import { bytesToHex } from '@noble/hashes/utils.js';
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { useServer } from '@/providers/server-provider';
 import { randomBytes } from '@/services/secure-random';
+import { Storage } from '@/services/storage';
 import type { AgentSuggestion } from '@/services/types';
 import { useAgentsSource } from './agents-source';
 import { useLive } from './use-live';
 import { useProposals, type ProposalRow } from './use-proposals';
 import { useReminders, type ReminderRow } from './use-reminders';
 import { useSuggestions, type OfferedPrompt } from './use-suggestions';
-
-/**
- * One decision at a time. Two cards took most of a phone's first screen and pushed the facts below
- * the fold; the rest wait one tap away, on the screen that lists them.
- */
-export const HOME_PROPOSAL_LIMIT = 1;
 
 /** Three chips is one or two lines on a phone; more and the row becomes a paragraph. */
 export const HOME_PROMPT_LIMIT = 3;
@@ -50,10 +45,8 @@ export interface HomeReminders {
 
 export interface UseHomeIdeas {
   data: {
-    /** The Pond's suggestions, for the board's From your Pond widget. */
+    /** Every suggestion the Pond offers, for the board's From your Pond widget, which grows to hold them. */
     proposals: ProposalRow[];
-    /** How many are offered beyond the ones on Home, for the link to the rest. */
-    moreProposals: number;
     prompts: PondPrompt[];
     agent: AgentIdea | null;
     reminders: HomeReminders | null;
@@ -66,10 +59,13 @@ export interface UseHomeIdeas {
    * failed is not quiet: it is unknown, and Home says nothing rather than "nothing needs you".
    */
   quiet: boolean;
+  /** From your Pond folded to its first suggestion. A preference of this phone, kept across launches. */
+  collapsed: boolean;
   actions: {
     approve: (id: string) => Promise<void>;
     decline: (id: string) => Promise<void>;
     taken: (prompt: OfferedPrompt) => void;
+    toggleCollapsed: () => void;
   };
 }
 
@@ -111,6 +107,24 @@ export function useHomeIdeas(): UseHomeIdeas {
     hydrated,
   );
 
+  const [collapsed, setCollapsed] = useState(false);
+  useEffect(() => {
+    let live = true;
+    void Storage.get('homeIdeasCollapsed')
+      .then((stored) => {
+        if (live && stored === '1') setCollapsed(true);
+      })
+      .catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, []);
+  // A convenience, not a record: a write that fails costs the next launch the fold and nothing else.
+  const toggleCollapsed = useCallback(() => {
+    setCollapsed(!collapsed);
+    void Storage.set('homeIdeasCollapsed', collapsed ? '0' : '1').catch(() => undefined);
+  }, [collapsed]);
+
   const prompts = useMemo(
     () => suggestions.data.prompts.filter((p): p is PondPrompt => p.id !== null).slice(0, HOME_PROMPT_LIMIT),
     [suggestions.data.prompts],
@@ -125,8 +139,9 @@ export function useHomeIdeas(): UseHomeIdeas {
       approve: (id: string) => decide(id, 'approve'),
       decline: (id: string) => decide(id, 'reject'),
       taken,
+      toggleCollapsed,
     }),
-    [decide, taken],
+    [decide, taken, toggleCollapsed],
   );
 
   const rows = proposals.data.rows;
@@ -135,8 +150,7 @@ export function useHomeIdeas(): UseHomeIdeas {
 
   return {
     data: {
-      proposals: rows.slice(0, HOME_PROPOSAL_LIMIT),
-      moreProposals: Math.max(0, rows.length - HOME_PROPOSAL_LIMIT),
+      proposals: rows,
       prompts,
       agent,
       reminders: pending.length > 0 ? { first: pending[0], more: pending.length - 1 } : null,
@@ -144,6 +158,7 @@ export function useHomeIdeas(): UseHomeIdeas {
     },
     deciding: proposals.deciding,
     quiet: settled(proposals) && settled(reminders) && rows.length === 0 && pending.length === 0,
+    collapsed,
     actions,
   };
 }

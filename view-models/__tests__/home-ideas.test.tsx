@@ -3,6 +3,7 @@
  * you, and that a decision's confirmation goes away by itself.
  */
 
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import React from 'react';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 
@@ -10,7 +11,6 @@ import { ApiError, api } from '@/services/api-client';
 import type { AgentSuggestion, Proposal, Reminder, Suggestion } from '@/services/types';
 import {
   HOME_PROMPT_LIMIT,
-  HOME_PROPOSAL_LIMIT,
   useHomeIdeas,
   type UseHomeIdeas,
 } from '@/view-models/use-home-ideas';
@@ -137,19 +137,17 @@ afterEach(() => {
 });
 
 describe('useHomeIdeas', () => {
-  it('puts the first suggestions on the board, from the first, and counts the rest', async () => {
+  it('puts every suggestion on the board, in the order the Pond gave', async () => {
     pond.listProposals.mockResolvedValue(['p1', 'p2', 'p3', 'p4'].map(proposal));
     const m = await mount();
 
-    expect(m.vm.data.proposals.map((p) => p.id)).toEqual(['p1', 'p2', 'p3', 'p4'].slice(0, HOME_PROPOSAL_LIMIT));
-    expect(m.vm.data.moreProposals).toBe(4 - HOME_PROPOSAL_LIMIT);
+    expect(m.vm.data.proposals.map((p) => p.id)).toEqual(['p1', 'p2', 'p3', 'p4']);
     await m.unmount();
   });
 
   it('has nothing to put on the board when the Pond proposed nothing', async () => {
     const m = await mount();
     expect(m.vm.data.proposals).toEqual([]);
-    expect(m.vm.data.moreProposals).toBe(0);
     await m.unmount();
   });
 
@@ -248,5 +246,32 @@ describe('useHomeIdeas', () => {
     act(() => m.vm.actions.taken(m.vm.data.prompts[0]));
     expect(pond.takeSuggestion).toHaveBeenCalledWith('a');
     await m.unmount();
+  });
+});
+
+describe('folding From your Pond', () => {
+  // The suite's resetAllMocks empties the storage mock's own implementation, so this keeps its own.
+  const kept = new Map<string, string>();
+  beforeEach(() => {
+    jest.mocked(AsyncStorage.getItem).mockImplementation(async (key: string) => kept.get(key) ?? null);
+    jest.mocked(AsyncStorage.setItem).mockImplementation(async (key: string, value: string) => {
+      kept.set(key, value);
+    });
+  });
+  afterEach(() => kept.clear());
+
+  it('opens unfolded, and keeps a fold for the next launch', async () => {
+    const first = await mount();
+    expect(first.vm.collapsed).toBe(false);
+    await act(async () => first.vm.actions.toggleCollapsed());
+    expect(first.vm.collapsed).toBe(true);
+    await first.unmount();
+
+    const next = await mount();
+    expect(next.vm.collapsed).toBe(true);
+    await act(async () => next.vm.actions.toggleCollapsed());
+    expect(next.vm.collapsed).toBe(false);
+    expect(await AsyncStorage.getItem('@goose/home-ideas-collapsed')).toBe('0');
+    await next.unmount();
   });
 });

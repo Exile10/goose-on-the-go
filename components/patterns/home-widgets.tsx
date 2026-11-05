@@ -9,6 +9,7 @@ import { useTranslation } from 'react-i18next';
 import { InkEmptyState, InkSwitch, InkText, inkText, useInkTheme } from '@jarida/ink/native';
 
 import { ContentUnavailable } from '@/components/patterns/content-unavailable';
+import { Markdown } from '@/components/patterns/markdown';
 import { EqualizerBars } from '@/components/ui/equalizer-bars';
 import { GIcon } from '@/components/ui/g-icon';
 import { GPressable } from '@/components/ui/g-pressable';
@@ -191,15 +192,9 @@ export function ConversationsWidget({ sessions, state, error, onRetry, onOpen, o
       {sessions.map((c, i) => (
         <GPressable key={c.id} style={[styles.row, i > 0 && styles.divided]} onPress={() => onOpen(c)}>
           <View style={styles.rowWords}>
-            <Text style={styles.rowText} numberOfLines={1}>
-              {c.text}
-            </Text>
+            <Text style={styles.rowText}>{c.text}</Text>
             {/* How it opened, under its name. Null when that is what the line above already says. */}
-            {c.preview ? (
-              <Text style={styles.rowPreview} numberOfLines={1}>
-                {c.preview}
-              </Text>
-            ) : null}
+            {c.preview ? <Markdown source={c.preview} size="sm" tone="secondary" selectable={false} /> : null}
           </View>
           <Text style={styles.rowTime}>{c.time}</Text>
         </GPressable>
@@ -333,12 +328,12 @@ const makeStyles = (theme: Theme) =>
     },
     bars: { marginTop: theme.space[3] },
 
-    row: { flexDirection: 'row', alignItems: 'center', gap: theme.space[3], minHeight: theme.rowHeight.md },
+    // Top-aligned: a row now runs as long as its preview, and the time belongs beside its name.
+    row: { flexDirection: 'row', alignItems: 'flex-start', gap: theme.space[3], minHeight: theme.rowHeight.md },
     divided: { borderTopWidth: theme.edge.hairlineWidth, borderTopColor: theme.color.line },
     rowWords: { flex: 1, gap: 1, paddingVertical: theme.space[2] },
     rowText: inkText(theme, { size: 'md' }).style,
-    rowPreview: inkText(theme, { size: 'sm', color: theme.color.textSecondary }).style,
-    rowTime: { ...inkText(theme, { size: 'sm', color: theme.color.textTertiary }).style, fontVariant: ['tabular-nums'] },
+    rowTime: { ...inkText(theme, { size: 'sm', color: theme.color.textTertiary }).style, fontVariant: ['tabular-nums'], paddingTop: theme.space[2] },
 
     grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: theme.space[2] },
     tile: {
