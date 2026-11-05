@@ -47,7 +47,7 @@ import {
   OutsideWidget,
   RememberWidget,
 } from '@/components/patterns/home-widgets';
-import { WidgetBoard, type BoardWidget } from '@/components/patterns/widget-board';
+import { WIDGET_GAP, WidgetBoard, type BoardWidget } from '@/components/patterns/widget-board';
 import { useHomeIdeas } from '@/view-models/use-home-ideas';
 import type { OfferedPrompt } from '@/view-models/use-suggestions';
 import { useHomeLayout, type HomeWidgetKey } from '@/view-models/use-home-layout';
@@ -102,7 +102,7 @@ function PondCard() {
 
   if (!hydrated) {
     return (
-      <InkCard style={styles.pond}>
+      <InkCard>
         <InkTitle level={2}>{t('pond.searching')}</InkTitle>
         <InkText>{t('pond.searchingBody')}</InkText>
       </InkCard>
@@ -116,6 +116,7 @@ function PondCard() {
       address={hostOf(pondUrls[0] ?? '')}
       note={t('pond.waitingBody')}
       onSwitch={() => router.push('/(stack)/switch-pond')}
+      style={styles.flush}
     />
   );
 }
@@ -169,6 +170,7 @@ export default function HomeScreen() {
   const chrome = useChromeScroll();
   const bottomInset = useBottomBarInset();
   const scroller = useRef<ScrollView>(null);
+  const cardsTop = useRef(0);
   const boardTop = useRef(0);
 
   // The clock is state, advanced once a minute while Home is in front, so render stays pure and
@@ -195,7 +197,7 @@ export default function HomeScreen() {
     void tap();
     layout.actions.edit();
     // Folded, the board fits on one screen; bring all of it into view, since the page holds still while widgets move.
-    scroller.current?.scrollTo({ y: Math.max(0, boardTop.current - Spacing.lg), animated: true });
+    scroller.current?.scrollTo({ y: Math.max(0, cardsTop.current + boardTop.current - Spacing.lg), animated: true });
   }, [layout.actions]);
 
   const shownDevices = devices.data.devices.slice(0, HOME_GRID_LIMIT);
@@ -400,47 +402,50 @@ export default function HomeScreen() {
 
         {offline ? null : <GlanceStrip figures={figures} />}
 
-        <PondCard />
+        {/* One column at the board's own gap, so a card that draws nothing leaves no space behind. */}
+        <View style={styles.cards} onLayout={(e) => (cardsTop.current = e.nativeEvent.layout.y)}>
+          <PondCard />
 
-        {/* Offered once per pairing, and declinable. It draws nothing unless
-            the Pond is reachable and remote access is off, so it sits under the
-            card that says the Pond is reachable. */}
-        {/* Whether Goose can answer yet matters more than reaching it from away, so it comes first. */}
-        <PondGettingReady />
-        <AgentsGettingReady />
-        {offline ? null : <RoomVoiceHome />}
-        <FinishSetup />
-        <InterviewOffer />
-        <RemoteAccessOffer />
+          {/* Offered once per pairing, and declinable. It draws nothing unless
+              the Pond is reachable and remote access is off, so it sits under the
+              card that says the Pond is reachable. */}
+          {/* Whether Goose can answer yet matters more than reaching it from away, so it comes first. */}
+          <PondGettingReady />
+          <AgentsGettingReady />
+          {offline ? null : <RoomVoiceHome />}
+          <FinishSetup />
+          <InterviewOffer />
+          <RemoteAccessOffer />
 
-        {offline ? null : (
-          <View onLayout={(e) => (boardTop.current = e.nativeEvent.layout.y)}>
-            {layout.editing ? (
-              <View style={styles.editBar}>
-                <Text style={styles.editHint}>{t('home.board.hint')}</Text>
-                <InkButton variant="quiet" onPress={layout.actions.reset}>
-                  {t('home.board.reset')}
-                </InkButton>
-                <InkButton variant="primary" onPress={layout.actions.done}>
-                  {t('common.done')}
-                </InkButton>
-              </View>
-            ) : null}
-            <WidgetBoard
-              widgets={widgets}
-              editing={layout.editing}
-              onEdit={edit}
-              onMove={layout.actions.move}
-              onStep={(key, delta) => layout.actions.step(key, delta, shown)}
-            />
-            {layout.editing ? null : (
-              <GPressable style={styles.editLink} hitSlop={8} accessibilityRole="button" onPress={edit}>
-                <GIcon name="grip" size={14} color={styles.editLinkText.color} />
-                <Text style={styles.editLinkText}>{t('home.board.edit')}</Text>
-              </GPressable>
-            )}
-          </View>
-        )}
+          {offline ? null : (
+            <View onLayout={(e) => (boardTop.current = e.nativeEvent.layout.y)}>
+              {layout.editing ? (
+                <View style={styles.editBar}>
+                  <Text style={styles.editHint}>{t('home.board.hint')}</Text>
+                  <InkButton variant="quiet" onPress={layout.actions.reset}>
+                    {t('home.board.reset')}
+                  </InkButton>
+                  <InkButton variant="primary" onPress={layout.actions.done}>
+                    {t('common.done')}
+                  </InkButton>
+                </View>
+              ) : null}
+              <WidgetBoard
+                widgets={widgets}
+                editing={layout.editing}
+                onEdit={edit}
+                onMove={layout.actions.move}
+                onStep={(key, delta) => layout.actions.step(key, delta, shown)}
+              />
+              {layout.editing ? null : (
+                <GPressable style={styles.editLink} hitSlop={8} accessibilityRole="button" onPress={edit}>
+                  <GIcon name="grip" size={14} color={styles.editLinkText.color} />
+                  <Text style={styles.editLinkText}>{t('home.board.edit')}</Text>
+                </GPressable>
+              )}
+            </View>
+          )}
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -487,8 +492,9 @@ const makeStyles = (c: ThemeColors) =>
   },
   pondDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: Semantic.success },
 
-  /* The plate sits 4px below the face, so every card reserves room for it. */
-  pond: { marginBottom: Spacing.lg },
+  cards: { gap: WIDGET_GAP },
+  // The column spaces Home's cards; the card's own margin is for screens that do not.
+  flush: { marginBottom: 0 },
 
   editBar: {
     flexDirection: 'row',

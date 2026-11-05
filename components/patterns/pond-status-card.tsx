@@ -8,7 +8,7 @@
  */
 
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { InkButton, InkCard, InkEyebrow, InkText } from '@jarida/ink/native';
@@ -30,9 +30,11 @@ export interface PondStatusCardProps {
   note?: string;
   /** Offers Switch Pond, for a screen that is not Switch Pond itself. */
   onSwitch?: () => void;
+  /** Layout from the screen around it, such as Home spacing its cards itself. */
+  style?: StyleProp<ViewStyle>;
 }
 
-export function PondStatusCard({ name, address, note, onSwitch }: PondStatusCardProps) {
+export function PondStatusCard({ name, address, note, onSwitch, style }: PondStatusCardProps) {
   const styles = useThemedStyles(makeStyles);
   const { t } = useTranslation();
   const router = useRouter();
@@ -40,7 +42,7 @@ export function PondStatusCard({ name, address, note, onSwitch }: PondStatusCard
   const label = status.reason ? `${status.title}. ${status.reason}` : status.title;
 
   return (
-    <InkCard style={styles.card} contentStyle={styles.content}>
+    <InkCard style={[styles.card, style]} contentStyle={styles.content}>
       <InkEyebrow>{t('pond.yours')}</InkEyebrow>
       <View style={styles.identity}>
         <GIcon name="server" size={18} />

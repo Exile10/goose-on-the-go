@@ -54,8 +54,11 @@ export interface WidgetBoardProps {
   onStep: (key: string, delta: -1 | 1) => void;
 }
 
-/** Between frames, before the plate's own offset, which makes the visible gap 12. */
-const GAP = 8;
+/**
+ * Between frames, before the plate's own offset, which makes the visible gap 12. Home stacks its
+ * cards above the board at the same gap, so every card on the screen stands as far from the next.
+ */
+export const WIDGET_GAP = 8;
 /** A folded widget: one line, tall enough to hold with a thumb. */
 const FOLDED = 52;
 const SETTLE = { duration: 220, easing: Easing.out(Easing.cubic) };
@@ -90,7 +93,7 @@ export function WidgetBoard({ widgets, editing, onEdit, onMove, onStep }: Widget
   const board = useMemo(() => {
     if (width === 0) return null;
     const tiles = widgets.filter((w) => heights[w.key] !== undefined).map(({ key, span }) => ({ key, span }));
-    return stagger(tiles, (key) => (editing ? FOLDED : heights[key] + plate), width, GAP);
+    return stagger(tiles, (key) => (editing ? FOLDED : heights[key] + plate), width, WIDGET_GAP);
   }, [widgets, heights, width, editing, plate]);
 
   const rects = useRef<Record<string, Rect>>({});
@@ -146,7 +149,7 @@ export function WidgetBoard({ widgets, editing, onEdit, onMove, onStep }: Widget
   }, []);
 
   const shown = widgets.map((w) => w.key);
-  const column = (width - GAP) / 2;
+  const column = (width - WIDGET_GAP) / 2;
 
   return (
     <GestureHandlerRootView>
