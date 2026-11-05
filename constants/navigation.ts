@@ -35,6 +35,8 @@ export const PROFILE_NAV: NavGroup[] = [
     groupKey: 'settings.menu.pond',
     items: [
       { id: 'myPond', labelKey: 'screens.myPond', icon: 'server', tile: 'amber', route: '/(stack)/pond' },
+      // Home no longer names the Pond it is connected to, so this is where another one is chosen.
+      { id: 'switchPond', labelKey: 'screens.switchPond', icon: 'updown', tile: 'amber', route: '/(stack)/switch-pond' },
     ],
   },
   {

@@ -15,8 +15,6 @@ import {
   InkEmptyState,
   InkText,
   InkTitle,
-  inkText,
-  useInkTheme,
 } from '@jarida/ink/native';
 import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -62,7 +60,7 @@ import { useServer } from '@/providers/server-provider';
 import { hostOf } from '@/services/discovery';
 import { tap } from '@/services/haptics';
 import type { Device } from '@/services/types';
-import { Brand, JaridaPurple, Semantic } from '@/constants/colors';
+import { Brand, JaridaPurple } from '@/constants/colors';
 import { FontSize, face } from '@/constants/typography';
 import { Spacing } from '@/constants/spacing';
 
@@ -118,36 +116,6 @@ function PondCard() {
       onSwitch={() => router.push('/(stack)/switch-pond')}
       style={styles.flush}
     />
-  );
-}
-
-/**
- * The Pond, connected: one line under the name rather than a card. It took a third of the screen
- * to say "connected" and offer two buttons; Ask Goose is now in the Ask row, and this line is the
- * way to another Pond.
- */
-function PondLine() {
-  const theme = useInkTheme();
-  const styles = useThemedStyles(makeStyles);
-  const { t } = useTranslation();
-  const { online, serverUrl, hydrated } = useServer();
-  const router = useRouter();
-
-  if (!hydrated || !online) return null;
-
-  return (
-    <GPressable
-      style={styles.pondLine}
-      hitSlop={8}
-      onPress={() => router.push('/(stack)/switch-pond')}
-      accessibilityRole="button"
-      accessibilityHint={t('pond.switch')}
-    >
-      <View style={styles.pondDot} />
-      <Text style={inkText(theme, { size: 'sm', color: theme.color.textSecondary }).style} numberOfLines={1}>
-        {t('home.connectedTo', { host: hostOf(serverUrl) })}
-      </Text>
-    </GPressable>
   );
 }
 
@@ -379,7 +347,6 @@ export default function HomeScreen() {
           <View style={styles.greetingText}>
             <Text style={styles.greetingLabel}>{t(greetingKey(now.getHours()))}</Text>
             <InkTitle level={1}>{firstName(member?.displayName) ?? t('home.you')}</InkTitle>
-            <PondLine />
           </View>
           <GPressable feedback="lift"
             style={styles.avatar}
@@ -483,14 +450,6 @@ const makeStyles = (c: ThemeColors) =>
     color: Brand.white,
   },
 
-  pondLine: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.xs + 2,
-    marginTop: Spacing.xs,
-    alignSelf: 'flex-start',
-  },
-  pondDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: Semantic.success },
 
   cards: { gap: WIDGET_GAP },
   // The column spaces Home's cards; the card's own margin is for screens that do not.

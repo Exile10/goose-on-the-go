@@ -89,7 +89,6 @@
     "shortcuts": "SHORTCUTS",
     "seeAll": "See all",
     "recentConversations": "RECENT CONVERSATIONS",
-    "connectedTo": "Connected to {{host}}",
     "saysReminders_one": "One reminder is waiting for you.",
     "saysReminders_other": "{{count}} reminders are waiting for you.",
     "saysQuiet": "Nothing needs you right now.",

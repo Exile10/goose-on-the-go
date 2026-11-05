@@ -40,7 +40,6 @@ Home answers two questions in order: whether the Pond wants anything from you, t
 |---|---|---|
 | Greeting | the phone's clock: morning from 5 until 12, afternoon until 17, evening after that (`greetingFor`) | |
 | Name and avatar | `readMember()`, above | no name when nobody has claimed the device |
-| "Connected to …" line | `useServer()`: the Pond's address, leading to Switch Pond | while connecting or unreachable, when the Pond card says so instead |
 | The Pond's sentence | `GET /api/v1/reminders`: how many reminders wait, leading to them; with none, "Nothing needs you right now." Suggestions are not said here: they are the From your Pond widget's | while anything is proposed, or the Pond cannot be reached; and "nothing needs you" when either read failed, since unknown is not quiet |
 | Glance line | "N devices on" from the device list, and the temperature with the place it is for | a phrase with no answer behind it is left out, and the line with it |
 | From your Pond: suggestions | `GET /api/v1/proposals`: every suggestion, as markdown, with its reason and Accept and Decline in place (`POST /proposals/{id}/decide`). Deciding in place is acceptable because a yes runs nothing: `executed` is always false. Folded, the first one and how many more wait | when none is offered |
