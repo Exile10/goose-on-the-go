@@ -2082,6 +2082,13 @@
     "marketplaceTitle": "Marketplace",
     "install": "Install",
     "installing": "Installing…",
+    "builtIn": {
+      "label": "Built in",
+      "on": "Web search is built in and already uses your Brave key.",
+      "needsKey": "Web search is built in. Add your Brave key to it instead; no extension is needed.",
+      "knowledgeOff": "Web search is built in. Turn on Knowledge in your Pond's settings to use it.",
+      "openWebSearch": "Open web search"
+    },
     "noneTitle": "No extensions yet",
     "noneBody": "Your Pond has no extensions installed, and none to add.",
     "status": {

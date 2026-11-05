@@ -9,6 +9,7 @@
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import React, { useCallback, useState } from 'react';
+import { useRouter } from 'expo-router';
 import { InkButton, InkEmptyState, InkNotice, InkSegmented, InkSpinner, InkSwitch, InkText, InkTitle, InkInput } from '@jarida/ink/native';
 import { RefreshControl, StyleSheet, Text, View } from 'react-native';
 
@@ -200,14 +201,16 @@ function CredentialsForm({
 }
 
 /** Marketplace entry not yet installed. */
-const MarketplaceCard = React.memo(function MarketplaceCard({
+export const MarketplaceCard = React.memo(function MarketplaceCard({
   item,
   installing,
   onInstall,
+  onOpenWebSearch,
 }: {
   item: MarketplaceExtension;
   installing: boolean;
   onInstall: (item: MarketplaceExtension) => void;
+  onOpenWebSearch: () => void;
 }) {
   const styles = useThemedStyles(makeStyles);
   const { t } = useTranslation();
@@ -224,27 +227,68 @@ const MarketplaceCard = React.memo(function MarketplaceCard({
         </View>
       </View>
 
-      <View style={styles.categoryRow}>
-        <View style={styles.categoryBadge}>
-          <Text style={styles.categoryText}>{item.category}</Text>
+      {item.built_in ? (
+        <BuiltInNote state={item.built_in_state} onOpenWebSearch={onOpenWebSearch} />
+      ) : (
+        <View style={styles.categoryRow}>
+          <View style={styles.categoryBadge}>
+            <Text style={styles.categoryText}>{item.category}</Text>
+          </View>
+          <InkButton
+            variant="quiet"
+            icon="plus"
+            onPress={() => onInstall(item)}
+            disabled={installing}
+          >
+            {installing ? t('extensions.installing') : t('extensions.install')}
+          </InkButton>
         </View>
-        <InkButton
-          variant="quiet"
-          icon="plus"
-          onPress={() => onInstall(item)}
-          disabled={installing}
-        >
-          {installing ? t('extensions.installing') : t('extensions.install')}
-        </InkButton>
-      </View>
+      )}
     </View>
   );
 });
+
+/**
+ * In place of Install for an entry the Pond already covers: says so, and points at the built-in
+ * capability when it still needs a key. An older Pond sends no state; the plain label then stands.
+ */
+function BuiltInNote({
+  state,
+  onOpenWebSearch,
+}: {
+  state: MarketplaceExtension['built_in_state'];
+  onOpenWebSearch: () => void;
+}) {
+  const styles = useThemedStyles(makeStyles);
+  const { t } = useTranslation();
+  const line =
+    state === 'on'
+      ? t('extensions.builtIn.on')
+      : state === 'needs_key'
+        ? t('extensions.builtIn.needsKey')
+        : state === 'knowledge_off'
+          ? t('extensions.builtIn.knowledgeOff')
+          : null;
+  return (
+    <View style={styles.builtIn}>
+      <View style={styles.categoryBadge}>
+        <Text style={styles.categoryText}>{t('extensions.builtIn.label')}</Text>
+      </View>
+      {line ? <Text style={styles.cardDesc}>{line}</Text> : null}
+      {state === 'needs_key' ? (
+        <InkButton variant="quiet" icon="search" onPress={onOpenWebSearch}>
+          {t('extensions.builtIn.openWebSearch')}
+        </InkButton>
+      ) : null}
+    </View>
+  );
+}
 
 export default function ExtensionsScreen() {
   const styles = useThemedStyles(makeStyles);
   const { t } = useTranslation();
   const confirm = useConfirm();
+  const router = useRouter();
   const { data, loading, error, failed, actions } = useExtensions();
   const [installingId, setInstallingId] = useState<string | null>(null);
   const [form, setForm] = useState<{ item: MarketplaceExtension; mode: FormMode } | null>(null);
@@ -398,6 +442,7 @@ export default function ExtensionsScreen() {
                 item={item}
                 installing={installingId === item.id}
                 onInstall={handleInstall}
+                onOpenWebSearch={() => router.push('/(stack)/web-search')}
               />
               {form?.mode === 'install' && form.item.id === item.id ? (
                 <CredentialsForm
@@ -484,6 +529,13 @@ const makeStyles = (c: ThemeColors) =>
   actionRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
+    gap: Spacing.sm,
+    marginTop: Spacing.md,
+  },
+
+  /* A marketplace entry the Pond already covers, in place of Install. */
+  builtIn: {
+    alignItems: 'flex-start',
     gap: Spacing.sm,
     marginTop: Spacing.md,
   },
