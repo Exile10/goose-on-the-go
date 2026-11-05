@@ -11,20 +11,29 @@ import { countRooms, initialOf, isSelfUnsupported, memberOf, mergeHousehold, rea
 
 const device = (id: string, room?: string): Device => ({ id, name: id, is_online: true, room });
 
+const read = <T,>(value: T): PromiseSettledResult<T> => ({ status: 'fulfilled', value });
+const refused = (status: number): PromiseSettledResult<never> => ({ status: 'rejected', reason: new ApiError('GET', status, null) });
+
 describe('countRooms', () => {
-  it('counts no rooms for a household with no devices', () => {
-    expect(countRooms([])).toBe(0);
+  it('counts the rooms the Pond keeps, empty ones too', () => {
+    expect(countRooms(read([{}, {}]), read([]))).toBe(2);
   });
 
-  // The Devices tab's own rule, from `groupByRoom`: a device with no room is Unassigned, which
-  // "is a fallback, not a room anyone named". A phone and a desktop with no rooms is a household
-  // of zero rooms, and the header saying one would contradict the tab beside it.
-  it('does not count Unassigned as a room', () => {
-    expect(countRooms([device('a'), device('b'), device('c', '  ')])).toBe(0);
+  // The Devices tab's own rule: a device with no room is Unassigned, which "is a fallback, not a
+  // room anyone named". A household with no rooms has zero, whatever its devices.
+  it('counts no rooms when the Pond has none', () => {
+    expect(countRooms(read([]), read([device('a'), device('b')]))).toBe(0);
   });
 
-  it('counts each named room once', () => {
-    expect(countRooms([device('a', 'Kitchen'), device('b', 'Kitchen'), device('c', 'Home'), device('d')])).toBe(2);
+  /** A Pond from before `/rooms` names rooms on its devices: each name once, Unassigned never. */
+  it('counts an older Pond’s rooms from the names its devices carry', () => {
+    const devices = [device('a', 'Kitchen'), device('b', 'Kitchen'), device('c', 'Home'), device('d'), device('e', '  ')];
+    expect(countRooms(refused(404), read(devices))).toBe(2);
+  });
+
+  it('is unknown when neither read can say', () => {
+    expect(countRooms(refused(500), read([device('a', 'Kitchen')]))).toBeNull();
+    expect(countRooms(refused(404), refused(500))).toBeNull();
   });
 });
 
@@ -91,7 +100,8 @@ describe('readHousehold', () => {
     return {
       deviceSelf: async () => ({ device_id: 'phone', profile: { id: 'p1', display_name: 'Liz' } }),
       systemInfo: async () => ({ hostname: 'giap-mac' }),
-      listDevices: async () => [device('lamp', 'Kitchen'), device('phone')],
+      listDevices: async () => [device('lamp'), device('phone')],
+      listRooms: async () => [{ id: 'kitchen', name: 'Kitchen' }],
       listSchedules: async () => [{} as never, {} as never],
       listProfiles: async () => [{} as never, {} as never, {} as never],
       ...overrides,

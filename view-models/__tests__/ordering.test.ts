@@ -11,9 +11,14 @@ import { groupByCategory } from '@/view-models/use-models';
 import { positionsFor, toMessage } from '@/view-models/use-chat';
 import type { Device, ModelEntry, SessionMessage } from '@/services/types';
 
-function device(name: string, online: boolean, room?: string): Device {
-  return { id: name, name, is_online: online, room, capabilities: [] } as Device;
+function device(name: string, online: boolean, roomId?: string): Device {
+  return { id: name, name, is_online: online, room_id: roomId, capabilities: [] } as Device;
 }
+
+const ROOMS = [
+  { id: 'kitchen', name: 'Kitchen' },
+  { id: 'study', name: 'Study' },
+];
 
 function model(category: ModelEntry['category'], name: string): ModelEntry {
   return { id: `${category}:${name}`, category, name, active: false };
@@ -33,17 +38,17 @@ describe('byReachability', () => {
 
 describe('groupByRoom', () => {
   it('sorts inside each room as well as between them', () => {
-    const rooms = groupByRoom([
-      device('lamp', false, 'Kitchen'),
-      device('kettle', true, 'Kitchen'),
-    ]);
+    const rooms = groupByRoom(
+      [device('lamp', false, 'kitchen'), device('kettle', true, 'kitchen')],
+      ROOMS,
+    );
     expect(rooms[0].devices.map((d) => d.name)).toEqual(['kettle', 'lamp']);
   });
 
   /** Unassigned is a fallback, not a room anyone named, so it sits last. */
   it('keeps the unassigned bucket at the end', () => {
-    const rooms = groupByRoom([device('x', true), device('y', true, 'Study')]);
-    expect(rooms.map((r) => r.name)).toEqual(['Study', UNASSIGNED_ROOM]);
+    const rooms = groupByRoom([device('x', true), device('y', true, 'study')], ROOMS);
+    expect(rooms.map((r) => r.id)).toEqual(['kitchen', 'study', UNASSIGNED_ROOM]);
   });
 });
 

@@ -20,6 +20,8 @@ import {
   mergePower,
   ALL_ROOMS,
   roomLabel,
+  legacyRooms,
+  nameTaken,
 } from '@/view-models/use-devices';
 import type { Device } from '@/services/types';
 import i18n from '@/services/i18n';
@@ -80,27 +82,76 @@ describe('parsePowerState', () => {
 });
 
 describe('groupByRoom', () => {
-  it('groups by the room the server recorded, alphabetically', () => {
-    const rooms = groupByRoom([
-      device({ id: 'a', room: 'Kitchen' }),
-      device({ id: 'b', room: 'Bedroom' }),
-      device({ id: 'c', room: 'Kitchen' }),
-    ]);
+  const ROOMS = [
+    { id: 'r-kitchen', name: 'Kitchen' },
+    { id: 'r-bedroom', name: 'Bedroom' },
+    { id: 'r-attic', name: 'Attic' },
+  ];
 
-    expect(rooms.map((r) => r.name)).toEqual(['Bedroom', 'Kitchen']);
-    expect(rooms[1].devices).toHaveLength(2);
+  it('groups by the room the server recorded, by name', () => {
+    const rooms = groupByRoom(
+      [
+        device({ id: 'a', room_id: 'r-kitchen' }),
+        device({ id: 'b', room_id: 'r-bedroom' }),
+        device({ id: 'c', room_id: 'r-kitchen' }),
+      ],
+      ROOMS,
+    );
+
+    expect(rooms.map((r) => r.name)).toEqual(['Attic', 'Bedroom', 'Kitchen']);
+    expect(rooms[2].devices).toHaveLength(2);
+  });
+
+  /** A room is the household's whether or not anything is in it yet. */
+  it('keeps a room with no devices in it', () => {
+    const rooms = groupByRoom([device({ id: 'a', room_id: 'r-kitchen' })], ROOMS);
+    expect(rooms.find((r) => r.id === 'r-attic')?.devices).toEqual([]);
   });
 
   /** A device with no room still has to appear, and it sorts last. */
   it('collects room-less devices under Unassigned, at the end', () => {
-    const rooms = groupByRoom([
-      device({ id: 'a' }),
-      device({ id: 'b', room: '  ' }),
-      device({ id: 'c', room: 'Attic' }),
-    ]);
+    const rooms = groupByRoom(
+      [device({ id: 'a' }), device({ id: 'b', room_id: null }), device({ id: 'c', room_id: 'r-attic' })],
+      ROOMS,
+    );
 
-    expect(rooms.map((r) => r.name)).toEqual(['Attic', UNASSIGNED_ROOM]);
-    expect(rooms[1].devices).toHaveLength(2);
+    expect(rooms.map((r) => r.id)).toEqual(['r-attic', 'r-bedroom', 'r-kitchen', UNASSIGNED_ROOM]);
+    expect(rooms[3].devices).toHaveLength(2);
+  });
+
+  /** Another phone made the room a moment ago; until it is read here, the device is in none. */
+  it('puts a device in a room this phone has not read yet under Unassigned', () => {
+    const rooms = groupByRoom([device({ id: 'a', room_id: 'r-new' })], []);
+    expect(rooms.map((r) => r.id)).toEqual([UNASSIGNED_ROOM]);
+  });
+});
+
+describe('legacyRooms', () => {
+  /** A Pond from before `/rooms` named rooms in each device's free text. */
+  it('makes one room per name a device carries, with its devices in it', () => {
+    const { rooms, devices } = legacyRooms([
+      device({ id: 'a', room: 'Kitchen ' }),
+      device({ id: 'b', room: 'Kitchen' }),
+      device({ id: 'c', room: '  ' }),
+    ]);
+    expect(rooms).toEqual([{ id: 'Kitchen', name: 'Kitchen' }]);
+    expect(groupByRoom(devices, rooms).map((r) => [r.id, r.devices.length])).toEqual([
+      ['Kitchen', 2],
+      [UNASSIGNED_ROOM, 1],
+    ]);
+  });
+});
+
+describe('nameTaken', () => {
+  const rooms = [{ id: 'k', name: 'Kitchen' }];
+
+  it('matches a name as a person reads it, trimmed and in any case', () => {
+    expect(nameTaken(rooms, ' kitchen ')).toBe(true);
+    expect(nameTaken(rooms, 'Study')).toBe(false);
+  });
+
+  it('lets a room keep its own name', () => {
+    expect(nameTaken(rooms, 'KITCHEN', 'k')).toBe(false);
   });
 });
 
@@ -162,19 +213,21 @@ describe('a poll does not undo what was done after it began', () => {
  */
 describe('room labels', () => {
   it('shows the fallback room and the all tab as copy, not as their ids', () => {
-    expect(roomLabel(UNASSIGNED_ROOM)).toBe(i18n.t('devices.roomUnassigned'));
-    expect(roomLabel(ALL_ROOMS)).toBe(i18n.t('devices.roomAll'));
-    expect(roomLabel(UNASSIGNED_ROOM)).not.toBe(UNASSIGNED_ROOM);
+    expect(roomLabel({ id: UNASSIGNED_ROOM, name: '' })).toBe(i18n.t('devices.roomUnassigned'));
+    expect(roomLabel({ id: ALL_ROOMS, name: '' })).toBe(i18n.t('devices.roomAll'));
+    expect(roomLabel({ id: UNASSIGNED_ROOM, name: '' })).not.toBe(UNASSIGNED_ROOM);
   });
 
   it('shows a room the household named exactly as it was named', () => {
-    expect(roomLabel('Kitchen')).toBe('Kitchen');
+    expect(roomLabel({ id: 'r1', name: 'Kitchen' })).toBe('Kitchen');
   });
 
   it('keeps a room literally named "Unassigned" apart from devices that have no room', () => {
-    const named = { id: 'a', name: 'a', is_online: true, room: 'Unassigned' } as Device;
+    const named = { id: 'a', name: 'a', is_online: true, room_id: 'r-u' } as Device;
     const none = { id: 'b', name: 'b', is_online: true } as Device;
-    expect(groupByRoom([named, none]).map((r) => r.name).sort()).toEqual(['Unassigned', UNASSIGNED_ROOM].sort());
+    const rooms = groupByRoom([named, none], [{ id: 'r-u', name: 'Unassigned' }]);
+    expect(rooms.map((r) => r.id)).toEqual(['r-u', UNASSIGNED_ROOM]);
+    expect(rooms.map(roomLabel)).toEqual(['Unassigned', i18n.t('devices.roomUnassigned')]);
   });
 });
 

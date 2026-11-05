@@ -14,7 +14,7 @@ import { useCallback, useState } from 'react';
 import { useServer } from '@/providers/server-provider';
 import { ApiError, api, type PondApiClient } from '@/services/api-client';
 import type { Device, DeviceSelf } from '@/services/types';
-import { UNASSIGNED_ROOM, groupByRoom } from './use-devices';
+import { legacyRooms } from './use-devices';
 import { useLive } from './use-live';
 
 export interface Member {
@@ -56,11 +56,17 @@ const UNREAD: Household = {
 };
 
 /**
- * Rooms somebody named. Built on `groupByRoom` rather than re-derived, so this header and the
- * Devices tab cannot disagree about how many rooms a household has.
+ * Rooms somebody named, from the two reads that can say: the Pond's list, or, from a Pond without
+ * `/rooms` (404), the names its devices carry. Unassigned is never one, as on the Devices tab. Null
+ * when the reads cannot say.
  */
-export function countRooms(devices: Device[]): number {
-  return groupByRoom(devices).filter((room) => room.name !== UNASSIGNED_ROOM).length;
+export function countRooms(
+  rooms: PromiseSettledResult<unknown[]>,
+  devices: PromiseSettledResult<Device[]>,
+): number | null {
+  if (rooms.status === 'fulfilled') return rooms.value.length;
+  const older = rooms.reason instanceof ApiError && rooms.reason.status === 404;
+  return older && devices.status === 'fulfilled' ? legacyRooms(devices.value).rooms.length : null;
 }
 
 /** How many a list read returned, or null when the read failed. */
@@ -111,24 +117,31 @@ export async function readMember(client: Pick<PondApiClient, 'deviceSelf'> = api
 }
 
 /** The reads the header needs, and no more of the client than that. */
-type HouseholdReader = Pick<PondApiClient, 'deviceSelf' | 'systemInfo' | 'listDevices' | 'listSchedules' | 'listProfiles'>;
+type HouseholdReader = Pick<PondApiClient, 'deviceSelf' | 'systemInfo' | 'listDevices' | 'listRooms' | 'listSchedules' | 'listProfiles'>;
 
 /**
  * Read the household in one pass. Never rejects: each read settles on its own, so one that fails
  * costs only its own figure, and it comes back as unknown rather than as zero.
  */
 export async function readHousehold(client: HouseholdReader = api): Promise<Household> {
-  const [member, [info, devices, schedules, profiles]] = await Promise.all([
+  const [member, [info, devices, schedules, profiles, rooms]] = await Promise.all([
     readMember(client),
-    Promise.allSettled([client.systemInfo(), client.listDevices(), client.listSchedules(), client.listProfiles()]),
+    Promise.allSettled([
+      client.systemInfo(),
+      client.listDevices(),
+      client.listSchedules(),
+      client.listProfiles(),
+      client.listRooms(),
+    ]),
   ]);
+
 
   return {
     member,
     pondName: info.status === 'fulfilled' ? info.value.hostname : null,
     counts: {
       devices: settledCount(devices),
-      rooms: devices.status === 'fulfilled' ? countRooms(devices.value) : null,
+      rooms: countRooms(rooms, devices),
       routines: settledCount(schedules),
       users: settledCount(profiles),
     },
