@@ -369,6 +369,46 @@ export function roleLabelKey(role: ModelUse) {
   }
 }
 
+/** What a model working beside a row adds to it, as the row reads: "Pictures included". */
+export function includedKey(use: ModelUse) {
+  switch (use) {
+    case 'pictures':
+      return 'models.library.included.pictures' as const;
+    case 'drafter':
+      return 'models.library.included.drafter' as const;
+    default:
+      return roleLabelKey(use);
+  }
+}
+
+/** What a model working beside the rows does, for its own page. */
+export function helperAboutKey(use: ModelUse) {
+  switch (use) {
+    case 'pictures':
+      return 'models.library.helperAbout.pictures' as const;
+    case 'drafter':
+      return 'models.library.helperAbout.drafter' as const;
+    case 'camera':
+      return 'models.library.helperAbout.camera' as const;
+    case 'faces':
+      return 'models.library.helperAbout.faces' as const;
+    default:
+      return roleLabelKey(use);
+  }
+}
+
+/** Who on the Pond relies on a model working beside the rows, for its own page. */
+export function helperUsedByKey(use: ModelUse) {
+  switch (use) {
+    case 'camera':
+      return 'models.library.usedBy.camera' as const;
+    case 'faces':
+      return 'models.library.usedBy.faces' as const;
+    default:
+      return 'models.library.usedBy.conversation' as const;
+  }
+}
+
 /** The heading of a section of the Models page. */
 export function sectionLabelKey(section: ModelSection) {
   switch (section) {

@@ -11,7 +11,7 @@ import { useTranslation } from 'react-i18next';
 import { RadioRow } from '@/components/settings/setting-controls';
 import { SettingsGroup, SettingsHeader, SettingsRow, TILE_INSET } from '@/components/settings/settings-list';
 import { SettingsScroll } from '@/components/settings/settings-scroll';
-import { candidatesFor, formatMegabytes, MODEL_ROLES, rollbackTarget, titleOf } from '@/models/model-library';
+import { candidatesFor, formatMegabytes, MODEL_ROLES, rollbackTarget, titleOf, usesOf } from '@/models/model-library';
 import { selectionTick } from '@/services/haptics';
 import type { ModelRole } from '@/services/types';
 import { roleAboutKey, roleLabelKey, useModelLibrary } from '@/view-models/use-model-library';
@@ -48,20 +48,23 @@ export default function ModelRoleScreen() {
       ) : null}
       <SettingsGroup>
         {candidates.length === 0 ? <SettingsRow label={t('models.library.noCandidates')} /> : null}
-        {candidates.map((m) => (
-          <RadioRow
-            key={m.id}
-            label={titleOf(m)}
-            description={[formatMegabytes(m.size_mb), m.engine?.label].filter(Boolean).join(' · ') || null}
-            selected={m.active}
-            disabled={lib.busy !== null}
-            onSelect={() => {
-              if (m.active) return;
-              void selectionTick();
-              void lib.actions.activate(m);
-            }}
-          />
-        ))}
+        {candidates.map((m) => {
+          const holds = usesOf(m).includes(role);
+          return (
+            <RadioRow
+              key={m.id}
+              label={titleOf(m)}
+              description={[formatMegabytes(m.size_mb), m.engine?.label].filter(Boolean).join(' · ') || null}
+              selected={holds}
+              disabled={lib.busy !== null}
+              onSelect={() => {
+                if (holds) return;
+                void selectionTick();
+                void lib.actions.activate(m);
+              }}
+            />
+          );
+        })}
       </SettingsGroup>
       <SettingsGroup inset={TILE_INSET}>
         <SettingsRow

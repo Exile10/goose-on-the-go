@@ -75,7 +75,16 @@ export function sectionOf(model: Pick<ModelEntry, 'section' | 'category'>): Mode
   return SECTION_OF_ROLE[roleOf(model)];
 }
 
-export type SectionEntry = { kind: 'model'; model: ModelEntry } | { kind: 'helper'; helper: HelperModel };
+/**
+ * The models working beside `model` that the Pond says serve it, such as its picture encoder or
+ * its drafter. They are part of the model, not models of their own.
+ */
+export function helpersOf(model: Pick<ModelEntry, 'category' | 'pond_category' | 'name'>, helpers: HelperModel[]): HelperModel[] {
+  const id = pondModelId(model);
+  return helpers.filter((h) => h.serves === id);
+}
+
+export type SectionEntry = { kind: 'model'; model: ModelEntry; helpers: HelperModel[] } | { kind: 'helper'; helper: HelperModel };
 
 export interface ModelSectionGroup {
   section: ModelSection;
@@ -85,11 +94,15 @@ export interface ModelSectionGroup {
 /**
  * What is on the Pond, by section in `MODEL_SECTIONS` order: every downloaded row, every row doing
  * a job even when the Pond fetched its weights itself (a built-in memory model has no file), and
- * the models in use beside the rows. Within a section the rows doing a job come first. Sections
- * with nothing in them are left out.
+ * the models in use beside the rows. A helper that serves a listed row goes with that row rather
+ * than standing alone; the rest (the camera's detector, face recognition) are listed in their own
+ * section. Within a section the rows doing a job come first. Sections with nothing in them are
+ * left out.
  */
 export function sectionsOnPond(models: ModelEntry[], helpers: HelperModel[]): ModelSectionGroup[] {
   const shown = models.filter((m) => isDownloaded(m) || usesOf(m).length > 0);
+  const served = new Set(shown.map(pondModelId));
+  const alone = helpers.filter((h) => !h.serves || !served.has(h.serves));
   const working = (m: ModelEntry) => (usesOf(m).length > 0 ? 0 : 1);
   return MODEL_SECTIONS.map((section) => ({
     section,
@@ -97,12 +110,20 @@ export function sectionsOnPond(models: ModelEntry[], helpers: HelperModel[]): Mo
       ...shown
         .filter((m) => sectionOf(m) === section)
         .sort((a, b) => working(a) - working(b))
-        .map((model): SectionEntry => ({ kind: 'model', model })),
-      ...helpers
+        .map((model): SectionEntry => ({ kind: 'model', model, helpers: helpersOf(model, helpers) })),
+      ...alone
         .filter((h) => (MODEL_SECTIONS.includes(h.section) ? h.section : 'other') === section)
         .map((helper): SectionEntry => ({ kind: 'helper', helper })),
     ],
   })).filter((g) => g.entries.length > 0);
+}
+
+/**
+ * True for a row whose weights the Pond fetches itself, such as a built-in memory model: there is
+ * no file to download, and choosing it is enough.
+ */
+export function fetchedByPond(model: Pick<ModelEntry, 'acquire'>): boolean {
+  return model.acquire === 'external';
 }
 
 /** The model holding a job, or null when nothing does. */
@@ -110,9 +131,9 @@ export function holderOf(models: ModelEntry[], role: ModelRole): ModelEntry | nu
   return models.find((m) => usesOf(m).includes(role)) ?? null;
 }
 
-/** Downloaded models that can hold a job and that this Pond can run. */
+/** Models that can hold a job, are on the Pond or fetched by it, and that this Pond can run. */
 export function candidatesFor(models: ModelEntry[], role: ModelRole): ModelEntry[] {
-  return models.filter((m) => roleOf(m) === role && isDownloaded(m) && m.available !== false);
+  return models.filter((m) => roleOf(m) === role && (isDownloaded(m) || fetchedByPond(m)) && m.available !== false);
 }
 
 /**
@@ -207,7 +228,7 @@ export function tooBig(model: Pick<ModelEntry, 'ram_estimate_mb'>, budgetMb: num
 /** The Pond's suggestions, best first, that are not already holding a job. */
 export function recommendations(models: ModelEntry[]): ModelEntry[] {
   const rank = (m: ModelEntry) => (m.recommended?.rank === 'primary' ? 0 : 1);
-  return models.filter((m) => m.recommended && !m.active).sort((a, b) => rank(a) - rank(b));
+  return models.filter((m) => m.recommended && usesOf(m).length === 0).sort((a, b) => rank(a) - rank(b));
 }
 
 export type SetupModelChoice =

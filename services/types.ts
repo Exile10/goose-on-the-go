@@ -561,6 +561,11 @@ export interface ModelEntry {
   recommended?: { rank: string; reason: string };
   /** Separate downloads that extend the model, such as picture support. */
   companions?: ModelCompanion[];
+  /**
+   * How the Pond gets the weights: `download` through its own downloader, `external` fetched by the
+   * engine itself (a built-in memory model, Ollama), `unavailable` from nowhere it knows.
+   */
+  acquire?: 'download' | 'external' | 'unavailable';
   /** The jobs the Pond says this row is doing now, read from its settings. Missing on an older Pond. */
   roles?: ModelUse[];
   /** The section the Pond lists this row under. Missing on an older Pond. */

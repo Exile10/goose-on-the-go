@@ -23,7 +23,7 @@ import {
 import type { ChooseFn } from '@/providers/confirm-provider';
 import { tap } from '@/services/haptics';
 import type { DownloadAction, HelperModel, ModelEntry, ModelUse } from '@/services/types';
-import { roleLabelKey, type UseModelLibrary } from '@/view-models/use-model-library';
+import { includedKey, roleLabelKey, type UseModelLibrary } from '@/view-models/use-model-library';
 import { SettingsRow } from './settings-list';
 import { useSettingsColors, useSettingsStyles, type SettingsColors, type SettingsMetrics, type SettingsType } from './settings-theme';
 
@@ -130,10 +130,18 @@ function RoleBadges({ uses }: { uses: ModelUse[] }) {
   );
 }
 
-/** A model, with its size and engine under its name, and a badge for each job it is doing. */
-export function ModelRow({ model, onPress }: { model: ModelEntry; onPress: () => void }) {
+/** What the models working beside a row add to it, one phrase each: "Pictures included". */
+export function helperPhrases(helpers: HelperModel[], t: TFunction): string[] {
+  return helpers.flatMap((h) => knownUses(h.uses)).map((use) => t(includedKey(use)));
+}
+
+/**
+ * A model, with its size and engine under its name, what the models working beside it add, and a
+ * badge for each job it is doing.
+ */
+export function ModelRow({ model, helpers, onPress }: { model: ModelEntry; helpers: HelperModel[]; onPress: () => void }) {
   const { t } = useTranslation();
-  const facts = [formatMegabytes(model.size_mb), model.engine?.label].filter(Boolean).join(' · ');
+  const facts = [formatMegabytes(model.size_mb), model.engine?.label, ...helperPhrases(helpers, t)].filter(Boolean).join(' · ');
   const uses = usesOf(model);
   return (
     <SettingsRow
@@ -148,21 +156,27 @@ export function ModelRow({ model, onPress }: { model: ModelEntry; onPress: () =>
 }
 
 /**
- * A model the Pond has in use that is not a catalogue row, such as picture support or the camera's
- * detector: named by the Pond where it can, else by its job. There is nothing to open.
+ * A model the Pond has in use that serves no row of its own, such as the camera's detector or face
+ * recognition: named by the Pond where it can, else by its job. It opens what it does.
  */
-export function HelperRow({ helper, servesTitle }: { helper: HelperModel; servesTitle: string | null }) {
+export function HelperRow({ helper, onPress }: { helper: HelperModel; onPress: () => void }) {
   const { t } = useTranslation();
   const uses = knownUses(helper.uses);
-  const job = uses[0] ? t(roleLabelKey(uses[0])) : null;
-  const title = helper.title?.trim() || job || helper.id;
   return (
     <SettingsRow
-      label={title}
-      description={servesTitle ? t('models.library.serves', { name: servesTitle }) : null}
+      label={helperTitle(helper, t)}
       trailing={<RoleBadges uses={uses} />}
+      accessory="next"
+      trailingLabel={uses.map((u) => t(roleLabelKey(u))).join(', ') || null}
+      onPress={onPress}
     />
   );
+}
+
+/** A helper's name: the Pond's, else its job's, else its id. */
+export function helperTitle(helper: HelperModel, t: TFunction): string {
+  const job = knownUses(helper.uses)[0];
+  return helper.title?.trim() || (job ? t(roleLabelKey(job)) : null) || helper.id;
 }
 
 const makeStyles = (c: SettingsColors, type: SettingsType, m: SettingsMetrics) => ({
