@@ -34,8 +34,9 @@ jest.mock('@/view-models/use-devices', () => {
     useDevices: (): UseDevices => ({
       data: {
         devices: mockDevices,
-        rooms: actual.groupByRoom(mockDevices),
+        rooms: actual.groupByRoom(mockDevices, []),
         roomTabs: [],
+        roomsEditable: true,
         onlineCount: mockDevices.filter((d) => d.is_online).length,
         powerById: {},
         waitingById: {},

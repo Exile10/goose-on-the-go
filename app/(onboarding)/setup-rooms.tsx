@@ -8,7 +8,7 @@
  * setup would have gone, the owner's interview over Home, or Home.
  */
 
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -17,7 +17,7 @@ import { InkButton, InkChip, InkInput, InkNotice, InkSpinner, InkText, InkTitle 
 
 import { RoomSheet } from '@/components/patterns/room-sheet';
 import { GIcon } from '@/components/ui/g-icon';
-import { GKeyboardView } from '@/components/ui/g-keyboard-view';
+import { GKeyboardView, useFocusedInputReveal } from '@/components/ui/g-keyboard-view';
 import { GPressable } from '@/components/ui/g-pressable';
 import type { ThemeColors } from '@/constants/colors';
 import { Spacing } from '@/constants/spacing';
@@ -112,6 +112,8 @@ export default function SetupRoomsScreen() {
   const { data, error, actions } = setup;
   const [name, setName] = useState('');
   const [renaming, setRenaming] = useState<DeviceRoom | null>(null);
+  const scroll = useRef<ScrollView>(null);
+  const reveal = useFocusedInputReveal(() => scroll.current);
 
   const add = useCallback(
     async (room: string) => {
@@ -151,7 +153,7 @@ export default function SetupRoomsScreen() {
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
       <GKeyboardView>
-        <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+        <ScrollView ref={scroll} contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false} {...reveal}>
           <View style={styles.lead}>
             <InkTitle level={2}>{t('setupRooms.title')}</InkTitle>
             <InkText tone="secondary">{t('setupRooms.lead')}</InkText>
