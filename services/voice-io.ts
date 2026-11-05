@@ -186,13 +186,15 @@ export async function requestMicrophone(): Promise<MicPermission> {
  */
 export async function beginVoiceSession(): Promise<void> {
   if (!audio) return;
-  await audio.setAudioModeAsync({
-    allowsRecording: true,
-    playsInSilentMode: true,
-    shouldRouteThroughEarpiece: false,
-    interruptionMode: 'doNotMix',
-  });
+  await audio.setAudioModeAsync(VOICE_MODE);
 }
+
+const VOICE_MODE = {
+  allowsRecording: true,
+  playsInSilentMode: true,
+  shouldRouteThroughEarpiece: false,
+  interruptionMode: 'doNotMix',
+} as const;
 
 /** Hand the audio session back, so other apps' sound resumes. */
 export async function endVoiceSession(): Promise<void> {
@@ -230,7 +232,8 @@ export function playFile(
   onTime: (seconds: number) => void,
 ): { done: Promise<void>; stop: () => void } {
   if (!audio) return { done: Promise.resolve(), stop: () => {} };
-  let player: Player | null = audio.createAudioPlayer({ uri }, { updateInterval: 50 });
+  const a = audio;
+  let player: Player | null = a.createAudioPlayer({ uri }, { updateInterval: 50 });
   let settle: () => void = () => {};
   const done = new Promise<void>((resolve) => {
     settle = resolve;
@@ -246,7 +249,13 @@ export function playFile(
     onTime(status.currentTime);
     if (status.didJustFinish) finish();
   });
-  player.play();
+  // On iOS the microphone stream leaves the session record-only (expo-audio's
+  // `AudioStream.start` sets `.record` and nothing sets it back), and a reply
+  // played into that is silent, with no error. So the speaker is set up again
+  // before every reply, not only when voice mode opens.
+  a.setAudioModeAsync(VOICE_MODE)
+    .catch((e: unknown) => console.warn('[voice] could not set up the speaker', e instanceof Error ? e.message : e))
+    .then(() => player?.play());
   return {
     done,
     stop: () => {
