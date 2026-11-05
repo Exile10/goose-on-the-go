@@ -65,8 +65,6 @@ class PondNetworkService : Service() {
       return START_NOT_STICKY
     }
     refusal = null
-    }
-    refusal = null
     // The node is restarted by PondNetwork, not by the system: a service recreated without
     // its node would show a notification claiming a connection that does not exist.
     return START_NOT_STICKY
