@@ -32,6 +32,8 @@ const KEYS = {
   lastWorkingModels: '@goose/last-working-models',
   /** The order of Home's widgets: how this phone's owner arranged it, so it outlives a Pond. */
   homeLayout: '@goose/home-layout',
+  /** What the paired Pond said it can do, with its pin. Not a secret. */
+  pondCapabilities: '@goose/pond-capabilities',
 } as const;
 
 /**

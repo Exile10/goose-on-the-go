@@ -19,8 +19,9 @@ import { ApiError, api } from '@/services/api-client';
 import i18n from '@/services/i18n';
 import { showSnackbar } from '@/services/snackbar';
 import type { CreateScheduleRequest, Schedule } from '@/services/types';
-import { SAMPLE_SCHEDULES, isRule, timedSchedules } from '@/models/schedule';
+import { SAMPLE_SCHEDULES, isRule, pondAsksIfMissed, timedSchedules } from '@/models/schedule';
 import { describeApiError } from './describe-error';
+import { usePondCapability } from './use-pond-capability';
 import { MIN_POLL_MS, useLive } from './use-live';
 
 /** While something is running, its result is worth seeing promptly. */
@@ -40,6 +41,11 @@ export interface UseSchedules {
     schedules: Schedule[];
     /** Whether run starts and finishes are arriving as they happen, or by poll. */
     live: 'stream' | 'poll';
+    /**
+     * Whether a new schedule can be a routine and ask about a missed run. The Pond says so when
+     * paired, and on every schedule; either is enough, so a Pond with none yet still offers them.
+     */
+    offersRoutines: boolean;
   };
   loading: boolean;
   /**
@@ -79,6 +85,7 @@ export function describeScheduleError(e: unknown): string | null {
 export function useSchedules(): UseSchedules {
   const { hydrated, isScreenReal } = useServer();
   const real = isScreenReal('schedule');
+  const routines = usePondCapability('routines');
 
   const [all, setAll] = useState<Schedule[]>(() => (real ? [] : SAMPLE_SCHEDULES));
   const [loading, setLoading] = useState(real);
@@ -304,7 +311,11 @@ export function useSchedules(): UseSchedules {
   }, [setPaused, runNow]);
 
   return {
-    data: { schedules: timedSchedules(all), live },
+    data: {
+      schedules: timedSchedules(all),
+      live,
+      offersRoutines: (real && routines === true) || pondAsksIfMissed(all),
+    },
     loading,
     error,
     failed,

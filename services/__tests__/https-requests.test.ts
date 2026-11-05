@@ -35,3 +35,12 @@ it('rejects redirects and marks requests for native enforcement', async () => {
   const init = jest.mocked(fetch).mock.calls[0][1]!;
   expect(init.redirect).toBe('error'); expect(new Headers(init.headers).get('X-Pond-Transport')).toBe('1');
 });
+it('passes on what an accepted refresh says the Pond can do', async () => {
+  jest.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify({
+    accepted: true, session_token: 's2', refresh_token: 'r2', hostname: 'pond', server_version: '1',
+    capabilities: ['chat', 'routines'], rejection_reason: null,
+  }), { status: 200 }));
+  const client = new PondApiClient('https://pond.local:4443'); client.setRefreshToken('secret');
+  const said = jest.fn(); client.setOnCapabilities(said);
+  await client.handshakeRefresh(); expect(said).toHaveBeenCalledWith(['chat', 'routines']);
+});

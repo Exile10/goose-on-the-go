@@ -16,7 +16,7 @@ import { useContentState } from '@/view-models/use-content-state';
 import { useReloadOnPull } from '@/view-models/use-pull-to-refresh';
 import { ScheduleCard } from '@/components/patterns/schedule-card';
 import { ScheduleFormSheet } from '@/components/patterns/schedule-form-sheet';
-import { deviceTimeZone, pondAsksIfMissed } from '@/models/schedule';
+import { deviceTimeZone } from '@/models/schedule';
 import { useServer } from '@/providers/server-provider';
 import { selectionTick } from '@/services/haptics';
 import type { Schedule } from '@/services/types';
@@ -88,7 +88,7 @@ export function ScheduleTab() {
         open={creating}
         onClose={() => setCreating(false)}
         onCreate={actions.create}
-        asksIfMissed={pondAsksIfMissed(data.schedules)}
+        asksIfMissed={data.offersRoutines}
       />
     </View>
   );
