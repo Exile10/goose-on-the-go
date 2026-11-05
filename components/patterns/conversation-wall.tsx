@@ -2,16 +2,16 @@
  * ConversationWall — the cards, two columns wide, newest first.
  *
  * The desktop's wall is a CSS grid of 48px rows that each card spans three,
- * four or five of. This is the same grid worked out by hand: `placeOnWall`
- * decides the column and the row, and this file multiplies them into points.
- * Because a card's height follows from its weight alone, nothing is measured —
- * which is what Ink means when it leaves masonry out as "a layout rather than
- * a component", and why this one can be exact.
+ * four or five of. A card here grows to hold its whole preview instead, so
+ * each one goes under the shorter column at the height it drew. Until it has
+ * drawn, its weight's grid frame stands in for that height: the loading wall
+ * and a card far down the wall are both placed that way.
  *
- * It is also why it can window. Every card's frame is known before it draws,
- * so only the ones near the viewport are mounted: a Pond that has run a daily
- * schedule for a year has several hundred conversations, and each card is an
- * edge, a plate and an animated face.
+ * That is what lets it window. Every card has a frame before it draws, so only
+ * the ones near the viewport are mounted: a Pond that has run a daily schedule
+ * for a year has several hundred conversations, and each card is an edge, a
+ * plate and an animated face. The cards below one that measured differently
+ * move to match, which happens below the screen more often than on it.
  */
 
 import React, { useCallback, useMemo, useRef, useState } from 'react';
@@ -29,6 +29,7 @@ import { useInkTheme } from '@jarida/ink/native';
 
 import { ConversationCard, GhostCard } from '@/components/patterns/conversation-card';
 import {
+  WEIGHT_SPAN,
   placeOnWall,
   type CardWeight,
   type HistoryCard,
@@ -52,13 +53,23 @@ const MIN_COLUMN = 150;
 /** How far past the viewport cards stay mounted, in screen heights. */
 const OVERSCAN = 1;
 
+/** Before any card has drawn. */
+const NOT_DRAWN: ReadonlyMap<string, number> = new Map();
+
 /** The loading wall: the desktop's six, in its order. */
 const GHOSTS: CardWeight[] = ['card', 'tile', 'column', 'tile', 'card', 'tile'];
 
-function frames(weights: CardWeight[], width: number) {
+function columnsFor(width: number) {
   const inner = width - WALL_GUTTER * 2;
   const columns = (inner - WALL_GAP) / 2 >= MIN_COLUMN ? 2 : 1;
-  const column = Math.floor((inner - WALL_GAP * (columns - 1)) / columns);
+  return { columns, column: Math.floor((inner - WALL_GAP * (columns - 1)) / columns) };
+}
+
+const gridHeight = (weight: CardWeight) => WEIGHT_SPAN[weight] * ROW + (WEIGHT_SPAN[weight] - 1) * WALL_GAP;
+
+/** The loading wall, on the desktop's grid. */
+function frames(weights: CardWeight[], width: number) {
+  const { columns, column } = columnsFor(width);
   const slots = placeOnWall(weights, columns);
   const step = ROW + WALL_GAP;
   let height = 0;
@@ -70,6 +81,23 @@ function frames(weights: CardWeight[], width: number) {
       height: slot.span * ROW + (slot.span - 1) * WALL_GAP,
     };
     height = Math.max(height, frame.top + frame.height);
+    return frame;
+  });
+  return { placed, height };
+}
+
+/** The cards, each under the shorter column at its drawn height, or its grid height until it has drawn. */
+export function cardFrames(cards: HistoryCard[], width: number, drawn: ReadonlyMap<string, number>) {
+  const { columns, column } = columnsFor(width);
+  const tops = new Array<number>(columns).fill(0);
+  let height = 0;
+  const placed = cards.map((card) => {
+    let c = 0;
+    for (let i = 1; i < columns; i += 1) if (tops[i] < tops[c]) c = i;
+    const h = drawn.get(card.id) ?? gridHeight(card.weight);
+    const frame = { left: c * (column + WALL_GAP), top: tops[c], width: column, height: h };
+    tops[c] += h + WALL_GAP;
+    height = Math.max(height, frame.top + h);
     return frame;
   });
   return { placed, height };
@@ -122,8 +150,29 @@ export function ConversationWall({
   const theme = useInkTheme();
   const { width, height: screen } = useWindowDimensions();
 
-  const weights = useMemo(() => (loading ? GHOSTS : cards.map((c) => c.weight)), [cards, loading]);
-  const wall = useMemo(() => frames(weights, width), [weights, width]);
+  // Heights as drawn, kept while the wall is up so a card scrolled away keeps its place.
+  // A new width rewraps every preview, so what was measured at the old one no longer holds.
+  const [drawn, setDrawn] = useState<{ width: number; heights: ReadonlyMap<string, number> }>(() => ({
+    width,
+    heights: NOT_DRAWN,
+  }));
+  const onMeasure = useCallback(
+    (id: string, height: number) => {
+      setDrawn((prev) => {
+        const heights = prev.width === width ? prev.heights : NOT_DRAWN;
+        const was = heights.get(id);
+        if (heights === prev.heights && was !== undefined && Math.abs(was - height) < 0.5) return prev;
+        return { width, heights: new Map(heights).set(id, height) };
+      });
+    },
+    [width],
+  );
+  const heights = drawn.width === width ? drawn.heights : NOT_DRAWN;
+
+  const wall = useMemo(
+    () => (loading ? frames(GHOSTS, width) : cardFrames(cards, width, heights)),
+    [cards, loading, width, heights],
+  );
 
   // Where the cards begin inside the scroll content, below the header.
   const [wallTop, setWallTop] = useState(0);
@@ -152,12 +201,12 @@ export function ConversationWall({
   const near = (frame: { top: number; height: number }) =>
     frame.top + frame.height >= from && frame.top <= to;
 
-  const frameStyle = (frame: (typeof wall.placed)[number]): ViewStyle => ({
+  const frameStyle = (frame: (typeof wall.placed)[number], sized: boolean): ViewStyle => ({
     position: 'absolute',
     left: frame.left,
     top: frame.top,
     width: frame.width,
-    height: frame.height,
+    height: sized ? frame.height : undefined,
   });
 
   const showEmpty = !loading && cards.length === 0;
@@ -191,7 +240,7 @@ export function ConversationWall({
           accessibilityState={loading ? { busy: true } : undefined}
         >
           {loading
-            ? wall.placed.map((frame, i) => <GhostCard key={i} style={frameStyle(frame)} />)
+            ? wall.placed.map((frame, i) => <GhostCard key={i} style={frameStyle(frame, true)} />)
             : cards.map((card, i) => {
                 const frame = wall.placed[i];
                 if (!frame || !near(frame)) return null;
@@ -207,7 +256,8 @@ export function ConversationWall({
                     onDelete={onDelete}
                     onKeep={onKeep}
                     onToggle={onToggle}
-                    style={frameStyle(frame)}
+                    onMeasure={onMeasure}
+                    style={frameStyle(frame, false)}
                   />
                 );
               })}

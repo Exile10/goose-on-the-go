@@ -4,8 +4,9 @@
  * pond-desktop's history card, rebuilt from the native edge rather than
  * restyled: a raised face over its plate, driven down into it on touch, so it
  * reads as a key being struck rather than a rectangle getting darker. Inside,
- * the same four things in the same order — the mono "when", the title, a
- * preview that runs out rather than stopping, and the count at the foot.
+ * the same four things in the same order — the mono "when", the title, the
+ * preview, and the count at the foot. The card grows to hold all of the title
+ * and the preview, set as markdown, and tells the wall how tall it came out.
  *
  * Built on `InkEdge` rather than `InkCard` for one reason: `InkCard` fixes the
  * radius at `lg`, and a tall narrow tile at 14 reads as a form field. `xl` is
@@ -36,9 +37,10 @@ import {
 } from 'react-native';
 import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
-import { alpha, hitSlop } from '@jarida/ink';
+import { hitSlop } from '@jarida/ink';
 import { InkEdge, InkEyebrow, InkSkeleton, InkSpinner, inkText, useInkTheme } from '@jarida/ink/native';
 
+import { Markdown } from '@/components/patterns/markdown';
 import { GIcon } from '@/components/ui/g-icon';
 import { GPressable } from '@/components/ui/g-pressable';
 import type { HistoryCard } from '@/view-models/use-chat-history';
@@ -55,8 +57,10 @@ export interface ConversationCardProps {
   onDelete: (id: string) => void;
   onKeep: () => void;
   onToggle?: (id: string) => void;
-  /** The card's frame on the wall. Layout only. */
+  /** The card's frame on the wall. Layout only: its height is the card's own. */
   style?: StyleProp<ViewStyle>;
+  /** How tall the card drew, for the wall to place the cards under it. */
+  onMeasure?: (id: string, height: number) => void;
 }
 
 /** How long a finger rests before the card asks about deleting. The list's rows wait as long. */
@@ -121,7 +125,6 @@ export function deleteActions(confirming: boolean, t: TFunction) {
 function useCardText() {
   const theme = useInkTheme();
   return useMemo(() => {
-    const preview = inkText(theme, { size: 'base', color: theme.color.textTertiary });
     return {
       title: inkText(theme, {
         role: 'display',
@@ -130,8 +133,6 @@ function useCardText() {
         tracking: 'snug',
         leading: 'snug',
       }).style,
-      preview: preview.style,
-      previewLine: preview.style.lineHeight ?? 20,
       foot: inkText(theme, {
         role: 'mono',
         size: 'xs',
@@ -248,50 +249,6 @@ export function DeleteOrKeep({
   );
 }
 
-/**
- * The preview, cut at a whole line and faded over the last of it.
- *
- * The desktop masks the paragraph out, because "a hard ellipsis at a fixed
- * line count reads as truncation, a fade reads as more conversation below".
- * React Native has no mask, so the text stops at the last line that fits
- * (`clip`, not an ellipsis) and a gradient in the face's own colour runs over
- * it. Where the gradient is unsupported the text still ends on a whole line.
- */
-function Preview({ text }: { text: string }) {
-  const theme = useInkTheme();
-  const styles = useCardText();
-  const [lines, setLines] = useState<number | undefined>(undefined);
-
-  return (
-    <View
-      style={local.preview}
-      onLayout={(e) => {
-        const fit = Math.floor(e.nativeEvent.layout.height / styles.previewLine);
-        if (fit !== lines) setLines(fit);
-      }}
-    >
-      {lines === 0 ? null : (
-        <Text style={styles.preview} numberOfLines={lines} ellipsizeMode="clip">
-          {text}
-        </Text>
-      )}
-      <View
-        pointerEvents="none"
-        style={[
-          local.fade,
-          {
-            height: Math.round(styles.previewLine * 1.5),
-            experimental_backgroundImage: `linear-gradient(to bottom, ${alpha(
-              theme.color.surface,
-              0,
-            )}, ${theme.color.surface})`,
-          },
-        ]}
-      />
-    </View>
-  );
-}
-
 export const ConversationCard = React.memo(function ConversationCard({
   card,
   confirming,
@@ -303,6 +260,7 @@ export const ConversationCard = React.memo(function ConversationCard({
   onKeep,
   onToggle,
   style,
+  onMeasure,
 }: ConversationCardProps) {
   const theme = useInkTheme();
   const text = useCardText();
@@ -344,6 +302,7 @@ export const ConversationCard = React.memo(function ConversationCard({
       delayLongPress={LONG_PRESS_MS}
       onPressIn={() => setPressed(true)}
       onPressOut={() => setPressed(false)}
+      onLayout={onMeasure ? (e) => onMeasure(card.id, e.nativeEvent.layout.height) : undefined}
       style={style}
     >
       <InkEdge
@@ -351,17 +310,14 @@ export const ConversationCard = React.memo(function ConversationCard({
         // A flat card has no plate to be driven into, as with Ink's own choices.
         state={pressed && raised ? 'pressed' : 'rest'}
         radius={theme.radius.xl}
-        style={local.fill}
         contentStyle={local.face}
       >
         {/* The padding is here rather than on the face, so the face has none
             and the circle's corner inset means the same thing on every Yoga. */}
-        <View style={[local.fill, { padding: theme.space[4], gap: theme.space[2] }]}>
+        <View style={{ padding: theme.space[4], gap: theme.space[2] }}>
           <InkEyebrow>{card.when}</InkEyebrow>
-          <Text style={text.title} numberOfLines={3}>
-            {title}
-          </Text>
-          {card.preview ? <Preview text={card.preview} /> : <View style={local.fill} />}
+          <Text style={text.title}>{title}</Text>
+          {card.preview ? <Markdown source={card.preview} size="base" tone="tertiary" selectable={false} /> : null}
           {confirming ? (
             <DeleteOrKeep
               deleteLabel={t('chat.history.deleteLabel')}
@@ -418,9 +374,7 @@ export function GhostCard({ style }: { style?: StyleProp<ViewStyle> }) {
 
 const local = StyleSheet.create({
   fill: { flex: 1 },
-  face: { flex: 1, overflow: 'hidden' },
-  preview: { flex: 1, overflow: 'hidden' },
-  fade: { position: 'absolute', left: 0, right: 0, bottom: 0 },
+  face: { overflow: 'hidden' },
   confirm: { flexDirection: 'row', justifyContent: 'flex-end' },
   answer: {
     minHeight: ANSWER_HEIGHT,
