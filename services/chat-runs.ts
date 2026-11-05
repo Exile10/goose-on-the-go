@@ -73,7 +73,8 @@ export function applyFrame(reply: Message, frame: ChatFrame): Message {
         args: frame.input === undefined || frame.input === null ? '{}' : JSON.stringify(frame.input),
         status: 'running',
       };
-      return { ...reply, tools: [...tools, call] };
+      const worked = frame.working_notes ? setNotesAside(reply, frame.working_notes) : reply;
+      return { ...worked, tools: [...tools, call], stepFrom: worked.content.length };
     }
     case 'tool_result': {
       if (!frame.id) return reply;
@@ -97,6 +98,19 @@ export function applyFrame(reply: Message, frame: ChatFrame): Message {
     default:
       return reply;
   }
+}
+
+/**
+ * Working notes out of the answer and into the steps. The Pond's notes are the
+ * text since the last tool call, so they end the answer; should they not, that
+ * text is what goes.
+ */
+function setNotesAside(reply: Message, notes: string): Message {
+  const content = reply.content.endsWith(notes)
+    ? reply.content.slice(0, reply.content.length - notes.length)
+    : reply.content.slice(0, reply.stepFrom ?? 0);
+  const step = notes.trim();
+  return { ...reply, content, steps: step ? [...(reply.steps ?? []), step] : reply.steps };
 }
 
 /** Whether a frame says what Goose is doing; `statusFor` in use-chat words it. */
