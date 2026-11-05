@@ -48,7 +48,8 @@ import {
   RememberWidget,
 } from '@/components/patterns/home-widgets';
 import { WidgetBoard, type BoardWidget } from '@/components/patterns/widget-board';
-import { useHomeIdeas, type PondPrompt } from '@/view-models/use-home-ideas';
+import { useHomeIdeas } from '@/view-models/use-home-ideas';
+import type { OfferedPrompt } from '@/view-models/use-suggestions';
 import { useHomeLayout, type HomeWidgetKey } from '@/view-models/use-home-layout';
 import { useContentState } from '@/view-models/use-content-state';
 import { usePullToRefresh } from '@/view-models/use-pull-to-refresh';
@@ -183,7 +184,7 @@ export default function HomeScreen() {
   );
 
   const ask = useCallback(
-    (prompt: PondPrompt) => {
+    (prompt: OfferedPrompt) => {
       ideas.actions.taken(prompt);
       router.push({ pathname: '/conversation', params: { ask: prompt.prompt } });
     },

@@ -20,7 +20,8 @@ import { Markdown } from '@/components/patterns/markdown';
 import { GIcon } from '@/components/ui/g-icon';
 import { GPressable } from '@/components/ui/g-pressable';
 import { selectionTick, tap } from '@/services/haptics';
-import { HOME_PROMPT_LIMIT, type AgentIdea, type PondPrompt } from '@/view-models/use-home-ideas';
+import type { AgentIdea } from '@/view-models/use-home-ideas';
+import type { OfferedPrompt } from '@/view-models/use-suggestions';
 import type { ProposalRow } from '@/view-models/use-proposals';
 import { WidgetHeader } from './home-widgets';
 
@@ -146,20 +147,19 @@ function AgentLine({ agent, divided }: { agent: AgentIdea; divided: boolean }) {
 }
 
 export interface AskRowProps {
-  prompts: PondPrompt[];
-  onAsk: (prompt: PondPrompt) => void;
+  prompts: OfferedPrompt[];
+  onAsk: (prompt: OfferedPrompt) => void;
   onAskGoose: () => void;
 }
 
 /**
- * Ask Goose: a field to tap, which opens a conversation, then up to three of the Pond's own
- * questions as rows under "Try asking". With none offered, the field stands alone.
+ * Ask Goose: a field to tap, which opens a conversation, then what a new chat would offer to ask,
+ * whole, as rows under "Try asking". With none offered, the field stands alone.
  */
 export function AskRow({ prompts, onAsk, onAskGoose }: AskRowProps) {
   const theme = useInkTheme();
   const styles = makeStyles(theme);
   const { t } = useTranslation();
-  const offered = prompts.slice(0, HOME_PROMPT_LIMIT);
 
   return (
     <View>
@@ -180,12 +180,12 @@ export function AskRow({ prompts, onAsk, onAskGoose }: AskRowProps) {
         </View>
       </GPressable>
 
-      {offered.length > 0 ? (
+      {prompts.length > 0 ? (
         <>
           <Text style={styles.tryLabel}>{t('home.ask.tryAsking')}</Text>
-          {offered.map((prompt, i) => (
+          {prompts.map((prompt, i) => (
             <GPressable
-              key={prompt.id}
+              key={prompt.id ?? prompt.prompt}
               style={[styles.suggestion, i > 0 && styles.hairline]}
               accessibilityRole="button"
               accessibilityLabel={prompt.prompt}
@@ -193,9 +193,7 @@ export function AskRow({ prompts, onAsk, onAskGoose }: AskRowProps) {
               onPress={() => onAsk(prompt)}
             >
               <GIcon name="prompts" size={16} color={theme.color.accentLine} />
-              <Text style={styles.suggestionText} numberOfLines={2}>
-                {prompt.prompt}
-              </Text>
+              <Text style={styles.suggestionText}>{prompt.prompt}</Text>
               <GIcon name="chevron-right" size={16} color={theme.color.textTertiary} strokeWidth={2.5} />
             </GPressable>
           ))}

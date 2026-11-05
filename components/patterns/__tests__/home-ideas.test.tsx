@@ -180,12 +180,11 @@ describe('AskRow', () => {
     expect(onAsk).toHaveBeenCalledWith(PROMPTS[1]);
   });
 
-  it('shows at most three questions, each held to two lines', async () => {
-    const tree = await render(<AskRow prompts={PROMPTS} onAsk={jest.fn()} onAskGoose={jest.fn()} />);
-    const rows = suggestions(tree);
-    expect(rows.map((r) => r.props.accessibilityLabel)).toEqual(PROMPTS.slice(0, 3).map((p) => p.prompt));
-    expect(texts(tree)).not.toContain(PROMPTS[3].prompt);
-    expect(tree.root.findAllByType(Text).filter((t) => t.props.children === PROMPTS[0].prompt)[0].props.numberOfLines).toBe(2);
+  it('shows every question it is given, each whole, starters included', async () => {
+    const all = [...PROMPTS, { id: null, prompt: 'What can you do?', composed: false }];
+    const tree = await render(<AskRow prompts={all} onAsk={jest.fn()} onAskGoose={jest.fn()} />);
+    expect(suggestions(tree).map((r) => r.props.accessibilityLabel)).toEqual(all.map((p) => p.prompt));
+    expect(tree.root.findAllByType(Text).filter((t) => t.props.children === PROMPTS[0].prompt)[0].props.numberOfLines).toBeUndefined();
   });
 
   it('leaves out "Try asking" when the Pond offers no question', async () => {

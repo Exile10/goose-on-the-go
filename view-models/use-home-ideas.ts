@@ -7,11 +7,9 @@
  * every poll, and the two copies would disagree for a minute after every decision.
  */
 
-import { bytesToHex } from '@noble/hashes/utils.js';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { useServer } from '@/providers/server-provider';
-import { randomBytes } from '@/services/secure-random';
 import { Storage } from '@/services/storage';
 import type { AgentSuggestion } from '@/services/types';
 import { useAgentsSource } from './agents-source';
@@ -20,14 +18,9 @@ import { useProposals, type ProposalRow } from './use-proposals';
 import { useReminders, type ReminderRow } from './use-reminders';
 import { useSuggestions, type OfferedPrompt } from './use-suggestions';
 
-/** Three chips is one or two lines on a phone; more and the row becomes a paragraph. */
-export const HOME_PROMPT_LIMIT = 3;
-
 /** What the Pond can run changes with its devices and extensions, not from minute to minute. */
 export const AGENT_IDEAS_MS = 10 * 60_000;
 
-/** A prompt the Pond offered. A fixed starter carries no id, and is not an idea from the Pond. */
-export type PondPrompt = OfferedPrompt & { id: string };
 
 /** One agent the Pond could run, as Home names it. */
 export interface AgentIdea {
@@ -47,7 +40,8 @@ export interface UseHomeIdeas {
   data: {
     /** Every suggestion the Pond offers, for the board's From your Pond widget, which grows to hold them. */
     proposals: ProposalRow[];
-    prompts: PondPrompt[];
+    /** What a new chat offers to ask, the same list: the Pond's own questions, or the starters. */
+    prompts: OfferedPrompt[];
     agent: AgentIdea | null;
     reminders: HomeReminders | null;
     /** Pending reminders, for the sentence Home leads with when nothing is proposed. */
@@ -69,14 +63,6 @@ export interface UseHomeIdeas {
   };
 }
 
-/**
- * A label for the required `session_id` that names no real session. Borrowing one from the recent
- * list would quietly claim it: the Pond binds an unattributed session to the device's member on read.
- */
-function homeSessionLabel(): string {
-  return `gotg-home-${bytesToHex(randomBytes(16))}`;
-}
-
 export function toAgentIdea(suggestion: AgentSuggestion): AgentIdea {
   return {
     template: suggestion.template,
@@ -87,10 +73,10 @@ export function toAgentIdea(suggestion: AgentSuggestion): AgentIdea {
 
 export function useHomeIdeas(): UseHomeIdeas {
   const { hydrated } = useServer();
-  const [session] = useState(homeSessionLabel);
   const proposals = useProposals();
   const reminders = useReminders();
-  const suggestions = useSuggestions(session);
+  // Asked as a new chat asks, with no conversation, so Ask Goose offers what the chat would.
+  const suggestions = useSuggestions(null);
   const agents = useAgentsSource();
 
   const [agent, setAgent] = useState<AgentIdea | null>(null);
@@ -125,10 +111,7 @@ export function useHomeIdeas(): UseHomeIdeas {
     void Storage.set('homeIdeasCollapsed', collapsed ? '0' : '1').catch(() => undefined);
   }, [collapsed]);
 
-  const prompts = useMemo(
-    () => suggestions.data.prompts.filter((p): p is PondPrompt => p.id !== null).slice(0, HOME_PROMPT_LIMIT),
-    [suggestions.data.prompts],
-  );
+  const prompts = suggestions.data.prompts;
 
   // On the functions, not on the `actions` objects around them: both hooks build a fresh literal
   // every render, so depending on those would rebuild this every render and memoise nothing.

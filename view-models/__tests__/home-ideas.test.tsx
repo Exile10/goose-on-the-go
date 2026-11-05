@@ -9,11 +9,7 @@ import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 
 import { ApiError, api } from '@/services/api-client';
 import type { AgentSuggestion, Proposal, Reminder, Suggestion } from '@/services/types';
-import {
-  HOME_PROMPT_LIMIT,
-  useHomeIdeas,
-  type UseHomeIdeas,
-} from '@/view-models/use-home-ideas';
+import { useHomeIdeas, type UseHomeIdeas } from '@/view-models/use-home-ideas';
 
 jest.mock('@/services/pond-trust', () => ({ assertPondTrust: jest.fn().mockResolvedValue(undefined) }));
 jest.mock('@/services/secure-random', () => ({ randomBytes: (n: number) => new Uint8Array(n).fill(7) }));
@@ -151,23 +147,22 @@ describe('useHomeIdeas', () => {
     await m.unmount();
   });
 
-  // The fixed starters are right in an empty conversation and wrong here: the same chips every
-  // day would be chrome, and the row would claim the Pond had ideas it does not.
-  it('offers only the questions the Pond itself composed, never the fixed starters', async () => {
+  // Ask Goose offers what a new chat would: every question the Pond offers, or the starters.
+  it('offers every question a new chat would, and the starters when the Pond has none', async () => {
     const m = await mount();
-    expect(m.vm.data.prompts).toEqual([]);
+    expect(m.vm.data.prompts.length).toBeGreaterThan(0);
+    expect(m.vm.data.prompts.every((p) => p.id === null)).toBe(true);
     await m.unmount();
 
     pond.listSuggestions.mockResolvedValue({ suggestions: ['a', 'b', 'c', 'd'].map(offered), audience: 'personal' });
     const n = await mount();
-    expect(n.vm.data.prompts.map((p) => p.id)).toEqual(['a', 'b', 'c', 'd'].slice(0, HOME_PROMPT_LIMIT));
+    expect(n.vm.data.prompts.map((p) => p.id)).toEqual(['a', 'b', 'c', 'd']);
     await n.unmount();
   });
 
-  it('asks for suggestions under a label of its own, never a real conversation', async () => {
+  it('asks for suggestions as a new chat does, under no conversation', async () => {
     const m = await mount();
-    const [label] = pond.listSuggestions.mock.calls[0];
-    expect(label).toMatch(/^gotg-home-[0-9a-f]{32}$/);
+    expect(pond.listSuggestions).toHaveBeenCalledWith(null);
     await m.unmount();
   });
 
