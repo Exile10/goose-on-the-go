@@ -13,7 +13,7 @@ import { ContentUnavailable } from '@/components/patterns/content-unavailable';
 import { isUnavailable } from '@/models/content-state';
 import { useContentState } from '@/view-models/use-content-state';
 import { usePullToRefresh } from '@/view-models/use-pull-to-refresh';
-import { DownloadRow, ModelRow } from '@/components/settings/model-rows';
+import { DownloadRow, HelperRow, ModelRow } from '@/components/settings/model-rows';
 import { SettingsGroup, SettingsHeader, SettingsRow, TILE_INSET } from '@/components/settings/settings-list';
 import { SettingsScroll } from '@/components/settings/settings-scroll';
 import { voiceName } from '@/components/settings/special-rows';
@@ -24,12 +24,14 @@ import {
   holderOf,
   isDownloaded,
   MODEL_ROLES,
+  pondModelId,
   recommendations,
+  sectionsOnPond,
   titleOf,
 } from '@/models/model-library';
 import { selectionTick } from '@/services/haptics';
 import type { ModelRole } from '@/services/types';
-import { roleLabelKey, useModelLibrary } from '@/view-models/use-model-library';
+import { roleLabelKey, sectionLabelKey, useModelLibrary } from '@/view-models/use-model-library';
 import { usePondSettings } from '@/view-models/use-pond-settings';
 
 function roleHintKey(role: ModelRole) {
@@ -57,11 +59,11 @@ export default function ModelsScreen() {
   const pull = usePullToRefresh(lib.actions.refresh);
 
   const downloads = useMemo(() => downloadsByModel(lib.downloads).filter((d) => d.status !== 'done' && d.status !== 'cancelled'), [lib.downloads]);
-  const onPond = useMemo(() => lib.models.filter(isDownloaded), [lib.models]);
+  const sections = useMemo(() => sectionsOnPond(lib.models, lib.helpers), [lib.models, lib.helpers]);
   const suggested = useMemo(() => recommendations(lib.models).slice(0, 4), [lib.models]);
   const offPond = lib.models.filter((m) => !isDownloaded(m)).length;
   const titleFor = (modelId: string) => {
-    const model = lib.models.find((m) => `${m.pond_category || m.category}/${m.name}` === modelId);
+    const model = lib.models.find((m) => pondModelId(m) === modelId);
     return model ? titleOf(model) : modelId.split('/').pop() ?? modelId;
   };
 
@@ -135,12 +137,26 @@ export default function ModelsScreen() {
             </SettingsGroup>
           ) : null}
 
-          <SettingsGroup title={t('models.library.section.onPond')}>
-            {onPond.length === 0 ? <SettingsRow label={t('models.library.empty')} /> : null}
-            {onPond.map((m) => (
-              <ModelRow key={m.id} model={m} onPress={() => go('/(stack)/settings-model', { id: m.id })} />
-            ))}
-          </SettingsGroup>
+          {sections.length === 0 ? (
+            <SettingsGroup title={t('models.library.section.onPond')}>
+              <SettingsRow label={t('models.library.empty')} />
+            </SettingsGroup>
+          ) : null}
+          {sections.map(({ section, entries }) => (
+            <SettingsGroup key={section} title={t(sectionLabelKey(section))}>
+              {entries.map((entry) =>
+                entry.kind === 'model' ? (
+                  <ModelRow key={entry.model.id} model={entry.model} onPress={() => go('/(stack)/settings-model', { id: entry.model.id })} />
+                ) : (
+                  <HelperRow
+                    key={entry.helper.id}
+                    helper={entry.helper}
+                    servesTitle={entry.helper.serves ? titleFor(entry.helper.serves) : null}
+                  />
+                ),
+              )}
+            </SettingsGroup>
+          ))}
 
           <SettingsGroup title={t('models.library.section.getMore')} footer={t('models.library.footer.search')} inset={TILE_INSET}>
             <SettingsRow

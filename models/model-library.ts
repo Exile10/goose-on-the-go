@@ -3,7 +3,7 @@
  * what is downloading, and what the files cost in space.
  */
 
-import type { DownloadEntry, ModelEntry, ModelRole } from '@/services/types';
+import { MODEL_SECTIONS, type DownloadEntry, type HelperModel, type ModelEntry, type ModelRole, type ModelSection, type ModelUse } from '@/services/types';
 
 /** The jobs in the order the Models page lists them. */
 export const MODEL_ROLES: readonly ModelRole[] = ['chat', 'asr', 'tts', 'embedding'];
@@ -40,9 +40,74 @@ export function isDownloaded(model: Pick<ModelEntry, 'downloaded'>): boolean {
   return model.downloaded !== false;
 }
 
+const USES: readonly ModelUse[] = ['chat', 'tool', 'asr', 'tts', 'embedding', 'pictures', 'drafter', 'camera', 'faces'];
+
+/** Jobs this phone has words for; one a newer Pond adds is left off rather than shown raw. */
+export function knownUses(uses: readonly string[] | undefined): ModelUse[] {
+  return (uses ?? []).filter((u): u is ModelUse => (USES as readonly string[]).includes(u));
+}
+
+/**
+ * The jobs a row is doing. The Pond says so on each row, read from its settings; an older Pond
+ * does not, and there a row the Pond assigned does the one job its category can hold.
+ */
+export function usesOf(model: Pick<ModelEntry, 'roles' | 'active' | 'category'>): ModelUse[] {
+  if (Array.isArray(model.roles)) return knownUses(model.roles);
+  return model.active ? [roleOf(model)] : [];
+}
+
+/** `model` with `role` given to it or taken from it, as a change is shown before the Pond answers. */
+export function withRole(model: ModelEntry, role: ModelRole, holds: boolean): ModelEntry {
+  const roles = model.roles?.filter((r) => r !== role);
+  return { ...model, active: holds, roles: roles && holds ? [...roles, role] : roles };
+}
+
+const SECTION_OF_ROLE: Record<ModelRole, ModelSection> = {
+  chat: 'conversation',
+  asr: 'listening',
+  tts: 'speaking',
+  embedding: 'memory',
+};
+
+/** The section a row is listed under: the Pond's word, else (an older Pond) its category's job. */
+export function sectionOf(model: Pick<ModelEntry, 'section' | 'category'>): ModelSection {
+  if (model.section && (MODEL_SECTIONS as readonly string[]).includes(model.section)) return model.section;
+  return SECTION_OF_ROLE[roleOf(model)];
+}
+
+export type SectionEntry = { kind: 'model'; model: ModelEntry } | { kind: 'helper'; helper: HelperModel };
+
+export interface ModelSectionGroup {
+  section: ModelSection;
+  entries: SectionEntry[];
+}
+
+/**
+ * What is on the Pond, by section in `MODEL_SECTIONS` order: every downloaded row, every row doing
+ * a job even when the Pond fetched its weights itself (a built-in memory model has no file), and
+ * the models in use beside the rows. Within a section the rows doing a job come first. Sections
+ * with nothing in them are left out.
+ */
+export function sectionsOnPond(models: ModelEntry[], helpers: HelperModel[]): ModelSectionGroup[] {
+  const shown = models.filter((m) => isDownloaded(m) || usesOf(m).length > 0);
+  const working = (m: ModelEntry) => (usesOf(m).length > 0 ? 0 : 1);
+  return MODEL_SECTIONS.map((section) => ({
+    section,
+    entries: [
+      ...shown
+        .filter((m) => sectionOf(m) === section)
+        .sort((a, b) => working(a) - working(b))
+        .map((model): SectionEntry => ({ kind: 'model', model })),
+      ...helpers
+        .filter((h) => (MODEL_SECTIONS.includes(h.section) ? h.section : 'other') === section)
+        .map((helper): SectionEntry => ({ kind: 'helper', helper })),
+    ],
+  })).filter((g) => g.entries.length > 0);
+}
+
 /** The model holding a job, or null when nothing does. */
 export function holderOf(models: ModelEntry[], role: ModelRole): ModelEntry | null {
-  return models.find((m) => m.active && roleOf(m) === role) ?? null;
+  return models.find((m) => usesOf(m).includes(role)) ?? null;
 }
 
 /** Downloaded models that can hold a job and that this Pond can run. */
@@ -56,7 +121,7 @@ export function candidatesFor(models: ModelEntry[], role: ModelRole): ModelEntry
  */
 export function rollbackTarget(models: ModelEntry[], role: ModelRole, lastWorkingId: string | undefined): ModelEntry | null {
   if (!lastWorkingId) return null;
-  return candidatesFor(models, role).find((m) => m.id === lastWorkingId && !m.active) ?? null;
+  return candidatesFor(models, role).find((m) => m.id === lastWorkingId && !usesOf(m).includes(role)) ?? null;
 }
 
 /** The picture add-on a model offers, when it offers one. */

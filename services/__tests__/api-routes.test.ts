@@ -271,6 +271,14 @@ describe('a catalogue the server did not send', () => {
     ]);
   });
 
+  it('reads the models in use beside the rows, and none from a Pond that lists none', async () => {
+    const helper = { id: 'camera_detector', title: 'YOLOX-Nano', uses: ['camera'], section: 'pictures', serves: null };
+    setFetch(async () => reply(JSON.stringify({ chat: {}, helpers: [helper] })));
+    await expect(new PondApiClient('https://pond.test:4000').helperModels()).resolves.toEqual([helper]);
+    setFetch(async () => reply('{"chat":{}}'));
+    await expect(new PondApiClient('https://pond.test:4000').helperModels()).resolves.toEqual([]);
+  });
+
   /**
    * Nine wrappers share the unwrapping, so pinning it through one of them proves
    * little. Devices is the other end of the same helper: the Home and Devices

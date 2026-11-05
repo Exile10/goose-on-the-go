@@ -7,20 +7,22 @@ import React from 'react';
 import { Pressable, Text, View } from 'react-native';
 import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
+import { InkBadge } from '@jarida/ink/native';
 
 import { Spacing } from '@/constants/spacing';
 import {
   formatBytes,
   formatMegabytes,
   fractionDone,
+  knownUses,
   picturesOf,
-  roleOf,
   titleOf,
+  usesOf,
   type ModelDownload,
 } from '@/models/model-library';
 import type { ChooseFn } from '@/providers/confirm-provider';
 import { tap } from '@/services/haptics';
-import type { DownloadAction, ModelEntry } from '@/services/types';
+import type { DownloadAction, HelperModel, ModelEntry, ModelUse } from '@/services/types';
 import { roleLabelKey, type UseModelLibrary } from '@/view-models/use-model-library';
 import { SettingsRow } from './settings-list';
 import { useSettingsColors, useSettingsStyles, type SettingsColors, type SettingsMetrics, type SettingsType } from './settings-theme';
@@ -112,17 +114,53 @@ export function DownloadRow({
   );
 }
 
-/** A model, with its size and engine under its name, and the job it holds on the right. */
+/** A badge per job, in the Pond's order, or nothing for a model doing none. */
+function RoleBadges({ uses }: { uses: ModelUse[] }) {
+  const { t } = useTranslation();
+  const styles = useSettingsStyles(makeStyles);
+  if (uses.length === 0) return null;
+  return (
+    <View style={styles.badges}>
+      {uses.map((use) => (
+        <InkBadge key={use} tone="brand">
+          {t(roleLabelKey(use))}
+        </InkBadge>
+      ))}
+    </View>
+  );
+}
+
+/** A model, with its size and engine under its name, and a badge for each job it is doing. */
 export function ModelRow({ model, onPress }: { model: ModelEntry; onPress: () => void }) {
   const { t } = useTranslation();
   const facts = [formatMegabytes(model.size_mb), model.engine?.label].filter(Boolean).join(' · ');
+  const uses = usesOf(model);
   return (
     <SettingsRow
       label={titleOf(model)}
       description={facts || null}
-      value={model.active ? t(roleLabelKey(roleOf(model))) : null}
+      trailing={<RoleBadges uses={uses} />}
       accessory="next"
+      trailingLabel={uses.map((u) => t(roleLabelKey(u))).join(', ') || null}
       onPress={onPress}
+    />
+  );
+}
+
+/**
+ * A model the Pond has in use that is not a catalogue row, such as picture support or the camera's
+ * detector: named by the Pond where it can, else by its job. There is nothing to open.
+ */
+export function HelperRow({ helper, servesTitle }: { helper: HelperModel; servesTitle: string | null }) {
+  const { t } = useTranslation();
+  const uses = knownUses(helper.uses);
+  const job = uses[0] ? t(roleLabelKey(uses[0])) : null;
+  const title = helper.title?.trim() || job || helper.id;
+  return (
+    <SettingsRow
+      label={title}
+      description={servesTitle ? t('models.library.serves', { name: servesTitle }) : null}
+      trailing={<RoleBadges uses={uses} />}
     />
   );
 }
@@ -144,4 +182,5 @@ const makeStyles = (c: SettingsColors, type: SettingsType, m: SettingsMetrics) =
   controls: { flexDirection: 'row' as const, gap: Spacing.xs },
   control: { paddingHorizontal: Spacing.sm, paddingVertical: Spacing.xs, borderRadius: m.radius.sm },
   controlText: { ...type.value, color: c.accent },
+  badges: { flexDirection: 'row' as const, flexWrap: 'wrap' as const, justifyContent: 'flex-end' as const, gap: Spacing.xs, flexShrink: 1 },
 });
