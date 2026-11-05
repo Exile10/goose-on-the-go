@@ -89,11 +89,15 @@ export function rideOfferFromData(data: unknown): RideOffer | null {
 
 /**
  * The app screen a Pond notification asks a tap to open. The Pond puts it in
- * `Notification.data` as `{ open: "schedule", schedule_id, run_id }`, or as
- * `{ open: "devices" }`, `"chat"`, `"models"`, `"extensions"` or
- * `"remote_access"` (the Pond's `OpenScreen` in pond-core's
- * `mcp/ports/notification.rs`). The phone's own notice that a reply finished
- * names `{ open: "conversation", session_id }`.
+ * `Notification.data` as `{ open: "schedule", schedule_id, run_id }`, as
+ * `{ open: "chat", session_id }` (the conversation a long task was started from,
+ * or a reminder was heard in; `session_id` is left out when there is none), or as
+ * `{ open: "devices" }`, `"models"`, `"extensions"` or `"remote_access"` (the
+ * Pond's `OpenScreen` in pond-core's `mcp/ports/notification.rs`; the contract
+ * is "Route hints" in the Pond's `docs/architecture/notifications.md`). The
+ * phone's own notice that a reply finished names
+ * `{ open: "conversation", session_id }`, and a Pond `chat` hint with a
+ * conversation becomes the same route.
  *
  * Only these seven screens are accepted, and only ids of the shape the Pond
  * mints, so a notification can open one of them and nothing else. An older Pond
@@ -134,8 +138,12 @@ export function openRouteFromData(data: unknown): OpenRoute | null {
     }
     case 'devices':
       return { open: 'devices' };
-    case 'chat':
-      return { open: 'chat' };
+    case 'chat': {
+      // A Pond older than the conversation hint sends none, and a malformed id is dropped: the
+      // wall is still the right place to land.
+      const sessionId = pondId(data.session_id);
+      return sessionId ? { open: 'conversation', sessionId } : { open: 'chat' };
+    }
     case 'models':
       return { open: 'models' };
     case 'extensions':

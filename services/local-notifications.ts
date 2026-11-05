@@ -24,74 +24,133 @@ import { Linking, Platform } from 'react-native';
 
 import { router } from 'expo-router';
 
-import { linkFromData, openRouteFromData, rideOfferFromData, screenPath } from './notification-link';
+import { api, ApiError } from './api-client';
+import i18n from './i18n';
+
+import { linkFromData, openRouteFromData, rideOfferFromData, screenPath, type OpenRoute } from './notification-link';
 import type { ServerNotification } from './notification-stream';
 
 /**
- * Android groups notifications by channel, and the channel — not the individual
- * notification — decides whether one may interrupt. A security alert and a
- * schedule result should not arrive the same way, and replies get their own so
- * the phone's settings can quiet them without quieting the rest.
+ * How each category of notice reaches the user on Android, decided here and nowhere else.
+ *
+ * Android groups notifications by channel, and the channel, not the individual notification,
+ * decides whether one may interrupt: only a HIGH-importance channel pops up as a heads-up banner.
+ * Android never lets an app change a channel's importance once it exists (the user owns it from
+ * then on), so a category whose importance changes needs a new channel id, and the old id goes in
+ * `RETIRED_CHANNELS` to be deleted.
+ *
+ * - `alert`: something went wrong or needs looking at now (a failed pairing, a failed run, the
+ *   disk filling, remote access down). HIGH, with its own vibration.
+ * - `action_required`: a suggestion or reminder waiting for a yes or no, a missed run to answer,
+ *   a sign-in to redo. HIGH, on its own channel so the phone's settings can quiet suggestions
+ *   without quieting alerts. Before 2026-11-04 these shared the alerts channel, then named
+ *   "Security alerts", which none of them is.
+ * - `info`: news worth a glance (a schedule's result, a long task done, a device paired, a model
+ *   downloaded). HIGH: every one of these is something the household asked the Pond to do or to
+ *   say, so it is worth the interruption.
+ * - `reply`: the phone's own notice that a reply finished while nobody was reading it. DEFAULT,
+ *   so it waits in the shade: the person asked moments ago and is usually still in the app.
+ *
+ * A category this app does not know arrives as an update.
  */
-const ALERT_CHANNEL = 'giap-alerts';
-/**
- * Updates (schedule results, pairings, reminders) at HIGH importance, so they
- * pop up as a heads-up banner: Android shows one only for a HIGH channel. The
- * first Updates channel, `giap-info`, was DEFAULT, and Android never lets an app
- * raise an existing channel's importance (the user owns it once created), so
- * the HIGH one needs a new id and the old one is deleted.
- */
-const INFO_CHANNEL = 'giap-info-v2';
-/** The DEFAULT-importance Updates channel that installs made before `giap-info-v2`. */
-const RETIRED_INFO_CHANNEL = 'giap-info';
-const REPLY_CHANNEL = 'giap-replies';
+type Category = 'alert' | 'action_required' | 'info' | 'reply';
 
-/** Categories that warrant a heads-up rather than a quiet shade entry. */
-const URGENT = new Set(['alert', 'action_required']);
+interface ChannelSpec {
+  id: string;
+  /** Read when the channels are created, so they carry the phone's language at the time. */
+  name: () => string;
+  description: () => string;
+  popsUp: boolean;
+  vibrationPattern?: number[];
+}
+
+const CHANNELS: Record<Category, ChannelSpec> = {
+  alert: {
+    id: 'giap-alerts',
+    name: () => i18n.t('notifications.channels.alerts.name'),
+    description: () => i18n.t('notifications.channels.alerts.description'),
+    popsUp: true,
+    vibrationPattern: [0, 250, 250, 250],
+  },
+  action_required: {
+    id: 'giap-requests',
+    name: () => i18n.t('notifications.channels.requests.name'),
+    description: () => i18n.t('notifications.channels.requests.description'),
+    popsUp: true,
+  },
+  // `giap-info` was DEFAULT, and Android keeps a channel's importance, so HIGH needed a new id.
+  info: {
+    id: 'giap-info-v2',
+    name: () => i18n.t('notifications.channels.updates.name'),
+    description: () => i18n.t('notifications.channels.updates.description'),
+    popsUp: true,
+  },
+  reply: {
+    id: 'giap-replies',
+    name: () => i18n.t('notifications.channels.replies.name'),
+    description: () => i18n.t('notifications.channels.replies.description'),
+    popsUp: false,
+  },
+};
+
+/** Channels earlier versions created and nothing uses now; deleting one never made is a no-op. */
+const RETIRED_CHANNELS = ['giap-info'];
+
+function channelSpec(category: unknown): ChannelSpec {
+  // Own keys only: `'toString' in CHANNELS` is true.
+  return typeof category === 'string' && Object.prototype.hasOwnProperty.call(CHANNELS, category)
+    ? CHANNELS[category as Category]
+    : CHANNELS.info;
+}
 
 let configured: Promise<void> | null = null;
 
 /**
- * Show foreground notifications in the shade.
+ * Show foreground notifications in the shade, popping up the ones whose channel does.
  *
- * Without a handler, expo-notifications suppresses a notification that arrives
- * while the app is in the foreground — which is precisely when the SSE stream
- * is delivering, so nothing would ever reach the shade.
+ * Without a handler, expo-notifications suppresses a notification that arrives while the app is
+ * in the foreground, which is precisely when the SSE stream is delivering, so nothing would ever
+ * reach the shade.
+ *
+ * `shouldPlaySound` is what decides the heads-up on Android, not `shouldShowBanner`: with it
+ * false expo-notifications posts the notification silent (`setSilent`), and Android never pops up
+ * a silent notification, whatever its channel. Before 2026-11-04 it was false for every notice,
+ * so a notice that arrived while the app was open (over the stream, or the pending fetch on
+ * return) landed silently in the shade, and only one presented while the app was in the
+ * background, where this handler is not consulted, popped up. With it true the channel decides,
+ * the same as in the background: its sound, which the phone's settings can turn off while
+ * keeping the pop-up.
  */
 function installHandler(Notifications: NotificationsModule): void {
   Notifications.setNotificationHandler({
-    handleNotification: async () => ({
-      shouldShowBanner: true, // Heads-up, the same as when the app is closed.
-      shouldShowList: true, // And it stays in the shade to be read later.
-      shouldPlaySound: false,
-      shouldSetBadge: false,
-    }),
+    handleNotification: async (notification) => {
+      const { popsUp } = channelSpec(notification.request.content.data?.category);
+      return {
+        shouldShowBanner: true, // iOS draws a banner either way; Android follows the sound.
+        shouldShowList: true, // And it stays in the shade to be read later.
+        shouldPlaySound: popsUp,
+        shouldSetBadge: false,
+      };
+    },
   });
 }
 
 async function createChannels(Notifications: NotificationsModule): Promise<void> {
   if (Platform.OS !== 'android') return;
 
-  await Notifications.setNotificationChannelAsync(ALERT_CHANNEL, {
-    name: 'Security alerts',
-    importance: Notifications.AndroidImportance.HIGH,
-    vibrationPattern: [0, 250, 250, 250],
-  });
-  await Notifications.setNotificationChannelAsync(INFO_CHANNEL, {
-    name: 'Updates',
-    importance: Notifications.AndroidImportance.HIGH,
-  });
-  // Deleting a channel that was never created is a no-op, so a fresh install is fine.
-  await Notifications.deleteNotificationChannelAsync(RETIRED_INFO_CHANNEL);
-  await Notifications.setNotificationChannelAsync(REPLY_CHANNEL, {
-    name: 'Replies',
-    importance: Notifications.AndroidImportance.DEFAULT,
-  });
-}
-
-function channelFor(category: string): string {
-  if (URGENT.has(category)) return ALERT_CHANNEL;
-  return category === 'reply' ? REPLY_CHANNEL : INFO_CHANNEL;
+  for (const spec of Object.values(CHANNELS)) {
+    await Notifications.setNotificationChannelAsync(spec.id, {
+      name: spec.name(),
+      description: spec.description(),
+      importance: spec.popsUp
+        ? Notifications.AndroidImportance.HIGH
+        : Notifications.AndroidImportance.DEFAULT,
+      ...(spec.vibrationPattern ? { vibrationPattern: spec.vibrationPattern } : {}),
+    });
+  }
+  for (const id of RETIRED_CHANNELS) {
+    await Notifications.deleteNotificationChannelAsync(id);
+  }
 }
 
 /**
@@ -143,7 +202,7 @@ export async function presentLocally(notification: ServerNotification): Promise<
       // A bare `{ channelId }` is the immediate, channel-aware trigger.
       trigger:
         Platform.OS === 'android'
-          ? { channelId: channelFor(notification.category) }
+          ? { channelId: channelSpec(notification.category).id }
           : null, // iOS has no channels; null is immediate.
     });
   } catch (e) {
@@ -214,14 +273,40 @@ function openTapped(Notifications: NotificationsModule, response: NotificationRe
     return;
   }
   const route = openRouteFromData(data);
-  if (route) router.push(screenPath(route));
+  if (!route) return;
+  if (route.open !== 'conversation') {
+    router.push(screenPath(route));
+    return;
+  }
+  void conversationOrWall(route).then((opened) => router.push(screenPath(opened)));
+}
+
+/**
+ * The conversation a tap names, or the chat wall when the Pond says there is no such
+ * conversation for this phone: deleted since, or another member's, which the Pond answers as
+ * missing too. Any other failure (the Pond out of reach, the app still connecting) opens the
+ * conversation, which says itself why it cannot load and keeps what it had, as before this check.
+ */
+async function conversationOrWall(route: Extract<OpenRoute, { open: 'conversation' }>): Promise<OpenRoute> {
+  try {
+    await api.listSessionMessages(route.sessionId, 1);
+    return route;
+  } catch (e) {
+    if (e instanceof ApiError && e.status === 404) {
+      console.info('[notifications] the conversation a notice named is not there; opening chat', {
+        kind: 'notification_open_fallback',
+      });
+      return { open: 'chat' };
+    }
+    return route;
+  }
 }
 
 /**
  * Open ride and directions links, the ride screen for a ride offer, and the
  * screen the Pond names (schedules, devices, chat, models, extensions or remote
- * access), or the conversation a reply notice names, when their notification is
- * tapped, including the tap that launched the app.
+ * access), or the conversation a Pond notice or a reply notice names, when
+ * their notification is tapped, including the tap that launched the app.
  * Returns the unsubscribe.
  */
 export function watchLinkTaps(): () => void {

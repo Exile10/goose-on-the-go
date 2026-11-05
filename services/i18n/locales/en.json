@@ -4129,6 +4129,24 @@
       },
       "channel": "Background connection",
       "channelDescription": "Shown while this phone keeps a connection to your Pond open in the background."
+    },
+    "channels": {
+      "alerts": {
+        "name": "Alerts",
+        "description": "Something went wrong or needs looking at now, such as a failed pairing or the Pond running out of space."
+      },
+      "requests": {
+        "name": "Suggestions and questions",
+        "description": "Suggestions, reminders and questions from your Pond that wait for your answer."
+      },
+      "updates": {
+        "name": "Updates",
+        "description": "Results of schedules and long tasks, new devices and other news from your Pond."
+      },
+      "replies": {
+        "name": "Replies",
+        "description": "A reply that finished while you were reading something else."
+      }
     }
   },
   "contentState": {
