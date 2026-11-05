@@ -790,7 +790,7 @@ export interface UpdateScheduleRequest {
   fire_at?: string;
   once?: boolean;
   ask_if_missed?: boolean;
-  /** A routine's new actions. Only a routine's kind is ever sent. */
+  /** The schedule's new kind: a routine's actions, or a prompt in place of a routine's. */
   kind?: TaskKind;
 }
 

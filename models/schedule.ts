@@ -681,9 +681,9 @@ function timingChanged(original: Schedule, d: ScheduleDraft): boolean {
  * one-off; a cron alone would make it repeat. A cron sent for a one-off turns
  * it into a repeating schedule, which is what choosing a repeat means.
  *
- * A webhook's URL is not here: `PUT /schedules/{id}` takes a prompt, which
- * would replace the webhook with an agent prompt, and nothing else changes the
- * kind. Its prompt field is therefore ignored.
+ * A prompt schedule can become a routine and a routine a prompt schedule: the
+ * new kind goes whole, as `kind`. A webhook's URL is not here: the form cannot
+ * show one, so a webhook keeps its kind and its prompt field is ignored.
  */
 export function updateRequest(
   original: Schedule,
@@ -692,14 +692,20 @@ export function updateRequest(
 ): DraftResult<UpdateScheduleRequest> {
   const prompt = promptOf(original);
   const devices = routineDevices(original);
+  const was: Does | null = devices ? 'routine' : prompt != null ? 'prompt' : null;
+  // A webhook does neither, and stays one.
+  const does = was && d.does;
   if (!d.name.trim()) return { ok: false, error: 'schedule.errors.nameRequired' };
-  if (prompt != null && !d.prompt.trim()) return { ok: false, error: 'schedule.errors.promptRequired' };
-  if (devices && Object.keys(d.devices).length === 0) return { ok: false, error: 'schedule.errors.devicesRequired' };
+  if (does === 'prompt' && !d.prompt.trim()) return { ok: false, error: 'schedule.errors.promptRequired' };
+  if (does === 'routine' && Object.keys(d.devices).length === 0) {
+    return { ok: false, error: 'schedule.errors.devicesRequired' };
+  }
 
   const req: UpdateScheduleRequest = {};
   if (d.name.trim() !== original.label) req.name = d.name.trim();
-  if (prompt != null && d.prompt.trim() !== prompt) req.prompt = d.prompt.trim();
-  if (devices && !sameDevices(d.devices, devices)) {
+  if (does === 'prompt' && was === 'routine') req.kind = { type: 'agent_prompt', prompt: d.prompt.trim() };
+  else if (does === 'prompt' && d.prompt.trim() !== prompt) req.prompt = d.prompt.trim();
+  if (does === 'routine' && (!devices || !sameDevices(d.devices, devices))) {
     req.kind = { type: 'routine', actions: routineActions(d.devices, original) };
   }
   if (d.timezone !== original.timezone) req.timezone = d.timezone;

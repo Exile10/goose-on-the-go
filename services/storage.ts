@@ -34,6 +34,8 @@ const KEYS = {
   homeLayout: '@goose/home-layout',
   /** Whether From your Pond is folded to its first suggestion on Home, as this phone's owner left it. */
   homeIdeasCollapsed: '@goose/home-ideas-collapsed',
+  /** What the paired Pond said it can do, with its pin. Not a secret. */
+  pondCapabilities: '@goose/pond-capabilities',
 } as const;
 
 /**

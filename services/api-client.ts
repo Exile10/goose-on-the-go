@@ -502,6 +502,8 @@ export class PondApiClient {
   private refreshToken: string | null = null;
   /** Called after a refresh succeeds so the caller can re-persist the pair. */
   private onTokensRotated: ((session: string, refresh: string) => void) | null = null;
+  /** Called with what the Pond says it can do, each time a refresh is accepted. */
+  private onCapabilities: ((capabilities: string[]) => void) | null = null;
   /** The refresh every concurrent 401 waits on, rather than each starting its own. */
   private refreshInFlight: Promise<HandshakeResponse | null> | null = null;
 
@@ -561,6 +563,10 @@ export class PondApiClient {
 
   setOnTokensRotated(cb: ((session: string, refresh: string) => void) | null) {
     this.onTokensRotated = cb;
+  }
+
+  setOnCapabilities(cb: ((capabilities: string[]) => void) | null) {
+    this.onCapabilities = cb;
   }
 
   /**
@@ -794,6 +800,7 @@ export class PondApiClient {
       if (body.refresh_token && this.onTokensRotated) {
         this.onTokensRotated(body.session_token, body.refresh_token);
       }
+      if (Array.isArray(body.capabilities)) this.onCapabilities?.(body.capabilities);
     }
     return body;
   }

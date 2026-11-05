@@ -34,7 +34,7 @@ jest.mock('@/services/remote-access', () => ({
 }));
 jest.mock('@/services/api-client', () => ({
   api: {
-    setRecovery: jest.fn(), setAuthRevoked: jest.fn(), setOnTokensRotated: jest.fn(),
+    setRecovery: jest.fn(), setAuthRevoked: jest.fn(), setOnTokensRotated: jest.fn(), setOnCapabilities: jest.fn(),
     invalidateIdentity: jest.fn(), setBaseUrl: jest.fn(), setToken: jest.fn(), setRefreshToken: jest.fn(),
     handshakeRevoke: jest.fn(async () => undefined),
   },

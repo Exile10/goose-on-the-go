@@ -47,7 +47,6 @@ import {
   draftFrom,
   emptyDraft,
   privateOwner,
-  promptOf,
   updateRequest,
   weekdayShortName,
   type ScheduleDraft,
@@ -174,11 +173,13 @@ export function ScheduleFormSheet(props: ScheduleFormSheetProps) {
 
   // Without `today` the calendar opens on its own default month, January 2026.
   const today = todayCivil();
-  // A webhook has no prompt to edit; see `updateRequest`.
-  const hasPrompt = !editing || promptOf(editing) != null;
-  // Routines came to the Pond with asking about missed runs, so one says the other is there.
-  // What a schedule does is chosen once: an edit keeps it.
-  const offersRoutine = !editing && asksIfMissed;
+  // A webhook has no prompt to edit; see `updateRequest`. A routine can be given one.
+  const hasPrompt = !editing || editing.kind.type === 'agent_prompt' || editing.kind.type === 'routine';
+  // Routines came to the Pond with asking about missed runs, so one says the other is there. An
+  // edit can switch between the two, but not a webhook, which the form cannot show.
+  const offersRoutine = editing
+    ? editing.ask_if_missed !== undefined && (editing.kind.type === 'agent_prompt' || editing.kind.type === 'routine')
+    : asksIfMissed;
   // The zone is offered only where there is a choice: the schedule's own, or this phone's.
   const zones = editing && editing.timezone !== phoneZone ? [editing.timezone, phoneZone] : null;
   // When it will run, in words, as the dashboard previews it. Nothing until the
@@ -319,20 +320,22 @@ export function ScheduleFormSheet(props: ScheduleFormSheetProps) {
                 />
               </InkFormField>
               <InkText size="sm" tone="tertiary">{t('schedule.form.cronHint')}</InkText>
-              {draft.askIfMissed !== null ? (
-                <>
-                  <LabelledSwitch
-                    label={t('schedule.form.askIfMissed')}
-                    checked={draft.askIfMissed}
-                    onChange={set('askIfMissed')}
-                  />
-                  <InkText size="sm" tone="tertiary">{t('schedule.form.askIfMissedHint')}</InkText>
-                </>
-              ) : null}
             </>
           ) : null}
 
           {preview ? <InkText size="sm" tone="secondary">{preview}</InkText> : null}
+
+          {/* Every repeat can be missed; a one-off the Pond slept through still runs late. */}
+          {draft.timing !== 'once' && draft.askIfMissed !== null ? (
+            <>
+              <LabelledSwitch
+                label={t('schedule.form.askIfMissed')}
+                checked={draft.askIfMissed}
+                onChange={set('askIfMissed')}
+              />
+              <InkText size="sm" tone="tertiary">{t('schedule.form.askIfMissedHint')}</InkText>
+            </>
+          ) : null}
 
           {zones ? (
             <InkFormField label={t('schedule.form.timezone')}>

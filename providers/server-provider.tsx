@@ -1,3 +1,4 @@
+import { rememberCapabilities } from '@/services/pond-capabilities';
 import { loadPairedProfile, commitPairedProfile, type PondIdentity as Identity, type SavedPond as Saved } from '@/services/paired-profile';
 /** Owns the saved identity, staged local pairing, and shared endpoint recovery. */
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type PropsWithChildren } from 'react';
@@ -385,10 +386,15 @@ export function ServerProvider({ children }: PropsWithChildren) {
       }
     })();
     api.setOnTokensRotated(keepRotated);
+    // A refresh says again what the Pond can do, so a phone paired before it said keeps up.
+    api.setOnCapabilities((capabilities) => {
+      const pin = saved.current?.identity.pin;
+      if (pin) void rememberCapabilities(pin, capabilities);
+    });
     return () => {
       cancelled = true; mounted.current = false; invalidateOperation();
       networkSub(); appSub.remove(); manager.environment(false, false);
-      api.setRecovery(null); api.setOnTokensRotated(null);
+      api.setRecovery(null); api.setOnTokensRotated(null); api.setOnCapabilities(null);
     };
   }, [manager, restore, invalidateOperation, resumeTransport, forgetPairing, keepRotated]);
 
@@ -520,6 +526,7 @@ export function ServerProvider({ children }: PropsWithChildren) {
       const commit = (async () => {
         await tokenWrite.current;
         saved.current = await commitPairedProfile(previous, { identity: next, profile: pending.profile });
+        void rememberCapabilities(next.pin, resp.capabilities);
         setHasPairing(true);
         staged.current = null;
         await restore();
@@ -546,6 +553,7 @@ export function ServerProvider({ children }: PropsWithChildren) {
     const commit = (async () => {
       await tokenWrite.current;
       saved.current = await commitPairedProfile(previous, { identity: next, profile });
+      void rememberCapabilities(next.pin, resp.capabilities);
       setHasPairing(true);
       await restore();
     })();

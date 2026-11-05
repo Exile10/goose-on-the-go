@@ -551,6 +551,25 @@ describe('routines', () => {
     });
   });
 
+  it('becomes a prompt schedule when an edit asks Goose instead', () => {
+    const built = updateRequest(morning, { ...draftFrom(morning), does: 'prompt', prompt: 'Good morning' }, now);
+    expect(built).toEqual({ ok: true, req: { kind: { type: 'agent_prompt', prompt: 'Good morning' } } });
+    expect(updateRequest(morning, { ...draftFrom(morning), does: 'prompt' }, now)).toEqual({
+      ok: false,
+      error: 'schedule.errors.promptRequired',
+    });
+  });
+
+  it('turns a prompt schedule into a routine when an edit sets devices', () => {
+    const ask = schedule({ label: 'Morning', cron: '0 30 6 * * *', kind: { type: 'agent_prompt', prompt: 'Lights on' } });
+    const draft = { ...draftFrom(ask), does: 'routine' as const };
+    expect(updateRequest(ask, draft, now)).toEqual({ ok: false, error: 'schedule.errors.devicesRequired' });
+    expect(updateRequest(ask, { ...draft, devices: { 'kitchen-lights': true } }, now)).toEqual({
+      ok: true,
+      req: { kind: { type: 'routine', actions: [{ type: 'device_power', device_id: 'kitchen-lights', on: true }] } },
+    });
+  });
+
   it('says what it sets by name, and by id when the name is unknown', () => {
     expect(describeRoutine({ 'kitchen-lights': true, 'water-heater': false }, { 'kitchen-lights': 'Kitchen lights' })).toBe(
       'Kitchen lights on, water-heater off',
