@@ -2,14 +2,14 @@
  * ConversationList — the wall's conversations, read as an index instead.
  *
  * The wall is for scanning: every card on the edge, sized by how much was
- * said. This is for finding: one line of title, two of preview, under a
- * heading that says roughly when. So nothing here wears the edge. The rows
+ * said. This is for finding: one line of title and the whole preview, set as
+ * markdown as on the cards, under a heading that says roughly when. So nothing here wears the edge. The rows
  * lie flat on the page between hairlines — a list in which every row is
  * raised is a list in which nothing is.
  *
  * A `SectionList` rather than the wall's windowed scroll view, because a
- * row's height is not known before it draws: a preview of no lines, one or
- * two, and a question about deleting when one is asked. The list measures as
+ * row's height is not known before it draws: a preview of any length, and a
+ * question about deleting when one is asked. The list measures as
  * it goes and mounts only what is near the viewport, which is what the wall
  * gets from its own arithmetic.
  *
@@ -46,6 +46,7 @@ import {
   cardWords,
   deleteActions,
 } from '@/components/patterns/conversation-card';
+import { Markdown } from '@/components/patterns/markdown';
 import { WALL_GUTTER } from '@/components/patterns/conversation-wall';
 import { GPressable } from '@/components/ui/g-pressable';
 import { useThemedStyles } from '@/hooks/use-themed-styles';
@@ -81,7 +82,6 @@ function useRowText() {
         weight: theme.weight.medium,
         color: theme.color.textTertiary,
       }).style,
-      preview: inkText(theme, { size: 'base', color: theme.color.textTertiary }).style,
     }),
     [theme],
   );
@@ -176,11 +176,7 @@ export const ConversationRow = React.memo(function ConversationRow({
             </Text>
           ) : null}
         </View>
-        {card.preview ? (
-          <Text style={text.preview} numberOfLines={2}>
-            {card.preview}
-          </Text>
-        ) : null}
+        {card.preview ? <Markdown source={card.preview} size="base" tone="tertiary" selectable={false} /> : null}
         {confirming ? (
           <DeleteOrKeep
             deleteLabel={t('chat.history.deleteLabel')}

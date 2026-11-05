@@ -28,10 +28,10 @@ interface Span {
 }
 
 /**
- * How large the text is set: a reply's body (`md`), a card's title, or a card's quieter lines in
- * Ink's own `base` and `sm`. Below `md`, headings shrink with it: a card has no room for a reply's.
+ * How large the text is set: a reply's body (`md`), a card's title, or quieter lines in Ink's own
+ * `base`, `sm` and `xs`. Below `md`, headings shrink with it: a card has no room for a reply's.
  */
-export type MarkdownSize = 'md' | 'title' | 'base' | 'sm';
+export type MarkdownSize = 'md' | 'title' | 'base' | 'sm' | 'xs';
 
 /** Where a block sits: a quote recolours what it holds, and a nested list changes its bullet. */
 interface Place {

@@ -24,6 +24,7 @@ import * as WebBrowser from 'expo-web-browser';
 import { InkEdge, InkEyebrow, inkText, useInkTheme } from '@jarida/ink/native';
 
 import { LongTaskCard } from '@/components/patterns/long-task-card';
+import { Markdown } from '@/components/patterns/markdown';
 import { GIcon } from '@/components/ui/g-icon';
 import { GPressable } from '@/components/ui/g-pressable';
 import {
@@ -527,7 +528,6 @@ function Steps({ steps }: { steps: string[] }) {
   const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
   const label = inkText(theme, { role: 'mono', size: 'xs', weight: theme.weight.medium, color: theme.color.textTertiary });
-  const note = inkText(theme, { size: 'xs', color: theme.color.textTertiary });
   return (
     <View style={styles.steps}>
       <GPressable
@@ -547,13 +547,7 @@ function Steps({ steps }: { steps: string[] }) {
         </Text>
         <GIcon name={expanded ? 'chevron' : 'chevron-right'} size={12} color={theme.color.textTertiary} />
       </GPressable>
-      {expanded
-        ? steps.map((step, i) => (
-            <Text key={i} style={note.style} selectable>
-              {step}
-            </Text>
-          ))
-        : null}
+      {expanded ? steps.map((step, i) => <Markdown key={i} source={step} size="xs" tone="tertiary" />) : null}
     </View>
   );
 }
