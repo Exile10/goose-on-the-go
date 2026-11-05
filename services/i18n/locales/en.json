@@ -2280,6 +2280,7 @@
     },
     "list": {
       "newSchedule": "New schedule",
+      "intro": "A schedule decides when Goose acts. Its prompt can use any tool that is switched on. To limit the tools, make an agent and give it a schedule.",
       "newAutomation": "New automation",
       "loading": "Reading your Pond's schedules",
       "noSchedulesTitle": "No schedules yet",
