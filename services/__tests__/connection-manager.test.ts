@@ -361,3 +361,22 @@ it('does not try for a phone the Pond has refused', async () => {
   expect(await manager.retryNow()).toBeNull();
   expect(deps.probe).not.toHaveBeenCalled();
 });
+
+/**
+ * On 2026-10-28 a phone on mobile data could not reach its Pond and the log said only
+ * "disconnected". A failed selection now says which route failed and how.
+ */
+it('says which route failed when nothing answers', async () => {
+  const info = jest.spyOn(console, 'info').mockImplementation(() => {});
+  const { deps } = fixture();
+  const manager = new ConnectionManager({ ...deps, remoteReady: async () => false });
+  deps.probe.mockResolvedValue(false);
+  await manager.configure(profile, pin);
+  manager.environment(true, true);
+  await manager.recover();
+  expect(info).toHaveBeenCalledWith('[connection] no route answered', expect.objectContaining({
+    kind: 'route_unavailable', cellular: true, local: 0, remote: 'node_not_ready',
+  }));
+  manager.environment(false, false);
+  info.mockRestore();
+});

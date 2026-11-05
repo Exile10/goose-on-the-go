@@ -599,7 +599,12 @@ infrastructure-restore/process-restart run is recorded in the Pond verification 
 
 Android's sandbox requires a native NetworkInterface provider for the embedded Go
 node; it cannot enumerate interfaces through netlink. ConnectivityManager forwards
-network changes without collecting SSIDs. Native logging uses the private profile
+network changes without collecting SSIDs. The default-network callback hands the
+node the interface name and DNS servers of the network each callback names, never
+`activeNetwork`: that lags a switch, and on 2026-10-28 a phone leaving Wi-Fi for
+mobile data was told its old interface and the home router's resolvers, did not
+re-bind, and could not reach its Pond until Wi-Fi returned. The node is told there
+is no network only when the current default is lost with no successor. Native logging uses the private profile
 directory, while upstream remote log upload remains disabled.
 
 The embedded Android library is linked with 16 KB ELF alignment. The build script

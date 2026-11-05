@@ -282,6 +282,35 @@ function parseTag(hex: string | null | undefined): Uint8Array {
 /** How long to wait for /health before calling the Pond unreachable. */
 const HEALTH_TIMEOUT_MS = 3_000;
 
+/** A Pond's tailnet address: Tailscale's CGNAT range or its ULA prefix. */
+function isTailnetUrl(url: string): boolean {
+  const host = url.replace(/^https?:\/\/\[?/, '').split(/[\]/:]/)[0] ?? '';
+  const octets = host.split('.').map(Number);
+  if (octets.length === 4 && octets[0] === 100 && octets[1] >= 64 && octets[1] < 128) return true;
+  return host.toLowerCase().startsWith('fd7a:115c:a1e0:');
+}
+
+/**
+ * Why a health probe got no answer, as a word an engineer can act on: `timeout`, or the
+ * platform's exception class (`ConnectException`, `UnknownHostException`, ...), or `network`.
+ * Never the message itself, which carries addresses.
+ */
+function probeFailureReason(error: unknown): string {
+  if (error instanceof Error && error.name === 'AbortError') return 'timeout';
+  const message = error instanceof Error ? error.message : String(error);
+  return /(\w+(?:Exception|Error))\b/.exec(message)?.[1] ?? 'network';
+}
+
+/**
+ * Route selection publishes only "disconnected"; this says which route failed and how. On
+ * 2026-10-28 a phone on mobile data could not reach its Pond and the log said nothing more.
+ */
+function logProbeFailure(url: string, reason: string, latencyMs: number): void {
+  console.info('[connection] probe got no answer', {
+    kind: 'route_probe_failed', route: isTailnetUrl(url) ? 'remote' : 'local', reason, latencyMs,
+  });
+}
+
 /** Default ceiling for an ordinary request. A Pond on the LAN is close by. */
 const REQUEST_TIMEOUT_MS = 15_000;
 
@@ -569,9 +598,12 @@ export class PondApiClient {
         headers: {},
         signal: timeoutSignal(HEALTH_TIMEOUT_MS),
       });
+      if (!res.ok) logProbeFailure(this.baseUrl, `http_${res.status}`, Date.now() - start);
       return { ok: res.ok, latencyMs: Date.now() - start };
-    } catch {
-      return { ok: false, latencyMs: Date.now() - start, trustFailure: await pondTrustFailed(this.baseUrl).catch(() => true) };
+    } catch (error) {
+      const trustFailure = await pondTrustFailed(this.baseUrl).catch(() => true);
+      logProbeFailure(this.baseUrl, trustFailure ? 'trust' : probeFailureReason(error), Date.now() - start);
+      return { ok: false, latencyMs: Date.now() - start, trustFailure };
     }
   }
 

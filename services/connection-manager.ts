@@ -160,6 +160,8 @@ export class ConnectionManager {
     // Probe only configured endpoints, without a bearer header. Every saved local address at
     // once; remote after the head start, or as soon as every local one has failed; discovery,
     // which can take seconds, alongside remote rather than ahead of it.
+    // What the remote route came to on the last pass, for the log when nothing answers.
+    let remoteOutcome: 'none' | 'node_not_ready' | 'no_answer' = remote === null ? 'none' : 'no_answer';
     const race = () => new Promise<Route | null>((resolve) => {
       const local = this.cellular ? [] : [...profile.localUrls];
       let pendingLocal = local.length;
@@ -180,6 +182,7 @@ export class ConnectionManager {
         remoteStarted = true;
         void (async () => {
           const ready = this.deps.remoteReady ? await this.deps.remoteReady(() => settled || !current()) : true;
+          remoteOutcome = ready ? 'no_answer' : 'node_not_ready';
           const ok = ready && !settled && current() && await probe(remote);
           remoteDone = true;
           if (ok) finish({ state: 'remote', url: remote }); else failIfExhausted();
@@ -241,6 +244,10 @@ export class ConnectionManager {
         }
       }
       if (current()) {
+        console.info('[connection] no route answered', {
+          kind: 'route_unavailable', cellular: this.cellular, local: this.cellular ? 0 : profile.localUrls.length,
+          remote: remoteOutcome, trustRejected, attempt: this.attempts + 1,
+        });
         this.retryAfter = Date.now() + Math.min(MAX_BACKOFF_MS, 1000 * 2 ** Math.min(this.attempts, BACKOFF_STEPS - 1)) * (0.75 + Math.random() * 0.5);
         this.attempts = Math.min(this.attempts + 1, BACKOFF_STEPS);
         this.publish(trustRejected ? 'trust' : 'disconnected');
