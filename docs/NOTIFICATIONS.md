@@ -89,6 +89,16 @@ wake: "1" }`, with no title or body. Nothing readable transits Google or Apple; 
   addresses, remote transport, pinning, then the same `ConnectionManager` the app uses), fetches,
   presents, acknowledges, and logs one line with counts and duration. It is bounded at 20 seconds
   and never throws.
+- A fetched notice reaches the shade with the time the Pond recorded it added to its text
+  (`withEventTime`), because the shade shows only when it arrived. After a wake-up, one the shade
+  refused is left unacknowledged, so the next wake-up fetches it again.
+- The task leaves a wake to the stream while the app is open. When the pass above reaches no
+  Pond, the wake ping's own pull (`handleWakePing` in `services/wake-handler.ts`) tries the home
+  addresses directly (`services/background-pond.ts`). When that fails too, the phone shows "Alert
+  from your Pond" (or "Update") with no detail, under the alert's own id (`standIn`), so the real
+  alert replaces it once fetched. Nothing in it came from anywhere but the ping.
+- On iOS the pairing is kept readable after the first unlock (`services/secure-storage.ts`), since
+  a wake-up arrives while the phone is locked and needs it to reach the Pond.
 - A token refresh during a headless wake-up is persisted to the secure store, so the app does not
   later start with a refresh token the Pond has retired.
 - `POST_NOTIFICATIONS` (Android 13 and later) is requested by `registerPushToken`. Without it the

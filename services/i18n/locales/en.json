@@ -4161,6 +4161,11 @@
     }
   },
   "notifications": {
+    "wake": {
+      "alertTitle": "Alert from your Pond",
+      "updateTitle": "Update from your Pond",
+      "body": "Your Pond could not be reached to show it here. Open Goose On The Go to see it."
+    },
     "background": {
       "connecting": {
         "title": "Connecting to your Pond",

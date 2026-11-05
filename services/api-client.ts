@@ -40,6 +40,7 @@ import { confirmationMatches, NONCE_BYTES, respond, type PakeCredential } from '
 import { randomBytes } from './secure-random';
 import { timeoutSignal } from './http';
 import { readSse, type SseEvent } from './sse';
+import type { ServerNotification } from './notification-stream';
 import type {
   RoomVoiceEvent,
   VoiceAgent,
@@ -509,6 +510,8 @@ export class PondApiClient {
   private onboardingRequired: (() => void) | null = null;
   private identityEpoch = 0;
   setRecovery(recover: (() => Promise<string | null>) | null) { this.recovery = recover; }
+  /** Whether a session is loaded, so background work can tell a running app from a cold start. */
+  get signedIn(): boolean { return this.token !== null; }
 
   /**
    * Called when the Pond refuses this phone's credentials and a refresh cannot
@@ -1400,6 +1403,29 @@ export class PondApiClient {
 
   usageSummary(): Promise<UsageSummary> {
     return this.get<UsageSummary>('/api/v1/usage/summary');
+  }
+
+  // ── Notifications ───────────────────────────────────────────
+
+  /**
+   * This phone's notifications the Pond has not yet seen delivered, oldest
+   * first. The Pond reads the device from the token; a push wake carries only
+   * an id, so this is where the alert's text and time come from.
+   * Accepts a bare array or `{ notifications: [...] }`; anything else is an
+   * empty list. Each item is as the Pond sent it, so `readNotification` checks
+   * it before use.
+   */
+  async pendingNotifications(): Promise<ServerNotification[]> {
+    const res = await this.request<{ notifications?: ServerNotification[] }>('/api/v1/notifications/pending');
+    return collection<ServerNotification>(res, 'notifications');
+  }
+
+  /**
+   * Marks one notification delivered to this phone, so it is not pulled or
+   * flushed to the stream again. A 404 means it was never this phone's.
+   */
+  async acknowledgeNotification(id: string): Promise<void> {
+    await this.post(`/api/v1/notifications/${encodeURIComponent(id)}/ack`, {});
   }
 
   // ── Reminders ───────────────────────────────────────────────
@@ -2624,15 +2650,6 @@ export class PondApiClient {
    */
   deviceHeartbeat(deviceId: string): Promise<void> {
     return this.post<void>(`/api/v1/devices/${encodeURIComponent(deviceId)}/heartbeat`, {});
-  }
-
-  /**
-   * Notices the Pond holds for this phone and has not seen acknowledged, in
-   * the stream's `ServerNotification` shape. Accepts a bare array or
-   * `{ notifications: [...] }`; anything else is an empty list.
-   */
-  async pendingNotifications(): Promise<unknown[]> {
-    return collection<unknown>(await this.request<unknown>('/api/v1/notifications/pending'), 'notifications');
   }
 
   /** Tell the Pond this phone has put a notice in front of the user, so it stops holding it. */

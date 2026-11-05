@@ -89,6 +89,13 @@ export class NotificationDeduplicator {
     if (this.ids.size > DEDUPE_CAPACITY) this.ids.delete(this.ids.values().next().value!);
     return true;
   }
+  has(id: string): boolean {
+    return this.ids.has(id);
+  }
+  /** For a notice that never reached the shade, so the next delivery of it is not taken for a repeat. */
+  forget(id: string): void {
+    this.ids.delete(id);
+  }
 }
 
 export class NotificationStream {

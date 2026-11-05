@@ -176,6 +176,16 @@ describe('presentLocally', () => {
     expect(mockSchedule.mock.calls[0][0].content.data).toEqual({ id: 'n-2', category: 'alert', open: 'remote_access' });
     expect(mockSchedule.mock.calls[1][0].content.data).toEqual({ id: 'n-3', category: 'alert' });
   });
+
+  it('says whether it reached the shade, so a pull only acknowledges what was shown', async () => {
+    const notice = { id: 'n-2', target: 'phone', category: 'info', title: 't', body: 'b', timestamp: '' };
+    await expect(presentLocally(notice)).resolves.toBe(true);
+
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    mockSchedule.mockRejectedValueOnce(new Error('no permission'));
+    await expect(presentLocally(notice)).resolves.toBe(false);
+    warn.mockRestore();
+  });
 });
 
 // Android shows a heads-up banner only for a HIGH-importance channel, and never raises the

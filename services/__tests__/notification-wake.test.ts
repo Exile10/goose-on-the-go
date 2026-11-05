@@ -5,15 +5,18 @@
  * throws.
  */
 
+import { presentLocally } from '@/services/local-notifications';
 import { deliver, deliverAndAcknowledge, onDelivered, type DeliveryClient } from '@/services/notification-delivery';
+import type { ServerNotification } from '@/services/notification-stream';
 import { handleWake, isWake } from '@/services/notification-wake';
 
 // Hoisted above the imports by babel-jest; `mock`-prefixed so the factory may read it.
 const mockPresented: string[] = [];
 jest.mock('@/services/local-notifications', () => ({
-  presentLocally: jest.fn(async (n: { id: string }) => { mockPresented.push(n.id); }),
+  presentLocally: jest.fn(async (n: { id: string }) => { mockPresented.push(n.id); return true; }),
 }));
 const presented = mockPresented;
+const present = presentLocally as jest.Mock;
 
 let seq = 0;
 /** Ids unique per test: the delivery deduplicator lives for the whole runtime, as it does in the app. */
@@ -28,7 +31,7 @@ function fakeClient(pending: unknown): DeliveryClient & { acked: string[] } {
     acked,
     pendingNotifications: jest.fn(async () => {
       if (pending instanceof Error) throw pending;
-      return pending as unknown[];
+      return pending as ServerNotification[];
     }),
     ackNotification: jest.fn(async (id: string) => { acked.push(id); }),
   };
@@ -38,6 +41,8 @@ const androidWake = (id = 'n-x') => ({ data: { notification_id: id, category: 'i
 
 beforeEach(() => {
   presented.length = 0;
+  present.mockClear();
+  present.mockImplementation(async (n: { id: string }) => { presented.push(n.id); return true; });
   jest.spyOn(console, 'info').mockImplementation(() => {});
   jest.spyOn(console, 'warn').mockImplementation(() => {});
 });
@@ -54,6 +59,13 @@ describe('isWake', () => {
     expect(isWake(null)).toBe(false);
     expect(isWake({ data: { wake: '0' } })).toBe(false);
     expect(isWake({ actionIdentifier: 'default', notification: {} })).toBe(false);
+  });
+
+  it('reads an Android data message as expo-notifications serialises it, and an iOS one under data', () => {
+    const ping = { wake: '1', notification_id: 'n-1:phone-a', category: 'alert' };
+    expect(isWake({ data: { ...ping, dataString: null }, notification: null, messageId: 'm1', priority: 1 })).toBe(true);
+    expect(isWake({ data: { ...ping }, notification: null, aps: { 'content-available': 1 } })).toBe(true);
+    expect(isWake({ data: { notification_id: 'n-1' } })).toBe(false);
   });
 });
 
@@ -86,6 +98,31 @@ describe('handleWake', () => {
     const outcome = await handleWake(androidWake(), { ensureSession: async () => false, client });
     expect(outcome).toBe('unpaired');
     expect(client.pendingNotifications).not.toHaveBeenCalled();
+  });
+
+  it('leaves a notice the shade refused unacknowledged, and shows it on the next wake-up', async () => {
+    const a = notice();
+    const b = notice();
+    const client = fakeClient([a, b]);
+    present.mockImplementationOnce(async () => false);
+
+    await handleWake(androidWake(a.id), { ensureSession: async () => true, client });
+    expect(client.acked).toEqual([b.id]);
+
+    await handleWake(androidWake(a.id), { ensureSession: async () => true, client: fakeClient([a]) });
+    expect(presented).toEqual([b.id, a.id]);
+  });
+
+  it('puts the time the Pond recorded a fetched notice in the shade, and leaves the in-app list as sent', async () => {
+    const a = notice({ timestamp: '2026-10-30T21:42:00Z' });
+    const listed: ServerNotification[] = [];
+    const stop = onDelivered((n) => listed.push(n));
+
+    await handleWake(androidWake(a.id), { ensureSession: async () => true, client: fakeClient([a]) });
+    stop();
+
+    expect(present.mock.calls[0][0].body).toMatch(/^The back door opened · /);
+    expect(listed[0].body).toBe('The back door opened');
   });
 
   it('survives a failed fetch, a failed session restore and a stalled Pond', async () => {

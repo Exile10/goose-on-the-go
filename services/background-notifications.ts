@@ -1,6 +1,12 @@
 /**
  * Registers the push wake-up task with expo-task-manager.
  *
+ * The background task a push wake runs, defined when the bundle loads.
+ * The OS may start the app only to run this, with no screen and no React tree,
+ * so it is defined and registered from the entry file (`index.ts`) before the
+ * router loads, as expo-notifications requires. In Expo Go there is no
+ * notifications module (`services/notifications-module.ts`) and nothing to wake.
+ *
  * Imported for its side effect from `index.ts`, ahead of expo-router, because
  * a headless start loads the bundle without mounting any screen: a task defined
  * inside the React tree would not exist when Android runs it. Defining and
@@ -12,14 +18,23 @@
  * iOS needs `content-available: 1` on the APNs payload and the
  * `remote-notification` background mode (set in app.json), and decides itself
  * how often to honour it.
+ *
+ * While the app is open the notification stream already delivers the alert, and
+ * pulling it as well would show it a second time, so the task leaves it alone.
+ * When the restored session reaches no Pond, the wake ping's own pull
+ * (`services/wake-handler.ts`) tries the home addresses directly, and shows a
+ * stand-in when it cannot reach one either.
  */
 
-import { Platform } from 'react-native';
+import { AppState, Platform } from 'react-native';
 
 import { api } from './api-client';
-import { notifications } from './notifications-module';
+import { notifications, type NotificationsModule } from './notifications-module';
+import { alreadyDelivered } from './notification-delivery';
 import { handleWake } from './notification-wake';
 import { ensurePondSession } from './pond-session';
+import { handleWakePing, type WakeOutcome } from './wake-handler';
+import { readWakePing } from './wake-ping';
 
 export const WAKE_TASK = 'giap-notification-wake';
 
@@ -44,20 +59,30 @@ function loadTaskManager(): typeof import('expo-task-manager') | null {
 }
 
 const TaskManager = loadTaskManager();
-const Notifications = notifications;
-// Expo Go has no expo-notifications (see notifications-module.ts) and web has no push.
-if (Notifications && TaskManager && (Platform.OS === 'android' || Platform.OS === 'ios')) {
+
+export function defineWakeTask(Notifications: NotificationsModule | null = notifications): void {
+  // Expo Go has no expo-notifications (see notifications-module.ts) and web has no push.
+  if (!Notifications || !TaskManager || (Platform.OS !== 'android' && Platform.OS !== 'ios')) return;
+  const { NewData, NoData, Failed } = Notifications.BackgroundNotificationTaskResult;
+  const result: Record<WakeOutcome, number> = { pulled: NewData, nothing: NoData, unreachable: Failed };
   TaskManager.defineTask(WAKE_TASK, async ({ data, error }) => {
     if (error) {
       console.warn('[wake] task error', { kind: 'notification_wake', error: error.message });
-      return Notifications.BackgroundNotificationTaskResult.Failed;
+      return Failed;
     }
+    if (AppState.currentState === 'active') return NoData;
     const outcome = await handleWake(data, { ensureSession: ensurePondSession, client: api });
-    if (outcome === 'delivered') return Notifications.BackgroundNotificationTaskResult.NewData;
-    if (outcome === 'failed') return Notifications.BackgroundNotificationTaskResult.Failed;
-    return Notifications.BackgroundNotificationTaskResult.NoData;
+    if (outcome === 'delivered') return NewData;
+    if (outcome === 'ignored') return NoData;
+    const ping = readWakePing(data);
+    if (!ping) return outcome === 'failed' ? Failed : NoData;
+    // A pass that ran out of time may already have shown this alert, which a stand-in would replace.
+    if (alreadyDelivered(ping.notificationId)) return NewData;
+    return result[await handleWakePing(ping)];
   });
   Notifications.registerTaskAsync(WAKE_TASK).catch((e: unknown) => {
     console.warn('[wake] task could not be registered', { kind: 'notification_wake', error: String(e) });
   });
 }
+
+defineWakeTask();

@@ -11,6 +11,9 @@
  * - The push wake-up: the Pond sends a content-free FCM/APNs message and the
  *   phone fetches what is pending (`services/notification-wake.ts`). This is
  *   what covers a phone whose stream Android has paused, and all of iOS.
+ *   While the app is in the background or closed, the Pond's FCM/APNs wake ping
+ *   runs `services/background-notifications.ts` instead, which pulls the alert
+ *   itself.
  * - The same pending fetch each time the app comes back to the foreground.
  *
  * Arrivals are presented in the phone's own notification shade

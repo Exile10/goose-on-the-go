@@ -19,6 +19,7 @@
 import type { PondApiClient } from './api-client';
 import { presentLocally } from './local-notifications';
 import { NotificationDeduplicator, type ServerNotification } from './notification-stream';
+import { withEventTime } from './pull-notifications';
 
 /** Shared by every delivery path in this runtime. */
 const deliveryDeduplicator = new NotificationDeduplicator();
@@ -67,12 +68,13 @@ export async function acknowledge(client: DeliveryClient, id: string, source: st
   }
 }
 
-/**
- * Show one notice, unless this runtime has already shown it. Returns whether it
- * was new. Does not acknowledge; the caller decides when.
- */
-export async function deliver(notification: ServerNotification): Promise<boolean> {
-  if (!deliveryDeduplicator.accept(notification.id)) return false;
+/** Whether this runtime has already put this notice in front of the user. */
+export function alreadyDelivered(id: string): boolean {
+  return deliveryDeduplicator.has(id);
+}
+
+async function show(notification: ServerNotification, shade: ServerNotification): Promise<'repeat' | 'shown' | 'refused'> {
+  if (!deliveryDeduplicator.accept(notification.id)) return 'repeat';
   for (const listener of listeners) {
     try {
       listener(notification);
@@ -80,8 +82,15 @@ export async function deliver(notification: ServerNotification): Promise<boolean
       console.warn('[notifications] delivery listener failed', { kind: 'notification_listener', error: String(e) });
     }
   }
-  await presentLocally(notification);
-  return true;
+  return (await presentLocally(shade)) ? 'shown' : 'refused';
+}
+
+/**
+ * Show one notice, unless this runtime has already shown it. Returns whether it
+ * was new. Does not acknowledge; the caller decides when.
+ */
+export async function deliver(notification: ServerNotification): Promise<boolean> {
+  return (await show(notification, notification)) !== 'repeat';
 }
 
 /**
@@ -105,9 +114,10 @@ export async function deliverAndAcknowledge(
 export interface DrainResult { fetched: number; presented: number; acked: number }
 
 /**
- * Fetch the notices the Pond is holding for this phone, show the new ones, and
- * acknowledge every one -- including those already shown, which the Pond would
- * otherwise keep offering. Throws only when the fetch itself fails.
+ * Fetch the notices the Pond is holding for this phone, show the new ones with
+ * the time each happened, and acknowledge every one -- including those already
+ * shown, which the Pond would otherwise keep offering. Throws only when the
+ * fetch itself fails.
  */
 export async function drainPending(client: DeliveryClient, source: 'wake' | 'foreground'): Promise<DrainResult> {
   const raw = await client.pendingNotifications();
@@ -118,9 +128,15 @@ export async function drainPending(client: DeliveryClient, source: 'wake' | 'for
       console.warn('[notifications] pending item ignored: not a notification', { kind: 'notification_pending', source });
       continue;
     }
-    const { presented, acked } = await deliverAndAcknowledge(client, notification, source);
-    if (presented) result.presented++;
-    if (acked) result.acked++;
+    const outcome = await show(notification, withEventTime(notification));
+    // After a wake-up the shade is the only place a notice shows, so one it refused stays with
+    // the Pond for the next wake. In the foreground the in-app list already has it.
+    if (outcome === 'refused' && source === 'wake') {
+      deliveryDeduplicator.forget(notification.id);
+      continue;
+    }
+    if (outcome !== 'repeat') result.presented++;
+    if (await acknowledge(client, notification.id, source)) result.acked++;
   }
   console.info('[notifications] pending drained', { kind: 'notification_pending', source, ...result });
   return result;

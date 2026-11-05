@@ -825,9 +825,13 @@ kept for reassurance.
 
 ### iOS
 
-iOS has no equivalent mechanism for this, and no `UIBackgroundModes` declaration this app
-could honestly justify. Nothing here changes iOS behaviour, and remote access there should
-be assumed not to survive backgrounding until measured. Implying parity would be the
+iOS has no equivalent mechanism for this, and no `UIBackgroundModes` declaration that would
+keep the node running. The app now declares `remote-notification`, so the Pond's silent push
+can wake it for a few seconds to fetch an alert (#164, `docs/DATA-SAFETY.md`). That gives no
+lasting network time: a cold start for a push brings the node up only for that fetch
+(`services/pond-session.ts`), and the fallback pull (`services/background-pond.ts`) does not
+start the node. Remote access there
+should be assumed not to survive backgrounding until measured. Implying parity would be the
 dishonest option.
 
 ### A separate fragility, not the cause
