@@ -76,6 +76,11 @@
     "greetingAfternoon": "Good afternoon",
     "greetingEvening": "Good evening",
     "askPlaceholder": "Ask Goose anything…",
+    "ask": {
+      "tryAsking": "Try asking",
+      "openHint": "Opens a conversation with Goose",
+      "suggestionHint": "Asks Goose this question"
+    },
     "rightNow": "RIGHT NOW",
     "dueNow": "Due now",
     "inMinutes": "In {{count}} min",
