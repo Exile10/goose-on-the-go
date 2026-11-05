@@ -46,7 +46,7 @@ jest.mock('@/services/api-client', () => {
 const pond = jest.mocked(api);
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-const LOCKED: AdminStatus = { card: 'present', unlocked: false, expires_at: null, idle_minutes: 15, retry_after: null, key: false };
+const LOCKED: AdminStatus = { card: 'present', unlocked: false, expires_at: null, idle_minutes: 15, retry_after: null, key: false, keys: true };
 const OPEN: AdminStatus = { ...LOCKED, unlocked: true, expires_at: new Date(Date.now() + 15 * 60_000).toISOString() };
 const OVERVIEW: AdminOverview = {
   disk: { total_bytes: 1000, free_bytes: 250 },

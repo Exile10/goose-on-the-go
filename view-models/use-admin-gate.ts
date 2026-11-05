@@ -7,6 +7,7 @@ import { useFocusEffect } from 'expo-router';
 import { adminPasswordProblem, formatAdminPassword, normalizeAdminPassword, type AdminPasswordProblem } from '@/models/pond-admin';
 import { useServer } from '@/providers/server-provider';
 import i18n from '@/services/i18n';
+import { showSnackbar } from '@/services/snackbar';
 import {
   canKeepAdminKey,
   forgetKeptAdminKey,
@@ -18,7 +19,7 @@ import {
 } from '@/services/kept-admin-key';
 import type { AdminStatus } from '@/services/types';
 import { isMissingRoute } from './agents-source';
-import { describeApiError } from './describe-error';
+import { describeApiError, logFailure } from './describe-error';
 import { adminRefusal, coolingSeconds, useAdminKeyPin, usePondAdminSource, type PondAdminSource } from './pond-admin-source';
 
 export type AdminPhase =
@@ -111,6 +112,7 @@ class GateStore {
       idle_minutes: 15,
       retry_after: null,
       key: false,
+      keys: false,
     };
     this.set({
       phase: 'unlocked',
@@ -271,8 +273,10 @@ export interface UseAdminUnlock {
   error: string | null;
   /** This phone keeps a key to this Pond, so My Pond can open with its Face ID or fingerprint. */
   kept: boolean;
-  /** This phone can keep a key behind its biometrics; never on the web. */
+  /** This phone can keep a key behind its biometrics, and this Pond keeps one for it; never on the web. */
   canKeep: boolean;
+  /** This phone could keep a key, but its Pond keeps none yet: My Pond opens only with the card until it is updated. */
+  keysAwaitPond: boolean;
   /** Keep a key after the card opens My Pond, so the next unlock needs only the phone's biometrics. */
   remember: boolean;
   setRemember: (on: boolean) => void;
@@ -298,7 +302,10 @@ export function useAdminUnlock(): UseAdminUnlock {
   const [now, setNow] = useState(() => Date.now());
   const [remember, setRemember] = useState(true);
   const [biometrics] = useState(canKeepAdminKey);
-  const canKeep = biometrics && pin !== null;
+  // Offered only once the Pond has said it keeps phone keys, or the switch would promise what it cannot do.
+  const keys = gate.status?.keys;
+  const canKeep = biometrics && pin !== null && keys === true;
+  const keysAwaitPond = biometrics && pin !== null && keys === false;
 
   // A countdown on screen, not a poll: nothing is asked of the Pond while it runs.
   const until = gate.coolingUntil;
@@ -361,17 +368,25 @@ export function useAdminUnlock(): UseAdminUnlock {
       let key: string;
       try {
         key = await source.enroll();
-      } catch {
+      } catch (e) {
+        // My Pond is open by now, so the lock's form is gone: the snackbar is where this can be said.
+        logFailure('admin', 'enrolling a phone key failed', e);
+        showSnackbar({ message: i18n.t(isMissingRoute(e) ? 'myPond.key.awaitsPond' : 'myPond.key.notKept') });
         return;
       }
       touch();
       try {
         await keepAdminKey(keepFor, key, i18n.t('myPond.key.savePrompt'));
         store.set({ kept: true });
-      } catch {
+        showSnackbar({ message: i18n.t('myPond.key.kept'), tone: 'success' });
+      } catch (e) {
         // Enrolling replaced any older key on the Pond, so whatever was kept before no longer opens. The new
         // one is left there with no copy anywhere: it opens nothing, and revoking it would lock this phone too.
         await forgetLocally();
+        if (!keptKeyWasCancelled(e)) {
+          logFailure('admin', 'keeping the phone key failed', e);
+          showSnackbar({ message: i18n.t('myPond.key.notKept') });
+        }
       } finally {
         store.keyEpoch++;
       }
@@ -471,6 +486,7 @@ export function useAdminUnlock(): UseAdminUnlock {
     error,
     kept: gate.kept,
     canKeep,
+    keysAwaitPond,
     remember,
     setRemember,
     setPassword,

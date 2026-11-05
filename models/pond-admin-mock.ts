@@ -371,6 +371,7 @@ export function createMockPond(options: MockPondOptions = {}, now: () => number 
         idle_minutes: ADMIN_IDLE_MINUTES,
         retry_after: wait > 0 ? wait : null,
         key: liveKey !== null,
+        keys: true,
       };
     },
 

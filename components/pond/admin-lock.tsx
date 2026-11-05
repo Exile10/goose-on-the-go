@@ -184,6 +184,8 @@ function CardForm({ vm }: { vm: UseAdminUnlock }) {
         <View style={styles.remember}>
           <LabelledSwitch label={t('myPond.key.remember')} checked={vm.remember} onChange={vm.setRemember} />
         </View>
+      ) : vm.keysAwaitPond ? (
+        <Text style={small}>{t('myPond.key.awaitsPond')}</Text>
       ) : null}
 
       <UnlockNotice vm={vm} />

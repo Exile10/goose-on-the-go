@@ -59,7 +59,7 @@ describe('the lock', () => {
     recordInto(seen, '{"card":"present","unlocked":true,"expires_at":"2026-10-29T10:15:00Z","idle_minutes":15,"retry_after":null}');
     const status = await paired().adminStatus();
     expect(seen).toEqual([{ url: `${BASE}/status`, method: undefined, body: undefined, authorization: 'Bearer session-token' }]);
-    expect(status).toEqual({ card: 'present', unlocked: true, expires_at: '2026-10-29T10:15:00Z', idle_minutes: 15, retry_after: null, key: false });
+    expect(status).toEqual({ card: 'present', unlocked: true, expires_at: '2026-10-29T10:15:00Z', idle_minutes: 15, retry_after: null, key: false, keys: false });
   });
 
   it('unlocks with the password as the body, and locks with an empty one', async () => {

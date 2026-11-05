@@ -18,6 +18,8 @@ import type { AdminStatus } from '@/services/types';
 import { MOCK_POND_PIN, resetMockPondAdmin } from '@/view-models/pond-admin-source';
 import { resetAdminGates, useAdminUnlock } from '@/view-models/use-admin-gate';
 import { ADMIN_STATUS_MS, useMyPond } from '@/view-models/use-my-pond';
+import i18n from '@/services/i18n';
+
 
 jest.mock('@/services/pond-trust', () => ({ assertPondTrust: jest.fn().mockResolvedValue(undefined) }));
 // The real hook also re-runs, cleanup first, when the navigation object changes, as a header change does.
@@ -33,6 +35,8 @@ const server = { hydrated: true, online: true, real: true, pairedPin: PIN as str
 jest.mock('@/providers/server-provider', () => ({ useServer: () => server }));
 const mockAsk = jest.fn<Promise<boolean>, [{ title: string; message: string; confirmLabel: string; cancelLabel?: string; destructive?: boolean }]>();
 jest.mock('@/providers/confirm-provider', () => ({ useConfirm: () => mockAsk }));
+const mockSnackbar = jest.fn();
+jest.mock('@/services/snackbar', () => ({ showSnackbar: (...a: unknown[]) => mockSnackbar(...a) }));
 // The phone's keychain, as the marker and the key it guards: one Pond's key at a time.
 const mockKeychain = { pin: null as string | null, key: null as string | null };
 jest.mock('@/services/kept-admin-key', () => ({
@@ -72,7 +76,7 @@ const keychain = {
 
 const OPENED = { unlocked: true as const, expires_at: new Date(Date.now() + 15 * 60_000).toISOString() };
 // What the real Pond would say, so a status read after an unlock does not contradict it.
-const live = { unlocked: false, key: null as string | null, card: 'present' as AdminStatus['card'], retry: null as number | null };
+const live = { unlocked: false, key: null as string | null, card: 'present' as AdminStatus['card'], retry: null as number | null, keys: true };
 const statusNow = (): AdminStatus => ({
   card: live.card,
   unlocked: live.unlocked,
@@ -80,6 +84,7 @@ const statusNow = (): AdminStatus => ({
   idle_minutes: 15,
   retry_after: live.retry,
   key: live.key !== null,
+  keys: live.keys,
 });
 
 function refused(status: number, error: string, extra: Record<string, unknown> = {}, retryAfter: number | null = null) {
@@ -122,12 +127,12 @@ let warn: jest.SpyInstance;
 beforeEach(() => {
   jest.useFakeTimers();
   // A reset, not a clear: an implementation one test sets must not answer in the next.
-  for (const fn of [...Object.values(pond), ...Object.values(keychain), mockAsk]) (fn as jest.Mock).mockReset();
+  for (const fn of [...Object.values(pond), ...Object.values(keychain), mockAsk, mockSnackbar]) (fn as jest.Mock).mockReset();
   resetAdminGates();
   resetMockPondAdmin();
   server.real = true;
   server.pairedPin = PIN;
-  Object.assign(live, { unlocked: false, key: null, card: 'present', retry: null });
+  Object.assign(live, { unlocked: false, key: null, card: 'present', retry: null, keys: true });
   mockKeychain.pin = null;
   mockKeychain.key = null;
 
@@ -188,6 +193,7 @@ describe('keeping a key after the card', () => {
   it('enrolls and keeps one for this Pond by default', async () => {
     const m = await mount(both);
     expect(m.vm.form.canKeep).toBe(true);
+    expect(m.vm.form.keysAwaitPond).toBe(false);
     expect(m.vm.form.remember).toBe(true);
     expect(m.vm.form.kept).toBe(false);
 
@@ -197,6 +203,7 @@ describe('keeping a key after the card', () => {
     expect(m.vm.tab.gate.phase).toBe('unlocked');
     expect(m.vm.form.kept).toBe(true);
     expect(m.vm.tab.kept).toBe(true);
+    expect(mockSnackbar).toHaveBeenCalledWith({ message: i18n.t('myPond.key.kept'), tone: 'success' });
     await m.unmount();
   });
 
@@ -226,23 +233,58 @@ describe('keeping a key after the card', () => {
     await m.unmount();
   });
 
-  it('stays open and keeps nothing when the save is refused', async () => {
+  it('stays open and keeps nothing when the save is refused, without a word for a cancel', async () => {
     keychain.keep.mockRejectedValueOnce(new Error('User canceled the authentication'));
     const m = await mount(both);
     expect(await typeCardAndUnlock(() => m.vm.form)).toBe(true);
     expect(m.vm.tab.gate.phase).toBe('unlocked');
     expect(m.vm.form.kept).toBe(false);
     expect(m.vm.form.error).toBeNull();
+    expect(mockSnackbar).not.toHaveBeenCalled();
     await m.unmount();
   });
 
-  it('stays open and keeps nothing when the Pond will not enroll', async () => {
+  it('says so when the phone could not keep the key', async () => {
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    keychain.keep.mockRejectedValueOnce(new Error('KeyStore error'));
+    const m = await mount(both);
+    expect(await typeCardAndUnlock(() => m.vm.form)).toBe(true);
+    expect(m.vm.form.kept).toBe(false);
+    expect(mockSnackbar).toHaveBeenCalledWith({ message: expect.stringContaining("couldn't keep its key") });
+    await m.unmount();
+    warn.mockRestore();
+  });
+
+  it('stays open and keeps nothing when the Pond will not enroll, and says so', async () => {
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
     pond.adminEnroll.mockRejectedValue(new ApiError('POST → 500', 500, null));
     const m = await mount(both);
     expect(await typeCardAndUnlock(() => m.vm.form)).toBe(true);
     expect(keychain.keep).not.toHaveBeenCalled();
     expect(m.vm.tab.gate.phase).toBe('unlocked');
     expect(m.vm.form.error).toBeNull();
+    expect(mockSnackbar).toHaveBeenCalledWith({ message: expect.stringContaining("couldn't keep its key") });
+    await m.unmount();
+    warn.mockRestore();
+  });
+
+  it('says the Pond needs an update when it has no enroll route', async () => {
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    pond.adminEnroll.mockRejectedValue(new ApiError('POST → 404', 404, null));
+    const m = await mount(both);
+    expect(await typeCardAndUnlock(() => m.vm.form)).toBe(true);
+    expect(mockSnackbar).toHaveBeenCalledWith({ message: expect.stringContaining('needs an update on your Pond') });
+    await m.unmount();
+    warn.mockRestore();
+  });
+
+  it('waits for a Pond that keeps no phone keys: no switch, a line saying why, and nothing enrolled', async () => {
+    live.keys = false;
+    const m = await mount(both);
+    expect(m.vm.form.canKeep).toBe(false);
+    expect(m.vm.form.keysAwaitPond).toBe(true);
+    expect(await typeCardAndUnlock(() => m.vm.form)).toBe(true);
+    expect(pond.adminEnroll).not.toHaveBeenCalled();
     await m.unmount();
   });
 });

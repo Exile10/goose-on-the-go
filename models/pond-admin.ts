@@ -91,6 +91,7 @@ export function readAdminStatus(raw: unknown): AdminStatus | null {
     idle_minutes: idle && idle > 0 ? idle : ADMIN_IDLE_MINUTES,
     retry_after: retry && retry > 0 ? Math.ceil(retry) : null,
     key: s.key === true,
+    keys: typeof s.key === 'boolean',
   };
 }
 

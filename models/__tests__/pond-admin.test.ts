@@ -70,11 +70,15 @@ describe('readAdminStatus', () => {
       idle_minutes: 15,
       retry_after: null,
       key: false,
+      keys: false,
     });
   });
 
   it('reads key only when the Pond says true', () => {
     expect(readAdminStatus({ card: 'present', unlocked: false, key: true })?.key).toBe(true);
+    // Saying `key` at all is how a Pond shows it keeps a key for each phone.
+    expect(readAdminStatus({ card: 'present', unlocked: false, key: false })?.keys).toBe(true);
+    expect(readAdminStatus({ card: 'present', unlocked: false })?.keys).toBe(false);
     for (const key of ['true', 1, null, {}]) expect(readAdminStatus({ card: 'present', unlocked: false, key })?.key).toBe(false);
   });
 
@@ -86,6 +90,7 @@ describe('readAdminStatus', () => {
       idle_minutes: 15,
       retry_after: null,
       key: false,
+      keys: false,
     });
     expect(readAdminStatus({ card: 'missing', unlocked: false, retry_after: 12.2 })).toMatchObject({ card: 'missing', retry_after: 13 });
   });

@@ -1958,6 +1958,11 @@ export interface AdminStatus {
   retry_after: number | null;
   /** Whether the Pond holds a live key for this phone; false when it does not say. */
   key: boolean;
+  /**
+   * Whether this Pond keeps a key for each phone at all, which it shows by saying `key`. One built
+   * before goose-in-a-pond#715 does not, and no phone can open My Pond with its biometrics there.
+   */
+  keys: boolean;
 }
 
 export interface AdminUnlocked {

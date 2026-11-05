@@ -44,7 +44,7 @@ jest.mock('@/services/api-client', () => {
 const pond = jest.mocked(api);
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-const LOCKED: AdminStatus = { card: 'present', unlocked: false, expires_at: null, idle_minutes: 15, retry_after: null, key: true };
+const LOCKED: AdminStatus = { card: 'present', unlocked: false, expires_at: null, idle_minutes: 15, retry_after: null, key: true, keys: true };
 
 /** The view with the gate's status read once, as My Pond reads it on arrival. */
 function Screen() {

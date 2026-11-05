@@ -39,7 +39,7 @@ describe('the lock', () => {
   it('starts locked, refuses every admin route, and opens with the card', async () => {
     const time = clock();
     const pond = createMockPond({}, time.now);
-    expect(await pond.status()).toEqual({ card: 'present', unlocked: false, expires_at: null, idle_minutes: 15, retry_after: null, key: false });
+    expect(await pond.status()).toEqual({ card: 'present', unlocked: false, expires_at: null, idle_minutes: 15, retry_after: null, key: false, keys: true });
     expect(await refusal(pond.overview())).toMatchObject({ status: 403, error: 'admin_locked' });
     expect(await refusal(pond.files(''))).toMatchObject({ status: 403, error: 'admin_locked' });
 
