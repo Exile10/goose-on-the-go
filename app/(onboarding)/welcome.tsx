@@ -6,7 +6,7 @@
  */
 
 import React, { useCallback } from 'react';
-import { Image, ScrollView, StyleSheet, View } from 'react-native';
+import { Image, StyleSheet, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -15,7 +15,7 @@ import { InkButton, InkCard, InkDots, InkNotice, InkSpinner, InkText, InkTitle }
 import { PondList } from '@/components/patterns/pond-list';
 import { NearbyPonds } from '@/components/setup/nearby-ponds';
 import { PhoneName } from '@/components/setup/phone-name';
-import { GKeyboardView } from '@/components/ui/g-keyboard-view';
+import { GKeyboardScrollView } from '@/components/ui/g-keyboard-view';
 import { useThemedStyles } from '@/hooks/use-themed-styles';
 import { useTheme } from '@/providers/theme-provider';
 import { selectionTick } from '@/services/haptics';
@@ -104,64 +104,62 @@ export default function Welcome() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
-      <GKeyboardView>
-        <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-          <Image
-            source={isDark ? require('@/assets/images/logo-dark.png') : require('@/assets/images/logo.png')}
-            style={styles.mark}
-            resizeMode="contain"
-          />
-          <InkTitle level={1}>{t('bleSetup.find.title')}</InkTitle>
-          <View style={styles.lede}>
-            <InkText>{t('bleSetup.find.lede')}</InkText>
-          </View>
+      <GKeyboardScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+        <Image
+          source={isDark ? require('@/assets/images/logo-dark.png') : require('@/assets/images/logo.png')}
+          style={styles.mark}
+          resizeMode="contain"
+        />
+        <InkTitle level={1}>{t('bleSetup.find.title')}</InkTitle>
+        <View style={styles.lede}>
+          <InkText>{t('bleSetup.find.lede')}</InkText>
+        </View>
 
-          <View style={styles.path}>
-            <InkButton variant="primary" block icon="camera" loading={phase.kind === 'claiming'} onPress={scanCard}>
-              {t('bleSetup.find.scanCard')}
-            </InkButton>
+        <View style={styles.path}>
+          <InkButton variant="primary" block icon="camera" loading={phase.kind === 'claiming'} onPress={scanCard}>
+            {t('bleSetup.find.scanCard')}
+          </InkButton>
 
-            {phase.kind === 'looking' ? (
-              <InkCard raised={false} contentStyle={styles.looking}>
-                <View accessibilityLiveRegion="polite">
-                  <InkSpinner label={t('bleSetup.find.looking', { id: phase.cardId })} />
-                </View>
-                {phase.late ? <InkText tone="secondary">{t('bleSetup.find.lookingLate', { id: phase.cardId })}</InkText> : null}
-                <View style={styles.start}>
-                  <InkButton variant="quiet" onPress={find.actions.cancel}>
-                    {t('bleSetup.find.cancel')}
-                  </InkButton>
-                </View>
-              </InkCard>
-            ) : null}
+          {phase.kind === 'looking' ? (
+            <InkCard raised={false} contentStyle={styles.looking}>
+              <View accessibilityLiveRegion="polite">
+                <InkSpinner label={t('bleSetup.find.looking', { id: phase.cardId })} />
+              </View>
+              {phase.late ? <InkText tone="secondary">{t('bleSetup.find.lookingLate', { id: phase.cardId })}</InkText> : null}
+              <View style={styles.start}>
+                <InkButton variant="quiet" onPress={find.actions.cancel}>
+                  {t('bleSetup.find.cancel')}
+                </InkButton>
+              </View>
+            </InkCard>
+          ) : null}
 
-            <BluetoothLine ble={ble} onFix={nearby.actions.fixBluetooth} />
-            <NearbyPonds ponds={fresh} find={find} onScanCard={scanCard} />
-            {fresh.length === 0 && phase.kind !== 'looking' ? (
-              searching ? (
-                <View style={styles.searching}>
-                  <InkDots label={t('bleSetup.find.scanning')} />
-                  <InkText size="sm" tone="tertiary">{t('bleSetup.find.scanning')}</InkText>
-                </View>
-              ) : (
-                <InkText size="sm" tone="tertiary">{t('bleSetup.find.none')}</InkText>
-              )
-            ) : null}
-            <PhoneName value={phoneName} onChange={find.actions.setPhoneName} disabled={phase.kind === 'claiming'} />
-          </View>
+          <BluetoothLine ble={ble} onFix={nearby.actions.fixBluetooth} />
+          <NearbyPonds ponds={fresh} find={find} onScanCard={scanCard} />
+          {fresh.length === 0 && phase.kind !== 'looking' ? (
+            searching ? (
+              <View style={styles.searching}>
+                <InkDots label={t('bleSetup.find.scanning')} />
+                <InkText size="sm" tone="tertiary">{t('bleSetup.find.scanning')}</InkText>
+              </View>
+            ) : (
+              <InkText size="sm" tone="tertiary">{t('bleSetup.find.none')}</InkText>
+            )
+          ) : null}
+          <PhoneName value={phoneName} onChange={find.actions.setPhoneName} disabled={phase.kind === 'claiming'} />
+        </View>
 
-          <View style={styles.path}>
-            <InkTitle level={3}>{t('onboarding.joinTitle')}</InkTitle>
-            <InkText tone="secondary">{t('onboarding.joinBody')}</InkText>
-            {joinable.length > 0 ? (
-              <PondList title={t('onboarding.joinFound')} ponds={joinable} phase={network} error={nearby.error} onSelect={onJoin} />
-            ) : null}
-            <InkButton variant="quiet" block icon="plus" onPress={() => openPairing({ kind: 'address' })}>
-              {t('onboarding.manual')}
-            </InkButton>
-          </View>
-        </ScrollView>
-      </GKeyboardView>
+        <View style={styles.path}>
+          <InkTitle level={3}>{t('onboarding.joinTitle')}</InkTitle>
+          <InkText tone="secondary">{t('onboarding.joinBody')}</InkText>
+          {joinable.length > 0 ? (
+            <PondList title={t('onboarding.joinFound')} ponds={joinable} phase={network} error={nearby.error} onSelect={onJoin} />
+          ) : null}
+          <InkButton variant="quiet" block icon="plus" onPress={() => openPairing({ kind: 'address' })}>
+            {t('onboarding.manual')}
+          </InkButton>
+        </View>
+      </GKeyboardScrollView>
     </SafeAreaView>
   );
 }

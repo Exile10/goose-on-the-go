@@ -19,7 +19,7 @@ import {
 import { Stack, useFocusEffect, useRouter } from 'expo-router';
 import { GIcon } from '@/components/ui/g-icon';
 import { GPressable } from '@/components/ui/g-pressable';
-import { GKeyboardView } from '@/components/ui/g-keyboard-view';
+import { GKeyboardView, useFocusedInputReveal } from '@/components/ui/g-keyboard-view';
 import { JaridaPurple, Brand } from '@/constants/colors';
 import { FontSize, face } from '@/constants/typography';
 import { Spacing } from '@/constants/spacing';
@@ -161,16 +161,20 @@ const ADDRESS_PLACEHOLDER = insecureDevMode ? 'http://192.168.1.10:4080' : 'http
  * It scrolls, which matters for two reasons. The step content is centred, so
  * when the keyboard takes half the screen the button under the focused field
  * ends up below the fold — `GKeyboardView` lifts the container, and this makes
- * what it lifted reachable. And the discovery step grows with however many hubs
- * answer, which is not a number the layout gets to assume.
+ * what it lifted reachable, scrolling the focused field back above the keyboard.
+ * And the discovery step grows with however many hubs answer, which is not a
+ * number the layout gets to assume.
  */
 function StepBody({ children }: { children: React.ReactNode }) {
   const styles = useThemedStyles(makeStyles);
+  const scroll = useRef<ScrollView>(null);
+  const reveal = useFocusedInputReveal(() => scroll.current);
   return (
     <ScrollView
+      ref={scroll}
       style={styles.stepScroll}
       contentContainerStyle={[styles.stepContent, styles.stepScrollContent]}
-      keyboardShouldPersistTaps="handled"
+      {...reveal}
     >
       {children}
     </ScrollView>

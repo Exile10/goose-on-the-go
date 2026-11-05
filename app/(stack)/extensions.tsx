@@ -10,10 +10,10 @@ import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import React, { useCallback, useState } from 'react';
 import { InkButton, InkEmptyState, InkNotice, InkSegmented, InkSpinner, InkSwitch, InkText, InkTitle, InkInput } from '@jarida/ink/native';
-import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { RefreshControl, StyleSheet, Text, View } from 'react-native';
 
 import { GIcon } from '@/components/ui/g-icon';
-import { GKeyboardView } from '@/components/ui/g-keyboard-view';
+import { GKeyboardScrollView } from '@/components/ui/g-keyboard-view';
 import { isIconName } from '@/constants/icons';
 import { JaridaPurple } from '@/constants/colors';
 import { FontSize, face } from '@/constants/typography';
@@ -335,88 +335,86 @@ export default function ExtensionsScreen() {
   const pull = usePullToRefresh(actions.refresh);
 
   return (
-    <GKeyboardView>
-      <ScrollView
-        style={styles.container}
-        contentContainerStyle={styles.scroll}
-        showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl {...pull} />}
-      >
-        {state === 'loading' ? (
-          <InkSpinner label={t('extensions.loading')} />
-        ) : null}
+    <GKeyboardScrollView
+      style={styles.container}
+      contentContainerStyle={styles.scroll}
+      showsVerticalScrollIndicator={false}
+      refreshControl={<RefreshControl {...pull} />}
+    >
+      {state === 'loading' ? (
+        <InkSpinner label={t('extensions.loading')} />
+      ) : null}
 
-        {!unavailable && error ? (
-          <View style={styles.notice}>
-            <InkNotice tone="danger">{error}</InkNotice>
-          </View>
-        ) : null}
+      {!unavailable && error ? (
+        <View style={styles.notice}>
+          <InkNotice tone="danger">{error}</InkNotice>
+        </View>
+      ) : null}
 
-        {unavailable ? <ContentUnavailable state={state} reason={error} onRetry={actions.refresh} /> : null}
+      {unavailable ? <ContentUnavailable state={state} reason={error} onRetry={actions.refresh} /> : null}
 
-        {state === 'empty' ? (
-          <InkEmptyState icon="package" title={t('extensions.noneTitle')}>
-            <InkText>{t('extensions.noneBody')}</InkText>
-          </InkEmptyState>
-        ) : null}
+      {state === 'empty' ? (
+        <InkEmptyState icon="package" title={t('extensions.noneTitle')}>
+          <InkText>{t('extensions.noneBody')}</InkText>
+        </InkEmptyState>
+      ) : null}
 
-        {data.installed.length > 0 ? (
-          <View style={styles.section}>
-            <InkTitle level={3}>{t('extensions.installedTitle')}</InkTitle>
-            {data.installed.map((ext) => {
-              // Only a marketplace install is named by a marketplace id. The Pond's built-in
-              // `giap-*` extensions never are, so they get neither credentials nor Remove.
-              const item = data.marketplace.find((m) => m.id === ext.name);
-              return (
-                <React.Fragment key={ext.name}>
-                  <InstalledCard
-                    extension={ext}
-                    onToggle={handleToggle}
-                    onCredentials={item && credentialFields(item).length > 0 ? handleCredentials : undefined}
-                    onRemove={item ? confirmRemove : undefined}
-                  />
-                  {form?.mode === 'credentials' && form.item.id === ext.name ? (
-                    <CredentialsForm
-                      item={form.item}
-                      mode="credentials"
-                      busy={saving}
-                      onSubmit={handleSubmit}
-                      onCancel={() => setForm(null)}
-                    />
-                  ) : null}
-                </React.Fragment>
-              );
-            })}
-          </View>
-        ) : null}
-
-        {data.available.length > 0 ? (
-          <View style={styles.section}>
-            <InkTitle level={3}>{t('extensions.marketplaceTitle')}</InkTitle>
-            {data.available.map((item) => (
-              <React.Fragment key={item.id}>
-                <MarketplaceCard
-                  item={item}
-                  installing={installingId === item.id}
-                  onInstall={handleInstall}
+      {data.installed.length > 0 ? (
+        <View style={styles.section}>
+          <InkTitle level={3}>{t('extensions.installedTitle')}</InkTitle>
+          {data.installed.map((ext) => {
+            // Only a marketplace install is named by a marketplace id. The Pond's built-in
+            // `giap-*` extensions never are, so they get neither credentials nor Remove.
+            const item = data.marketplace.find((m) => m.id === ext.name);
+            return (
+              <React.Fragment key={ext.name}>
+                <InstalledCard
+                  extension={ext}
+                  onToggle={handleToggle}
+                  onCredentials={item && credentialFields(item).length > 0 ? handleCredentials : undefined}
+                  onRemove={item ? confirmRemove : undefined}
                 />
-                {form?.mode === 'install' && form.item.id === item.id ? (
+                {form?.mode === 'credentials' && form.item.id === ext.name ? (
                   <CredentialsForm
-                    item={item}
-                    mode="install"
-                    busy={installingId === item.id}
+                    item={form.item}
+                    mode="credentials"
+                    busy={saving}
                     onSubmit={handleSubmit}
                     onCancel={() => setForm(null)}
                   />
                 ) : null}
               </React.Fragment>
-            ))}
-          </View>
-        ) : null}
+            );
+          })}
+        </View>
+      ) : null}
 
-        <View style={{ height: 32 }} />
-      </ScrollView>
-    </GKeyboardView>
+      {data.available.length > 0 ? (
+        <View style={styles.section}>
+          <InkTitle level={3}>{t('extensions.marketplaceTitle')}</InkTitle>
+          {data.available.map((item) => (
+            <React.Fragment key={item.id}>
+              <MarketplaceCard
+                item={item}
+                installing={installingId === item.id}
+                onInstall={handleInstall}
+              />
+              {form?.mode === 'install' && form.item.id === item.id ? (
+                <CredentialsForm
+                  item={item}
+                  mode="install"
+                  busy={installingId === item.id}
+                  onSubmit={handleSubmit}
+                  onCancel={() => setForm(null)}
+                />
+              ) : null}
+            </React.Fragment>
+          ))}
+        </View>
+      ) : null}
+
+      <View style={{ height: 32 }} />
+    </GKeyboardScrollView>
   );
 }
 

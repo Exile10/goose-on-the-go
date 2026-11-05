@@ -9,7 +9,7 @@
  */
 
 import React, { useCallback } from 'react';
-import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { RefreshControl, StyleSheet, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { InkButton, InkCard, InkInput, InkNotice, InkSpinner, InkText, InkTitle } from '@jarida/ink/native';
 
@@ -17,7 +17,7 @@ import { ContentUnavailable } from '@/components/patterns/content-unavailable';
 import { isUnavailable } from '@/models/content-state';
 import { useContentState } from '@/view-models/use-content-state';
 import { usePullToRefresh } from '@/view-models/use-pull-to-refresh';
-import { GKeyboardView } from '@/components/ui/g-keyboard-view';
+import { GKeyboardScrollView } from '@/components/ui/g-keyboard-view';
 import type { ThemeColors } from '@/constants/colors';
 import { Spacing } from '@/constants/spacing';
 import { FontSize, face } from '@/constants/typography';
@@ -65,129 +65,126 @@ export default function SecretsScreen() {
   const replacing = form?.kind === 'replace' ? data.keys.find((row) => row.key === form.key) ?? { key: form.key, labelKey: null } : null;
 
   return (
-    <GKeyboardView>
-      <ScrollView
-        style={styles.container}
-        contentContainerStyle={styles.scroll}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl {...pull} />}
-      >
-        <InkText size="sm" tone="secondary">
-          {t('secrets.intro')}
-        </InkText>
+    <GKeyboardScrollView
+      style={styles.container}
+      contentContainerStyle={styles.scroll}
+      showsVerticalScrollIndicator={false}
+      refreshControl={<RefreshControl {...pull} />}
+    >
+      <InkText size="sm" tone="secondary">
+        {t('secrets.intro')}
+      </InkText>
 
-        {loading ? <InkSpinner label={t('secrets.loading')} /> : null}
+      {loading ? <InkSpinner label={t('secrets.loading')} /> : null}
 
-        {unavailable ? (
-          <ContentUnavailable state={state} reason={error} onRetry={actions.refresh} />
-        ) : error ? (
-          <InkNotice tone="danger">{error}</InkNotice>
-        ) : null}
+      {unavailable ? (
+        <ContentUnavailable state={state} reason={error} onRetry={actions.refresh} />
+      ) : error ? (
+        <InkNotice tone="danger">{error}</InkNotice>
+      ) : null}
 
-        {!loading && !failed ? (
-          <InkCard contentStyle={styles.card}>
-            <InkTitle level={3}>{t('secrets.storedTitle')}</InkTitle>
-            {data.keys.length === 0 ? (
-              <InkText size="sm" tone="secondary">
-                {t('secrets.empty')}
-              </InkText>
-            ) : (
-              data.keys.map((row) => (
-                <View key={row.key} style={styles.row}>
-                  <View style={styles.rowText}>
-                    <InkText>{secretName(row)}</InkText>
-                    {row.labelKey ? <Text style={styles.keyName}>{row.key}</Text> : null}
-                  </View>
-                  <View style={styles.rowActions}>
-                    <InkButton
-                      variant="quiet"
-                      icon="edit"
-                      onPress={() => actions.startReplace(row.key)}
-                      disabled={busy}
-                    >
-                      {t('secrets.replace')}
-                    </InkButton>
-                    <InkButton
-                      variant="quiet"
-                      icon="trash"
-                      onPress={() => handleDelete(row)}
-                      disabled={busy}
-                    >
-                      {deleting === row.key ? t('secrets.deleting') : t('secrets.delete')}
-                    </InkButton>
-                  </View>
+      {!loading && !failed ? (
+        <InkCard contentStyle={styles.card}>
+          <InkTitle level={3}>{t('secrets.storedTitle')}</InkTitle>
+          {data.keys.length === 0 ? (
+            <InkText size="sm" tone="secondary">
+              {t('secrets.empty')}
+            </InkText>
+          ) : (
+            data.keys.map((row) => (
+              <View key={row.key} style={styles.row}>
+                <View style={styles.rowText}>
+                  <InkText>{secretName(row)}</InkText>
+                  {row.labelKey ? <Text style={styles.keyName}>{row.key}</Text> : null}
                 </View>
-              ))
-            )}
-            {form ? null : (
-              <View style={styles.actionsEnd}>
-                <InkButton variant="primary" icon="plus" onPress={actions.startAdd} disabled={busy}>
-                  {t('secrets.add')}
-                </InkButton>
+                <View style={styles.rowActions}>
+                  <InkButton
+                    variant="quiet"
+                    icon="edit"
+                    onPress={() => actions.startReplace(row.key)}
+                    disabled={busy}
+                  >
+                    {t('secrets.replace')}
+                  </InkButton>
+                  <InkButton
+                    variant="quiet"
+                    icon="trash"
+                    onPress={() => handleDelete(row)}
+                    disabled={busy}
+                  >
+                    {deleting === row.key ? t('secrets.deleting') : t('secrets.delete')}
+                  </InkButton>
+                </View>
               </View>
-            )}
-          </InkCard>
-        ) : null}
-
-        {form ? (
-          <InkCard contentStyle={styles.card}>
-            <InkTitle level={3}>
-              {replacing ? t('secrets.replaceTitle', { name: secretName(replacing) }) : t('secrets.addTitle')}
-            </InkTitle>
-
-            {form.kind === 'add' ? (
-              <InkInput
-                label={t('secrets.keyLabel')}
-                value={data.draftKey}
-                onChange={actions.setDraftKey}
-                disabled={busy}
-                placeholder={t('secrets.keyPlaceholder')}
-                inputProps={{
-                  maxLength: SECRET_KEY_MAX,
-                  autoCapitalize: 'characters',
-                  autoCorrect: false,
-                  autoComplete: 'off',
-                  spellCheck: false,
-                  returnKeyType: 'next',
-                }}
-              />
-            ) : (
-              <InkText size="sm" tone="secondary">
-                {t('secrets.replaceHelp')}
-              </InkText>
-            )}
-
-            <InkInput
-              label={t('secrets.valueLabel')}
-              type="password"
-              value={data.draftValue}
-              onChange={actions.setDraftValue}
-              onSubmit={() => void handleSave()}
-              disabled={busy}
-              invalid={formError ?? undefined}
-              placeholder={form.kind === 'replace' ? t('secrets.valuePlaceholderReplace') : t('secrets.valuePlaceholder')}
-              inputProps={{
-                autoComplete: 'off',
-                spellCheck: false,
-                textContentType: 'none',
-                importantForAutofill: 'no',
-                returnKeyType: 'done',
-              }}
-            />
-
-            <View style={styles.actions}>
-              <InkButton variant="quiet" onPress={actions.cancel} disabled={saving}>
-                {t('common.cancel')}
-              </InkButton>
-              <InkButton variant="primary" onPress={() => void handleSave()} disabled={!saving && !data.canSave} loading={saving}>
-                {saving ? t('secrets.saving') : t('common.save')}
+            ))
+          )}
+          {form ? null : (
+            <View style={styles.actionsEnd}>
+              <InkButton variant="primary" icon="plus" onPress={actions.startAdd} disabled={busy}>
+                {t('secrets.add')}
               </InkButton>
             </View>
-          </InkCard>
-        ) : null}
-      </ScrollView>
-    </GKeyboardView>
+          )}
+        </InkCard>
+      ) : null}
+
+      {form ? (
+        <InkCard contentStyle={styles.card}>
+          <InkTitle level={3}>
+            {replacing ? t('secrets.replaceTitle', { name: secretName(replacing) }) : t('secrets.addTitle')}
+          </InkTitle>
+
+          {form.kind === 'add' ? (
+            <InkInput
+              label={t('secrets.keyLabel')}
+              value={data.draftKey}
+              onChange={actions.setDraftKey}
+              disabled={busy}
+              placeholder={t('secrets.keyPlaceholder')}
+              inputProps={{
+                maxLength: SECRET_KEY_MAX,
+                autoCapitalize: 'characters',
+                autoCorrect: false,
+                autoComplete: 'off',
+                spellCheck: false,
+                returnKeyType: 'next',
+              }}
+            />
+          ) : (
+            <InkText size="sm" tone="secondary">
+              {t('secrets.replaceHelp')}
+            </InkText>
+          )}
+
+          <InkInput
+            label={t('secrets.valueLabel')}
+            type="password"
+            value={data.draftValue}
+            onChange={actions.setDraftValue}
+            onSubmit={() => void handleSave()}
+            disabled={busy}
+            invalid={formError ?? undefined}
+            placeholder={form.kind === 'replace' ? t('secrets.valuePlaceholderReplace') : t('secrets.valuePlaceholder')}
+            inputProps={{
+              autoComplete: 'off',
+              spellCheck: false,
+              textContentType: 'none',
+              importantForAutofill: 'no',
+              returnKeyType: 'done',
+            }}
+          />
+
+          <View style={styles.actions}>
+            <InkButton variant="quiet" onPress={actions.cancel} disabled={saving}>
+              {t('common.cancel')}
+            </InkButton>
+            <InkButton variant="primary" onPress={() => void handleSave()} disabled={!saving && !data.canSave} loading={saving}>
+              {saving ? t('secrets.saving') : t('common.save')}
+            </InkButton>
+          </View>
+        </InkCard>
+      ) : null}
+    </GKeyboardScrollView>
   );
 }
 

@@ -8,7 +8,7 @@ import { ScrollView, View, type RefreshControlProps, type ViewStyle } from 'reac
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { InkNotice } from '@jarida/ink/native';
 
-import { GKeyboardView } from '@/components/ui/g-keyboard-view';
+import { GKeyboardScrollView } from '@/components/ui/g-keyboard-view';
 import { Spacing } from '@/constants/spacing';
 import { useSettingsColors } from './settings-theme';
 
@@ -31,23 +31,21 @@ export function SettingsScroll({
 }: {
   children: ReactNode;
   refreshControl?: ReactElement<RefreshControlProps>;
-  /** The page has fields: keep taps on them, and let the keyboard push the page up. */
+  /** The page has fields: keep taps on them, lift the page clear of the keyboard, and scroll the field being typed in above it. */
   typing?: boolean;
 }) {
   const colors = useSettingsColors();
   const padding = useSettingsPagePadding();
-  const scroll = (
-    <ScrollView
-      style={{ flex: 1, backgroundColor: colors.page }}
-      contentContainerStyle={padding}
-      refreshControl={refreshControl}
-      keyboardShouldPersistTaps={typing ? 'handled' : undefined}
-      keyboardDismissMode={typing ? 'interactive' : undefined}
-    >
+  const page = { flex: 1, backgroundColor: colors.page };
+  return typing ? (
+    <GKeyboardScrollView containerStyle={page} style={page} contentContainerStyle={padding} refreshControl={refreshControl} keyboardDismissMode="interactive">
+      {children}
+    </GKeyboardScrollView>
+  ) : (
+    <ScrollView style={page} contentContainerStyle={padding} refreshControl={refreshControl}>
       {children}
     </ScrollView>
   );
-  return typing ? <GKeyboardView style={{ flex: 1, backgroundColor: colors.page }}>{scroll}</GKeyboardView> : scroll;
 }
 
 /** A notice on the page, spaced as a group is, so it never sits flush against the card below. */

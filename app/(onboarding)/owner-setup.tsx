@@ -5,7 +5,7 @@
  * says whether Goose can answer yet.
  */
 
-import React, { useCallback, useEffect } from 'react';
+import React, { useCallback, useEffect, useRef } from 'react';
 import { BackHandler, ScrollView, StyleSheet, View } from 'react-native';
 import { Redirect, Stack, useFocusEffect, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
@@ -16,7 +16,7 @@ import { ModelStep } from '@/components/setup/model-step';
 import { SetupFooter, SetupWarmup } from '@/components/setup/setup-chrome';
 import { AboutStep } from '@/components/setup/setup-steps';
 import { PersonalityStep } from '@/components/setup/personality-step';
-import { GKeyboardView } from '@/components/ui/g-keyboard-view';
+import { GKeyboardView, useFocusedInputReveal } from '@/components/ui/g-keyboard-view';
 import type { ThemeColors } from '@/constants/colors';
 import { Spacing } from '@/constants/spacing';
 import { useThemedStyles } from '@/hooks/use-themed-styles';
@@ -38,6 +38,8 @@ export default function OwnerSetupScreen() {
   const styles = useThemedStyles(makeStyles);
   const { t } = useTranslation();
   const setup = useOwnerSetup();
+  const scroll = useRef<ScrollView>(null);
+  const reveal = useFocusedInputReveal(() => scroll.current);
   // The model step counts only once the Pond has asked for it.
   const count = setup.noChatModel ? SETUP_STEPS.length : SETUP_STEPS.indexOf('model');
   const { index, phase, interview } = setup;
@@ -100,7 +102,7 @@ export default function OwnerSetupScreen() {
           <InkMeter value={(index + 1) / count} label={t('setup.progressLabel')} />
         </View>
         {/* Keyed by step, so each step opens at its top rather than where the last one was left. */}
-        <ScrollView key={setup.step} contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+        <ScrollView key={setup.step} ref={scroll} contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false} {...reveal}>
           {setup.notice ? <InkNotice tone="warning">{setup.notice}</InkNotice> : null}
           <StepBody setup={setup} />
         </ScrollView>

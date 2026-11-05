@@ -5,12 +5,13 @@
  * the title into an inline rename field.
  */
 
-import React, { useCallback, useState } from 'react';
-import { FlatList, StyleSheet, Text, TextInput, View } from 'react-native';
+import React, { useCallback, useRef, useState } from 'react';
+import { FlatList, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { InkSpinner } from '@jarida/ink/native';
 import { useRouter } from 'expo-router';
 
 import { GIcon } from '@/components/ui/g-icon';
+import { GKeyboardView, useFocusedInputReveal } from '@/components/ui/g-keyboard-view';
 import { GPressable } from '@/components/ui/g-pressable';
 import type { SessionSummary } from '@/services/types';
 import { usePullToRefresh } from '@/view-models/use-pull-to-refresh';
@@ -93,6 +94,9 @@ export default function SessionsScreen() {
   const pull = usePullToRefresh(actions.refresh);
   const router = useRouter();
   const confirm = useConfirm();
+  // A rename opens in place, and a row low in the list would open under the keyboard.
+  const list = useRef<FlatList<SessionSummary>>(null);
+  const reveal = useFocusedInputReveal(() => list.current?.getNativeScrollRef() as ScrollView | null | undefined);
 
   const openSession = useCallback(
     (session: SessionSummary) => {
@@ -139,21 +143,25 @@ export default function SessionsScreen() {
   }
 
   return (
-    <FlatList
-      style={styles.list}
-      contentContainerStyle={styles.listContent}
-      showsVerticalScrollIndicator={false}
-      data={data.sessions}
-      keyExtractor={(item) => item.id}
-      renderItem={renderItem}
-      {...pull}
-      ListEmptyComponent={
-        <View style={styles.empty}>
-          <Text style={styles.emptyTitle}>{i18n.t('sessions.emptyTitle')}</Text>
-          <Text style={styles.emptyMessage}>{i18n.t('sessions.emptyMessage')}</Text>
-        </View>
-      }
-    />
+    <GKeyboardView>
+      <FlatList
+        ref={list}
+        style={styles.list}
+        contentContainerStyle={styles.listContent}
+        showsVerticalScrollIndicator={false}
+        data={data.sessions}
+        keyExtractor={(item) => item.id}
+        renderItem={renderItem}
+        {...pull}
+        {...reveal}
+        ListEmptyComponent={
+          <View style={styles.empty}>
+            <Text style={styles.emptyTitle}>{i18n.t('sessions.emptyTitle')}</Text>
+            <Text style={styles.emptyMessage}>{i18n.t('sessions.emptyMessage')}</Text>
+          </View>
+        }
+      />
+    </GKeyboardView>
   );
 }
 
