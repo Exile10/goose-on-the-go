@@ -10,8 +10,14 @@
  * rather than queueing behind it, because the newer one is about what the user just did.
  */
 
-/** Neutral for "it worked", danger for "it did not". */
-export type SnackbarTone = 'neutral' | 'danger';
+/**
+ * What the sentence reports, which picks the icon at its start.
+ *
+ * - `success`: an action the user took is done -- saved, started, deleted, decided.
+ * - `danger`: an action the user took did not happen.
+ * - `neutral`: anything else worth saying about it, such as "that one was already gone".
+ */
+export type SnackbarTone = 'success' | 'neutral' | 'danger';
 
 /** The one thing a snackbar can offer to do -- Try again, mostly. */
 export interface SnackbarAction {

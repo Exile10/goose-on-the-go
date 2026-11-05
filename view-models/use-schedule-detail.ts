@@ -153,14 +153,14 @@ export function useScheduleDetail(id: string): UseScheduleDetail {
       if (!real) {
         changes.current += 1;
         setSchedule(applyLocally(current, req));
-        showSnackbar({ message: i18n.t('schedule.detail.saved') });
+        showSnackbar({ message: i18n.t('schedule.detail.saved'), tone: 'success' });
         return null;
       }
       try {
         const saved = await api.updateSchedule(id, req);
         changes.current += 1;
         setSchedule(saved);
-        showSnackbar({ message: i18n.t('schedule.detail.saved') });
+        showSnackbar({ message: i18n.t('schedule.detail.saved'), tone: 'success' });
         return null;
       } catch (e) {
         console.warn('[schedule-detail] update refused', e instanceof ApiError ? e.status : 'network');
@@ -214,7 +214,7 @@ export function useScheduleDetail(id: string): UseScheduleDetail {
     try {
       await api.runScheduleNow(id);
       changes.current += 1;
-      showSnackbar({ message: i18n.t('schedule.detail.runStarted') });
+      showSnackbar({ message: i18n.t('schedule.detail.runStarted'), tone: 'success' });
     } catch (e) {
       changes.current += 1;
       setSchedule((s) => (s ? { ...s, currently_running: current.currently_running } : s));

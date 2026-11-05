@@ -11,11 +11,22 @@ import '@/services/i18n';
 import React from 'react';
 import { AccessibilityInfo, StyleSheet, Text } from 'react-native';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
+import { ACCENT_NAMES, contrast, type InkScheme } from '@jarida/ink';
 import { InkProvider } from '@jarida/ink/native';
 
 import { SNACKBAR_ACTION_MS, SNACKBAR_MS, currentSnackbar, resetSnackbar, showSnackbar } from '@/services/snackbar';
-import { SnackbarProvider, snackbarDuration, useSnackbar, useSnackbarClearance, type SnackbarApi } from '../snackbar-provider';
+import {
+  SNACKBAR_ICON,
+  SnackbarProvider,
+  snackbarDuration,
+  snackbarPalette,
+  useSnackbar,
+  useSnackbarClearance,
+  type SnackbarApi,
+} from '../snackbar-provider';
 
+// lucide ships ES modules Jest does not transform; the glyph's name and colour are what is checked.
+jest.mock('@/components/ui/g-icon', () => ({ GIcon: () => null }));
 jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, left: 0, right: 0, bottom: 20 }),
 }));
@@ -49,7 +60,11 @@ interface Mounted {
 }
 
 /** `animate: false` is Reduce Motion: the message comes and goes without a slide to wait out. */
-async function mount({ animate = false, clearance = 0 }: { animate?: boolean; clearance?: number } = {}): Promise<Mounted> {
+async function mount({
+  animate = false,
+  clearance = 0,
+  scheme = 'light',
+}: { animate?: boolean; clearance?: number; scheme?: InkScheme } = {}): Promise<Mounted> {
   const hooks: { api?: SnackbarApi } = {};
   const Probe = () => {
     hooks.api = useSnackbar();
@@ -59,7 +74,7 @@ async function mount({ animate = false, clearance = 0 }: { animate?: boolean; cl
   let tree!: ReactTestRenderer;
   await act(async () => {
     tree = create(
-      <InkProvider animate={animate}>
+      <InkProvider animate={animate} scheme={scheme} accent="Purple">
         <SnackbarProvider>
           <Probe />
         </SnackbarProvider>
@@ -83,6 +98,12 @@ function pressable(tree: ReactTestRenderer, text: string) {
   );
   if (!outer) throw new Error(`nothing pressable says ${text}`);
   return outer;
+}
+
+/** The glyph at the start of the message, and the colour it is drawn in. */
+function iconOf(tree: ReactTestRenderer): { name: string; color: string } {
+  const [glyph] = tree.root.findByProps({ testID: 'snackbar-icon' }).findAll((n) => typeof n.props.name === 'string');
+  return { name: glyph.props.name, color: glyph.props.color };
 }
 
 async function advance(ms: number) {
@@ -227,4 +248,95 @@ it('slides away with its words on it when motion is allowed', async () => {
   expect(messages(tree)).toEqual(['Saved on your Pond.']);
   await advance(1_000);
   expect(messages(tree)).toEqual([]);
+});
+
+it.each([
+  ['success', 'Saved on your Pond.', 'done'],
+  ['danger', 'Could not save.', 'alert'],
+  ['neutral', 'That reminder was already gone.', 'info'],
+] as const)('opens a %s message with its own icon, in its own colour', async (tone, message, icon) => {
+  const { tree, api } = await mount();
+  await act(async () => {
+    api.show({ message, tone });
+  });
+  expect(SNACKBAR_ICON[tone]).toBe(icon);
+  expect(iconOf(tree)).toEqual({ name: icon, color: snackbarPalette({ scheme: 'light', accent: 'Purple' }).icon[tone] });
+  // The icon says nothing of its own: the sentence is what is read.
+  expect(tree.root.findByProps({ testID: 'snackbar-icon' }).props.importantForAccessibility).toBe('no-hide-descendants');
+  expect(messages(tree)).toEqual([message]);
+});
+
+it('keeps a confirmation as a success, and a message given no tone as neutral', async () => {
+  const { tree, api } = await mount();
+  await act(async () => {
+    api.show({ message: 'Run started.', tone: 'success' });
+  });
+  expect(currentSnackbar()?.tone).toBe('success');
+  await act(async () => {
+    api.show({ message: 'That reminder was already gone.' });
+  });
+  expect(currentSnackbar()?.tone).toBe('neutral');
+  expect(iconOf(tree).name).toBe('info');
+});
+
+it('draws in the other scheme: dark over a light app, light over a dark one', async () => {
+  const groundOf = (tree: ReactTestRenderer) =>
+    StyleSheet.flatten(tree.root.findByProps({ testID: 'snackbar' }).props.style).backgroundColor as string;
+
+  const light = await mount({ scheme: 'light' });
+  await act(async () => {
+    light.api.show({ message: 'Saved on your Pond.', tone: 'success' });
+  });
+  const dark = await mount({ scheme: 'dark' });
+  await act(async () => {
+    dark.api.show({ message: 'Saved on your Pond.', tone: 'success' });
+  });
+
+  expect(groundOf(light.tree)).toBe(snackbarPalette({ scheme: 'light', accent: 'Purple' }).ground);
+  expect(groundOf(dark.tree)).toBe(snackbarPalette({ scheme: 'dark', accent: 'Purple' }).ground);
+  expect(groundOf(light.tree)).not.toBe(groundOf(dark.tree));
+});
+
+it('keeps the message, the action and every icon readable on its surface, in both schemes and every accent', () => {
+  for (const scheme of ['light', 'dark'] as const) {
+    for (const accent of ACCENT_NAMES) {
+      const p = snackbarPalette({ scheme, accent });
+      const where = `${scheme} ${accent}`;
+      expect([where, contrast(p.words, p.ground) >= 4.5]).toEqual([where, true]);
+      expect([where, contrast(p.action, p.ground) >= 4.5]).toEqual([where, true]);
+      for (const tone of ['success', 'danger', 'neutral'] as const) {
+        expect([where, tone, contrast(p.icon[tone], p.ground) >= 4.5]).toEqual([where, tone, true]);
+      }
+    }
+  }
+});
+
+it('offers its action as a button a finger can hit, in the accent, and the action still runs', async () => {
+  const retry = jest.fn();
+  const { tree, api } = await mount();
+  await act(async () => {
+    api.show({ message: 'Could not start the run.', tone: 'danger', action: { label: 'Try again', onPress: retry } });
+  });
+  const button = pressable(tree, 'Try again');
+  expect(button.props.accessibilityRole).toBe('button');
+  const style = StyleSheet.flatten(button.props.style({ pressed: false }));
+  expect(style.minHeight).toBeGreaterThanOrEqual(44);
+  expect(style.minWidth).toBeGreaterThanOrEqual(44);
+  const label = tree.root.findAll((n) => n.type === Text && n.props.children === 'Try again')[0];
+  expect(StyleSheet.flatten(label.props.style).color).toBe(snackbarPalette({ scheme: 'light', accent: 'Purple' }).action);
+  await act(async () => button.props.onPress());
+  expect(retry).toHaveBeenCalledTimes(1);
+  expect(currentSnackbar()).toBeNull();
+});
+
+it('shows at most two lines, and still announces the whole sentence', async () => {
+  const long = Array.from({ length: 30 }, () => 'word').join(' ');
+  const { tree, api } = await mount();
+  await act(async () => {
+    api.show({ message: long, tone: 'danger' });
+  });
+  const text = tree.root.findAll((n) => n.type === Text && n.props.children === long)[0];
+  expect(text.props.numberOfLines).toBe(2);
+  expect(pressable(tree, long).props.accessibilityLabel).toBe(long);
+  expect(announce).toHaveBeenCalledWith(long);
 });

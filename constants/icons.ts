@@ -12,7 +12,7 @@
 
 import {
   Activity, Archive, ArrowDown, ArrowRight, AudioLines, Bell, Bluetooth, Bot, Boxes, Brain, Calendar, Camera,
-  Check, ChevronDown, ChevronLeft, ChevronRight, ChevronsUpDown, CircleCheck, Clock, Cloud, CloudAlert, CloudDrizzle,
+  Check, ChevronDown, ChevronLeft, ChevronRight, ChevronsUpDown, CircleAlert, CircleCheck, Clock, Cloud, CloudAlert, CloudDrizzle,
   CloudFog, CloudLightning, CloudOff, CloudRain, CloudSnow, CloudSun, Copy, Cpu, Download, Droplet,
   Ear, Eye, EyeOff, FileText, HardDrive, Info, Palette, SlidersHorizontal,
   Ellipsis, ExternalLink, File, Filter, Folder, Frame, Globe, GripVertical, House, Image,
@@ -30,6 +30,7 @@ export const ICONS = {
   alarm: Siren,
   appliance: Plug,
   agent: Bot,
+  alert: CircleAlert,
   arrow: ArrowRight,
   'arrow-down': ArrowDown,
   bell: Bell,
@@ -51,6 +52,7 @@ export const ICONS = {
   copy: Copy,
   cpu: Cpu,
   dashboard: Boxes,
+  done: CircleCheck,
   device: MonitorSmartphone,
   download: Download,
   drizzle: CloudDrizzle,

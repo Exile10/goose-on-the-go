@@ -141,10 +141,12 @@ response ink's own controls already have.
 What a tap came to goes in the snackbar, not in a notice that stays on the
 page: `useSnackbar().show({ message, tone, action })` from
 `providers/snackbar-provider.tsx` in a component, `showSnackbar` from
-`services/snackbar.ts` in a view-model or store. Confirmations are neutral;
+`services/snackbar.ts` in a view-model or store. Confirmations are success;
 failures are danger, with a Try again action when sending the request again
-is cheap. A field's error, a form still open, and a standing condition stay
-inline with `InkNotice`; content that did not load is `ContentUnavailable`. The
+is cheap; anything else said about the action is neutral. The tone picks the
+icon at the start of the message. A field's error, a form still open, and a
+standing condition stay inline with `InkNotice`; content that did not load is
+`ContentUnavailable`. The
 full rule, and the snackbar's timing, placement and accessibility, are in
 "Feedback for actions" in [VIEW-LAYER.md](./VIEW-LAYER.md).
 

@@ -179,7 +179,7 @@ export default function ActivityScreen() {
     try {
       const purged = await activity.actions.clear();
       void confirm();
-      snackbar.show({ message: t('activity.clear.done', { count: purged }) });
+      snackbar.show({ message: t('activity.clear.done', { count: purged }), tone: 'success' });
       void activitySummary.actions.refresh();
     } catch (e) {
       console.warn('[activity] clear failed', e instanceof Error ? e.name : 'unknown');
