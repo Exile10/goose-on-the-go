@@ -60,7 +60,9 @@ export const ScheduleCard = React.memo(function ScheduleCard({
               ? t('schedule.card.kindWebhook')
               : schedule.kind.type === 'routine'
                 ? t('schedule.card.kindRoutine')
-                : t('schedule.card.kindPrompt')}
+                : schedule.kind.type === 'member_reminder'
+                  ? t('schedule.card.kindPrivate')
+                  : t('schedule.card.kindPrompt')}
           </InkBadge>
         </View>
         <View style={styles.status}>

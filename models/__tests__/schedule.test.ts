@@ -17,6 +17,7 @@ import {
   isSixFieldCron,
   linkedScheduleId,
   oneOffCron,
+  privateOwner,
   repeatFrom,
   pondAsksIfMissed,
   timedSchedules,
@@ -554,5 +555,25 @@ describe('routines', () => {
     expect(describeRoutine({ 'kitchen-lights': true, 'water-heater': false }, { 'kitchen-lights': 'Kitchen lights' })).toBe(
       'Kitchen lights on, water-heater off',
     );
+  });
+});
+
+describe('private reminders', () => {
+  const now = new Date(2026, 9, 24, 12, 0);
+  // As the Pond lists one: what it says is left out, because the Pond can't tell who is asking.
+  const medicine = schedule({ label: 'Medicine', kind: { type: 'member_reminder', profile_id: 'grace', prompt: '' } });
+
+  it('knows whose it is, and that nothing else is private', () => {
+    expect(privateOwner(medicine)).toBe('grace');
+    expect(privateOwner(schedule({}))).toBeNull();
+  });
+
+  it('changes only its name, and never sends the empty prompt it was listed with', () => {
+    const built = updateRequest(medicine, { ...draftFrom(medicine), name: 'Evening medicine' }, now);
+    expect(built).toEqual({ ok: true, req: { name: 'Evening medicine' } });
+  });
+
+  it('opens an edit with nothing changed when nothing was', () => {
+    expect(updateRequest(medicine, draftFrom(medicine), now)).toEqual({ ok: true, req: {} });
   });
 });
