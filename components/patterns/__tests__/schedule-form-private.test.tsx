@@ -32,9 +32,10 @@ const MEDICINE: Schedule = {
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-function shownText(element: React.ReactElement): string {
+// Async, so ThemeProvider's stored preference lands inside the test rather than after its teardown.
+async function shownText(element: React.ReactElement): Promise<string> {
   let tree: ReactTestRenderer | undefined;
-  act(() => {
+  await act(async () => {
     tree = create(<ThemeProvider>{element}</ThemeProvider>);
   });
   return tree!.root
@@ -43,13 +44,13 @@ function shownText(element: React.ReactElement): string {
     .join(' ');
 }
 
-it('tells someone making a schedule how to set a private reminder instead', () => {
-  const text = shownText(<ScheduleFormSheet open onClose={jest.fn()} onCreate={jest.fn()} asksIfMissed={false} />);
+it('tells someone making a schedule how to set a private reminder instead', async () => {
+  const text = await shownText(<ScheduleFormSheet open onClose={jest.fn()} onCreate={jest.fn()} asksIfMissed={false} />);
   expect(text).toContain('ask Goose out loud for a private reminder');
 });
 
-it('says an edited private reminder keeps its words private, and never calls it a webhook', () => {
-  const text = shownText(<ScheduleFormSheet open onClose={jest.fn()} schedule={MEDICINE} onUpdate={jest.fn()} />);
+it('says an edited private reminder keeps its words private, and never calls it a webhook', async () => {
+  const text = await shownText(<ScheduleFormSheet open onClose={jest.fn()} schedule={MEDICINE} onUpdate={jest.fn()} />);
   expect(text).toContain('What this reminder says stays private.');
   expect(text).not.toContain('webhook');
   expect(text).not.toContain('ask Goose out loud');
