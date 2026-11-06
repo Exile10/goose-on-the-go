@@ -2031,6 +2031,23 @@
     "holdSteady": "Hold steady…",
     "aimAtPond": "Point the camera at the QR code on your Pond's dashboard or on its setup card"
   },
+  "help": {
+    "problem": {
+      "subject": "A problem with Goose On The Go",
+      "intro": "What happened, and what did you expect instead?"
+    },
+    "feedback": {
+      "subject": "Feedback on Goose On The Go",
+      "intro": "What would you like to tell us?"
+    },
+    "details": {
+      "app": "App version",
+      "phone": "Phone",
+      "system": "System",
+      "pond": "Pond version",
+      "unknown": "Not known"
+    }
+  },
   "privacy": {
     "policy": "Privacy policy",
     "rights": "Your data rights",
