@@ -1493,7 +1493,8 @@
       "notices": "Notices and privacy",
       "records": "Records",
       "phone": "This phone",
-      "advanced": "Advanced"
+      "advanced": "Advanced",
+      "help": "Help"
     },
     "loading": "Reading your Pond's settings",
     "account": {
@@ -1620,6 +1621,7 @@
     "settingsRetention": "Keeping records",
     "settingsAppearance": "Appearance",
     "settingsAdvanced": "Advanced",
+    "help": "Help & Feedback",
     "settingsTimezone": "Time zone",
     "settingsModelRole": "Choose a model",
     "settingsModel": "Model",
@@ -2046,6 +2048,52 @@
       "system": "System",
       "pond": "Pond version",
       "unknown": "Not known"
+    },
+    "description": "Answers to the problems people run into most, and a way to tell us about a problem or an idea.",
+    "guide": {
+      "heading": "Common problems",
+      "open": "Open {{screen}}",
+      "unreachable": {
+        "title": "The app can't reach your Pond",
+        "body": "At home, check that your Pond is switched on and that this phone is on the same Wi-Fi. Away from home, the app can only reach your Pond if outside access is set up in Remote access. If the app says your Pond no longer recognises this phone, pair again at home."
+      },
+      "slow": {
+        "title": "Goose takes too long to answer",
+        "body": "Your Pond may still be loading the model Goose thinks with, or answering too much at once. Wait a moment and try again. Models shows which model Goose uses."
+      },
+      "microphone": {
+        "title": "Goose can't hear you in the app",
+        "body": "The app needs the microphone to hear you. Tap the orb to allow it. If you said no before, turn on the microphone for Goose On The Go in your phone's settings."
+      },
+      "wakeWord": {
+        "title": "Goose doesn't answer the wake word",
+        "body": "Your Pond listens through its own microphone and answers through its own speaker, so both need to be plugged into the Pond. It looks for them when it starts, so restart it after plugging them in. It also needs its speech models, from Models. Wake word lets Goose learn how your household says it."
+      },
+      "deviceOffline": {
+        "title": "A device shows Offline or doesn't respond",
+        "body": "Your Pond lists the device but can't reach it. Check that the device has power, then switch it off and on again. A new device only accepts pairing for about 15 minutes after it starts up."
+      },
+      "pairingCode": {
+        "title": "The pairing code doesn't work",
+        "body": "Check the six digits on your Pond and try again. After 10 wrong tries your Pond retires the code, so show a new one on its dashboard and pair again."
+      },
+      "notices": {
+        "title": "Notices arrive late or not at all",
+        "body": "Your Pond wakes this phone with a push, which can arrive later while the phone is idle. On Android, turn on Stay connected in the background in Notifications so notices arrive straight away. On iPhone, iOS decides how soon a push arrives."
+      },
+      "whatHappened": {
+        "title": "Find out what Goose did",
+        "body": "Activity lists what Goose has been doing, which helps when something went wrong. Mention what you see there when you report a problem."
+      }
+    },
+    "contact": {
+      "heading": "Contact us",
+      "problem": "Report a problem",
+      "problemHint": "Tell us what went wrong.",
+      "feedback": "Send feedback",
+      "feedbackHint": "Share an idea or tell us what you think.",
+      "footer": "Opens your mail app with an email to {{email}}. It includes the app version, your phone and your Pond's version, and nothing is sent until you send it.",
+      "noMail": "This phone has no mail app to open. Write to {{email}} from any email account."
     }
   },
   "privacy": {

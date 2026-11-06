@@ -12,6 +12,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 
+import { HELP_TOPICS } from '@/constants/help-guide';
 import { ACCOUNT_ROUTE, PROFILE_NAV } from '@/constants/navigation';
 import { SETTINGS_PAGES } from '@/constants/settings-pages';
 
@@ -100,4 +101,18 @@ it('registers every stack screen file it ships', () => {
   const registered = new Set(registeredStackScreens());
 
   expect(stackScreenFiles().filter((name) => !registered.has(name))).toEqual([]);
+});
+
+/** Help & Feedback's guide sends people to the screen that fixes each problem; one that has moved strands them. */
+it('sends every help guide link to a screen that exists', () => {
+  const links = HELP_TOPICS.flatMap((topic) => (topic.link ? [topic.link.route] : []));
+  expect(links.length).toBeGreaterThan(0);
+
+  expect(links.filter((route) => !screenFor(route))).toEqual([]);
+});
+
+it('offers Help & Feedback from the menu', () => {
+  expect(PROFILE_NAV.flatMap((group) => group.items)).toContainEqual(
+    expect.objectContaining({ id: 'help', labelKey: 'screens.help', route: '/(stack)/help' }),
+  );
 });
