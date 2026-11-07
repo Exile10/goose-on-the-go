@@ -237,10 +237,22 @@
       "tooLarge": "That picture is too large for your Pond, even made smaller.",
       "turnTooLarge": "Those pictures are more than 8 MB together, which is your Pond's limit for one message. Send fewer at once.",
       "textTooLarge": "That file is too long to send. Text files can be up to 64 KB.",
-      "unsupported": "Your Pond reads pictures and text files, and that file is neither.",
+      "unsupported": "Goose sends pictures, text files, audio files and PDFs, and that file is none of them.",
       "cameraDenied": "Camera access is off for Goose On The Go. Turn it on in Settings to take a photo.",
       "cameraUnavailable": "There is no camera Goose can use right now.",
-      "noVision": "The model on your Pond cannot read pictures. Switch to one that can, such as gemma-4-E2B-it."
+      "noVision": "The model on your Pond cannot read pictures. Switch to one that can, such as gemma-4-E2B-it.",
+      "pondUnchecked": "Goose could not ask your Pond what files it takes. Try again once it answers.",
+      "audioNeedsUpdate": "Your Pond needs an update before it can take audio files.",
+      "pdfNeedsUpdate": "Your Pond needs an update before it can read PDFs.",
+      "audioUnsupported": "Your Pond does not take that kind of audio file. MP3, M4A, WAV, FLAC and OGG files work.",
+      "audioTooLarge": "That audio file is larger than your Pond takes, which is up to {{limit}}.",
+      "pdfTooLarge": "That PDF is larger than your Pond takes, which is up to {{limit}}.",
+      "oneAudio": "Your Pond listens to one recording a message. Send the others one at a time.",
+      "tooManyPdfs": "That is more PDFs than your Pond reads in one message. Send fewer at once.",
+      "audioTooLong": "That audio file runs longer than your Pond listens to in one message.",
+      "pdfInvalid": "Your Pond could not open that PDF. It may be locked with a password, or damaged.",
+      "pdfNoText": "That PDF has no text in it to read, only pictures of pages.",
+      "pdfTooLargeForPond": "That PDF is more than your Pond reads in one message."
     },
     "voice": {
       "open": "Talk to Goose",
@@ -280,7 +292,9 @@
       "modelCannotHear": "The model your Pond is using can't listen to voice notes. Gemma 4 E2B and E4B can.",
       "addOnNotReady": "Your Pond's model will hear voice notes once its picture and sound add-on is ready.",
       "openModels": "Open Models",
-      "unreadable": "Your Pond could not read that voice note. Try recording it again."
+      "unreadable": "Your Pond could not read that voice note. Try recording it again.",
+      "playFile": "Play {{name}}",
+      "stopFile": "Stop {{name}}"
     },
     "tools": {
       "toolGroup": "Tools ready",

@@ -85,6 +85,10 @@ export function describeTurnError(e: unknown, t: TFunction): string {
     if (code === 'audio_unsupported') return t('chat.voiceNote.modelCannotHear');
     if (code === 'audio_not_ready') return t('chat.voiceNote.addOnNotReady');
     if (code === 'audio_invalid') return t('chat.voiceNote.unreadable');
+    if (code === 'audio_too_long') return t('chat.composer.audioTooLong');
+    if (code === 'document_invalid') return t('chat.composer.pdfInvalid');
+    if (code === 'document_no_text') return t('chat.composer.pdfNoText');
+    if (code === 'document_too_large') return t('chat.composer.pdfTooLargeForPond');
     if (e.status === 503) return t('chat.busy');
     if (e.status === 413) return t('chat.composer.tooLarge');
     if (e.status === 415) return t('chat.composer.unsupported');
@@ -133,6 +137,8 @@ export function keptStubOf(m: SessionMessage): string | null {
 /** What the Pond saves on a user row in place of a voice note's recording: its wire text, never shown. */
 // eslint-disable-next-line i18next/no-literal-string
 export const VOICE_NOTE_MARK = '[Voice note]';
+/** And for each PDF, with its name. */
+const DOCUMENT_MARK = /^\[Document: (.+)\]$/;
 
 export function toMessage(m: SessionMessage): Message | null {
   if (m.role === 'tool') return null;
@@ -142,10 +148,15 @@ export function toMessage(m: SessionMessage): Message | null {
     content: m.content,
     timestamp: Date.parse(m.created_at) || Date.now(),
   };
-  // The Pond keeps a mark where a voice note was, not the sound: it reads back as a note with nothing to play.
-  if (m.role === 'user' && m.content.split('\n').includes(VOICE_NOTE_MARK)) {
-    message.content = m.content.split('\n').filter((line) => line !== VOICE_NOTE_MARK).join('\n');
-    message.voice = { uri: '', durationMs: 0 };
+  // The Pond keeps marks where a recording or a PDF was, not the file: a recording reads back as a
+  // note with nothing to play, and a PDF as its name, as it was shown when it was sent.
+  if (m.role === 'user') {
+    const lines = m.content.split('\n');
+    if (lines.includes(VOICE_NOTE_MARK)) message.voice = { uri: '', durationMs: 0 };
+    message.content = lines
+      .filter((line) => line !== VOICE_NOTE_MARK)
+      .map((line) => DOCUMENT_MARK.exec(line)?.[1] ?? line)
+      .join('\n');
   }
   if (m.images?.length) {
     message.images = m.images.map((image) => ({
@@ -302,11 +313,15 @@ export function streamBody(
 ): ChatStreamRequest {
   const images = attachments.filter((a) => a.kind === 'image' && a.base64);
   const audio = attachments.filter((a) => a.kind === 'audio' && a.base64);
+  const documents = attachments.filter((a) => a.kind === 'document' && a.base64);
   return {
     message: composeMessage(text, attachments),
     ...(sessionId ? { session_id: sessionId } : {}),
     ...(images.length ? { images: images.map((a) => ({ data: a.base64 as string, mime_type: a.mimeType })) } : {}),
     ...(audio.length ? { audio: audio.map((a) => ({ data: a.base64 as string, mime_type: a.mimeType })) } : {}),
+    ...(documents.length
+      ? { documents: documents.map((a) => ({ data: a.base64 as string, mime_type: a.mimeType, name: a.name })) }
+      : {}),
     voice_mode: Boolean(options.voice),
     resumable: true,
     ...(options.research ? { deep_research: true } : {}),
@@ -407,14 +422,16 @@ const pendingReply = (id: string): Message => ({
  */
 function questionFor(id: string, text: string, attachments: Attachment[]): Message {
   const images = attachments.filter((a) => a.kind === 'image' && a.base64);
-  const files = attachments.filter((a) => a.kind === 'text');
+  const files = attachments.filter((a) => a.kind === 'text' || a.kind === 'document');
   const note = attachments.find((a) => a.kind === 'audio');
   return {
     id,
     role: 'user',
     content: [text, ...files.map((f) => f.name)].filter(Boolean).join('\n'),
     timestamp: Date.now(),
-    ...(note ? { voice: { uri: note.uri, durationMs: note.durationMs ?? 0 } } : {}),
+    ...(note
+      ? { voice: { uri: note.uri, durationMs: note.durationMs ?? 0, ...(note.durationMs ? {} : { name: note.name }) } }
+      : {}),
     images: images.map((a) => ({
       id: a.id,
       uri: a.uri,

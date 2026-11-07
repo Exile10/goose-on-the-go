@@ -242,10 +242,17 @@ export interface ImageAttachment {
   mime_type: string;
 }
 
-/** A voice note as the model hears it: one 16-bit PCM WAV a turn, at most 60 s and 2 MiB. */
+/** A recording the model hears: a voice note's WAV, or an audio file the Pond decodes. One a turn. */
 export interface AudioAttachment {
   data: string;
   mime_type: string;
+}
+
+/** A PDF whose text the Pond reads out and puts after the message, under its name. */
+export interface DocumentAttachment {
+  data: string;
+  mime_type: string;
+  name: string;
 }
 
 /**
@@ -257,6 +264,7 @@ export interface ChatStreamRequest {
   session_id?: string;
   images?: ImageAttachment[];
   audio?: AudioAttachment[];
+  documents?: DocumentAttachment[];
   /** Shorter answers and no reasoning passage, because they will be spoken. */
   voice_mode?: boolean;
   /** Keep the turn running if the connection drops, so it can be reattached. */
@@ -634,6 +642,11 @@ export interface ModelCapabilities {
   /** Older Ponds set this from the model's name alone, so it is not a promise; `voice_notes` is. */
   audio_input: boolean;
   voice_notes?: VoiceNoteSupport;
+  /** The limits the chat routes enforce on files; a Pond that predates files sends none. */
+  attachments?: {
+    audio?: { formats: string[]; max_bytes: number; max_seconds: number };
+    documents?: { formats: string[]; max_bytes: number; max_per_turn: number };
+  };
   context_window_tokens: number;
   structured_output: boolean;
   tool_calling: boolean;

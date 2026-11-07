@@ -8,9 +8,10 @@
  * edge to a JPEG at 0.85 (`lib/imageAttach.ts`); this does the same for every
  * picture, because on a phone that is every picture.
  *
- * Files are pictures or plain text. The Pond reads images and words and nothing
- * in between, so a text file is read here and sent as part of the message, and
- * anything else is refused at the picker rather than after an upload.
+ * Files are pictures, plain text, audio or PDFs. A text file is read here and
+ * sent as part of the message. Audio files and PDFs go as they are, for the Pond
+ * to decode and read, and only to a Pond whose capabilities say it takes them:
+ * an older one would drop them and answer a message with nothing in it.
  *
  * The three native modules are loaded on first use rather than imported. A
  * development build made before they were added has no native half for them,
@@ -26,12 +27,12 @@ export type AttachSource = 'camera' | 'photos' | 'files';
 
 export interface Attachment {
   id: string;
-  kind: 'image' | 'text' | 'audio';
+  kind: 'image' | 'text' | 'audio' | 'document';
   /** A file on this phone, for the preview. */
   uri: string;
   name: string;
   mimeType: string;
-  /** Images and voice notes: raw base64, ready for the Pond. */
+  /** Images, audio and PDFs: raw base64, ready for the Pond. */
   base64?: string;
   /** Text files: the contents, which travel inside the message. */
   text?: string;
@@ -44,12 +45,31 @@ export interface Attachment {
 /** A refusal worth telling the reader, as the words to tell them. */
 export class AttachError extends Error {
   readonly key: TranslationKey;
-  constructor(key: TranslationKey) {
+  readonly params?: Record<string, string>;
+  constructor(key: TranslationKey, params?: Record<string, string>) {
     super(key);
     this.name = 'AttachError';
     this.key = key;
+    this.params = params;
   }
 }
+
+/** What the Pond takes of one kind of file, from its capabilities. */
+export interface FileRule {
+  formats: readonly string[];
+  maxBytes: number;
+}
+
+/** What the Pond takes beyond pictures and text, or why it takes none of that kind. */
+export interface FileAccepts {
+  audio: FileRule | { refusal: TranslationKey };
+  documents: FileRule | { refusal: TranslationKey };
+}
+
+const NOTHING_CHECKED: FileAccepts = {
+  audio: { refusal: 'chat.composer.pondUnchecked' },
+  documents: { refusal: 'chat.composer.pondUnchecked' },
+};
 
 /** pond-desktop's long edge and quality, so a picture costs the same from either. */
 const LONG_EDGE = 1024;
@@ -62,6 +82,30 @@ export const MAX_TURN_IMAGE_BYTES = 8 * 1024 * 1024;
 const MAX_TEXT_BYTES = 64 * 1024;
 
 const TEXT_TYPES = ['text/plain', 'text/markdown', 'text/csv', 'application/json'];
+const PDF = 'application/pdf';
+
+/** A picker's type for an audio file is often missing or vendor-specific; the extension is surer. */
+const AUDIO_BY_EXTENSION: Record<string, string> = {
+  wav: 'audio/wav',
+  mp3: 'audio/mpeg',
+  m4a: 'audio/mp4',
+  aac: 'audio/aac',
+  flac: 'audio/flac',
+  ogg: 'audio/ogg',
+  oga: 'audio/ogg',
+};
+
+/** The type to send an audio file under: its own if the Pond takes it, else the one its extension names. */
+export function audioTypeFor(name: string, reported: string, formats: readonly string[]): string | null {
+  if (reported && formats.includes(reported)) return reported;
+  const byName = AUDIO_BY_EXTENSION[name.split('.').pop()?.toLowerCase() ?? ''];
+  return byName && formats.includes(byName) ? byName : null;
+}
+
+/** Megabytes, as a limit is said. */
+function megabytes(bytes: number): string {
+  return `${Math.round((bytes / (1024 * 1024)) * 10) / 10} MB`;
+}
 
 /** Standard base64 of `bytes`, a slice at a time: a minute of speech is two million of them. */
 export function bytesToBase64(bytes: Uint8Array): string {
@@ -176,12 +220,38 @@ async function prepareText(uri: string, name: string, mimeType: string, size?: n
   return { id: nextId(), kind: 'text' as const, uri, name, mimeType, text };
 }
 
+/** An audio file or PDF as it goes to the Pond: whole, in base64, under the type the Pond knows it by. */
+async function prepareFile(
+  uri: string,
+  name: string,
+  kind: 'audio' | 'document',
+  mimeType: string,
+  rule: FileRule,
+  size?: number,
+): Promise<Attachment> {
+  const tooLarge = kind === 'audio' ? 'chat.composer.audioTooLarge' : 'chat.composer.pdfTooLarge';
+  if (size !== undefined && size > rule.maxBytes) throw new AttachError(tooLarge, { limit: megabytes(rule.maxBytes) });
+  let base64: string;
+  try {
+    base64 = await new File(uri).base64();
+  } catch {
+    throw new AttachError('chat.composer.fileUnreadable');
+  }
+  if (base64Bytes(base64) > rule.maxBytes) throw new AttachError(tooLarge, { limit: megabytes(rule.maxBytes) });
+  return { id: nextId(), kind, uri, name, mimeType, base64 };
+}
+
 /**
  * Ask for up to `room` attachments from one source. Resolves with what was
  * chosen — nothing, if the reader backed out — and throws `AttachError` for
- * a refusal the reader should hear about.
+ * a refusal the reader should hear about. Audio and PDFs are offered whatever
+ * the Pond takes, so that picking one it cannot take says why.
  */
-export async function pickAttachments(source: AttachSource, room: number): Promise<Attachment[]> {
+export async function pickAttachments(
+  source: AttachSource,
+  room: number,
+  accepts: FileAccepts = NOTHING_CHECKED,
+): Promise<Attachment[]> {
   if (room <= 0) return [];
 
   if (source === 'files') {
@@ -189,7 +259,7 @@ export async function pickAttachments(source: AttachSource, room: number): Promi
     if (!lib) throw new AttachError('chat.composer.needsUpdate');
     const result = await launch(() =>
       lib.getDocumentAsync({
-        type: ['image/*', ...TEXT_TYPES],
+        type: ['image/*', ...TEXT_TYPES, 'audio/*', PDF],
         multiple: room > 1,
         copyToCacheDirectory: true,
       }),
@@ -203,6 +273,16 @@ export async function pickAttachments(source: AttachSource, room: number): Promi
         out.push(await prepareImage(asset.uri, {}, asset.name));
       } else if (TEXT_TYPES.includes(type) || /\.(txt|md|csv|json)$/i.test(asset.name)) {
         out.push(await prepareText(asset.uri, asset.name, type || 'text/plain', asset.size));
+      } else if (type.startsWith('audio/') || audioTypeFor(asset.name, '', Object.values(AUDIO_BY_EXTENSION))) {
+        const rule = accepts.audio;
+        if ('refusal' in rule) throw new AttachError(rule.refusal);
+        const sent = audioTypeFor(asset.name, type, rule.formats);
+        if (!sent) throw new AttachError('chat.composer.audioUnsupported');
+        out.push(await prepareFile(asset.uri, asset.name, 'audio', sent, rule, asset.size));
+      } else if (type === PDF || /\.pdf$/i.test(asset.name)) {
+        const rule = accepts.documents;
+        if ('refusal' in rule) throw new AttachError(rule.refusal);
+        out.push(await prepareFile(asset.uri, asset.name, 'document', PDF, rule, asset.size));
       } else {
         throw new AttachError('chat.composer.unsupported');
       }
@@ -263,4 +343,11 @@ export function composeMessage(text: string, attachments: Attachment[]): string 
 export function withinTurnLimit(attachments: Attachment[]): boolean {
   const total = attachments.reduce((n, a) => n + (a.kind === 'image' && a.base64 ? base64Bytes(a.base64) : 0), 0);
   return total <= MAX_TURN_IMAGE_BYTES;
+}
+
+/** Why a turn's files would be refused as a set, or null: the Pond hears one recording a turn. */
+export function turnFileProblem(attachments: Attachment[], maxDocuments: number): TranslationKey | null {
+  if (attachments.filter((a) => a.kind === 'audio').length > 1) return 'chat.composer.oneAudio';
+  if (attachments.filter((a) => a.kind === 'document').length > maxDocuments) return 'chat.composer.tooManyPdfs';
+  return null;
 }

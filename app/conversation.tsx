@@ -69,7 +69,15 @@ import { useThemedStyles } from '@/hooks/use-themed-styles';
 import { useServer } from '@/providers/server-provider';
 import { NEW_DRAFT, draftFor, moveDraft, setDraft } from '@/services/chat-threads';
 import { selectionTick } from '@/services/haptics';
-import { AttachError, bytesToBase64, pickAttachments, withinTurnLimit, type Attachment, type AttachSource } from '@/services/media';
+import {
+  AttachError,
+  bytesToBase64,
+  pickAttachments,
+  turnFileProblem,
+  withinTurnLimit,
+  type Attachment,
+  type AttachSource,
+} from '@/services/media';
 import { cacheFile } from '@/services/voice-io';
 import { useChatSenses } from '@/view-models/use-chat-senses';
 import type { VoiceNote } from '@/view-models/use-voice-note';
@@ -255,7 +263,7 @@ export default function ChatScreen() {
     scrollToFoot();
   }, [scrollToFoot]);
 
-  const { vision, voiceNotes } = useChatSenses();
+  const { vision, voiceNotes, files, maxPdfs } = useChatSenses();
 
   const onAttach = useCallback(
     async (source: AttachSource, room: number): Promise<Attachment[]> => {
@@ -265,18 +273,18 @@ export default function ChatScreen() {
         return [];
       }
       try {
-        const picked = await pickAttachments(source, room);
+        const picked = await pickAttachments(source, room, files);
         if (vision === false && picked.some((a) => a.kind === 'image')) {
           setNotice(t('chat.composer.noVision'));
           return picked.filter((a) => a.kind !== 'image');
         }
         return picked;
       } catch (e) {
-        setNotice(e instanceof AttachError ? t(e.key) : t('chat.composer.unreadable'));
+        setNotice(e instanceof AttachError ? t(e.key, e.params) : t('chat.composer.unreadable'));
         return [];
       }
     },
-    [t, vision],
+    [files, t, vision],
   );
 
   const onSend = useCallback(
@@ -285,13 +293,18 @@ export default function ChatScreen() {
         setNotice(t('chat.composer.turnTooLarge'));
         return;
       }
+      const problem = turnFileProblem(attachments, maxPdfs);
+      if (problem) {
+        setNotice(t(problem));
+        return;
+      }
       setNotice(null);
       // What the reader just wrote is where they are now, however far back
       // they had been reading.
       scrollToFoot();
       void actions.send(text, attachments, options);
     },
-    [actions, scrollToFoot, t],
+    [actions, maxPdfs, scrollToFoot, t],
   );
 
   // The sound itself goes to the model, never a transcript of it. The phone keeps a copy to replay,

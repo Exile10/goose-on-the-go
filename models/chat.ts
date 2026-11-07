@@ -65,6 +65,8 @@ export interface ChatImage {
 export interface ChatVoiceNote {
   uri: string;
   durationMs: number;
+  /** An audio file's own name; a voice note has none. */
+  name?: string;
 }
 
 export interface Message {

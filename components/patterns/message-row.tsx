@@ -107,12 +107,22 @@ function VoiceNoteChip({ note }: { note: ChatVoiceNote }) {
       feedback="lift"
       onPress={toggle}
       accessibilityRole="button"
-      accessibilityLabel={t(at === null ? 'chat.voiceNote.play' : 'chat.voiceNote.stop', { length: clockWords(note.durationMs) })}
+      accessibilityLabel={
+        note.name
+          ? t(at === null ? 'chat.voiceNote.playFile' : 'chat.voiceNote.stopFile', { name: note.name })
+          : t(at === null ? 'chat.voiceNote.play' : 'chat.voiceNote.stop', { length: clockWords(note.durationMs) })
+      }
       style={[styles.voice, { backgroundColor: theme.color.accent, borderRadius: theme.radius.pill }]}
     >
       <GIcon name={at === null ? 'play' : 'stop'} size={16} color={theme.color.textOnAccent} />
       <GIcon name="voice" size={16} color={theme.color.textOnAccent} />
-      <Text style={words.style}>{clockWords(at === null ? note.durationMs : Math.min(at, note.durationMs))}</Text>
+      {note.name ? (
+        <Text style={[words.style, styles.voiceName]} numberOfLines={1}>
+          {at === null ? note.name : clockWords(at)}
+        </Text>
+      ) : (
+        <Text style={words.style}>{clockWords(at === null ? note.durationMs : Math.min(at, note.durationMs))}</Text>
+      )}
     </GPressable>
   );
 }
@@ -209,6 +219,7 @@ const styles = StyleSheet.create({
   theirs: { gap: 10, marginBottom: 18, paddingRight: 8 },
   pictures: { alignItems: 'flex-end' },
   voice: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 14, paddingVertical: 10 },
+  voiceName: { flexShrink: 1, maxWidth: 220 },
   // Ink's bubble dims to this while sending; its pictures match it.
   waiting: { opacity: 0.6 },
   queuedNote: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12 },

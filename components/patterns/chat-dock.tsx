@@ -245,7 +245,7 @@ export function ChatDock({
                 <Image source={{ uri: a.uri }} style={styles.thumbImage} contentFit="cover" />
               ) : (
                 <View style={styles.fileThumb}>
-                  <GIcon name="file" size={20} color={theme.color.textSecondary} />
+                  <GIcon name={a.kind === 'audio' ? 'music' : 'file'} size={20} color={theme.color.textSecondary} />
                 </View>
               )}
               <Pressable
