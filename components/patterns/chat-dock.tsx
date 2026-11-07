@@ -50,7 +50,7 @@ import { AttachMenu } from '@/components/patterns/attach-menu';
 import { VoiceNoteMic, VoiceNoteStrip } from '@/components/patterns/voice-note-mic';
 import { GIcon } from '@/components/ui/g-icon';
 import { GPressable } from '@/components/ui/g-pressable';
-import { selectionTick, tap } from '@/services/haptics';
+import { reject, selectionTick, tap } from '@/services/haptics';
 import type { Attachment, AttachSource } from '@/services/media';
 import type { ResearchOffer } from '@/models/long-tasks';
 import type { SendOptions } from '@/view-models/use-chat';
@@ -69,12 +69,20 @@ function fieldHeight(content: number): number {
 /** Past this many the Pond's turn gets heavy and the strip stops fitting a thumb. */
 export const MAX_ATTACHMENTS = 4;
 
+export interface VoiceNoteRefusal {
+  words: string;
+  action?: string;
+  onPress?: () => void;
+}
+
 export interface ChatDockProps {
   onSend: (text: string, attachments: Attachment[], options?: Pick<SendOptions, 'research' | 'answer'>) => void;
   /** Open voice mode. */
   onVoice: () => void;
   /** A held microphone was let go: the note to send. Without it, the microphone only opens voice mode. */
   onVoiceNote?: (note: VoiceNote) => void;
+  /** Why a hold would record nothing worth sending, said instead of recording; with a way to fix it when there is one. */
+  voiceNoteRefusal?: VoiceNoteRefusal | null;
   /** Ask for pictures or a file. Resolves with what was chosen, or nothing. */
   onAttach: (source: AttachSource, room: number) => Promise<Attachment[]>;
   /** A turn is in flight: what is sent now waits behind it. */
@@ -95,6 +103,7 @@ export function ChatDock({
   onSend,
   onVoice,
   onVoiceNote,
+  voiceNoteRefusal = null,
   onAttach,
   busy,
   bottomInset = 0,
@@ -156,6 +165,7 @@ export function ChatDock({
   const voiceNote = useVoiceNote((note) => onVoiceNote?.(note));
   const recording = voiceNote.state !== 'idle';
   const [pastLine, setPastLine] = useState(false);
+  const [refused, setRefused] = useState(false);
 
   const handleSend = useCallback(() => {
     if (!hasContent) return;
@@ -321,6 +331,12 @@ export function ChatDock({
             onHold={() => {
               Keyboard.dismiss();
               setPastLine(false);
+              if (voiceNoteRefusal) {
+                setRefused(true);
+                void reject();
+                return;
+              }
+              setRefused(false);
               void voiceNote.begin();
             }}
             onRelease={voiceNote.release}
@@ -345,7 +361,25 @@ export function ChatDock({
         <AnsweringNote note={note} />
       </View>
 
-      {voiceNote.error && !recording ? <Text style={[hint.style, styles.noteError]}>{voiceNote.error}</Text> : null}
+      {refused && voiceNoteRefusal && !recording ? (
+        <Text style={[hint.style, styles.noteError]}>
+          {voiceNoteRefusal.words}
+          {voiceNoteRefusal.action && voiceNoteRefusal.onPress ? (
+            <>
+              {' '}
+              <Text
+                onPress={voiceNoteRefusal.onPress}
+                accessibilityRole="link"
+                style={{ color: theme.color.accentLine, fontWeight: '600' }}
+              >
+                {voiceNoteRefusal.action}
+              </Text>
+            </>
+          ) : null}
+        </Text>
+      ) : voiceNote.error && !recording ? (
+        <Text style={[hint.style, styles.noteError]}>{voiceNote.error}</Text>
+      ) : null}
 
       <AttachMenu
         open={menu}

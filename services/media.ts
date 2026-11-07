@@ -31,11 +31,11 @@ export interface Attachment {
   uri: string;
   name: string;
   mimeType: string;
-  /** Images, and voice notes for a model that hears: raw base64, ready for the Pond. */
+  /** Images and voice notes: raw base64, ready for the Pond. */
   base64?: string;
   /** Text files: the contents, which travel inside the message. */
   text?: string;
-  /** Voice notes: how long it runs. `base64` carries the WAV only when the model hears audio itself. */
+  /** Voice notes: how long it runs. */
   durationMs?: number;
   width?: number;
   height?: number;
@@ -62,6 +62,15 @@ export const MAX_TURN_IMAGE_BYTES = 8 * 1024 * 1024;
 const MAX_TEXT_BYTES = 64 * 1024;
 
 const TEXT_TYPES = ['text/plain', 'text/markdown', 'text/csv', 'application/json'];
+
+/** Standard base64 of `bytes`, a slice at a time: a minute of speech is two million of them. */
+export function bytesToBase64(bytes: Uint8Array): string {
+  let bin = '';
+  for (let at = 0; at < bytes.length; at += 0x2000) {
+    bin += String.fromCharCode(...bytes.subarray(at, at + 0x2000));
+  }
+  return btoa(bin);
+}
 
 /** Decoded size of raw base64, without decoding it. */
 export function base64Bytes(base64: string): number {

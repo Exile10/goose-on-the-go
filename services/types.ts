@@ -242,6 +242,12 @@ export interface ImageAttachment {
   mime_type: string;
 }
 
+/** A voice note as the model hears it: one 16-bit PCM WAV a turn, at most 60 s and 2 MiB. */
+export interface AudioAttachment {
+  data: string;
+  mime_type: string;
+}
+
 /**
  * `POST /api/v1/chat/stream`. The only chat route that honours `images` and
  * `voice_mode`: `/chat` parses both and then drops them.
@@ -250,6 +256,7 @@ export interface ChatStreamRequest {
   message: string;
   session_id?: string;
   images?: ImageAttachment[];
+  audio?: AudioAttachment[];
   /** Shorter answers and no reasoning passage, because they will be spoken. */
   voice_mode?: boolean;
   /** Keep the turn running if the connection drops, so it can be reattached. */
@@ -618,10 +625,15 @@ export type ModelCategory = (typeof MODEL_CATEGORIES)[number];
 
 export type ModelListResponse = Partial<Record<ModelCategory, ModelEntry[]>>;
 
+/** Whether a voice note sent as sound would be heard; a Pond that predates sound sends none. */
+export type VoiceNoteSupport = 'ready' | 'not_ready' | 'unsupported';
+
 export interface ModelCapabilities {
   thinking: boolean;
   vision: boolean;
+  /** Older Ponds set this from the model's name alone, so it is not a promise; `voice_notes` is. */
   audio_input: boolean;
+  voice_notes?: VoiceNoteSupport;
   context_window_tokens: number;
   structured_output: boolean;
   tool_calling: boolean;

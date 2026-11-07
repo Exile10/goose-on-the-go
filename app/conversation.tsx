@@ -67,11 +67,11 @@ import { GKeyboardView } from '@/components/ui/g-keyboard-view';
 import { GPressable } from '@/components/ui/g-pressable';
 import { useThemedStyles } from '@/hooks/use-themed-styles';
 import { useServer } from '@/providers/server-provider';
-import { api } from '@/services/api-client';
 import { NEW_DRAFT, draftFor, moveDraft, setDraft } from '@/services/chat-threads';
 import { selectionTick } from '@/services/haptics';
-import { AttachError, pickAttachments, withinTurnLimit, type Attachment, type AttachSource } from '@/services/media';
-import { cacheFile, discardFile } from '@/services/voice-io';
+import { AttachError, bytesToBase64, pickAttachments, withinTurnLimit, type Attachment, type AttachSource } from '@/services/media';
+import { cacheFile } from '@/services/voice-io';
+import { useChatSenses } from '@/view-models/use-chat-senses';
 import type { VoiceNote } from '@/view-models/use-voice-note';
 import type { Message } from '@/models/chat';
 import type { ThemeColors } from '@/constants/colors';
@@ -255,24 +255,7 @@ export default function ChatScreen() {
     scrollToFoot();
   }, [scrollToFoot]);
 
-  // Whether the model serving chat can read pictures, asked once. Unknown is
-  // treated as yes: the Pond's own refusal is clearer than a guess here.
-  const [vision, setVision] = useState<boolean | null>(null);
-  useEffect(() => {
-    if (!hydrated) return;
-    let live = true;
-    void (async () => {
-      try {
-        const caps = await api.modelCapabilities();
-        if (live) setVision(caps.vision);
-      } catch {
-        // Leave it unknown.
-      }
-    })();
-    return () => {
-      live = false;
-    };
-  }, [hydrated]);
+  const { vision, voiceNotes } = useChatSenses();
 
   const onAttach = useCallback(
     async (source: AttachSource, room: number): Promise<Attachment[]> => {
@@ -311,41 +294,48 @@ export default function ChatScreen() {
     [actions, scrollToFoot, t],
   );
 
-  // The model hears only words for now: the Pond has no way yet to hand it the sound itself, so a
-  // note goes through its transcriber and is asked as what was said, with the note kept to replay.
-  const [hearing, setHearing] = useState(false);
+  // The sound itself goes to the model, never a transcript of it. The phone keeps a copy to replay,
+  // because the Pond keeps only a mark where the note was.
   const onVoiceNote = useCallback(
-    async (note: VoiceNote) => {
-      const uri = cacheFile('voice-note', note.wav);
+    (note: VoiceNote) => {
       setNotice(null);
-      setHearing(true);
+      let uri: string;
       try {
-        const heard = await api.transcribe(uri);
-        if (!heard) {
-          discardFile(uri);
-          setNotice(t('chat.voiceNote.unheard'));
-          return;
-        }
-        scrollToFoot();
-        const attachment: Attachment = {
-          id: `voice-${Date.now().toString(36)}`,
-          kind: 'audio',
-          uri,
-          name: 'voice-note.wav',
-          mimeType: 'audio/wav',
-          durationMs: note.durationMs,
-        };
-        void actions.send(heard, [attachment]);
+        uri = cacheFile('voice-note', note.wav);
       } catch (e) {
-        console.warn('[voice-note] not sent', { kind: 'voice_note', error: String(e) });
-        discardFile(uri);
+        console.warn('[voice-note] could not keep the recording', { kind: 'voice_note', error: String(e) });
         setNotice(t('chat.voiceNote.failed'));
-      } finally {
-        setHearing(false);
+        return;
       }
+      scrollToFoot();
+      const attachment: Attachment = {
+        id: `voice-${Date.now().toString(36)}`,
+        kind: 'audio',
+        uri,
+        name: 'voice-note.wav',
+        mimeType: 'audio/wav',
+        base64: bytesToBase64(note.wav),
+        durationMs: note.durationMs,
+      };
+      void actions.send('', [attachment]);
     },
     [actions, scrollToFoot, t],
   );
+
+  // A hold on a Pond that would not hear the note is refused before anyone speaks into it.
+  const voiceNoteRefusal = useMemo(() => {
+    const openModels = () => router.push('/(stack)/models' as never);
+    switch (voiceNotes) {
+      case 'update':
+        return { words: t('chat.voiceNote.needsPondUpdate') };
+      case 'unsupported':
+        return { words: t('chat.voiceNote.modelCannotHear'), action: t('chat.voiceNote.openModels'), onPress: openModels };
+      case 'not_ready':
+        return { words: t('chat.voiceNote.addOnNotReady'), action: t('chat.voiceNote.openModels'), onPress: openModels };
+      default:
+        return null;
+    }
+  }, [router, t, voiceNotes]);
 
   // A prompt Home handed over: asked once on arrival, exactly as picking one here does.
   //
@@ -448,11 +438,6 @@ export default function ChatScreen() {
             <InkNotice tone={notice ? 'warning' : 'danger'}>{shown}</InkNotice>
           </GPressable>
         ) : null}
-        {hearing && !shown ? (
-          <View style={styles.notice} accessibilityLiveRegion="polite">
-            <InkNotice tone="info" icon="voice">{t('chat.voiceNote.transcribing')}</InkNotice>
-          </View>
-        ) : null}
 
         <View style={styles.conversation}>
           {started ? (
@@ -509,7 +494,8 @@ export default function ChatScreen() {
             onDraftChange={onDraftChange}
             onSend={onSend}
             onVoice={() => setVoice(true)}
-            onVoiceNote={(note) => void onVoiceNote(note)}
+            onVoiceNote={onVoiceNote}
+            voiceNoteRefusal={voiceNoteRefusal}
             onAttach={onAttach}
             busy={streaming}
             bottomInset={insets.bottom}

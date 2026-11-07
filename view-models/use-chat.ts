@@ -81,6 +81,10 @@ export function describeTurnError(e: unknown, t: TFunction): string {
   if (research === 'off') return t('chat.research.refusedOff');
   if (research === 'unidentified') return t('chat.research.unidentified');
   if (e instanceof ApiError) {
+    const code = (e.body as { code?: unknown } | null)?.code;
+    if (code === 'audio_unsupported') return t('chat.voiceNote.modelCannotHear');
+    if (code === 'audio_not_ready') return t('chat.voiceNote.addOnNotReady');
+    if (code === 'audio_invalid') return t('chat.voiceNote.unreadable');
     if (e.status === 503) return t('chat.busy');
     if (e.status === 413) return t('chat.composer.tooLarge');
     if (e.status === 415) return t('chat.composer.unsupported');
@@ -126,6 +130,10 @@ export function keptStubOf(m: SessionMessage): string | null {
  * addressed to the model rather than to the reader. Their results reach the
  * screen through `fromHistory`, folded into the call that asked for them.
  */
+/** What the Pond saves on a user row in place of a voice note's recording: its wire text, never shown. */
+// eslint-disable-next-line i18next/no-literal-string
+export const VOICE_NOTE_MARK = '[Voice note]';
+
 export function toMessage(m: SessionMessage): Message | null {
   if (m.role === 'tool') return null;
   const message: Message = {
@@ -134,6 +142,11 @@ export function toMessage(m: SessionMessage): Message | null {
     content: m.content,
     timestamp: Date.parse(m.created_at) || Date.now(),
   };
+  // The Pond keeps a mark where a voice note was, not the sound: it reads back as a note with nothing to play.
+  if (m.role === 'user' && m.content.split('\n').includes(VOICE_NOTE_MARK)) {
+    message.content = m.content.split('\n').filter((line) => line !== VOICE_NOTE_MARK).join('\n');
+    message.voice = { uri: '', durationMs: 0 };
+  }
   if (m.images?.length) {
     message.images = m.images.map((image) => ({
       id: image.id,
@@ -288,10 +301,12 @@ export function streamBody(
   sessionId: string | null,
 ): ChatStreamRequest {
   const images = attachments.filter((a) => a.kind === 'image' && a.base64);
+  const audio = attachments.filter((a) => a.kind === 'audio' && a.base64);
   return {
     message: composeMessage(text, attachments),
     ...(sessionId ? { session_id: sessionId } : {}),
     ...(images.length ? { images: images.map((a) => ({ data: a.base64 as string, mime_type: a.mimeType })) } : {}),
+    ...(audio.length ? { audio: audio.map((a) => ({ data: a.base64 as string, mime_type: a.mimeType })) } : {}),
     voice_mode: Boolean(options.voice),
     resumable: true,
     ...(options.research ? { deep_research: true } : {}),

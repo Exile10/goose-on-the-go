@@ -274,9 +274,13 @@
       "tooShort": "Hold the microphone while you speak, then let go to send.",
       "play": "Play your voice note, {{length}}",
       "stop": "Stop your voice note, {{length}}",
-      "transcribing": "Writing down what you said",
-      "unheard": "Your Pond could not make out that voice note. Try again, a little closer to the phone.",
-      "failed": "That voice note could not be sent."
+      "failed": "That voice note could not be kept on this phone, so it was not sent.",
+      "sent": "Voice note",
+      "needsPondUpdate": "Your Pond needs an update before it can hear voice notes.",
+      "modelCannotHear": "The model your Pond is using can't listen to voice notes. Gemma 4 E2B and E4B can.",
+      "addOnNotReady": "Your Pond's model will hear voice notes once its picture and sound add-on is ready.",
+      "openModels": "Open Models",
+      "unreadable": "Your Pond could not read that voice note. Try recording it again."
     },
     "tools": {
       "toolGroup": "Tools ready",
