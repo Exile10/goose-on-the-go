@@ -86,6 +86,7 @@ export function describeTurnError(e: unknown, t: TFunction): string {
     if (code === 'audio_not_ready') return t('chat.voiceNote.addOnNotReady');
     if (code === 'audio_invalid') return t('chat.voiceNote.unreadable');
     if (code === 'audio_too_long') return t('chat.composer.audioTooLong');
+    if (code === 'audio_too_large') return t('chat.composer.audioTooLargeForPond');
     if (code === 'document_invalid') return t('chat.composer.pdfInvalid');
     if (code === 'document_no_text') return t('chat.composer.pdfNoText');
     if (code === 'document_too_large') return t('chat.composer.pdfTooLargeForPond');
@@ -139,6 +140,8 @@ export function keptStubOf(m: SessionMessage): string | null {
 export const VOICE_NOTE_MARK = '[Voice note]';
 /** And for each PDF, with its name. */
 const DOCUMENT_MARK = /^\[Document: (.+)\]$/;
+/** And for an audio file, with its name. */
+const AUDIO_FILE_MARK = /^\[Audio: (.+)\]$/;
 
 export function toMessage(m: SessionMessage): Message | null {
   if (m.role === 'tool') return null;
@@ -152,9 +155,11 @@ export function toMessage(m: SessionMessage): Message | null {
   // note with nothing to play, and a PDF as its name, as it was shown when it was sent.
   if (m.role === 'user') {
     const lines = m.content.split('\n');
-    if (lines.includes(VOICE_NOTE_MARK)) message.voice = { uri: '', durationMs: 0 };
+    const audioFile = lines.map((line) => AUDIO_FILE_MARK.exec(line)?.[1]).find(Boolean);
+    if (audioFile) message.voice = { uri: '', durationMs: 0, name: audioFile };
+    else if (lines.includes(VOICE_NOTE_MARK)) message.voice = { uri: '', durationMs: 0 };
     message.content = lines
-      .filter((line) => line !== VOICE_NOTE_MARK)
+      .filter((line) => line !== VOICE_NOTE_MARK && !AUDIO_FILE_MARK.test(line))
       .map((line) => DOCUMENT_MARK.exec(line)?.[1] ?? line)
       .join('\n');
   }
@@ -318,7 +323,15 @@ export function streamBody(
     message: composeMessage(text, attachments),
     ...(sessionId ? { session_id: sessionId } : {}),
     ...(images.length ? { images: images.map((a) => ({ data: a.base64 as string, mime_type: a.mimeType })) } : {}),
-    ...(audio.length ? { audio: audio.map((a) => ({ data: a.base64 as string, mime_type: a.mimeType })) } : {}),
+    ...(audio.length
+      ? {
+          audio: audio.map((a) => ({
+            data: a.base64 as string,
+            mime_type: a.mimeType,
+            ...(a.durationMs === undefined ? { name: a.name } : {}),
+          })),
+        }
+      : {}),
     ...(documents.length
       ? { documents: documents.map((a) => ({ data: a.base64 as string, mime_type: a.mimeType, name: a.name })) }
       : {}),

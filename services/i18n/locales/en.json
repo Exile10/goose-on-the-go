@@ -250,6 +250,7 @@
       "oneAudio": "Your Pond listens to one recording a message. Send the others one at a time.",
       "tooManyPdfs": "That is more PDFs than your Pond reads in one message. Send fewer at once.",
       "audioTooLong": "That audio file runs longer than your Pond listens to in one message.",
+      "audioTooLargeForPond": "That audio file is more than your Pond takes in one message.",
       "pdfInvalid": "Your Pond could not open that PDF. It may be locked with a password, or damaged.",
       "pdfNoText": "That PDF has no text in it to read, only pictures of pages.",
       "pdfTooLargeForPond": "That PDF is more than your Pond reads in one message."

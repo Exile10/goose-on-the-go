@@ -246,6 +246,8 @@ export interface ImageAttachment {
 export interface AudioAttachment {
   data: string;
   mime_type: string;
+  /** A file's own name, which the Pond saves in its place; a held voice note sends none. */
+  name?: string;
 }
 
 /** A PDF whose text the Pond reads out and puts after the message, under its name. */

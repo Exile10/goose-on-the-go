@@ -125,8 +125,13 @@ describe('a turn with files', () => {
     expect(streamBody('Summarise these', [file('document', 'lease.pdf', 'application/pdf'), file('audio', 'memo.m4a', 'audio/mp4')], {}, 's1')).toMatchObject({
       message: 'Summarise these',
       documents: [{ data: 'QUJD', mime_type: 'application/pdf', name: 'lease.pdf' }],
-      audio: [{ data: 'QUJD', mime_type: 'audio/mp4' }],
+      audio: [{ data: 'QUJD', mime_type: 'audio/mp4', name: 'memo.m4a' }],
     });
+  });
+
+  it('names an audio file but not a held voice note, which the Pond saves as a voice note', () => {
+    const note = { ...file('audio', 'voice-note.wav', 'audio/wav'), durationMs: 4000 };
+    expect(streamBody('', [note], {}, 's1').audio).toEqual([{ data: 'QUJD', mime_type: 'audio/wav' }]);
   });
 
   it('holds one recording and the Pond’s number of PDFs', () => {
@@ -142,6 +147,11 @@ describe('a turn with files', () => {
     expect(fromHistory([row])[0].content).toBe('Summarise this\nlease.pdf');
   });
 
+  it('reads an audio file back as a named note with nothing to play', () => {
+    const row = { id: 'm2', session_id: 's1', role: 'user', content: 'What is said here?\n[Audio: memo.m4a]', created_at: '2026-11-07T10:00:00Z' } as SessionMessage;
+    expect(fromHistory([row])[0]).toMatchObject({ content: 'What is said here?', voice: { uri: '', name: 'memo.m4a' } });
+  });
+
   it('says what a refused PDF or recording needs', () => {
     jest.spyOn(console, 'warn').mockImplementation(() => undefined);
     const refusal = (status: number, code: string) => new ApiError('POST → refused', status, null, 'English', { code });
@@ -150,6 +160,7 @@ describe('a turn with files', () => {
       'Your Pond could not open that PDF. It may be locked with a password, or damaged.',
     );
     expect(describeTurnError(refusal(413, 'audio_too_long'), t)).toBe('That audio file runs longer than your Pond listens to in one message.');
+    expect(describeTurnError(refusal(413, 'audio_too_large'), t)).toBe('That audio file is more than your Pond takes in one message.');
     jest.restoreAllMocks();
   });
 });

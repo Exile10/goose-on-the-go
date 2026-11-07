@@ -91,14 +91,17 @@ function VoiceNoteChip({ note }: { note: ChatVoiceNote }) {
   const words = inkText(theme, { role: 'mono', size: 'sm', color: theme.color.textOnAccent });
   // Read back from the Pond, which keeps no recording: the note was sent, and there is nothing to play.
   if (!note.uri) {
+    const label = note.name ?? t('chat.voiceNote.sent');
     return (
       <View
         accessible
-        accessibilityLabel={t('chat.voiceNote.sent')}
+        accessibilityLabel={label}
         style={[styles.voice, { backgroundColor: theme.color.accent, borderRadius: theme.radius.pill }]}
       >
         <GIcon name="voice" size={16} color={theme.color.textOnAccent} />
-        <Text style={words.style}>{t('chat.voiceNote.sent')}</Text>
+        <Text style={[words.style, note.name ? styles.voiceName : null]} numberOfLines={1}>
+          {label}
+        </Text>
       </View>
     );
   }
