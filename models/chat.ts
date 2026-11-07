@@ -61,12 +61,20 @@ export interface ChatImage {
   height?: number;
 }
 
+/** A voice note the person sent, kept on this phone so it can be played back. */
+export interface ChatVoiceNote {
+  uri: string;
+  durationMs: number;
+}
+
 export interface Message {
   id: string;
   role: MessageRole;
   content: string;
   timestamp: number;
   images?: ChatImage[];
+  /** User turns only: the note this turn was spoken as; `content` is then what was heard, if anything. */
+  voice?: ChatVoiceNote;
   /** Assistant turns only: what Goose did before it answered, in order. */
   tools?: ToolCall[];
   /** Reasoning passages, when the Pond kept them. */

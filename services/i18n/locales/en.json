@@ -267,6 +267,17 @@
       "keyboard": "Type instead",
       "speakingAgent": "The Voice agent is answering"
     },
+    "voiceNote": {
+      "holdHint": "Hold to record a voice note, and let go to send it",
+      "slideToCancel": "Slide left to cancel",
+      "releaseToCancel": "Let go to cancel",
+      "tooShort": "Hold the microphone while you speak, then let go to send.",
+      "play": "Play your voice note, {{length}}",
+      "stop": "Stop your voice note, {{length}}",
+      "transcribing": "Writing down what you said",
+      "unheard": "Your Pond could not make out that voice note. Try again, a little closer to the phone.",
+      "failed": "That voice note could not be sent."
+    },
     "tools": {
       "toolGroup": "Tools ready",
       "weather": "Weather",

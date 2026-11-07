@@ -47,6 +47,7 @@ import {
   type FieldBox,
 } from '@/components/patterns/answering';
 import { AttachMenu } from '@/components/patterns/attach-menu';
+import { VoiceNoteMic, VoiceNoteStrip } from '@/components/patterns/voice-note-mic';
 import { GIcon } from '@/components/ui/g-icon';
 import { GPressable } from '@/components/ui/g-pressable';
 import { selectionTick, tap } from '@/services/haptics';
@@ -54,6 +55,7 @@ import type { Attachment, AttachSource } from '@/services/media';
 import type { ResearchOffer } from '@/models/long-tasks';
 import type { SendOptions } from '@/view-models/use-chat';
 import { RESEARCH_ANSWERS, researchAnswerWords, researchItem, useResearchMode } from '@/view-models/use-deep-research';
+import { useVoiceNote, type VoiceNote } from '@/view-models/use-voice-note';
 import { Spacing } from '@/constants/spacing';
 
 /** The controls' diameter, and the field's height on one line: the touch floor. */
@@ -71,6 +73,8 @@ export interface ChatDockProps {
   onSend: (text: string, attachments: Attachment[], options?: Pick<SendOptions, 'research' | 'answer'>) => void;
   /** Open voice mode. */
   onVoice: () => void;
+  /** A held microphone was let go: the note to send. Without it, the microphone only opens voice mode. */
+  onVoiceNote?: (note: VoiceNote) => void;
   /** Ask for pictures or a file. Resolves with what was chosen, or nothing. */
   onAttach: (source: AttachSource, room: number) => Promise<Attachment[]>;
   /** A turn is in flight: what is sent now waits behind it. */
@@ -90,6 +94,7 @@ export interface ChatDockProps {
 export function ChatDock({
   onSend,
   onVoice,
+  onVoiceNote,
   onAttach,
   busy,
   bottomInset = 0,
@@ -148,6 +153,9 @@ export function ChatDock({
   }, [research, clearResearch]);
 
   const hasContent = draft.trim().length > 0 || attachments.length > 0;
+  const voiceNote = useVoiceNote((note) => onVoiceNote?.(note));
+  const recording = voiceNote.state !== 'idle';
+  const [pastLine, setPastLine] = useState(false);
 
   const handleSend = useCallback(() => {
     if (!hasContent) return;
@@ -246,7 +254,8 @@ export function ChatDock({
 
       <View style={styles.row}>
         {fieldBox ? <AnsweringLight light={light} field={fieldBox} radius={CONTROL / 2} /> : null}
-        <GPressable
+        {/* Nothing can be attached mid-note, and the strip needs the room to say how to cancel. */}
+        {recording ? null : <GPressable
           feedback="lift"
           onPress={() => {
             void selectionTick();
@@ -265,12 +274,13 @@ export function ChatDock({
           style={[styles.control, material, glassLift(theme)]}
         >
           <GIcon name="plus" size={20} color={theme.color.text} />
-        </GPressable>
+        </GPressable>}
 
         <View style={[styles.field, material]} onLayout={(e) => setFieldBox(e.nativeEvent.layout)}>
+          {recording ? <VoiceNoteStrip elapsedMs={voiceNote.elapsedMs} level={voiceNote.level} past={pastLine} /> : null}
           <TextInput
             ref={input}
-            style={[field.style, styles.input, { height: fieldHeight(draft ? lines : 0) }]}
+            style={[field.style, styles.input, { height: fieldHeight(draft ? lines : 0) }, recording && styles.hidden]}
             value={draft}
             onChangeText={setDraft}
             onContentSizeChange={(e) => setLines(e.nativeEvent.contentSize.height)}
@@ -300,6 +310,23 @@ export function ChatDock({
               </InkEdge>
             )}
           </Pressable>
+        ) : onVoiceNote ? (
+          <VoiceNoteMic
+            size={CONTROL}
+            recording={recording}
+            onTap={() => {
+              void selectionTick();
+              onVoice();
+            }}
+            onHold={() => {
+              Keyboard.dismiss();
+              setPastLine(false);
+              void voiceNote.begin();
+            }}
+            onRelease={voiceNote.release}
+            onCancel={voiceNote.cancel}
+            onPastLine={setPastLine}
+          />
         ) : (
           <GPressable
             feedback="lift"
@@ -317,6 +344,8 @@ export function ChatDock({
         {fieldBox ? <AnsweringWash light={light} field={fieldBox} radius={CONTROL / 2} /> : null}
         <AnsweringNote note={note} />
       </View>
+
+      {voiceNote.error && !recording ? <Text style={[hint.style, styles.noteError]}>{voiceNote.error}</Text> : null}
 
       <AttachMenu
         open={menu}
@@ -357,6 +386,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.lg,
     justifyContent: 'center',
   },
+  hidden: { position: 'absolute', opacity: 0, height: 0 },
+  noteError: { paddingLeft: CONTROL + Spacing.sm },
   input: {
     maxHeight: 132,
     paddingTop: Platform.OS === 'ios' ? 12 : 8,

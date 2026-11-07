@@ -20,7 +20,7 @@
  * is visible and not a silent buffer.
  */
 
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Image } from 'expo-image';
 import { useTranslation } from 'react-i18next';
@@ -31,9 +31,11 @@ import { ThinkingQuips } from '@/components/patterns/thinking-quips';
 import { ToolTrail } from '@/components/patterns/tool-card';
 import { GIcon } from '@/components/ui/g-icon';
 import { GPressable } from '@/components/ui/g-pressable';
-import type { ChatImage, Message } from '@/models/chat';
+import { clockWords } from '@/components/patterns/voice-note-mic';
+import type { ChatImage, ChatVoiceNote, Message } from '@/models/chat';
 import { api } from '@/services/api-client';
 import { selectionTick } from '@/services/haptics';
+import { playFile } from '@/services/voice-io';
 
 /** One picture on its own is shown large; several share a row. */
 const SINGLE = 220;
@@ -65,6 +67,43 @@ function Pictures({ images }: { images: ChatImage[] }) {
 }
 
 /** "Queued", and the way to take it back, under a message still waiting its turn. */
+/** A voice note the person sent: played back from this phone, which is where it was recorded. */
+function VoiceNoteChip({ note }: { note: ChatVoiceNote }) {
+  const theme = useInkTheme();
+  const { t } = useTranslation();
+  const [at, setAt] = useState<number | null>(null);
+  const playing = useRef<{ stop: () => void } | null>(null);
+  useEffect(() => () => playing.current?.stop(), []);
+  const toggle = () => {
+    void selectionTick();
+    if (playing.current) {
+      playing.current.stop();
+      return;
+    }
+    const run = playFile(note.uri, (secs) => setAt(secs * 1000));
+    playing.current = run;
+    setAt(0);
+    void run.done.then(() => {
+      playing.current = null;
+      setAt(null);
+    });
+  };
+  const words = inkText(theme, { role: 'mono', size: 'sm', color: theme.color.textOnAccent });
+  return (
+    <GPressable
+      feedback="lift"
+      onPress={toggle}
+      accessibilityRole="button"
+      accessibilityLabel={t(at === null ? 'chat.voiceNote.play' : 'chat.voiceNote.stop', { length: clockWords(note.durationMs) })}
+      style={[styles.voice, { backgroundColor: theme.color.accent, borderRadius: theme.radius.pill }]}
+    >
+      <GIcon name={at === null ? 'play' : 'stop'} size={16} color={theme.color.textOnAccent} />
+      <GIcon name="voice" size={16} color={theme.color.textOnAccent} />
+      <Text style={words.style}>{clockWords(at === null ? note.durationMs : Math.min(at, note.durationMs))}</Text>
+    </GPressable>
+  );
+}
+
 function QueuedNote({ onRemove }: { onRemove: () => void }) {
   const theme = useInkTheme();
   const { t } = useTranslation();
@@ -119,6 +158,11 @@ export const MessageRow = React.memo(function MessageRow({
             <Pictures images={message.images} />
           </View>
         ) : null}
+        {message.voice ? (
+          <View style={queued ? styles.waiting : null}>
+            <VoiceNoteChip note={message.voice} />
+          </View>
+        ) : null}
         {message.content ? (
           <InkBubble mine position={position} status={queued ? 'sending' : 'sent'}>
             {message.content}
@@ -151,6 +195,7 @@ const styles = StyleSheet.create({
   mine: { alignItems: 'flex-end', gap: 6, marginBottom: 10 },
   theirs: { gap: 10, marginBottom: 18, paddingRight: 8 },
   pictures: { alignItems: 'flex-end' },
+  voice: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 14, paddingVertical: 10 },
   // Ink's bubble dims to this while sending; its pictures match it.
   waiting: { opacity: 0.6 },
   queuedNote: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12 },

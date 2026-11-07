@@ -19,6 +19,8 @@ jest.mock('react-native-reanimated', () => {
     withTiming: (value: number) => value,
   };
 });
+// The held microphone runs on gesture-handler, which this Reanimated stand-in cannot carry.
+jest.mock('@/components/patterns/voice-note-mic', () => ({ VoiceNoteMic: () => null, VoiceNoteStrip: () => null }));
 // The light and the note animate on SVG; none of it decides what is sent.
 jest.mock('@/components/patterns/answering', () => ({
   AnsweringLight: () => null,

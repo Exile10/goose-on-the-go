@@ -26,15 +26,17 @@ export type AttachSource = 'camera' | 'photos' | 'files';
 
 export interface Attachment {
   id: string;
-  kind: 'image' | 'text';
+  kind: 'image' | 'text' | 'audio';
   /** A file on this phone, for the preview. */
   uri: string;
   name: string;
   mimeType: string;
-  /** Images: the re-encoded picture, raw base64, ready for the Pond. */
+  /** Images, and voice notes for a model that hears: raw base64, ready for the Pond. */
   base64?: string;
   /** Text files: the contents, which travel inside the message. */
   text?: string;
+  /** Voice notes: how long it runs. `base64` carries the WAV only when the model hears audio itself. */
+  durationMs?: number;
   width?: number;
   height?: number;
 }
@@ -250,6 +252,6 @@ export function composeMessage(text: string, attachments: Attachment[]): string 
 
 /** Whether a turn's pictures fit the Pond's per-turn ceiling. */
 export function withinTurnLimit(attachments: Attachment[]): boolean {
-  const total = attachments.reduce((n, a) => n + (a.base64 ? base64Bytes(a.base64) : 0), 0);
+  const total = attachments.reduce((n, a) => n + (a.kind === 'image' && a.base64 ? base64Bytes(a.base64) : 0), 0);
   return total <= MAX_TURN_IMAGE_BYTES;
 }

@@ -393,11 +393,13 @@ const pendingReply = (id: string): Message => ({
 function questionFor(id: string, text: string, attachments: Attachment[]): Message {
   const images = attachments.filter((a) => a.kind === 'image' && a.base64);
   const files = attachments.filter((a) => a.kind === 'text');
+  const note = attachments.find((a) => a.kind === 'audio');
   return {
     id,
     role: 'user',
     content: [text, ...files.map((f) => f.name)].filter(Boolean).join('\n'),
     timestamp: Date.now(),
+    ...(note ? { voice: { uri: note.uri, durationMs: note.durationMs ?? 0 } } : {}),
     images: images.map((a) => ({
       id: a.id,
       uri: a.uri,

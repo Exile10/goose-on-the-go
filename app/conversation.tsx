@@ -71,6 +71,8 @@ import { api } from '@/services/api-client';
 import { NEW_DRAFT, draftFor, moveDraft, setDraft } from '@/services/chat-threads';
 import { selectionTick } from '@/services/haptics';
 import { AttachError, pickAttachments, withinTurnLimit, type Attachment, type AttachSource } from '@/services/media';
+import { cacheFile, discardFile } from '@/services/voice-io';
+import type { VoiceNote } from '@/view-models/use-voice-note';
 import type { Message } from '@/models/chat';
 import type { ThemeColors } from '@/constants/colors';
 import { Spacing } from '@/constants/spacing';
@@ -309,6 +311,42 @@ export default function ChatScreen() {
     [actions, scrollToFoot, t],
   );
 
+  // The model hears only words for now: the Pond has no way yet to hand it the sound itself, so a
+  // note goes through its transcriber and is asked as what was said, with the note kept to replay.
+  const [hearing, setHearing] = useState(false);
+  const onVoiceNote = useCallback(
+    async (note: VoiceNote) => {
+      const uri = cacheFile('voice-note', note.wav);
+      setNotice(null);
+      setHearing(true);
+      try {
+        const heard = await api.transcribe(uri);
+        if (!heard) {
+          discardFile(uri);
+          setNotice(t('chat.voiceNote.unheard'));
+          return;
+        }
+        scrollToFoot();
+        const attachment: Attachment = {
+          id: `voice-${Date.now().toString(36)}`,
+          kind: 'audio',
+          uri,
+          name: 'voice-note.wav',
+          mimeType: 'audio/wav',
+          durationMs: note.durationMs,
+        };
+        void actions.send(heard, [attachment]);
+      } catch (e) {
+        console.warn('[voice-note] not sent', { kind: 'voice_note', error: String(e) });
+        discardFile(uri);
+        setNotice(t('chat.voiceNote.failed'));
+      } finally {
+        setHearing(false);
+      }
+    },
+    [actions, scrollToFoot, t],
+  );
+
   // A prompt Home handed over: asked once on arrival, exactly as picking one here does.
   //
   // The ref stops a re-render asking it again, and clearing the param stops a remount doing so --
@@ -410,6 +448,11 @@ export default function ChatScreen() {
             <InkNotice tone={notice ? 'warning' : 'danger'}>{shown}</InkNotice>
           </GPressable>
         ) : null}
+        {hearing && !shown ? (
+          <View style={styles.notice} accessibilityLiveRegion="polite">
+            <InkNotice tone="info" icon="voice">{t('chat.voiceNote.transcribing')}</InkNotice>
+          </View>
+        ) : null}
 
         <View style={styles.conversation}>
           {started ? (
@@ -466,6 +509,7 @@ export default function ChatScreen() {
             onDraftChange={onDraftChange}
             onSend={onSend}
             onVoice={() => setVoice(true)}
+            onVoiceNote={(note) => void onVoiceNote(note)}
             onAttach={onAttach}
             busy={streaming}
             bottomInset={insets.bottom}
