@@ -66,6 +66,11 @@ const voice: SettingsPage = {
       footerKey: 'settings.footer.voiceAgent',
       items: [{ kind: 'link', route: '/(stack)/voice-agent', icon: 'voice', tile: 'pink', labelKey: 'screens.voiceAgent' }],
     },
+    // On this phone, not the Pond: Android's assist gesture opens Goose's voice orb over any app.
+    {
+      titleKey: 'settings.section.phoneAssistant',
+      items: [{ kind: 'special', id: 'phoneAssistant' }],
+    },
     // The speaking voice is a page of its own: its picker would otherwise be most of this one.
     {
       items: [

@@ -11,7 +11,7 @@
  * while voice mode is open, and closing it stops everything.
  */
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { inkText, useInkTheme } from '@jarida/ink/native';
@@ -55,13 +55,18 @@ export interface VoiceDockProps {
   /** Back to the keyboard. */
   onClose: () => void;
   bottomInset: number;
+  /** Told each state the pipeline moves through, for a host that ends with the conversation. */
+  onStateChange?: (state: VoiceState) => void;
 }
 
-export function VoiceDock({ send, stop, onClose, bottomInset }: VoiceDockProps) {
+export function VoiceDock({ send, stop, onClose, bottomInset, onStateChange }: VoiceDockProps) {
   const theme = useInkTheme();
   const { t } = useTranslation();
   const voice = useVoice({ send, stop });
   const { state, level, speaker, error, micBlocked } = voice.data;
+  useEffect(() => {
+    onStateChange?.(state);
+  }, [onStateChange, state]);
 
   const caption = inkText(theme, {
     size: 'sm',

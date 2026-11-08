@@ -40,7 +40,7 @@ import type { BubblePosition } from '@jarida/ink/native';
 
 import type { Message, ToolCall } from '@/models/chat';
 import { toolWords, humanizeTool } from '@/constants/tools';
-import { useServer } from '@/providers/server-provider';
+import { useServer, type MigrationScreen } from '@/providers/server-provider';
 import { ApiError, api } from '@/services/api-client';
 import { cardsFor, forgetCalls, type CardsByCall } from '@/services/card-cache';
 import { chatRuns, type TurnHandle } from '@/services/chat-runs';
@@ -456,9 +456,25 @@ function questionFor(id: string, text: string, attachments: Attachment[]): Messa
   };
 }
 
+/**
+ * What a conversation needs to know about the connection: whether the saved pairing has been read
+ * back, and whether chat talks to the Pond or to its mock.
+ */
+export interface ChatConnection {
+  hydrated: boolean;
+  isScreenReal: (screen: MigrationScreen) => boolean;
+}
+
 export function useChat(): UseChat {
+  return useChatOn(useServer());
+}
+
+/**
+ * A conversation over a connection handed in, for a React tree with no ServerProvider: the
+ * assist overlay (`components/assist/`), which restores the pairing itself.
+ */
+export function useChatOn({ hydrated, isScreenReal }: ChatConnection): UseChat {
   const { t } = useTranslation();
-  const { hydrated, isScreenReal } = useServer();
 
   // The conversation on screen. Its thread lives in `chat-threads.ts`, not
   // here, so leaving the screen does not take the thread with it.
