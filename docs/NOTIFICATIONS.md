@@ -114,8 +114,11 @@ wake: "1" }`, with no title or body. Nothing readable transits Google or Apple; 
 
 ## Stay connected in the background (Android)
 
-Settings, This phone, Notifications: **Stay connected in the background**, on by default. Stored
-on the phone (`Storage` key `stayConnected`), not on the Pond.
+Settings, This phone, Notifications: **Stay connected in the background**, off by default. Stored
+on the phone (`Storage` key `stayConnected`), not on the Pond. It was on by default until
+2026-11, and holding the stream open all day was the largest drain on Android batteries the app
+had; a phone that never chose keeps it off, and one that turned it on keeps its choice. With it
+off, the push wake-up delivers, sometimes later while the phone is idle.
 
 While it is on and the phone is paired, `NotificationsProvider` starts `PondPresenceService`
 (`plugins/pond-presence/PondPresence.kt`, wired by `plugins/with-pond-presence.js`): an Android
@@ -136,7 +139,9 @@ Lifecycle, as pure functions in `services/background-connection.ts` and tested t
 - The service is started only while the app is in the foreground. Android 12 and later refuse a
   foreground-service start from the background; the refusal is logged and the push wake-up covers
   delivery.
-- A dropped stream reconnects with its own backoff, 1 s doubling to 30 s. While the app is open the
+- A dropped stream reconnects with its own backoff, 1 s doubling to 30 s in the foreground and
+  to five minutes in the background (`maxBackoff`), so an unreachable Pond does not wake the radio
+  every 30 s all day. While the app is open the
   provider also asks the connection manager to look for a better endpoint; while it is not, the
   stream keeps retrying the endpoint it had, and the next foreground pass re-selects. A 401 with no
   provider mounted stops the stream, since nothing there can refresh the token; the wake-up

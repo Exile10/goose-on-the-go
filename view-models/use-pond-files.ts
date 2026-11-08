@@ -34,6 +34,8 @@ export interface UsePondFiles {
     open: (entry: AdminFileEntry) => void;
     /** To a folder on the way back to the data directory. */
     goTo: (path: string) => void;
+    /** To the folder this one is in; at the data directory there is nothing above. */
+    up: () => void;
     /** Asks first; resolves to whether it was deleted. */
     remove: (entry: AdminFileEntry) => Promise<boolean>;
   };
@@ -167,6 +169,6 @@ export function usePondFiles(): UsePondFiles {
     error,
     notice,
     removing,
-    actions: { refresh: () => read(path), open, goTo, remove },
+    actions: { refresh: () => read(path), open, goTo, up: () => goTo(parentOf(path)), remove },
   };
 }

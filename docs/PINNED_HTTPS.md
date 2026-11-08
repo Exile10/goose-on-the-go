@@ -751,6 +751,18 @@ aimed at process lifetime would have addressed nothing.
 when `stage()` brings a node up, stopped in `stopTransport()`. A profile that never enables
 remote access never starts a node, so a local-only user never sees the notification.
 
+Since 2026-11 the node does not run all day. Held in the background, the node and its service
+kept the radio and processor awake whether or not anything was asked of the Pond, and drained
+Android batteries. When the app leaves the foreground, `ServerProvider` calls
+`pauseRemoteAccess`, which asks `PondNetwork.pause()` to stop the node and its service while
+keeping the active profile and the node's identity. Coming back to the foreground,
+`resumeRemoteAccess` finds the node stopped and restarts it, as it always did for a node that
+died. A push wake-up starts a paused node with `resumePausedRemoteAccess` before reaching the
+Pond, and pauses it again once the notice is shown. The node stays up in the background only
+while **Stay connected in the background** is on, because that stream reaches a Pond away from
+home through it. A status read while the node is stopped no longer starts the service, so its
+notification never appears for a node that is not there.
+
 The notification reports what the connection is actually doing and opens the app when
 tapped, because a permanent notification reading "Goose is running" would be a cost with no
 return. `RemoteNotice` decides the text from two signals:

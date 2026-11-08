@@ -2,7 +2,7 @@ jest.mock('../api-client', () => ({ ApiError: jest.requireActual('../api-client'
 import i18n from '../i18n';
 import { AppState, NativeModules } from 'react-native';
 import { ApiError, api } from '../api-client';
-import { enableRemoteAccess, cancelRemoteAccess, machineKeyPreview, remoteBackgroundPaused, remoteNodeRunning, restoreRemoteAccess, resumeRemoteAccess } from '../remote-access';
+import { enableRemoteAccess, cancelRemoteAccess, disableRemoteAccess, machineKeyPreview, pauseRemoteAccess, remoteBackgroundPaused, remoteNodeRunning, restoreRemoteAccess, resumePausedRemoteAccess, resumeRemoteAccess } from '../remote-access';
 const local = 'https://192.168.1.2:4443';
 const control = 'https://coord.example';
 const pending = JSON.stringify({ state: 'NeedsLogin', machineKey: 'mkey:' + 'b'.repeat(64), authUrl: `${control}/register/pending-registration`, addresses: [] });
@@ -10,7 +10,7 @@ const running = JSON.stringify({ state: 'Running', addresses: ['100.64.0.2'] });
 let bridge: Record<string, jest.Mock>;
 beforeEach(() => {
   jest.useFakeTimers(); Object.defineProperty(AppState, 'currentState', { value: 'active', configurable: true });
-  bridge = { beginRemote: jest.fn(async () => pending), remoteStatus: jest.fn(async () => running), cancelRemote: jest.fn(async () => undefined), activateRemote: jest.fn(async () => undefined), resetIdentity: jest.fn(async () => undefined) };
+  bridge = { beginRemote: jest.fn(async () => pending), remoteStatus: jest.fn(async () => running), cancelRemote: jest.fn(async () => undefined), activateRemote: jest.fn(async () => undefined), resetIdentity: jest.fn(async () => undefined), pauseRemote: jest.fn(async () => undefined) };
   NativeModules.PondTls = bridge;
   jest.mocked(api.requestLocal).mockReset();
   jest.mocked(api.requestLocal).mockImplementation(async (_endpoint, path) => path.endsWith('/configuration') ? { enabled: true, controlUrl: control } : path.endsWith('/info') ? { tailnet_address: '100.64.0.1', https_port: 4443 } : {});
@@ -228,5 +228,67 @@ describe('background access', () => {
   it('claims no pause on a build without the native bridge', async () => {
     NativeModules.PondTls = {};
     await expect(remoteBackgroundPaused()).resolves.toBe(false);
+  });
+});
+
+// Held all day, the node and its foreground service drained Android batteries. It is paused while the
+// app is in the background and started again for the app's return or a push wake-up.
+describe('pausing the node in the background', () => {
+  it('pauses the node it started, and a wake-up starts the same one and waits for it', async () => {
+    await restoreRemoteAccess('profile', control);
+    expect(await pauseRemoteAccess()).toBe(true);
+    expect(bridge.pauseRemote).toHaveBeenCalledTimes(1);
+    expect(await pauseRemoteAccess()).toBe(false);
+
+    bridge.activateRemote.mockClear();
+    await expect(resumePausedRemoteAccess()).resolves.toBe(true);
+    expect(bridge.activateRemote).toHaveBeenCalledWith('profile', control);
+    expect(bridge.remoteStatus).toHaveBeenCalled();
+    await expect(resumePausedRemoteAccess()).resolves.toBe(false);
+  });
+
+  it('starts nothing for a wake-up when nothing was paused', async () => {
+    await restoreRemoteAccess('profile', control);
+    bridge.activateRemote.mockClear();
+    await expect(resumePausedRemoteAccess()).resolves.toBe(false);
+    expect(bridge.activateRemote).not.toHaveBeenCalled();
+  });
+
+  it('has nothing to pause for a local-only profile', async () => {
+    await restoreRemoteAccess('profile', '');
+    expect(await pauseRemoteAccess()).toBe(false);
+    expect(bridge.pauseRemote).not.toHaveBeenCalled();
+  });
+
+  it('asks nothing of a bridge without a pause, as on iOS where the app is suspended', async () => {
+    await restoreRemoteAccess('profile', control);
+    delete (bridge as Partial<typeof bridge>).pauseRemote;
+    expect(await pauseRemoteAccess()).toBe(false);
+  });
+
+  it('leaves the node running when the bridge cannot pause it', async () => {
+    await restoreRemoteAccess('profile', control);
+    bridge.pauseRemote.mockRejectedValueOnce(new Error('busy'));
+    expect(await pauseRemoteAccess()).toBe(false);
+    await expect(resumePausedRemoteAccess()).resolves.toBe(false);
+  });
+
+  it('never starts remote access again for a wake-up once it is turned off', async () => {
+    bridge.disableRemote = jest.fn(async () => undefined);
+    await restoreRemoteAccess('profile', control);
+    await pauseRemoteAccess();
+    await disableRemoteAccess();
+    bridge.activateRemote.mockClear();
+    await expect(resumePausedRemoteAccess()).resolves.toBe(false);
+    expect(await pauseRemoteAccess()).toBe(false);
+    expect(bridge.activateRemote).not.toHaveBeenCalled();
+  });
+
+  it('never pauses a node an enrollment is driving', async () => {
+    await restoreRemoteAccess('profile', control);
+    const enrolling = enableRemoteAccess('profile', local, jest.fn(), jest.fn(async () => undefined));
+    expect(await pauseRemoteAccess()).toBe(false);
+    expect(bridge.pauseRemote).not.toHaveBeenCalled();
+    await jest.advanceTimersByTimeAsync(1000); await enrolling;
   });
 });

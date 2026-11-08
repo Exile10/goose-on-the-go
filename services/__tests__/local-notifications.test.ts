@@ -8,6 +8,7 @@ import { Linking } from 'react-native';
 import { presentLocally, watchLinkTaps } from '@/services/local-notifications';
 
 const mockPush = jest.fn();
+const mockNavigate = jest.fn();
 const mockSchedule = jest.fn().mockResolvedValue('id');
 const mockSessionMessages = jest.fn().mockResolvedValue([]);
 jest.mock('@/services/api-client', () => {
@@ -22,7 +23,12 @@ jest.mock('@/services/api-client', () => {
 });
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { ApiError: MockApiError } = require('@/services/api-client');
-jest.mock('expo-router', () => ({ router: { push: (...args: unknown[]) => mockPush(...args) } }));
+jest.mock('expo-router', () => ({
+  router: {
+    push: (...args: unknown[]) => mockPush(...args),
+    navigate: (...args: unknown[]) => mockNavigate(...args),
+  },
+}));
 
 let mockListener: ((response: unknown) => void) | null = null;
 jest.mock('@/services/notifications-module', () => ({
@@ -52,6 +58,7 @@ describe('openTapped', () => {
   let stop: () => void;
   beforeEach(() => {
     mockPush.mockClear();
+    mockNavigate.mockClear();
     stop = watchLinkTaps();
   });
   afterEach(() => stop());
@@ -64,7 +71,9 @@ describe('openTapped', () => {
   it('opens the devices tab and the chat tab', () => {
     tap({ open: 'devices' });
     tap({ open: 'chat', proposal_id: 'p-1' });
-    expect(mockPush.mock.calls).toEqual([['/(tabs)/devices'], ['/(tabs)/chat']]);
+    // A tab is gone back to rather than pushed, so the history holds one tab bar.
+    expect(mockNavigate.mock.calls).toEqual([['/(tabs)/devices'], ['/(tabs)/chat']]);
+    expect(mockPush).not.toHaveBeenCalled();
   });
 
   it('opens the models, extensions and remote access screens', () => {
@@ -72,6 +81,11 @@ describe('openTapped', () => {
     tap({ open: 'extensions', kind: 'startup_problems' });
     tap({ open: 'remote_access', kind: 'remote_access_down' });
     expect(mockPush.mock.calls).toEqual([['/(stack)/models'], ['/(stack)/extensions'], ['/(stack)/remote-access']]);
+  });
+
+  it('opens My Pond for the notice that the Pond was unlocked, not Devices', () => {
+    tap({ open: 'my_pond' });
+    expect(mockPush.mock.calls).toEqual([['/(stack)/pond']]);
   });
 
   it('opens nothing for a screen outside the allow-list, or no hint at all', () => {
@@ -131,7 +145,7 @@ describe('openTapped', () => {
   it('acts on one tap once, however many times it is delivered', () => {
     tap({ open: 'devices' }, 'same');
     tap({ open: 'devices' }, 'same');
-    expect(mockPush).toHaveBeenCalledTimes(1);
+    expect(mockNavigate).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -167,6 +181,21 @@ describe('presentLocally', () => {
     expect(request.identifier).toBe('reply-r1');
     expect(request.content.data).toEqual({ id: 'reply-r1', category: 'reply', open: 'conversation', session_id: 's-1' });
   });
+  it('shows a schedule answer as plain words, however the model marked it up', async () => {
+    mockSchedule.mockClear();
+    await presentLocally({
+      id: 'n-md',
+      target: 'broadcast',
+      category: 'update',
+      title: 'Schedule: Daily Brief',
+      body: '**Weather**\nOvercast, *fifteen* degrees.\n1. **Sunday:** won',
+      timestamp: '2026-11-06T08:31:00Z',
+    });
+    const { title, body } = mockSchedule.mock.calls[0][0].content;
+    expect(title).toBe('Schedule: Daily Brief');
+    expect(body).toBe('Weather\nOvercast, fifteen degrees.\n1. Sunday: won');
+  });
+
   /** The shade keeps the Pond's own hint, so the tap reads back a value it accepts. */
   it('stores the remote access hint as the Pond sent it, and drops one it does not know', async () => {
     mockSchedule.mockClear();

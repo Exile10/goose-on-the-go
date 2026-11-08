@@ -29,14 +29,19 @@
 import { AppState, Platform } from 'react-native';
 
 import { api } from './api-client';
+import { stayConnectedEnabled } from './background-connection';
 import { notifications, type NotificationsModule } from './notifications-module';
 import { alreadyDelivered } from './notification-delivery';
 import { handleWake } from './notification-wake';
 import { ensurePondSession } from './pond-session';
+import { pauseRemoteAccess, resumePausedRemoteAccess } from './remote-access';
 import { handleWakePing, type WakeOutcome } from './wake-handler';
 import { readWakePing } from './wake-ping';
 
 export const WAKE_TASK = 'giap-notification-wake';
+
+/** Read afresh each time: the person may open the app while a wake-up is under way. */
+const appActive = () => AppState.currentState === 'active';
 
 /**
  * expo-task-manager, or null where its native side is not in this build.
@@ -70,15 +75,23 @@ export function defineWakeTask(Notifications: NotificationsModule | null = notif
       console.warn('[wake] task error', { kind: 'notification_wake', error: error.message });
       return Failed;
     }
-    if (AppState.currentState === 'active') return NoData;
-    const outcome = await handleWake(data, { ensureSession: ensurePondSession, client: api });
-    if (outcome === 'delivered') return NewData;
-    if (outcome === 'ignored') return NoData;
-    const ping = readWakePing(data);
-    if (!ping) return outcome === 'failed' ? Failed : NoData;
-    // A pass that ran out of time may already have shown this alert, which a stand-in would replace.
-    if (alreadyDelivered(ping.notificationId)) return NewData;
-    return result[await handleWakePing(ping)];
+    if (appActive()) return NoData;
+    // The node was paused when the app left the foreground; a Pond away from home is reached through it.
+    await resumePausedRemoteAccess();
+    try {
+      const outcome = await handleWake(data, { ensureSession: ensurePondSession, client: api });
+      if (outcome === 'delivered') return NewData;
+      if (outcome === 'ignored') return NoData;
+      const ping = readWakePing(data);
+      if (!ping) return outcome === 'failed' ? Failed : NoData;
+      // A pass that ran out of time may already have shown this alert, which a stand-in would replace.
+      if (alreadyDelivered(ping.notificationId)) return NewData;
+      return result[await handleWakePing(ping)];
+    } finally {
+      // Paused again once the notice is shown, or a single wake-up would leave the node and its
+      // foreground service running until the app is next opened.
+      if (!appActive() && !stayConnectedEnabled()) await pauseRemoteAccess();
+    }
   });
   Notifications.registerTaskAsync(WAKE_TASK).catch((e: unknown) => {
     console.warn('[wake] task could not be registered', { kind: 'notification_wake', error: String(e) });

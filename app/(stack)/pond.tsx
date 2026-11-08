@@ -136,8 +136,15 @@ export default function MyPondScreen() {
   }, [actions]);
 
   // Options merge, so the locked screen has to take Lock away again rather than leave it standing.
+  // The header keeps one right-hand view either way and only its content changes: adding and
+  // removing that view as the screen locks and unlocks made react-native-screens remove a header
+  // child that Fabric had already moved, which closed the app.
   const header = (
-    <Stack.Screen options={{ headerRight: unlocked ? () => <HeaderLock disabled={locking} onPress={() => void lock()} /> : undefined }} />
+    <Stack.Screen
+      options={{
+        headerRight: () => (unlocked ? <HeaderLock disabled={locking} onPress={() => void lock()} /> : <View />),
+      }}
+    />
   );
   const refresh = <RefreshControl refreshing={refreshing} onRefresh={() => void actions.refresh()} />;
 

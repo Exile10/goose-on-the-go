@@ -1524,7 +1524,8 @@
       "notices": "Notices and privacy",
       "records": "Records",
       "phone": "This phone",
-      "advanced": "Advanced"
+      "advanced": "Advanced",
+      "help": "Help"
     },
     "loading": "Reading your Pond's settings",
     "account": {
@@ -1660,6 +1661,7 @@
     "settingsRetention": "Keeping records",
     "settingsAppearance": "Appearance",
     "settingsAdvanced": "Advanced",
+    "help": "Help & Feedback",
     "settingsTimezone": "Time zone",
     "settingsModelRole": "Choose a model",
     "settingsModel": "Model",
@@ -2070,6 +2072,69 @@
     "codeUnreadable": "Could not read that code. Try again.",
     "holdSteady": "Hold steady…",
     "aimAtPond": "Point the camera at the QR code on your Pond's dashboard or on its setup card"
+  },
+  "help": {
+    "problem": {
+      "subject": "A problem with Goose On The Go",
+      "intro": "What happened, and what did you expect instead?"
+    },
+    "feedback": {
+      "subject": "Feedback on Goose On The Go",
+      "intro": "What would you like to tell us?"
+    },
+    "details": {
+      "app": "App version",
+      "phone": "Phone",
+      "system": "System",
+      "pond": "Pond version",
+      "unknown": "Not known"
+    },
+    "description": "Answers to the problems people run into most, and a way to tell us about a problem or an idea.",
+    "guide": {
+      "heading": "Common problems",
+      "open": "Open {{screen}}",
+      "unreachable": {
+        "title": "The app can't reach your Pond",
+        "body": "At home, check that your Pond is switched on and that this phone is on the same Wi-Fi. Away from home, the app can only reach your Pond if outside access is set up in Remote access. If the app says your Pond no longer recognises this phone, pair again at home."
+      },
+      "slow": {
+        "title": "Goose takes too long to answer",
+        "body": "Your Pond may still be loading the model Goose thinks with, or answering too much at once. Wait a moment and try again. Models shows which model Goose uses."
+      },
+      "microphone": {
+        "title": "Goose can't hear you in the app",
+        "body": "The app needs the microphone to hear you. Tap the orb to allow it. If you said no before, turn on the microphone for Goose On The Go in your phone's settings."
+      },
+      "wakeWord": {
+        "title": "Goose doesn't answer the wake word",
+        "body": "Your Pond listens through its own microphone and answers through its own speaker, so both need to be plugged into the Pond. It looks for them when it starts, so restart it after plugging them in. It also needs its speech models, from Models. Wake word lets Goose learn how your household says it."
+      },
+      "deviceOffline": {
+        "title": "A device shows Offline or doesn't respond",
+        "body": "Your Pond lists the device but can't reach it. Check that the device has power, then switch it off and on again. A new device only accepts pairing for about 15 minutes after it starts up."
+      },
+      "pairingCode": {
+        "title": "The pairing code doesn't work",
+        "body": "Check the six digits on your Pond and try again. After 10 wrong tries your Pond retires the code, so show a new one on its dashboard and pair again."
+      },
+      "notices": {
+        "title": "Notices arrive late or not at all",
+        "body": "Your Pond wakes this phone with a push, which can arrive later while the phone is idle. On Android, turn on Stay connected in the background in Notifications so notices arrive straight away. On iPhone, iOS decides how soon a push arrives."
+      },
+      "whatHappened": {
+        "title": "Find out what Goose did",
+        "body": "Activity lists what Goose has been doing, which helps when something went wrong. Mention what you see there when you report a problem."
+      }
+    },
+    "contact": {
+      "heading": "Contact us",
+      "problem": "Report a problem",
+      "problemHint": "Tell us what went wrong.",
+      "feedback": "Send feedback",
+      "feedbackHint": "Share an idea or tell us what you think.",
+      "footer": "Opens your mail app with an email to {{email}}. It includes the app version, your phone and your Pond's version, and nothing is sent until you send it.",
+      "noMail": "This phone has no mail app to open. Write to {{email}} from any email account."
+    }
   },
   "privacy": {
     "policy": "Privacy policy",
@@ -3113,7 +3178,7 @@
       "readyTitle": "Goose is ready",
       "readyBody": "Your Pond has its model and can answer now.",
       "dismiss": "Dismiss",
-      "adminKey": "My Pond opens with your Face ID or fingerprint on this phone."
+      "adminKey": "My Pond opens with your {{unlockMethod}} on this phone."
     },
     "model": {
       "title": "Choose what Goose thinks with",
@@ -3936,20 +4001,22 @@
     },
     "key": {
       "title": "Open My Pond with this phone's security",
-      "body": "This phone keeps its own key to My Pond. It never leaves the phone, and only this phone's Face ID or fingerprint opens it.",
-      "unlock": "Unlock with Face ID or fingerprint",
+      "methodIos": "Face ID or fingerprint",
+      "methodAndroid": "fingerprint or the phone's PIN",
+      "body": "This phone keeps its own key to My Pond. It never leaves the phone, and only this phone's {{unlockMethod}} opens it.",
+      "unlock": "Unlock with {{unlockMethod}}",
       "useCard": "Use the admin card instead",
-      "remember": "Open My Pond with Face ID or fingerprint next time",
-      "awaitsPond": "Opening My Pond with Face ID or fingerprint needs an update on your Pond. Until then, it opens with the admin card.",
-      "kept": "Next time, My Pond opens with Face ID or fingerprint.",
+      "remember": "Open My Pond with {{unlockMethod}} next time",
+      "awaitsPond": "Opening My Pond with {{unlockMethod}} needs an update on your Pond. Until then, it opens with the admin card.",
+      "kept": "Next time, My Pond opens with {{unlockMethod}}.",
       "notKept": "My Pond is open, but this phone couldn't keep its key. Next time it asks for the admin card again.",
       "prompt": "Unlock My Pond",
       "savePrompt": "Keep a key to My Pond on this phone",
       "lost": "This phone can no longer read its key. That often happens after a new fingerprint or face is added. Type the admin card once more.",
       "rejected": "This phone's key no longer opens My Pond. Type the admin card to open it.",
-      "unreadable": "Face ID or fingerprint didn't open the key. Try again, or use the admin card.",
+      "unreadable": "The phone's check didn't open the key. Try again, or use the admin card.",
       "forget": "Forget My Pond on this phone",
-      "forgetHint": "My Pond opens here with Face ID or fingerprint.",
+      "forgetHint": "My Pond opens here with {{unlockMethod}}.",
       "forgetTitle": "Forget My Pond on this phone?",
       "forgetBody": "This phone's key is removed here and on the Pond, and My Pond locks. Next time, My Pond asks for the admin card.",
       "forgetConfirm": "Forget it"

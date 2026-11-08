@@ -27,7 +27,7 @@
  * written, and the old copy is removed only once the new one is saved.
  */
 
-import { Platform } from 'react-native';
+import { NativeModules, Platform } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 
 const KEYS = {
@@ -84,14 +84,40 @@ function adminKeyOptions(prompt?: string): SecureStore.SecureStoreOptions {
 }
 
 /**
+ * Android's own store for the admin key (plugins/pond-keyguard/PondKeyguard.kt): sealed by a
+ * Keystore key that opens after a strong biometric or the phone's PIN, pattern or password.
+ * expo-secure-store asks for a strong biometric alone, and a Galaxy's face unlock is not one, so
+ * those phones offered a fingerprint and nothing else. Absent outside a native Android build.
+ */
+interface PondKeyguardModule {
+  available(): boolean;
+  has(slot: AdminKeySlot): boolean;
+  save(slot: AdminKeySlot, secret: string, title: string): Promise<void>;
+  read(slot: AdminKeySlot, title: string): Promise<string | null>;
+  forget(slot: AdminKeySlot): Promise<void>;
+}
+
+function keyguard(): PondKeyguardModule | null {
+  if (Platform.OS !== 'android') return null;
+  return (NativeModules.PondKeyguard as PondKeyguardModule | undefined) ?? null;
+}
+
+/** A key kept before Android's own store existed: still opens, with a fingerprint, until it moves. */
+async function readLegacy(prompt: string, slot: AdminKeySlot): Promise<string | null> {
+  return SecureStore.getItemAsync(ADMIN_KEYS[slot], adminKeyOptions(prompt));
+}
+
+/**
  * This phone's own key to My Pond, kept only when the member chooses to, and readable only after the
- * phone's Face ID or fingerprint. A new face or finger invalidates it. Web cannot hold it at all.
+ * phone's check: Face ID or a fingerprint on iOS, a fingerprint or the screen lock on Android. A new
+ * face or finger invalidates it. Web cannot hold it at all.
  */
 export const AdminKeyKeychain = {
   available(): boolean {
     if (isWeb) return false;
+    const native = keyguard();
     try {
-      return SecureStore.canUseBiometricAuthentication() === true;
+      return native ? native.available() === true : SecureStore.canUseBiometricAuthentication() === true;
     } catch {
       return false;
     }
@@ -99,19 +125,41 @@ export const AdminKeyKeychain = {
 
   async save(key: string, prompt: string, slot: AdminKeySlot): Promise<void> {
     if (isWeb) throw new Error('A browser cannot keep the admin key');
+    const native = keyguard();
+    if (native) {
+      await native.save(slot, key, prompt);
+      // The fingerprint-only copy, if one was kept before, would only ever be read in its place.
+      await SecureStore.deleteItemAsync(ADMIN_KEYS[slot], adminKeyOptions()).catch(() => undefined);
+      return;
+    }
     // Updating a kept item asks for biometrics on iOS; a fresh one is written without asking.
     await SecureStore.deleteItemAsync(ADMIN_KEYS[slot], adminKeyOptions()).catch(() => undefined);
     await SecureStore.setItemAsync(ADMIN_KEYS[slot], key, adminKeyOptions(prompt));
   },
 
-  /** Asks for the phone's biometrics. Null when nothing is kept or the system invalidated it; throws on a refusal. */
+  /**
+   * Asks for the phone's check. Null when nothing is kept or the system invalidated it; throws on a
+   * refusal. On Android a key kept the old way is opened with a fingerprint once and moved to the
+   * store that also takes the screen lock, which asks once more; if that second check is declined,
+   * the old copy stays and opens as before.
+   */
   async read(prompt: string, slot: AdminKeySlot): Promise<string | null> {
     if (isWeb) return null;
-    return SecureStore.getItemAsync(ADMIN_KEYS[slot], adminKeyOptions(prompt));
+    const native = keyguard();
+    if (!native) return readLegacy(prompt, slot);
+    if (native.has(slot)) return native.read(slot, prompt);
+    const key = await readLegacy(prompt, slot);
+    if (key !== null) {
+      await AdminKeyKeychain.save(key, prompt, slot).catch((e: unknown) => {
+        console.warn('[secure-storage] the admin key stays in its fingerprint-only store', e);
+      });
+    }
+    return key;
   },
 
   async forget(slot: AdminKeySlot): Promise<void> {
     if (isWeb) return;
+    await keyguard()?.forget(slot);
     await SecureStore.deleteItemAsync(ADMIN_KEYS[slot], adminKeyOptions());
   },
 };

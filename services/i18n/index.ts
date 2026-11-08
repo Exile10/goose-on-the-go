@@ -12,6 +12,7 @@
  */
 
 import i18n from 'i18next';
+import { Platform } from 'react-native';
 import { initReactI18next } from 'react-i18next';
 
 import en from './locales/en.json';
@@ -37,11 +38,19 @@ function deviceLanguage(): Language {
   return (SUPPORTED_LANGUAGES as readonly string[]).includes(tag) ? (tag as Language) : 'en';
 }
 
+/**
+ * How this phone opens the key it keeps to My Pond, for the sentences that name it: Face ID or a
+ * fingerprint on iOS, a fingerprint or the phone's PIN on Android, where the key also opens with
+ * the screen lock (services/secure-storage.ts). Read from the catalogue's English; a second
+ * language will need it read again when the language changes.
+ */
+const unlockMethod = Platform.OS === 'ios' ? en.myPond.key.methodIos : en.myPond.key.methodAndroid;
+
 void i18n.use(initReactI18next).init({
   resources: { en: { translation: en } },
   lng: deviceLanguage(),
   fallbackLng: 'en',
-  interpolation: { escapeValue: false },
+  interpolation: { escapeValue: false, defaultVariables: { unlockMethod } },
   returnNull: false,
 });
 

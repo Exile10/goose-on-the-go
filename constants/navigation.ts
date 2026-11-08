@@ -100,6 +100,12 @@ export const PROFILE_NAV: NavGroup[] = [
       { id: 'advanced', labelKey: 'screens.settingsAdvanced', icon: 'sliders', tile: 'slate', route: '/(stack)/settings-advanced' },
     ],
   },
+  {
+    groupKey: 'settings.menu.help',
+    items: [
+      { id: 'help', labelKey: 'screens.help', icon: 'info', tile: 'blue', route: '/(stack)/help' },
+    ],
+  },
   // Dev-only: the per-screen mock/real backend toggle (#21). Discoverable in a
   // dev build without a code change; absent entirely from production.
   ...(__DEV__

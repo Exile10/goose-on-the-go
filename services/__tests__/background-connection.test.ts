@@ -4,7 +4,8 @@
  * checked without a device.
  */
 
-import { shouldHoldStream, shouldRunService } from '@/services/background-connection';
+import { BACKGROUND_MAX_BACKOFF_MS, loadStayConnectedPreference, maxBackoff, shouldHoldStream, shouldRunService } from '@/services/background-connection';
+import { Storage } from '@/services/storage';
 
 // Hoisted above the import: keeps expo-notifications, and its Expo Go warning, out of a pure test.
 jest.mock('@/services/local-notifications', () => ({ presentLocally: jest.fn() }));
@@ -45,5 +46,30 @@ describe('shouldHoldStream', () => {
   it('never holds it without a pairing', () => {
     expect(shouldHoldStream({ ...android, paired: false, active: true })).toBe(false);
     expect(shouldHoldStream({ ...android, paired: false, active: false })).toBe(false);
+  });
+});
+
+describe('the Stay connected setting', () => {
+  afterEach(() => jest.restoreAllMocks());
+
+  it('starts off on a phone that never chose, so no service drains the battery', async () => {
+    jest.spyOn(Storage, 'get').mockResolvedValue(null);
+    expect(await loadStayConnectedPreference()).toBe(false);
+  });
+
+  it('keeps the choice of a phone that turned it on', async () => {
+    jest.spyOn(Storage, 'get').mockResolvedValue('1');
+    expect(await loadStayConnectedPreference()).toBe(true);
+  });
+});
+
+describe('maxBackoff', () => {
+  it('retries within 30 s while the app is open', () => {
+    expect(maxBackoff('active')).toBe(30_000);
+  });
+
+  it('waits up to five minutes in the background, where each try wakes the radio', () => {
+    expect(maxBackoff('background')).toBe(BACKGROUND_MAX_BACKOFF_MS);
+    expect(maxBackoff(null)).toBe(BACKGROUND_MAX_BACKOFF_MS);
   });
 });
