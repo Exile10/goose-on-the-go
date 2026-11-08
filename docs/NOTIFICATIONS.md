@@ -114,8 +114,11 @@ wake: "1" }`, with no title or body. Nothing readable transits Google or Apple; 
 
 ## Stay connected in the background (Android)
 
-Settings, This phone, Notifications: **Stay connected in the background**, on by default. Stored
-on the phone (`Storage` key `stayConnected`), not on the Pond.
+Settings, This phone, Notifications: **Stay connected in the background**, off by default. Stored
+on the phone (`Storage` key `stayConnected`), not on the Pond. It was on by default until
+2026-11, and holding the stream open all day was the largest drain on Android batteries the app
+had; a phone that never chose keeps it off, and one that turned it on keeps its choice. With it
+off, the push wake-up delivers, sometimes later while the phone is idle.
 
 While it is on and the phone is paired, `NotificationsProvider` starts `PondPresenceService`
 (`plugins/pond-presence/PondPresence.kt`, wired by `plugins/with-pond-presence.js`): an Android
