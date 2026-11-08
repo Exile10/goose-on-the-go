@@ -280,7 +280,11 @@ function openTapped(Notifications: NotificationsModule, response: NotificationRe
   const route = openRouteFromData(data);
   if (!route) return;
   if (route.open !== 'conversation') {
-    router.push(screenPath(route));
+    const href = screenPath(route);
+    // A tab is gone back to, not pushed: pushing one from a stack screen stacked a second tab bar
+    // into the history, and back then walked through both.
+    if (typeof href === 'string' && href.startsWith('/(tabs)/')) router.navigate(href);
+    else router.push(href);
     return;
   }
   void conversationOrWall(route).then((opened) => router.push(screenPath(opened)));

@@ -3,6 +3,7 @@
 import React, { useCallback } from 'react';
 import { Pressable, RefreshControl, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
+import { usePreventRemove } from '@react-navigation/native';
 import { InkButton, InkSpinner, useInkTheme } from '@jarida/ink/native';
 
 import { AdminLockView } from '@/components/pond/admin-lock';
@@ -109,6 +110,13 @@ export default function PondFilesScreen() {
   const styles = useSettingsStyles(makeStyles);
   const colors = useSettingsColors();
   const { gate, path, crumbs, entries, total, loading, failed, error, notice, removing, actions } = usePondFiles();
+
+  // A folder is opened in place, so it is not in the stack's history: back, from the header or
+  // the phone, steps up one folder, and only leaves Files from the data directory itself.
+  usePreventRemove(path !== '' && gate.phase === 'unlocked', () => {
+    void selectionTick();
+    actions.up();
+  });
 
   const open = useCallback(
     (entry: AdminFileEntry) => {
