@@ -308,13 +308,15 @@ until this phone is unlocked with the Pond's administrator card.
   and a Pond that predates My Pond (404, 405 or 501 on the status, after which it stops asking).
 - **This phone's key** (`services/kept-admin-key.ts`). After the card opens My Pond, the phone asks
   the Pond for a key of its own (`POST /admin/enroll`, which replaces any older one) and keeps it
-  in the keychain behind its Face ID or fingerprint (`requireAuthentication`,
-  `WHEN_PASSCODE_SET_THIS_DEVICE_ONLY`), unless the form's "next time" switch is off or the phone
+  behind the phone's own check: the iOS keychain with Face ID or a fingerprint
+  (`requireAuthentication`, `WHEN_PASSCODE_SET_THIS_DEVICE_ONLY`), or on Android a Keystore-sealed
+  copy that a fingerprint or the screen lock opens (`plugins/pond-keyguard/PondKeyguard.kt`; a
+  Galaxy's face unlock is Class 2, which the Keystore never accepts), unless the form's "next time" switch is off or the phone
   has no biometrics; the web never keeps one. Owner setup keeps the key `/onboard/complete` gives
   the phone that claimed the Pond, and Home's getting-ready card says so. A non-secret AsyncStorage
   marker names the Pond (its pin), so the app knows a key is kept without a prompt; Android asks
   on every read of the key itself. With a key kept, the lock leads with "Unlock with Face ID or
-  fingerprint" (`POST /admin/unlock {key}`), asks once by itself on each arrival, and keeps the
+  fingerprint" ("fingerprint or the phone's PIN" on Android) (`POST /admin/unlock {key}`), asks once by itself on each arrival, and keeps the
   card a tap away. A Pond with no card still opens to a key. A cancel leaves the lock as it was;
   a key the phone can no longer read (a new face or finger invalidates it) or the Pond rejects
   (`admin_key_rejected`) is forgotten, with a line saying to type the card. A status whose `key`

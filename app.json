@@ -140,6 +140,7 @@
       ],
       "./plugins/with-pond-ble",
       "./plugins/with-pond-presence",
+      "./plugins/with-pond-keyguard",
       "./plugins/with-release-signing",
       "./plugins/with-appearance-resync",
       "expo-asset"

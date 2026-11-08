@@ -36,10 +36,13 @@ not readable before the first unlock after a restart. Pairings saved before this
 next time the app saves the sign-in.
 
 `goose.adminKey` is kept apart from the table above, and only when the member keeps it: this
-phone's own key to My Pond, the Pond's administration. It is written with `requireAuthentication`
-and `WHEN_PASSCODE_SET_THIS_DEVICE_ONLY`, so it is read only after the phone's Face ID or
-fingerprint, never leaves in a backup or for another phone, and can no longer be read once the
-passcode is removed or a new face or finger is added. It goes nowhere but the paired Pond, and
+phone's own key to My Pond, the Pond's administration. On iOS it is written with
+`requireAuthentication` and `WHEN_PASSCODE_SET_THIS_DEVICE_ONLY`, so it is read only after Face ID
+or a fingerprint. On Android it is sealed by an AES-GCM key in the Android Keystore that opens, for
+one use at a time, only after a strong (Class 3) biometric or the phone's PIN, pattern or password
+(`plugins/pond-keyguard/PondKeyguard.kt`); only the sealed bytes are kept, in the app's own
+preferences. Either way it never leaves in a backup or for another phone, and can no longer be read
+once the screen lock is removed or a new face or finger is added. It goes nowhere but the paired Pond, and
 signing out forgets it.
 
 `installId` deserves a note for the forms, because "persistent identifier" is a category
