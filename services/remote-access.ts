@@ -38,6 +38,10 @@ type NativeStatus = { state: string; authUrl?: string; nodeKey?: string; machine
 let generation = 0;
 let busy = false;
 let pendingRecovery: { endpoint: string; id: string } | null = null;
+/** The node `restoreRemoteAccess` last started, so a pause knows what to start again. */
+let restored: { profileId: string; control: string } | null = null;
+/** Whether the node is stopped because the app left the foreground. Any restore clears it. */
+let paused = false;
 async function cancelPendingRecovery(): Promise<void> {
   const pending = pendingRecovery; pendingRecovery = null;
   if (pending) await api.requestLocal(pending.endpoint, `/api/v1/remote-access/recovery/${pending.id}`, { method: 'DELETE' })
@@ -64,6 +68,9 @@ export async function cancelRemoteAccess(): Promise<void> {
 }
 export async function disableRemoteAccess(): Promise<void> {
   generation++;
+  // Turned off, it is no node to start again for a wake-up.
+  restored = null;
+  paused = false;
   await cancelPendingRecovery();
   await native().disableRemote();
 }
@@ -306,10 +313,49 @@ export async function remoteNodeRunning(abandoned: () => boolean): Promise<boole
 /** Restore transport before trust, credentials, health checks, or notification streams. */
 export async function restoreRemoteAccess(profileId: string, control: string): Promise<void> {
   generation++;
+  paused = false;
   await cancelPendingRecovery();
   if (!NativeModules.PondTls?.activateRemote) {
     if (control) throw new Error(i18n.t('remote.unsupported'));
     return;
   }
   await NativeModules.PondTls.activateRemote(profileId, control);
+  restored = control ? { profileId, control } : null;
+}
+
+/**
+ * Stop this phone's node while the app is in the background. On Android the node runs under a
+ * foreground service of its own, and held all day it kept the radio and processor awake whether or
+ * not anything was asked of the Pond. The pairing and the node's identity stay: `resumeRemoteAccess`
+ * starts it again when the app returns, and `resumePausedRemoteAccess` for a push wake-up.
+ *
+ * Not during an enrollment, which is driving the node itself, and not on a build whose bridge has
+ * no pause: iOS suspends the whole app in the background, node included. Never throws.
+ */
+export async function pauseRemoteAccess(): Promise<boolean> {
+  const bridge = NativeModules.PondTls;
+  if (busy || paused || !restored || !bridge?.pauseRemote) return false;
+  try {
+    await bridge.pauseRemote();
+    paused = true;
+    return true;
+  } catch {
+    console.warn('[remote] node could not be paused for the background; it keeps running');
+    return false;
+  }
+}
+
+/**
+ * Start a node paused for the background and wait until it runs, so a push wake-up can reach a Pond
+ * away from home. Resolves false when nothing was paused or it did not start. Never throws.
+ */
+export async function resumePausedRemoteAccess(): Promise<boolean> {
+  if (!paused || !restored) return false;
+  try {
+    await restoreRemoteAccess(restored.profileId, restored.control);
+  } catch {
+    console.warn('[remote] paused node could not be started for a wake-up; trying local addresses');
+    return false;
+  }
+  return remoteNodeRunning(() => false);
 }

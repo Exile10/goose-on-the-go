@@ -68,6 +68,9 @@ object PondNetwork {
    * succeed again.
    */
   private fun announce(raw: String) {
+    // No node, no notice: a status read while the node is paused or stopped must not start the
+    // foreground service again with a notification for a connection that is not there.
+    if (runningProfile == null) return
     val state = try { JSONObject(raw).optString("state") } catch (error: Exception) { "" }
     val next = if (state == PondNetworkService.STATE_RUNNING) PondNetworkService.STATE_RUNNING
                else PondNetworkService.STATE_CONNECTING
@@ -299,6 +302,17 @@ object PondNetwork {
     val base = java.io.File(context.noBackupFilesDir, "pond-network")
     try { Mobile.prune(base.absolutePath, keep) }
     catch (error: Exception) { android.util.Log.w("PondNetwork", "superseded node identities were not all erased: ${error.message}") }
+  }
+  /**
+   * Stop the node while the app is in the background, keeping [activeProfile], so [activate]
+   * starts it again from the same identity. The foreground service goes with it: held all day,
+   * the node kept the radio and processor awake on its own. Only the node [activate]
+   * started is paused; an enrollment's node, staged and not yet active, is left alone.
+   */
+  @Synchronized fun pause() {
+    if (runningProfile == null || runningProfile != activeProfile) return
+    stopTransport()
+    PondTls.invalidateConnections()
   }
   @Synchronized fun cancel() {
     val active = activeProfile
