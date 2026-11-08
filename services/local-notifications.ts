@@ -26,6 +26,7 @@ import { router } from 'expo-router';
 
 import { api, ApiError } from './api-client';
 import i18n from './i18n';
+import { markdownToPlain } from './markdown';
 
 import { linkFromData, openRouteFromData, rideOfferFromData, screenPath, type OpenRoute } from './notification-link';
 import type { ServerNotification } from './notification-stream';
@@ -188,8 +189,9 @@ export async function presentLocally(notification: ServerNotification): Promise<
       // stream and a remote push replaces itself instead of duplicating.
       identifier: notification.id,
       content: {
-        title: notification.title,
-        body: notification.body,
+        // The Pond sends a schedule's answer as the model wrote it, markdown and all.
+        title: markdownToPlain(notification.title),
+        body: markdownToPlain(notification.body),
         // A link, a ride offer or a screen to open rides along, already checked, for the tap to act on.
         data: {
           id: notification.id,

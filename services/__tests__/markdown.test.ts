@@ -1,4 +1,4 @@
-import { decodeEntities, htmlAsText, isMapLink, parseReply, webLink, type Tokens } from '../markdown';
+import { decodeEntities, htmlAsText, isMapLink, markdownToPlain, parseReply, webLink, type Tokens } from '../markdown';
 
 describe('parseReply', () => {
   it('reads a fence still being streamed as code to the end, not as prose', () => {
@@ -59,5 +59,30 @@ describe('htmlAsText', () => {
   it('keeps HTML as its own text, and only a line break as a break', () => {
     expect(htmlAsText('<script>alert(1)</script>')).toBe('<script>alert(1)</script>');
     expect(htmlAsText('<br/>')).toBe('\n');
+  });
+});
+
+describe('markdownToPlain', () => {
+  it('takes the emphasis out of a schedule answer and keeps its lines', () => {
+    const brief = '**Weather**\nThe current weather in Nairobi is *overcast*.\n\n**Calendar**\nNothing today.';
+    expect(markdownToPlain(brief)).toBe(
+      'Weather\nThe current weather in Nairobi is overcast.\nCalendar\nNothing today.',
+    );
+  });
+
+  it('keeps a list numbered and bulleted, without its asterisks', () => {
+    const results = 'Arsenal played two matches:\n1. **Sunday, November 1:** won 1-0\n2. **Wednesday:** won 2-1\n\n- one\n- two';
+    expect(markdownToPlain(results)).toBe(
+      'Arsenal played two matches:\n1. Sunday, November 1: won 1-0\n2. Wednesday: won 2-1\n• one\n• two',
+    );
+  });
+
+  it('keeps a heading and a link as their words and leaves plain text alone', () => {
+    expect(markdownToPlain('## Top news\nRead [the story](https://example.com) &amp; more')).toBe(
+      'Top news\nRead the story & more',
+    );
+    expect(markdownToPlain('Notices from your Pond arrive here straight away.')).toBe(
+      'Notices from your Pond arrive here straight away.',
+    );
   });
 });

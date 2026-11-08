@@ -167,6 +167,21 @@ describe('presentLocally', () => {
     expect(request.identifier).toBe('reply-r1');
     expect(request.content.data).toEqual({ id: 'reply-r1', category: 'reply', open: 'conversation', session_id: 's-1' });
   });
+  it('shows a schedule answer as plain words, however the model marked it up', async () => {
+    mockSchedule.mockClear();
+    await presentLocally({
+      id: 'n-md',
+      target: 'broadcast',
+      category: 'update',
+      title: 'Schedule: Daily Brief',
+      body: '**Weather**\nOvercast, *fifteen* degrees.\n1. **Sunday:** won',
+      timestamp: '2026-11-06T08:31:00Z',
+    });
+    const { title, body } = mockSchedule.mock.calls[0][0].content;
+    expect(title).toBe('Schedule: Daily Brief');
+    expect(body).toBe('Weather\nOvercast, fifteen degrees.\n1. Sunday: won');
+  });
+
   /** The shade keeps the Pond's own hint, so the tap reads back a value it accepts. */
   it('stores the remote access hint as the Pond sent it, and drops one it does not know', async () => {
     mockSchedule.mockClear();
