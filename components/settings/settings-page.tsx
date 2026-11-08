@@ -41,6 +41,7 @@ import {
 import { SettingsGroup, SettingsHeader, SettingsRow, TILE_INSET, SettingsMessage } from './settings-list';
 import {
   LocationRows,
+  PhoneAssistantRow,
   PostureRow,
   PrimaryProfileRow,
   ProviderRow,
@@ -256,6 +257,8 @@ function specialRows(id: SpecialId, ctx: Context): ReactElement[] {
       return [
         <SwitchRow key={id} label={t('settings.stayConnected.label')} value={ctx.stayConnected.on} onChange={ctx.stayConnected.set} />,
       ];
+    case 'phoneAssistant':
+      return [<PhoneAssistantRow key={id} />];
     case 'replyNotices':
       return [
         <SwitchRow

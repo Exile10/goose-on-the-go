@@ -106,7 +106,8 @@ export type SpecialId =
   | 'visionEventTypes'
   | 'debugScreen'
   | 'stayConnected'
-  | 'replyNotices';
+  | 'replyNotices'
+  | 'phoneAssistant';
 
 export type SliderFormat = 'pace' | 'creativity' | 'fraction';
 

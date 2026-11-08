@@ -119,12 +119,6 @@
       ],
       "expo-localization",
       [
-        "expo-audio",
-        {
-          "microphonePermission": "Goose On The Go uses the microphone when you talk to Goose. What you say goes to your own Pond, nowhere else."
-        }
-      ],
-      [
         "expo-image-picker",
         {
           "photosPermission": "Goose On The Go opens your photos so you can choose pictures to send to Goose.",
@@ -140,6 +134,7 @@
       ],
       "./plugins/with-pond-ble",
       "./plugins/with-pond-presence",
+      "./plugins/with-pond-assist",
       "./plugins/with-pond-keyguard",
       "./plugins/with-release-signing",
       "./plugins/with-appearance-resync",

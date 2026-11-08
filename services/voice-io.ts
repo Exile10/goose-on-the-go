@@ -172,9 +172,17 @@ export interface MicPermission {
   canAskAgain: boolean;
 }
 
-/** Ask for the microphone. Refused, or no audio module at all, is not granted. */
+/**
+ * Ask for the microphone. Refused, or no audio module at all, is not granted.
+ *
+ * A permission already held is read, not asked for. Asking goes through the app's foreground
+ * activity, and the assist overlay is a second activity: opened while the app's own screen sat
+ * stopped behind it, the request waited on that screen and the overlay never listened.
+ */
 export async function requestMicrophone(): Promise<MicPermission> {
   if (!audio) return { granted: false, canAskAgain: false };
+  const held = await audio.getRecordingPermissionsAsync();
+  if (held.granted) return { granted: true, canAskAgain: held.canAskAgain };
   const permission = await audio.requestRecordingPermissionsAsync();
   return { granted: permission.granted, canAskAgain: permission.canAskAgain };
 }

@@ -717,7 +717,8 @@
       "watchesFor": "What your Pond watches for",
       "faces": "Faces",
       "inTheRoom": "In this room",
-      "whisperDetector": "Whisper detector"
+      "whisperDetector": "Whisper detector",
+      "phoneAssistant": "On this phone"
     },
     "footer": {
       "standingInstructions": "Added to everything Goose already knows, in every conversation.",
@@ -1605,6 +1606,15 @@
     "stayConnected": {
       "label": "Stay connected in the background",
       "ios": "iPhone does not let apps hold a connection open in the background. Your Pond wakes this phone with a push instead, and iOS decides how soon that arrives."
+    },
+    "phoneAssistant": {
+      "label": "Use Goose as this phone's assistant",
+      "howTo": "Then hold the side key, or swipe up from a bottom corner, to talk to Goose over any app; on Samsung, the Side button setting must say Digital assistant.",
+      "isGoose": "Goose",
+      "notGoose": "Another app",
+      "openFailed": "This phone did not open its assistant settings. Choose Goose in Settings > Apps > Default apps > Digital assistant app.",
+      "needsUpdate": "Being the phone's assistant needs the newest build of the app.",
+      "ios": "iPhone does not let another app take Siri's place."
     }
   },
   "screens": {
@@ -4569,5 +4579,11 @@
       "runHeard": "The “hey goose” detector heard {{heard}} of these {{of}} sentences.",
       "listensHeyGoose": "Your Pond listens for “hey goose” with its own detector."
     }
+  },
+  "assist": {
+    "close": "Close Goose",
+    "connecting": "Reaching your Pond",
+    "unreachable": "Goose cannot reach your Pond from here. Open the app to pair this phone or check its connection.",
+    "openApp": "Open Goose On The Go"
   }
 }

@@ -3,7 +3,7 @@
  */
 
 import React, { useCallback, useState } from 'react';
-import { Pressable, Text } from 'react-native';
+import { Platform, Pressable, Text } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
@@ -32,8 +32,9 @@ import {
   voiceLanguageKey,
 } from '@/view-models/use-settings-extras';
 import type { UsePondSettings } from '@/view-models/use-pond-settings';
+import { usePhoneAssistant } from '@/view-models/use-phone-assistant';
 import { MenuRow, TextRow } from './setting-controls';
-import { RowSeparator, SettingsRow } from './settings-list';
+import { RowSeparator, SettingsMessage, SettingsRow } from './settings-list';
 import { useSettingsColors, useSettingsStyles, type SettingsColors, type SettingsMetrics, type SettingsType } from './settings-theme';
 
 export interface SpecialProps {
@@ -322,3 +323,32 @@ const makeStyles = (c: SettingsColors, type: SettingsType, m: SettingsMetrics) =
   inlineAction: type.label,
   posture: { ...type.body, paddingHorizontal: m.rowH, paddingVertical: m.rowV },
 });
+
+/**
+ * Goose as this phone's assistant: whether it is, and the way to Android's own screen to choose it.
+ * Android makes the choice, so the row opens that screen rather than flipping a switch.
+ */
+export function PhoneAssistantRow() {
+  const { t } = useTranslation();
+  const { data, actions } = usePhoneAssistant();
+  if (!data.supported) {
+    return (
+      <SettingsMessage>
+        {t(Platform.OS === 'android' ? 'settings.phoneAssistant.needsUpdate' : 'settings.phoneAssistant.ios')}
+      </SettingsMessage>
+    );
+  }
+  return (
+    <SettingsRow
+      label={t('settings.phoneAssistant.label')}
+      description={t('settings.phoneAssistant.howTo')}
+      value={data.held === null ? null : t(data.held ? 'settings.phoneAssistant.isGoose' : 'settings.phoneAssistant.notGoose')}
+      error={data.error}
+      accessory="next"
+      onPress={() => {
+        void selectionTick();
+        void actions.choose();
+      }}
+    />
+  );
+}
