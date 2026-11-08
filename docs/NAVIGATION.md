@@ -66,6 +66,7 @@ at the top leads to `ACCOUNT_ROUTE`, You and your household. Labels are
 | Records | Memories, Conversations, Activity, Schedule |
 | This phone | Appearance, and Haptic feedback as a switch on the row |
 | Advanced | Advanced |
+| Help | Help & Feedback: a guide to common problems, and email to support (#249) |
 | Developer | Developer mode (dev builds only, #21) |
 
 ### Settings pages

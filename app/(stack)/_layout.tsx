@@ -110,6 +110,7 @@ export default function StackLayout() {
       <Stack.Screen name="settings-appearance" options={{ title: t('screens.settingsAppearance') }} />
       <Stack.Screen name="settings-phone-notifications" options={{ title: t('screens.settingsPhoneNotifications') }} />
       <Stack.Screen name="settings-advanced" options={{ title: t('screens.settingsAdvanced') }} />
+      <Stack.Screen name="help" options={{ title: t('screens.help') }} />
       <Stack.Screen name="models" options={{ title: t('screens.models') }} />
       <Stack.Screen name="settings-model-role" options={{ title: t('screens.settingsModelRole') }} />
       <Stack.Screen name="settings-model" options={{ title: t('screens.settingsModel') }} />
