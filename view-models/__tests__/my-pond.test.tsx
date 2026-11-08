@@ -396,6 +396,25 @@ describe('deleting a file', () => {
     expect(m.vm.entries).toHaveLength(2);
     await m.unmount();
   });
+
+  it('steps up one folder at a time, which is what back does in Files', async () => {
+    pond.adminStatus.mockResolvedValue(OPEN);
+    const m = await mount(usePondFiles);
+    pond.adminFiles.mockResolvedValue({ path: 'engine/kv', entries: [] });
+    await act(async () => m.vm.actions.goTo('engine/kv'));
+    await flush();
+    pond.adminFiles.mockResolvedValue({ path: 'engine', entries: [] });
+    await act(async () => m.vm.actions.up());
+    await flush();
+    expect(pond.adminFiles).toHaveBeenLastCalledWith('engine');
+    expect(m.vm.path).toBe('engine');
+    pond.adminFiles.mockResolvedValue(ROOT);
+    await act(async () => m.vm.actions.up());
+    await flush();
+    expect(pond.adminFiles).toHaveBeenLastCalledWith('');
+    expect(m.vm.path).toBe('');
+    await m.unmount();
+  });
 });
 
 describe('restarting', () => {
