@@ -3103,7 +3103,7 @@
       "readyTitle": "Goose is ready",
       "readyBody": "Your Pond has its model and can answer now.",
       "dismiss": "Dismiss",
-      "adminKey": "My Pond opens with your Face ID or fingerprint on this phone."
+      "adminKey": "My Pond opens with your {{unlockMethod}} on this phone."
     },
     "model": {
       "title": "Choose what Goose thinks with",
@@ -3926,20 +3926,22 @@
     },
     "key": {
       "title": "Open My Pond with this phone's security",
-      "body": "This phone keeps its own key to My Pond. It never leaves the phone, and only this phone's Face ID or fingerprint opens it.",
-      "unlock": "Unlock with Face ID or fingerprint",
+      "methodIos": "Face ID or fingerprint",
+      "methodAndroid": "fingerprint or the phone's PIN",
+      "body": "This phone keeps its own key to My Pond. It never leaves the phone, and only this phone's {{unlockMethod}} opens it.",
+      "unlock": "Unlock with {{unlockMethod}}",
       "useCard": "Use the admin card instead",
-      "remember": "Open My Pond with Face ID or fingerprint next time",
-      "awaitsPond": "Opening My Pond with Face ID or fingerprint needs an update on your Pond. Until then, it opens with the admin card.",
-      "kept": "Next time, My Pond opens with Face ID or fingerprint.",
+      "remember": "Open My Pond with {{unlockMethod}} next time",
+      "awaitsPond": "Opening My Pond with {{unlockMethod}} needs an update on your Pond. Until then, it opens with the admin card.",
+      "kept": "Next time, My Pond opens with {{unlockMethod}}.",
       "notKept": "My Pond is open, but this phone couldn't keep its key. Next time it asks for the admin card again.",
       "prompt": "Unlock My Pond",
       "savePrompt": "Keep a key to My Pond on this phone",
       "lost": "This phone can no longer read its key. That often happens after a new fingerprint or face is added. Type the admin card once more.",
       "rejected": "This phone's key no longer opens My Pond. Type the admin card to open it.",
-      "unreadable": "Face ID or fingerprint didn't open the key. Try again, or use the admin card.",
+      "unreadable": "The phone's check didn't open the key. Try again, or use the admin card.",
       "forget": "Forget My Pond on this phone",
-      "forgetHint": "My Pond opens here with Face ID or fingerprint.",
+      "forgetHint": "My Pond opens here with {{unlockMethod}}.",
       "forgetTitle": "Forget My Pond on this phone?",
       "forgetBody": "This phone's key is removed here and on the Pond, and My Pond locks. Next time, My Pond asks for the admin card.",
       "forgetConfirm": "Forget it"
