@@ -118,6 +118,7 @@ describe('openRouteFromData', () => {
     expect(openRouteFromData({ open: 'models', kind: 'disk_low' })).toEqual({ open: 'models' });
     expect(openRouteFromData({ open: 'extensions' })).toEqual({ open: 'extensions' });
     expect(openRouteFromData({ open: 'remote_access' })).toEqual({ open: 'remote_access' });
+    expect(openRouteFromData({ open: 'my_pond' })).toEqual({ open: 'my_pond' });
   });
 
   it('keeps the schedule screen but drops an id that is not a Pond id', () => {
@@ -162,6 +163,7 @@ describe('screenPath', () => {
     expect(screenPath({ open: 'models' })).toBe('/(stack)/models');
     expect(screenPath({ open: 'extensions' })).toBe('/(stack)/extensions');
     expect(screenPath({ open: 'remote_access' })).toBe('/(stack)/remote-access');
+    expect(screenPath({ open: 'my_pond' })).toBe('/(stack)/pond');
     expect(screenPath({ open: 'conversation', sessionId: 's-1' })).toEqual({
       pathname: '/conversation',
       params: { session: 's-1' },

@@ -74,6 +74,11 @@ describe('openTapped', () => {
     expect(mockPush.mock.calls).toEqual([['/(stack)/models'], ['/(stack)/extensions'], ['/(stack)/remote-access']]);
   });
 
+  it('opens My Pond for the notice that the Pond was unlocked, not Devices', () => {
+    tap({ open: 'my_pond' });
+    expect(mockPush.mock.calls).toEqual([['/(stack)/pond']]);
+  });
+
   it('opens nothing for a screen outside the allow-list, or no hint at all', () => {
     tap({ open: '/(stack)/developer' });
     tap({ open: 'storage' });

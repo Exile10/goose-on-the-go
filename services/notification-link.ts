@@ -92,14 +92,15 @@ export function rideOfferFromData(data: unknown): RideOffer | null {
  * `Notification.data` as `{ open: "schedule", schedule_id, run_id }`, as
  * `{ open: "chat", session_id }` (the conversation a long task was started from,
  * or a reminder was heard in; `session_id` is left out when there is none), or as
- * `{ open: "devices" }`, `"models"`, `"extensions"` or `"remote_access"` (the
+ * `{ open: "devices" }`, `"models"`, `"extensions"`, `"remote_access"` or
+ * `"my_pond"` (the
  * Pond's `OpenScreen` in pond-core's `mcp/ports/notification.rs`; the contract
  * is "Route hints" in the Pond's `docs/architecture/notifications.md`). The
  * phone's own notice that a reply finished names
  * `{ open: "conversation", session_id }`, and a Pond `chat` hint with a
  * conversation becomes the same route.
  *
- * Only these seven screens are accepted, and only ids of the shape the Pond
+ * Only these eight screens are accepted, and only ids of the shape the Pond
  * mints, so a notification can open one of them and nothing else. An older Pond
  * sends no `open`, and the tap opens the app where it was, as before; a value
  * this app does not know does the same.
@@ -111,6 +112,7 @@ export type OpenRoute =
   | { open: 'models' }
   | { open: 'extensions' }
   | { open: 'remote_access' }
+  | { open: 'my_pond' }
   | { open: 'conversation'; sessionId: string };
 
 /** A Pond id: a UUID, optionally prefixed (`timer-...`). Nothing that could be a path. */
@@ -150,6 +152,8 @@ export function openRouteFromData(data: unknown): OpenRoute | null {
       return { open: 'extensions' };
     case 'remote_access':
       return { open: 'remote_access' };
+    case 'my_pond':
+      return { open: 'my_pond' };
     case 'conversation': {
       // Without a conversation it can open, the wall is still where it was about.
       const sessionId = pondId(data.session_id);
@@ -169,6 +173,7 @@ type ScreenHref =
   | '/(stack)/models'
   | '/(stack)/extensions'
   | '/(stack)/remote-access'
+  | '/(stack)/pond'
   | { pathname: '/conversation'; params: { session: string } };
 
 /**
@@ -193,6 +198,8 @@ export function screenPath(route: OpenRoute): ScreenHref {
       return '/(stack)/extensions';
     case 'remote_access':
       return '/(stack)/remote-access';
+    case 'my_pond':
+      return '/(stack)/pond';
     case 'conversation':
       return { pathname: '/conversation', params: { session: route.sessionId } };
   }
