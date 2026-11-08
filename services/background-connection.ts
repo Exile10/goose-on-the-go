@@ -50,10 +50,12 @@ export function shouldHoldStream({ active, ...inputs }: PresenceInputs & { activ
 
 // --- The setting -----------------------------------------------------------
 
-let enabled = true;
+// Off unless chosen. Held open, the stream keeps a foreground service, the JavaScript runtime and
+// a socket awake all day, and that drained Android batteries; the push wake-up delivers without it.
+let enabled = false;
 const settingListeners = new Set<(on: boolean) => void>();
 
-/** The remembered choice. Nothing stored means on. */
+/** The remembered choice. Nothing stored means off. */
 export function stayConnectedEnabled(): boolean {
   return enabled;
 }
