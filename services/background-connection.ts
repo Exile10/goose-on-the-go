@@ -18,12 +18,12 @@
  * open, and background delivery is the push wake-up alone.
  */
 
-import { NativeModules, Platform } from 'react-native';
+import { AppState, NativeModules, Platform } from 'react-native';
 
 import i18n from './i18n';
 import { api } from './api-client';
 import { deliver, deliverAndAcknowledge } from './notification-delivery';
-import { NotificationStream, type ServerNotification } from './notification-stream';
+import { MAX_BACKOFF_MS, NotificationStream, type ServerNotification } from './notification-stream';
 import { Storage } from './storage';
 
 /** The inputs to the service decision; plain values so the rule can be tested on its own. */
@@ -46,6 +46,19 @@ export function shouldRunService({ platform, paired, enabled }: PresenceInputs):
  */
 export function shouldHoldStream({ active, ...inputs }: PresenceInputs & { active: boolean }): boolean {
   return inputs.paired && (active || shouldRunService(inputs));
+}
+
+/**
+ * Five minutes: how long a stream held in the background waits between tries once its backoff has
+ * grown. A Pond out of reach -- the phone away from home with no remote access -- was retried every
+ * 30 s all day, each try waking the radio. The app restarts the stream when it returns to the
+ * foreground, so the longer wait never delays a person looking at it.
+ */
+export const BACKGROUND_MAX_BACKOFF_MS = 300_000;
+
+/** The longest wait between reconnects: the usual 30 s in the foreground, five minutes away from it. */
+export function maxBackoff(appState: string | null): number {
+  return appState === 'active' ? MAX_BACKOFF_MS : BACKGROUND_MAX_BACKOFF_MS;
 }
 
 // --- The setting -----------------------------------------------------------
@@ -239,6 +252,7 @@ export function connectLink(target: LinkTarget): void {
   if (linkState !== 'connected') setLinkState('connecting');
   const opened = new NotificationStream({
     ...target,
+    maxBackoffMs: () => maxBackoff(AppState.currentState),
     onConnect: () => { if (stream === opened) setLinkState('connected'); },
     onDisconnect: () => {
       if (stream === opened) setLinkState('unreachable');

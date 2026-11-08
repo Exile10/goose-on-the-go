@@ -15,7 +15,8 @@ import { isInsecureDevOrigin } from '@/models/connection';
  *
  * React Native's `fetch` cannot stream response bodies, so this parses SSE
  * frames incrementally off `XMLHttpRequest.onprogress` — no added dependency.
- * Reconnects with exponential backoff, from 1 s and capped at 30 s, until
+ * Reconnects with exponential backoff, from 1 s and capped at 30 s (or the owner's
+ * `maxBackoffMs`), until
  * `stop()` is called or the Pond answers 401. A 401 stops the stream and hands
  * the token back through `onAuthFailure`. A 403 is a refusal to serve the stream
  * yet, such as before onboarding completes, not a dead token, and is retried.
@@ -51,10 +52,15 @@ interface StreamOptions {
    * stopped and will not retry: only a fresh token can recover it.
    */
   onAuthFailure?: () => void;
+  /**
+   * The longest wait between reconnects, asked at each drop so it can follow the app in and out
+   * of the foreground. Leave it out for the usual 30 s.
+   */
+  maxBackoffMs?: () => number;
 }
 
 const INITIAL_BACKOFF_MS = 1_000;
-const MAX_BACKOFF_MS = 30_000;
+export const MAX_BACKOFF_MS = 30_000;
 /** Ids remembered for dedupe; old entries are evicted FIFO. */
 const DEDUPE_CAPACITY = 200;
 
@@ -218,7 +224,7 @@ export class NotificationStream {
       this.reconnectTimer = null;
       if (generation === this.generation) void this.connect();
     }, this.backoffMs);
-    this.backoffMs = Math.min(this.backoffMs * 2, MAX_BACKOFF_MS);
+    this.backoffMs = Math.min(this.backoffMs * 2, this.opts.maxBackoffMs?.() ?? MAX_BACKOFF_MS);
   }
 
   private handleFrame(data: string): void {

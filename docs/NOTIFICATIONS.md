@@ -139,7 +139,9 @@ Lifecycle, as pure functions in `services/background-connection.ts` and tested t
 - The service is started only while the app is in the foreground. Android 12 and later refuse a
   foreground-service start from the background; the refusal is logged and the push wake-up covers
   delivery.
-- A dropped stream reconnects with its own backoff, 1 s doubling to 30 s. While the app is open the
+- A dropped stream reconnects with its own backoff, 1 s doubling to 30 s in the foreground and
+  to five minutes in the background (`maxBackoff`), so an unreachable Pond does not wake the radio
+  every 30 s all day. While the app is open the
   provider also asks the connection manager to look for a better endpoint; while it is not, the
   stream keeps retrying the endpoint it had, and the next foreground pass re-selects. A 401 with no
   provider mounted stops the stream, since nothing there can refresh the token; the wake-up

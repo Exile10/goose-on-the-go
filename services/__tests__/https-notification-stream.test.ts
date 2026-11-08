@@ -133,3 +133,32 @@ it('reports a connection on the first read where no header event came', async ()
   expect(connected).toHaveBeenCalledTimes(1);
   stream.stop();
 });
+
+// Each drop doubles the wait from 1 s; the owner's cap decides where it stops. In the background the
+// app lets it grow to five minutes, so an unreachable Pond is not retried every 30 s all day.
+it('lets the owner cap the wait between reconnects, asked at each drop', async () => {
+  jest.useFakeTimers();
+  try {
+    const waitAfterSixDrops = async (cap?: () => number): Promise<{ at30: boolean; at32: boolean }> => {
+      FakeXHR.instances = [];
+      const stream = new NotificationStream({ baseUrl: 'https://pond.local:4443', token: 'secret', deviceId: 'phone', onNotification: jest.fn(), maxBackoffMs: cap });
+      stream.start(); await Promise.resolve();
+      const drop = async (waitMs: number) => {
+        FakeXHR.instances[FakeXHR.instances.length - 1].onload();
+        jest.advanceTimersByTime(waitMs); await Promise.resolve(); await Promise.resolve();
+      };
+      for (const wait of [1_000, 2_000, 4_000, 8_000, 16_000]) await drop(wait);
+      const before = FakeXHR.instances.length;
+      await drop(30_000);
+      const at30 = FakeXHR.instances.length > before;
+      jest.advanceTimersByTime(2_000); await Promise.resolve(); await Promise.resolve();
+      const at32 = FakeXHR.instances.length > before;
+      stream.stop();
+      return { at30, at32 };
+    };
+    expect(await waitAfterSixDrops()).toEqual({ at30: true, at32: true });
+    expect(await waitAfterSixDrops(() => 300_000)).toEqual({ at30: false, at32: true });
+  } finally {
+    jest.useRealTimers();
+  }
+});

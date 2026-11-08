@@ -4,7 +4,7 @@
  * checked without a device.
  */
 
-import { loadStayConnectedPreference, shouldHoldStream, shouldRunService } from '@/services/background-connection';
+import { BACKGROUND_MAX_BACKOFF_MS, loadStayConnectedPreference, maxBackoff, shouldHoldStream, shouldRunService } from '@/services/background-connection';
 import { Storage } from '@/services/storage';
 
 // Hoisted above the import: keeps expo-notifications, and its Expo Go warning, out of a pure test.
@@ -60,5 +60,16 @@ describe('the Stay connected setting', () => {
   it('keeps the choice of a phone that turned it on', async () => {
     jest.spyOn(Storage, 'get').mockResolvedValue('1');
     expect(await loadStayConnectedPreference()).toBe(true);
+  });
+});
+
+describe('maxBackoff', () => {
+  it('retries within 30 s while the app is open', () => {
+    expect(maxBackoff('active')).toBe(30_000);
+  });
+
+  it('waits up to five minutes in the background, where each try wakes the radio', () => {
+    expect(maxBackoff('background')).toBe(BACKGROUND_MAX_BACKOFF_MS);
+    expect(maxBackoff(null)).toBe(BACKGROUND_MAX_BACKOFF_MS);
   });
 });
