@@ -30,7 +30,8 @@ source. There is still no `expo-background-fetch`, `expo-calendar` or `expo-cont
 
 The only foreground service is remote access's `PondNetworkService` (type `connectedDevice`,
 declared by `plugins/with-pond-tls.js`), which holds network access for the tunnel and reads
-nothing from the phone.
+nothing from the phone. It runs only while the app is open, during a push wake-up, or while
+Stay connected in the background is on (`docs/PINNED_HTTPS.md`).
 
 The connection manager already knows how it reached the Pond: `services/connection-manager.ts`
 types a route as `'local' | 'remote'`, the home network or the embedded tailnet.

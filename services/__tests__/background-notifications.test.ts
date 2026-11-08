@@ -15,6 +15,14 @@ jest.mock('@/services/notification-wake', () => ({ handleWake: (...a: unknown[])
 jest.mock('@/services/notification-delivery', () => ({ alreadyDelivered: (id: string) => mockDelivered(id) }));
 jest.mock('@/services/pond-session', () => ({ ensurePondSession: jest.fn() }));
 jest.mock('@/services/api-client', () => ({ api: {} }));
+const mockResume = jest.fn();
+const mockPause = jest.fn();
+let mockStayConnected = false;
+jest.mock('@/services/remote-access', () => ({
+  resumePausedRemoteAccess: () => mockResume(),
+  pauseRemoteAccess: () => mockPause(),
+}));
+jest.mock('@/services/background-connection', () => ({ stayConnectedEnabled: () => mockStayConnected }));
 
 import type { NotificationsModule } from '@/services/notifications-module';
 import { defineWakeTask, WAKE_TASK } from '@/services/background-notifications';
@@ -35,6 +43,9 @@ beforeEach(() => {
   mockWake.mockReset().mockResolvedValue('unpaired');
   mockDelivered.mockReset().mockReturnValue(false);
   mockAppState = 'background';
+  mockResume.mockReset().mockResolvedValue(true);
+  mockPause.mockReset().mockResolvedValue(true);
+  mockStayConnected = false;
 });
 
 describe('defineWakeTask', () => {
@@ -106,5 +117,49 @@ describe('defineWakeTask', () => {
     await expect(task({ data: PING, error: new Error('no data') })).resolves.toBe(RESULT.Failed);
     expect(mockWake).not.toHaveBeenCalled();
     warn.mockRestore();
+  });
+});
+
+// The remote-access node is paused while the app is in the background, to save the battery. A wake-up
+// starts it so a Pond away from home can be reached, and pauses it again once the notice is shown.
+describe('the remote-access node during a wake-up', () => {
+  it('starts the paused node before reaching the Pond, and pauses it again after', async () => {
+    const order: string[] = [];
+    mockResume.mockImplementation(async () => { order.push('resume'); return true; });
+    mockWake.mockImplementation(async () => { order.push('wake'); return 'delivered'; });
+    mockPause.mockImplementation(async () => { order.push('pause'); return true; });
+    const { task } = define();
+    await expect(task({ data: PING })).resolves.toBe(RESULT.NewData);
+    expect(order).toEqual(['resume', 'wake', 'pause']);
+  });
+
+  it('pauses it again even when reaching the Pond fails', async () => {
+    mockWake.mockRejectedValue(new Error('unreachable'));
+    const { task } = define();
+    await expect(task({ data: PING })).rejects.toThrow('unreachable');
+    expect(mockPause).toHaveBeenCalledTimes(1);
+  });
+
+  it('leaves it running while Stay connected holds the stream open through it', async () => {
+    mockStayConnected = true;
+    mockWake.mockResolvedValue('delivered');
+    const { task } = define();
+    await task({ data: PING });
+    expect(mockPause).not.toHaveBeenCalled();
+  });
+
+  it('leaves it running once the app has come to the front', async () => {
+    mockWake.mockImplementation(async () => { mockAppState = 'active'; return 'delivered'; });
+    const { task } = define();
+    await task({ data: PING });
+    expect(mockPause).not.toHaveBeenCalled();
+  });
+
+  it('touches nothing while the app is open, where the stream delivers', async () => {
+    mockAppState = 'active';
+    const { task } = define();
+    await expect(task({ data: PING })).resolves.toBe(RESULT.NoData);
+    expect(mockResume).not.toHaveBeenCalled();
+    expect(mockPause).not.toHaveBeenCalled();
   });
 });

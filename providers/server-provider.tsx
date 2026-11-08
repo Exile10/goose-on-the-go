@@ -20,7 +20,8 @@ import { probePond as probe, trustPond as trust } from '@/services/pond-session'
 import { findPondAt, findPondByHost } from '@/services/discovery';
 import { parseConnectionProfile, validPin, isInsecureDevOrigin, isLocalPairingUrl, type ConnectionOutage, type ConnectionProfile } from '@/models/connection';
 import i18n from '@/services/i18n';
-import { cancelRemoteAccess, remoteNodeRunning, restoreRemoteAccess, resumeRemoteAccess } from '@/services/remote-access';
+import { stayConnectedEnabled } from '@/services/background-connection';
+import { cancelRemoteAccess, pauseRemoteAccess, remoteNodeRunning, restoreRemoteAccess, resumeRemoteAccess } from '@/services/remote-access';
 import { getInstallId } from '@/services/install-id';
 import { canBeat, HEARTBEAT_MS } from '@/services/heartbeat';
 
@@ -351,6 +352,8 @@ export function ServerProvider({ children }: PropsWithChildren) {
       if (staged.current) return;
       manager.environment(environment.current.cellular, environment.current.active);
       if (state === 'active') void resumeTransport();
+      // The background stream reaches a Pond away from home through the node, so it stays up for it.
+      else if (state === 'background' && !stayConnectedEnabled()) void pauseRemoteAccess();
     });
     api.setRecovery(manager.recover);
     api.setAuthRevoked(() => {
