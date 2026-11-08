@@ -8,6 +8,7 @@ import { Linking } from 'react-native';
 import { presentLocally, watchLinkTaps } from '@/services/local-notifications';
 
 const mockPush = jest.fn();
+const mockNavigate = jest.fn();
 const mockSchedule = jest.fn().mockResolvedValue('id');
 const mockSessionMessages = jest.fn().mockResolvedValue([]);
 jest.mock('@/services/api-client', () => {
@@ -22,7 +23,12 @@ jest.mock('@/services/api-client', () => {
 });
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { ApiError: MockApiError } = require('@/services/api-client');
-jest.mock('expo-router', () => ({ router: { push: (...args: unknown[]) => mockPush(...args) } }));
+jest.mock('expo-router', () => ({
+  router: {
+    push: (...args: unknown[]) => mockPush(...args),
+    navigate: (...args: unknown[]) => mockNavigate(...args),
+  },
+}));
 
 let mockListener: ((response: unknown) => void) | null = null;
 jest.mock('@/services/notifications-module', () => ({
@@ -52,6 +58,7 @@ describe('openTapped', () => {
   let stop: () => void;
   beforeEach(() => {
     mockPush.mockClear();
+    mockNavigate.mockClear();
     stop = watchLinkTaps();
   });
   afterEach(() => stop());
@@ -64,7 +71,9 @@ describe('openTapped', () => {
   it('opens the devices tab and the chat tab', () => {
     tap({ open: 'devices' });
     tap({ open: 'chat', proposal_id: 'p-1' });
-    expect(mockPush.mock.calls).toEqual([['/(tabs)/devices'], ['/(tabs)/chat']]);
+    // A tab is gone back to rather than pushed, so the history holds one tab bar.
+    expect(mockNavigate.mock.calls).toEqual([['/(tabs)/devices'], ['/(tabs)/chat']]);
+    expect(mockPush).not.toHaveBeenCalled();
   });
 
   it('opens the models, extensions and remote access screens', () => {
@@ -131,7 +140,7 @@ describe('openTapped', () => {
   it('acts on one tap once, however many times it is delivered', () => {
     tap({ open: 'devices' }, 'same');
     tap({ open: 'devices' }, 'same');
-    expect(mockPush).toHaveBeenCalledTimes(1);
+    expect(mockNavigate).toHaveBeenCalledTimes(1);
   });
 });
 
