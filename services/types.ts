@@ -1298,6 +1298,10 @@ export interface WeatherResponse {
   enabled: boolean;
   temp?: number;
   location_name?: string;
+  /** The condition, in English from the WMO list (`pond-adapters-weather/src/wmo.rs`). */
+  cond?: string;
+  /** Day or night where the Pond is; absent from a Pond older than this field. */
+  is_day?: boolean;
 }
 
 /**

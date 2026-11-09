@@ -128,7 +128,7 @@ export function readWeatherCard(data: Data): WeatherCard | null {
  * fixed list (the WMO weather codes, `pond-adapters-weather/src/wmo.rs`)
  * whatever the phone's language, so they are matched as words. Anything not
  * recognised is a plain cloud, the sky that claims least, as the dashboard
- * does.
+ * does. A clear or partly cloudy night is the moon, alone or behind a cloud.
  */
 export function conditionIcon(condition: string, isDay: boolean | null = null): IconName {
   const c = condition.toLowerCase();
@@ -138,7 +138,7 @@ export function conditionIcon(condition: string, isDay: boolean | null = null): 
   if (c.includes('rain') || c.includes('shower')) return 'rain';
   if (c.includes('fog')) return 'fog';
   if (c.includes('overcast')) return 'cloud';
-  if (c.includes('partly')) return isDay === false ? 'cloud' : 'partly-sunny';
+  if (c.includes('partly')) return isDay === false ? 'partly-night' : 'partly-sunny';
   if (c.includes('clear')) return isDay === false ? 'moon' : 'sun';
   return 'cloud';
 }

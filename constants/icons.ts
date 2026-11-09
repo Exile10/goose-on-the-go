@@ -13,7 +13,7 @@
 import {
   Activity, Archive, ArrowDown, ArrowRight, AudioLines, Bell, Bluetooth, Bot, Boxes, Brain, Calendar, Camera,
   Check, ChevronDown, ChevronLeft, ChevronRight, ChevronsUpDown, CircleAlert, CircleCheck, Clock, Cloud, CloudAlert, CloudDrizzle,
-  CloudFog, CloudLightning, CloudOff, CloudRain, CloudSnow, CloudSun, Copy, Cpu, Download, Droplet,
+  CloudFog, CloudLightning, CloudMoon, CloudOff, CloudRain, CloudSnow, CloudSun, Copy, Cpu, Download, Droplet,
   Ear, Eye, EyeOff, FileText, HardDrive, Info, Palette, SlidersHorizontal,
   Ellipsis, ExternalLink, File, Filter, Folder, Frame, Globe, GripVertical, House, Image,
   Key, Keyboard, Lightbulb, Link, ListFilter, Lock, LockOpen, MapPin, MessageCircle, MessageSquareText, Mic, Minus,
@@ -94,6 +94,8 @@ export const ICONS = {
   package: Package,
   palette: Palette,
   'partly-sunny': CloudSun,
+  /** A partly cloudy night: the moon behind a cloud, as the dashboard draws it. */
+  'partly-night': CloudMoon,
   pause: Pause,
   photo: Image,
   pin: MapPin,
