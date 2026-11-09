@@ -10,6 +10,7 @@ import { bytesToBase64, type Attachment } from '@/services/media';
 import type { SessionMessage } from '@/services/types';
 import { describeTurnError, fromHistory, streamBody } from '@/view-models/use-chat';
 import { voiceNoteReadiness } from '@/view-models/use-chat-senses';
+import { spokenClip } from '@/view-models/use-voice';
 
 jest.mock('@/services/pond-trust', () => ({ assertPondTrust: jest.fn().mockResolvedValue(undefined) }));
 
@@ -28,6 +29,19 @@ const note: Attachment = {
 function row(content: string, role: SessionMessage['role'] = 'user'): SessionMessage {
   return { id: `m-${content.length}`, session_id: 's1', role, content, created_at: '2026-11-07T10:00:00Z' } as SessionMessage;
 }
+
+describe('a spoken turn in voice mode', () => {
+  it('sends the recording with the words beside it, never as the message', () => {
+    const clip = spokenClip('what time is it', new Uint8Array([82, 73, 70, 70]), 1200);
+    expect(streamBody('what time is it', [clip], { voice: true }, 's1')).toEqual({
+      message: '',
+      session_id: 's1',
+      audio: [{ data: 'UklGRg==', mime_type: 'audio/wav', heard_as: 'what time is it' }],
+      voice_mode: true,
+      resumable: true,
+    });
+  });
+});
 
 describe('the turn a voice note goes in', () => {
   it('carries the recording itself and no words', () => {
