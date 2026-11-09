@@ -22,6 +22,8 @@ import {
   Router, Settings, Shield, Siren, Sparkles, Speaker, Square, SquarePen, Sun, Thermometer, Trash2,
   TriangleAlert,
   Upload, User, Users, Video, Volume2, VolumeX, Waves, Wifi, Wind, Wrench, X, Zap,
+  BellRing, CalendarClock, Car, Circle, Headphones, ListChecks, LocateFixed, Mail, Newspaper, Repeat, ShoppingCart,
+  Tag, Target, TrendingDown, TrendingUp, Wallet, Webhook,
 } from 'lucide-react-native';
 
 export const ICONS = {
@@ -34,14 +36,20 @@ export const ICONS = {
   arrow: ArrowRight,
   'arrow-down': ArrowDown,
   bell: Bell,
+  'bell-ring': BellRing,
   bluetooth: Bluetooth,
   bolt: Zap,
   bridge: Router,
   calendar: Calendar,
+  'calendar-clock': CalendarClock,
   camera: Camera,
   canvas: Frame,
+  car: Car,
+  cart: ShoppingCart,
   chat: MessageCircle,
   check: Check,
+  checklist: ListChecks,
+  circle: Circle,
   chevron: ChevronDown,
   'chevron-right': ChevronRight,
   'chevron-left': ChevronLeft,
@@ -78,6 +86,9 @@ export const ICONS = {
   key: Key,
   keyboard: Keyboard,
   light: Lightbulb,
+  listen: Headphones,
+  locate: LocateFixed,
+  mail: Mail,
   link: Link,
   'list-filter': ListFilter,
   lock: Lock,
@@ -89,6 +100,7 @@ export const ICONS = {
   moon: Moon,
   more: Ellipsis,
   music: Music,
+  news: Newspaper,
   'not-kept': Clock,
   outlet: Plug,
   package: Package,
@@ -98,12 +110,14 @@ export const ICONS = {
   photo: Image,
   pin: MapPin,
   play: Play,
+  plug: Plug,
   plus: Plus,
   power: Power,
   profile: User,
   rain: CloudRain,
   prompts: MessageSquareText,
   refresh: RefreshCw,
+  repeat: Repeat,
   restore: RotateCcw,
   schedule: Clock,
   search: Search,
@@ -121,8 +135,12 @@ export const ICONS = {
   storm: CloudLightning,
   speaker: Speaker,
   sun: Sun,
+  tag: Tag,
+  target: Target,
   thermo: Thermometer,
   trash: Trash2,
+  'trending-down': TrendingDown,
+  'trending-up': TrendingUp,
   unlock: LockOpen,
   updown: ChevronsUpDown,
   upload: Upload,
@@ -131,7 +149,9 @@ export const ICONS = {
   voice: AudioLines,
   volume: Volume2,
   'volume-off': VolumeX,
+  wallet: Wallet,
   warn: TriangleAlert,
+  webhook: Webhook,
   wifi: Wifi,
   x: X,
 };
@@ -140,4 +160,9 @@ export type IconName = keyof typeof ICONS;
 
 export function isIconName(name: string): name is IconName {
   return name in ICONS;
+}
+
+/** A glyph the Pond named, or `fallback` when the app does not draw that one. */
+export function iconOr(name: string, fallback: IconName): IconName {
+  return Object.prototype.hasOwnProperty.call(ICONS, name) ? (name as IconName) : fallback;
 }

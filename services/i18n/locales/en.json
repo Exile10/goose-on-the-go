@@ -2381,7 +2381,8 @@
       "settings": "Settings",
       "agents": "Agents",
       "pond": "My Pond",
-      "voice": "Voice: the room, the Voice agent and Voice Match"
+      "voice": "Voice: the room, the Voice agent and Voice Match",
+      "myGoose": "My Goose: news, to-dos, cart, connectors, ideas and interests"
     },
     "devOnly": "This screen is dev-only. It is not linked from the You tab in production builds."
   },
@@ -4768,6 +4769,148 @@
     "errors": {
       "status": "Your Pond answered with an error ({{status}}).",
       "unreachable": "Your Pond can’t be reached right now."
+    }
+  },
+  "goose": {
+    "errors": {
+      "action": "Your Pond could not do that. Try again in a moment.",
+      "tryAgain": "Try again"
+    },
+    "saved": {
+      "storiesCollection": "Saved stories"
+    },
+    "news": {
+      "writing": "Goose is writing fresh news. It will be here in a few minutes."
+    },
+    "story": {
+      "voteSent": "Thanks. Goose will tune your news.",
+      "wrongSent": "Thanks. Goose has hidden this story.",
+      "saved": "Saved to your stories.",
+      "following": "Following {{topic}}.",
+      "unfollowed": "No more news about {{topic}}.",
+      "neverShown": "Goose will never bring up {{topic}}."
+    },
+    "digest": {
+      "listenFailed": "Your Pond could not read the digest aloud. Try again in a moment.",
+      "speaking": "Reading it on your Pond’s speaker now."
+    },
+    "todos": {
+      "markedDone": "Marked done.",
+      "askLater": "Goose will ask again later.",
+      "dropped": "Goose will stop asking about it.",
+      "saved": "Saved.",
+      "added": "To-do added.",
+      "reminderAdded": "Reminder added.",
+      "deleted": "Deleted.",
+      "offerAdded": "Added to your to-dos."
+    },
+    "places": {
+      "positionDenied": "Goose needs your location to save this place. Allow it in your phone’s settings.",
+      "positionUnavailable": "Your phone could not find where you are. Try again outside or with Wi-Fi on.",
+      "saved": "Saved {{place}}."
+    },
+    "cart": {
+      "watching": "Goose is reading the page. The price will be here in a moment.",
+      "stopped": "Stopped watching."
+    },
+    "connectors": {
+      "connected": "{{name}} is connected.",
+      "disconnected": "{{name}} is disconnected.",
+      "missing": "Fill in the fields marked required, then connect.",
+      "refused": "Your Pond could not connect with those details. Check them and try again.",
+      "category": {
+        "mail": "Mail",
+        "calendar": "Calendar",
+        "home": "Your home",
+        "web": "The web",
+        "travel": "Getting around",
+        "weather": "Weather",
+        "music": "Music",
+        "money": "Money",
+        "custom": "Your own"
+      },
+      "status": {
+        "connected": "Connected",
+        "available": "Not connected",
+        "needsSetup": "Needs setting up",
+        "error": "Needs attention"
+      }
+    },
+    "ideas": {
+      "gooseStarted": "Goose is on it. You can follow it here.",
+      "stepsAdded_one": "Added {{count}} step to your to-dos.",
+      "stepsAdded_other": "Added {{count}} steps to your to-dos."
+    },
+    "interests": {
+      "saved": "Saved.",
+      "confirmed": "Goose will keep {{topic}} in mind.",
+      "allowed": "Goose can bring up {{topic}} again.",
+      "added": "Added {{topic}}.",
+      "removed": "Removed {{topic}}.",
+      "category": {
+        "sport": "Sport",
+        "tech": "Tech",
+        "science": "Science",
+        "business": "Business",
+        "money": "Money",
+        "politics": "Politics",
+        "culture": "Culture",
+        "filmTv": "Film and TV",
+        "music": "Music",
+        "games": "Games",
+        "books": "Books",
+        "food": "Food",
+        "travel": "Travel",
+        "health": "Health",
+        "home": "Home",
+        "cars": "Cars",
+        "shopping": "Shopping",
+        "people": "People",
+        "places": "Places",
+        "learning": "Learning",
+        "other": "Other"
+      },
+      "depth": {
+        "curious": "Curious",
+        "keen": "Keen",
+        "devoted": "Devoted"
+      },
+      "news": {
+        "off": "No news",
+        "tiles": "Stories",
+        "digest": "In the digest",
+        "both": "Both"
+      }
+    },
+    "interview": {
+      "saved_one": "Saved {{count}} interest.",
+      "saved_other": "Saved {{count}} interests."
+    },
+    "hook": {
+      "time": "On {{when}}",
+      "everyDay": "Every day at {{at}}",
+      "everyWeekday": "Every weekday at {{at}}",
+      "everyWeek": "Every week at {{at}}",
+      "everyWeekOn": "Every {{days}} at {{at}}",
+      "everyMonth": "Every month at {{at}}",
+      "getHome": "When you get home",
+      "leaveHome": "When you leave home",
+      "arrive": "When you get to {{place}}",
+      "leave": "When you leave {{place}}",
+      "arriveSomewhere": "When you arrive at a place you saved",
+      "leaveSomewhere": "When you leave a place you saved",
+      "event": "When {{source}} {{event}}"
+    },
+    "hookPicker": {
+      "kind": {
+        "presence": "People",
+        "camera": "Cameras",
+        "device": "Devices",
+        "sensor": "Sensors",
+        "webWatch": "Pages Goose watches",
+        "cart": "Prices Goose watches",
+        "connector": "Connected services"
+      }
     }
   }
 }
