@@ -160,6 +160,7 @@
     "timedOut": "Goose took too long to answer. Your Pond may still be loading the model — try again in a moment.",
     "failed": "That message did not get through.",
     "history": {
+      "sentPicture": "A picture sent in this conversation",
       "title": "Conversations",
       "subtitle_one": "{{count}} on your Pond, and nowhere else.",
       "subtitle_other": "{{count}} on your Pond, and nowhere else.",

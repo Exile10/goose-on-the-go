@@ -193,7 +193,7 @@ export const ConversationRow = React.memo(function ConversationRow({
       {card.picture ? (
         <PondPicture
           path={card.picture.src}
-          label={card.picture.caption ?? card.picture.credit}
+          label={card.picture.label ?? t('chat.history.sentPicture')}
           style={[local.thumb, { borderRadius: theme.radius.md }]}
         />
       ) : null}
