@@ -17,7 +17,13 @@ import { InkButton, InkDialog } from '@jarida/ink/native';
 import { caution } from '@/services/haptics';
 import { ConfirmProvider, useChoice, useConfirm, useInform, type ChooseFn, type ConfirmFn, type InformFn } from '../confirm-provider';
 
-jest.mock('@/services/haptics', () => ({ caution: jest.fn(async () => undefined) }));
+// Ink's buttons give a press feel (components/ui/ink.tsx), so the press feels are here too.
+jest.mock('@/services/haptics', () => ({
+  caution: jest.fn(async () => undefined),
+  tap: jest.fn(async () => undefined),
+  selectionTick: jest.fn(async () => undefined),
+  toggle: jest.fn(async () => undefined),
+}));
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 

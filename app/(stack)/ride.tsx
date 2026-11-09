@@ -4,7 +4,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { InkButton, InkNotice, InkText, InkTitle } from '@jarida/ink/native';
+import { InkButton, InkNotice, InkText, InkTitle } from '@/components/ui/ink';
 
 import { useThemedStyles } from '@/hooks/use-themed-styles';
 import type { ThemeColors } from '@/constants/colors';

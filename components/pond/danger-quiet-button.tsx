@@ -3,7 +3,7 @@
 
 import React, { useMemo, type ReactNode } from 'react';
 import { alpha } from '@jarida/ink';
-import { InkButton, InkProvider, useInkTheme, type InkIconSlot } from '@jarida/ink/native';
+import { InkButton, InkProvider, useInkTheme, type InkIconSlot } from '@/components/ui/ink';
 
 export function DangerQuietButton({
   children,

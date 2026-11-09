@@ -14,7 +14,7 @@ import React, { useCallback, useMemo, useState } from 'react';
 import { RefreshControl, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { InkButton, InkEmptyState, InkNotice, InkSpinner, InkText } from '@jarida/ink/native';
+import { InkButton, InkEmptyState, InkNotice, InkSpinner, InkText } from '@/components/ui/ink';
 
 import { ContentUnavailable } from '@/components/patterns/content-unavailable';
 import { VoicePrintSheet } from '@/components/patterns/voice-print-sheet';

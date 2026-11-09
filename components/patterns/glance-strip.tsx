@@ -13,7 +13,7 @@
 
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
-import { InkText, useInkTheme } from '@jarida/ink/native';
+import { InkText, useInkTheme } from '@/components/ui/ink';
 
 /** One fact, already written as a phrase: "4 devices on", "21° in Nairobi". */
 export interface Figure {

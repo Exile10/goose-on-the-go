@@ -7,7 +7,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { RefreshControl, StyleSheet, Text, View } from 'react-native';
 import { Stack, useNavigation, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { InkBadge, InkButton, InkSpinner, InkText, inkText, useInkTheme } from '@jarida/ink/native';
+import { InkBadge, InkButton, InkSpinner, InkText, inkText, useInkTheme } from '@/components/ui/ink';
 
 import { RoomVoicePanel } from '@/components/patterns/room-voice';
 import { FieldRow } from '@/components/settings/field-row';

@@ -31,6 +31,7 @@
  * actions".
  */
 
+import { GPressable } from '@/components/ui/g-pressable';
 import React, {
   createContext,
   useContext,
@@ -40,11 +41,11 @@ import React, {
   useSyncExternalStore,
   type PropsWithChildren,
 } from 'react';
-import { AccessibilityInfo, Animated, Easing, Keyboard, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { AccessibilityInfo, Animated, Easing, Keyboard, Platform, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { EASE_IN_OUT, createTheme, toneColors, type InkTheme } from '@jarida/ink';
-import { inkText, readingTime, useInkTheme } from '@jarida/ink/native';
+import { inkText, readingTime, useInkTheme } from '@/components/ui/ink';
 
 import { GIcon } from '@/components/ui/g-icon';
 import type { IconName } from '@/constants/icons';
@@ -287,7 +288,8 @@ function SnackbarHost({ clearance }: { clearance: number }) {
         >
           <GIcon name={SNACKBAR_ICON[shown.tone]} size={20} strokeWidth={2} color={palette.icon[shown.tone]} />
         </View>
-        <Pressable
+        <GPressable
+          feedback="none"
           style={{ flex: 1, paddingVertical: theme.space[3] }}
           onPress={() => dismissSnackbar(shown.id)}
           onAccessibilityEscape={() => dismissSnackbar(shown.id)}
@@ -297,9 +299,10 @@ function SnackbarHost({ clearance }: { clearance: number }) {
           <Text style={body.style} numberOfLines={2} ellipsizeMode="tail">
             {shown.message}
           </Text>
-        </Pressable>
+        </GPressable>
         {shown.action ? (
-          <Pressable
+          <GPressable
+            feedback="none"
             accessibilityRole="button"
             onPress={() => {
               dismissSnackbar(shown.id);
@@ -316,7 +319,7 @@ function SnackbarHost({ clearance }: { clearance: number }) {
             })}
           >
             <Text style={action.style}>{shown.action.label}</Text>
-          </Pressable>
+          </GPressable>
         ) : null}
       </Animated.View>
     </View>

@@ -7,7 +7,7 @@
 
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { InkButton, InkFormField, InkInput, InkNotice, InkSheet, InkText, InkTextArea } from '@jarida/ink/native';
+import { InkButton, InkFormField, InkInput, InkNotice, InkSheet, InkText, InkTextArea } from '@/components/ui/ink';
 
 import { ADVISED_NOTE_LENGTH, noteName } from '@/models/prompt-extras';
 import { confirm, reject } from '@/services/haptics';

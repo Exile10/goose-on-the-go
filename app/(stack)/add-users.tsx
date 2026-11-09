@@ -26,7 +26,7 @@ import {
   InkTitle,
   inkText,
   useInkTheme,
-} from '@jarida/ink/native';
+} from '@/components/ui/ink';
 
 import { GKeyboardScrollView } from '@/components/ui/g-keyboard-view';
 import { usePullToRefresh } from '@/view-models/use-pull-to-refresh';

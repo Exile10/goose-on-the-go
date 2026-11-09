@@ -14,7 +14,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
-import { InkButton, InkCard, InkText, InkTitle } from '@jarida/ink/native';
+import { InkButton, InkCard, InkText, InkTitle } from '@/components/ui/ink';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 

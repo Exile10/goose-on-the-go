@@ -4,7 +4,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { FlatList, StyleSheet, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { InkButton, InkInput, InkListItem, InkSearchField, InkSelect, InkSheet, InkSpinner, InkText } from '@jarida/ink/native';
+import { InkButton, InkInput, InkListItem, InkSearchField, InkSelect, InkSheet, InkSpinner, InkText } from '@/components/ui/ink';
 
 import { GIcon } from '@/components/ui/g-icon';
 import { GPressable } from '@/components/ui/g-pressable';

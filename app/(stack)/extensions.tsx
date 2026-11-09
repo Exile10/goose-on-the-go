@@ -10,7 +10,7 @@ import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import React, { useCallback, useState } from 'react';
 import { useRouter } from 'expo-router';
-import { InkButton, InkEmptyState, InkNotice, InkSegmented, InkSpinner, InkSwitch, InkText, InkTitle, InkInput } from '@jarida/ink/native';
+import { InkButton, InkEmptyState, InkNotice, InkSegmented, InkSpinner, InkSwitch, InkText, InkTitle, InkInput } from '@/components/ui/ink';
 import { RefreshControl, StyleSheet, Text, View } from 'react-native';
 
 import { GIcon } from '@/components/ui/g-icon';

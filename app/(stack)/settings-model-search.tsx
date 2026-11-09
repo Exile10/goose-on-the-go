@@ -5,7 +5,7 @@
 import React from 'react';
 import { View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { InkButton, InkSearchField, InkSpinner } from '@jarida/ink/native';
+import { InkButton, InkSearchField, InkSpinner } from '@/components/ui/ink';
 
 import { SettingsGroup, SettingsHeader, SettingsMessage, SettingsRow } from '@/components/settings/settings-list';
 import { SettingsScroll } from '@/components/settings/settings-scroll';

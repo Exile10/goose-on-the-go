@@ -5,7 +5,7 @@ import React, { useCallback, useState } from 'react';
 import { RefreshControl, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { InkBadge, InkButton, InkEdge, InkEyebrow, InkSegmented, InkSpinner, inkText, useInkTheme } from '@jarida/ink/native';
+import { InkBadge, InkButton, InkEdge, InkEyebrow, InkSegmented, InkSpinner, inkText, useInkTheme } from '@/components/ui/ink';
 
 import { AdminLockView } from '@/components/pond/admin-lock';
 import { DangerQuietButton } from '@/components/pond/danger-quiet-button';

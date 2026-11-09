@@ -6,7 +6,7 @@
  */
 
 import React from 'react';
-import { InkCheckbox, InkText } from '@jarida/ink/native';
+import { InkCheckbox, InkText } from '@/components/ui/ink';
 
 export interface LabelledCheckboxProps {
   /** What ticking the box chooses, such as a device's name. */

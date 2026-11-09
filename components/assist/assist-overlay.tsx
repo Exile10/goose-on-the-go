@@ -8,11 +8,12 @@
  * conversation closes it; "Type instead" carries the conversation into the app.
  */
 
+import { GPressable } from '@/components/ui/g-pressable';
 import React from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { InkButton, InkSpinner, InkText, useInkTheme } from '@jarida/ink/native';
+import { InkButton, InkSpinner, InkText, useInkTheme } from '@/components/ui/ink';
 
 import { VoiceDock } from '@/components/patterns/voice-dock';
 import { Spacing } from '@/constants/spacing';
@@ -43,7 +44,7 @@ export function AssistOverlay() {
 
   return (
     <View style={styles.root}>
-      <Pressable
+      <GPressable feedback="none" haptic="none"
         style={[StyleSheet.absoluteFill, { backgroundColor: SCRIM }]}
         onPress={actions.close}
         accessibilityRole="button"

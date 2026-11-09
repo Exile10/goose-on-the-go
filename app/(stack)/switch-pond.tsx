@@ -19,7 +19,7 @@ import React, { useCallback, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { InkButton, InkEyebrow, InkNotice, InkText } from '@jarida/ink/native';
+import { InkButton, InkEyebrow, InkNotice, InkText } from '@/components/ui/ink';
 
 import { PondList } from '@/components/patterns/pond-list';
 import { PondStatusCard } from '@/components/patterns/pond-status-card';

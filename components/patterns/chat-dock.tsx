@@ -31,12 +31,12 @@
  */
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Keyboard, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Keyboard, Platform, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Image } from 'expo-image';
 import { useTranslation } from 'react-i18next';
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { glassLift, hitSlop } from '@jarida/ink';
-import { InkChip, InkEdge, InkEyebrow, InkSegmented, inkText, useInkTheme, useReduceMotion } from '@jarida/ink/native';
+import { InkChip, InkEdge, InkEyebrow, InkSegmented, inkText, useInkTheme, useReduceMotion } from '@/components/ui/ink';
 
 import {
   AnsweringLight,
@@ -248,7 +248,7 @@ export function ChatDock({
                   <GIcon name={a.kind === 'audio' ? 'music' : 'file'} size={20} color={theme.color.textSecondary} />
                 </View>
               )}
-              <Pressable
+              <GPressable feedback="none"
                 onPress={() => remove(a.id)}
                 accessibilityRole="button"
                 accessibilityLabel={t('chat.composer.removeAttachment', { name: a.name })}
@@ -256,7 +256,7 @@ export function ChatDock({
                 style={[styles.unattach, { backgroundColor: theme.color.chrome }]}
               >
                 <GIcon name="x" size={12} color={theme.color.text} />
-              </Pressable>
+              </GPressable>
             </View>
           ))}
         </View>
@@ -303,7 +303,7 @@ export function ChatDock({
         </View>
 
         {hasContent ? (
-          <Pressable
+          <GPressable feedback="none"
             onPress={handleSend}
             accessibilityRole="button"
             accessibilityLabel={busy ? t('chat.queue') : t('chat.send')}
@@ -319,7 +319,7 @@ export function ChatDock({
                 <GIcon name="send" size={18} color={theme.color.textOnAccent} />
               </InkEdge>
             )}
-          </Pressable>
+          </GPressable>
         ) : onVoiceNote ? (
           <VoiceNoteMic
             size={CONTROL}

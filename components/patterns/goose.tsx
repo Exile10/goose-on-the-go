@@ -28,7 +28,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Animated, Easing, StyleSheet, View } from 'react-native';
 import Svg, { Circle, Ellipse, Path } from 'react-native-svg';
-import { useInkTheme, useReduceMotion } from '@jarida/ink/native';
+import { useInkTheme, useReduceMotion } from '@/components/ui/ink';
 
 export type GooseState =
   /** Afloat and waiting. A slow bob, and now and then a dip of the head. */

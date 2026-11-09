@@ -14,7 +14,7 @@
 
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { InkButton, InkDialog } from '@jarida/ink/native';
+import { InkButton, InkDialog } from '@/components/ui/ink';
 
 /** One answer other than Cancel. `danger` is for an answer that loses something. */
 export interface ConfirmDialogAction {

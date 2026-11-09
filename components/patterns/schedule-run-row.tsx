@@ -19,7 +19,7 @@
 import React, { useState } from 'react';
 import { LayoutAnimation, StyleSheet, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { InkBadge, InkText, inkText, useInkTheme, useReduceMotion } from '@jarida/ink/native';
+import { InkBadge, InkText, inkText, useInkTheme, useReduceMotion } from '@/components/ui/ink';
 import type { InkTone } from '@jarida/ink';
 
 import { Markdown } from '@/components/patterns/markdown';

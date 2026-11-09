@@ -18,10 +18,10 @@
  */
 
 import React, { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import * as WebBrowser from 'expo-web-browser';
-import { InkEdge, InkEyebrow, inkText, useInkTheme } from '@jarida/ink/native';
+import { InkEdge, InkEyebrow, inkText, useInkTheme } from '@/components/ui/ink';
 
 import { LongTaskCard } from '@/components/patterns/long-task-card';
 import { Markdown } from '@/components/patterns/markdown';
@@ -328,7 +328,7 @@ function Search({ data }: { data: Data }) {
             <SearchRow key={`${page.url ?? page.title}-${i}`} entry={page} first={i === 0} />
           ))}
           {!all && pages.length > SEARCH_SHOWN ? (
-            <Pressable
+            <GPressable feedback="none"
               onPress={() => {
                 void selectionTick();
                 setAll(true);
@@ -337,7 +337,7 @@ function Search({ data }: { data: Data }) {
               style={styles.searchRow}
             >
               <Text style={more.style}>{t('chat.tools.moreSources', { count: pages.length - SEARCH_SHOWN })}</Text>
-            </Pressable>
+            </GPressable>
           ) : null}
         </View>
       ) : null}
@@ -507,7 +507,7 @@ function Sources({ tools }: { tools: ToolCall[] }) {
         </GPressable>
       ))}
       {!all && sources.length > SOURCES_SHOWN ? (
-        <Pressable
+        <GPressable feedback="none"
           onPress={() => {
             void selectionTick();
             setAll(true);
@@ -516,7 +516,7 @@ function Sources({ tools }: { tools: ToolCall[] }) {
           style={[styles.source, rule]}
         >
           <Text style={more.style}>{t('chat.tools.moreSources', { count: sources.length - SOURCES_SHOWN })}</Text>
-        </Pressable>
+        </GPressable>
       ) : null}
     </InkEdge>
   );

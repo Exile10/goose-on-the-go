@@ -4,10 +4,11 @@
  * a voice saves it, has the engine switch to it, and then says the next line in it.
  */
 
+import { GPressable } from '@/components/ui/g-pressable';
 import React, { useMemo, useState } from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { ScrollView, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { InkButton, InkChoice, InkEyebrow, InkField, InkNotice, InkSpinner, InkStage, useInkTheme } from '@jarida/ink/native';
+import { InkButton, InkChoice, InkEyebrow, InkField, InkNotice, InkSpinner, InkStage, useInkTheme } from '@/components/ui/ink';
 
 import { ContentUnavailable } from '@/components/patterns/content-unavailable';
 import { isUnavailable } from '@/models/content-state';
@@ -259,7 +260,7 @@ export function VoicePickerView({ voices, current, pace: savedPace, applying, pr
         <View style={styles.voicesHead}>
           <InkEyebrow>{t('settings.voice.voice')}</InkEyebrow>
           {all.length > FEW ? (
-            <Pressable
+            <GPressable feedback="none"
               onPress={() => {
                 void selectionTick();
                 setShowAll((open) => !open);
@@ -269,7 +270,7 @@ export function VoicePickerView({ voices, current, pace: savedPace, applying, pr
               accessibilityState={{ expanded: showAll }}
             >
               <Text style={styles.more}>{showAll ? t('settings.voice.showFewer') : t('settings.voice.showAll', { count: all.length })}</Text>
-            </Pressable>
+            </GPressable>
           ) : null}
         </View>
         <View

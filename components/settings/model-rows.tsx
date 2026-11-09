@@ -3,11 +3,12 @@
  * costs and what it is doing.
  */
 
+import { GPressable } from '@/components/ui/g-pressable';
 import React from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
-import { InkBadge } from '@jarida/ink/native';
+import { InkBadge } from '@/components/ui/ink';
 
 import { Spacing } from '@/constants/spacing';
 import {
@@ -64,7 +65,7 @@ function ControlButton({ label, onPress, danger }: { label: string; onPress: () 
   const styles = useSettingsStyles(makeStyles);
   const colors = useSettingsColors();
   return (
-    <Pressable
+    <GPressable feedback="none"
       onPress={() => {
         void tap();
         onPress();
@@ -74,7 +75,7 @@ function ControlButton({ label, onPress, danger }: { label: string; onPress: () 
       style={({ pressed }) => [styles.control, pressed && { backgroundColor: colors.pressed }]}
     >
       <Text style={[styles.controlText, danger && { color: colors.danger }]}>{label}</Text>
-    </Pressable>
+    </GPressable>
   );
 }
 

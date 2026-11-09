@@ -44,7 +44,11 @@ jest.mock('lucide-react-native', () => new Proxy({}, { get: () => () => null }))
 jest.mock('@/components/ui/g-icon', () => ({ GIcon: () => null }));
 jest.mock('@/providers/server-provider', () => ({ useServer: () => mockServer }));
 jest.mock('@/providers/snackbar-provider', () => ({ useSnackbar: () => ({ show: mockShow }) }));
-jest.mock('@/services/haptics', () => ({ selectionTick: jest.fn().mockResolvedValue(undefined) }));
+jest.mock('@/services/haptics', () => ({
+  selectionTick: jest.fn().mockResolvedValue(undefined),
+  tap: jest.fn().mockResolvedValue(undefined),
+  toggle: jest.fn().mockResolvedValue(undefined),
+}));
 jest.mock('@/view-models/use-discovery', () => ({
   useDiscovery: () => ({ data: { ponds: mockPonds, phase: 'found' }, loading: false, error: null, actions: { retry: jest.fn() } }),
 }));

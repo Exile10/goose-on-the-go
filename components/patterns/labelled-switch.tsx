@@ -7,7 +7,7 @@
  */
 
 import React from 'react';
-import { InkSwitch, InkText } from '@jarida/ink/native';
+import { InkSwitch, InkText } from '@/components/ui/ink';
 
 export interface LabelledSwitchProps {
   /** What the switch controls or is set to, such as "Keep forever" or "Paused". */

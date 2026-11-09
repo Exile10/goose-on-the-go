@@ -7,7 +7,7 @@
 
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { InkTitle } from '@jarida/ink/native';
+import { InkTitle } from '@/components/ui/ink';
 import {
   View,
   Text,

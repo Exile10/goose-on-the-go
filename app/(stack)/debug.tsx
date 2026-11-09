@@ -20,7 +20,7 @@ import React, { useCallback, useState } from 'react';
 import { FlatList, StyleSheet, Text, View } from 'react-native';
 import { Redirect, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { InkEmptyState, InkButton, InkSpinner, InkSwitch, InkText } from '@jarida/ink/native';
+import { InkEmptyState, InkButton, InkSpinner, InkSwitch, InkText } from '@/components/ui/ink';
 
 import { TelemetryCard, TurnsSheet } from '@/components/patterns/conversation-telemetry';
 import { SettingsGroup, SettingsHeader, SettingsRow } from '@/components/settings/settings-list';

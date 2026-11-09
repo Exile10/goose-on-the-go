@@ -5,7 +5,7 @@ import React, { useCallback } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { InkButton, InkEdge, InkEyebrow, InkSpinner, inkText, useInkTheme } from '@jarida/ink/native';
+import { InkButton, InkEdge, InkEyebrow, InkSpinner, inkText, useInkTheme } from '@/components/ui/ink';
 
 import { LongTaskQueue } from '@/components/patterns/long-task-queue';
 import { Markdown } from '@/components/patterns/markdown';

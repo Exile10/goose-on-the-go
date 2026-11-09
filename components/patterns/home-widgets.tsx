@@ -6,7 +6,7 @@
 import React, { useCallback } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { InkEmptyState, InkSwitch, InkText, inkText, useInkTheme } from '@jarida/ink/native';
+import { InkEmptyState, InkSwitch, InkText, inkText, useInkTheme } from '@/components/ui/ink';
 
 import { ContentUnavailable } from '@/components/patterns/content-unavailable';
 import { Markdown } from '@/components/patterns/markdown';

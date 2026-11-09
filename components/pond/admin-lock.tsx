@@ -4,7 +4,7 @@
 import React, { useState } from 'react';
 import { StyleSheet, Text, TextInput, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { InkButton, InkEdge, InkEyebrow, InkNotice, InkSpinner, InkText, InkTitle, inkText, useInkTheme } from '@jarida/ink/native';
+import { InkButton, InkEdge, InkEyebrow, InkNotice, InkSpinner, InkText, InkTitle, inkText, useInkTheme } from '@/components/ui/ink';
 
 import { LabelledSwitch } from '@/components/patterns/labelled-switch';
 import { IconTile, SettingsGroup } from '@/components/settings/settings-list';

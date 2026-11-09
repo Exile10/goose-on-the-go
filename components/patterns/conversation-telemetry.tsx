@@ -10,7 +10,7 @@
 import React from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { InkButton, InkCard, InkNotice, InkSheet, InkSpinner, InkText } from '@jarida/ink/native';
+import { InkButton, InkCard, InkNotice, InkSheet, InkSpinner, InkText } from '@/components/ui/ink';
 
 import { formatDuration, formatPercent } from '@/models/telemetry';
 import type { TurnMetrics } from '@/services/types';

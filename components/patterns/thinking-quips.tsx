@@ -17,7 +17,7 @@
 import React, { useEffect, useState } from 'react';
 import { Animated, Easing, StyleSheet, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { inkText, useInkTheme, useReduceMotion } from '@jarida/ink/native';
+import { inkText, useInkTheme, useReduceMotion } from '@/components/ui/ink';
 
 import { quipKey, THINKING_QUIPS } from '@/constants/quips';
 

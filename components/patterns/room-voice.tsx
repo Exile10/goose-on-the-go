@@ -12,7 +12,7 @@ import { StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
-import { InkButton, InkCard, InkText, InkTitle } from '@jarida/ink/native';
+import { InkButton, InkCard, InkText, InkTitle } from '@/components/ui/ink';
 
 import { Spacing } from '@/constants/spacing';
 import { formatScheduleTime } from '@/models/schedule';

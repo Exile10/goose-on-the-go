@@ -23,7 +23,7 @@ import {
   InkText,
   InkTitle,
   useInkTheme,
-} from '@jarida/ink/native';
+} from '@/components/ui/ink';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 
 import { GIcon } from '@/components/ui/g-icon';

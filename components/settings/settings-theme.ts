@@ -6,7 +6,7 @@
 
 import { useMemo } from 'react';
 import { StyleSheet, type TextStyle } from 'react-native';
-import { inkText, useInkTheme } from '@jarida/ink/native';
+import { inkText, useInkTheme } from '@/components/ui/ink';
 
 import { useTheme } from '@/providers/theme-provider';
 

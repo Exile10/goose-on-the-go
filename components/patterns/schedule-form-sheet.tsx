@@ -31,7 +31,7 @@ import {
   InkText,
   InkTextArea,
   InkTimePicker,
-} from '@jarida/ink/native';
+} from '@/components/ui/ink';
 import type { CivilDate } from '@jarida/ink';
 
 import { Spacing } from '@/constants/spacing';

@@ -1,9 +1,10 @@
 // The Pond's power mode, what it draws, and restarting it. Every change asks first.
 
+import { GPressable } from '@/components/ui/g-pressable';
 import React, { useCallback } from 'react';
-import { Pressable, RefreshControl, Text, View } from 'react-native';
+import { RefreshControl, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { InkBadge, InkButton, InkEdge, InkEyebrow, InkNotice, InkSpinner, inkText, useInkTheme } from '@jarida/ink/native';
+import { InkBadge, InkButton, InkEdge, InkEyebrow, InkNotice, InkSpinner, inkText, useInkTheme } from '@/components/ui/ink';
 
 import { AdminLockView } from '@/components/pond/admin-lock';
 import { Radio } from '@/components/settings/setting-controls';
@@ -37,7 +38,7 @@ function ModeCard({
   const theme = useInkTheme();
   const words = powerModeWords(mode.name);
   return (
-    <Pressable
+    <GPressable feedback="none" haptic="selection"
       onPress={onSelect}
       disabled={disabled}
       accessibilityRole="radio"
@@ -66,7 +67,7 @@ function ModeCard({
           </View>
         </InkEdge>
       )}
-    </Pressable>
+    </GPressable>
   );
 }
 

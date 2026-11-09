@@ -50,10 +50,34 @@ const i18nextWithoutUppercaseExemption = {
   },
 };
 
+/**
+ * Every press is felt. Ink has no haptics, so its pressable components reach the app through
+ * `components/ui/ink.tsx`, which gives each the right feel, and every other press goes through
+ * `GPressable`, which taps by default. A direct import of either bypasses that, and a button
+ * goes silent under the thumb: the Devices tab's add button and the Home avatar were.
+ */
+const PRESS_RULE = {
+  files: ['app/**/*.{ts,tsx}', 'components/**/*.{ts,tsx}', 'view-models/**/*.{ts,tsx}', 'providers/**/*.{ts,tsx}', 'hooks/**/*.{ts,tsx}'],
+  ignores: ['**/__tests__/**', 'components/ui/ink.tsx', 'components/ui/g-pressable.tsx'],
+  rules: {
+    'no-restricted-imports': ['error', {
+      paths: [
+        { name: '@jarida/ink/native', message: "Import Ink from '@/components/ui/ink', which gives its presses their haptic feel." },
+        {
+          name: 'react-native',
+          importNames: ['Pressable', 'TouchableOpacity', 'TouchableHighlight', 'TouchableWithoutFeedback'],
+          message: "Use GPressable from '@/components/ui/g-pressable', which gives a press its haptic feel.",
+        },
+      ],
+    }],
+  },
+};
+
 const TRANSLATED_SURFACE = ['app/**/*.tsx', 'components/**/*.tsx', 'view-models/**/*.ts', 'constants/**/*.ts'];
 
 module.exports = defineConfig([
   expoConfig,
+  PRESS_RULE,
   {
     // `._*`: macOS AppleDouble sidecars, which are binary. See metro.config.js.
     ignores: ['dist/*', '**/._*'],

@@ -5,7 +5,7 @@ import React, { useCallback } from 'react';
 import { RefreshControl, Text, View } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { InkBadge, InkEdge, InkMeter, InkSpinner, inkText, useInkTheme } from '@jarida/ink/native';
+import { InkBadge, InkEdge, InkMeter, InkSpinner, inkText, useInkTheme } from '@/components/ui/ink';
 
 import { AdminLockView } from '@/components/pond/admin-lock';
 import { SettingsNotice, SettingsScroll } from '@/components/settings/settings-scroll';

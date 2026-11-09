@@ -7,7 +7,7 @@ import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { InkButton, InkDots, InkNotice, InkSpinner, InkText } from '@jarida/ink/native';
+import { InkButton, InkDots, InkNotice, InkSpinner, InkText } from '@/components/ui/ink';
 
 import { askToDownload, DownloadRow } from '@/components/settings/model-rows';
 import { Spacing } from '@/constants/spacing';

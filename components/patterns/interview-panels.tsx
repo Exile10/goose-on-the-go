@@ -7,7 +7,7 @@
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { InkButton, InkCard, InkDivider, InkEyebrow, InkMeter, InkNotice, InkText, InkTitle } from '@jarida/ink/native';
+import { InkButton, InkCard, InkDivider, InkEyebrow, InkMeter, InkNotice, InkText, InkTitle } from '@/components/ui/ink';
 
 import { Spacing } from '@/constants/spacing';
 import { draftByTopic, interviewProgress, topicNameKey } from '@/models/interview';

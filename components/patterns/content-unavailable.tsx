@@ -25,7 +25,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { InkEmptyState, InkIcon, InkText } from '@jarida/ink/native';
+import { InkEmptyState, InkIcon, InkText } from '@/components/ui/ink';
 
 import { Spacing } from '@/constants/spacing';
 

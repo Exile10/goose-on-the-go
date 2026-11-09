@@ -12,7 +12,7 @@
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { InkFormField, InkSegmented, InkSpinner, InkText } from '@jarida/ink/native';
+import { InkFormField, InkSegmented, InkSpinner, InkText } from '@/components/ui/ink';
 
 import { supports, useDevices } from '@/view-models/use-devices';
 import { Spacing } from '@/constants/spacing';

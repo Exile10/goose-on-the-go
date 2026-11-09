@@ -19,7 +19,7 @@
 
 import React from 'react';
 import { StyleSheet } from 'react-native';
-import { useInkTheme } from '@jarida/ink/native';
+import { useInkTheme } from '@/components/ui/ink';
 
 import type { IconName } from '@/constants/icons';
 import { GIcon } from './g-icon';

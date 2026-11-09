@@ -31,7 +31,7 @@ import Animated, {
   type SharedValue,
 } from 'react-native-reanimated';
 import Svg, { Defs, Ellipse, Path, RadialGradient, Stop } from 'react-native-svg';
-import { inkText, useInkTheme, useReduceMotion } from '@jarida/ink/native';
+import { inkText, useInkTheme, useReduceMotion } from '@/components/ui/ink';
 
 const AnimatedPath = Animated.createAnimatedComponent(Path);
 

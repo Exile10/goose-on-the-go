@@ -24,7 +24,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Image } from 'expo-image';
 import { useTranslation } from 'react-i18next';
-import { InkBubble, inkText, useInkTheme, type BubblePosition } from '@jarida/ink/native';
+import { InkBubble, inkText, useInkTheme, type BubblePosition } from '@/components/ui/ink';
 
 import { Markdown } from '@/components/patterns/markdown';
 import { ThinkingQuips } from '@/components/patterns/thinking-quips';

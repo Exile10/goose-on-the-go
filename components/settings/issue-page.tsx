@@ -7,7 +7,7 @@ import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { InkButton } from '@jarida/ink/native';
+import { InkButton } from '@/components/ui/ink';
 
 import { Spacing } from '@/constants/spacing';
 import { factValue, ISSUE_TILES, type IssueContext, type SettingsIssue } from '@/models/settings-issues';

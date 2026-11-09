@@ -54,7 +54,7 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NAVBAR_DEFAULTS, NavbarBehaviour, type NavbarStage } from '@jarida/ink/headless';
-import { InkNavbar, InkNotice, InkSpinner, useInkTheme, useReduceMotion } from '@jarida/ink/native';
+import { InkNavbar, InkNotice, InkSpinner, useInkTheme, useReduceMotion } from '@/components/ui/ink';
 
 import { ChatDock } from '@/components/patterns/chat-dock';
 import { GreetingCard } from '@/components/patterns/greeting-card';
@@ -98,7 +98,7 @@ import { useResearchOffer } from '@/view-models/use-deep-research';
 import { useGreetingName } from '@/view-models/use-greeting';
 import { useInterview } from '@/view-models/use-interview';
 import { useSuggestions, type OfferedPrompt } from '@/view-models/use-suggestions';
-import type { BubblePosition } from '@jarida/ink/native';
+import type { BubblePosition } from '@/components/ui/ink';
 
 /** The phone number for when the title bar condenses; see `chrome-provider.tsx`. */
 const BEHAVIOUR = { ...NAVBAR_DEFAULTS, collapseAt: 120 };

@@ -24,7 +24,7 @@ import {
   InkTitle,
   inkText,
   useInkTheme,
-} from '@jarida/ink/native';
+} from '@/components/ui/ink';
 
 import { ContentUnavailable } from '@/components/patterns/content-unavailable';
 import { isUnavailable } from '@/models/content-state';

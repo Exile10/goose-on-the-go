@@ -26,19 +26,11 @@
  */
 
 import React, { useMemo, useState } from 'react';
-import {
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-  type AccessibilityActionEvent,
-  type StyleProp,
-  type ViewStyle,
-} from 'react-native';
+import {StyleSheet, Text, View, type AccessibilityActionEvent, type StyleProp, type ViewStyle} from 'react-native';
 import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
 import { hitSlop } from '@jarida/ink';
-import { InkEdge, InkEyebrow, InkSkeleton, InkSpinner, inkText, useInkTheme } from '@jarida/ink/native';
+import { InkEdge, InkEyebrow, InkSkeleton, InkSpinner, inkText, useInkTheme } from '@/components/ui/ink';
 
 import { Markdown } from '@/components/patterns/markdown';
 import { GIcon } from '@/components/ui/g-icon';
@@ -281,7 +273,7 @@ export const ConversationCard = React.memo(function ConversationCard({
   };
 
   return (
-    <Pressable
+    <GPressable feedback="none"
       accessibilityRole="button"
       accessibilityLabel={label}
       accessibilityHint={t(
@@ -339,7 +331,7 @@ export const ConversationCard = React.memo(function ConversationCard({
           />
         ) : null}
       </InkEdge>
-    </Pressable>
+    </GPressable>
   );
 });
 

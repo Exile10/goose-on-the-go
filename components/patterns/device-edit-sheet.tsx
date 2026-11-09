@@ -9,7 +9,7 @@
 import React, { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { InkButton, InkChip, InkFormField, InkInput, InkNotice, InkSheet, InkText } from '@jarida/ink/native';
+import { InkButton, InkChip, InkFormField, InkInput, InkNotice, InkSheet, InkText } from '@/components/ui/ink';
 
 import { confirm, reject } from '@/services/haptics';
 import type { Device, Room } from '@/services/types';

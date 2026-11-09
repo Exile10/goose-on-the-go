@@ -10,7 +10,7 @@ import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-g
 import Animated, { useAnimatedStyle, useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
 import { scheduleOnRN } from 'react-native-worklets';
 import { glassLift } from '@jarida/ink';
-import { inkText, useInkTheme, useReduceMotion } from '@jarida/ink/native';
+import { inkText, useInkTheme, useReduceMotion } from '@/components/ui/ink';
 
 import { GIcon } from '@/components/ui/g-icon';
 

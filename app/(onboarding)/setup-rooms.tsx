@@ -13,7 +13,7 @@ import { ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { InkButton, InkChip, InkInput, InkNotice, InkSpinner, InkText, InkTitle } from '@jarida/ink/native';
+import { InkButton, InkChip, InkInput, InkNotice, InkSpinner, InkText, InkTitle } from '@/components/ui/ink';
 
 import { RoomSheet } from '@/components/patterns/room-sheet';
 import { GIcon } from '@/components/ui/g-icon';

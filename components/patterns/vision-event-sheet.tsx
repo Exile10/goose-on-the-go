@@ -11,7 +11,7 @@
 import React, { useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { InkBadge, InkButton, InkEdge, InkNotice, InkSheet, InkText, InkTitle, useInkTheme } from '@jarida/ink/native';
+import { InkBadge, InkButton, InkEdge, InkNotice, InkSheet, InkText, InkTitle, useInkTheme } from '@/components/ui/ink';
 
 import { AutomationForm } from '@/components/patterns/automation-form-sheet';
 import { PondPicture } from '@/components/patterns/pond-picture';

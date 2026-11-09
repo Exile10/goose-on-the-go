@@ -5,7 +5,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Stack, useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { InkButton, InkSpinner, InkText, inkText, useInkTheme } from '@jarida/ink/native';
+import { InkButton, InkSpinner, InkText, inkText, useInkTheme } from '@/components/ui/ink';
 
 import { FieldRow } from '@/components/settings/field-row';
 import { radioRows, SwitchRow } from '@/components/settings/setting-controls';

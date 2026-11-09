@@ -5,7 +5,7 @@ import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useRouter } from 'expo-router';
-import { InkButton, InkCard, InkFormField, InkInput, InkRadioGroup, InkText, InkTitle } from '@jarida/ink/native';
+import { InkButton, InkCard, InkFormField, InkInput, InkRadioGroup, InkText, InkTitle } from '@/components/ui/ink';
 
 import { Spacing } from '@/constants/spacing';
 import { WAKE_PRESETS, shortPhraseSuggestion, wakePhrase, wakePhraseProblem, type SetupDraft, type WakePreset } from '@/models/owner-setup';

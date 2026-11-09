@@ -19,7 +19,7 @@
 import { useTranslation } from 'react-i18next';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Animated, Easing, Linking, StyleSheet, Text, View } from 'react-native';
-import { InkButton } from '@jarida/ink/native';
+import { InkButton } from '@/components/ui/ink';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CameraView, useCameraPermissions, type BarcodeScanningResult } from 'expo-camera';

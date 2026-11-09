@@ -6,7 +6,7 @@
 import React, { useMemo, type ReactElement, type ReactNode } from 'react';
 import { ScrollView, View, type RefreshControlProps, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { InkNotice } from '@jarida/ink/native';
+import { InkNotice } from '@/components/ui/ink';
 
 import { GKeyboardScrollView } from '@/components/ui/g-keyboard-view';
 import { Spacing } from '@/constants/spacing';

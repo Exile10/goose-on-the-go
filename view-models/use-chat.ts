@@ -36,7 +36,7 @@ import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from '
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 
-import type { BubblePosition } from '@jarida/ink/native';
+import type { BubblePosition } from '@/components/ui/ink';
 
 import type { Message, ToolCall } from '@/models/chat';
 import { toolWords, humanizeTool } from '@/constants/tools';

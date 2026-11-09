@@ -25,7 +25,7 @@ import {
   type NativeSyntheticEvent,
   type ViewStyle,
 } from 'react-native';
-import { useInkTheme } from '@jarida/ink/native';
+import { useInkTheme } from '@/components/ui/ink';
 
 import { ConversationCard, GhostCard } from '@/components/patterns/conversation-card';
 import {

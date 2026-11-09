@@ -35,7 +35,7 @@ import {
   InkText,
   InkTitle,
   useReduceMotion,
-} from '@jarida/ink/native';
+} from '@/components/ui/ink';
 
 import { ChromePill } from '@/components/patterns/chrome-pill';
 import { ContentUnavailable } from '@/components/patterns/content-unavailable';

@@ -27,7 +27,7 @@ import {
   InkSwitch,
   InkText,
   InkTitle,
-} from '@jarida/ink/native';
+} from '@/components/ui/ink';
 
 import { GIcon } from '@/components/ui/g-icon';
 import { GRoundButton } from '@/components/ui/g-round-button';
