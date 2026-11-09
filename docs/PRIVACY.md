@@ -206,9 +206,13 @@ and nowhere else.
   in backups.
 - **Remote access** is encrypted end to end between your phone and your Pond, and must be
   approved on your Pond, from your home network, before it works.
-- **On your Pond**, the keys you give it for other services are stored encrypted. The rest of
-  your Pond's data is stored as files on your Pond, protected by the device itself, so keep it
-  somewhere safe, as you would a computer.
+- **On your Pond**, the keys you give it for other services are stored encrypted. Your Pond can
+  also keep all of its data (conversations, memories, profiles, face templates and those keys) in
+  an encrypted volume, opened at start-up by your Pond's own security chip, with your admin card as
+  the recovery key; then storage taken out of your Pond and read elsewhere shows nothing. Until the
+  volume is set up, that data is ordinary files on your Pond, and your Pond's health check says
+  which it is. On a Pond whose security fuses have not been set, its storage moved into another
+  identical device may still open, so keep your Pond somewhere safe, as you would a computer.
 
 No system is perfectly secure. If you believe your Pond or this phone has been compromised,
 unpair this phone, remove it on your Pond's dashboard, and pair again.
