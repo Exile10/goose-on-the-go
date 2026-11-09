@@ -92,6 +92,14 @@ describe('the resources the manifest names', () => {
     expect(styles).toContain('<item name="android:windowIsTranslucent">true</item>');
   });
 
+  it('blurs the app behind from Android 12, otherwise the same theme', () => {
+    const items = (xml: string) => [...xml.matchAll(/<item name="([^"]+)">([^<]+)<\/item>/g)].map((m) => `${m[1]}=${m[2]}`);
+    const base = items(read('values/goose_assist_styles.xml'));
+    const v31 = items(read('values-v31/goose_assist_styles.xml'));
+    expect(v31.filter((item) => !item.startsWith('android:windowBlurBehind'))).toEqual(base);
+    expect(v31).toEqual(expect.arrayContaining(['android:windowBlurBehindEnabled=true', expect.stringMatching(/^android:windowBlurBehindRadius=\d+px$/)]));
+  });
+
   it('renders the component index.ts registers', () => {
     const kotlin = fs.readFileSync(path.join(__dirname, '..', 'pond-assist', 'PondAssist.kt'), 'utf8');
     const index = fs.readFileSync(path.join(__dirname, '..', '..', 'index.ts'), 'utf8');

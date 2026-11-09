@@ -4,9 +4,10 @@
  */
 import { NativeModules, Platform } from 'react-native';
 
-import { assistantSupported, choosePhoneAssistant, closeAssist, isPhoneAssistant } from '@/services/phone-assistant';
+import { assistantSupported, choosePhoneAssistant, closeAssist, isPhoneAssistant, overlayBlursBehind } from '@/services/phone-assistant';
 
 const bridge = {
+  blursBehind: jest.fn(),
   isAssistant: jest.fn(),
   chooseAssistant: jest.fn(),
   close: jest.fn(),
@@ -25,6 +26,15 @@ afterEach(() => {
 });
 
 describe('on Android with the module', () => {
+  it('says whether the phone blurs behind the overlay, and reads a failed question as no, logged', () => {
+    bridge.blursBehind.mockReturnValueOnce(true).mockImplementationOnce(() => {
+      throw new Error('E');
+    });
+    expect(overlayBlursBehind()).toBe(true);
+    expect(overlayBlursBehind()).toBe(false);
+    expect(console.warn).toHaveBeenCalledWith('[assistant] could not ask whether the overlay blurs', expect.objectContaining({ kind: 'phone_assistant' }));
+  });
+
   it('passes the role through', async () => {
     bridge.isAssistant.mockResolvedValue(true);
     expect(assistantSupported()).toBe(true);
