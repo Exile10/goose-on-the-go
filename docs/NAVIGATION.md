@@ -5,7 +5,7 @@
 - **Google Home**: Device grid with color-coded toggles, room groupings, "Ask" bar
 - **Claude Mobile**: Clean threaded chat, conversation list, generous whitespace
 
-## Bottom Tabs (4)
+## Bottom Tabs (5)
 
 Ink's `InkBottomBar`, floating over the screens rather than beside them, and
 leaving on scroll. Labels come from `tabs.*` in the catalogue; icon names are
@@ -15,6 +15,7 @@ registry keys, so `device` is singular.
 |-----|--------|------|---------|
 | Home | Dashboard | home | Greeting, status, devices, shortcuts, recent |
 | Chat | Conversations wall → conversation | chat | Every conversation the Pond holds; open one or start one |
+| My Goose | What the Goose holds for you | the brand mark | Suggestions to decide, watches, news briefs, the cart of kept listings, ideas |
 | Devices | Device Grid | device | Room-grouped smart home control |
 | You | Profile Hub | profile | Settings, integrations, data |
 
@@ -24,6 +25,16 @@ bar is in lives in `providers/chrome-provider.tsx`; see
 [`VIEW-LAYER.md`](VIEW-LAYER.md#the-bar-leaving) for the last stage, where the
 bar contracts to one control, and the fix in Ink that makes that work more
 than once.
+
+My Goose (`app/(tabs)/goose.tsx`, `view-models/use-my-goose.ts`) opens on one sentence of at most
+three clauses, each a link to its shelf's screen, then a shelf per kind of thing with something on
+it. Its glyph is the brand mark from `assets/images/tab-goose*.png`, made by `scripts/make-icons.py`;
+the mark is never tinted, so an unselected tab steps back by opacity. The Pond has no cart or news
+route: Cart (`goose-cart`) is the saved listings per collection, shown as a price range because kept
+listings are alternatives, and News (`goose-news`) is what scheduled prompts last answered, with a
+one-press daily 7:00 brief when there are none. Ideas (`goose-ideas`) is the Pond's composed
+questions and its agent suggestions. Watching and Waiting on you open the existing `web-watches`
+and `suggestions` screens.
 
 The Chat tab opens on the wall of conversations, `app/(tabs)/chat/index.tsx`,
 as pond-desktop's Chat does. A conversation is `app/conversation.tsx`, a

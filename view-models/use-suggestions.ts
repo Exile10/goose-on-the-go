@@ -32,6 +32,8 @@ export interface OfferedPrompt {
   prompt: string;
   /** Composed from a memory: the Pond should hear that it was used. */
   composed: boolean;
+  /** Why the Pond offers it, in its own words; a starter has none. */
+  because?: string;
 }
 
 export interface UseSuggestions {
@@ -70,7 +72,7 @@ export function useSuggestions(sessionId: string | null): UseSuggestions {
 
   const prompts: OfferedPrompt[] =
     offered.length > 0
-      ? offered.map((s) => ({ id: s.id, prompt: s.prompt, composed: s.composed }))
+      ? offered.map((s) => ({ id: s.id, prompt: s.prompt, composed: s.composed, because: s.because?.trim() || undefined }))
       : STARTERS.map((key) => ({ id: null, prompt: t(key), composed: false }));
 
   return { data: { prompts }, actions: { taken } };

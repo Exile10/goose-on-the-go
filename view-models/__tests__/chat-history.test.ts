@@ -448,6 +448,30 @@ describe('toCard', () => {
     });
   });
 
+  it('carries the Pond’s picture only when it is one the Pond serves', () => {
+    const now = at(2026, 9, 24);
+    const picture = {
+      key: 'a1b2c3d4e5f60718a1b2c3d4e5f60718',
+      src: '/api/v1/report-images/a1b2c3d4e5f60718a1b2c3d4e5f60718',
+      page: 'https://en.wikipedia.org/wiki/Goose',
+      credit: 'Someone, CC BY-SA 4.0',
+    };
+    expect(toCard(session({ picture }), now, LOCALE, 'Yesterday').picture).toEqual({
+      src: picture.src,
+      label: picture.credit,
+    });
+    expect(toCard(session({ picture: { ...picture, src: 'https://elsewhere.example/x.jpg' } }), now, LOCALE, 'Yesterday').picture).toBeNull();
+    expect(toCard(session(), now, LOCALE, 'Yesterday').picture).toBeNull();
+  });
+
+  it('carries a picture sent in the conversation, by the Pond’s attachment path only', () => {
+    const now = at(2026, 9, 24);
+    const src = '/api/v1/sessions/s-1/attachments/att-9';
+    expect(toCard(session({ picture: { kind: 'sent', src } }), now, LOCALE, 'Yesterday').picture).toEqual({ src, label: null });
+    expect(toCard(session({ picture: { kind: 'sent', src: '/api/v1/settings' } }), now, LOCALE, 'Yesterday').picture).toBeNull();
+    expect(toCard(session({ picture: { kind: 'sent', src: `${src}/../../x` } }), now, LOCALE, 'Yesterday').picture).toBeNull();
+  });
+
   it('keeps when it last moved as a number, and an unreadable time as NaN rather than a guess', () => {
     const now = at(2026, 9, 24);
     expect(toCard(session(), now, LOCALE, 'Yesterday').updatedAt).toBe(Date.UTC(2026, 8, 22, 9));

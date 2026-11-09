@@ -7,7 +7,9 @@
  *             begun once it is loud for 60ms and has ended after a pause.
  *   hear      the samples as a 16 kHz WAV, to `/transcribe`.
  *   answer    the words as an ordinary turn with `voice_mode`, so it lands in
- *             the conversation like anything typed — and is shorter.
+ *             the conversation like anything typed — and is shorter. Where the
+ *             Pond takes recordings, the clip goes too, the words beside it:
+ *             its model hears the clip, or the words stand in.
  *   speak     each clause of the reply to `/tts` as soon as it is whole,
  *             played in order, the next one fetched while this one plays.
  *
@@ -26,6 +28,7 @@ import { useTranslation } from 'react-i18next';
 
 import type { VoiceState } from '@/models/voice';
 import { api } from '@/services/api-client';
+import { bytesToBase64, type Attachment } from '@/services/media';
 import {
   MAX_SPEECH_MS,
   SILENCE_MS,
@@ -134,6 +137,8 @@ export interface UseVoice {
 export function useVoice(chat: {
   send: UseChat['actions']['send'];
   stop: UseChat['actions']['stop'];
+  /** Send each turn's recording with its words, for a Pond whose model hears it. */
+  sendsRecordings?: boolean;
 }): UseVoice {
   const { t } = useTranslation();
   const [state, setStateRaw] = useState<VoiceState>('idle');
@@ -151,6 +156,8 @@ export function useVoice(chat: {
   const speakerRef = useRef(true);
   const alive = useRef(true);
   const sendRef = useRef(chat.send);
+  const recordingsRef = useRef(Boolean(chat.sendsRecordings));
+  recordingsRef.current = Boolean(chat.sendsRecordings);
   const stopRef = useRef(chat.stop);
   useEffect(() => {
     sendRef.current = chat.send;
@@ -364,7 +371,7 @@ export function useVoice(chat: {
   );
 
   const converse = useCallback(
-    async (text: string) => {
+    async (text: string, clip?: Attachment) => {
       const v = voice.current;
       v.turnDone = false;
       v.line.clear();
@@ -375,7 +382,7 @@ export function useVoice(chat: {
         v.line.push(units);
         void pump();
       };
-      const reply = await sendRef.current(text, [], {
+      const reply = await sendRef.current(text, clip ? [clip] : [], {
         voice: true,
         onText: (full) => {
           // Working notes set aside shorten the reply; what is left of it was already said.
@@ -409,7 +416,8 @@ export function useVoice(chat: {
       const samples = downsample(concatSamples(tk.chunks), tk.rate);
       tk.chunks = [];
       const rate = tk.rate >= SPEECH_RATE ? SPEECH_RATE : tk.rate;
-      const uri = cacheFile('speech', encodeWav(samples, rate));
+      const wav = encodeWav(samples, rate);
+      const uri = cacheFile('speech', wav);
       let text = '';
       try {
         text = await api.transcribe(uri);
@@ -432,7 +440,10 @@ export function useVoice(chat: {
         void speakFarewell(t(dismissal.isExit ? 'chat.voice.farewellExit' : 'chat.voice.farewellPause'));
         return;
       }
-      void converse(text);
+      void converse(
+        text,
+        recordingsRef.current ? spokenClip(text, wav, Math.round((samples.length / rate) * 1000)) : undefined,
+      );
     },
     [converse, listen, setState, speakFarewell, t],
   );
@@ -500,5 +511,20 @@ export function useVoice(chat: {
   return {
     data: { state, level, speaker, error, micBlocked, supported: voiceSupported() },
     actions: { tap, toggleSpeaker, end },
+  };
+}
+
+/** A spoken turn's recording with the words Whisper heard in it: the Pond's model hears the clip
+ *  where it can, and the words stand in where it cannot. */
+export function spokenClip(words: string, wav: Uint8Array, durationMs: number): Attachment {
+  return {
+    id: `speech-${Date.now().toString(36)}`,
+    kind: 'audio',
+    uri: '',
+    name: 'speech.wav',
+    mimeType: 'audio/wav',
+    base64: bytesToBase64(wav),
+    durationMs,
+    heardAs: words,
   };
 }

@@ -32,7 +32,8 @@
     "chat": "Chat",
     "devices": "Devices",
     "you": "You",
-    "navigation": "Main navigation"
+    "navigation": "Main navigation",
+    "goose": "My Goose"
   },
   "greeting": {
     "night": "Good night,",
@@ -160,6 +161,7 @@
     "timedOut": "Goose took too long to answer. Your Pond may still be loading the model — try again in a moment.",
     "failed": "That message did not get through.",
     "history": {
+      "sentPicture": "A picture sent in this conversation",
       "title": "Conversations",
       "subtitle_one": "{{count}} on your Pond, and nowhere else.",
       "subtitle_other": "{{count}} on your Pond, and nowhere else.",
@@ -570,7 +572,17 @@
       "shareFailed": "Could not get the file from your Pond. Try again in a moment.",
       "pdfFailed": "Could not make the PDF. Try again, or share it as a web page.",
       "shareUnavailable": "This phone has no share sheet to hand the file to.",
-      "noDates": "This report has no dated events for a calendar."
+      "noDates": "This report has no dated events for a calendar.",
+      "openSource": "Open page",
+      "options_one": "One option",
+      "options_other": "{{count}} options",
+      "save": "Save",
+      "saved": "Saved",
+      "watchPrice": "Watch price",
+      "watching": "Watching",
+      "sourcesCount_one": "One source",
+      "sourcesCount_other": "{{count}} sources",
+      "closeSource": "Close"
     }
   },
   "devices": {
@@ -1688,7 +1700,14 @@
     "settingsPhoneNotifications": "Notifications",
     "voiceAgent": "Voice agent",
     "voiceMatch": "Voice Match",
-    "teachVoice": "Teach Goose your voice"
+    "teachVoice": "Teach Goose your voice",
+    "webWatches": "Watches",
+    "webWatch": "Watch",
+    "saved": "Saved",
+    "savedItem": "Saved card",
+    "gooseCart": "Cart",
+    "gooseNews": "News",
+    "gooseIdeas": "Ideas"
   },
   "nav": {
     "goose": "Goose",
@@ -4585,5 +4604,170 @@
     "connecting": "Reaching your Pond",
     "unreachable": "Goose cannot reach your Pond from here. Open the app to pair this phone or check its connection.",
     "openApp": "Open Goose On The Go"
+  },
+  "webWatches": {
+    "intro": "Pages your Pond keeps checking for you. Ask Goose to watch a page of listings, and it tells your phone when something you want appears or drops in price.",
+    "loading": "Reading your watches",
+    "emptyTitle": "No watches yet",
+    "emptyBody": "Ask Goose to watch a page of listings, such as \"tell me when a Subaru Forester under 1.5 million shows up on this site\".",
+    "lookingFor": "Looking for {{what}}",
+    "paused": "Paused",
+    "every_one": "Checks every hour",
+    "every_other": "Checks every {{count}} hours",
+    "matching": "{{count}} of {{total}} match",
+    "failing": "The site has refused your Pond several times in a row, so it checks less often.",
+    "stopTitle": "Stop watching?",
+    "stopBody": "Your Pond stops checking this page and forgets what it found.",
+    "stop": "Stop watching",
+    "gone": "This watch is no longer on your Pond.",
+    "checking": "Keep checking",
+    "howOften": "How often",
+    "hours_one": "Hourly",
+    "hours_other": "{{count}} h",
+    "changes": "What changed",
+    "noChanges": "Nothing has changed since it started.",
+    "matchSent": "Sent to your phone",
+    "inDigest": "In the evening summary",
+    "listings_one": "One listing now",
+    "listings_other": "{{count}} listings now",
+    "openListing": "Open listing",
+    "errors": {
+      "status": "Your Pond could not answer (error {{status}}).",
+      "unreachable": "Goose cannot reach your Pond from here."
+    }
+  },
+  "saved": {
+    "intro": "What you kept from Goose's work: recipes, listings, places and reports, in your collections and any the household shares.",
+    "all": "All",
+    "collection": "{{name}} ({{count}})",
+    "loading": "Reading your saved cards",
+    "emptyTitle": "Nothing saved yet",
+    "emptyBody": "Ask Goose to keep a recipe or a listing it found, or save an option from a report.",
+    "shared": "Shared",
+    "kinds": {
+      "recipe": "Recipe",
+      "listing": "Listing",
+      "place": "Place",
+      "report": "Report",
+      "note": "Note"
+    },
+    "deleteTitle": "Delete this card?",
+    "deleteBody": "It is removed from your Pond for good.",
+    "delete": "Delete",
+    "gone": "This card is no longer on your Pond.",
+    "ingredients": "Ingredients",
+    "steps": "Steps",
+    "openPage": "Open on {{site}}",
+    "sources_one": "One source",
+    "sources_other": "{{count}} sources",
+    "shareWithHousehold": "Share with the household",
+    "watchPrice": "Watch price",
+    "watching": "Watching its price",
+    "sharedByOther": "Shared by someone in the household.",
+    "errors": {
+      "status": "Your Pond could not answer (error {{status}}).",
+      "unreachable": "Goose cannot reach your Pond from here."
+    }
+  },
+  "myGoose": {
+    "title": "My Goose",
+    "loading": "Seeing what your Goose has",
+    "quiet": "Nothing needs you right now.",
+    "quietWatching_one": "Nothing needs you right now. {{count}} watch is running.",
+    "quietWatching_other": "Nothing needs you right now. {{count}} watches are running.",
+    "say": {
+      "offers_one": "{{count}} suggestion is waiting on your yes.",
+      "offers_other": "{{count}} suggestions are waiting on your yes.",
+      "watchOne_one": "Your {{title}} watch has {{count}} match.",
+      "watchOne_other": "Your {{title}} watch has {{count}} matches.",
+      "watchMany_one": "{{count}} listing matches across {{watches}} watches.",
+      "watchMany_other": "{{count}} listings match across {{watches}} watches.",
+      "brief": "Your brief “{{name}}” is ready to read.",
+      "reminders_one": "{{count}} reminder is waiting.",
+      "reminders_other": "{{count}} reminders are waiting.",
+      "cart_one": "You kept {{count}} listing.",
+      "cart_other": "You kept {{count}} listings.",
+      "cartFrom_one": "You kept {{count}} listing, at {{low}}.",
+      "cartFrom_other": "You kept {{count}} listings, from {{low}}.",
+      "ideas_one": "{{count}} idea is ready when you are.",
+      "ideas_other": "{{count}} ideas are ready when you are."
+    },
+    "shelf": {
+      "offers": "Waiting on you",
+      "watching": "Watching",
+      "news": "News",
+      "cart": "Cart",
+      "ideas": "Ideas",
+      "seeAll": "See all",
+      "seeAllLabel": "See all of {{shelf}}",
+      "count": "{{count}}",
+      "unavailable": "Your Pond did not answer for this. Pull down to try again."
+    },
+    "offer": {
+      "yes": "Yes",
+      "notNow": "Not now",
+      "until": "Offered until {{when}}",
+      "more_one": "{{count}} more is waiting",
+      "more_other": "{{count}} more are waiting"
+    },
+    "watch": {
+      "matches_one": "match",
+      "matches_other": "matches",
+      "of": "of {{total}} listings",
+      "checked": "Checked {{when}}",
+      "notChecked": "Not checked yet",
+      "paused": "Paused",
+      "failing": "Can’t reach the page",
+      "open": "{{title}}, {{count}} matching"
+    },
+    "news": {
+      "written": "Written {{when}}",
+      "morningName": "Morning news",
+      "morningPrompt": "Give me today’s top news for Kenya and the world in a few short paragraphs, with the most important story first.",
+      "start": "Get the news every morning",
+      "started": "Your Goose will write the news at 7:00 every morning.",
+      "emptyTitle": "No news yet",
+      "emptyBody": "Your Goose can read the news at 7:00 every morning and keep it here, ready when you wake up.",
+      "waiting": "Your first brief arrives on its next run.",
+      "runNow": "Write it again now",
+      "asked": "Writing it now. It will be here when it’s done.",
+      "earlier": "Earlier",
+      "asksFor": "Asks for: {{prompt}}"
+    },
+    "cart": {
+      "intro": "Listings your Goose kept for you, grouped as you filed them, cheapest first.",
+      "listings_one": "{{count}} listing",
+      "listings_other": "{{count}} listings",
+      "range": "{{low}} to {{high}}",
+      "lowest": "Lowest price",
+      "more": "{{amount}} more than the lowest",
+      "loose": "Not in a list",
+      "noPrice": "No price given",
+      "emptyTitle": "Your cart is empty",
+      "emptyBody": "When Goose finds listings in a chat, say “keep that one” and it lands here, ready to compare."
+    },
+    "ideas": {
+      "intro": "Your Goose writes these while it’s quiet, from what it remembers about you.",
+      "ask": "Questions worth asking",
+      "agents": "Agents it could run",
+      "setUp": "Set it up",
+      "notForMe": "Not for me",
+      "askLabel": "Ask: {{prompt}}",
+      "reminders_one": "{{count}} reminder from your conversations",
+      "reminders_other": "{{count}} reminders from your conversations",
+      "emptyTitle": "No ideas right now",
+      "emptyBody": "Ideas show up after a few conversations, once your Goose knows what you care about."
+    },
+    "try": {
+      "title": "More your Goose can do",
+      "watching": "Ask Goose to watch a listings page, and it will check it and tell you what’s new.",
+      "cart": "Keep listings from a chat to compare them here.",
+      "news": "Have the news written for you every morning.",
+      "startChat": "Start a chat"
+    },
+    "errors": {
+      "status": "Your Pond answered with an error ({{status}}).",
+      "unreachable": "Your Pond can’t be reached right now."
+    }
   }
 }
