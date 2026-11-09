@@ -222,6 +222,8 @@ export function createMockLongTasks(now: () => number = Date.now) {
         sections: done ? 4 : 0,
         sources: done ? [{ title: 'Madaraka Express timetable', url: 'https://metickets.krc.co.ke' }] : [],
         calendar_events: done ? 4 : 0,
+        images: [],
+        options: [],
       };
     },
     export: async (id: string, format: ReportFormat) => {

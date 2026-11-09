@@ -83,6 +83,8 @@ const REPORT: LongTaskReportWire = {
   sections: 2,
   sources: [{ title: 'Timetable', url: 'https://metickets.krc.co.ke' }],
   calendar_events: 2,
+  images: [],
+  options: [],
 };
 
 const TASK: LongTask = {
@@ -264,6 +266,9 @@ describe('the share choices', () => {
     exportable: true,
     calendarEvents: 0,
     final: true,
+    sources: [],
+    images: [],
+    options: [],
     ...over,
   });
 

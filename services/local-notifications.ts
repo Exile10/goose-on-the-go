@@ -234,6 +234,7 @@ function openData(data: unknown): Record<string, unknown> {
   const route = openRouteFromData(data);
   if (!route) return {};
   if (route.open === 'conversation') return { open: route.open, session_id: route.sessionId };
+  if (route.open === 'watch') return { open: route.open, ...(route.watchId ? { watch_id: route.watchId } : {}) };
   if (route.open !== 'schedule') return { open: route.open };
   return {
     open: route.open,

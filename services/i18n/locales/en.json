@@ -570,7 +570,16 @@
       "shareFailed": "Could not get the file from your Pond. Try again in a moment.",
       "pdfFailed": "Could not make the PDF. Try again, or share it as a web page.",
       "shareUnavailable": "This phone has no share sheet to hand the file to.",
-      "noDates": "This report has no dated events for a calendar."
+      "noDates": "This report has no dated events for a calendar.",
+      "openSource": "Open page",
+      "options_one": "One option",
+      "options_other": "{{count}} options",
+      "save": "Save",
+      "saved": "Saved",
+      "watchPrice": "Watch price",
+      "watching": "Watching",
+      "sourcesCount_one": "One source",
+      "sourcesCount_other": "{{count}} sources"
     }
   },
   "devices": {
@@ -1688,7 +1697,11 @@
     "settingsPhoneNotifications": "Notifications",
     "voiceAgent": "Voice agent",
     "voiceMatch": "Voice Match",
-    "teachVoice": "Teach Goose your voice"
+    "teachVoice": "Teach Goose your voice",
+    "webWatches": "Watches",
+    "webWatch": "Watch",
+    "saved": "Saved",
+    "savedItem": "Saved card"
   },
   "nav": {
     "goose": "Goose",
@@ -4585,5 +4598,69 @@
     "connecting": "Reaching your Pond",
     "unreachable": "Goose cannot reach your Pond from here. Open the app to pair this phone or check its connection.",
     "openApp": "Open Goose On The Go"
+  },
+  "webWatches": {
+    "intro": "Pages your Pond keeps checking for you. Ask Goose to watch a page of listings, and it tells your phone when something you want appears or drops in price.",
+    "loading": "Reading your watches",
+    "emptyTitle": "No watches yet",
+    "emptyBody": "Ask Goose to watch a page of listings, such as \"tell me when a Subaru Forester under 1.5 million shows up on this site\".",
+    "lookingFor": "Looking for {{what}}",
+    "paused": "Paused",
+    "every_one": "Checks every hour",
+    "every_other": "Checks every {{count}} hours",
+    "matching": "{{count}} of {{total}} match",
+    "failing": "The site has refused your Pond several times in a row, so it checks less often.",
+    "stopTitle": "Stop watching?",
+    "stopBody": "Your Pond stops checking this page and forgets what it found.",
+    "stop": "Stop watching",
+    "gone": "This watch is no longer on your Pond.",
+    "checking": "Keep checking",
+    "howOften": "How often",
+    "hours_one": "Hourly",
+    "hours_other": "{{count}} h",
+    "changes": "What changed",
+    "noChanges": "Nothing has changed since it started.",
+    "matchSent": "Sent to your phone",
+    "inDigest": "In the evening summary",
+    "listings_one": "One listing now",
+    "listings_other": "{{count}} listings now",
+    "openListing": "Open listing",
+    "errors": {
+      "status": "Your Pond could not answer (error {{status}}).",
+      "unreachable": "Goose cannot reach your Pond from here."
+    }
+  },
+  "saved": {
+    "intro": "What you kept from Goose's work: recipes, listings, places and reports, in your collections and any the household shares.",
+    "all": "All",
+    "collection": "{{name}} ({{count}})",
+    "loading": "Reading your saved cards",
+    "emptyTitle": "Nothing saved yet",
+    "emptyBody": "Ask Goose to keep a recipe or a listing it found, or save an option from a report.",
+    "shared": "Shared",
+    "kinds": {
+      "recipe": "Recipe",
+      "listing": "Listing",
+      "place": "Place",
+      "report": "Report",
+      "note": "Note"
+    },
+    "deleteTitle": "Delete this card?",
+    "deleteBody": "It is removed from your Pond for good.",
+    "delete": "Delete",
+    "gone": "This card is no longer on your Pond.",
+    "ingredients": "Ingredients",
+    "steps": "Steps",
+    "openPage": "Open on {{site}}",
+    "sources_one": "One source",
+    "sources_other": "{{count}} sources",
+    "shareWithHousehold": "Share with the household",
+    "watchPrice": "Watch price",
+    "watching": "Watching its price",
+    "sharedByOther": "Shared by someone in the household.",
+    "errors": {
+      "status": "Your Pond could not answer (error {{status}}).",
+      "unreachable": "Goose cannot reach your Pond from here."
+    }
   }
 }

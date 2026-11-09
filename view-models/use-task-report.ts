@@ -1,6 +1,7 @@
 // A long task's whole report, for its reading screen, and sharing it as a file. A Pond without the
 // report route still shows the task's result artifact, as the chat card used to, with nothing to share.
 
+import type { ReportImage, ReportOption } from '@/models/web-watches';
 import { useCallback, useEffect, useState } from 'react';
 
 import { isEnded, pdfFileName, REPORT_FILES, reportSections, resultArtifact, type ReportSection } from '@/models/long-tasks';
@@ -24,6 +25,10 @@ export interface ShownReport {
   calendarEvents: number;
   /** Whether the task has ended, after which the report cannot change. */
   final: boolean;
+  /** The pages it cites, numbered in order: a chip's number is its place here, from 1. */
+  sources: { title: string; url: string }[];
+  images: ReportImage[];
+  options: ReportOption[];
 }
 
 /** What the Pond exports, and a PDF the phone prints from the Pond's web page. */
@@ -68,6 +73,9 @@ export async function loadReport(source: LongTasksSource, id: string): Promise<S
       exportable: true,
       calendarEvents: r.calendar_events,
       final: isEnded(r.state),
+      sources: r.sources,
+      images: r.images,
+      options: r.options,
     };
   } catch (e) {
     if (!isMissing(e)) throw e;
@@ -89,6 +97,9 @@ export async function loadReport(source: LongTasksSource, id: string): Promise<S
     exportable: false,
     calendarEvents: 0,
     final: isEnded(task.state),
+    sources: [],
+    images: [],
+    options: [],
   };
 }
 
