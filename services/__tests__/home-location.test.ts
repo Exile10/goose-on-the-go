@@ -3,7 +3,7 @@
  * and at most one unasked offer per run of the app.
  */
 
-import { offerHomeLocationOnce, placeName, readPhoneFix } from '@/services/home-location';
+import { homeLocationIsPinned, offerHomeLocationOnce, placeName, readPhoneFix } from '@/services/home-location';
 
 const mockLocation = {
   getForegroundPermissionsAsync: jest.fn(),
@@ -62,4 +62,14 @@ it('offers unasked once per run, with a grant already given, never replacing a s
   await expect(offerHomeLocationOnce()).resolves.toBe(false);
   expect(mockSet).toHaveBeenCalledTimes(1);
   expect(mockLocation.requestForegroundPermissionsAsync).not.toHaveBeenCalled();
+});
+
+describe('a pinned home', () => {
+  it('is a phone\'s fix or coordinates someone entered, and nothing a lookup made', () => {
+    expect(homeLocationIsPinned({ weather_location_source: 'device' })).toBe(true);
+    expect(homeLocationIsPinned({ weather_location_source: 'manual' })).toBe(true);
+    expect(homeLocationIsPinned({ weather_location_source: 'geocoded' })).toBe(false);
+    // A Pond from before the field: its location is a guess.
+    expect(homeLocationIsPinned({})).toBe(false);
+  });
 });

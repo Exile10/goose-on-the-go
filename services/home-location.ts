@@ -67,6 +67,16 @@ export async function sendHomeLocation(fix: Extract<PhoneFix, { kind: 'fix' }>, 
   return result;
 }
 
+/**
+ * Whether the Pond's home location is a place someone pinned: a household phone's fix
+ * ('device') or coordinates entered as such ('manual'). A guess from away never replaces it,
+ * not even by renaming it: the Pond looks a new name up again and would move home to the
+ * town's centre. A Pond that predates the field reports nothing, which counts as a guess.
+ */
+export function homeLocationIsPinned(settings: { weather_location_source?: string }): boolean {
+  return settings.weather_location_source === 'device' || settings.weather_location_source === 'manual';
+}
+
 /** Whether this run of the app has already offered its fix unasked. */
 let offered = false;
 

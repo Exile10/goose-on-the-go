@@ -20,6 +20,7 @@ import {
 } from '@/models/pond-settings';
 import { useConfirm } from '@/providers/confirm-provider';
 import { selectionTick, tap } from '@/services/haptics';
+import { homeLocationIsPinned } from '@/services/home-location';
 import type { PondSettings } from '@/services/types';
 import {
   llmModels,
@@ -141,13 +142,16 @@ export function LocationRows({ settings, vm }: SpecialProps) {
       await vm.actions.refresh();
       return;
     }
+    // Away from home the answer is only the Pond's guess: it never renames a pinned home, since
+    // the Pond would look the new name up and move home to the town's centre.
+    if (homeLocationIsPinned(settings)) return;
     if (place.name && place.name !== settings.weather_location_name) {
       await vm.actions.update('weather_location_name', place.name);
     }
     if (place.timezone && (!settings.timezone || settings.timezone === 'UTC')) {
       await vm.actions.update('timezone', place.timezone);
     }
-  }, [detect, settings.timezone, settings.weather_location_name, vm.actions]);
+  }, [detect, settings, vm.actions]);
   return (
     <>
       <TextRow
