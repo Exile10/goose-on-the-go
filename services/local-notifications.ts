@@ -49,8 +49,10 @@ import type { ServerNotification } from './notification-stream';
  * - `info`: news worth a glance (a schedule's result, a long task done, a device paired, a model
  *   downloaded). HIGH: every one of these is something the household asked the Pond to do or to
  *   say, so it is worth the interruption.
- * - `reply`: the phone's own notice that a reply finished while nobody was reading it. DEFAULT,
- *   so it waits in the shade: the person asked moments ago and is usually still in the app.
+ * - `reply`: the phone's own notice that a reply finished while nobody was reading it. HIGH:
+ *   it is posted only when nobody is reading that conversation, so the person has moved on and
+ *   asked to be told. Until 2026-11-09 it was DEFAULT and waited in the shade unseen, which read
+ *   as the answer never arriving.
  *
  * A category this app does not know arrives as an update.
  */
@@ -86,16 +88,17 @@ const CHANNELS: Record<Category, ChannelSpec> = {
     description: () => i18n.t('notifications.channels.updates.description'),
     popsUp: true,
   },
+  // `giap-replies` was DEFAULT, and Android keeps a channel's importance, so HIGH needed a new id.
   reply: {
-    id: 'giap-replies',
+    id: 'giap-replies-v2',
     name: () => i18n.t('notifications.channels.replies.name'),
     description: () => i18n.t('notifications.channels.replies.description'),
-    popsUp: false,
+    popsUp: true,
   },
 };
 
 /** Channels earlier versions created and nothing uses now; deleting one never made is a no-op. */
-const RETIRED_CHANNELS = ['giap-info'];
+const RETIRED_CHANNELS = ['giap-info', 'giap-replies'];
 
 function channelSpec(category: unknown): ChannelSpec {
   // Own keys only: `'toString' in CHANNELS` is true.
