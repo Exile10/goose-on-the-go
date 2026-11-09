@@ -136,7 +136,7 @@ it('keeps the pairing when the revoke did not reach the Pond', async () => {
 
 // The tab layout redirects to pairing when nothing is paired. Staging another pairing clears the
 // in-memory identity while the stored one stays, so the gate must key on the stored pairing, or
-// starting "Pair another Pond" throws the user out of the tabs mid-wizard.
+// pairing another Pond from Switch Pond throws the user out of the tabs mid-wizard.
 it('still reports a stored pairing while another is being staged', async () => {
   (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
   let server!: ReturnType<typeof useServer>;
