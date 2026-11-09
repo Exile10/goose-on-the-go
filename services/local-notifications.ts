@@ -28,7 +28,8 @@ import { api, ApiError } from './api-client';
 import i18n from './i18n';
 import { markdownToPlain } from './markdown';
 
-import { linkFromData, openRouteFromData, rideOfferFromData, screenPath, type OpenRoute } from './notification-link';
+import { linkFromData, openRouteFromData, rideOfferFromData, screenPath, todoPromptFromData, type OpenRoute } from './notification-link';
+import { answerFrom, categoryFor, handleTodoResponse, promptData, registerTodoCategories } from './todo-prompts';
 import type { ServerNotification } from './notification-stream';
 
 /**
@@ -163,10 +164,16 @@ export function configureLocalNotifications(): Promise<void> {
   if (!Notifications) return Promise.resolve(); // Expo Go: see notifications-module.ts
   if (!configured) {
     installHandler(Notifications);
-    configured = createChannels(Notifications).catch((e) => {
-      // A channel that cannot be created costs the shade entry, not the app.
-      console.warn('[notifications] could not create channels', e);
-    });
+    configured = Promise.all([
+      createChannels(Notifications).catch((e) => {
+        // A channel that cannot be created costs the shade entry, not the app.
+        console.warn('[notifications] could not create channels', e);
+      }),
+      registerTodoCategories(Notifications).catch((e) => {
+        // Without the categories a question still arrives; it is answered in the app instead.
+        console.warn('[notifications] could not register the to-do buttons', e);
+      }),
+    ]).then(() => undefined);
   }
   return configured;
 }
@@ -184,6 +191,8 @@ export async function presentLocally(notification: ServerNotification): Promise<
     await configureLocalNotifications();
     const Notifications = notifications;
     if (!Notifications) return false; // Expo Go: see notifications-module.ts
+    // A question Goose asks about a to-do carries its own buttons, answered without opening the app.
+    const buttons = categoryFor(notification.data);
     await Notifications.scheduleNotificationAsync({
       // The server's own id, so the same notification arriving over both the
       // stream and a remote push replaces itself instead of duplicating.
@@ -197,7 +206,9 @@ export async function presentLocally(notification: ServerNotification): Promise<
           id: notification.id,
           category: notification.category,
           ...linkData(notification.data),
+          ...promptData(notification.data),
         },
+        ...(buttons ? { categoryIdentifier: buttons } : {}),
       },
       // Android routes by channel, and the channel is carried on the trigger —
       // `NotificationContentInput` has no `channelId`, so a channel set there is
@@ -235,6 +246,9 @@ function openData(data: unknown): Record<string, unknown> {
   if (!route) return {};
   if (route.open === 'conversation') return { open: route.open, session_id: route.sessionId };
   if (route.open === 'watch') return { open: route.open, ...(route.watchId ? { watch_id: route.watchId } : {}) };
+  if (route.open === 'todos') return { open: route.open, ...(route.todoId ? { todo_id: route.todoId } : {}) };
+  if (route.open === 'news') return { open: route.open, ...(route.storyId ? { story_id: route.storyId } : {}) };
+  if (route.open === 'cart') return { open: route.open, ...(route.cartId ? { cart_id: route.cartId } : {}) };
   if (route.open !== 'schedule') return { open: route.open };
   return {
     open: route.open,
@@ -249,6 +263,11 @@ const handledTaps = new Set<string>();
 /** Act on a tapped notification, checking what it carries again first. */
 function openTapped(Notifications: NotificationsModule, response: NotificationResponse | null): void {
   if (!response) return;
+  // Done, Not yet, Add or No on one of Goose's questions: answered where it is, nothing opened.
+  if (answerFrom(response.actionIdentifier, response.notification.request.content.data)) {
+    void handleTodoResponse(response, api, Notifications);
+    return;
+  }
   // The listener and the read of the last response can both deliver one tap; it opens once.
   const id = response.notification.request.identifier;
   if (handledTaps.has(id)) return;
@@ -278,7 +297,8 @@ function openTapped(Notifications: NotificationsModule, response: NotificationRe
     });
     return;
   }
-  const route = openRouteFromData(data);
+  // A question tapped rather than answered opens the to-dos, where it can be answered in full.
+  const route = openRouteFromData(data) ?? (todoPromptFromData(data) ? ({ open: 'todos' } as const) : null);
   if (!route) return;
   if (route.open !== 'conversation') {
     const href = screenPath(route);

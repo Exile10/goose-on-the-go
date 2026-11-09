@@ -35,6 +35,7 @@ import { alreadyDelivered } from './notification-delivery';
 import { handleWake } from './notification-wake';
 import { ensurePondSession } from './pond-session';
 import { pauseRemoteAccess, resumePausedRemoteAccess } from './remote-access';
+import { handleTodoResponse } from './todo-prompts';
 import { handleWakePing, type WakeOutcome } from './wake-handler';
 import { readWakePing } from './wake-ping';
 
@@ -74,6 +75,18 @@ export function defineWakeTask(Notifications: NotificationsModule | null = notif
     if (error) {
       console.warn('[wake] task error', { kind: 'notification_wake', error: error.message });
       return Failed;
+    }
+    // On Android a button on one of Goose's questions runs this task when the app is not in front.
+    if (data && typeof data === 'object' && 'actionIdentifier' in data) {
+      if (appActive()) return NoData;
+      await resumePausedRemoteAccess();
+      try {
+        if (!(await ensurePondSession())) return Failed;
+        const handled = await handleTodoResponse(data as Parameters<typeof handleTodoResponse>[0], api, Notifications);
+        return handled ? NewData : NoData;
+      } finally {
+        if (!appActive() && !stayConnectedEnabled()) await pauseRemoteAccess();
+      }
     }
     if (appActive()) return NoData;
     // The node was paused when the app left the foreground; a Pond away from home is reached through it.
