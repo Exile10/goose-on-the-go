@@ -1,11 +1,12 @@
 // The Pond's data folder, one folder at a time, largest first. What the Pond keeps says why.
 
-import React, { useCallback } from 'react';
-import { Pressable, RefreshControl, Text, View } from 'react-native';
+import React, { useCallback, useEffect, useRef } from 'react';
+import { BackHandler, Pressable, RefreshControl, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { usePreventRemove } from '@react-navigation/native';
+import { Stack, useFocusEffect } from 'expo-router';
 import { InkButton, InkSpinner, useInkTheme } from '@jarida/ink/native';
 
+import { BackButton } from '@/components/navigation/back-button';
 import { AdminLockView } from '@/components/pond/admin-lock';
 import { SettingsGroup, SettingsMessage } from '@/components/settings/settings-list';
 import { SettingsNotice, SettingsScroll } from '@/components/settings/settings-scroll';
@@ -113,10 +114,31 @@ export default function PondFilesScreen() {
 
   // A folder is opened in place, so it is not in the stack's history: back, from the header or
   // the phone, steps up one folder, and only leaves Files from the data directory itself.
-  usePreventRemove(path !== '' && gate.phase === 'unlocked', () => {
-    void selectionTick();
-    actions.up();
+  //
+  // Not usePreventRemove: Files is the only entry in the nested stack, so back removes that whole
+  // stack from the root one, and the screen's own beforeRemove never fires. Each way back is
+  // caught where it starts instead.
+  // The listing shows while the gate is still checking as well as once it is unlocked: opened
+  // straight from a link or a notice, Files lists the folder before the gate has answered.
+  const locked = gate.phase !== 'unlocked' && gate.phase !== 'checking';
+  const inFolder = path !== '' && !locked;
+  const up = useRef(actions.up);
+  useEffect(() => {
+    up.current = actions.up;
   });
+  const stepUp = useCallback(() => up.current(), []);
+  useFocusEffect(
+    useCallback(() => {
+      if (!inFolder) return undefined;
+      const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+        void selectionTick();
+        stepUp();
+        return true;
+      });
+      return () => sub.remove();
+    }, [inFolder, stepUp]),
+  );
+  const header = <Stack.Screen options={{ headerLeft: () => <BackButton onPress={inFolder ? stepUp : undefined} /> }} />;
 
   const open = useCallback(
     (entry: AdminFileEntry) => {
@@ -133,9 +155,10 @@ export default function PondFilesScreen() {
     [actions],
   );
 
-  if (gate.phase !== 'unlocked' && gate.phase !== 'checking') {
+  if (locked) {
     return (
       <SettingsScroll typing>
+        {header}
         <AdminLockView onRetry={() => void actions.refresh()} />
       </SettingsScroll>
     );
@@ -143,6 +166,7 @@ export default function PondFilesScreen() {
 
   return (
     <SettingsScroll refreshControl={<RefreshControl refreshing={false} onRefresh={() => void actions.refresh()} />}>
+      {header}
       <View style={styles.where} accessibilityLabel={t('myPond.files.where')}>
         <View style={styles.pill}>
           <GIcon name="server" size={14} color={colors.accent} strokeWidth={2.2} />

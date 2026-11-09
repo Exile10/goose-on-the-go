@@ -59,6 +59,20 @@ module.exports = defineConfig([
     ignores: ['dist/*', '**/._*'],
   },
   {
+    // expo-router carries its own build of React Navigation and mounts only that one. A hook or
+    // provider imported from the @react-navigation packages talks to a context nothing provides:
+    // usePreventRemove from @react-navigation/native threw "Couldn't find a navigation object"
+    // and closed the app as Files opened, and the theme provider set a theme no navigator read.
+    rules: {
+      'no-restricted-imports': ['error', {
+        patterns: [{
+          group: ['@react-navigation/*'],
+          message: "Import from 'expo-router' or 'expo-router/react-navigation': expo-router mounts its own copy of React Navigation, not this package.",
+        }],
+      }],
+    },
+  },
+  {
     files: TRANSLATED_SURFACE,
     // Tests assert on copy; they are not copy.
     ignores: ['**/__tests__/**'],

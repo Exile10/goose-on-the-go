@@ -7,47 +7,16 @@
  * above every one of these screens.
  */
 
-import { Stack, useRouter } from 'expo-router';
-import React, { useCallback, type ReactElement } from 'react';
+import { Stack } from 'expo-router';
+import React, { type ReactElement } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
+import { BackButton } from '@/components/navigation/back-button';
 import { ConnectionStatus } from '@/components/patterns/connection-status';
-import { GIcon } from '@/components/ui/g-icon';
-import { GPressable } from '@/components/ui/g-pressable';
 import { useTheme } from '@/providers/theme-provider';
-import { selectionTick } from '@/services/haptics';
 import { JaridaPurple } from '@/constants/colors';
 import { face } from '@/constants/typography';
-
-/**
- * A back control the navigator will not draw on its own.
- *
- * These screens are pushed from the tab group through the *root* stack, so this
- * nested navigator has exactly one entry in its own history and suppresses the
- * system back button. Without this, every one of them is a dead end reachable
- * only by the edge-swipe gesture — which is invisible, and which a person who
- * has turned it off does not have at all.
- */
-function BackButton() {
-  const router = useRouter();
-  const { t } = useTranslation();
-  const onPress = useCallback(() => {
-    void selectionTick();
-    router.back();
-  }, [router]);
-
-  return (
-    <GPressable
-      onPress={onPress}
-      hitSlop={12}
-      accessibilityRole="button"
-      accessibilityLabel={t('common.back')}
-    >
-      <GIcon name="chevron-left" size={22} color={JaridaPurple[500]} />
-    </GPressable>
-  );
-}
 
 /**
  * Each screen under its title bar, with the connection strip at the top of its content while the
