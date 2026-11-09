@@ -88,3 +88,23 @@ describe('reading saved cards and report extras', () => {
     });
   });
 });
+
+describe('the pages an answer cites', () => {
+  const { citedLinks, mergeSources } = jest.requireActual('@/components/patterns/cited-sources');
+
+  it('numbers cited pages in citing order, once each, then the other pages read', () => {
+    const cited = citedLinks(
+      'Fort Jesus ([Wikipedia](https://en.wikipedia.org/wiki/Fort_Jesus)) is old; see [the fort](https://fort.example/) and [Wikipedia](https://en.wikipedia.org/wiki/Fort_Jesus) again, not [mail](mailto:x@y.z).',
+    );
+    expect(cited.map((s: { url: string }) => s.url)).toEqual(['https://en.wikipedia.org/wiki/Fort_Jesus', 'https://fort.example/']);
+    const all = mergeSources(cited, [
+      { title: 'Fort', url: 'https://fort.example/' },
+      { title: 'Ferry', url: 'https://ferry.example/' },
+    ]);
+    expect(all.map((s: { url: string }) => s.url)).toEqual([
+      'https://en.wikipedia.org/wiki/Fort_Jesus',
+      'https://fort.example/',
+      'https://ferry.example/',
+    ]);
+  });
+});

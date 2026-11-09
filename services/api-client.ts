@@ -2,9 +2,11 @@ import { File } from 'expo-file-system';
 import {
   readCollection,
   readList,
+  readReportImage,
   readSavedItem,
   readWebWatch,
   readWebWatchDetail,
+  type ReportImage,
   type SavedCollection,
   type SavedItem,
   type SavedKind,
@@ -2712,6 +2714,16 @@ export class PondApiClient {
 
   deleteSavedItem(id: string): Promise<void> {
     return this.del<void>(`/api/v1/saved-items/${encodeURIComponent(id)}`);
+  }
+
+  /** Pictures the Pond keeps for the pages an answer cites or read; none from an older Pond. */
+  async pagePictures(pages: string[]): Promise<ReportImage[]> {
+    try {
+      return readList(await this.post<unknown>('/api/v1/report-images/for-pages', { pages }), readReportImage);
+    } catch (e) {
+      if (e instanceof ApiError && (e.status === 404 || e.status === 405)) return [];
+      throw e;
+    }
   }
 
   /** "Watch price": a watch on the card's own page, which tells this member when its price drops. */

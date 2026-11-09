@@ -1,20 +1,18 @@
 // A long task's whole report, read on its own page: a plan or research can run pages long, so it is
 // not a chat card. Its sections are a tap apart, and Share hands it on as a document, a page or dates.
 
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import * as WebBrowser from 'expo-web-browser';
 import { InkButton, InkCard, InkChip, InkEyebrow, InkNotice, InkSpinner, InkText, inkText, useInkTheme } from '@jarida/ink/native';
 
-import { Markdown, type SourceChips } from '@/components/patterns/markdown';
-import { PondPicture } from '@/components/patterns/pond-picture';
-import { siteOf } from '@/models/web-watches';
+import { PagePictures, SourcesChipRow, useSourceChips } from '@/components/patterns/cited-sources';
+import { Markdown } from '@/components/patterns/markdown';
 import type { ThemeColors } from '@/constants/colors';
 import { Spacing } from '@/constants/spacing';
 import { useThemedStyles } from '@/hooks/use-themed-styles';
-import { useChoice, useConfirm } from '@/providers/confirm-provider';
+import { useChoice } from '@/providers/confirm-provider';
 import { confirm, reject, selectionTick } from '@/services/haptics';
 import { taskEyebrow } from '@/view-models/long-task-words';
 import { useReportOptions } from '@/view-models/use-report-options';
@@ -34,31 +32,8 @@ export default function TaskReportScreen() {
   const params = useLocalSearchParams<{ id?: string }>();
   const id = taskIdOf(params.id);
   const { report, loading, error, gone, sharing, shareError, options, actions } = useTaskReport(id);
-  const ask = useConfirm();
   const picks = useReportOptions(report?.title ?? null);
-  const [sourcesOpen, setSourcesOpen] = useState(false);
-  // A chip's number is the page's place in the report's sources, from 1, as the Pond lists them.
-  const chips = useMemo<SourceChips | undefined>(() => {
-    const cited = report?.sources ?? [];
-    if (cited.length === 0) return undefined;
-    return {
-      numberOf: (url) => {
-        const i = cited.findIndex((s) => s.url === url);
-        return i === -1 ? undefined : i + 1;
-      },
-      open: (url) => {
-        const source = cited.find((s) => s.url === url);
-        void selectionTick();
-        void ask({
-          title: source?.title ?? siteOf(url),
-          message: `${siteOf(url)}\n${url}`,
-          confirmLabel: t('chat.report.openSource'),
-        }).then((yes) => {
-          if (yes) void WebBrowser.openBrowserAsync(url);
-        });
-      },
-    };
-  }, [ask, report?.sources, t]);
+  const chips = useSourceChips(report?.sources ?? []);
   const scroll = useRef<ScrollView>(null);
   // Where each section starts, measured as it lays out, so a chip can scroll straight to it.
   const [offsets, setOffsets] = useState<Record<number, number>>({});
@@ -131,19 +106,12 @@ export default function TaskReportScreen() {
             </View>
           ) : null}
 
-          {report.images.length > 0 ? (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.pictures}>
-              {report.images.map((image) => (
-                <View key={image.key} style={styles.picture}>
-                  <PondPicture path={image.src} label={image.caption ?? image.credit} style={styles.pictureBox} />
-                  <InkText size="xs" tone="tertiary" numberOfLines={2}>{image.credit}</InkText>
-                </View>
-              ))}
-            </ScrollView>
-          ) : null}
+          <PagePictures pictures={report.images} />
 
           {report.markdown.trim() === '' ? <InkNotice tone="neutral">{t('chat.report.empty')}</InkNotice> : null}
-          {report.sections.map((section, i) => (
+          {report.sections.map((section, i) =>
+            // The Pond's own Sources list is drawn below as the sources row, numbered like the chips.
+            report.sources.length > 0 && section.title.trim().toLowerCase() === 'sources' ? null : (
             <View
               key={i}
               onLayout={(e) => {
@@ -153,7 +121,8 @@ export default function TaskReportScreen() {
             >
               <Markdown source={section.markdown} sources={chips} />
             </View>
-          ))}
+            ),
+          )}
 
           {report.options.length > 0 ? (
             <View style={styles.row}>
@@ -195,20 +164,7 @@ export default function TaskReportScreen() {
             </View>
           ) : null}
 
-          {report.sources.length > 0 ? (
-            <View style={styles.row}>
-              <InkButton variant="quiet" icon={sourcesOpen ? 'chevron' : 'link'} onPress={() => setSourcesOpen((o) => !o)}>
-                {t('chat.report.sourcesCount', { count: report.sources.length })}
-              </InkButton>
-              {sourcesOpen
-                ? report.sources.map((source, i) => (
-                    <InkChip key={source.url} onPress={() => chips?.open(source.url)}>
-                      {`[${i + 1}] ${source.title}`}
-                    </InkChip>
-                  ))
-                : null}
-            </View>
-          ) : null}
+          <SourcesChipRow sources={report.sources} chips={chips} />
         </>
       ) : null}
     </ScrollView>

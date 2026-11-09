@@ -20,13 +20,22 @@
  * is visible and not a silent buffer.
  */
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Image } from 'expo-image';
 import { useTranslation } from 'react-i18next';
 import { InkBubble, inkText, useInkTheme, type BubblePosition } from '@jarida/ink/native';
 
+import {
+  PagePictures,
+  SourcesChipRow,
+  citedLinks,
+  mergeSources,
+  useSourceChips,
+} from '@/components/patterns/cited-sources';
 import { Markdown } from '@/components/patterns/markdown';
+import { sourcesOf } from '@/constants/tools';
+import { usePagePictures } from '@/view-models/use-page-pictures';
 import { ThinkingQuips } from '@/components/patterns/thinking-quips';
 import { ToolTrail } from '@/components/patterns/tool-card';
 import { GIcon } from '@/components/ui/g-icon';
@@ -174,8 +183,6 @@ export const MessageRow = React.memo(function MessageRow({
   queued = false,
   onUnqueue,
 }: MessageRowProps) {
-  const theme = useInkTheme();
-
   if (message.role === 'user') {
     return (
       <View style={styles.mine}>
@@ -199,13 +206,41 @@ export const MessageRow = React.memo(function MessageRow({
     );
   }
 
+  return <TheirMessage message={message} status={status} turnSeed={turnSeed} />;
+});
+
+/** Pages an answer's pictures are asked for at most. */
+const PICTURE_PAGES = 6;
+
+/**
+ * What Goose said: its text with each cited page a numbered chip, then once the turn is done the
+ * Pond's pictures for those pages and the pages folded into one chip, then what its tools did.
+ */
+function TheirMessage({ message, status, turnSeed }: { message: Message; status: string | null; turnSeed: number }) {
+  const theme = useInkTheme();
+  const done = !message.pending;
+  const sources = useMemo(
+    () =>
+      mergeSources(
+        citedLinks(message.content),
+        sourcesOf(message.tools).map((s) => ({ title: s.title, url: s.url })),
+      ),
+    [message.content, message.tools],
+  );
+  const chips = useSourceChips(sources);
+  const pictures = usePagePictures(
+    sources.slice(0, PICTURE_PAGES).map((s) => s.url),
+    done,
+  );
   const waiting = message.pending && !message.content;
   const unfinished = Boolean(message.pending && message.content);
   const note = inkText(theme, { role: 'mono', size: 'xs', color: theme.color.textTertiary });
 
   return (
     <View style={styles.theirs}>
-      {message.content ? <Markdown source={message.content} /> : null}
+      {message.content ? <Markdown source={message.content} sources={done ? chips : undefined} /> : null}
+      {done ? <PagePictures pictures={pictures} /> : null}
+      {done ? <SourcesChipRow sources={sources} chips={chips} /> : null}
       {waiting ? <ThinkingQuips status={status} seed={turnSeed} /> : null}
       {unfinished && status ? (
         <Text style={note.style} numberOfLines={1} accessibilityLiveRegion="polite">
@@ -215,7 +250,7 @@ export const MessageRow = React.memo(function MessageRow({
       {message.tools?.length ? <ToolTrail tools={message.tools} steps={message.steps} done={!message.pending} /> : null}
     </View>
   );
-});
+}
 
 const styles = StyleSheet.create({
   mine: { alignItems: 'flex-end', gap: 6, marginBottom: 10 },
