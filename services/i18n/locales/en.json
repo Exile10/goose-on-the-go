@@ -579,7 +579,8 @@
       "watchPrice": "Watch price",
       "watching": "Watching",
       "sourcesCount_one": "One source",
-      "sourcesCount_other": "{{count}} sources"
+      "sourcesCount_other": "{{count}} sources",
+      "closeSource": "Close"
     }
   },
   "devices": {

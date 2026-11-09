@@ -7,7 +7,7 @@ import { useLocalSearchParams } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { InkButton, InkCard, InkChip, InkEyebrow, InkNotice, InkSpinner, InkText, inkText, useInkTheme } from '@jarida/ink/native';
 
-import { PagePictures, SourcesChipRow, useSourceChips } from '@/components/patterns/cited-sources';
+import { PagePictures, SourcesChipRow, useSources } from '@/components/patterns/cited-sources';
 import { Markdown } from '@/components/patterns/markdown';
 import type { ThemeColors } from '@/constants/colors';
 import { Spacing } from '@/constants/spacing';
@@ -33,7 +33,7 @@ export default function TaskReportScreen() {
   const id = taskIdOf(params.id);
   const { report, loading, error, gone, sharing, shareError, options, actions } = useTaskReport(id);
   const picks = useReportOptions(report?.title ?? null);
-  const chips = useSourceChips(report?.sources ?? []);
+  const cited = useSources(report?.sources ?? []);
   const scroll = useRef<ScrollView>(null);
   // Where each section starts, measured as it lays out, so a chip can scroll straight to it.
   const [offsets, setOffsets] = useState<Record<number, number>>({});
@@ -119,7 +119,7 @@ export default function TaskReportScreen() {
                 setOffsets((all) => (all[i] === y ? all : { ...all, [i]: y }));
               }}
             >
-              <Markdown source={section.markdown} sources={chips} />
+              <Markdown source={section.markdown} sources={cited.chips} />
             </View>
             ),
           )}
@@ -164,7 +164,7 @@ export default function TaskReportScreen() {
             </View>
           ) : null}
 
-          <SourcesChipRow sources={report.sources} chips={chips} />
+          <SourcesChipRow state={cited} pictures={report.images} />
         </>
       ) : null}
     </ScrollView>

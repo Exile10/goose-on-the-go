@@ -90,7 +90,7 @@ describe('reading saved cards and report extras', () => {
 });
 
 describe('the pages an answer cites', () => {
-  const { citedLinks, mergeSources } = jest.requireActual('@/components/patterns/cited-sources');
+  const { citedLinks, mergeSources } = jest.requireActual('@/models/sources');
 
   it('numbers cited pages in citing order, once each, then the other pages read', () => {
     const cited = citedLinks(
@@ -106,5 +106,16 @@ describe('the pages an answer cites', () => {
       'https://fort.example/',
       'https://ferry.example/',
     ]);
+  });
+
+  it('names a page by itself, not by its site', () => {
+    const [wiki, fort] = citedLinks(
+      'See [Wikipedia](https://en.wikipedia.org/wiki/Playboi_Carti) and [the fort](https://fort.example/).',
+    );
+    expect(wiki.title).toBe('Playboi Carti');
+    expect(fort.title).toBe('the fort');
+    expect(citedLinks('[Wikipedia](https://www.wikipedia.org/)')[0].title).toBe('Wikipedia');
+    const [read] = mergeSources([wiki], [{ title: 'Playboi Carti - Wikipedia', url: wiki.url }]);
+    expect(read.title).toBe('Playboi Carti - Wikipedia');
   });
 });

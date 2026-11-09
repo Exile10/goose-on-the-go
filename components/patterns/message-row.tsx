@@ -26,13 +26,8 @@ import { Image } from 'expo-image';
 import { useTranslation } from 'react-i18next';
 import { InkBubble, inkText, useInkTheme, type BubblePosition } from '@jarida/ink/native';
 
-import {
-  PagePictures,
-  SourcesChipRow,
-  citedLinks,
-  mergeSources,
-  useSourceChips,
-} from '@/components/patterns/cited-sources';
+import { PagePictures, SourcesChipRow, useSources } from '@/components/patterns/cited-sources';
+import { citedLinks, mergeSources } from '@/models/sources';
 import { Markdown } from '@/components/patterns/markdown';
 import { sourcesOf } from '@/constants/tools';
 import { usePagePictures } from '@/view-models/use-page-pictures';
@@ -227,7 +222,7 @@ function TheirMessage({ message, status, turnSeed }: { message: Message; status:
       ),
     [message.content, message.tools],
   );
-  const chips = useSourceChips(sources);
+  const cited = useSources(sources);
   const pictures = usePagePictures(
     sources.slice(0, PICTURE_PAGES).map((s) => s.url),
     done,
@@ -238,9 +233,9 @@ function TheirMessage({ message, status, turnSeed }: { message: Message; status:
 
   return (
     <View style={styles.theirs}>
-      {message.content ? <Markdown source={message.content} sources={done ? chips : undefined} /> : null}
+      {message.content ? <Markdown source={message.content} sources={done ? cited.chips : undefined} /> : null}
       {done ? <PagePictures pictures={pictures} /> : null}
-      {done ? <SourcesChipRow sources={sources} chips={chips} /> : null}
+      {done ? <SourcesChipRow state={cited} pictures={pictures} /> : null}
       {waiting ? <ThinkingQuips status={status} seed={turnSeed} /> : null}
       {unfinished && status ? (
         <Text style={note.style} numberOfLines={1} accessibilityLiveRegion="polite">
