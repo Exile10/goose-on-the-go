@@ -319,8 +319,10 @@ export function streamBody(
   const images = attachments.filter((a) => a.kind === 'image' && a.base64);
   const audio = attachments.filter((a) => a.kind === 'audio' && a.base64);
   const documents = attachments.filter((a) => a.kind === 'document' && a.base64);
+  // A spoken turn's words ride beside its recording, so the Pond sends its model one or the other.
+  const spoken = audio.some((a) => a.heardAs);
   return {
-    message: composeMessage(text, attachments),
+    message: spoken ? '' : composeMessage(text, attachments),
     ...(sessionId ? { session_id: sessionId } : {}),
     ...(images.length ? { images: images.map((a) => ({ data: a.base64 as string, mime_type: a.mimeType })) } : {}),
     ...(audio.length
@@ -329,6 +331,7 @@ export function streamBody(
             data: a.base64 as string,
             mime_type: a.mimeType,
             ...(a.durationMs === undefined ? { name: a.name } : {}),
+            ...(a.heardAs ? { heard_as: a.heardAs } : {}),
           })),
         }
       : {}),
@@ -436,7 +439,8 @@ const pendingReply = (id: string): Message => ({
 function questionFor(id: string, text: string, attachments: Attachment[]): Message {
   const images = attachments.filter((a) => a.kind === 'image' && a.base64);
   const files = attachments.filter((a) => a.kind === 'text' || a.kind === 'document');
-  const note = attachments.find((a) => a.kind === 'audio');
+  // A spoken turn reads as its words; only a voice note shows as a note.
+  const note = attachments.find((a) => a.kind === 'audio' && !a.heardAs);
   return {
     id,
     role: 'user',
