@@ -167,13 +167,21 @@ export default function ChatScreen() {
     /** The member whose setup interview this conversation is, which turns its panels on. */
     interview?: string;
   }>();
+  // The link alone decides what opens. `open` changes whenever the chat's queue
+  // is replaced, which starting a new conversation does; read through a ref, so
+  // that change cannot open the linked conversation again over the new one.
   const openedRef = useRef<string | null>(null);
   const { open, unqueue, watch } = actions;
+  const openRef = useRef(open);
+  // Declared before the effect that reads it, so it is current when that runs.
+  useEffect(() => {
+    openRef.current = open;
+  }, [open]);
   useEffect(() => {
     if (!session || openedRef.current === session) return;
     openedRef.current = session;
-    open(session, linkedTitle);
-  }, [session, linkedTitle, open]);
+    openRef.current(session, linkedTitle);
+  }, [session, linkedTitle]);
 
   // What is half-written stays with its conversation: leave and come back, or
   // start another and return, and the composer holds it again. A conversation
@@ -374,7 +382,10 @@ export default function ChatScreen() {
 
   const handleNew = useCallback(() => {
     void selectionTick();
+    // The screen no longer shows the conversation it was linked to, so it drops
+    // the link; following the same link again opens that conversation again.
     openedRef.current = null;
+    router.setParams({ session: undefined, title: undefined });
     behaviour.set('expanded');
     setStage('expanded');
     setLatest(HIDDEN);
@@ -382,7 +393,7 @@ export default function ChatScreen() {
     draftKey.current = NEW_DRAFT;
     setDock((d) => ({ key: d.key + 1, draft: draftFor(NEW_DRAFT) }));
     actions.newConversation();
-  }, [actions, behaviour]);
+  }, [actions, behaviour, router]);
 
   // Runs are read in speaking order, then reversed for `inverted`. What is
   // queued comes last, where it will be asked; a queued message keeps its id
