@@ -1,12 +1,18 @@
 /**
- * My Goose: everything the Goose is holding for this member, read once and handed to the tab's
- * shelves. Each part already has its own route on the Pond; nothing here invents one.
+ * My Goose: everything the Goose is holding for this member. A Pond that serves the hub
+ * (`/me/hub`) gets `useMyGooseHub`, composed from each part's own view-model; an older Pond keeps
+ * `useOlderMyGoose`, read from the routes it already had, exactly as before the hub.
  */
 
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { useFocusEffect } from 'expo-router';
 
-import { cartsFrom, formatPrice, gooseClauses, watchesWithHits } from '@/models/my-goose';
+import { priceMove, atTarget } from '@/models/cart';
+import { featuredIdea } from '@/models/ideas';
+import type { MeHub } from '@/models/hub';
+import { formatMoney } from '@/models/me-read';
+import { cartsFrom, formatPrice, gooseClauses, hubClauses, watchesWithHits } from '@/models/my-goose';
+import { nextUp } from '@/models/todos';
 import { useServer } from '@/providers/server-provider';
 import type { AgentSuggestion } from '@/services/types';
 import { useAgentsSource } from './agents-source';
@@ -18,6 +24,13 @@ import { useReminders } from './use-reminders';
 import { useSavedItems } from './use-saved-items';
 import { useSuggestions } from './use-suggestions';
 import { useWebWatches } from './use-web-watches';
+import { useCart } from './use-cart';
+import { useCatalog } from './use-catalog';
+import { useConnectors } from './use-connectors';
+import { useIdeas } from './use-ideas';
+import { useInterests } from './use-interests';
+import { useNews } from './use-news';
+import { useTodos } from './use-todos';
 
 /** Agents the Pond could run for this household, and saying yes or no to one. */
 export function useAgentIdeas() {
@@ -58,7 +71,8 @@ export function useAgentIdeas() {
   return { ideas, enabling, refresh, enable, dismiss };
 }
 
-export function useMyGoose() {
+/** The older My Goose, for a Pond without `/me/hub`: unchanged from before the hub. */
+export function useOlderMyGoose() {
   const proposals = useProposals();
   // Asked as a new chat asks, so the questions offered here are the ones a chat would offer.
   const suggestions = useSuggestions(null);
@@ -160,4 +174,67 @@ export function useMyGoose() {
   };
 }
 
-export type UseMyGoose = ReturnType<typeof useMyGoose>;
+export type UseOlderMyGoose = ReturnType<typeof useOlderMyGoose>;
+
+function sameDay(iso: string, now: Date): boolean {
+  const d = new Date(iso);
+  return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate();
+}
+
+/** The hub: each part the Pond serves, read by its own view-model, and the sentence over them all. */
+export function useMyGooseHub(hub: MeHub) {
+  const news = useNews(hub.news);
+  const todos = useTodos(hub.todos);
+  const cart = useCart(hub.cart);
+  const ideas = useIdeas(hub.ideas);
+  const interests = useInterests(hub.interests);
+  const connectors = useConnectors(hub.connectors);
+  const catalog = useCatalog(hub.catalog);
+  const watches = useWebWatches();
+
+  const now = new Date();
+  const moved = cart.data.find((i) => atTarget(i)) ?? cart.data.find((i) => priceMove(i)?.direction === 'down') ?? null;
+  const move = moved ? priceMove(moved) : null;
+  const idea = featuredIdea(ideas.data.ideas);
+  const newMember = hub.interests && !interests.loading && !interests.failed && interests.groups.confirmed.length === 0;
+  const clauses = hubClauses({
+    checkins: todos.data.asking.map((t) => ({ text: t.text })),
+    offers: todos.data.offers.length,
+    newMember,
+    digest: news.data.digest ? { id: news.data.digest.id, stories: news.data.digest.sections.length } : null,
+    stories: news.data.stories.filter((s) => !s.read).length,
+    cart: moved ? { id: moved.id, title: moved.title, by: move ? formatMoney(move.by) : null, atTarget: atTarget(moved) } : null,
+    dueToday: todos.data.upcoming.filter((t) => {
+      const at = nextUp(t);
+      return at !== null && sameDay(at, now);
+    }).length,
+    idea: idea ? { title: idea.title } : null,
+  });
+
+  const { reload: reloadNews } = news.actions;
+  const { reload: reloadTodos } = todos.actions;
+  const { reload: reloadCart } = cart.actions;
+  const { reload: reloadIdeas } = ideas.actions;
+  const { reload: reloadInterests } = interests.actions;
+  const { reload: reloadConnectors } = connectors.actions;
+  const { reload: reloadCatalog } = catalog;
+  const { refresh: reloadWatches } = watches.actions;
+  const reload = useCallback(async () => {
+    await Promise.all([
+      hub.news ? reloadNews() : null,
+      hub.todos ? reloadTodos() : null,
+      hub.cart ? reloadCart() : null,
+      hub.ideas ? reloadIdeas() : null,
+      hub.interests ? reloadInterests() : null,
+      hub.connectors ? reloadConnectors() : null,
+      hub.catalog ? reloadCatalog() : null,
+      reloadWatches(),
+    ]);
+  }, [hub, reloadNews, reloadTodos, reloadCart, reloadIdeas, reloadInterests, reloadConnectors, reloadCatalog, reloadWatches]);
+
+  const loading = (hub.news && news.loading) || (hub.todos && todos.loading) || (hub.interests && interests.loading);
+
+  return { hub, clauses, newMember, loading, news, todos, cart, ideas, interests, connectors, catalog, watches, reload };
+}
+
+export type UseMyGooseHub = ReturnType<typeof useMyGooseHub>;

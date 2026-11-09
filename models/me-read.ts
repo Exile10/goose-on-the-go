@@ -107,3 +107,19 @@ export function readAll<T>(raw: unknown, key: string, read: (item: unknown) => T
     return read1 ? [read1] : [];
   });
 }
+
+/**
+ * Words written to stand alone ("Send the slides"), set inside a sentence ("Did you send the
+ * slides?"). A leading acronym or name in capitals ("MCP", "GTA") keeps its case.
+ */
+export function inSentence(words: string): string {
+  const w = words.trim();
+  if (w.length < 2 || /^[A-Z]{2}/.test(w)) return w;
+  return w.charAt(0).toLowerCase() + w.slice(1);
+}
+
+/** A title cut where a comma starts the details, so it fits inside a sentence. */
+export function headOf(title: string): string {
+  const cut = title.indexOf(',');
+  return cut >= 8 ? title.slice(0, cut).trim() : title.trim();
+}

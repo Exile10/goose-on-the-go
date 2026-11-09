@@ -118,6 +118,19 @@ export function sparkline(history: readonly PricePoint[], width: number, height:
   }));
 }
 
+/** The points as an SVG path. */
+export function sparklinePath(points: readonly { x: number; y: number }[]): string {
+  return points.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' ');
+}
+
+/** The currency a typed target is in when no watched link has told the phone one yet. */
+export const DEFAULT_CURRENCY = 'KSh';
+
+/** The currency the member's watched links are priced in, for a target typed as a bare number. */
+export function cartCurrency(items: readonly Pick<CartItem, 'price'>[]): string {
+  return items.find((i) => i.price)?.price?.currency || DEFAULT_CURRENCY;
+}
+
 /** A typed amount as the Pond takes a target, in the currency the link is priced in. */
 export function targetFrom(typed: string, currency: string): Money | null {
   const amount = Number(typed.replace(/[^\d.]/g, ''));

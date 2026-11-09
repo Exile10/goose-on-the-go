@@ -2,6 +2,7 @@
 // them (docs/MY-GOOSE-HUB.md, part 1). Read defensively: an unknown category is "other", an
 // unknown depth the lightest, an unknown news choice "off", so nothing feeds the news by accident.
 
+import type { IconName } from '@/constants/icons';
 import type { TranslationKey } from '@/services/i18n';
 import type { InterestCategoryWire, InterestDepthWire, InterestNewsWire, InterestWriteWire } from '@/services/types';
 
@@ -224,4 +225,36 @@ export function newsKey(news: InterestNews): TranslationKey {
     case 'digest': return 'goose.interests.news.digest';
     case 'both': return 'goose.interests.news.both';
   }
+}
+
+/** The glyph a category's row is drawn with. */
+export function categoryIcon(category: InterestCategory): IconName {
+  switch (category) {
+    case 'sport': return 'activity';
+    case 'tech': return 'cpu';
+    case 'science': return 'sparkle';
+    case 'business': return 'dashboard';
+    case 'money': return 'wallet';
+    case 'politics': return 'users';
+    case 'culture': return 'palette';
+    case 'film_tv': return 'video';
+    case 'music': return 'music';
+    case 'games': return 'bolt';
+    case 'books': return 'file-text';
+    case 'food': return 'droplet';
+    case 'travel': return 'globe';
+    case 'health': return 'activity';
+    case 'home': return 'home';
+    case 'cars': return 'car';
+    case 'shopping': return 'cart';
+    case 'people': return 'users';
+    case 'places': return 'pin';
+    case 'learning': return 'light';
+    case 'other': return 'sparkle';
+  }
+}
+
+/** The categories the member's interests fall in, in the contract's order, each with its interests. */
+export function categoriesOf(interests: readonly Interest[]): { category: InterestCategory; interests: Interest[] }[] {
+  return CATEGORIES.map((category) => ({ category, interests: interests.filter((i) => i.category === category) })).filter((g) => g.interests.length > 0);
 }
