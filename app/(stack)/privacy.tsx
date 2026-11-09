@@ -1,10 +1,11 @@
 /**
- * PrivacyScreen — what happens to a household's data, what can be done from here, and what
- * this app is built from. The content is in `constants/privacy.ts`, verified against the Pond;
+ * PrivacyScreen — what happens to a household's data, what can be done from here, and the full
+ * privacy policy, terms of use and open-source licenses. The content is in `constants/privacy.ts`, verified against the Pond;
  * `docs/PRIVACY-SCREEN.md` keeps the evidence for each statement. The one live line is the
  * town web search sends, which the Pond reports while Nearby places is on.
  */
 
+import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { InkTitle } from '@jarida/ink/native';
@@ -21,7 +22,8 @@ import { Grey, JaridaPurple } from '@/constants/colors';
 import { FontSize, face } from '@/constants/typography';
 import { Spacing } from '@/constants/spacing';
 import { Radii } from '@/constants/radii';
-import { APP_LICENSES, DATA_RIGHT_KEYS, PRIVACY_SECTIONS, type PrivacySection } from '@/constants/privacy';
+import { DATA_RIGHT_KEYS, PRIVACY_DOCUMENTS, PRIVACY_SECTIONS, type PrivacySection } from '@/constants/privacy';
+import { componentCount } from '@/models/open-source';
 import { useThemedStyles } from '@/hooks/use-themed-styles';
 import type { ThemeColors } from '@/constants/colors';
 import { usePrivacy } from '@/view-models/use-privacy';
@@ -56,6 +58,7 @@ export default function PrivacyScreen() {
   const styles = useThemedStyles(makeStyles);
   const { t } = useTranslation();
   const { data } = usePrivacy();
+  const router = useRouter();
   const townLine = data.nearbyTown ? t('webSearch.townSentence', { town: data.nearbyTown }) : null;
 
   return (
@@ -82,16 +85,27 @@ export default function PrivacyScreen() {
         ))}
       </View>
 
-      {/* Licenses */}
-      <InkTitle level={3}>{t('privacy.licensesHeading')}</InkTitle>
+      {/* The full documents. The summary above is what a household needs at a glance; these are
+          what the stores and the law ask for, in full, and every open-source licence. */}
+      <InkTitle level={3}>{t('privacy.documentsHeading')}</InkTitle>
       <View style={styles.licensesCard}>
-        {APP_LICENSES.map((l, i) => (
-          <View key={l.pkg} style={[styles.licenseRow, i < APP_LICENSES.length - 1 && styles.licenseDivider]}>
-            <Text style={styles.licenseName}>{l.name}</Text>
-            <View style={styles.licenseBadge}>
-              <Text style={styles.licenseText}>{l.license}</Text>
+        {PRIVACY_DOCUMENTS.map((d, i) => (
+          <GPressable
+            key={d.id}
+            feedback="lift"
+            style={[styles.documentRow, i < PRIVACY_DOCUMENTS.length - 1 && styles.licenseDivider]}
+            onPress={() => router.push(d.route)}
+            accessibilityRole="link"
+          >
+            <View style={{ marginRight: Spacing.md }}>
+              <GIcon name={d.icon} size={16} color={JaridaPurple[500]} />
             </View>
-          </View>
+            <View style={styles.documentText}>
+              <Text style={styles.licenseName}>{t(d.titleKey)}</Text>
+              <Text style={styles.documentHint}>{t(d.hintKey, { count: componentCount() })}</Text>
+            </View>
+            <GIcon name="chevron-right" size={16} color={Grey[400]} />
+          </GPressable>
         ))}
       </View>
 
@@ -167,31 +181,26 @@ const makeStyles = (c: ThemeColors) =>
       borderWidth: 1,
       borderColor: c.border,
     },
-    licenseRow: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      paddingVertical: Spacing.sm,
-    },
     licenseDivider: {
       borderBottomWidth: 1,
       borderBottomColor: c.border,
       paddingBottom: Spacing.sm,
     },
+    documentRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: Spacing.sm,
+    },
+    documentText: { flex: 1 },
+    documentHint: {
+      ...face('body', 'regular'),
+      fontSize: FontSize.sm,
+      color: c.textSecondary,
+      marginTop: 2,
+    },
     licenseName: {
       ...face('body', 'regular'),
       fontSize: FontSize.base,
       color: c.text,
-    },
-    licenseBadge: {
-      backgroundColor: c.backgroundSecondary,
-      paddingHorizontal: Spacing.sm,
-      paddingVertical: 2,
-      borderRadius: Radii.pill,
-    },
-    licenseText: {
-      ...face('mono', 'regular'),
-      fontSize: FontSize.xs,
-      color: c.textTertiary,
     },
   });

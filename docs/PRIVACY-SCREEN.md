@@ -31,6 +31,10 @@
 
 Only the two this app can actually exercise: **signing out**, which releases this phone's access to the Pond including remote access, and **removing a household member** under Users, which deletes their face data through the cascade above. They are plain statements, not buttons.
 
-## Licences
+## The full documents
 
-`constants/privacy.ts` lists the open-source packages this app ships, each with the licence its installed package declares. `constants/__tests__/privacy.test.ts` checks every entry against `package.json` and the package's own manifest, so an entry cannot outlive its dependency. Pond components belong on the Pond's own licence screen.
+After the summary, the screen links the full privacy policy, the terms of use and every
+open-source license this app ships (`PRIVACY_DOCUMENTS` in `constants/privacy.ts`). Where each
+comes from, and when to regenerate it, is in [LICENSES.md](LICENSES.md). The short list of three
+packages that used to stand here is gone: the generated list is complete, and checked against the
+installed packages by its own test.

@@ -140,6 +140,8 @@ export default function StackLayout() {
       <Stack.Screen name="secrets" options={{ title: t('screens.secrets') }} />
       <Stack.Screen name="add-users" options={{ title: t('screens.addUsers') }} />
       <Stack.Screen name="privacy" options={{ title: t('screens.privacy') }} />
+      <Stack.Screen name="legal" options={{ title: t('screens.legalPrivacy') }} />
+      <Stack.Screen name="open-source" options={{ title: t('screens.openSource') }} />
       <Stack.Screen name="remote-access" options={{ title: t('screens.remoteAccess') }} />
       <Stack.Screen name="home-management" options={{ title: t('screens.homeManagement') }} />
       <Stack.Screen name="pond-pairing" options={{ title: t('screens.pondPairing') }} />

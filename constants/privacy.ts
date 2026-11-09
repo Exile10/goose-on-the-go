@@ -31,12 +31,27 @@ export const PRIVACY_SECTIONS: PrivacySection[] = [
  */
 export const DATA_RIGHT_KEYS = ['privacy.rightSignOut', 'privacy.rightRemoveMember'] as const;
 
-/**
- * Open-source components this app ships, with the licence each package declares. Checked against
- * the installed packages in a test, so an entry cannot outlive the dependency it names.
- */
-export const APP_LICENSES = [
-  { name: 'React Native', pkg: 'react-native', license: 'MIT' },
-  { name: 'Expo', pkg: 'expo', license: 'MIT' },
-  { name: 'react-native-svg', pkg: 'react-native-svg', license: 'MIT' },
-];
+/** The full documents, after the summary: their route and their copy. */
+export const PRIVACY_DOCUMENTS = [
+  {
+    id: 'policy',
+    icon: 'shield',
+    route: { pathname: '/(stack)/legal', params: { doc: 'privacy' } },
+    titleKey: 'privacy.documentPolicy',
+    hintKey: 'privacy.documentPolicyHint',
+  },
+  {
+    id: 'terms',
+    icon: 'file',
+    route: { pathname: '/(stack)/legal', params: { doc: 'terms' } },
+    titleKey: 'privacy.documentTerms',
+    hintKey: 'privacy.documentTermsHint',
+  },
+  {
+    id: 'licenses',
+    icon: 'package',
+    route: { pathname: '/(stack)/open-source', params: {} },
+    titleKey: 'privacy.documentLicenses',
+    hintKey: 'privacy.documentLicensesHint',
+  },
+] as const satisfies readonly { id: string; icon: IconName; titleKey: TranslationKey; hintKey: TranslationKey; route: { pathname: string; params: Record<string, string> } }[];

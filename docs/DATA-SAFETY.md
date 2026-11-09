@@ -203,6 +203,14 @@ crash reporter, no advertising or attribution SDK, and no tracking library of an
 `package.json`. There is no contacts access and no advertising identifier. Location is read
 only for a ride fare, below.
 
+The Android build does carry Google code that reports on itself (found 2026-11-09 in the release
+runtime classpath, listed in `assets/legal/open-source.json`): `com.google.mlkit:barcode-scanning`
+and `play-services-mlkit-barcode-scanning`, which `expo-camera` uses to read QR codes, and
+`firebase-messaging` for push. Both bring Google's data transport
+(`com.google.android.datatransport:transport-backend-cct`), which Google uses for those SDKs'
+own usage and performance metrics. What they send from a release build, and whether it can be
+turned off, is not yet verified; the privacy policy says so as an open item.
+
 `expo-device` establishes whether the code is running on physical hardware before attempting push
 registration, and since 2026-10-17 gives the default name this phone pairs under (its device name,
 else its model). That name is shown with Change before pairing, and goes only to the user's own
