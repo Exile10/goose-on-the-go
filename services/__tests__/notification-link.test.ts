@@ -182,3 +182,14 @@ describe('screenPath', () => {
     expect(screenPath({ open: 'schedule' })).toBe('/(stack)/schedule');
   });
 });
+
+describe('a watch notice', () => {
+  it('opens the watch it names, or the list for a digest', () => {
+    const { openRouteFromData, screenPath } = jest.requireActual('@/services/notification-link');
+    expect(openRouteFromData({ open: 'watch', watch_id: 'w-1' })).toEqual({ open: 'watch', watchId: 'w-1' });
+    expect(screenPath({ open: 'watch', watchId: 'w-1' })).toEqual({ pathname: '/(stack)/web-watch', params: { id: 'w-1' } });
+    expect(openRouteFromData({ open: 'watch' })).toEqual({ open: 'watch' });
+    expect(screenPath({ open: 'watch' })).toBe('/(stack)/web-watches');
+    expect(openRouteFromData({ open: 'watch', watch_id: '../etc' })).toEqual({ open: 'watch' });
+  });
+});

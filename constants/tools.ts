@@ -187,8 +187,10 @@ export function sourcesOf(tools: ToolCall[] | undefined): Source[] {
     if (tool.card?.type === 'search') continue;
     const fromCard = data ? str(data.source_url) : '';
     const fromText = /Source:\s*(https?:\/\/\S+)\s*$/i.exec(tool.result ?? '')?.[1] ?? '';
-    const url = fromCard || fromText;
-    if (url) add(url, data ? str(data.title) || str(data.primary_title) : '');
+    // A page read names itself on its first lines: `Page: <title>` then `Address: <url>`.
+    const read = /^Page: (.*)\nAddress: (https?:\/\/\S+)/.exec(tool.result ?? '');
+    const url = fromCard || fromText || read?.[2] || '';
+    if (url) add(url, data ? str(data.title) || str(data.primary_title) : read?.[1]?.trim() ?? '');
   }
   return out;
 }

@@ -34,6 +34,7 @@ import { Storage } from '@/services/storage';
 import { matchesQuery } from '@/utils/search';
 import { describeApiError, logFailure } from '@/view-models/describe-error';
 import type { SessionSummary } from '@/services/types';
+import { readReportImage } from '@/models/web-watches';
 
 /** How much conversation a card has to show, which is how tall it gets. */
 export type CardWeight = 'tile' | 'card' | 'column';
@@ -79,6 +80,26 @@ export interface HistoryCard {
   routine: boolean;
   /** Goose is answering in it now, a turn this phone asked. */
   answering: boolean;
+  /** The first picture sent in it, else the Pond's picture for the first page it cited, or null. */
+  picture: CardPicture | null;
+}
+
+/** A conversation card's picture, and what a screen reader hears for it (null: a sent picture). */
+export interface CardPicture {
+  src: string;
+  label: string | null;
+}
+
+const SENT_PICTURE_SRC = /^\/api\/v1\/sessions\/[A-Za-z0-9._%-]+\/attachments\/[A-Za-z0-9._%-]+$/;
+
+/** The Pond's picture for a card, if it is one the Pond serves: a sent picture or a page's. */
+export function readCardPicture(raw: unknown): CardPicture | null {
+  if (typeof raw === 'object' && raw !== null && (raw as { kind?: unknown }).kind === 'sent') {
+    const src = (raw as { src?: unknown }).src;
+    return typeof src === 'string' && SENT_PICTURE_SRC.test(src) ? { src, label: null } : null;
+  }
+  const image = readReportImage(raw);
+  return image ? { src: image.src, label: image.caption ?? (image.credit || null) } : null;
 }
 
 /**
@@ -373,6 +394,7 @@ export function toCard(
     weight: cardWeight(session),
     routine: isRoutine(session.id),
     answering: false,
+    picture: readCardPicture(session.picture),
   };
 }
 
