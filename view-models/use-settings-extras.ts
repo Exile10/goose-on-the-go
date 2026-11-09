@@ -9,6 +9,7 @@ import type { TFunction } from 'i18next';
 import { useServer } from '@/providers/server-provider';
 import { useTheme } from '@/providers/theme-provider';
 import { ApiError, api } from '@/services/api-client';
+import { readPhoneFix, sendHomeLocation } from '@/services/home-location';
 import i18n from '@/services/i18n';
 import type { ModelEntry, PondSettings, Profile, WebSearchStatus, ZoneChoice } from '@/services/types';
 import { knownByFace } from '@/models/faces';
@@ -422,6 +423,51 @@ export function useDetectLocation(): ActionState & {
     [isScreenReal],
   );
   return { ...state, run };
+}
+
+/** What "Find my location" came to: the Pond saved this phone's fix, or a guess to save. */
+export type FoundLocation = { kind: 'saved'; name: string } | { kind: 'guess'; name: string; timezone: string };
+
+/**
+ * "Find my location". At home (the connection is `local`), this phone's own fix, which the Pond
+ * saves itself; it asks for location permission if it has none. Away, the Pond's guess from the
+ * time zone or the typed name, as before, with a word that home is where the phone can do better:
+ * a phone away from home must not move the household (the Pond refuses it too).
+ */
+export function useFindLocation(): ActionState & { run: (typed: string) => Promise<FoundLocation | null> } {
+  const { connectionState, isScreenReal } = useServer();
+  const detect = useDetectLocation();
+  const [state, setState] = useState<ActionState>(IDLE);
+  const atHome = connectionState === 'local' && isScreenReal('settings');
+  const run = useCallback(
+    async (typed: string): Promise<FoundLocation | null> => {
+      if (!atHome) {
+        const place = await detect.run(typed);
+        return place ? { kind: 'guess', ...place } : null;
+      }
+      setState({ busy: true, message: null, tone: 'neutral' });
+      const fix = await readPhoneFix(true);
+      if (fix.kind === 'denied') {
+        setState({ busy: false, message: i18n.t(fix.canAskAgain ? 'settings.location.allow' : 'settings.location.allowInSettings'), tone: 'danger' });
+        return null;
+      }
+      if (fix.kind === 'unavailable') {
+        setState({ busy: false, message: i18n.t('settings.location.noFix'), tone: 'danger' });
+        return null;
+      }
+      try {
+        const result = await sendHomeLocation(fix, true);
+        setState({ busy: false, message: i18n.t('settings.location.fromPhone', { name: result.name }), tone: 'neutral' });
+        return { kind: 'saved', name: result.name };
+      } catch (e) {
+        const away = e instanceof ApiError && e.status === 403;
+        setState({ busy: false, message: away ? i18n.t('settings.location.atHome') : describeApiError(e) ?? i18n.t('settings.location.failed'), tone: 'danger' });
+        return null;
+      }
+    },
+    [atHome, detect],
+  );
+  return atHome ? { ...state, run } : { ...detect, message: detect.message && `${detect.message} ${i18n.t('settings.location.atHome')}`, run };
 }
 
 /** Forget the wake word's learned pronunciations. Resolves to whether the Pond did. */

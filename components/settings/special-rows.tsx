@@ -24,7 +24,7 @@ import type { PondSettings } from '@/services/types';
 import {
   llmModels,
   providerChoices,
-  useDetectLocation,
+  useFindLocation,
   useModelChoices,
   useProfileChoices,
   useResetWakeWord,
@@ -125,14 +125,22 @@ export function TimezoneRow({ settings }: SpecialProps) {
   );
 }
 
-/** The place name, which the Pond geocodes when it is saved, and a way to find it from the phone. */
+/**
+ * The place name, which the Pond geocodes when it is saved, and a way to find it from the phone:
+ * its own fix at home, a guess away (`useFindLocation`).
+ */
 export function LocationRows({ settings, vm }: SpecialProps) {
   const { t } = useTranslation();
-  const detect = useDetectLocation();
+  const detect = useFindLocation();
   const find = useCallback(async () => {
     void tap();
     const place = await detect.run(settings.weather_location_name);
     if (!place) return;
+    // The Pond saved the phone's fix itself; the record here only needs reading again.
+    if (place.kind === 'saved') {
+      await vm.actions.refresh();
+      return;
+    }
     if (place.name && place.name !== settings.weather_location_name) {
       await vm.actions.update('weather_location_name', place.name);
     }
