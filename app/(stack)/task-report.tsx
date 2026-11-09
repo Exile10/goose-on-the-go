@@ -5,8 +5,9 @@ import React, { useCallback, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { InkButton, InkChip, InkEyebrow, InkNotice, InkSpinner, inkText, useInkTheme } from '@/components/ui/ink';
+import { InkButton, InkCard, InkChip, InkEyebrow, InkNotice, InkSpinner, InkText, inkText, useInkTheme } from '@/components/ui/ink';
 
+import { PagePictures, SourcesChipRow, useSources } from '@/components/patterns/cited-sources';
 import { Markdown } from '@/components/patterns/markdown';
 import type { ThemeColors } from '@/constants/colors';
 import { Spacing } from '@/constants/spacing';
@@ -14,6 +15,7 @@ import { useThemedStyles } from '@/hooks/use-themed-styles';
 import { useChoice } from '@/providers/confirm-provider';
 import { confirm, reject, selectionTick } from '@/services/haptics';
 import { taskEyebrow } from '@/view-models/long-task-words';
+import { useReportOptions } from '@/view-models/use-report-options';
 import { useTaskReport, type ShareFormat } from '@/view-models/use-task-report';
 
 /** A task id from a link: only what the Pond issues, never anything that could be a path. */
@@ -30,6 +32,8 @@ export default function TaskReportScreen() {
   const params = useLocalSearchParams<{ id?: string }>();
   const id = taskIdOf(params.id);
   const { report, loading, error, gone, sharing, shareError, options, actions } = useTaskReport(id);
+  const picks = useReportOptions(report?.title ?? null);
+  const cited = useSources(report?.sources ?? []);
   const scroll = useRef<ScrollView>(null);
   // Where each section starts, measured as it lays out, so a chip can scroll straight to it.
   const [offsets, setOffsets] = useState<Record<number, number>>({});
@@ -102,8 +106,12 @@ export default function TaskReportScreen() {
             </View>
           ) : null}
 
+          <PagePictures pictures={report.images} />
+
           {report.markdown.trim() === '' ? <InkNotice tone="neutral">{t('chat.report.empty')}</InkNotice> : null}
-          {report.sections.map((section, i) => (
+          {report.sections.map((section, i) =>
+            // The Pond's own Sources list is drawn below as the sources row, numbered like the chips.
+            report.sources.length > 0 && section.title.trim().toLowerCase() === 'sources' ? null : (
             <View
               key={i}
               onLayout={(e) => {
@@ -111,9 +119,52 @@ export default function TaskReportScreen() {
                 setOffsets((all) => (all[i] === y ? all : { ...all, [i]: y }));
               }}
             >
-              <Markdown source={section.markdown} />
+              <Markdown source={section.markdown} sources={cited.chips} />
             </View>
-          ))}
+            ),
+          )}
+
+          {report.options.length > 0 ? (
+            <View style={styles.row}>
+              <InkEyebrow>{t('chat.report.options', { count: report.options.length })}</InkEyebrow>
+              {report.options.map((option, i) => {
+                const state = picks.states[i] ?? {};
+                return (
+                  <InkCard key={`${option.title}-${i}`}>
+                    <InkText weight="semibold">{option.title}</InkText>
+                    {option.price ? <InkText>{option.price}</InkText> : null}
+                    {option.fields.map(([label, value]) => (
+                      <InkText key={label} size="sm" tone="secondary">{`${label}: ${value}`}</InkText>
+                    ))}
+                    {option.why ? <InkText size="sm">{option.why}</InkText> : null}
+                    <View style={styles.optionActions}>
+                      <InkButton
+                        variant="quiet"
+                        icon="folder"
+                        disabled={state.saving || state.savedId !== undefined}
+                        onPress={() => void picks.actions.save(i, option, false).then(() => confirm())}
+                      >
+                        {state.savedId ? t('chat.report.saved') : t('chat.report.save')}
+                      </InkButton>
+                      {option.link ? (
+                        <InkButton
+                          variant="quiet"
+                          icon="eye"
+                          disabled={state.saving || state.watched}
+                          onPress={() => void picks.actions.save(i, option, true).then(() => confirm())}
+                        >
+                          {state.watched ? t('chat.report.watching') : t('chat.report.watchPrice')}
+                        </InkButton>
+                      ) : null}
+                    </View>
+                    {state.error ? <InkNotice tone="danger">{state.error}</InkNotice> : null}
+                  </InkCard>
+                );
+              })}
+            </View>
+          ) : null}
+
+          <SourcesChipRow state={cited} pictures={report.images} />
         </>
       ) : null}
     </ScrollView>
@@ -128,4 +179,8 @@ const makeStyles = (c: ThemeColors) =>
     row: { gap: Spacing.sm },
     jumps: { gap: Spacing.xs },
     chips: { gap: Spacing.sm, paddingVertical: Spacing.xs },
+    pictures: { gap: Spacing.md },
+    picture: { width: 240, gap: Spacing.xs },
+    pictureBox: { width: 240, height: 160, borderRadius: 12, overflow: 'hidden' },
+    optionActions: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm },
   });

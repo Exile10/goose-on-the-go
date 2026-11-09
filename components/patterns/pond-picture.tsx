@@ -6,7 +6,7 @@
  * in a list and the large picture in the sheet are one read between them.
  */
 
-import React from 'react';
+import React, { useCallback, useState } from 'react';
 import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import { Image } from 'expo-image';
 import { useInkTheme } from '@/components/ui/ink';
@@ -26,6 +26,31 @@ export interface PondPictureProps {
   label: string;
   /** The stand-in's size. */
   iconSize?: number;
+  /** The picture's own size once loaded, so a frame can take its shape instead of cropping it. */
+  onSize?: (size: { width: number; height: number }) => void;
+}
+
+/** Shapes of pictures already drawn, so a frame drawn again starts right instead of jumping. */
+const RATIOS = new Map<string, number>();
+const MAX_RATIOS = 256;
+
+/** A picture's width over its height, `fallback` until it has loaded once. */
+export function usePictureRatio(path: string | null, fallback: number) {
+  const [ratio, setRatio] = useState(() => (path ? RATIOS.get(path) : undefined) ?? fallback);
+  const onSize = useCallback(
+    ({ width, height }: { width: number; height: number }) => {
+      if (!path || width <= 0 || height <= 0) return;
+      const next = width / height;
+      if (RATIOS.size >= MAX_RATIOS && !RATIOS.has(path)) {
+        const oldest = RATIOS.keys().next().value;
+        if (oldest !== undefined) RATIOS.delete(oldest);
+      }
+      RATIOS.set(path, next);
+      setRatio(next);
+    },
+    [path],
+  );
+  return [ratio, onSize] as const;
 }
 
 export const PondPicture = React.memo(function PondPicture({
@@ -35,6 +60,7 @@ export const PondPicture = React.memo(function PondPicture({
   contentFit = 'cover',
   label,
   iconSize = 22,
+  onSize,
 }: PondPictureProps) {
   const theme = useInkTheme();
   const { uri, failed } = usePondImage(path, version);
@@ -44,7 +70,14 @@ export const PondPicture = React.memo(function PondPicture({
   return (
     <View style={[{ backgroundColor: theme.color.line, overflow: 'hidden' }, style]}>
       {uri ? (
-        <Image source={{ uri }} style={StyleSheet.absoluteFill} contentFit={contentFit} transition={120} accessibilityLabel={label} />
+        <Image
+          source={{ uri }}
+          style={StyleSheet.absoluteFill}
+          contentFit={contentFit}
+          transition={120}
+          accessibilityLabel={label}
+          onLoad={onSize ? (e) => onSize({ width: e.source.width, height: e.source.height }) : undefined}
+        />
       ) : standIn ? (
         <View style={styles.center}>
           <GIcon name={icon} size={iconSize} color={theme.color.textTertiary} />

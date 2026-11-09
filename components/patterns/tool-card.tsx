@@ -31,7 +31,6 @@ import {
   humanizeTool,
   keptLine,
   readSearch,
-  sourcesOf,
   toolIcon,
   toolWords,
   type SearchEntry,
@@ -464,64 +463,6 @@ function KeptLine({ tool }: { tool: ToolCall }) {
   );
 }
 
-/** Enough to judge where an answer came from without a search's whole first page. */
-const SOURCES_SHOWN = 3;
-
-/** The pages a reply read from, each one a tap away from the in-app browser. */
-function Sources({ tools }: { tools: ToolCall[] }) {
-  const theme = useInkTheme();
-  const { t } = useTranslation();
-  const [all, setAll] = useState(false);
-  const sources = sourcesOf(tools);
-  if (sources.length === 0) return null;
-  const shown = all ? sources : sources.slice(0, SOURCES_SHOWN);
-  const title = inkText(theme, { size: 'base', weight: theme.weight.semibold, leading: 'snug' });
-  const site = inkText(theme, { role: 'mono', size: 'xs', color: theme.color.textTertiary });
-  const more = inkText(theme, { size: 'sm', weight: theme.weight.medium, color: theme.color.accentLine });
-  const rule = { borderTopWidth: theme.edge.hairlineWidth, borderTopColor: theme.color.line };
-  return (
-    <InkEdge raised={false} budgeted={false} radius={theme.radius.lg} contentStyle={styles.sourceCard}>
-      <View style={styles.sourceHead}>
-        <InkEyebrow>{t('chat.tools.sources')}</InkEyebrow>
-      </View>
-      {shown.map((s, i) => (
-        <GPressable
-          key={s.url}
-          feedback="tint"
-          onPress={() => void WebBrowser.openBrowserAsync(s.url)}
-          accessibilityRole="link"
-          accessibilityLabel={t('chat.tools.openSource', { source: s.title })}
-          style={[styles.source, i > 0 ? rule : null]}
-        >
-          <View style={styles.sourceText}>
-            <Text style={title.style} numberOfLines={2}>
-              {s.title}
-            </Text>
-            {s.site !== s.title ? (
-              <Text style={site.style} numberOfLines={1}>
-                {s.site}
-              </Text>
-            ) : null}
-          </View>
-          <GIcon name="external" size={13} color={theme.color.textTertiary} />
-        </GPressable>
-      ))}
-      {!all && sources.length > SOURCES_SHOWN ? (
-        <GPressable feedback="none"
-          onPress={() => {
-            void selectionTick();
-            setAll(true);
-          }}
-          accessibilityRole="button"
-          style={[styles.source, rule]}
-        >
-          <Text style={more.style}>{t('chat.tools.moreSources', { count: sources.length - SOURCES_SHOWN })}</Text>
-        </GPressable>
-      ) : null}
-    </InkEdge>
-  );
-}
-
 /** What Goose wrote while it worked, folded to one faint line until asked for. */
 function Steps({ steps }: { steps: string[] }) {
   const theme = useInkTheme();
@@ -585,7 +526,6 @@ export const ToolTrail = React.memo(function ToolTrail({
       {tools.map((tool) => (
         <FactCard key={tool.id} tool={tool} />
       ))}
-      {done ? <Sources tools={tools} /> : null}
       {steps?.length ? <Steps steps={steps} /> : null}
       {chips.length > 0 ? (
         <View style={styles.chips}>

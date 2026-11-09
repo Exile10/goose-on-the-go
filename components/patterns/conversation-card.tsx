@@ -33,9 +33,10 @@ import { hitSlop } from '@jarida/ink';
 import { InkEdge, InkEyebrow, InkSkeleton, InkSpinner, inkText, useInkTheme } from '@/components/ui/ink';
 
 import { Markdown } from '@/components/patterns/markdown';
+import { PondPicture, usePictureRatio } from '@/components/patterns/pond-picture';
 import { GIcon } from '@/components/ui/g-icon';
 import { GPressable } from '@/components/ui/g-pressable';
-import type { HistoryCard } from '@/view-models/use-chat-history';
+import type { CardPicture as Picture, HistoryCard } from '@/view-models/use-chat-history';
 
 export interface ConversationCardProps {
   card: HistoryCard;
@@ -124,6 +125,11 @@ function useCardText() {
         weight: theme.weight.bold,
         tracking: 'snug',
         leading: 'snug',
+      }).style,
+      preview: inkText(theme, {
+        size: 'base',
+        leading: 'base',
+        color: theme.color.textTertiary,
       }).style,
       foot: inkText(theme, {
         role: 'mono',
@@ -304,12 +310,19 @@ export const ConversationCard = React.memo(function ConversationCard({
         radius={theme.radius.xl}
         contentStyle={local.face}
       >
+        {card.picture ? <CardPicture picture={card.picture} /> : null}
         {/* The padding is here rather than on the face, so the face has none
             and the circle's corner inset means the same thing on every Yoga. */}
         <View style={{ padding: theme.space[4], gap: theme.space[2] }}>
           <InkEyebrow>{card.when}</InkEyebrow>
           <Text style={text.title}>{title}</Text>
-          {card.preview ? <Markdown source={card.preview} size="base" tone="tertiary" selectable={false} /> : null}
+          {card.preview && card.picture ? (
+            <Text style={text.preview} numberOfLines={PICTURED_PREVIEW_LINES}>
+              {card.preview}
+            </Text>
+          ) : card.preview ? (
+            <Markdown source={card.preview} size="base" tone="tertiary" selectable={false} />
+          ) : null}
           {confirming ? (
             <DeleteOrKeep
               deleteLabel={t('chat.history.deleteLabel')}
@@ -334,6 +347,30 @@ export const ConversationCard = React.memo(function ConversationCard({
     </GPressable>
   );
 });
+
+/** A pictured card's preview is cut short: the picture already says what it was about. */
+const PICTURED_PREVIEW_LINES = 3;
+
+/** A wall picture is held between a portrait 4:5 and a wide 2:1; past those its edges are cut. */
+const TALLEST = 0.8;
+const WIDEST = 2;
+
+/**
+ * The conversation's picture (one sent in it, or the page it cited) across the card's head and in
+ * its own shape, so the wall reads by what each was about. A page's credit is under it in the thread.
+ */
+function CardPicture({ picture }: { picture: Picture }) {
+  const { t } = useTranslation();
+  const [ratio, onSize] = usePictureRatio(picture.src, 4 / 3);
+  return (
+    <PondPicture
+      path={picture.src}
+      label={picture.label ?? t('chat.history.sentPicture')}
+      style={{ width: '100%', aspectRatio: Math.min(WIDEST, Math.max(TALLEST, ratio)) }}
+      onSize={onSize}
+    />
+  );
+}
 
 /**
  * The wall's shape before its contents, so nothing jumps when the cards land.

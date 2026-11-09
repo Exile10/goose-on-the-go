@@ -506,3 +506,17 @@ describe('endsUnanswered', () => {
     expect(endsUnanswered([])).toBe(false);
   });
 });
+
+describe('a page read with read_web_page', () => {
+  it('is a source, named by its own first lines', () => {
+    const sources = sourcesOf([
+      {
+        id: 'r1',
+        name: 'giap-knowledge__read_web_page',
+        args: '{}',
+        result: 'Page: Madaraka Express | Fares\nAddress: https://krc.co.ke/sgr\nThe lines below...',
+      } as never,
+    ]);
+    expect(sources).toEqual([{ url: 'https://krc.co.ke/sgr', site: 'krc.co.ke', title: 'Madaraka Express | Fares' }]);
+  });
+});
