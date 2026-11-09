@@ -62,18 +62,35 @@ With Goose as the assistant, Settings, Voice, **On this phone**, **Listen for "H
 phone listen for the phrase itself and open the same voice orb as the side key.
 
 - **What listens.** `GooseWakeService` (`plugins/pond-wake/PondWake.kt`), a foreground service of
-  type microphone, runs the Pond's own detector: the `pond-ear` crate and its embedded
-  `hey-goose.onnx`, threshold 0.97, built for Android by `scripts/build-embedded-ear.sh` from the
-  Pond checkout beside this repository (`native/pondear`, a JNI shim). The phone hears exactly what
-  the Pond's ear would; the model's provenance and measurements are in the Pond's
-  `crates/pond-ear/models/hey-goose.md`.
+  type microphone, built on the Pond's own ear: the `pond-ear` crate, built for Android by
+  `scripts/build-embedded-ear.sh` from the Pond checkout beside this repository (`native/pondear`,
+  a JNI shim). Licences ship in the APK as `pond-wake-notices.txt`.
+- **Which phrase.** The household's, set on the Pond (`voice_wake_word`), not a fixed one:
+  - For "hey goose", the phone runs the Pond's detector itself (`hey-goose.onnx`, threshold 0.97;
+    provenance and measurements in the Pond's `crates/pond-ear/models/hey-goose.md`).
+  - For any other phrase, only the Pond knows it and the pronunciations it has learned, so the
+    phone cuts what it hears into speech segments as the Pond's ear does for Whisper (Silero VAD
+    v5, the revision the Pond downloads, embedded in the library) and asks the Pond about each
+    (`POST /voice/wake/check`, `services/phone-wake-pond.ts`). The Pond matches it with the
+    room's own triggers and answers `{heard, phrase}`; it keeps nothing. A segment waits in the
+    app's cache until it is sent, at most two at once, and is deleted when answered or after
+    30 s. This needs the Pond reachable; the settings row says that speech near the phone goes
+    to the Pond.
+- **When the phrase changes.** The app hands the service the phrase from the Pond's settings,
+  which it re-reads while open (`PhoneWakeSync` in `app/_layout.tsx`), and every answer to a
+  segment names the phrase. A change made on the dashboard or another phone therefore counts
+  from the next segment, and a return to "hey goose" moves the phone back to its own detector.
+  Learned pronunciations live only on the Pond, so calibrating or clearing them applies at once.
+  The one gap: a phrase changed from "hey goose" while the app is closed and its background link
+  is down is learned when the app next opens or the orb next reaches the Pond.
 - **When it listens.** Only while the screen is on, the phone unlocked, and no screen of the app in
   front: the overlay does not open over the lock screen, and the app's own voice mode and the
   overlay record with their own microphone, so the service lets go while either shows. The
   notification says so, and its **Stop** turns the switch off.
-- **What happens to the audio.** Each 80 ms is scored and dropped; the detector keeps the last 20
-  seconds in memory to place the phrase. Nothing is written or sent until the orb opens and the
-  conversation starts, as with the side key.
+- **What happens to the audio.** For "hey goose", each 80 ms is scored and dropped; the detector
+  keeps the last 20 seconds in memory to place the phrase, and nothing is written or sent until the
+  orb opens. For another phrase, each speech segment (at most 8 s) goes to the household's own
+  Pond and nowhere else, and is deleted from the phone once answered.
 - **Opening the orb.** On the phrase, the service releases the microphone and calls
   `GooseInteractionService.showOverlay()`, which shows the assistant's own session: the path the
   side key takes, and one Android allows from the background for the active assistant. Speak
@@ -83,8 +100,10 @@ phone listen for the phrase itself and open the same voice orb as the side key.
   14 and later start a microphone service only while the app is in front, so it starts from the
   switch and resumes each time the app opens (`resumePhoneWake` at launch, and `PondWakeModule` on
   each return to the front); after a reboot it waits for the app to be opened once.
-- **Logs.** `adb logcat -s PondWake` shows `kind=wake_listening state=on|off why=...`,
-  `kind=wake_detector rung=...`, `kind=wake_heard p=...` and every `kind=wake_refused reason=...`.
+- **Logs.** `adb logcat -s PondWake` shows `kind=wake_listening state=on|off mode=... why=...`,
+  `kind=wake_detector rung=...` or `kind=wake_segmenter rung=...`, `kind=wake_heard p=...` or
+  `by=pond`, `kind=wake_segment_dropped reason=...`, and every `kind=wake_refused reason=...`. The
+  Pond logs `kind=wake_check heard=true` for a phone's wake, and its misses only at debug.
 
 To build it: `npm run build:ear` (add `--emulator` for x86_64), then prebuild as usual. The
 `with-pond-wake` plugin stops the prebuild if a packaged ABI's library is missing.

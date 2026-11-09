@@ -12,20 +12,29 @@ import { AppState } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { isPhoneAssistant } from '@/services/phone-assistant';
+import type { TranslationKey } from '@/services/i18n';
 import {
   choosePhoneWake,
+  CNN_PHRASE,
   phoneWakeState,
   phoneWakeSupported,
+  wakeMode,
   type PhoneWakeState,
+  type WakeMode,
   type WakeRefusal,
 } from '@/services/phone-wake';
-import type { TranslationKey } from '@/services/i18n';
+import { wakeNotificationWords } from '@/services/phone-wake-pond';
 import { requestMicrophone } from '@/services/voice-io';
+import { usePondSettings } from './use-pond-settings';
 
 export interface UsePhoneWake {
   data: {
     /** False on iOS, on a build without the detector, and before Android 8. */
     supported: boolean;
+    /** The household's phrase, as set on the Pond; "hey goose" until the settings are read. */
+    phrase: string;
+    /** Whether this phone hears the phrase itself or asks the Pond. */
+    mode: WakeMode;
     /** The switch: the person's choice. */
     on: boolean;
     busy: boolean;
@@ -52,6 +61,7 @@ export function wakeProblem(state: PhoneWakeState | null): TranslationKey | null
 export function usePhoneWake(): UsePhoneWake {
   const { t } = useTranslation();
   const supported = phoneWakeSupported();
+  const phrase = usePondSettings().settings?.voice_wake_word?.trim() || CNN_PHRASE;
   const [state, setState] = useState<PhoneWakeState | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -100,20 +110,18 @@ export function usePhoneWake(): UsePhoneWake {
             return;
           }
         }
-        const accepted = await choosePhoneWake(on, {
-          title: t('settings.phoneWake.notification.title'),
-          body: t('settings.phoneWake.notification.body'),
-          stop: t('settings.phoneWake.notification.stop'),
-          channel: t('settings.phoneWake.notification.channel'),
-        });
+        const accepted = await choosePhoneWake(on, wakeNotificationWords(phrase));
         await read();
         if (!accepted) setError((current) => current ?? t('settings.phoneWake.refused.start'));
       } finally {
         setBusy(false);
       }
     },
-    [read, t],
+    [read, t, phrase],
   );
 
-  return { data: { supported, on: state?.chosen ?? false, busy, error }, actions: { set } };
+  return {
+    data: { supported, phrase, mode: wakeMode(phrase), on: state?.chosen ?? false, busy, error },
+    actions: { set },
+  };
 }

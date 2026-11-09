@@ -72,3 +72,12 @@ describe('copyPondEarLibraries', () => {
     );
   });
 });
+
+describe('the notices', () => {
+  it('are tracked beside the shim, naming what the library carries', () => {
+    const notices = fs.readFileSync(path.join(__dirname, '..', '..', 'native/pondear/THIRD_PARTY_NOTICES.txt'), 'utf8');
+    expect(notices).toContain('Silero Team');
+    expect(notices).toContain('rust-jni-sys Developers');
+    expect(notices).toContain('pond-ear');
+  });
+});

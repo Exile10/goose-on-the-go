@@ -6,12 +6,22 @@
  * Pond's own detector (`native/pondear`, from the Pond's pond-ear crate). This is the JavaScript
  * side of its module, `PondWake`.
  *
+ * The phrase is the household's, set on the Pond. For "hey goose" the phone's own detector hears
+ * it. For any other phrase the service cuts what it hears into speech segments and this file sends
+ * each to the Pond (`POST /voice/wake/check`), which matches it with the pronunciations it has
+ * learned; the Pond's answer names the phrase, so a change made there reaches the phone with the
+ * next segment, and `usePhoneWakeSync` carries one made while the app is open.
+ *
  * Every call is safe anywhere: on iOS, which lets no app listen in the background this way, on an
  * Android build without the plugin, or on a CPU without the detector, `phoneWakeSupported()` is
  * false and the rest do nothing.
  */
 
-import { NativeModules, Platform } from 'react-native';
+import { DeviceEventEmitter, NativeModules, Platform } from 'react-native';
+
+import { WAKE_PRESETS } from '@/models/owner-setup';
+
+import type { WakeCheck } from './types';
 
 /** Why the service last stopped without being asked to (GooseWakeService's REFUSED_* values). */
 export type WakeRefusal = 'start_refused' | 'no_microphone' | 'model_failed' | 'not_assistant';
@@ -33,8 +43,14 @@ export interface WakeNotificationWords {
   channel: string;
 }
 
+/** How the service listens: its own detector for "hey goose", the Pond's for anything else. */
+export type WakeMode = 'hey_goose' | 'pond';
+
 interface WakeBridge {
   available(): boolean;
+  configure(mode: WakeMode, words: WakeNotificationWords): void;
+  done(path: string): void;
+  heard(): Promise<boolean>;
   state(): Promise<PhoneWakeState>;
   choose(on: boolean, words: WakeNotificationWords | Record<string, never>): Promise<boolean>;
   resume(): Promise<boolean>;
@@ -98,4 +114,65 @@ export async function resumePhoneWake(): Promise<void> {
   } catch (e) {
     console.warn('[wake] could not resume listening', { kind: 'phone_wake', error: String(e) });
   }
+}
+
+/** The phrase as the Pond compares it (`normalize_transcript`): lower case, words only. */
+export function normalizePhrase(phrase: string): string {
+  return phrase
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s']/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/** The one phrase the phone's own detector (and the Pond's) was trained on: the first preset. */
+export const CNN_PHRASE = WAKE_PRESETS[0];
+
+/** Which way the phone listens for `phrase`. */
+export function wakeMode(phrase: string): WakeMode {
+  return normalizePhrase(phrase) === CNN_PHRASE ? 'hey_goose' : 'pond';
+}
+
+/** Tell the service the household's phrase, with the notification's words that name it. */
+export function configurePhoneWake(phrase: string, words: WakeNotificationWords): void {
+  const native = bridge();
+  if (!native) return;
+  try {
+    native.configure(wakeMode(phrase), words);
+  } catch (e) {
+    console.warn('[wake] could not set the wake phrase', { kind: 'phone_wake', error: String(e) });
+  }
+}
+
+/** Sends one segment to the Pond; null when it could not be asked. */
+export type SegmentCheck = (fileUri: string) => Promise<WakeCheck | null>;
+
+let segments: { remove(): void } | null = null;
+
+/**
+ * Answer the service's segments for the life of the JavaScript runtime, not of a screen: the
+ * service hands them over while the app is in the background, when no screen is mounted. Each is
+ * sent with `check`, deleted once answered, and opens the voice orb when the Pond heard the phrase.
+ * `phraseHeard` receives the phrase each answer names. Installing again replaces the handlers.
+ */
+export function answerWakeSegments(check: SegmentCheck, phraseHeard: (phrase: string) => void): void {
+  const native = bridge();
+  if (!native) return;
+  segments?.remove();
+  segments = DeviceEventEmitter.addListener('PondWakeSegment', (path: string) => {
+    void (async () => {
+      try {
+        const answer = await check(`file://${path}`);
+        if (!answer) return;
+        phraseHeard(answer.phrase);
+        if (answer.heard && !(await native.heard())) {
+          console.warn('[wake] the Pond heard the phrase after listening stopped', { kind: 'phone_wake' });
+        }
+      } catch (e) {
+        console.warn('[wake] a segment could not be answered', { kind: 'phone_wake', error: String(e) });
+      } finally {
+        native.done(path);
+      }
+    })();
+  });
 }

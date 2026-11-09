@@ -7,6 +7,7 @@ import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 
 import i18n from '@/services/i18n';
 import type { PhoneWakeState } from '@/services/phone-wake';
+import { wakeNotificationWords } from '@/services/phone-wake-pond';
 import { usePhoneWake, wakeProblem, type UsePhoneWake } from '@/view-models/use-phone-wake';
 
 const mockWake = {
@@ -16,11 +17,15 @@ const mockWake = {
 };
 const mockAssistant = jest.fn<Promise<boolean | null>, []>();
 const mockMicrophone = jest.fn<Promise<{ granted: boolean; canAskAgain: boolean }>, []>();
+const mockSettings = { voice_wake_word: 'hey goose' };
 jest.mock('@/services/phone-wake', () => ({
+  ...jest.requireActual('@/services/phone-wake'),
   phoneWakeSupported: () => mockWake.supported,
   phoneWakeState: () => mockWake.state(),
   choosePhoneWake: (on: boolean, words: Record<string, string>) => mockWake.choose(on, words),
 }));
+jest.mock('@/services/api-client', () => ({ api: {} }));
+jest.mock('@/view-models/use-pond-settings', () => ({ usePondSettings: () => ({ settings: mockSettings }) }));
 jest.mock('@/services/phone-assistant', () => ({ isPhoneAssistant: () => mockAssistant() }));
 jest.mock('@/services/voice-io', () => ({ requestMicrophone: () => mockMicrophone() }));
 
@@ -64,16 +69,11 @@ it('turns on with the notification in the app language, once the role and microp
   mockWake.state.mockResolvedValueOnce(off).mockResolvedValue(on);
   mockWake.choose.mockResolvedValue(true);
   const view = await mount();
-  expect(view.vm.data).toEqual({ supported: true, on: false, busy: false, error: null });
+  expect(view.vm.data).toEqual({ supported: true, phrase: 'hey goose', mode: 'hey_goose', on: false, busy: false, error: null });
 
   await act(async () => view.vm.actions.set(true));
-  expect(mockWake.choose).toHaveBeenCalledWith(true, {
-    title: i18n.t('settings.phoneWake.notification.title'),
-    body: i18n.t('settings.phoneWake.notification.body'),
-    stop: i18n.t('settings.phoneWake.notification.stop'),
-    channel: i18n.t('settings.phoneWake.notification.channel'),
-  });
-  expect(view.vm.data).toEqual({ supported: true, on: true, busy: false, error: null });
+  expect(mockWake.choose).toHaveBeenCalledWith(true, wakeNotificationWords('hey goose'));
+  expect(view.vm.data).toEqual({ supported: true, phrase: 'hey goose', mode: 'hey_goose', on: true, busy: false, error: null });
 });
 
 it('asks for Goose to be the assistant first, and starts nothing', async () => {
@@ -121,7 +121,19 @@ it('explains a service that stopped while the app was away, on return', async ()
   const view = await mount();
   expect(view.vm.data.error).toBeNull();
   await act(async () => onAppState?.('active'));
-  expect(view.vm.data).toEqual({ supported: true, on: false, busy: false, error: i18n.t('settings.phoneWake.refused.notAssistant') });
+  expect(view.vm.data.on).toBe(false);
+  expect(view.vm.data.error).toBe(i18n.t('settings.phoneWake.refused.notAssistant'));
+});
+
+it("follows the household's phrase: the Pond hears any but hey goose", async () => {
+  mockSettings.voice_wake_word = 'Hey Jarvis';
+  mockWake.state.mockResolvedValue(off);
+  mockWake.choose.mockResolvedValue(true);
+  const view = await mount();
+  expect(view.vm.data).toMatchObject({ phrase: 'Hey Jarvis', mode: 'pond' });
+  await act(async () => view.vm.actions.set(true));
+  expect(mockWake.choose).toHaveBeenCalledWith(true, wakeNotificationWords('Hey Jarvis'));
+  mockSettings.voice_wake_word = 'hey goose';
 });
 
 it('has words for every refusal the service reports', () => {

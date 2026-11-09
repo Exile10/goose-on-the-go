@@ -355,8 +355,9 @@ export function PhoneAssistantRow() {
 }
 
 /**
- * "Listen for Hey Goose": the phone's own wake word, which opens the same voice orb as the assist
- * gesture. Android only, and only where this build carries the detector.
+ * "Listen for <the household's phrase>": the phone's wake word, which opens the same voice orb as
+ * the assist gesture. Android only, and only where this build carries the detector. Says which way
+ * the phone listens, because for any phrase but "hey goose" speech near it goes to the Pond.
  */
 export function PhoneWakeRow() {
   const { t } = useTranslation();
@@ -370,8 +371,8 @@ export function PhoneWakeRow() {
   }
   return (
     <SwitchRow
-      label={t('settings.phoneWake.label')}
-      description={t('settings.phoneWake.description')}
+      label={t('settings.phoneWake.label', { phrase: data.phrase })}
+      description={t(data.mode === 'pond' ? 'settings.phoneWake.descriptionPond' : 'settings.phoneWake.description')}
       value={data.on}
       disabled={data.busy}
       error={data.error}

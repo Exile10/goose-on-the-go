@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Build the "Hey Goose" detector this app embeds on Android, from the pond-ear crate in the
-# adjacent Pond checkout, into native/pondear/jniLibs/. The with-pond-wake config plugin copies
+# Build the "Hey Goose" detector and the speech segmenter this app embeds on Android, from the
+# pond-ear crate in the adjacent Pond checkout, into native/pondear/jniLibs/. The with-pond-wake config plugin copies
 # it in at prebuild. Written for bash 3.2, which is what /usr/bin/env bash finds on a stock Mac.
 set -euo pipefail
 
@@ -110,6 +110,26 @@ if [[ "$(cd "$pond_root" && pwd)" != "$(cd "$default_pond" 2>/dev/null && pwd ||
   cp "$shim/Cargo.lock" "$staging/Cargo.lock"
   manifest="$staging/Cargo.toml"
   note "Using pond-ear from $crate"
+fi
+
+# Silero VAD v5 for the segmenter, the revision the Pond itself downloads (its
+# crates/pond-server/src/model_download.rs, SILERO_REVISION), checked against Hugging Face's own
+# record of that file before it is embedded.
+silero_revision="e71cae966052b992a7eca6b17738916ce0eca4ec"
+silero_sha256="a4a068cd6cf1ea8355b84327595838ca748ec29a25bc91fc82e6c299ccdc5808"
+silero="$shim/models/silero_vad.onnx"
+hash_file() { if command -v shasum >/dev/null; then shasum -a 256 "$1"; else sha256sum "$1"; fi | cut -d' ' -f1; }
+if [[ ! -f "$silero" || "$(hash_file "$silero")" != "$silero_sha256" ]]; then
+  step "Fetching Silero VAD v5 at ${silero_revision:0:12}"
+  mkdir -p "$(dirname "$silero")"
+  download="$(mktemp "${TMPDIR:-/tmp}/silero.XXXXXX")"
+  curl -fsSL -o "$download" \
+    "https://huggingface.co/onnx-community/silero-vad/resolve/$silero_revision/onnx/model.onnx" ||
+    { rm -f "$download"; die "Could not download Silero VAD" "Check the network, then run this again."; }
+  got="$(hash_file "$download")"
+  [[ "$got" == "$silero_sha256" ]] ||
+    { rm -f "$download"; die "Silero VAD's checksum is $got, not $silero_sha256" "Nothing was installed."; }
+  mv "$download" "$silero"
 fi
 
 model_sum="$(awk -F'"' '/HEY_GOOSE_SHA256: &str =/{getline; print $2; exit}' "$crate/src/wake/mod.rs")"

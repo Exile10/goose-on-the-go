@@ -78,6 +78,11 @@ function withPondWake(config) {
     fs.mkdirSync(java, { recursive: true });
     fs.copyFileSync(path.join(__dirname, 'pond-wake/PondWake.kt'), path.join(java, 'PondWake.kt'));
     copyPondEarLibraries(mod.modRequest.projectRoot, main);
+    // The licences of what the library carries (Silero VAD, jni-sys, pond-ear), shipped with it
+    // as the network library's are.
+    const assets = path.join(main, 'assets');
+    fs.mkdirSync(assets, { recursive: true });
+    fs.copyFileSync(path.join(mod.modRequest.projectRoot, 'native/pondear/THIRD_PARTY_NOTICES.txt'), path.join(assets, 'pond-wake-notices.txt'));
     return mod;
   }]);
 }

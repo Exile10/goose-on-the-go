@@ -2,9 +2,18 @@
  * The JavaScript side of the wake-word module: a no-op wherever there is no bridge or no detector,
  * and every failure logged rather than thrown into a screen.
  */
-import { NativeModules, Platform } from 'react-native';
+import { DeviceEventEmitter, NativeModules, Platform } from 'react-native';
 
-import { choosePhoneWake, phoneWakeState, phoneWakeSupported, resumePhoneWake } from '@/services/phone-wake';
+import {
+  answerWakeSegments,
+  choosePhoneWake,
+  configurePhoneWake,
+  normalizePhrase,
+  phoneWakeState,
+  phoneWakeSupported,
+  resumePhoneWake,
+  wakeMode,
+} from '@/services/phone-wake';
 
 const bridge = {
   available: jest.fn(),
@@ -78,5 +87,59 @@ describe('without the module', () => {
     delete NativeModules.PondWake;
     expect(phoneWakeSupported()).toBe(false);
     await expect(choosePhoneWake(true, words)).resolves.toBe(false);
+  });
+});
+
+describe('the household phrase', () => {
+  it('reads "hey goose" in any case or punctuation as the phone\'s own detector, anything else as the Pond\'s', () => {
+    expect(normalizePhrase('  Hey, Goose!  ')).toBe('hey goose');
+    expect(wakeMode('Hey Goose')).toBe('hey_goose');
+    expect(wakeMode('hey goose.')).toBe('hey_goose');
+    expect(wakeMode('Goose')).toBe('pond');
+    expect(wakeMode('Hey Jarvis')).toBe('pond');
+  });
+
+  it('tells the service the mode with the words that name the phrase', () => {
+    const native = { ...bridge, configure: jest.fn() };
+    NativeModules.PondWake = native;
+    configurePhoneWake('Hey Jarvis', words);
+    expect(native.configure).toHaveBeenCalledWith('pond', words);
+  });
+});
+
+describe('segments the service hands over', () => {
+  let emit: (path: string) => void;
+  const native = { ...bridge, done: jest.fn(), heard: jest.fn().mockResolvedValue(true) };
+
+  beforeEach(() => {
+    NativeModules.PondWake = native;
+    jest.spyOn(DeviceEventEmitter, 'addListener').mockImplementation((_event, listener) => {
+      emit = listener as (path: string) => void;
+      return { remove: jest.fn() } as never;
+    });
+  });
+
+  const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+  it('opens the orb when the Pond heard the phrase, passes the phrase on, and deletes the segment', async () => {
+    const check = jest.fn().mockResolvedValue({ heard: true, phrase: 'Hey Jarvis' });
+    const phrase = jest.fn();
+    answerWakeSegments(check, phrase);
+    emit('/cache/wake-segments/a.wav');
+    await settle();
+    expect(check).toHaveBeenCalledWith('file:///cache/wake-segments/a.wav');
+    expect(phrase).toHaveBeenCalledWith('Hey Jarvis');
+    expect(native.heard).toHaveBeenCalledTimes(1);
+    expect(native.done).toHaveBeenCalledWith('/cache/wake-segments/a.wav');
+  });
+
+  it('opens nothing for other speech or an unanswered check, and still deletes the segment', async () => {
+    const check = jest.fn().mockResolvedValueOnce({ heard: false, phrase: 'Hey Jarvis' }).mockResolvedValueOnce(null).mockRejectedValueOnce(new Error('E'));
+    answerWakeSegments(check, jest.fn());
+    for (const name of ['b', 'c', 'd']) emit(`/cache/wake-segments/${name}.wav`);
+    await settle();
+    expect(native.heard).not.toHaveBeenCalled();
+    expect(native.done).toHaveBeenCalledTimes(3);
+    expect(console.warn).toHaveBeenCalledWith('[wake] a segment could not be answered', expect.objectContaining({ kind: 'phone_wake' }));
   });
 });

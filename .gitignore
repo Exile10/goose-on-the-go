@@ -63,6 +63,7 @@ app-example
 # scripts/build-embedded-ear.sh output and cargo's
 /native/pondear/jniLibs/
 /native/pondear/target/
+/native/pondear/models/
 
 # Python native integration harness bytecode
 __pycache__/

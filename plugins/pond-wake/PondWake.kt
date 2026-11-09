@@ -36,8 +36,10 @@ import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.ReactContextBaseJavaModule
 import com.facebook.react.bridge.ReactMethod
 import com.facebook.react.bridge.ReadableMap
+import com.facebook.react.modules.core.DeviceEventManagerModule
 import com.facebook.react.uimanager.ViewManager
 import io.jarida.pondassist.GooseInteractionService
+import java.io.File
 
 private const val TAG = "PondWake"
 
@@ -59,6 +61,10 @@ object PondEar {
   @JvmStatic external fun nativeRung(): String
   @JvmStatic external fun nativePush(handle: Long, pcm: ShortArray, count: Int): Float
   @JvmStatic external fun nativeClose(handle: Long)
+  @JvmStatic external fun nativeOpenSegments(): Long
+  /** A finished speech segment as PCM16, or null while speech goes on or none was heard. */
+  @JvmStatic external fun nativeSegment(handle: Long, pcm: ShortArray, count: Int): ShortArray?
+  @JvmStatic external fun nativeCloseSegments(handle: Long)
 }
 
 /**
@@ -72,8 +78,17 @@ object PondEar {
  * - no screen of this app is in front: the app has its own voice mode, and the overlay records
  *   with its own microphone, so the service lets go of the microphone while either is showing.
  *
- * Audio never leaves the phone and is never written anywhere: each 80 ms is scored by the detector
- * and dropped, except the last 20 seconds the detector keeps in memory to find the phrase.
+ * It listens in one of two ways ([MODE_HEY_GOOSE], [MODE_POND]), which the app sets from the
+ * household's phrase (`configure`):
+ *
+ * - "hey goose": the Pond's own detector runs here. Audio never leaves the phone and is never
+ *   written anywhere; each 80 ms is scored and dropped, beyond the last 20 seconds the detector
+ *   keeps in memory to find the phrase.
+ * - any other phrase: only the Pond knows it and the pronunciations it has learned, so the phone
+ *   cuts what it hears into speech segments as the Pond's ear does (Silero VAD), and the app sends
+ *   each one to the Pond (`POST /voice/wake/check`), which answers whether it opened with the
+ *   phrase. A segment is a temporary file in the app's cache until the app has sent it, then
+ *   deleted; at most [MAX_PENDING] wait at once, and the rest are dropped.
  *
  * Starting it needs the app in front (Android 14 refuses a microphone foreground service started
  * from the background), so it is started from the settings switch and resumed each time the app
@@ -81,8 +96,10 @@ object PondEar {
  */
 class GooseWakeService : Service() {
   private val main = Handler(Looper.getMainLooper())
+  /** The mode the listening thread was started in; a change restarts it. */
+  private var listeningMode = MODE_HEY_GOOSE
   private var listener: Thread? = null
-  @Volatile private var running = false
+  @Volatile private var listening = false
   private var appScreens = 0
 
   private val screenEvents = object : BroadcastReceiver() {
@@ -150,6 +167,7 @@ class GooseWakeService : Service() {
     }
     refusal = null
     active = true
+    running = this
     update("started")
     return START_NOT_STICKY
   }
@@ -163,6 +181,7 @@ class GooseWakeService : Service() {
 
   override fun onDestroy() {
     active = false
+    if (running === this) running = null
     main.removeCallbacksAndMessages(null)
     application.unregisterActivityLifecycleCallbacks(screens)
     unregisterReceiver(screenEvents)
@@ -185,12 +204,21 @@ class GooseWakeService : Service() {
 
   private fun startListening(why: String) {
     if (listener != null) return
-    running = true
+    listening = true
+    listeningMode = mode(this)
+    val pond = listeningMode == MODE_POND
     lateinit var thread: Thread
-    thread = Thread({ ended(thread, listen()) }, "goose-wake")
+    thread = Thread({ ended(thread, if (pond) segment() else listen()) }, "goose-wake")
     listener = thread
     thread.start()
-    Log.i(TAG, "kind=wake_listening state=on why=$why")
+    Log.i(TAG, "kind=wake_listening state=on mode=$listeningMode why=$why")
+  }
+
+  /** Main thread: listen again in the mode the app has just set, if it changed. */
+  private fun modeChanged() {
+    if (listener == null || listeningMode == mode(this)) return
+    stopListening("the household's phrase changed")
+    update("the household's phrase changed")
   }
 
   /** Main thread, from a listening thread that ended by itself: what to do about how it ended. */
@@ -213,13 +241,13 @@ class GooseWakeService : Service() {
 
   private fun stopListening(why: String) {
     val thread = listener ?: return
-    running = false
+    listening = false
     listener = null
     thread.join(JOIN_MS)
     Log.i(TAG, "kind=wake_listening state=off why=$why")
   }
 
-  /** The listening thread: 80 ms at a time into the detector until [running] is cleared. */
+  /** The listening thread for "hey goose": 80 ms at a time into the detector until [listening] is cleared. */
   @SuppressLint("MissingPermission") // Checked first; the service is not started without it.
   private fun listen(): End {
     if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
@@ -249,7 +277,7 @@ class GooseWakeService : Service() {
       record.startRecording()
       Log.i(TAG, "kind=wake_detector rung=${PondEar.nativeRung()}")
       val chunk = ShortArray(HOP)
-      while (running) {
+      while (listening) {
         val read = record.read(chunk, 0, HOP)
         if (read < 0) {
           Log.w(TAG, "kind=wake_microphone_unavailable read=$read")
@@ -266,6 +294,89 @@ class GooseWakeService : Service() {
       record.release()
       PondEar.nativeClose(detector)
     }
+  }
+
+  /**
+   * The listening thread for any other phrase: speech segments, each handed to the app to ask the
+   * Pond (see the class comment), until [listening] is cleared or the Pond says it heard the phrase.
+   */
+  @SuppressLint("MissingPermission") // Checked first; the service is not started without it.
+  private fun segment(): End {
+    if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+      Log.w(TAG, "kind=wake_refused reason=$REFUSED_MICROPHONE")
+      refusal = REFUSED_MICROPHONE
+      return End.REFUSED
+    }
+    val segments = PondEar.nativeOpenSegments()
+    if (segments == 0L) {
+      Log.e(TAG, "kind=wake_refused reason=$REFUSED_MODEL: the embedded voice activity model did not convert")
+      refusal = REFUSED_MODEL
+      return End.REFUSED
+    }
+    val minimum = AudioRecord.getMinBufferSize(RATE, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT)
+    val record = AudioRecord(
+      MediaRecorder.AudioSource.VOICE_RECOGNITION,
+      RATE,
+      AudioFormat.CHANNEL_IN_MONO,
+      AudioFormat.ENCODING_PCM_16BIT,
+      maxOf(minimum, HOP * 2 * 4),
+    )
+    try {
+      if (record.state != AudioRecord.STATE_INITIALIZED) {
+        Log.w(TAG, "kind=wake_microphone_unavailable state=${record.state}")
+        return End.MICROPHONE
+      }
+      record.startRecording()
+      Log.i(TAG, "kind=wake_segmenter rung=${PondEar.nativeRung()}")
+      val chunk = ShortArray(HOP)
+      while (listening) {
+        val read = record.read(chunk, 0, HOP)
+        if (read < 0) {
+          Log.w(TAG, "kind=wake_microphone_unavailable read=$read")
+          return End.MICROPHONE
+        }
+        PondEar.nativeSegment(segments, chunk, read)?.let(::handOver)
+      }
+      return End.STOPPED
+    } finally {
+      record.release()
+      PondEar.nativeCloseSegments(segments)
+    }
+  }
+
+  /** Listening thread: write a segment for the app to send, unless too many already wait. */
+  private fun handOver(pcm: ShortArray) {
+    val seconds = pcm.size.toFloat() / RATE
+    if (pending.get() >= MAX_PENDING) {
+      Log.i(TAG, "kind=wake_segment_dropped reason=busy seconds=$seconds")
+      return
+    }
+    val file = File(segmentDir(this), "segment-${System.nanoTime()}.wav")
+    try {
+      file.writeBytes(wav(pcm))
+    } catch (error: java.io.IOException) {
+      Log.w(TAG, "kind=wake_segment_dropped reason=write_failed error=${error.message}")
+      return
+    }
+    pending.incrementAndGet()
+    main.post {
+      if (!PondWakeModule.offer(file.absolutePath)) {
+        Log.i(TAG, "kind=wake_segment_dropped reason=app_not_running seconds=$seconds")
+        release(file.absolutePath)
+        return@post
+      }
+      // An answer that never comes (the app's runtime went away mid-send) must not hold a place.
+      main.postDelayed({
+        if (File(file.absolutePath).exists()) Log.i(TAG, "kind=wake_segment_dropped reason=unanswered seconds=$seconds")
+        release(file.absolutePath)
+      }, ANSWER_MS)
+    }
+  }
+
+  /** Main thread: the Pond heard the phrase in a segment; let go of the microphone and open the orb. */
+  private fun heardByPond() {
+    stopListening("the Pond heard the phrase")
+    heard()
   }
 
   /**
@@ -300,6 +411,16 @@ class GooseWakeService : Service() {
     private const val JOIN_MS = 500L
     private const val RETRY_MS = 5_000L
     private const val OVERLAY_MS = 3_000L
+    private const val KEY_MODE = "mode"
+    /** Segments waiting for the app to send them; more are dropped until one is answered. */
+    private const val MAX_PENDING = 2
+    /** How long a segment waits for the app's answer before it is deleted unanswered. */
+    private const val ANSWER_MS = 30_000L
+
+    /** The household's phrase is "hey goose": the detector here hears it. */
+    const val MODE_HEY_GOOSE = "hey_goose"
+    /** Any other phrase: the Pond hears it in the segments the phone sends. */
+    const val MODE_POND = "pond"
 
     const val REFUSED_START = "start_refused"
     const val REFUSED_MICROPHONE = "no_microphone"
@@ -310,6 +431,11 @@ class GooseWakeService : Service() {
     @Volatile var active = false
       private set
 
+    /** The running service, for the module's calls. Main thread. */
+    private var running: GooseWakeService? = null
+
+    private val pending = java.util.concurrent.atomic.AtomicInteger(0)
+
     /** Why the service last stopped without being asked to, or null. Read by the settings row. */
     @Volatile var refusal: String? = null
       private set
@@ -318,6 +444,51 @@ class GooseWakeService : Service() {
 
     /** Whether the person has turned listening on; kept across restarts of the app. */
     fun chosen(context: Context) = prefs(context).getBoolean(KEY_ON, false)
+
+    fun mode(context: Context): String = prefs(context).getString(KEY_MODE, MODE_HEY_GOOSE) ?: MODE_HEY_GOOSE
+
+    /**
+     * Main thread: listen in `mode` from now on, with the notification's new words (they name the
+     * phrase). A running service re-words its notification and, if the mode changed, restarts.
+     */
+    fun configure(context: Context, mode: String, words: Map<String, String>) {
+      val edit = prefs(context).edit().putString(KEY_MODE, if (mode == MODE_POND) MODE_POND else MODE_HEY_GOOSE)
+      words.forEach { (key, value) -> edit.putString(key, value) }
+      edit.apply()
+      val service = running ?: return
+      service.getSystemService(NotificationManager::class.java).notify(NOTIFICATION_ID, notification(service))
+      service.modeChanged()
+    }
+
+    /** Main thread: the app's answer from the Pond for one segment was a wake. */
+    fun heardByPond(): Boolean {
+      val service = running ?: return false
+      Log.i(TAG, "kind=wake_heard by=pond")
+      service.heardByPond()
+      return true
+    }
+
+    /** Delete a segment the app has sent or given up on. */
+    fun release(path: String) {
+      val file = File(path)
+      // Only this service's own segments: the path comes back over the bridge.
+      if (file.parentFile?.name == SEGMENT_DIR && file.delete()) pending.decrementAndGet()
+    }
+
+    private const val SEGMENT_DIR = "wake-segments"
+
+    private fun segmentDir(context: Context) = File(context.cacheDir, SEGMENT_DIR).apply { mkdirs() }
+
+    /** PCM16 mono 16 kHz as a WAV file's bytes, as the Pond's routes read them. */
+    private fun wav(pcm: ShortArray): ByteArray {
+      val data = pcm.size * 2
+      val out = java.nio.ByteBuffer.allocate(44 + data).order(java.nio.ByteOrder.LITTLE_ENDIAN)
+      out.put("RIFF".toByteArray()).putInt(36 + data).put("WAVE".toByteArray())
+      out.put("fmt ".toByteArray()).putInt(16).putShort(1).putShort(1).putInt(RATE).putInt(RATE * 2).putShort(2).putShort(16)
+      out.put("data".toByteArray()).putInt(data)
+      pcm.forEach { out.putShort(it) }
+      return out.array()
+    }
 
     /**
      * Turn listening on with the notification's words, which come from the app's translations,
@@ -406,9 +577,32 @@ class GooseWakeService : Service() {
 class PondWakeModule(context: ReactApplicationContext) : ReactContextBaseJavaModule(context), LifecycleEventListener {
   init {
     context.addLifecycleEventListener(this)
+    live = this
   }
 
   override fun getName() = "PondWake"
+
+  override fun invalidate() {
+    if (live === this) live = null
+    super.invalidate()
+  }
+
+  companion object {
+    /** JavaScript's event for a segment to send: its file's path (services/phone-wake.ts). */
+    private const val SEGMENT_EVENT = "PondWakeSegment"
+
+    /** The module the app's JavaScript is running, for the service to hand segments to. */
+    @Volatile private var live: PondWakeModule? = null
+
+    /** Main thread: give a segment's file to the app's JavaScript; false when no app is running. */
+    fun offer(path: String): Boolean {
+      val module = live ?: return false
+      val context = module.reactApplicationContext
+      if (!context.hasActiveReactInstance()) return false
+      context.getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter::class.java).emit(SEGMENT_EVENT, path)
+      return true
+    }
+  }
 
   override fun onHostResume() {
     if (available()) GooseWakeService.start(reactApplicationContext)
@@ -439,6 +633,25 @@ class PondWakeModule(context: ReactApplicationContext) : ReactContextBaseJavaMod
   fun choose(on: Boolean, words: ReadableMap, promise: Promise) {
     val copy = GooseWakeService.WORD_KEYS.filter { words.hasKey(it) }.associateWith { words.getString(it).orEmpty() }
     promise.resolve(GooseWakeService.choose(reactApplicationContext, on, copy))
+  }
+
+  /** Listen for the household's phrase in `mode` ("hey_goose" or "pond"); `words` name it. */
+  @ReactMethod
+  fun configure(mode: String, words: ReadableMap) {
+    val copy = GooseWakeService.WORD_KEYS.filter { words.hasKey(it) }.associateWith { words.getString(it).orEmpty() }
+    reactApplicationContext.runOnUiQueueThread { GooseWakeService.configure(reactApplicationContext, mode, copy) }
+  }
+
+  /** The app has sent a segment, or given up on it: delete it. */
+  @ReactMethod
+  fun done(path: String) {
+    GooseWakeService.release(path)
+  }
+
+  /** The Pond heard the phrase in a segment: open the orb. Resolves whether the service was there. */
+  @ReactMethod
+  fun heard(promise: Promise) {
+    reactApplicationContext.runOnUiQueueThread { promise.resolve(GooseWakeService.heardByPond()) }
   }
 
   /** Start the service again if it was chosen; called once at launch. */

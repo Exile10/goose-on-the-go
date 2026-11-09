@@ -47,6 +47,7 @@ import type {
   VoiceAgentPatch,
   VoicePrints,
   VoiceTakeResult,
+  WakeCheck,
   VoiceRoom,
   AdminCache,
   AdminCacheId,
@@ -1369,6 +1370,34 @@ export class PondApiClient {
     const result = readVoiceTake(await res.json());
     if (!result) throw new Error('The Pond answered a voice take with something unexpected');
     return result;
+  }
+
+  /**
+   * `POST /voice/wake/check`: whether a speech segment this phone heard opens with the household's
+   * wake phrase, matched by the Pond with its learned pronunciations. Only the verdict and the phrase
+   * come back; the Pond keeps nothing. 503 `speech_recognition_unavailable` and 413
+   * `segment_too_long` are refusals by name.
+   */
+  async checkWakeSegment(fileUri: string): Promise<WakeCheck> {
+    const form = new FormData();
+    form.append('audio', new File(fileUri), 'segment.wav');
+    const res = await this.send(`${this.baseUrl}/api/v1/voice/wake/check`, {
+      method: 'POST',
+      // No Content-Type: the runtime writes the multipart boundary itself.
+      headers: this.token ? { Authorization: `Bearer ${this.token}` } : {},
+      body: form,
+      signal: timeoutSignal(VOICE_TIMEOUT_MS),
+    });
+    if (!res.ok) {
+      const body = await errorBody(res);
+      throw new ApiError(`POST /api/v1/voice/wake/check → ${res.status}`, res.status, parseRetryAfter(res), detailOf(body), body);
+    }
+    const body: unknown = await res.json();
+    const check = body as Partial<WakeCheck> | null;
+    if (typeof check?.heard !== 'boolean' || typeof check.phrase !== 'string') {
+      throw new Error('The Pond answered a wake check with something unexpected');
+    }
+    return { heard: check.heard, phrase: check.phrase };
   }
 
   /** Forget a member's voice. Their face, profile and memories stay. */

@@ -1778,6 +1778,12 @@ export interface VoicePrints {
   members: VoicePrintMember[];
 }
 
+/** `POST /api/v1/voice/wake/check`: the Pond's verdict on one segment, and the phrase it matched. */
+export interface WakeCheck {
+  heard: boolean;
+  phrase: string;
+}
+
 /**
  * `POST /api/v1/voice/takes`: one sentence read while teaching Goose a voice. It tunes the wake
  * phrase, and adds to the person's voice print unless Voice Match is off for the run.
