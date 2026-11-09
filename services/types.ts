@@ -275,6 +275,8 @@ export interface ChatStreamRequest {
   deep_research?: boolean;
   /** With `deep_research` only, and left out for `auto`, so an older Pond sees the body it knows. */
   deep_research_answer?: Exclude<AnswerShape, 'auto'>;
+  /** Where this phone is, by name, while the person has turned on telling Goose (`phone-place.ts`). */
+  device_place?: string;
 }
 
 /**

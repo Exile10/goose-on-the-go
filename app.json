@@ -58,7 +58,7 @@
       [
         "expo-location",
         {
-          "locationWhenInUsePermission": "Goose On The Go uses your location only when you ask for a ride fare, so the driver is sent to where you are. It is sent to your Pond and to the ride company for that ride, and nowhere else.",
+          "locationWhenInUsePermission": "Goose On The Go uses your location when you ask for a ride fare, so the driver is sent to where you are, and, if you turn on Tell Goose where this phone is, to name the place you are in with your messages. It is sent to your Pond, and for a ride to the ride company, and nowhere else.",
           "locationAlwaysAndWhenInUsePermission": false,
           "locationAlwaysPermission": false,
           "isIosBackgroundLocationEnabled": false,

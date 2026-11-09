@@ -114,6 +114,7 @@ What the app sends it, beyond the control traffic of the screens themselves:
 | Recorded speech | Voice mode, only the stretches where the user is speaking | `view-models/use-voice.ts` (`api.transcribe`), `services/api-client.ts` (`transcribe`, `POST /api/v1/transcribe`) |
 | Photos and files the user attaches | When the user picks or takes one for a message | `services/media.ts` |
 | The device's location | Once, when the user asks for a ride fare | `view-models/use-ride.ts` (`locateHere`), `services/api-client.ts` (`POST /api/v1/rides/quote`) |
+| The name of the place the device is in | With each message, only while the user has turned on Tell Goose where this phone is | `services/phone-place.ts`, `services/api-client.ts` (`streamChat`, `device_place`) |
 
 Each is described under its own heading below.
 
@@ -201,7 +202,7 @@ hands the user to that app or site; this app sends it nothing.
 Verified against the dependency list rather than asserted: there is no analytics SDK, no
 crash reporter, no advertising or attribution SDK, and no tracking library of any kind in
 `package.json`. There is no contacts access and no advertising identifier. Location is read
-only for a ride fare, below.
+only for a ride fare and, if the user turns it on, to name the place the phone is in, below.
 
 `expo-device` establishes whether the code is running on physical hardware before attempting push
 registration, and since 2026-10-17 gives the default name this phone pairs under (its device name,
@@ -246,8 +247,17 @@ duplicate should be removed before submission, keeping whichever sentence is mea
 what it is for. `locateHere` in `view-models/use-ride.ts` asks for foreground permission and
 takes one high-accuracy fix, when the user asks for a ride fare. The coordinates go to the
 Pond as the pickup point and from there to Uber (above). They are held in memory for the ride
-screen and never written to storage. There is no background location, no geofence, and no
-continuous tracking.
+screen and never written to storage.
+
+Tell Goose where this phone is (Settings, off until the user turns it on, which asks for
+foreground permission) sends the name of the place the phone is in ("Westlands, Nairobi") with
+each message, so the assistant can say where the user is. `services/phone-place.ts` takes a
+balanced-accuracy fix at most every five minutes while a message is being sent, names it with the
+phone's system geocoder, and drops the coordinates: only the name reaches the household's own Pond,
+which keeps it for that turn. The switch is remembered on the phone; the place is held in memory
+only.
+
+There is no background location, no geofence, and no continuous tracking.
 
 The built apps agree (checked 2026-10-17 in prebuilt native projects): iOS's `Info.plist`
 carries `NSLocationWhenInUseUsageDescription` and no "always" key, and the Android manifest

@@ -538,6 +538,14 @@ export class PondApiClient {
     this.baseUrl = normalizePondUrl(url);
   }
 
+  /** Where this phone is, for each turn, while the person shares it (`services/phone-place.ts`). */
+  private turnPlace: (() => Promise<string | undefined>) | null = null;
+
+  /** Installed at launch by `loadPhonePlacePreference`, which keeps location out of this client. */
+  setTurnPlace(source: () => Promise<string | undefined>) {
+    this.turnPlace = source;
+  }
+
   setToken(token: string | null) {
     this.token = token;
   }
@@ -1142,10 +1150,11 @@ export class PondApiClient {
     onFrame: (frame: ChatFrame) => void,
     signal?: AbortSignal,
   ): Promise<void> {
+    const place = await this.turnPlace?.();
     const res = await this.open('/api/v1/chat/stream', {
       method: 'POST',
       headers: { Accept: 'text/event-stream' },
-      body: JSON.stringify(body),
+      body: JSON.stringify(place ? { ...body, device_place: place } : body),
       signal,
     });
     await readSse(res, (event) => deliver(event, onFrame), { idleMs: STREAM_IDLE_MS });
