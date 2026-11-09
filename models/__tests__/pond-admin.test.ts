@@ -120,6 +120,13 @@ describe('readAdminKey', () => {
 });
 
 describe('readOverview', () => {
+  it('keeps the encrypted volume the Pond sends apart from the disk, and none when it sends none', () => {
+    const volume = { total_bytes: 16_000, free_bytes: 13_000 };
+    expect(readOverview({ disk: { total_bytes: 115_000, free_bytes: 28_000 }, volume })?.volume).toEqual(volume);
+    expect(readOverview({ disk: { total_bytes: 1, free_bytes: 1 }, volume: null })?.volume).toBeNull();
+    expect(readOverview({ disk: { total_bytes: 1, free_bytes: 1 } })?.volume).toBeNull();
+  });
+
   it('reads areas largest first, folding ids this phone does not know into one Other', () => {
     const overview = readOverview({
       disk: { total_bytes: 1000, free_bytes: 200 },
@@ -148,6 +155,7 @@ describe('readOverview', () => {
   it('draws an empty overview from an object missing everything', () => {
     expect(readOverview({})).toEqual({
       disk: { total_bytes: 0, free_bytes: 0 },
+      volume: null,
       data_dir_bytes: 0,
       areas: [],
       databases: [],
