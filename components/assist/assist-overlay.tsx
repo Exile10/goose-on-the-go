@@ -18,6 +18,7 @@ import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { InkButton, InkSpinner, InkText, useInkTheme } from '@jarida/ink/native';
 
+import { Markdown } from '@/components/patterns/markdown';
 import { VoiceDock } from '@/components/patterns/voice-dock';
 import { GLASS_INTENSITY, GLASS_TINT_ALPHA, GLASS_TINT_ALPHA_UNBLURRED, GlassBlur } from '@/components/ui/glass-blur';
 import { overlayBlursBehind } from '@/services/phone-assistant';
@@ -36,7 +37,8 @@ function ExchangeView({ exchange }: { exchange: Exchange }) {
           {exchange.asked}
         </InkText>
       ) : null}
-      {exchange.answer ? <InkText size="md">{exchange.answer}</InkText> : null}
+      {/* The answer is Markdown, as in the conversation; set as text it showed its asterisks. */}
+      {exchange.answer ? <Markdown source={exchange.answer} /> : null}
     </ScrollView>
   );
 }
