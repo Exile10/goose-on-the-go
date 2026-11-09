@@ -37,6 +37,7 @@ import { ServerProvider } from '@/providers/server-provider';
 import { ConfirmProvider } from '@/providers/confirm-provider';
 import { SnackbarProvider } from '@/providers/snackbar-provider';
 import { loadHapticsPreference } from '@/services/haptics';
+import { resumePhoneWake } from '@/services/phone-wake';
 import { loadReplyNoticePreference } from '@/services/reply-notices';
 
 /**
@@ -103,6 +104,9 @@ export default function RootLayout() {
     );
     void loadHapticsPreference();
     void loadReplyNoticePreference();
+    // Android starts the wake-word service only while the app is in front, so a reboot ends it
+    // until the app opens again: this is that moment.
+    void resumePhoneWake();
   }, []);
 
   if (!fontsLoaded && !fontError) {

@@ -1,0 +1,30 @@
+# The Pond's "hey goose" detector for this app's Android wake service, as a JNI library.
+#
+# Built by scripts/build-embedded-ear.sh into native/pondear/jniLibs/, which the with-pond-wake
+# config plugin copies in at prebuild. pond-ear comes from the Pond checkout beside this
+# repository, the same place scripts/build-embedded-network.sh takes pondnet from, so the phone
+# runs the detector and model the Pond ships, byte for byte.
+[package]
+name = "pondear"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+path = "src/lib.rs"
+
+[dependencies]
+pond-ear = { path = "../../../goose-in-a-pond/crates/pond-ear" }
+jni-sys = "0.4"
+
+# Its own workspace, so cargo never looks for one above this repository.
+[workspace]
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true

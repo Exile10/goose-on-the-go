@@ -55,9 +55,11 @@ copies the working tree to a temporary directory, links `node_modules`, and runs
 and `android/`.
 
 It needs what prebuild itself needs, including the untracked inputs: the
-Firebase config files and the `native/pondnet` libraries that
-`scripts/build-embedded-network.sh` produces. Without the libraries the plugins
-fail and name the command to run.
+Firebase config files, the `native/pondnet` libraries that
+`scripts/build-embedded-network.sh` produces, and the wake-word detector in
+`native/pondear/jniLibs` that `scripts/build-embedded-ear.sh` (`npm run
+build:ear`) produces. Without the libraries the plugins fail and name the command
+to run.
 
 `.githooks/pre-push` runs the same check against each pushed commit that changes
 `app.json`, `package.json`, the lockfile, `plugins/`, `patches/` or `native/`.

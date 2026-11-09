@@ -33,7 +33,8 @@ import {
 } from '@/view-models/use-settings-extras';
 import type { UsePondSettings } from '@/view-models/use-pond-settings';
 import { usePhoneAssistant } from '@/view-models/use-phone-assistant';
-import { MenuRow, TextRow } from './setting-controls';
+import { usePhoneWake } from '@/view-models/use-phone-wake';
+import { MenuRow, SwitchRow, TextRow } from './setting-controls';
 import { RowSeparator, SettingsMessage, SettingsRow } from './settings-list';
 import { useSettingsColors, useSettingsStyles, type SettingsColors, type SettingsMetrics, type SettingsType } from './settings-theme';
 
@@ -349,6 +350,32 @@ export function PhoneAssistantRow() {
         void selectionTick();
         void actions.choose();
       }}
+    />
+  );
+}
+
+/**
+ * "Listen for Hey Goose": the phone's own wake word, which opens the same voice orb as the assist
+ * gesture. Android only, and only where this build carries the detector.
+ */
+export function PhoneWakeRow() {
+  const { t } = useTranslation();
+  const { data, actions } = usePhoneWake();
+  if (!data.supported) {
+    return (
+      <SettingsMessage>
+        {t(Platform.OS === 'android' ? 'settings.phoneWake.unsupported' : 'settings.phoneWake.ios')}
+      </SettingsMessage>
+    );
+  }
+  return (
+    <SwitchRow
+      label={t('settings.phoneWake.label')}
+      description={t('settings.phoneWake.description')}
+      value={data.on}
+      disabled={data.busy}
+      error={data.error}
+      onChange={(next) => void actions.set(next)}
     />
   );
 }

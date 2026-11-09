@@ -38,6 +38,9 @@ app: the overlay is a new conversation each time it opens.
 | `components/assist/assist-root.tsx` | | Root of the overlay's own React tree, registered in `index.ts` as `assist`. Providers for theme, Ink, safe area and translations; no router, no ServerProvider. |
 | `components/assist/assist-overlay.tsx`, `view-models/use-assist.ts` | | The dimmed backdrop and the panel: reaching the Pond, the last exchange, and `VoiceDock`, the same voice pipeline (`useVoice`) as voice mode. |
 | `view-models/use-phone-assistant.ts`, `PhoneAssistantRow` | `components/settings/special-rows.tsx` | The settings row. |
+| `GooseWakeService`, `PondWakeModule` (`PondWake`), `PondEar` | `plugins/pond-wake/PondWake.kt` | "Hey Goose": the listening service, its module, and the detector's JNI (below). |
+| `with-pond-wake.js`, `native/pondear` | `plugins/`, `native/` | Declares the service, copies the Kotlin and the detector libraries in; the JNI shim over the Pond's `pond-ear`. |
+| `services/phone-wake.ts`, `view-models/use-phone-wake.ts`, `PhoneWakeRow` | `components/settings/special-rows.tsx` | The "Listen for Hey Goose" switch. |
 
 Two React surfaces share one JavaScript runtime: MainActivity's `main` (expo-router) and
 AssistActivity's `assist`. They do not share a tree, which is why the overlay does not mount a
@@ -53,15 +56,45 @@ The choose button opens `Settings.ACTION_VOICE_INPUT_SETTINGS`, falling back to
 `RoleManager.createRequestRoleIntent(ROLE_ASSISTANT)`: the assistant role is not requestable, so
 that intent returns `RESULT_CANCELED` without showing anything.
 
+## "Hey Goose" on the phone
+
+With Goose as the assistant, Settings, Voice, **On this phone**, **Listen for "Hey Goose"** lets the
+phone listen for the phrase itself and open the same voice orb as the side key.
+
+- **What listens.** `GooseWakeService` (`plugins/pond-wake/PondWake.kt`), a foreground service of
+  type microphone, runs the Pond's own detector: the `pond-ear` crate and its embedded
+  `hey-goose.onnx`, threshold 0.97, built for Android by `scripts/build-embedded-ear.sh` from the
+  Pond checkout beside this repository (`native/pondear`, a JNI shim). The phone hears exactly what
+  the Pond's ear would; the model's provenance and measurements are in the Pond's
+  `crates/pond-ear/models/hey-goose.md`.
+- **When it listens.** Only while the screen is on, the phone unlocked, and no screen of the app in
+  front: the overlay does not open over the lock screen, and the app's own voice mode and the
+  overlay record with their own microphone, so the service lets go while either shows. The
+  notification says so, and its **Stop** turns the switch off.
+- **What happens to the audio.** Each 80 ms is scored and dropped; the detector keeps the last 20
+  seconds in memory to place the phrase. Nothing is written or sent until the orb opens and the
+  conversation starts, as with the side key.
+- **Opening the orb.** On the phrase, the service releases the microphone and calls
+  `GooseInteractionService.showOverlay()`, which shows the assistant's own session: the path the
+  side key takes, and one Android allows from the background for the active assistant. Speak
+  after the orb appears; what is said in the same breath as the phrase is not kept.
+- **What stops it.** Goose no longer being the assistant (the service stops at the next phrase and
+  the row says why), the microphone permission withdrawn, or Android refusing the start. Android
+  14 and later start a microphone service only while the app is in front, so it starts from the
+  switch and resumes each time the app opens (`resumePhoneWake` at launch, and `PondWakeModule` on
+  each return to the front); after a reboot it waits for the app to be opened once.
+- **Logs.** `adb logcat -s PondWake` shows `kind=wake_listening state=on|off why=...`,
+  `kind=wake_detector rung=...`, `kind=wake_heard p=...` and every `kind=wake_refused reason=...`.
+
+To build it: `npm run build:ear` (add `--emulator` for x86_64), then prebuild as usual. The
+`with-pond-wake` plugin stops the prebuild if a packaged ABI's library is missing.
+
 ## What Android does not allow
 
 - **No always-on "Hey Goose" through this role.** The platform's hotword path
   (`HotwordDetectionService`, the always-on hotword detector) is a system API for preinstalled
-  assistants. A third-party assistant gets the assist gesture and nothing more. Hands-free wake
-  needs the app's own foreground service listening on the microphone, a later phase. The overlay
-  is ready for it: `AssistActivity` can be started by an explicit intent from such a service (as
-  a full-screen intent or from a visible notification, since Android limits activity starts from
-  the background).
+  assistants. A third-party assistant gets the assist gesture and nothing more, so "Hey Goose" is
+  the app's own foreground service; see below.
 - **No lock screen.** `supportsLaunchVoiceAssistFromKeyguard` is false: a locked phone does not
   open a conversation with the household's Pond.
 - **No speech recognition for other apps.** Android 11 and earlier also make an assistant's

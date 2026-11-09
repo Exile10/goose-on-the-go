@@ -36,13 +36,40 @@ private const val TAG = "PondAssist"
  * app. Android lists an app there when it declares a VoiceInteractionService whose
  * `android.voice_interaction` meta-data names a session service (`res/xml/goose_interaction_service.xml`).
  *
- * The service itself does nothing. A third-party assistant cannot listen for a hotword through
- * it: `HotwordDetectionService` and the always-on detector are reserved for preinstalled apps,
- * so "Hey Goose" has to come from this app's own foreground service, a later phase. What the
- * role does give is the system's assist gesture (holding the side key, or a swipe up from a
- * bottom corner), which reaches [GooseSession].
+ * A third-party assistant cannot listen for a hotword through it: `HotwordDetectionService` and
+ * the always-on detector are reserved for preinstalled apps, so "Hey Goose" comes from this app's
+ * own foreground service (`plugins/pond-wake/PondWake.kt`). What the role does give is the
+ * system's assist gesture (holding the side key, or a swipe up from a bottom corner), which reaches
+ * [GooseSession], and [showOverlay], the same session on request.
  */
-class GooseInteractionService : VoiceInteractionService()
+class GooseInteractionService : VoiceInteractionService() {
+  override fun onReady() {
+    super.onReady()
+    ready = this
+  }
+
+  override fun onShutdown() {
+    if (ready === this) ready = null
+    super.onShutdown()
+  }
+
+  companion object {
+    /** The service while Android has it bound as the phone's assistant. */
+    @Volatile private var ready: GooseInteractionService? = null
+
+    /**
+     * Open the voice orb as the assist gesture does, through [GooseSession]. Showing its own
+     * session is what the active assistant may do from the background, so this works over any
+     * app. False when Goose is not the phone's assistant now. Main thread only.
+     */
+    fun showOverlay(): Boolean {
+      val service = ready ?: return false
+      service.showSession(Bundle(), 0)
+      Log.i(TAG, "assist session requested by the wake word")
+      return true
+    }
+  }
+}
 
 /** Hands Android a [GooseSession] each time the assist gesture is made. */
 class GooseSessionService : VoiceInteractionSessionService() {
@@ -139,8 +166,7 @@ class GooseRecognitionService : RecognitionService() {
  * MainActivity in the app's own task. It shares the React host with MainActivity, so a running
  * app's JavaScript, its Pond connection included, is reused rather than started twice.
  *
- * Anything that can start an activity can start this one by class name, which leaves room for a
- * later wake-word service to open the same overlay.
+ * The wake word opens it the same way as the gesture, through [GooseInteractionService.showOverlay].
  */
 class AssistActivity : ReactActivity() {
   override fun onCreate(savedInstanceState: Bundle?) {

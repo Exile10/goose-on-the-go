@@ -1615,6 +1615,26 @@
       "openFailed": "This phone did not open its assistant settings. Choose Goose in Settings > Apps > Default apps > Digital assistant app.",
       "needsUpdate": "Being the phone's assistant needs the newest build of the app.",
       "ios": "iPhone does not let another app take Siri's place."
+    },
+    "phoneWake": {
+      "label": "Listen for “Hey Goose”",
+      "description": "Say Hey Goose while the phone is unlocked to open the voice orb over any app. The phone listens for the phrase itself; nothing it hears leaves the phone until the orb opens.",
+      "needsAssistant": "Make Goose this phone's assistant first: Hey Goose opens the same voice orb.",
+      "microphone": "Goose needs the microphone to hear Hey Goose.",
+      "microphoneSettings": "Allow the microphone for Goose On The Go in the phone's Settings, then try again.",
+      "unsupported": "Hey Goose needs the newest build of the app on this phone.",
+      "ios": "iPhone does not let an app listen for its own wake word.",
+      "refused": {
+        "start": "Android did not let Goose start listening. Open the app and turn it on again.",
+        "model": "Hey Goose could not start on this phone.",
+        "notAssistant": "Goose stopped listening because it is no longer this phone's assistant."
+      },
+      "notification": {
+        "title": "Listening for Hey Goose",
+        "body": "Say Hey Goose to talk to your Pond. Paused while the phone is locked or Goose is open.",
+        "stop": "Stop",
+        "channel": "Hey Goose"
+      }
     }
   },
   "screens": {
