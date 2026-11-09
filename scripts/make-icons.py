@@ -35,7 +35,11 @@ except ImportError:
 
 ROOT = Path(__file__).resolve().parent.parent
 MARK_ON_DARK = ROOT / "assets/brand/goose-logo-dark.png"
+MARK_ON_LIGHT = ROOT / "assets/brand/goose-logo.png"
 OUT = ROOT / "assets/images"
+
+# The My Goose tab draws the mark at glyph size, 26pt, so it ships at 3x.
+TAB_MARK = 78
 
 # The plate colour, taken from the Pond's own app icon rather than from this
 # app's design tokens.
@@ -215,6 +219,9 @@ def main() -> None:
     save(plated(mark, 48, MARK_WIDTH_RATIO), "favicon.png")
     # Wired in app.json as expo-notifications' `icon`.
     save(notification_silhouette(MARK_ON_DARK), "notification-icon.png")
+    # The My Goose tab's glyph: the mark to its own ink, so it fills a tab icon's box as a glyph does.
+    save(transparent(mark, TAB_MARK, 1.0), "tab-goose-dark.png")
+    save(transparent(trimmed_mark(MARK_ON_LIGHT), TAB_MARK, 1.0), "tab-goose.png")
 
     print("wrote:")
     for line in written:

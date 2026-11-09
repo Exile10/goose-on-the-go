@@ -28,7 +28,7 @@ import {
   useInkTheme,
   type InkNavDestination,
 } from '@/components/ui/ink';
-import { StyleSheet, View } from 'react-native';
+import { Image, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { GIcon } from '@/components/ui/g-icon';
@@ -71,12 +71,31 @@ function TabBarBlur({ style, ...props }: React.ComponentProps<typeof BlurView>) 
   );
 }
 
-const DESTINATIONS: { name: string; labelKey: TranslationKey; icon: IconName }[] = [
+const DESTINATIONS: { name: string; labelKey: TranslationKey; icon: IconName | 'mark' }[] = [
   { name: 'index', labelKey: 'tabs.home', icon: 'home' },
   { name: 'chat', labelKey: 'tabs.chat', icon: 'chat' },
+  { name: 'goose', labelKey: 'tabs.goose', icon: 'mark' },
   { name: 'devices', labelKey: 'tabs.devices', icon: 'device' },
   { name: 'profile', labelKey: 'tabs.you', icon: 'profile' },
 ];
+
+const MARK = require('@/assets/images/tab-goose.png');
+const MARK_ON_DARK = require('@/assets/images/tab-goose-dark.png');
+
+/**
+ * My Goose is drawn with the brand mark, which is never recoloured: so it is not tinted as the
+ * other glyphs are, and an unselected one steps back by opacity instead.
+ */
+function MarkGlyph({ selected }: { selected: boolean }) {
+  const theme = useInkTheme();
+  return (
+    <Image
+      source={theme.scheme === 'dark' ? MARK_ON_DARK : MARK}
+      style={[styles.mark, { opacity: selected ? 1 : 0.62 }]}
+      accessibilityIgnoresInvertColors
+    />
+  );
+}
 
 /**
  * What the bar reads of the navigator. expo-router and @react-navigation ship
@@ -121,11 +140,15 @@ function AppTabBar({ state, navigation }: TabBarProps) {
         // the whole item and so off the icon, and which the collapsed bar does not draw.
         icon: (
           <View style={styles.glyph}>
-            <GIcon
-              name={d.icon}
-              size={22}
-              color={d.name === current ? theme.color.text : theme.color.textSecondary}
-            />
+            {d.icon === 'mark' ? (
+              <MarkGlyph selected={d.name === current} />
+            ) : (
+              <GIcon
+                name={d.icon}
+                size={22}
+                color={d.name === current ? theme.color.text : theme.color.textSecondary}
+              />
+            )}
             {d.name === 'profile' && issueTone ? (
               <View style={[styles.dot, { backgroundColor: issueTone === 'info' ? theme.color.accent : theme.color.danger }]} />
             ) : null}
@@ -273,6 +296,8 @@ export default function TabLayout() {
 }
 
 const styles = StyleSheet.create({
-  glyph: { width: 22, height: 22 },
+  glyph: { width: 22, height: 22, alignItems: 'center', justifyContent: 'center' },
+  // The mark is wider than it is tall, so it is given more room than a glyph to read at the same weight.
+  mark: { width: 30, height: 30 },
   dot: { position: 'absolute', top: -3, right: -5, width: 9, height: 9, borderRadius: 4.5 },
 });

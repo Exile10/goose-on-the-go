@@ -70,3 +70,6 @@ type Leaves<T, Prefix extends string = ''> = {
 }[keyof T & string];
 
 export type TranslationKey = Leaves<typeof en>;
+
+/** A plural's base carried as data, which `t()` resolves to its `_one` or `_other` by `count`. */
+export type PluralKey = TranslationKey extends infer K ? (K extends `${infer Base}_one` ? Base : never) : never;
