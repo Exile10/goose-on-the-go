@@ -46,6 +46,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   FlatList,
   StyleSheet,
+  Text,
   View,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
@@ -54,13 +55,14 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NAVBAR_DEFAULTS, NavbarBehaviour, type NavbarStage } from '@jarida/ink/headless';
-import { InkNavbar, InkNotice, InkSpinner, useInkTheme, useReduceMotion } from '@jarida/ink/native';
+import { InkNavbar, InkNotice, InkSpinner, inkText, useInkTheme, useReduceMotion } from '@jarida/ink/native';
 
 import { ChatDock } from '@/components/patterns/chat-dock';
 import { GreetingCard } from '@/components/patterns/greeting-card';
 import { JumpToLatest } from '@/components/patterns/jump-to-latest';
 import { InterviewDraft, InterviewProgress, InterviewSaved } from '@/components/patterns/interview-panels';
 import { MessageRow } from '@/components/patterns/message-row';
+import { RenameSheet } from '@/components/patterns/rename-sheet';
 import { VoiceDock } from '@/components/patterns/voice-dock';
 import { GIcon } from '@/components/ui/g-icon';
 import { GKeyboardView } from '@/components/ui/g-keyboard-view';
@@ -141,6 +143,39 @@ function BackToWall() {
   );
 }
 
+/**
+ * The bar's title, which renames the conversation, as the dashboard's title does. Set exactly as
+ * the bar sets a plain title, so a name that can be changed reads no differently from one that
+ * cannot. Only a control once the Pond has the conversation: before that there is nothing to rename.
+ */
+function ConversationTitle({ title, onPress }: { title: string; onPress: (() => void) | null }) {
+  const theme = useInkTheme();
+  const { t } = useTranslation();
+  const heading = inkText(theme, {
+    role: 'display',
+    size: 'lg',
+    weight: theme.weight.bold,
+    tracking: 'title',
+    leading: 'tight',
+  });
+  const text = (
+    <Text accessibilityRole="header" numberOfLines={1} style={[heading.style, localStyles.title]}>
+      {title}
+    </Text>
+  );
+  if (!onPress) return text;
+  return (
+    <GPressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={t('chat.rename.open', { title })}
+      style={localStyles.title}
+    >
+      {text}
+    </GPressable>
+  );
+}
+
 export default function ChatScreen() {
   const styles = useThemedStyles(makeStyles);
   const router = useRouter();
@@ -154,6 +189,7 @@ export default function ChatScreen() {
   const research = useResearchOffer();
   const [voice, setVoice] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const [renaming, setRenaming] = useState(false);
 
   // The wall and Home link a conversation here by id, with the title they show
   // for it; without an id the screen opens a new conversation, which is what
@@ -424,7 +460,11 @@ export default function ChatScreen() {
           style={styles.navbar}
           stage={stage}
           lead={<BackToWall />}
-          title={title ?? undefined}
+          title={
+            title ? (
+              <ConversationTitle title={title} onPress={sessionId ? () => setRenaming(true) : null} />
+            ) : undefined
+          }
           actions={[
             {
               key: 'new',
@@ -434,6 +474,16 @@ export default function ChatScreen() {
             },
           ]}
         />
+
+        {renaming && sessionId && title ? (
+          <RenameSheet
+            key={sessionId}
+            title={title}
+            onClose={() => setRenaming(false)}
+            onRename={actions.rename}
+            onNameForMe={actions.nameForMe}
+          />
+        ) : null}
 
         {asking && current ? <InterviewProgress interview={current} /> : null}
 
@@ -564,4 +614,6 @@ const localStyles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  // Shrinks before the bar's actions do, as the bar's own title does.
+  title: { flexShrink: 1 },
 });

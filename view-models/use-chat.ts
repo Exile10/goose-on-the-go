@@ -401,6 +401,10 @@ export interface UseChat {
      * otherwise.
      */
     open: (sessionId: string, title?: string) => void;
+    /** Give the conversation on screen a name. Resolves to why it was refused, or null once it is named. */
+    rename: (title: string) => Promise<string | null>;
+    /** Ask Goose to name the conversation on screen. Resolves as `rename` does. */
+    nameForMe: () => Promise<string | null>;
     dismissError: () => void;
   };
 }
@@ -826,6 +830,49 @@ export function useChatOn({ hydrated, isScreenReal }: ChatConnection): UseChat {
     setTurnSeed(Date.now());
   }, [makeQueue, queue, show]);
 
+  /**
+   * Both write the name to the Pond first and show it only once the Pond has it, so the bar never
+   * names a conversation something the wall will not. A hand-typed name is one the Pond's idle
+   * renaming leaves alone; asking Goose replaces even that, since asking is consent.
+   */
+  const rename = useCallback(
+    async (title: string): Promise<string | null> => {
+      const th = viewRef.current;
+      const next = title.trim();
+      if (!th.session) return t('chat.rename.notYet');
+      if (!next) return t('chat.rename.nameRequired');
+      try {
+        await api.renameSession(th.session, next);
+      } catch (e) {
+        logFailure('chat', 'conversation not renamed', e);
+        return describeApiError(e) ?? t('chat.rename.failed');
+      }
+      th.title = next;
+      changed(th);
+      return null;
+    },
+    [t],
+  );
+
+  const nameForMe = useCallback(async (): Promise<string | null> => {
+    const th = viewRef.current;
+    if (!th.session) return t('chat.rename.notYet');
+    try {
+      const result = await api.retitleSession(th.session);
+      const named = result.title?.trim();
+      if (result.outcome !== 'retitled' || !named) {
+        console.warn(`[chat] goose kept the name outcome=${result.outcome} reason=${result.reason ?? 'none'}`);
+        return t('chat.rename.kept');
+      }
+      th.title = named;
+      changed(th);
+      return null;
+    } catch (e) {
+      logFailure('chat', 'conversation not named by goose', e);
+      return describeApiError(e) ?? t('chat.rename.failed');
+    }
+  }, [t]);
+
   const dismissError = useCallback(() => setError(null), []);
 
   const watch = useCallback(() => {
@@ -845,6 +892,6 @@ export function useChatOn({ hydrated, isScreenReal }: ChatConnection): UseChat {
     },
     loading,
     error,
-    actions: { send, unqueue, stop, newConversation, open, dismissError, watch },
+    actions: { send, unqueue, stop, newConversation, open, rename, nameForMe, dismissError, watch },
   };
 }

@@ -1594,6 +1594,16 @@ export interface RetitleResult {
   reason?: string;
 }
 
+/** `POST /api/v1/sessions/{id}/retitle`: the model named one conversation, or did not. */
+export interface RetitleOneResult {
+  session_id: string;
+  outcome: 'retitled' | 'skipped' | 'unusable' | 'cancelled';
+  /** The new name, or null when nothing was written. */
+  title: string | null;
+  /** Present on "skipped": why, in a stable slug. */
+  reason?: string;
+}
+
 // ── Owner setup ───────────────────────────────────────────────
 
 /** `GET /api/v1/onboard/status`. `current_step` is the furthest step recorded, PascalCase, or `not_started`. */
