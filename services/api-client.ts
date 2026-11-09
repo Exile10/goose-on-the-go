@@ -834,12 +834,15 @@ export class PondApiClient {
   async request<T>(path: string, init: RequestInit = {}): Promise<T> {
     if (!path.startsWith('/api/') || path.startsWith('//')) throw new Error('Invalid Pond API path');
     const epoch = this.identityEpoch;
-    const doFetch = () =>
-      this.send(`${this.baseUrl}${path}`, {
+    let sentWith = this.token;
+    const doFetch = () => {
+      sentWith = this.token;
+      return this.send(`${this.baseUrl}${path}`, {
         ...init,
         headers: { ...this.headers(), ...(init.headers ?? {}) },
         signal: init.signal ?? timeoutSignal(REQUEST_TIMEOUT_MS),
       });
+    };
 
     let res: Response;
     try { res = await doFetch(); }
@@ -850,10 +853,7 @@ export class PondApiClient {
       this.setBaseUrl(recovered);
       res = await doFetch();
     }
-    if (res.status === 401 && this.refreshToken) {
-      const refreshed = await this.refreshOnce();
-      if (refreshed?.accepted) res = await doFetch();
-    }
+    if (res.status === 401) res = await this.afterUnauthorized(res, doFetch, () => sentWith);
     // Still refused after the one refresh this client allows itself: the
     // credentials are dead rather than stale, and no retry will revive them.
     // Reported once here so the whole app can settle, instead of each screen
@@ -889,14 +889,14 @@ export class PondApiClient {
    */
   async open(path: string, init: RequestInit = {}): Promise<Response> {
     const url = `${this.baseUrl}${path}`;
-    const doFetch = () =>
-      this.send(url, { ...init, headers: { ...this.headers(), ...(init.headers ?? {}) } }, null);
+    let sentWith = this.token;
+    const doFetch = () => {
+      sentWith = this.token;
+      return this.send(url, { ...init, headers: { ...this.headers(), ...(init.headers ?? {}) } }, null);
+    };
 
     let res = await doFetch();
-    if (res.status === 401 && this.refreshToken) {
-      const refreshed = await this.refreshOnce();
-      if (refreshed?.accepted) res = await doFetch();
-    }
+    if (res.status === 401) res = await this.afterUnauthorized(res, doFetch, () => sentWith);
     if (!res.ok) {
       const body = await errorBody(res);
       const detail = detailOf(body);
@@ -941,6 +941,34 @@ export class PondApiClient {
         await errorDetail(response));
     }
     return (await parseBody<T>(response)) as T;
+  }
+
+  /**
+   * After a 401: retry with a token another request has already refreshed, or refresh once.
+   *
+   * Coalescing alone is not enough. A request sent with the old token whose 401 arrives after the
+   * shared refresh has finished would start a second one, which revokes the token the first
+   * request just retried with; that retry's 401 then reads as dead credentials and unpairs the
+   * phone. On 2026-11-09 one expiry became seven rotations in a second and a forced re-pair. So a
+   * 401 for a token that has since been replaced is answered with the new one, and only a 401 for
+   * the current token refreshes.
+   */
+  private async afterUnauthorized(
+    res: Response,
+    doFetch: () => Promise<Response>,
+    sentWith: () => string | null,
+  ): Promise<Response> {
+    if (this.token && this.token !== sentWith()) {
+      res = await doFetch();
+      if (res.status !== 401) return res;
+    }
+    if (!this.refreshToken) return res;
+    const refreshed = await this.refreshOnce();
+    if (!refreshed?.accepted) return res;
+    res = await doFetch();
+    // A refresh that finished while this retry was out replaced the token it carried.
+    if (res.status === 401 && this.token && this.token !== sentWith()) res = await doFetch();
+    return res;
   }
 
   /** Used by SSE without starting a competing token rotation. */
