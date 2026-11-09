@@ -221,7 +221,7 @@ export default function ProfileHub() {
             </View>
           ))}
 
-          {/* Signing out is also the only way to release a remote enrollment the Pond still calls
+          {/* Unpairing is also the only way to release a remote enrollment the Pond still calls
               active, so it has to work, and say that it is working. A Pond that cannot be reached
               can still be removed from this phone; see useUnpair. */}
           <InkButton variant="danger" disabled={unpairing} onPress={() => void confirmUnpair()} style={styles.unpair}>

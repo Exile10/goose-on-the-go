@@ -45,7 +45,7 @@ If you choose to open My Pond with your phone's security, your phone also keeps 
 My Pond in that protected storage. Only your phone's own check can read it: Face ID or a
 fingerprint on an iPhone, a fingerprint or the phone's PIN, pattern or password on Android. It is
 never included in a backup or moved to another phone, and adding a new face or fingerprint makes
-it unreadable. Forgetting My Pond on this phone, or signing out, removes it.
+it unreadable. Forgetting My Pond on this phone, or unpairing it, removes it.
 
 Your phone also keeps ordinary preferences: your Pond's address on your network, which
 screen you were last on, your settings. None of this leaves your phone.
@@ -88,7 +88,7 @@ Turning on remote access also requires approval on the Pond itself, from your ho
 We cannot enable it for you, and neither can anyone who has only your phone.
 
 **Retention:** [NEEDS ANSWER — how long connection records and device keys are kept, and
-what happens to them when a user signs out]
+what happens to them when a phone is unpaired]
 
 ## Notifications
 
@@ -166,7 +166,7 @@ directly; it does not pass through us, and your phone does not keep it after the
 **Where home is.** Your Pond has no GPS, so on its own it only knows the city its time zone
 names. When your phone reaches your Pond on your home network, and you have already allowed
 the app to use your location, the app tells your Pond where home is, once, if your Pond's
-location is still only a guess. You can also ask for it with Find my location in Settings. Your
+location is still only a guess. You can also ask for it with Find my location in the app. Your
 phone names the place using its own map service (Google's on Android, Apple's on iPhone), which
 is the same service that gives your phone its location. Your Pond keeps the place to about
 110 metres, which is enough for the weather and nearby results, and not your exact house. Your
@@ -211,7 +211,7 @@ and nowhere else.
   somewhere safe, as you would a computer.
 
 No system is perfectly secure. If you believe your Pond or this phone has been compromised,
-sign out from the app, remove the phone on your Pond's dashboard, and pair again.
+unpair this phone, remove it on your Pond's dashboard, and pair again.
 
 ## Where your data is processed
 
@@ -251,10 +251,10 @@ to each store, so this section matches it]
 ## Your choices and your rights
 
 - **Decline remote access.** The app works without it, and you can turn it down when asked.
-- **Turn it off later.** Signing out releases this phone's access to your Pond, including
+- **Turn it off later.** Unpairing releases this phone's access to your Pond, including
   its remote access. You pair again at home to come back. Turning remote access off also
   erases the map of your home network that your phone kept to reconnect quickly.
-- **Remove a Pond you cannot reach.** If your Pond does not answer when you sign out, you
+- **Remove a Pond you cannot reach.** If your Pond does not answer when you unpair, you
   can remove it from this phone instead. The phone forgets the Pond and everything it kept
   from your household; the Pond still lists the phone until you remove it on the Pond's
   dashboard.

@@ -104,7 +104,7 @@ license to use it on devices you own or control, under these terms and the rules
 got it from.
 
 The app includes open-source software, each part under its own license, listed in the app under
-Settings, Privacy and licenses, Open-source licenses. Those licenses give you rights over that
+You, Privacy and licenses, Open-source licenses. Those licenses give you rights over that
 software that these terms do not limit.
 
 ## 11. Disclaimers
@@ -126,7 +126,7 @@ excluded, such as for death or personal injury caused by negligence, or for frau
 
 ## 13. Ending these terms
 
-You can stop using the app at any time by signing out and deleting it. We may stop providing the
+You can stop using the app at any time by unpairing it and deleting it. We may stop providing the
 app or the remote access service, or end these terms for you if you seriously or repeatedly break
 them. Sections 9 to 14 continue after these terms end.
 
