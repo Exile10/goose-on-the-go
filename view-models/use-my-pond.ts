@@ -27,6 +27,8 @@ export interface UseMyPond {
   /** What the Pond keeps, in four parts that always come in the same order. */
   parts: MyPondPart[];
   disk: { used: number; total: number; free: number; fraction: number } | null;
+  /** The encrypted data volume, when the Pond keeps its data in one; it can fill before the disk. */
+  volume: { used: number; total: number; free: number; fraction: number } | null;
   /** Whole minutes before the Pond locks My Pond again, or null when unknown. */
   locksIn: number | null;
   /** Any health check is not ok, so the Health row carries a badge. */
@@ -146,12 +148,16 @@ export function useMyPond(): UseMyPond {
   const disk = overview
     ? { ...diskUsed(overview.disk), total: overview.disk.total_bytes, free: overview.disk.free_bytes }
     : null;
+  const volume = overview?.volume
+    ? { ...diskUsed(overview.volume), total: overview.volume.total_bytes, free: overview.volume.free_bytes }
+    : null;
 
   return {
     gate,
     overview: unlocked ? overview : null,
     parts: unlocked && overview ? groupAreas(overview.areas) : [],
     disk: unlocked ? disk : null,
+    volume: unlocked ? volume : null,
     locksIn: unlocked ? minutesLeft(gate.status?.expires_at ?? null, now) : null,
     healthWarning: unlocked && healthNeedsAttention(health),
     healthStatus: unlocked && health ? healthSummary(health).status : null,

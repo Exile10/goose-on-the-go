@@ -2010,7 +2010,10 @@ export interface AdminUnlocked {
 export type AdminAreaId = 'models' | 'conversations' | 'kv_snapshots' | 'engine_caches' | 'attachments' | 'camera' | 'logs' | 'other';
 
 export interface AdminOverview {
+  /** The disk the Pond's files are on; with an encrypted data volume, the one that holds it. */
   disk: { total_bytes: number; free_bytes: number };
+  /** The encrypted data volume, when the Pond keeps its data in one. Older Ponds send nothing. */
+  volume?: { total_bytes: number; free_bytes: number } | null;
   data_dir_bytes: number;
   areas: { id: AdminAreaId; bytes: number }[];
   databases: { name: string; bytes: number }[];
