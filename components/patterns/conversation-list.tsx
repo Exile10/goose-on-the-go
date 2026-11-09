@@ -47,11 +47,15 @@ import {
   deleteActions,
 } from '@/components/patterns/conversation-card';
 import { Markdown } from '@/components/patterns/markdown';
+import { PondPicture } from '@/components/patterns/pond-picture';
 import { WALL_GUTTER } from '@/components/patterns/conversation-wall';
 import { GPressable } from '@/components/ui/g-pressable';
 import { useThemedStyles } from '@/hooks/use-themed-styles';
 import type { ThemeColors } from '@/constants/colors';
 import type { HistoryCard, HistorySection } from '@/view-models/use-chat-history';
+
+/** A row's picture: about two lines of title and preview tall, so it never sets the row's height alone. */
+const THUMB = 56;
 
 /** The loading list, in rows: a title's width, then each preview line's. */
 const GHOSTS: { title: `${number}%`; lines: `${number}%`[] }[] = [
@@ -186,6 +190,13 @@ export const ConversationRow = React.memo(function ConversationRow({
           />
         ) : null}
       </View>
+      {card.picture ? (
+        <PondPicture
+          path={card.picture.src}
+          label={card.picture.caption ?? card.picture.credit}
+          style={[local.thumb, { borderRadius: theme.radius.md }]}
+        />
+      ) : null}
     </GPressable>
   );
 });
@@ -360,6 +371,7 @@ const local = StyleSheet.create({
   body: { flex: 1, gap: 2 },
   line: { flexDirection: 'row', alignItems: 'baseline' },
   title: { flex: 1 },
+  thumb: { width: THUMB, height: THUMB, alignSelf: 'flex-start' },
   rule: { marginHorizontal: WALL_GUTTER },
   gutter: { paddingHorizontal: WALL_GUTTER },
   ghosts: { opacity: 0.7 },

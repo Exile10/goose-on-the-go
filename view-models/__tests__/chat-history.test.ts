@@ -448,6 +448,22 @@ describe('toCard', () => {
     });
   });
 
+  it('carries the Pond’s picture only when it is one the Pond serves', () => {
+    const now = at(2026, 9, 24);
+    const picture = {
+      key: 'a1b2c3d4e5f60718a1b2c3d4e5f60718',
+      src: '/api/v1/report-images/a1b2c3d4e5f60718a1b2c3d4e5f60718',
+      page: 'https://en.wikipedia.org/wiki/Goose',
+      credit: 'Someone, CC BY-SA 4.0',
+    };
+    expect(toCard(session({ picture }), now, LOCALE, 'Yesterday').picture).toMatchObject({
+      src: picture.src,
+      credit: picture.credit,
+    });
+    expect(toCard(session({ picture: { ...picture, src: 'https://elsewhere.example/x.jpg' } }), now, LOCALE, 'Yesterday').picture).toBeNull();
+    expect(toCard(session(), now, LOCALE, 'Yesterday').picture).toBeNull();
+  });
+
   it('keeps when it last moved as a number, and an unreadable time as NaN rather than a guess', () => {
     const now = at(2026, 9, 24);
     expect(toCard(session(), now, LOCALE, 'Yesterday').updatedAt).toBe(Date.UTC(2026, 8, 22, 9));

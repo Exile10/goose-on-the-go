@@ -184,6 +184,8 @@ export interface SessionSummary {
   title?: string;
   /** How the conversation opened, for a history card. Absent on older servers. */
   preview?: string;
+  /** A picture the Pond kept for the first page the conversation cited or read. Absent on older servers. */
+  picture?: unknown;
   created_at: string;
   updated_at: string;
   message_count?: number;

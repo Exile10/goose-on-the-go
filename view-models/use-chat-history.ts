@@ -34,6 +34,7 @@ import { Storage } from '@/services/storage';
 import { matchesQuery } from '@/utils/search';
 import { describeApiError, logFailure } from '@/view-models/describe-error';
 import type { SessionSummary } from '@/services/types';
+import { readReportImage, type ReportImage } from '@/models/web-watches';
 
 /** How much conversation a card has to show, which is how tall it gets. */
 export type CardWeight = 'tile' | 'card' | 'column';
@@ -79,6 +80,8 @@ export interface HistoryCard {
   routine: boolean;
   /** Goose is answering in it now, a turn this phone asked. */
   answering: boolean;
+  /** The Pond's picture for the first page it cited or read, or null. */
+  picture: ReportImage | null;
 }
 
 /**
@@ -373,6 +376,7 @@ export function toCard(
     weight: cardWeight(session),
     routine: isRoutine(session.id),
     answering: false,
+    picture: readReportImage(session.picture),
   };
 }
 

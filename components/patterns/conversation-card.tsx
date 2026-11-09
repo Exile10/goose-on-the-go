@@ -41,8 +41,10 @@ import { hitSlop } from '@jarida/ink';
 import { InkEdge, InkEyebrow, InkSkeleton, InkSpinner, inkText, useInkTheme } from '@jarida/ink/native';
 
 import { Markdown } from '@/components/patterns/markdown';
+import { PondPicture, usePictureRatio } from '@/components/patterns/pond-picture';
 import { GIcon } from '@/components/ui/g-icon';
 import { GPressable } from '@/components/ui/g-pressable';
+import type { ReportImage } from '@/models/web-watches';
 import type { HistoryCard } from '@/view-models/use-chat-history';
 
 export interface ConversationCardProps {
@@ -312,6 +314,7 @@ export const ConversationCard = React.memo(function ConversationCard({
         radius={theme.radius.xl}
         contentStyle={local.face}
       >
+        {card.picture ? <CardPicture image={card.picture} /> : null}
         {/* The padding is here rather than on the face, so the face has none
             and the circle's corner inset means the same thing on every Yoga. */}
         <View style={{ padding: theme.space[4], gap: theme.space[2] }}>
@@ -342,6 +345,26 @@ export const ConversationCard = React.memo(function ConversationCard({
     </Pressable>
   );
 });
+
+/** A wall picture is held between a portrait 4:5 and a wide 2:1; past those its edges are cut. */
+const TALLEST = 0.8;
+const WIDEST = 2;
+
+/**
+ * The picture of the page a conversation cited, across the card's head and in its own shape, so a
+ * wall of web answers reads by what they were about. Its credit is under it in the conversation.
+ */
+function CardPicture({ image }: { image: ReportImage }) {
+  const [ratio, onSize] = usePictureRatio(image.src, 4 / 3);
+  return (
+    <PondPicture
+      path={image.src}
+      label={image.caption ?? image.credit}
+      style={{ width: '100%', aspectRatio: Math.min(WIDEST, Math.max(TALLEST, ratio)) }}
+      onSize={onSize}
+    />
+  );
+}
 
 /**
  * The wall's shape before its contents, so nothing jumps when the cards land.
