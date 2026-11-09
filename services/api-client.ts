@@ -1,4 +1,19 @@
 import { File } from 'expo-file-system';
+import {
+  readCollection,
+  readList,
+  readReportImage,
+  readSavedItem,
+  readWebWatch,
+  readWebWatchDetail,
+  type ReportImage,
+  type SavedCollection,
+  type SavedItem,
+  type SavedKind,
+  type WatchFilters,
+  type WebWatch,
+  type WebWatchDetail,
+} from '@/models/web-watches';
 
 import { assertPondTrust, PondTrustError, pondTrustFailed } from './pond-trust';
 import { isInsecureDevOrigin, isLocalPairingUrl, normalizePondUrl } from '@/models/connection';
@@ -2635,6 +2650,87 @@ export class PondApiClient {
   /** A 202; a 409 `long_task_running` unless `force`, which loses the running step. */
   async adminRestart(force: boolean): Promise<void> {
     await this.post<unknown>('/api/v1/admin/power/restart', force ? { force: true } : {});
+  }
+
+  // ── Web watches and saved cards ─────────────────────────────
+
+  /** The caller's own web watches, newest first. */
+  async listWebWatches(): Promise<WebWatch[]> {
+    return readList(await this.get<unknown>('/api/v1/web-watches'), readWebWatch);
+  }
+
+  /** One watch with the items it last saw and its newest changes. */
+  async webWatch(id: string): Promise<WebWatchDetail> {
+    const watch = readWebWatchDetail(await this.get<unknown>(`/api/v1/web-watches/${encodeURIComponent(id)}`));
+    if (!watch) throw new Error('The Pond answered the watch with something unexpected');
+    return watch;
+  }
+
+  async editWebWatch(
+    id: string,
+    edit: { paused?: boolean; interval_hours?: number; filters?: WatchFilters; looking_for?: string },
+  ): Promise<WebWatch> {
+    const watch = readWebWatch(await this.patch<unknown>(`/api/v1/web-watches/${encodeURIComponent(id)}`, edit));
+    if (!watch) throw new Error('The Pond answered the watch with something unexpected');
+    return watch;
+  }
+
+  deleteWebWatch(id: string): Promise<void> {
+    return this.del<void>(`/api/v1/web-watches/${encodeURIComponent(id)}`);
+  }
+
+  /** The caller's cards and the household's shared ones, of one collection when named. */
+  async listSavedItems(collection?: string): Promise<SavedItem[]> {
+    const query = collection ? `?collection=${encodeURIComponent(collection)}` : '';
+    return readList(await this.get<unknown>(`/api/v1/saved-items${query}`), readSavedItem);
+  }
+
+  async savedCollections(): Promise<SavedCollection[]> {
+    return readList(await this.get<unknown>('/api/v1/saved-items/collections'), readCollection);
+  }
+
+  async savedItem(id: string): Promise<SavedItem> {
+    const item = readSavedItem(await this.get<unknown>(`/api/v1/saved-items/${encodeURIComponent(id)}`));
+    if (!item) throw new Error('The Pond answered the card with something unexpected');
+    return item;
+  }
+
+  /** Keeps a card, such as an option a task found; the Pond bounds what it stores. */
+  async saveItem(card: Record<string, unknown> & { kind: SavedKind; title: string }): Promise<SavedItem> {
+    const item = readSavedItem(await this.post<unknown>('/api/v1/saved-items', card));
+    if (!item) throw new Error('The Pond answered the card with something unexpected');
+    return item;
+  }
+
+  /** `collection: null` takes the card out of its collection. */
+  async editSavedItem(
+    id: string,
+    edit: { title?: string; body?: string; collection?: string | null; shared?: boolean },
+  ): Promise<SavedItem> {
+    const item = readSavedItem(await this.patch<unknown>(`/api/v1/saved-items/${encodeURIComponent(id)}`, edit));
+    if (!item) throw new Error('The Pond answered the card with something unexpected');
+    return item;
+  }
+
+  deleteSavedItem(id: string): Promise<void> {
+    return this.del<void>(`/api/v1/saved-items/${encodeURIComponent(id)}`);
+  }
+
+  /** Pictures the Pond keeps for the pages an answer cites or read; none from an older Pond. */
+  async pagePictures(pages: string[]): Promise<ReportImage[]> {
+    try {
+      return readList(await this.post<unknown>('/api/v1/report-images/for-pages', { pages }), readReportImage);
+    } catch (e) {
+      if (e instanceof ApiError && (e.status === 404 || e.status === 405)) return [];
+      throw e;
+    }
+  }
+
+  /** "Watch price": a watch on the card's own page, which tells this member when its price drops. */
+  async watchSavedItem(id: string, body: { max_price?: number } = {}): Promise<WebWatch> {
+    const watch = readWebWatch(await this.post<unknown>(`/api/v1/saved-items/${encodeURIComponent(id)}/watch`, body));
+    if (!watch) throw new Error('The Pond answered the watch with something unexpected');
+    return watch;
   }
 
   // ── Verb helpers ────────────────────────────────────────────

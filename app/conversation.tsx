@@ -497,6 +497,7 @@ export default function ChatScreen() {
           <VoiceDock
             send={actions.send}
             stop={actions.stop}
+            sendsRecordings={voiceNotes === 'ready'}
             onClose={() => setVoice(false)}
             bottomInset={insets.bottom}
           />

@@ -41,6 +41,14 @@ interface Place {
   size: MarkdownSize;
   /** Off inside a card: selectable text on Android takes the touch the card is waiting for. */
   selectable: boolean;
+  /** A report's citations: a cited page draws as its number, and a tap opens its card. */
+  sources?: SourceChips;
+}
+
+/** How a report numbers the pages it cites, and what a tap on one does. */
+export interface SourceChips {
+  numberOf: (url: string) => number | undefined;
+  open: (url: string) => void;
 }
 
 /** Quicksand at 13px, erring wide; every row of a column needs one width, so it is estimated, not measured. */
@@ -61,6 +69,21 @@ function face(theme: Theme, span: Span): TextStyle {
 function link(href: string, children: React.ReactNode, place: Place, key: number) {
   const url = webLink(href);
   if (!url) return <React.Fragment key={key}>{children}</React.Fragment>;
+  const n = place.sources?.numberOf(url);
+  if (n !== undefined && place.sources) {
+    const { open } = place.sources;
+    return (
+      <Text
+        key={key}
+        accessibilityRole="button"
+        accessibilityLabel={`Source ${n}`}
+        onPress={() => open(url)}
+        style={[styles.chip, { color: place.theme.color.accentLine }]}
+      >
+        {`\u2009[${n}]`}
+      </Text>
+    );
+  }
   // A map opens where the phone opens maps; the rest in the in-app browser, beside the reply.
   const open = () => void (isMapLink(url) ? Linking.openURL(url) : WebBrowser.openBrowserAsync(url));
   return (
@@ -340,6 +363,8 @@ export interface MarkdownProps {
   size?: MarkdownSize;
   tone?: 'primary' | 'secondary' | 'tertiary';
   selectable?: boolean;
+  /** Draw the cited pages as numbered chips; a report passes its own numbering. */
+  sources?: SourceChips;
 }
 
 export const Markdown = React.memo(function Markdown({
@@ -347,6 +372,7 @@ export const Markdown = React.memo(function Markdown({
   size = 'md',
   tone = 'primary',
   selectable = true,
+  sources,
 }: MarkdownProps) {
   const theme = useInkTheme();
   const tokens = useMemo(() => parseReply(source), [source]);
@@ -354,7 +380,7 @@ export const Markdown = React.memo(function Markdown({
     tone === 'secondary' ? theme.color.textSecondary : tone === 'tertiary' ? theme.color.textTertiary : theme.color.text;
   return (
     <View style={size === 'md' ? styles.page : styles.compact}>
-      {blocks(tokens, { theme, tone: color, depth: 0, size, selectable })}
+      {blocks(tokens, { theme, tone: color, depth: 0, size, selectable, sources })}
     </View>
   );
 });
@@ -364,6 +390,7 @@ const styles = StyleSheet.create({
   compact: { gap: 6 },
   headingGap: { marginTop: 8 },
   link: { textDecorationLine: 'underline' },
+  chip: { fontSize: 12, fontWeight: '600' },
   struck: { textDecorationLine: 'line-through' },
   quote: { borderLeftWidth: 2, paddingLeft: 12, gap: 8 },
   rule: { marginVertical: 4 },

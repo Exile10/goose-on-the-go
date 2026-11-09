@@ -14,6 +14,8 @@
 
 // ── Devices ───────────────────────────────────────────────────
 
+import type { ReportImage, ReportOption } from '@/models/web-watches';
+
 export interface Device {
   id: string;
   name: string;
@@ -182,6 +184,8 @@ export interface SessionSummary {
   title?: string;
   /** How the conversation opened, for a history card. Absent on older servers. */
   preview?: string;
+  /** A picture the Pond kept for the first page the conversation cited or read. Absent on older servers. */
+  picture?: unknown;
   created_at: string;
   updated_at: string;
   message_count?: number;
@@ -248,6 +252,8 @@ export interface AudioAttachment {
   mime_type: string;
   /** A file's own name, which the Pond saves in its place; a held voice note sends none. */
   name?: string;
+  /** A spoken turn's words as Whisper heard them: what the model gets where it cannot hear. */
+  heard_as?: string;
 }
 
 /** A PDF whose text the Pond reads out and puts after the message, under its name. */
@@ -1967,6 +1973,10 @@ export interface LongTaskReportWire {
   sections: number;
   sources: { title: string; url: string }[];
   calendar_events: number;
+  /** Pictures the Pond kept from the pages the report cites; none from an older Pond. */
+  images: ReportImage[];
+  /** The options a compare step wrote, as cards; none from an older Pond. */
+  options: ReportOption[];
 }
 
 /** What `GET /long-tasks/{id}/export` gives: Markdown, a self-contained page, or a calendar file. */

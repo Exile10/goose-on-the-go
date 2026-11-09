@@ -113,7 +113,8 @@ export type OpenRoute =
   | { open: 'extensions' }
   | { open: 'remote_access' }
   | { open: 'my_pond' }
-  | { open: 'conversation'; sessionId: string };
+  | { open: 'conversation'; sessionId: string }
+  | { open: 'watch'; watchId?: string };
 
 /** A Pond id: a UUID, optionally prefixed (`timer-...`). Nothing that could be a path. */
 const POND_ID = /^[A-Za-z0-9_-]{1,128}$/;
@@ -154,6 +155,11 @@ export function openRouteFromData(data: unknown): OpenRoute | null {
       return { open: 'remote_access' };
     case 'my_pond':
       return { open: 'my_pond' };
+    case 'watch': {
+      // A digest across several watches names none: the list is still the right place to land.
+      const watchId = pondId(data.watch_id);
+      return watchId ? { open: 'watch', watchId } : { open: 'watch' };
+    }
     case 'conversation': {
       // Without a conversation it can open, the wall is still where it was about.
       const sessionId = pondId(data.session_id);
@@ -174,7 +180,9 @@ type ScreenHref =
   | '/(stack)/extensions'
   | '/(stack)/remote-access'
   | '/(stack)/pond'
-  | { pathname: '/conversation'; params: { session: string } };
+  | { pathname: '/conversation'; params: { session: string } }
+  | '/(stack)/web-watches'
+  | { pathname: '/(stack)/web-watch'; params: { id: string } };
 
 /**
  * The expo-router location a route opens. A schedule notification names the
@@ -202,5 +210,7 @@ export function screenPath(route: OpenRoute): ScreenHref {
       return '/(stack)/pond';
     case 'conversation':
       return { pathname: '/conversation', params: { session: route.sessionId } };
+    case 'watch':
+      return route.watchId ? { pathname: '/(stack)/web-watch', params: { id: route.watchId } } : '/(stack)/web-watches';
   }
 }

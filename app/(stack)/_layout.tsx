@@ -123,6 +123,10 @@ export default function StackLayout() {
       <Stack.Screen name="schedule" options={{ title: t('screens.schedule') }} />
       <Stack.Screen name="schedule-detail" options={{ title: t('screens.scheduleDetail') }} />
       <Stack.Screen name="reminders" options={{ title: t('screens.reminders') }} />
+      <Stack.Screen name="web-watches" options={{ title: t('screens.webWatches') }} />
+      <Stack.Screen name="web-watch" options={{ title: t('screens.webWatch') }} />
+      <Stack.Screen name="saved" options={{ title: t('screens.saved') }} />
+      <Stack.Screen name="saved-item" options={{ title: t('screens.savedItem') }} />
       <Stack.Screen name="ride" options={{ title: t('screens.ride') }} />
       <Stack.Screen name="agents" options={{ title: t('screens.agents') }} />
       <Stack.Screen name="task-report" options={{ title: t('screens.taskReport') }} />
