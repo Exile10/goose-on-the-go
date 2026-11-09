@@ -23,7 +23,7 @@ import {
   TriangleAlert,
   Upload, User, Users, Video, Volume2, VolumeX, Waves, Wifi, Wind, Wrench, X, Zap,
   BellRing, CalendarClock, Car, Circle, Headphones, ListChecks, LocateFixed, Mail, Newspaper, Repeat, ShoppingCart,
-  Tag, Target, TrendingDown, TrendingUp, Wallet, Webhook,
+  ChevronUp, Share2, Tag, Target, ThumbsDown, ThumbsUp, TrendingDown, TrendingUp, Wallet, Webhook,
 } from 'lucide-react-native';
 
 export const ICONS = {
@@ -53,6 +53,7 @@ export const ICONS = {
   chevron: ChevronDown,
   'chevron-right': ChevronRight,
   'chevron-left': ChevronLeft,
+  'chevron-up': ChevronUp,
   cloud: Cloud,
   'cloud-alert': CloudAlert,
   'cloud-off': CloudOff,
@@ -126,6 +127,7 @@ export const ICONS = {
   sensor: Waves,
   server: Server,
   settings: Settings,
+  share: Share2,
   shield: Shield,
   skills: Wrench,
   snow: CloudSnow,
@@ -138,6 +140,8 @@ export const ICONS = {
   tag: Tag,
   target: Target,
   thermo: Thermometer,
+  'thumbs-down': ThumbsDown,
+  'thumbs-up': ThumbsUp,
   trash: Trash2,
   'trending-down': TrendingDown,
   'trending-up': TrendingUp,
