@@ -1,310 +1,344 @@
 /**
  * Goose — the Pond's bird, afloat. A shared illustration, not a decoration.
  *
- * pond-desktop's `<Goose />` (`components/Goose.tsx`, `styles/goose.css`)
- * brought across part for part, for anywhere the app needs the assistant doing
- * something: an empty conversation, a working strip, an empty list. It is drawn
- * from separate pieces — body, tail, wing, neck, head, beak — so the body and
- * the head can move on different phases. A single silhouette can only be
- * translated as a lump, which is what made the desktop's first version read as
- * a sticker rather than a bird.
+ * The drawing and its motion live in `goose-motion.ts`, which pond-desktop's `<Goose />` shares file
+ * for file, so the phone and the dashboard draw the same bird and move it the same way. The neck and
+ * head are rebuilt every frame along a curved spine, so they bend as one body; every other part turns
+ * about its own pivot. With `water`, the goose floats on a pond with drifting waves, glints, and a
+ * reflection the ripples break up.
  *
- * The periods are the stylesheet's, and deliberately not multiples of one
- * another: a 3.6s bob against a 5.2s dip drifts in and out of step instead of
- * locking into a loop the eye can find. Working is the same vocabulary at about
- * twice the tempo, so it reads as the same bird paddling rather than a
- * different animation.
+ * One Reanimated frame callback keeps the clock and one derived value computes the whole frame, both
+ * on the UI thread: the goose works hardest while the Pond is answering, which is when the JS thread
+ * is busiest, so nothing here waits on it.
  *
- * Each moving part is its own layer, turned on the native driver about the
- * point the stylesheet's `transform-origin` names. The goose works hardest
- * while the Pond is running, which is when the JS thread is busiest, so nothing
- * here waits on that thread once a loop has begun.
- *
- * Reduced motion stops everything and leaves one ripple standing, as the
- * desktop does. The ripples are the one part whose last frame is not a sensible
- * resting pose: scaled out, and invisible.
+ * Reduced motion draws one resting frame.
  */
 
-import React, { useEffect, useMemo, useState } from 'react';
-import { Animated, Easing, StyleSheet, View } from 'react-native';
-import Svg, { Circle, Ellipse, Path } from 'react-native-svg';
+import React, { useEffect } from 'react';
+import Animated, {
+  type SharedValue,
+  useAnimatedProps,
+  useDerivedValue,
+  useFrameCallback,
+  useSharedValue,
+} from 'react-native-reanimated';
+import Svg, { ClipPath, Defs, Ellipse, G, LinearGradient, Path, RadialGradient, Rect, Stop } from 'react-native-svg';
 import { useInkTheme, useReduceMotion } from '@jarida/ink/native';
 
-export type GooseState =
-  /** Afloat and waiting. A slow bob, and now and then a dip of the head. */
-  | 'idle'
-  /** The Pond is running. It paddles and pecks, and the ripples quicken. */
-  | 'working';
+import {
+  BACK_SHEEN, BANDS, BELLY, BODY, CHEST_SHEEN, GLINTS, HEAD_DETAIL, PRIMARIES, SCALLOPS, TAIL, WAKE, WAVES, WING,
+  WING_LINES, easeListen, neckFrame, neckPose, partsFrame, restingParts, wavePath,
+  type GooseMood, type NeckFrame, type PartsFrame,
+} from '@/components/patterns/goose-motion';
+
+export type GooseState = GooseMood;
 
 export interface GooseProps {
+  /** Idle: afloat. Working: the Pond is answering. Listening: it is hearing speech. */
   state: GooseState;
-  /**
-   * Width in points. The height follows the art: three quarters of the width
-   * over water, eight ninths without, where the art is cropped to the bird.
-   */
+  /** Width in points; the height follows the drawing. */
   size?: number;
   /**
-   * The waterline and its ripples. Off for inline use — a status strip wants
-   * the bird, not the pond — and the art crops to the bird to suit, so a small
-   * goose does not spend half its box on empty water.
+   * The pond under the goose. Off for inline use, where the drawing crops to the bird, so a small goose
+   * does not spend half its box on water.
    */
   water?: boolean;
+  /**
+   * The colour behind the goose. The ripples that break the reflection up are drawn in it, so it has to
+   * match what is there; the theme's surface, a card's face, by default.
+   */
+  ground?: string;
 }
 
-interface ArtFrame {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
+type Matrix = [number, number, number, number, number, number];
+
+/** The native components take `matrix`; the JS ones only reach it through `transform`. */
+type WithMatrix<P> = React.ComponentType<P & { matrix?: Matrix }>;
+const AG = Animated.createAnimatedComponent(G as WithMatrix<React.ComponentProps<typeof G>>);
+const APath = Animated.createAnimatedComponent(Path);
+const AEllipse = Animated.createAnimatedComponent(Ellipse as WithMatrix<React.ComponentProps<typeof Ellipse>>);
+
+// Animated transforms go to react-native-svg's native `matrix` prop, [a b c d tx ty], directly.
+// Reanimated reads an animated `transform` as a React Native style transform, a list of objects,
+// and a six-number SVG matrix there crashes the draw ("expected dynamic type 'object'").
+
+/** a then b: the matrix that applies `b` first and `a` after, as SVG's transform lists compose. */
+function times(a: Matrix, b: Matrix): Matrix {
+  'worklet';
+  return [
+    a[0] * b[0] + a[2] * b[1], a[1] * b[0] + a[3] * b[1],
+    a[0] * b[2] + a[2] * b[3], a[1] * b[2] + a[3] * b[3],
+    a[0] * b[4] + a[2] * b[5] + a[4], a[1] * b[4] + a[3] * b[5] + a[5],
+  ];
 }
 
-/** The whole pond, and the crop to the bird a waterless goose uses. */
-const POND: ArtFrame = { x: 0, y: 0, width: 160, height: 120 };
-const BIRD: ArtFrame = { x: 38, y: 6, width: 108, height: 96 };
+/** A linear map [a b c d] about the point (x, y). */
+function about(a: number, b: number, c: number, d: number, x: number, y: number): Matrix {
+  'worklet';
+  return [a, b, c, d, x - a * x - c * y, y - b * x - d * y];
+}
 
-/** The stylesheet's `transform-origin`s, in the art's own units. */
-const FLOAT_ORIGIN = { x: 80, y: 84 };
-const HEAD_ORIGIN = { x: 70, y: 62 };
-const RIPPLE_ORIGIN = { x: 80, y: 98 };
+function turn(deg: number, x: number, y: number): Matrix {
+  'worklet';
+  const r = (deg * Math.PI) / 180;
+  return about(Math.cos(r), Math.sin(r), -Math.sin(r), Math.cos(r), x, y);
+}
 
-/** Each part's period. The second ripple runs half a period behind the first. */
-const TEMPO: Record<GooseState, { float: number; head: number; ripple: number }> = {
-  idle: { float: 3600, head: 5200, ripple: 3600 },
-  working: { float: 1150, head: 1700, ripple: 1500 },
+const shift = (x: number, y: number): Matrix => {
+  'worklet';
+  return [1, 0, 0, 1, x, y];
 };
 
-type Keyframe = readonly [at: number, value: number];
-
-// goose-bob and goose-paddle. The lift (in the art's units) and the roll (in
-// degrees) share one phase, as the two halves of one keyframe block do.
-const FLOAT: Record<GooseState, { lift: readonly Keyframe[]; roll: readonly Keyframe[] }> = {
-  idle: {
-    lift: [[0, 0], [0.5, -4], [1, 0]],
-    roll: [[0, 0], [0.5, -1.2], [1, 0]],
-  },
-  // A forward lean as well as the quicker tempo.
-  working: {
-    lift: [[0, 0], [0.5, -3], [1, 0]],
-    roll: [[0, -1], [0.5, 1.5], [1, -1]],
-  },
-};
-
-// goose-dip and goose-peck, in degrees.
-const HEAD: Record<GooseState, readonly Keyframe[]> = {
-  idle: [[0, 0], [0.35, 4], [0.7, -2.5], [1, 0]],
-  working: [[0, 0], [0.4, 9], [0.6, 6], [1, 0]],
-};
-
-/** Under reduced motion the first ripple stays, at its natural size and faint. */
-const RIPPLE_STILL = 0.26;
-
-// CSS's named curves, spelled out: React Native's `Easing.ease` is CSS's
-// ease-in, not its `ease-in-out`.
-const EASE_IN_OUT = Easing.bezier(0.42, 0, 0.58, 1);
-const EASE_OUT = Easing.bezier(0, 0, 0.58, 1);
-
-/** Points sampled along each eased segment: enough that the straight runs between them never show. */
-const SAMPLES = 8;
-
-/**
- * A CSS `@keyframes` block, as an interpolation a native loop can drive.
- *
- * CSS eases each segment between two keyframes on its own curve; an
- * interpolation joins its points with straight lines. Sampling each segment's
- * curve puts the ease back, and keeps the whole cycle one `0 → 1` timing that
- * loops on the UI thread. `unit` scales the values, here from the art's units
- * to points.
- */
-function keyframes(
-  frames: readonly Keyframe[],
-  ease: (t: number) => number = EASE_IN_OUT,
-  unit = 1,
-) {
-  const inputRange: number[] = [];
-  const outputRange: number[] = [];
-  for (let i = 0; i < frames.length - 1; i += 1) {
-    const [from, a] = frames[i];
-    const [to, b] = frames[i + 1];
-    // A hold has nothing to ease.
-    const steps = a === b ? 1 : SAMPLES;
-    for (let s = 0; s < steps; s += 1) {
-      inputRange.push(from + ((to - from) * s) / steps);
-      outputRange.push((a + (b - a) * ease(s / steps)) * unit);
-    }
-  }
-  const [end, last] = frames[frames.length - 1];
-  inputRange.push(end);
-  outputRange.push(last * unit);
-  return { inputRange, outputRange };
+/** One hex colour mixed toward another, `p` of the way. Anything but #rrggbb passes through. */
+function mix(from: string, to: string, p: number): string {
+  const hex = (s: string) => (/^#[0-9a-f]{6}$/i.test(s) ? [1, 3, 5].map((i) => parseInt(s.slice(i, i + 2), 16)) : null);
+  const a = hex(from), b = hex(to);
+  if (!a || !b) return from;
+  return `#${a.map((v, i) => Math.round(v + (b[i] - v) * p).toString(16).padStart(2, '0')).join('')}`;
 }
 
-/** The same, for a rotation written in degrees. */
-function turn(frames: readonly Keyframe[]) {
-  const { inputRange, outputRange } = keyframes(frames);
-  return { inputRange, outputRange: outputRange.map((deg) => `${deg}deg`) };
+interface Palette { accent: string; light: string; deep: string; darkest: string; beak: string; beakDeep: string; ground: string }
+
+interface Frame { neck: NeckFrame; lid: number; parts: PartsFrame }
+
+/** One part whose transform the frame sets. */
+function Moving({ frame, at, children }: { frame: SharedValue<Frame>; at: (f: Frame) => Matrix; children: React.ReactNode }) {
+  const props = useAnimatedProps(() => ({ matrix: at(frame.get()) }));
+  return <AG animatedProps={props}>{children}</AG>;
 }
 
-/**
- * Created native, so a `setValue` goes straight to the UI thread instead of
- * re-rendering the views it drives.
- */
-function native(at: number) {
-  return new Animated.Value(at, { useNativeDriver: true });
+/** The neck, its highlight and the head: outlines the frame rebuilds. */
+function Rebuilt({ frame, pick, ...rest }: { frame: SharedValue<Frame>; pick: (n: NeckFrame) => string } & React.ComponentProps<typeof Path>) {
+  const props = useAnimatedProps(() => ({ d: pick(frame.get().neck) }));
+  return <APath animatedProps={props} {...rest} />;
 }
 
-/** Runs `value` from 0 to 1 forever, entirely on the UI thread, and returns the stop. */
-function runLoop(value: Animated.Value, duration: number, easing: (t: number) => number = Easing.linear) {
-  // A native loop repeats from wherever it started, so it has to start at 0.
-  value.setValue(0);
-  const loop = Animated.loop(Animated.timing(value, { toValue: 1, duration, easing, useNativeDriver: true }));
-  loop.start();
-  return () => loop.stop();
-}
-
-function createGooseMotion() {
-  const float = native(0);
-  const head = native(0);
-  const ripple = native(0);
-  // Parked past its end, where it is invisible, until it joins the first.
-  const echo = native(1);
-  // goose-ripple: out from half size to 1.4, fading as it goes.
-  const opening = (value: Animated.Value) => ({
-    opacity: value.interpolate({ inputRange: [0, 1], outputRange: [0.45, 0] }),
-    transform: [{ scale: value.interpolate({ inputRange: [0, 1], outputRange: [0.5, 1.4] }) }],
+function Ring({ frame, i, color }: { frame: SharedValue<Frame>; i: number; color: string }) {
+  const props = useAnimatedProps(() => {
+    const c = frame.get().neck.ringCentre, r = frame.get().parts.rings[i];
+    return { cx: c[0], cy: c[1], rx: r.r, ry: r.r, opacity: r.opacity };
   });
-  return { float, head, ripple, echo, rippleMotion: opening(ripple), echoMotion: opening(echo) };
+  return <AEllipse animatedProps={props} fill="none" stroke={color} strokeWidth={1.3} />;
 }
 
-export const Goose = React.memo(function Goose({ state, size = 150, water = true }: GooseProps) {
+/** One goose, drawn in full; `tag` keeps ids unique when it is drawn twice (the bird and its reflection). */
+function Bird({ id, tag, frame, p }: { id: string; tag: string; frame: SharedValue<Frame>; p: Palette }) {
+  const u = (n: string) => `${id}-${tag}-${n}`;
+  const D = HEAD_DETAIL;
+  const head = (f: Frame) => {
+    'worklet';
+    return f.neck.headMatrix;
+  };
+  const eye = (f: Frame) => {
+    'worklet';
+    return times(f.neck.headMatrix, about(1, 0, 0, f.lid, D.eye.cx, D.eye.cy));
+  };
+  return (
+    <>
+      <Defs>
+        <LinearGradient id={u('body')} x1="0" y1="0" x2="0" y2="1"><Stop offset="0" stopColor={p.light} /><Stop offset=".45" stopColor={p.accent} /><Stop offset="1" stopColor={p.darkest} /></LinearGradient>
+        <LinearGradient id={u('wing')} x1="0" y1="0" x2="1" y2="1"><Stop offset="0" stopColor={p.accent} /><Stop offset="1" stopColor={p.darkest} /></LinearGradient>
+        <LinearGradient id={u('prim')} x1="0" y1="0" x2="1" y2="0"><Stop offset="0" stopColor={p.deep} /><Stop offset="1" stopColor={p.darkest} /></LinearGradient>
+        <LinearGradient id={u('tail')} x1="0" y1="1" x2="1" y2="0"><Stop offset="0" stopColor={p.deep} /><Stop offset="1" stopColor={p.darkest} /></LinearGradient>
+        <LinearGradient id={u('nh')} gradientUnits="userSpaceOnUse" x1="42" y1="0" x2="70" y2="0"><Stop offset="0" stopColor={p.light} /><Stop offset=".45" stopColor={p.accent} /><Stop offset="1" stopColor={p.deep} /></LinearGradient>
+        <LinearGradient id={u('beak')} x1="0" y1="0" x2="0" y2="1"><Stop offset="0" stopColor="#ffd27a" /><Stop offset="1" stopColor={p.beak} /></LinearGradient>
+        <ClipPath id={u('above')}><Rect x="0" y="0" width="160" height="99" /></ClipPath>
+        <ClipPath id={u('bodyClip')}><Path d={BODY} /></ClipPath>
+      </Defs>
+      {/* The neck and head, rebuilt every frame; the neck's root sits behind the chest. */}
+      <Rebuilt frame={frame} pick={(n) => { 'worklet'; return n.neck; }} fill={`url(#${u('nh')})`} />
+      <Rebuilt frame={frame} pick={(n) => { 'worklet'; return n.highlight; }} fill="none" stroke="#fff" strokeWidth={1.5} strokeLinecap="round" opacity={0.26} />
+      {/* The beak's root runs under the head, so no turn opens a notch. */}
+      <Moving frame={frame} at={head}>
+        <Path fill={`url(#${u('beak')})`} d={D.beakUpper} />
+        <Path fill={p.beakDeep} d={D.beakLower} />
+        <Path fill="none" stroke={p.beakDeep} strokeWidth={0.45} strokeLinecap="round" opacity={0.7} d={D.beakSeam} />
+        <Ellipse fill={p.beakDeep} {...D.nostril} transform={turn(6, D.nostril.cx, D.nostril.cy)} />
+      </Moving>
+      <Rebuilt frame={frame} pick={(n) => { 'worklet'; return n.head; }} fill={`url(#${u('nh')})`} />
+      <Moving frame={frame} at={head}>
+        <Path fill={p.darkest} opacity={0.22} d={D.throatShade} />
+        <Ellipse fill="#fff" opacity={0.42} {...D.gloss} transform={turn(-6, D.gloss.cx, D.gloss.cy)} />
+        <Path fill="#fff" opacity={0.94} d={D.chinstrap} />
+      </Moving>
+      <Moving frame={frame} at={eye}>
+        <Ellipse fill="#fff" cx={D.eye.cx} cy={D.eye.cy} rx={D.eye.r} ry={D.eye.r} />
+        <Ellipse fill="#14111c" cx={D.pupil.cx} cy={D.pupil.cy} rx={D.pupil.r} ry={D.pupil.r} />
+        <Ellipse fill="#fff" cx={D.catchlight.cx} cy={D.catchlight.cy} rx={D.catchlight.r} ry={D.catchlight.r} />
+      </Moving>
+      {[0, 1, 2].map((i) => <Ring key={i} frame={frame} i={i} color={p.accent} />)}
+      <G clipPath={`url(#${u('above')})`}>
+        <Moving frame={frame} at={(f) => { 'worklet'; return turn(f.parts.tail, 120, 78); }}>
+          <Path fill={p.darkest} d={TAIL[0]} />
+          <Path fill={`url(#${u('tail')})`} d={TAIL[1]} />
+          <Path fill={p.accent} d={TAIL[2]} />
+        </Moving>
+        <Path fill={`url(#${u('body')})`} d={BODY} />
+        <G clipPath={`url(#${u('bodyClip')})`}>
+          <Path fill={p.darkest} opacity={0.32} d={BELLY} />
+          <Path fill="#fff" opacity={0.34} d={BACK_SHEEN} />
+          <Path fill="#fff" opacity={0.2} d={CHEST_SHEEN} />
+          {SCALLOPS.map((d, i) => <Path key={d} fill="none" stroke="#fff" strokeWidth={1} strokeLinecap="round" opacity={i ? 0.16 : 0.22} d={d} />)}
+        </G>
+        <Moving frame={frame} at={(f) => { 'worklet'; return about(f.parts.wing, 0, 0, f.parts.wing, 76, 82); }}>
+          {PRIMARIES.map((d, i) => (
+            <Moving key={d} frame={frame} at={(f) => { 'worklet'; return turn(f.parts.primaries[i], 104, 84); }}>
+              <Path fill={`url(#${u('prim')})`} d={d} />
+            </Moving>
+          ))}
+          <Path fill={`url(#${u('wing')})`} d={WING} />
+          {WING_LINES.coverts.map((d, i) => <Path key={d} fill="none" stroke="#fff" strokeWidth={i ? 0.8 : 0.9} strokeLinecap="round" opacity={i ? 0.2 : 0.28} d={d} />)}
+          <Path fill="none" stroke={p.darkest} strokeWidth={0.7} strokeLinecap="round" opacity={0.45} d={WING_LINES.edge} />
+        </Moving>
+      </G>
+    </>
+  );
+}
+
+function Wake({ frame, i, d, color }: { frame: SharedValue<Frame>; i: number; d: string; color: string }) {
+  const props = useAnimatedProps(() => ({ strokeDashoffset: frame.get().parts.wake[i].offset, opacity: frame.get().parts.wake[i].opacity }));
+  return <APath animatedProps={props} d={d} fill="none" stroke={color} strokeWidth={1.3} strokeLinecap="round" strokeDasharray="14 60" />;
+}
+
+function Glint({ frame, i, color }: { frame: SharedValue<Frame>; i: number; color: string }) {
+  const [cx, cy, rx, ry] = GLINTS[i];
+  const props = useAnimatedProps(() => {
+    const g = frame.get().parts.glints[i];
+    return { matrix: times(shift(g.x, 0), about(g.sx, 0, 0, 1, cx, cy)), opacity: g.opacity };
+  });
+  return <AEllipse animatedProps={props} fill={color} cx={cx} cy={cy} rx={rx} ry={ry} />;
+}
+
+function Ripple({ frame, i, color }: { frame: SharedValue<Frame>; i: number; color: string }) {
+  const props = useAnimatedProps(() => {
+    const r = frame.get().parts.ripples[i];
+    return { matrix: about(r.scale, 0, 0, r.scale, 88, 98), opacity: r.opacity };
+  });
+  return <AEllipse animatedProps={props} cx={88} cy={98} rx={30} ry={5.5} fill="none" stroke={color} strokeWidth={1.3} />;
+}
+
+function Shadow({ frame, id }: { frame: SharedValue<Frame>; id: string }) {
+  const props = useAnimatedProps(() => {
+    const s = frame.get().parts.shadow;
+    return { matrix: about(s.scale, 0, 0, s.scale, 90, 99), opacity: s.opacity };
+  });
+  return <AG animatedProps={props}><Ellipse fill={`url(#${id}-shadow)`} cx={90} cy={99} rx={46} ry={4.2} /></AG>;
+}
+
+/**
+ * The pond, back to front: the reflection, the water, the bands that break the reflection, the waves,
+ * then the ground drawn over its edges, then the glints, shadow, wake and ripples.
+ *
+ * The dashboard fades the pond's edges with SVG masks over an elliptical gradient. On the device
+ * react-native-svg drew nothing inside those masks, and it ignores a radial gradient's separate rx and
+ * ry, so here the ground itself is laid over the pond with linear gradients, clear in the middle and
+ * solid at the sides and toward the bottom. The reflection is cut at the waterline with a clip path.
+ */
+function Pond({ id, frame, p }: { id: string; frame: SharedValue<Frame>; p: Palette }) {
+  return (
+    <>
+      <Defs>
+        <LinearGradient id={`${id}-deep`} gradientUnits="userSpaceOnUse" x1="0" x2="0" y1="98" y2="138">
+          <Stop offset="0" stopColor={p.accent} stopOpacity={0.24} /><Stop offset=".45" stopColor={p.accent} stopOpacity={0.1} /><Stop offset="1" stopColor={p.accent} stopOpacity={0} />
+        </LinearGradient>
+        <RadialGradient id={`${id}-shadow`} cx=".5" cy=".5" r=".5"><Stop offset="0" stopColor="#000" stopOpacity={0.26} /><Stop offset="1" stopColor="#000" stopOpacity={0} /></RadialGradient>
+        {/* The pond's sides: clear in the middle, the ground at either end. Linear, because the phone's
+            renderer ignores a radial gradient's separate rx and ry and would cover the whole pond. */}
+        <LinearGradient id={`${id}-edge`} gradientUnits="userSpaceOnUse" x1="4" x2="156" y1="0" y2="0">
+          <Stop offset="0" stopColor={p.ground} stopOpacity={1} /><Stop offset=".22" stopColor={p.ground} stopOpacity={0} />
+          <Stop offset=".78" stopColor={p.ground} stopOpacity={0} /><Stop offset="1" stopColor={p.ground} stopOpacity={1} />
+        </LinearGradient>
+        {/* The reflection's fade with depth. */}
+        <LinearGradient id={`${id}-depth`} gradientUnits="userSpaceOnUse" x1="0" x2="0" y1="98" y2="136">
+          <Stop offset="0" stopColor={p.ground} stopOpacity={0} /><Stop offset=".45" stopColor={p.ground} stopOpacity={0.45} /><Stop offset="1" stopColor={p.ground} stopOpacity={1} />
+        </LinearGradient>
+        <ClipPath id={`${id}-below`}><Rect x="0" y="98" width="160" height="42" /></ClipPath>
+      </Defs>
+      <G clipPath={`url(#${id}-below)`}>
+        <Moving frame={frame} at={(f) => {
+          'worklet';
+          const r = f.parts.reflection;
+          return times(shift(0, r.y), about(1, 0, Math.tan((r.skew * Math.PI) / 180) * r.sy, r.sy, 88, 98));
+        }}>
+          <G opacity={0.42} transform={[1, 0, 0, -1, 0, 196]}><Bird id={id} tag="r" frame={frame} p={p} /></G>
+        </Moving>
+      </G>
+      <Rect x="0" y="98" width="160" height="42" fill={`url(#${id}-deep)`} />
+      {BANDS.map(([y, width, dash], i) => (
+        <Moving key={y} frame={frame} at={(f) => { 'worklet'; return shift(f.parts.bands[i], 0); }}>
+          <Path d={`M-80 ${y}h320`} fill="none" stroke={p.ground} strokeWidth={width} strokeDasharray={dash} opacity={0.7} />
+        </Moving>
+      ))}
+      {WAVES.map(([y, amplitude, wavelength, width, opacity], i) => (
+        <Moving key={y} frame={frame} at={(f) => { 'worklet'; return shift(f.parts.waves[i], 0); }}>
+          <Path d={wavePath(y, amplitude, wavelength)} fill="none" stroke={p.accent} strokeWidth={width} strokeLinecap="round" opacity={opacity} />
+        </Moving>
+      ))}
+      <Rect x="-40" y="94" width="240" height="50" fill={`url(#${id}-depth)`} />
+      <Rect x="-40" y="94" width="240" height="50" fill={`url(#${id}-edge)`} />
+      {GLINTS.map(([cx], i) => <Glint key={cx} frame={frame} i={i} color={p.light} />)}
+      <Shadow frame={frame} id={id} />
+      {WAKE.map((d, i) => <Wake key={d} frame={frame} i={i} d={d} color={p.accent} />)}
+      {[0, 1].map((i) => <Ripple key={i} frame={frame} i={i} color={p.accent} />)}
+    </>
+  );
+}
+
+let gooseIds = 0;
+
+export const Goose = React.memo(function Goose({ state, size = 150, water = true, ground }: GooseProps) {
   const theme = useInkTheme();
   const reduced = useReduceMotion();
-  // `useState` rather than `useRef`: the values are created once and read
-  // during render, which a ref cannot be under the React Compiler.
-  const [motion] = useState(createGooseMotion);
-
-  const frame = water ? POND : BIRD;
-  const unit = size / frame.width;
-  const height = frame.height * unit;
-  const viewBox = `${frame.x} ${frame.y} ${frame.width} ${frame.height}`;
-
-  const pose = useMemo(() => {
-    // Three values, not two: React Native's array form of `transformOrigin`
-    // is x, y and z, and throws a render error on a pair.
-    const origin = (point: { x: number; y: number }) => [
-      (point.x - frame.x) * unit,
-      (point.y - frame.y) * unit,
-      0,
-    ];
-    const float = FLOAT[state];
-    return {
-      float: {
-        transformOrigin: origin(FLOAT_ORIGIN),
-        transform: [
-          { translateY: motion.float.interpolate(keyframes(float.lift, EASE_IN_OUT, unit)) },
-          { rotate: motion.float.interpolate(turn(float.roll)) },
-        ],
-      },
-      head: {
-        transformOrigin: origin(HEAD_ORIGIN),
-        transform: [{ rotate: motion.head.interpolate(turn(HEAD[state])) }],
-      },
-      ripple: { transformOrigin: origin(RIPPLE_ORIGIN) },
-      // `M14 98h132` at a stroke of 2 with round caps, as a box of its own.
-      waterline: {
-        left: (13 - frame.x) * unit,
-        top: (97 - frame.y) * unit,
-        width: 134 * unit,
-        height: 2 * unit,
-        borderRadius: unit,
-      },
-    };
-  }, [motion, state, frame, unit]);
-
-  useEffect(() => {
-    if (reduced) return;
-    const tempo = TEMPO[state];
-    const stops = [runLoop(motion.float, tempo.float), runLoop(motion.head, tempo.head)];
-    let join: ReturnType<typeof setTimeout> | undefined;
-    if (water) {
-      stops.push(runLoop(motion.ripple, tempo.ripple, EASE_OUT));
-      // The second ripple joins half a period late, as the stylesheet's
-      // `animation-delay` has it, and waits out of sight until then.
-      motion.echo.setValue(1);
-      join = setTimeout(() => {
-        stops.push(runLoop(motion.echo, tempo.ripple, EASE_OUT));
-      }, tempo.ripple / 2);
-    }
-    return () => {
-      clearTimeout(join);
-      stops.forEach((stop) => stop());
-    };
-  }, [motion, state, reduced, water]);
-
+  const [id] = React.useState(() => `goose${gooseIds++}`);
   const c = theme.color;
-  const ring = (
-    <Svg width={size} height={height} viewBox={viewBox}>
-      <Ellipse cx={80} cy={98} rx={30} ry={5.5} fill="none" stroke={c.accent} strokeWidth={1.5} />
+  const p: Palette = {
+    accent: c.accent,
+    light: mix(c.accent, '#ffffff', 0.42),
+    deep: c.accentPressed,
+    darkest: mix(c.accentPressed, '#000000', 0.38),
+    beak: c.warning,
+    beakDeep: mix(c.warning, '#000000', 0.24),
+    ground: ground ?? c.surface,
+  };
+
+  const mood = useSharedValue<GooseMood>(state);
+  const clock = useSharedValue(0);
+  const listen = useSharedValue(state === 'listening' ? 1 : 0);
+  useEffect(() => {
+    mood.set(state);
+    if (reduced) listen.set(state === 'listening' ? 1 : 0);
+  }, [state, reduced, mood, listen]);
+
+  useFrameCallback((info) => {
+    'worklet';
+    const dt = Math.min(0.1, (info.timeSincePreviousFrame ?? 16) / 1000);
+    clock.set(info.timeSinceFirstFrame / 1000);
+    listen.set(easeListen(listen.get(), mood.get(), dt));
+  }, !reduced);
+
+  const frame = useDerivedValue<Frame>(() => {
+    const t = reduced ? 0 : clock.get();
+    const m = mood.get(), l = listen.get();
+    const pose = neckPose(t, m, l);
+    return {
+      neck: neckFrame(pose),
+      lid: pose.lid,
+      parts: reduced ? restingParts(m) : partsFrame(t, m, l),
+    };
+  });
+
+  const ratio = water ? 140 / 160 : 96 / 136;
+  return (
+    <Svg width={size} height={size * ratio} viewBox={water ? '0 0 160 140' : '22 6 136 96'} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+      {water ? <Pond id={id} frame={frame} p={p} /> : null}
+      <Moving frame={frame} at={(f) => {
+        'worklet';
+        const b = f.parts.bob;
+        return times(shift(0, b.y), times(about(b.sx, 0, 0, b.sy, 88, 98), turn(f.parts.roll, 88, 98)));
+      }}>
+        <Bird id={id} tag="b" frame={frame} p={p} />
+      </Moving>
+      {water ? <Path d="M10 98.4h140" fill="none" stroke={p.light} strokeWidth={0.9} strokeLinecap="round" opacity={0.7} /> : null}
     </Svg>
   );
-
-  return (
-    <View
-      style={{ width: size, height }}
-      pointerEvents="none"
-      accessible={false}
-      importantForAccessibility="no-hide-descendants"
-      accessibilityElementsHidden
-    >
-      {water ? (
-        <>
-          {/* The ripples open from the waterline; the line itself is still. */}
-          <Animated.View
-            style={[StyleSheet.absoluteFill, pose.ripple, reduced ? styles.rippleStill : motion.rippleMotion]}
-          >
-            {ring}
-          </Animated.View>
-          {reduced ? null : (
-            <Animated.View style={[StyleSheet.absoluteFill, pose.ripple, motion.echoMotion]}>{ring}</Animated.View>
-          )}
-          <View style={[styles.waterline, pose.waterline, { backgroundColor: c.lineStrong }]} />
-        </>
-      ) : null}
-
-      {/* Everything above the water rides the same bob. */}
-      <Animated.View style={[StyleSheet.absoluteFill, reduced ? null : pose.float]}>
-        <Svg width={size} height={height} viewBox={viewBox}>
-          {/* Elongated rather than round. A circle reads as a duck; the length
-              is what makes the silhouette a goose. */}
-          <Path d="M40 84c0-14 16-23 39-23s41 8 41 22-17 20-41 20-39-5-39-19z" fill={c.accent} />
-          {/* The tail's base sits inside the body's outline. Drawn flush to the
-              edge, it reads as a separate shard floating alongside the bird. */}
-          <Path d="M106 80l34-19-8 25z" fill={c.accent} />
-          {/* A shade down from the body, so the bird has a shoulder. */}
-          <Path
-            d="M64 78c8-7 22-9 33-4 6 3 7 9 2 13-9 6-26 6-34-1-4-3-4-6-1-8z"
-            fill={c.accentPressed}
-            opacity={0.55}
-          />
-        </Svg>
-
-        {/* The neck and head, on their own slower phase. Long, slender and
-            tapered: a short wedge is exactly what reads as a duck. */}
-        <Animated.View style={[StyleSheet.absoluteFill, reduced ? null : pose.head]}>
-          <Svg width={size} height={height} viewBox={viewBox}>
-            <Path d="M70 66c-7-15-7-31 0-41l10 2c-5 9-5 25 0 39z" fill={c.accent} />
-            <Ellipse cx={75} cy={22} rx={10.5} ry={8.5} fill={c.accent} />
-            {/* The chinstrap. Without it a purple head is just a blob. */}
-            <Path d="M67 27q8 6 16 0" fill="none" stroke={c.surface} strokeWidth={3} strokeLinecap="round" />
-            <Path d="M65 18l-16 5 16 5z" fill={c.warning} />
-            <Circle cx={79} cy={19} r={2} fill={c.surface} />
-          </Svg>
-        </Animated.View>
-      </Animated.View>
-    </View>
-  );
-});
-
-const styles = StyleSheet.create({
-  waterline: { position: 'absolute' },
-  rippleStill: { opacity: RIPPLE_STILL },
 });
