@@ -26,15 +26,39 @@ bar is in lives in `providers/chrome-provider.tsx`; see
 bar contracts to one control, and the fix in Ink that makes that work more
 than once.
 
-My Goose (`app/(tabs)/goose.tsx`, `view-models/use-my-goose.ts`) opens on one sentence of at most
-three clauses, each a link to its shelf's screen, then a shelf per kind of thing with something on
-it. Its glyph is the brand mark from `assets/images/tab-goose*.png`, made by `scripts/make-icons.py`;
-the mark is never tinted, so an unselected tab steps back by opacity. The Pond has no cart or news
-route: Cart (`goose-cart`) is the saved listings per collection, shown as a price range because kept
-listings are alternatives, and News (`goose-news`) is what scheduled prompts last answered, with a
-one-press daily 7:00 brief when there are none. Ideas (`goose-ideas`) is the Pond's composed
-questions and its agent suggestions. Watching and Waiting on you open the existing `web-watches`
-and `suggestions` screens.
+My Goose (`app/(tabs)/goose.tsx`) asks the Pond what it serves (`GET /me/hub`,
+`view-models/use-hub.ts`, kept per Pond for the session). Its glyph is the brand mark from
+`assets/images/tab-goose*.png`, made by `scripts/make-icons.py`; the mark is never tinted, so an
+unselected tab steps back by opacity.
+
+**A Pond that serves the hub** (contract: `docs/MY-GOOSE-HUB.md`) gets
+`components/goose/hub-my-goose.tsx`, composed by `useMyGooseHub`. It opens on a sentence of at most
+three clauses, each run over with a highlighter band (`accentSoft`, radius 4) and each opening its
+screen: what needs an answer, then the news, then what changed. Then, in order: Asking you
+(check-ins answered with Done and Not yet, and dated mentions from chats offered as to-dos), the
+news (a lead story, compact cards, the digest with Listen), carousels of ideas and watched prices,
+long reads as covers, the to-dos with their hooks in words, the watches, what is connected, what
+else Goose can do, and at the foot the Following groups (saved cards, shared, saved stories,
+history, interests with Edit, sections). A new member, with no interests yet, is invited to the
+interview near the top. Each part has its stack screen (`goose-news`, `goose-story`,
+`goose-digest`, `goose-news-settings`, `goose-interest`, `goose-section`, `goose-history`,
+`goose-search`, `goose-todos`, `goose-todo`, `goose-cart`, `goose-cart-item`, `goose-connectors`,
+`goose-connector`, `goose-ideas`, `goose-interests`, `goose-interview`, `goose-catalog`). The story
+and interest pages hide the title bar for floating controls. Reminders (`reminders`) lists the
+same offers from chats. Every hub route goes through `view-models/hub-source.ts`, so the
+Developer screen's My Goose toggle swaps in the mock Pond (`models/my-goose-mock.ts`, Jerry in
+Nairobi). News shows only what the Pond wrote from the member's interests; their own scheduled
+briefs stay under Agents and Schedule.
+
+**A Pond without the hub** answers 404 and keeps the older My Goose, unchanged
+(`components/goose/older-*.tsx`, `useOlderMyGoose`): one sentence, then a shelf per kind of thing.
+Cart is the saved listings per collection, shown as a price range because kept listings are
+alternatives; News is what scheduled prompts last answered, with a one-press daily 7:00 brief when
+there are none; Ideas is the Pond's composed questions and its agent suggestions. Watching and
+Waiting on you open the existing `web-watches` and `suggestions` screens.
+
+Setup ends with the interests interview (`app/(onboarding)/interests.tsx`), skippable, after the
+rooms; a Pond without it passes straight through.
 
 The Chat tab opens on the wall of conversations, `app/(tabs)/chat/index.tsx`,
 as pond-desktop's Chat does. A conversation is `app/conversation.tsx`, a
@@ -374,7 +398,7 @@ Backup and Restore were removed rather than wired (#64): the Pond exposes no bac
 
 A Pond notification can name the screen a tap opens, as `open` in its `data` (the Pond's
 `OpenScreen`, in pond-core `mcp/ports/notification.rs`, and its `docs/architecture/notifications.md`).
-`openRouteFromData` in `services/notification-link.ts` accepts six values and `screenPath` maps
+`openRouteFromData` in `services/notification-link.ts` accepts these values and `screenPath` maps
 them:
 
 | `open` | Screen | Sent for |
@@ -385,6 +409,17 @@ them:
 | `models` | `/(stack)/models` | a model download finished or failed, the disk running low or recovering, a start with speech or voice down |
 | `extensions` | `/(stack)/extensions` | a start where a saved extension failed |
 | `remote_access` | `/(stack)/remote-access` | remote access stopped, needs signing in, or works again |
+| `todos` (with `todo_id`) | `/(stack)/goose-todos` | a reminder or a hook firing |
+| `news` (with `story_id`) | `/(stack)/goose-story`, else `/(stack)/goose-news` | a story or the digest |
+| `cart` (with `cart_id`) | `/(stack)/goose-cart-item`, else `/(stack)/goose-cart` | a watched price moved |
+
+Goose's questions carry buttons, answered without opening the app (`services/todo-prompts.ts`):
+`{"action":"todo_checkin","todo_id","text"}` is shown with Done and Not yet (`POST
+/me/todos/{id}/answer`, Not yet snoozing two hours), and `{"action":"todo_offer","reminder_id",
+"text","when_said"}` with Add and No (`/me/todos/offers/{id}/accept` or `/decline`). The press
+reaches the app through the response listener, through the push task on Android when the app is
+not running, or as the last response on the next launch, and is sent once. A tap on the notice
+itself opens the to-dos.
 
 The hint is the Pond's name, not the route's: `remote_access` is accepted, `remote-access` is
 not. Any other value, a non-string, or no `open` at all is ignored, and the tap opens the app
