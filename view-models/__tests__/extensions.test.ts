@@ -7,7 +7,7 @@
  */
 
 import type { MarketplaceExtension, SecretRequirement } from '@/services/types';
-import { credentialFields } from '@/view-models/use-extensions';
+import { credentialFields, signInFields } from '@/view-models/use-extensions';
 
 function requirement(over: Partial<SecretRequirement>): SecretRequirement {
   return { key: 'K', display_name: 'K', description: '', required: false, kind: 'generic', ...over };
@@ -30,4 +30,14 @@ it('keeps keys and choices, and leaves out sign-ins, host-only and advanced keys
   ]));
 
   expect(fields.map((f) => f.key)).toEqual(['TOKEN', 'SERVICE']);
+});
+
+it('offers a sign-in for each account the extension signs in to, never a host-only one', () => {
+  const fields = signInFields(extension([
+    requirement({ key: 'TOKEN', kind: 'api_key' }),
+    requirement({ key: 'SPOTIFY', kind: 'oauth_flow', display_name: 'Spotify' }),
+    requirement({ key: 'POND_ONLY', kind: 'oauth_flow', host_only: true }),
+  ]));
+
+  expect(fields.map((f) => f.key)).toEqual(['SPOTIFY']);
 });
