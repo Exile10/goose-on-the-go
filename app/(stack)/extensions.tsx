@@ -24,12 +24,12 @@ import { useThemedStyles } from '@/hooks/use-themed-styles';
 import { useTheme } from '@/providers/theme-provider';
 import { useConfirm } from '@/providers/confirm-provider';
 import type { ThemeColors } from '@/constants/colors';
-import type { Extension, MarketplaceExtension } from '@/services/types';
+import type { Extension, MarketplaceExtension, SecretRequirement } from '@/services/types';
 import { ContentUnavailable } from '@/components/patterns/content-unavailable';
 import { isUnavailable } from '@/models/content-state';
 import { useContentState } from '@/view-models/use-content-state';
 import { usePullToRefresh } from '@/view-models/use-pull-to-refresh';
-import { credentialFields, useExtensions } from '@/view-models/use-extensions';
+import { credentialFields, signInFields, useExtensions } from '@/view-models/use-extensions';
 
 /** Which of the theme's colours each status wears; the tone flips with the scheme, the fixed values did not. */
 function statusColor(status: string, colors: ThemeColors): string | undefined {
@@ -50,16 +50,24 @@ function statusLabel(status: string, t: TFunction): string | null {
 }
 
 /** Installed extension card: toggle plus whatever status the Pond reported. */
-const InstalledCard = React.memo(function InstalledCard({
+export const InstalledCard = React.memo(function InstalledCard({
   extension,
   onToggle,
   onCredentials,
   onRemove,
+  signIns = [],
+  signingIn,
+  onSignIn,
 }: {
   extension: Extension;
   onToggle: (name: string, enabled: boolean) => void;
   /** Present when the marketplace entry it came from has credentials to set. */
   onCredentials?: (name: string) => void;
+  /** The accounts it signs in to, such as Spotify, from its marketplace entry. */
+  signIns?: SecretRequirement[];
+  /** The key of the sign-in under way, which shows as busy. */
+  signingIn?: string | null;
+  onSignIn?: (name: string, requirement: SecretRequirement) => void;
   /** Present only for a marketplace extension; the Pond's built-in ones stay. */
   onRemove?: (name: string) => void;
 }) {
@@ -91,6 +99,24 @@ const InstalledCard = React.memo(function InstalledCard({
 
       {extension.last_error ? (
         <Text style={styles.errorText}>{extension.last_error}</Text>
+      ) : null}
+
+      {onSignIn && signIns.length > 0 ? (
+        <View style={styles.signInBlock}>
+          {signIns.map((req) => (
+            <InkButton
+              key={req.key}
+              variant="quiet"
+              icon="external"
+              onPress={() => onSignIn(extension.name, req)}
+              disabled={signingIn != null}
+              loading={signingIn === req.key}
+            >
+              {signingIn === req.key ? t('extensions.signIn.signingIn') : t('extensions.signIn.action', { name: req.display_name })}
+            </InkButton>
+          ))}
+          <Text style={styles.secretDesc}>{t('extensions.signIn.note')}</Text>
+        </View>
       ) : null}
 
       {onCredentials || onRemove ? (
@@ -293,6 +319,7 @@ export default function ExtensionsScreen() {
   const [installingId, setInstallingId] = useState<string | null>(null);
   const [form, setForm] = useState<{ item: MarketplaceExtension; mode: FormMode } | null>(null);
   const [saving, setSaving] = useState(false);
+  const [signingIn, setSigningIn] = useState<string | null>(null);
 
   const handleToggle = useCallback(
     (name: string, enabled: boolean) => void actions.setEnabled(name, enabled),
@@ -349,6 +376,15 @@ export default function ExtensionsScreen() {
       if (yes) void actions.remove(name);
     },
     [actions, confirm, data.marketplace, t],
+  );
+
+  const handleSignIn = useCallback(
+    async (name: string, requirement: SecretRequirement) => {
+      setSigningIn(requirement.key);
+      await actions.signIn(name, requirement);
+      setSigningIn(null);
+    },
+    [actions],
   );
 
   /** Closes the form only on success, so a refused submit keeps what was typed. */
@@ -417,6 +453,9 @@ export default function ExtensionsScreen() {
                   onToggle={handleToggle}
                   onCredentials={item && credentialFields(item).length > 0 ? handleCredentials : undefined}
                   onRemove={item ? confirmRemove : undefined}
+                  signIns={item ? signInFields(item) : undefined}
+                  signingIn={signingIn}
+                  onSignIn={handleSignIn}
                 />
                 {form?.mode === 'credentials' && form.item.id === ext.name ? (
                   <CredentialsForm
@@ -530,6 +569,13 @@ const makeStyles = (c: ThemeColors) =>
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: Spacing.sm,
+    marginTop: Spacing.md,
+  },
+
+  /* The accounts an installed extension signs in to. */
+  signInBlock: {
+    alignItems: 'flex-start',
+    gap: Spacing.xs,
     marginTop: Spacing.md,
   },
 
