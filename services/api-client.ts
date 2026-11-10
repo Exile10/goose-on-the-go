@@ -176,6 +176,8 @@ import type {
   ModelMemoryStatus,
   NowPlayingResponse,
   OAuthProvider,
+  OAuthSignInStatus,
+  OAuthStart,
   Profile,
   CreateScheduleRequest,
   Rule,
@@ -2256,10 +2258,20 @@ export class PondApiClient {
     return res.providers;
   }
 
-  oauthStatus(providerId: string): Promise<{ connected: boolean }> {
-    return this.get<{ connected: boolean }>(
-      `/api/v1/oauth/status/${encodeURIComponent(providerId)}`,
-    );
+  /**
+   * Start a sign-in for the secret an extension asks for. The Pond accepts a provider id or the
+   * secret's key, and keeps the tokens itself when the provider sends the browser back.
+   */
+  startOAuth(provider: string, extensionId?: string): Promise<OAuthStart> {
+    return this.post<OAuthStart>('/api/v1/oauth/authorize', {
+      provider,
+      ...(extensionId ? { extension_id: extensionId } : {}),
+    });
+  }
+
+  /** How the sign-in started with this `state` stands. Asked by sign-in, not by provider. */
+  oauthStatus(state: string): Promise<OAuthSignInStatus> {
+    return this.get<OAuthSignInStatus>(`/api/v1/oauth/status/${encodeURIComponent(state)}`);
   }
 
   // ── Web search ──────────────────────────────────────────────
