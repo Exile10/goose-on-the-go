@@ -219,6 +219,8 @@ export function ServerProvider({ children }: PropsWithChildren) {
   const saved = useRef<Saved | null>(null);
   // Mirrors whether `saved` holds a pairing, for render. Set wherever that changes.
   const [hasPairing, setHasPairing] = useState(false);
+  // Mirrors whether the saved profile reaches the Pond from outside, for render. Set by `restore`.
+  const [remoteEnabled, setRemoteEnabled] = useState(false);
   const staged = useRef<{ profile: ConnectionProfile; pin: string; client: PondApiClient } | null>(null);
   const operation = useRef(0);
   const committing = useRef<Promise<void> | null>(null);
@@ -242,6 +244,7 @@ export function ServerProvider({ children }: PropsWithChildren) {
     catch { console.warn('[remote] saved transport unavailable; local access remains enabled'); }
     await manager.configure(current?.profile ?? null, current?.identity.pin ?? '');
     if (!mounted.current) return;
+    setRemoteEnabled(remote?.mode === 'embedded');
     if (current) {
       api.setToken(current.identity.session);
       api.setRefreshToken(current.identity.refresh);
@@ -281,7 +284,7 @@ export function ServerProvider({ children }: PropsWithChildren) {
     // Stopping the remote transport also ends the foreground service that carries it.
     await cancelRemoteAccess().catch(() => undefined);
     await restoreRemoteAccess('', '').catch(() => undefined);
-    operation.current++; staged.current = null; saved.current = null; setHasPairing(false);
+    operation.current++; staged.current = null; saved.current = null; setHasPairing(false); setRemoteEnabled(false);
     api.invalidateIdentity(); setIdentity(null);
     await tokenWrite.current.catch(() => undefined);
     await SecureStorage.remove('pondIdentity');
@@ -673,10 +676,10 @@ export function ServerProvider({ children }: PropsWithChildren) {
     refreshToken: identity?.refresh ?? null, pairedPin: identity?.pin ?? null, keepRotatedTokens, connectionState: snapshot.state,
     connectionOutage: snapshot.outage ?? null,
     pondUrls: [...new Set([...(snapshot.url ? [snapshot.url] : []), ...(manager.savedProfile?.localUrls ?? [])])],
-    profileId: identity?.id ?? '', paired: hasPairing, remoteEnabled: saved.current?.profile.remoteAccess?.mode === 'embedded',
+    profileId: identity?.id ?? '', paired: hasPairing, remoteEnabled,
     keepLocalOnly, hydrated, screenModes, isScreenReal, setScreenMode,
     checkHealth, setRemoteEndpoint, recover: manager.recover, retryNow: manager.retryNow, tryAddress: manager.tryAddress, revoke: manager.revoke.bind(manager), stagePairing, cancelPairing, pair, adoptPairing, requestSpokenCode, unpair, forgetLocally,
-  }), [snapshot, identity, hasPairing, hydrated, screenModes, isScreenReal, setScreenMode, checkHealth, setRemoteEndpoint, keepLocalOnly, keepRotatedTokens, manager, stagePairing, cancelPairing, pair, adoptPairing, requestSpokenCode, unpair, forgetLocally]);
+  }), [snapshot, identity, hasPairing, remoteEnabled, hydrated, screenModes, isScreenReal, setScreenMode, checkHealth, setRemoteEndpoint, keepLocalOnly, keepRotatedTokens, manager, stagePairing, cancelPairing, pair, adoptPairing, requestSpokenCode, unpair, forgetLocally]);
   return <ServerContext.Provider value={value}>{children}</ServerContext.Provider>;
 }
 export function useServer(): ServerContextValue {
