@@ -2,6 +2,8 @@
 // that never mounts a screen. See services/background-notifications.ts.
 // The OS may start the app only to run the wake task, so it is defined while the bundle loads.
 import './services/background-notifications';
+// The geofence task, for a to-do that waits on arriving at or leaving a place, is defined the same way.
+import './services/geofence';
 import 'expo-router/entry';
 
 import { AppRegistry } from 'react-native';

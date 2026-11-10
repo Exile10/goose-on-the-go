@@ -100,7 +100,7 @@ export function rideOfferFromData(data: unknown): RideOffer | null {
  * `{ open: "conversation", session_id }`, and a Pond `chat` hint with a
  * conversation becomes the same route.
  *
- * Only these eight screens are accepted, and only ids of the shape the Pond
+ * Only these screens are accepted, and only ids of the shape the Pond
  * mints, so a notification can open one of them and nothing else. An older Pond
  * sends no `open`, and the tap opens the app where it was, as before; a value
  * this app does not know does the same.
@@ -114,7 +114,10 @@ export type OpenRoute =
   | { open: 'remote_access' }
   | { open: 'my_pond' }
   | { open: 'conversation'; sessionId: string }
-  | { open: 'watch'; watchId?: string };
+  | { open: 'watch'; watchId?: string }
+  | { open: 'todos'; todoId?: string }
+  | { open: 'news'; storyId?: string }
+  | { open: 'cart'; cartId?: string };
 
 /** A Pond id: a UUID, optionally prefixed (`timer-...`). Nothing that could be a path. */
 const POND_ID = /^[A-Za-z0-9_-]{1,128}$/;
@@ -165,9 +168,47 @@ export function openRouteFromData(data: unknown): OpenRoute | null {
       const sessionId = pondId(data.session_id);
       return sessionId ? { open: 'conversation', sessionId } : { open: 'chat' };
     }
+    // My Goose's hub: a reminder or a check-in, a story or the digest, a price that moved. A
+    // malformed id drops the id, not the screen.
+    case 'todos': {
+      const todoId = pondId(data.todo_id);
+      return todoId ? { open: 'todos', todoId } : { open: 'todos' };
+    }
+    case 'news': {
+      const storyId = pondId(data.story_id);
+      return storyId ? { open: 'news', storyId } : { open: 'news' };
+    }
+    case 'cart': {
+      const cartId = pondId(data.cart_id);
+      return cartId ? { open: 'cart', cartId } : { open: 'cart' };
+    }
     default:
       return null;
   }
+}
+
+/**
+ * Something the member can answer from the notification itself: Goose asking whether a to-do is
+ * done (`todo_checkin`, with Done and Not yet), or a dated mention from a chat offered as a to-do
+ * (`todo_offer`, with Add and No). Null for anything else, or an id of the wrong shape.
+ */
+export type TodoPrompt =
+  | { action: 'todo_checkin'; todoId: string; text: string }
+  | { action: 'todo_offer'; reminderId: string; text: string; whenSaid: string };
+
+export function todoPromptFromData(data: unknown): TodoPrompt | null {
+  if (!isRecord(data)) return null;
+  const text = typeof data.text === 'string' ? data.text.trim() : '';
+  if (data.action === 'todo_checkin') {
+    const todoId = pondId(data.todo_id);
+    return todoId ? { action: 'todo_checkin', todoId, text } : null;
+  }
+  if (data.action === 'todo_offer') {
+    const reminderId = pondId(data.reminder_id);
+    const whenSaid = typeof data.when_said === 'string' ? data.when_said.trim() : '';
+    return reminderId ? { action: 'todo_offer', reminderId, text, whenSaid } : null;
+  }
+  return null;
 }
 
 /** Where a route opens: an expo-router path, with the schedule's id when it names one. */
@@ -182,7 +223,12 @@ type ScreenHref =
   | '/(stack)/pond'
   | { pathname: '/conversation'; params: { session: string } }
   | '/(stack)/web-watches'
-  | { pathname: '/(stack)/web-watch'; params: { id: string } };
+  | { pathname: '/(stack)/web-watch'; params: { id: string } }
+  | '/(stack)/goose-todos'
+  | '/(stack)/goose-news'
+  | { pathname: '/(stack)/goose-story'; params: { id: string } }
+  | '/(stack)/goose-cart'
+  | { pathname: '/(stack)/goose-cart-item'; params: { id: string } };
 
 /**
  * The expo-router location a route opens. A schedule notification names the
@@ -212,5 +258,11 @@ export function screenPath(route: OpenRoute): ScreenHref {
       return { pathname: '/conversation', params: { session: route.sessionId } };
     case 'watch':
       return route.watchId ? { pathname: '/(stack)/web-watch', params: { id: route.watchId } } : '/(stack)/web-watches';
+    case 'todos':
+      return '/(stack)/goose-todos';
+    case 'news':
+      return route.storyId ? { pathname: '/(stack)/goose-story', params: { id: route.storyId } } : '/(stack)/goose-news';
+    case 'cart':
+      return route.cartId ? { pathname: '/(stack)/goose-cart-item', params: { id: route.cartId } } : '/(stack)/goose-cart';
   }
 }

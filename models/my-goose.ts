@@ -2,6 +2,7 @@
 // arithmetic are tested without a Pond.
 
 import type { PluralKey, TranslationKey } from '@/services/i18n';
+import { headOf, inSentence } from './me-read';
 import type { Schedule, ScheduleRun } from '@/services/types';
 import type { SavedItem, WebWatch } from './web-watches';
 
@@ -159,5 +160,61 @@ export function gooseClauses(facts: GooseFacts): GooseClause[] {
     );
   }
   if (facts.ideas > 0) clauses.push({ shelf: 'ideas', key: 'myGoose.say.ideas', params: { count: facts.ideas } });
+  return clauses.slice(0, SENTENCE_CLAUSES);
+}
+
+/** Where a clause of the hub's sentence takes the member. */
+export type HubTarget =
+  | { to: 'todos' }
+  | { to: 'interview' }
+  | { to: 'news' }
+  | { to: 'digest'; id: string }
+  | { to: 'cart'; id: string }
+  | { to: 'ideas' };
+
+export interface HubClause {
+  target: HubTarget;
+  key: TranslationKey | PluralKey;
+  params: Record<string, string | number>;
+}
+
+export interface HubFacts {
+  /** The to-dos Goose is asking about, most recently asked first. */
+  checkins: { text: string }[];
+  offers: number;
+  /** Goose knows nothing the member is into yet. */
+  newMember: boolean;
+  digest: { id: string; stories: number } | null;
+  stories: number;
+  cart: { id: string; title: string; by: string | null; atTarget: boolean } | null;
+  dueToday: number;
+  idea: { title: string } | null;
+}
+
+/**
+ * The hub's sentence: what needs an answer, then what Goose made, then what changed. The member's
+ * answers come first because only they can give them; the news is ready whenever they are.
+ */
+export function hubClauses(facts: HubFacts): HubClause[] {
+  const clauses: HubClause[] = [];
+  const answers = facts.checkins.length + facts.offers;
+  if (answers === 1 && facts.checkins.length === 1) {
+    clauses.push({ target: { to: 'todos' }, key: 'goose.say.checkingOne', params: { text: shortTitle(inSentence(facts.checkins[0].text)) } });
+  } else if (answers > 0) {
+    clauses.push({ target: { to: 'todos' }, key: 'goose.say.asking', params: { count: answers } });
+  }
+  if (facts.newMember) clauses.push({ target: { to: 'interview' }, key: 'goose.say.newMember', params: {} });
+  if (facts.digest) {
+    clauses.push({ target: { to: 'digest', id: facts.digest.id }, key: 'goose.say.digest', params: { count: Math.max(facts.digest.stories, 1) } });
+  } else if (facts.stories > 0) {
+    clauses.push({ target: { to: 'news' }, key: 'goose.say.stories', params: { count: facts.stories } });
+  }
+  if (facts.cart?.atTarget) {
+    clauses.push({ target: { to: 'cart', id: facts.cart.id }, key: 'goose.say.cartTarget', params: { title: shortTitle(headOf(facts.cart.title)) } });
+  } else if (facts.cart?.by) {
+    clauses.push({ target: { to: 'cart', id: facts.cart.id }, key: 'goose.say.cartDrop', params: { title: shortTitle(headOf(facts.cart.title)), by: facts.cart.by } });
+  }
+  if (facts.dueToday > 0) clauses.push({ target: { to: 'todos' }, key: 'goose.say.dueToday', params: { count: facts.dueToday } });
+  if (facts.idea) clauses.push({ target: { to: 'ideas' }, key: 'goose.say.idea', params: { title: shortTitle(facts.idea.title) } });
   return clauses.slice(0, SENTENCE_CLAUSES);
 }

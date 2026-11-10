@@ -5,7 +5,7 @@
 
 import i18n from '@/services/i18n';
 import type { Schedule, ScheduleRun } from '@/services/types';
-import { briefFrom, cartsFrom, formatPrice, gooseClauses, readPrice, watchesWithHits, type GooseFacts } from '@/models/my-goose';
+import { briefFrom, cartsFrom, formatPrice, gooseClauses, hubClauses, readPrice, watchesWithHits, type GooseFacts } from '@/models/my-goose';
 import type { SavedItem, WebWatch } from '@/models/web-watches';
 
 const listing = (id: string, price: string | undefined, extra: Partial<SavedItem> = {}): SavedItem => ({
@@ -146,5 +146,34 @@ describe('the sentence My Goose opens with', () => {
 
   it('counts only watches with matches, most first, and none that are paused', () => {
     expect(watchesWithHits([watch('a', 1), watch('b', 0), watch('c', 5), watch('d', 9, { paused: true })]).map((w) => w.id)).toEqual(['c', 'a']);
+  });
+});
+
+describe('the hub sentence', () => {
+  const none = { checkins: [], offers: 0, newMember: false, digest: null, stories: 0, cart: null, dueToday: 0, idea: null };
+
+  it('asks for answers first, then the news, then what changed, three clauses at most', () => {
+    const clauses = hubClauses({
+      ...none,
+      checkins: [{ text: 'Send the slides' }],
+      digest: { id: 'd-1', stories: 3 },
+      cart: { id: 'c-1', title: 'Toyota Fielder 2016', by: 'KSh 40,000', atTarget: false },
+      dueToday: 2,
+    });
+    expect(clauses.map((c) => c.key)).toEqual(['goose.say.checkingOne', 'goose.say.digest', 'goose.say.cartDrop']);
+    expect(clauses[2].target).toEqual({ to: 'cart', id: 'c-1' });
+  });
+
+  it('counts check-ins and offers together once there is more than one', () => {
+    expect(hubClauses({ ...none, checkins: [{ text: 'a' }], offers: 2 })[0]).toMatchObject({ key: 'goose.say.asking', params: { count: 3 } });
+  });
+
+  it('invites a new member to the interview, and says nothing when nothing is there', () => {
+    expect(hubClauses({ ...none, newMember: true })[0].target).toEqual({ to: 'interview' });
+    expect(hubClauses(none)).toEqual([]);
+  });
+
+  it('says a price reached before a price dropped', () => {
+    expect(hubClauses({ ...none, cart: { id: 'c', title: 'Fielder', by: 'KSh 1', atTarget: true } })[0].key).toBe('goose.say.cartTarget');
   });
 });
