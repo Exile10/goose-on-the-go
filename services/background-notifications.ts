@@ -35,11 +35,18 @@ import { alreadyDelivered } from './notification-delivery';
 import { handleWake } from './notification-wake';
 import { ensurePondSession } from './pond-session';
 import { pauseRemoteAccess, resumePausedRemoteAccess } from './remote-access';
-import { handleTodoResponse } from './todo-prompts';
+import { answerFrom, handleTodoResponse } from './todo-prompts';
 import { handleWakePing, type WakeOutcome } from './wake-handler';
 import { readWakePing } from './wake-ping';
 
 export const WAKE_TASK = 'giap-notification-wake';
+
+/** A press of Done, Not yet, Add or No, as the task is handed it; any other response is not ours. */
+function isTodoResponse(data: unknown): boolean {
+  if (!data || typeof data !== 'object' || !('actionIdentifier' in data)) return false;
+  const response = data as { actionIdentifier?: unknown; notification?: { request?: { content?: { data?: unknown } } } };
+  return answerFrom(response.actionIdentifier, response.notification?.request?.content?.data) !== null;
+}
 
 /** Read afresh each time: the person may open the app while a wake-up is under way. */
 const appActive = () => AppState.currentState === 'active';
@@ -77,7 +84,7 @@ export function defineWakeTask(Notifications: NotificationsModule | null = notif
       return Failed;
     }
     // On Android a button on one of Goose's questions runs this task when the app is not in front.
-    if (data && typeof data === 'object' && 'actionIdentifier' in data) {
+    if (isTodoResponse(data)) {
       if (appActive()) return NoData;
       await resumePausedRemoteAccess();
       try {
