@@ -27,10 +27,15 @@ export function useConnectionStatus(): ConnectionStatusView {
   const counting = connectionState !== 'reconnecting' && connectionOutage?.nextCheckAt != null;
 
   useEffect(() => {
-    setNow(Date.now());
     if (!counting) return;
-    const timer = setInterval(() => setNow(Date.now()), TICK_MS);
-    return () => clearInterval(timer);
+    const tick = () => setNow(Date.now());
+    // At once as well, so a new outage does not count down from the clock of the last one.
+    const first = setTimeout(tick, 0);
+    const timer = setInterval(tick, TICK_MS);
+    return () => {
+      clearTimeout(first);
+      clearInterval(timer);
+    };
   }, [counting, connectionOutage]);
 
   const tryNow = useCallback(() => {
