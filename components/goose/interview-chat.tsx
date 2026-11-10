@@ -12,7 +12,7 @@ import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { InkBubble, InkButton, InkCheckbox, InkChoice, InkInput, InkMeter, InkSpinner, InkText, InkTyping, inkText, useInkTheme } from '@jarida/ink/native';
 
-import { GKeyboardView } from '@/components/ui/g-keyboard-view';
+import { GKeyboardView, useFocusedInputReveal } from '@/components/ui/g-keyboard-view';
 import { Spacing } from '@/constants/spacing';
 import { categoryKey, depthKey, interviewProgress, newsKey, type Interest } from '@/models/interests';
 import { selectionTick, tap } from '@/services/haptics';
@@ -126,6 +126,7 @@ export function InterviewChat({ vm, onSkip, onFinished }: { vm: UseInterestsInte
   const theme = useInkTheme();
   const { t } = useTranslation();
   const scroll = useRef<ScrollView>(null);
+  const reveal = useFocusedInputReveal(() => scroll.current);
   // Picks belong to the question they were made on; a new question starts with none.
   const [pickedFor, setPickedFor] = useState<{ question: string; items: string[] }>({ question: '', items: [] });
   const [typed, setTyped] = useState('');
@@ -154,7 +155,7 @@ export function InterviewChat({ vm, onSkip, onFinished }: { vm: UseInterestsInte
 
   return (
     <GKeyboardView style={styles.fill}>
-      <ScrollView ref={scroll} style={styles.fill} contentContainerStyle={styles.chat} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+      <ScrollView ref={scroll} style={styles.fill} contentContainerStyle={styles.chat} showsVerticalScrollIndicator={false} {...reveal}>
         {progress && data.status !== 'review' ? (
           <View style={styles.progress}>
             <InkText size="sm" weight="semibold" tone="secondary">

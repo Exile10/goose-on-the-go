@@ -15,7 +15,6 @@ import { Labelled } from '@/components/goose/labelled';
 import { LocationSheet, hookIcon, useHookWords } from '@/components/goose/todo-parts';
 import { DangerQuietButton } from '@/components/pond/danger-quiet-button';
 import { GIcon } from '@/components/ui/g-icon';
-import { GKeyboardView } from '@/components/ui/g-keyboard-view';
 import { Spacing } from '@/constants/spacing';
 import { draftOf, type Hook, type TodoDraft, type TodoKind } from '@/models/todos';
 import { useConfirm } from '@/providers/confirm-provider';
@@ -60,7 +59,7 @@ export default function GooseTodoScreen() {
   };
 
   return (
-    <GKeyboardView>
+    <>
       <ScreenScroll gap={Spacing.xl}>
         <InkSegmented
           label={t('goose.todo.kind')}
@@ -119,7 +118,7 @@ export default function GooseTodoScreen() {
         </View>
       </ScreenScroll>
       <LocationSheet open={sheet} access={todos.access} onClose={() => setSheet(false)} onAllow={todos.actions.allowLocation} />
-    </GKeyboardView>
+    </>
   );
 }
 

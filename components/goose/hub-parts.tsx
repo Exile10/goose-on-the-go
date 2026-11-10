@@ -5,12 +5,13 @@
  */
 
 import React from 'react';
-import { RefreshControl, ScrollView, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
+import { RefreshControl, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { InkText, inkText, useInkTheme } from '@jarida/ink/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { GIcon } from '@/components/ui/g-icon';
+import { GKeyboardScrollView } from '@/components/ui/g-keyboard-view';
 import { GPressable } from '@/components/ui/g-pressable';
 import type { IconName } from '@/constants/icons';
 import { Spacing } from '@/constants/spacing';
@@ -161,20 +162,23 @@ export function SectionGap() {
   return <View style={styles.gap} />;
 }
 
-/** A hub screen's scroll: the page's ground, the gutter, a pull to read again, room at the foot. */
+/**
+ * A hub screen's scroll: the page's ground, the gutter, a pull to read again, room at the foot. It
+ * lifts above the keyboard and scrolls a focused field into view, since several hub screens are forms.
+ */
 export function ScreenScroll({ pull, children, gap = Spacing['2xl'], top = Spacing.lg }: { pull?: PullToRefresh; children: React.ReactNode; gap?: number; top?: number }) {
   const theme = useInkTheme();
   const insets = useSafeAreaInsets();
   return (
-    <ScrollView
-      style={{ flex: 1, backgroundColor: theme.color.bg }}
+    <GKeyboardScrollView
+      containerStyle={{ backgroundColor: theme.color.bg }}
+      style={{ flex: 1 }}
       contentContainerStyle={{ paddingHorizontal: Spacing.lg, paddingTop: top, paddingBottom: insets.bottom + Spacing['3xl'], gap }}
       showsVerticalScrollIndicator={false}
-      keyboardShouldPersistTaps="handled"
       refreshControl={pull ? <RefreshControl {...pull} /> : undefined}
     >
       {children}
-    </ScrollView>
+    </GKeyboardScrollView>
   );
 }
 
