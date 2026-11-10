@@ -3,15 +3,19 @@
  * member changes on one (pause, how often, stop).
  */
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 
 import type { WebWatch, WebWatchDetail } from '@/models/web-watches';
 import { useServer } from '@/providers/server-provider';
 import { ApiError, api } from '@/services/api-client';
 import i18n from '@/services/i18n';
+import { useLive } from './use-live';
 
 /** Hours a member may pick between checks; the Pond keeps any value from 1 to 168. */
 export const WATCH_INTERVALS = [1, 3, 6, 12, 24] as const;
+
+/** A watch the Pond checked meanwhile shows its new state without leaving the screen. */
+export const WEB_WATCHES_MS = 60_000;
 
 function failure(e: unknown): string {
   return e instanceof ApiError ? i18n.t('webWatches.errors.status', { status: e.status }) : i18n.t('webWatches.errors.unreachable');
@@ -23,11 +27,15 @@ export function useWebWatches() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const refresh = useCallback(async () => {
-    setLoading(true);
-    setError(null);
+  /** `loud` is a read somebody asked for; one on arrival or a poll changes nothing until it lands. */
+  const load = useCallback(async (loud: boolean) => {
+    if (loud) {
+      setLoading(true);
+      setError(null);
+    }
     try {
       setWatches(await api.listWebWatches());
+      setError(null);
     } catch (e) {
       setError(failure(e));
     } finally {
@@ -35,10 +43,8 @@ export function useWebWatches() {
     }
   }, []);
 
-  useEffect(() => {
-    if (!hydrated) return;
-    void refresh();
-  }, [hydrated, refresh]);
+  const refresh = useCallback(() => load(true), [load]);
+  useLive(() => load(false), WEB_WATCHES_MS, hydrated);
 
   return { data: { watches }, loading, error, actions: { refresh } };
 }
@@ -51,12 +57,16 @@ export function useWebWatch(id: string) {
   const [saving, setSaving] = useState(false);
   const [gone, setGone] = useState(false);
 
-  const refresh = useCallback(async () => {
+  /** `loud` is a read somebody asked for; one on arrival or a poll changes nothing until it lands. */
+  const load = useCallback(async (loud: boolean) => {
     if (!id) return;
-    setLoading(true);
-    setError(null);
+    if (loud) {
+      setLoading(true);
+      setError(null);
+    }
     try {
       setWatch(await api.webWatch(id));
+      setError(null);
     } catch (e) {
       if (e instanceof ApiError && e.status === 404) setGone(true);
       else setError(failure(e));
@@ -65,10 +75,8 @@ export function useWebWatch(id: string) {
     }
   }, [id]);
 
-  useEffect(() => {
-    if (!hydrated) return;
-    void refresh();
-  }, [hydrated, refresh]);
+  const refresh = useCallback(() => load(true), [load]);
+  useLive(() => load(false), WEB_WATCHES_MS, hydrated);
 
   const edit = useCallback(
     async (change: { paused?: boolean; interval_hours?: number }) => {

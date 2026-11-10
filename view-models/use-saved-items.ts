@@ -3,12 +3,16 @@
  * what a member does with one of theirs (share it, move it, delete it, watch its price).
  */
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 
 import type { SavedCollection, SavedItem } from '@/models/web-watches';
 import { useServer } from '@/providers/server-provider';
 import { ApiError, api } from '@/services/api-client';
 import i18n from '@/services/i18n';
+import { useLive } from './use-live';
+
+/** A card shared or moved on another phone shows up without leaving the screen. */
+export const SAVED_MS = 60_000;
 
 function failure(e: unknown): string {
   return e instanceof ApiError ? i18n.t('saved.errors.status', { status: e.status }) : i18n.t('saved.errors.unreachable');
@@ -22,26 +26,37 @@ export function useSavedItems() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const refresh = useCallback(async () => {
-    setLoading(true);
-    setError(null);
+  /** `loud` is a read somebody asked for; one on arrival or a poll changes nothing until it lands. */
+  const load = useCallback(async (loud: boolean, from: string | null) => {
+    if (loud) {
+      setLoading(true);
+      setError(null);
+    }
     try {
-      const [found, named] = await Promise.all([api.listSavedItems(collection ?? undefined), api.savedCollections()]);
+      const [found, named] = await Promise.all([api.listSavedItems(from ?? undefined), api.savedCollections()]);
       setItems(found);
       setCollections(named);
+      setError(null);
     } catch (e) {
       setError(failure(e));
     } finally {
       setLoading(false);
     }
-  }, [collection]);
+  }, []);
 
-  useEffect(() => {
-    if (!hydrated) return;
-    void refresh();
-  }, [hydrated, refresh]);
+  const refresh = useCallback(() => load(true, collection), [load, collection]);
+  useLive(() => load(false, collection), SAVED_MS, hydrated);
 
-  return { data: { items, collections, collection }, loading, error, actions: { refresh, setCollection } };
+  /** Another collection is read at once, rather than at the next poll. */
+  const choose = useCallback(
+    (next: string | null) => {
+      setCollection(next);
+      void load(true, next);
+    },
+    [load],
+  );
+
+  return { data: { items, collections, collection }, loading, error, actions: { refresh, setCollection: choose } };
 }
 
 export function useSavedItem(id: string) {
@@ -53,12 +68,16 @@ export function useSavedItem(id: string) {
   const [gone, setGone] = useState(false);
   const [watching, setWatching] = useState(false);
 
-  const refresh = useCallback(async () => {
+  /** `loud` is a read somebody asked for; one on arrival or a poll changes nothing until it lands. */
+  const load = useCallback(async (loud: boolean) => {
     if (!id) return;
-    setLoading(true);
-    setError(null);
+    if (loud) {
+      setLoading(true);
+      setError(null);
+    }
     try {
       setItem(await api.savedItem(id));
+      setError(null);
     } catch (e) {
       if (e instanceof ApiError && e.status === 404) setGone(true);
       else setError(failure(e));
@@ -67,10 +86,8 @@ export function useSavedItem(id: string) {
     }
   }, [id]);
 
-  useEffect(() => {
-    if (!hydrated) return;
-    void refresh();
-  }, [hydrated, refresh]);
+  const refresh = useCallback(() => load(true), [load]);
+  useLive(() => load(false), SAVED_MS, hydrated);
 
   const run = useCallback(async <T,>(work: () => Promise<T>): Promise<T | null> => {
     setBusy(true);
