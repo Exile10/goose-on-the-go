@@ -324,3 +324,34 @@ describe('a refresh that could not complete', () => {
     expect(revoked).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('extension sign-in', () => {
+  it('starts a sign-in for an extension and reads it back by its nonce', async () => {
+    const seen: { url: string; method?: string; body?: string }[] = [];
+    setFetch(async (url: string, init?: { method?: string; body?: string }) => {
+      seen.push({ url, method: init?.method, body: init?.body });
+      return url.endsWith('/authorize')
+        ? reply('{"auth_url":"https://accounts.spotify.com/authorize?state=n%2F1","state":"n/1"}')
+        : reply('{"status":"pending"}');
+    });
+    const api = new PondApiClient('https://pond.test:4000');
+
+    const started = await api.startOAuth('spotify_token', 'music');
+    expect(started).toEqual({ auth_url: 'https://accounts.spotify.com/authorize?state=n%2F1', state: 'n/1' });
+    await expect(api.oauthStatus(started.state)).resolves.toEqual({ status: 'pending' });
+
+    expect(seen[0]).toMatchObject({ url: 'https://pond.test:4000/api/v1/oauth/authorize', method: 'POST' });
+    expect(JSON.parse(seen[0].body!)).toEqual({ provider: 'spotify_token', extension_id: 'music' });
+    expect(seen[1].url).toBe('https://pond.test:4000/api/v1/oauth/status/n%2F1');
+  });
+
+  it('names no extension when there is none', async () => {
+    let body: string | undefined;
+    setFetch(async (_url: string, init?: { body?: string }) => {
+      body = init?.body;
+      return reply('{"auth_url":"https://example.com","state":"s"}');
+    });
+    await new PondApiClient('https://pond.test:4000').startOAuth('spotify');
+    expect(JSON.parse(body!)).toEqual({ provider: 'spotify' });
+  });
+});
