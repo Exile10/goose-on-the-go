@@ -2794,10 +2794,16 @@
     },
     "timing": {
       "title": "Command timing",
-      "empty": "Ask Goose something and each answer’s time shows here.",
-      "firstWord": "First word",
+      "empty": "Ask Goose something or use a device, and its time shows here.",
+      "command": "Command",
+      "reply": "Reply · {{time}}",
+      "replyNoTime": "Reply",
       "finished": "Finished",
-      "took": "Took"
+      "took": "Took",
+      "device": "{{device}} {{verb}}",
+      "deviceFailed": "{{device}} {{verb}} failed",
+      "on": "on",
+      "off": "off"
     },
     "log": {
       "title": "Live log",
@@ -2876,7 +2882,7 @@
       "footer": "The newest 100 lines, read every 5 seconds while this screen is open."
     },
     "timings": {
-      "title": "Command timings",
+      "title": "Conversation timing",
       "none": "No conversations yet.",
       "footer": "How long Goose took over its latest conversation. Tap it for each command: time to the first word, the whole answer and any tool it used."
     }

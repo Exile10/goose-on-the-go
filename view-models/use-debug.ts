@@ -46,6 +46,8 @@ export interface UseDebug {
     /** The same lines as the screen lists them: a chat message's together, repeats counted. */
     items: LogItem[];
     timings: CommandTiming[];
+    /** Device id to the name the household gave it, for the timing table. */
+    deviceNames: ReadonlyMap<string, string>;
     /** Lines the Pond dropped because this phone fell behind, since the screen opened. */
     skipped: number;
     stream: StreamState;
@@ -78,6 +80,7 @@ export function useDebug(): UseDebug {
   const [lines, setLines] = useState<LogEntry[]>([]);
   const items = useMemo(() => groupLog(lines), [lines]);
   const [timings, setTimings] = useState<CommandTiming[]>([]);
+  const [deviceNames, setDeviceNames] = useState<ReadonlyMap<string, string>>(() => new Map());
   const [skipped, setSkipped] = useState(0);
   const [stream, setStream] = useState<StreamState>('connecting');
   const [loading, setLoading] = useState(true);
@@ -92,13 +95,23 @@ export function useDebug(): UseDebug {
     }
   }, []);
 
+  // Timing names a device as the household does; without the list it still shows its id.
+  const readDeviceNames = useCallback(async () => {
+    try {
+      const devices = await api.listDevices();
+      setDeviceNames(new Map(devices.map((d) => [d.id, d.name])));
+    } catch (e) {
+      console.warn('[debug] could not read the device names', e instanceof ApiError ? e.status : 'network');
+    }
+  }, []);
+
   const load = useCallback(async () => {
     try {
       const state = await api.developerDebug();
       setTestPond(state.test_pond);
       setDebugState(state.debug);
       setError(null);
-      if (state.test_pond) await readChat();
+      if (state.test_pond) await Promise.all([readChat(), readDeviceNames()]);
     } catch (e) {
       // A Pond from before developer mode has no such route: it is no test Pond.
       if (e instanceof ApiError && e.status === 404) setTestPond(false);
@@ -106,7 +119,7 @@ export function useDebug(): UseDebug {
     } finally {
       setLoading(false);
     }
-  }, [readChat]);
+  }, [readChat, readDeviceNames]);
 
   useEffect(() => {
     // After this render, not inside it: the first read sets state.
@@ -214,7 +227,7 @@ export function useDebug(): UseDebug {
   }, [readChat]);
 
   return {
-    data: { testPond, debug, chat, lines, items, timings, skipped, stream },
+    data: { testPond, debug, chat, lines, items, timings, deviceNames, skipped, stream },
     loading,
     busy,
     error,

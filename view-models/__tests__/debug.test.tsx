@@ -11,6 +11,7 @@ import type { LogEntry, LogStreamEvent } from '@/services/types';
 import i18n from '@/services/i18n';
 import {
   commandTiming,
+  deviceCommandLabel,
   describeCommand,
   describeLine,
   formatDuration,
@@ -32,6 +33,7 @@ jest.mock('@/services/api-client', () => {
       rollbackModel: jest.fn(),
       streamLogs: jest.fn(),
       listLogs: jest.fn(),
+      listDevices: jest.fn(),
     },
   };
 });
@@ -100,6 +102,7 @@ beforeEach(() => {
   pond.developerDebug.mockResolvedValue({ test_pond: true, debug: false });
   pond.activeChatRole.mockResolvedValue({ model_id: 'gguf/new-model', rollback: { model_id: 'gguf/steady-model', model: 'steady-model' } });
   pond.listLogs.mockResolvedValue([]);
+  pond.listDevices.mockResolvedValue([]);
 });
 
 afterEach(() => jest.restoreAllMocks());
@@ -112,7 +115,44 @@ describe('commandTiming', () => {
       totalMs: 16697,
       firstTokenMs: 2119,
       completionTokens: 201,
+      device: null,
     });
+  });
+
+  it('times a device the Pond drove, from the line its Matter controller logs', () => {
+    const driven = line(8, {
+      kind: 'matter_device_command',
+      device: 'matter-3-1',
+      verb: 'power',
+      value: 'true',
+      duration_ms: 412,
+    });
+    expect(commandTiming(driven)).toEqual({
+      id: 8,
+      timestamp: '2026-10-29 09:06:28',
+      totalMs: 412,
+      firstTokenMs: null,
+      completionTokens: null,
+      device: { id: 'matter-3-1', verb: 'power', value: 'true', failed: false },
+    });
+  });
+
+  it('marks a device command that failed, which the Pond logs with an error code', () => {
+    const meta = { kind: 'matter_device_command', device: 'matter-3-1', verb: 'power', duration_ms: 5000, error_code: 'timeout' };
+    expect(commandTiming(line(9, meta, { level: 'WARN' }))?.device?.failed).toBe(true);
+  });
+
+  it('names a device as the household does, or by its id when the Pond has no name for it', () => {
+    const t = i18n.t.bind(i18n);
+    const names = new Map([['matter-3-1', 'Kitchen light']]);
+    const power = (value: string | null, failed = false) => ({ id: 'matter-3-1', verb: 'power', value, failed });
+    expect(deviceCommandLabel(power('true'), names, t)).toBe('Kitchen light on');
+    expect(deviceCommandLabel(power('false', true), names, t)).toBe('Kitchen light off failed');
+    // A Pond from before it logged the value still says what it did.
+    expect(deviceCommandLabel(power(null), names, t)).toBe('Kitchen light power');
+    expect(deviceCommandLabel({ id: 'matter-9-2', verb: 'level', value: '40', failed: false }, names, t)).toBe(
+      'matter-9-2 level',
+    );
   });
 
   it('leaves out the warm-up turns the Pond runs for itself', () => {
@@ -266,6 +306,14 @@ describe('useDebug', () => {
     });
     expect(m.vm.data.lines.map((l) => l.id)).toEqual([10, 9, 8]);
     expect(m.vm.data.timings.map((t) => t.id)).toEqual([9]);
+    await m.unmount();
+  });
+
+  it('reads the device names on a test Pond, so timing can show them', async () => {
+    pond.listDevices.mockResolvedValue([{ id: 'matter-3-1', name: 'Kitchen light', is_online: true }]);
+    openStream();
+    const m = await mount();
+    expect(m.vm.data.deviceNames.get('matter-3-1')).toBe('Kitchen light');
     await m.unmount();
   });
 
