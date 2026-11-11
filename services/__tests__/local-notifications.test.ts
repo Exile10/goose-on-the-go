@@ -83,6 +83,12 @@ describe('openTapped', () => {
     expect(mockPush.mock.calls).toEqual([['/(stack)/models'], ['/(stack)/extensions'], ['/(stack)/remote-access']]);
   });
 
+  it('opens Reminders for an offer from a conversation, and the to-dos for a check-in', () => {
+    tap({ id: 'offer-1', action: 'todo_offer', reminder_id: 'rem-1', text: 'Daily Brief', when_said: 'every morning' });
+    tap({ id: 'checkin-1', action: 'todo_checkin', todo_id: 'todo-1', text: 'Water the plants' });
+    expect(mockPush.mock.calls).toEqual([['/(stack)/reminders'], ['/(stack)/goose-todos']]);
+  });
+
   it('opens My Pond for the notice that the Pond was unlocked, not Devices', () => {
     tap({ open: 'my_pond' });
     expect(mockPush.mock.calls).toEqual([['/(stack)/pond']]);

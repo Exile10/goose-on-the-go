@@ -297,8 +297,9 @@ function openTapped(Notifications: NotificationsModule, response: NotificationRe
     });
     return;
   }
-  // A question tapped rather than answered opens the to-dos, where it can be answered in full.
-  const route = openRouteFromData(data) ?? (todoPromptFromData(data) ? ({ open: 'todos' } as const) : null);
+  // A question tapped rather than answered opens where it is answered in full: an offer of a
+  // reminder from a conversation on Reminders, where the offers are listed, a check-in on the to-dos.
+  const route = openRouteFromData(data) ?? promptRoute(todoPromptFromData(data));
   if (!route) return;
   if (route.open !== 'conversation') {
     const href = screenPath(route);
@@ -309,6 +310,12 @@ function openTapped(Notifications: NotificationsModule, response: NotificationRe
     return;
   }
   void conversationOrWall(route).then((opened) => router.push(screenPath(opened)));
+}
+
+/** Where a tapped question about a to-do opens; null for a notice that asks none. */
+function promptRoute(prompt: ReturnType<typeof todoPromptFromData>): OpenRoute | null {
+  if (!prompt) return null;
+  return prompt.action === 'todo_offer' ? { open: 'reminders' } : { open: 'todos' };
 }
 
 /**
