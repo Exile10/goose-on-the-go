@@ -1,7 +1,7 @@
 import { PondTrustError } from './pond-trust';
 /** Shared, bounded endpoint selection for REST and foreground SSE. */
 import type { ConnectionOutage, ConnectionProfile, ConnectionState, UnreachableReason } from '@/models/connection';
-import { normalizeHttpsUrl, isLocalPairingUrl, unreachableReason } from '@/models/connection';
+import { normalizeHttpsUrl, isLocalPairingUrl, remoteRoutes, unreachableReason } from '@/models/connection';
 
 export interface ConnectionSnapshot {
   state: ConnectionState;
@@ -116,7 +116,7 @@ export class ConnectionManager {
     const route = key ? this.deps.routes?.get(key) : undefined;
     if (!route?.url) return null;
     if (route.state === 'local' && profile.localUrls.includes(route.url)) return route;
-    if (route.state === 'remote' && profile.remoteAccess?.mode === 'embedded' && profile.remoteUrl === route.url) return route;
+    if (route.state === 'remote' && remoteRoutes(profile).includes(route.url)) return route;
     return null;
   }
   get current(): ConnectionSnapshot { return this.snapshot; }
@@ -133,7 +133,7 @@ export class ConnectionManager {
     const remembered = profile ? this.rememberedRoute(profile) : null;
     if (remembered) this.publish(remembered.state, remembered.url);
     else this.publish(profile ? 'reconnecting' : upgrade ? 'upgrade' : 'unpaired');
-    await this.deps.trust(profile ? [...profile.localUrls, ...(profile.remoteAccess?.mode === 'embedded' && profile.remoteUrl ? [profile.remoteUrl] : [])] : [], pin);
+    await this.deps.trust(profile ? [...profile.localUrls, ...remoteRoutes(profile)] : [], pin);
   }
   /**
    * The Pond answered, and said it does not know this phone: its session token
@@ -201,16 +201,20 @@ export class ConnectionManager {
       catch (error) { if (current() && error instanceof PondTrustError) trustRejected = true; return false; }
     };
     const remote = profile.remoteAccess?.mode === 'embedded' && profile.remoteUrl ? profile.remoteUrl : null;
+    // The household's public tunnel needs no embedded node, so it is probed as soon as the
+    // remote routes start, beside the tailnet one, under the same pin.
+    const tunnel = profile.tunnelUrl ?? null;
     // Probe only configured endpoints, without a bearer header. Every saved local address at
     // once; remote after the head start, or as soon as every local one has failed; discovery,
     // which can take seconds, alongside remote rather than ahead of it.
     // What the remote route came to on the last pass, for the log when nothing answers.
-    let remoteOutcome: 'none' | 'node_not_ready' | 'no_answer' = remote === null ? 'none' : 'no_answer';
+    let remoteOutcome: 'none' | 'node_not_ready' | 'no_answer' = remote === null && tunnel === null ? 'none' : 'no_answer';
     const race = () => new Promise<Route | null>((resolve) => {
       const local = this.cellular ? [] : [...profile.localUrls];
       let pendingLocal = local.length;
       let remoteStarted = false;
       let remoteDone = remote === null;
+      let tunnelDone = tunnel === null;
       let discoveryDone = this.cellular;
       let settled = false;
       let headStart: ReturnType<typeof setTimeout> | null = null;
@@ -220,10 +224,18 @@ export class ConnectionManager {
         if (headStart) clearTimeout(headStart);
         resolve(route);
       };
-      const failIfExhausted = () => { if (pendingLocal === 0 && remoteDone && discoveryDone) finish(null); };
+      const failIfExhausted = () => { if (pendingLocal === 0 && remoteDone && tunnelDone && discoveryDone) finish(null); };
       const startRemote = () => {
-        if (remoteStarted || remote === null) return;
+        if (remoteStarted || (remote === null && tunnel === null)) return;
         remoteStarted = true;
+        if (tunnel !== null) {
+          void (async () => {
+            const ok = !settled && current() && await probe(tunnel);
+            tunnelDone = true;
+            if (ok) finish({ state: 'remote', url: tunnel }); else failIfExhausted();
+          })();
+        }
+        if (remote === null) return;
         void (async () => {
           const ready = this.deps.remoteReady ? await this.deps.remoteReady(() => settled || !current()) : true;
           remoteOutcome = ready ? 'no_answer' : 'node_not_ready';
@@ -239,7 +251,7 @@ export class ConnectionManager {
             const found = this.candidate ?? await this.deps.discover(profile.host, profile.port);
             if (settled || !current() || !found || !isLocalPairingUrl(found)) return;
             const url = normalizeHttpsUrl(found);
-            await this.deps.trust([...new Set([...profile.localUrls, url, ...(remote ? [remote] : [])])], this.pin);
+            await this.deps.trust([...new Set([...profile.localUrls, url, ...remoteRoutes(profile)])], this.pin);
             if (!settled && current() && await probe(url)) finish({ state: 'local', url, discovered: true });
           } catch {
             // A discovery failure only means this route is unavailable.
@@ -257,7 +269,7 @@ export class ConnectionManager {
         });
       }
       if (local.length === 0) { startRemote(); startDiscovery(); failIfExhausted(); }
-      else if (remote !== null) headStart = setTimeout(() => { headStart = null; if (!settled && current()) startRemote(); }, LOCAL_HEAD_START_MS);
+      else if (remote !== null || tunnel !== null) headStart = setTimeout(() => { headStart = null; if (!settled && current()) startRemote(); }, LOCAL_HEAD_START_MS);
     });
     const work = async () => {
       // A route that was working gets a second pass, inside this same recovery, so the read that

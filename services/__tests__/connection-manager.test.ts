@@ -380,3 +380,44 @@ it('says which route failed when nothing answers', async () => {
   manager.environment(false, false);
   info.mockRestore();
 });
+
+describe('the Pond\'s public tunnel', () => {
+  const tunnelUrl = 'https://2.tcp.eu.ngrok.io:22333';
+  const tunnelOnly: ConnectionProfile = { version: 2, host: 'pond.local', port: 4443,
+    localUrls: ['https://192.168.1.2:4443'], tunnelUrl, remoteAccess: { mode: 'local' } };
+
+  it('reaches the Pond through its tunnel away from home, under the same pin', async () => {
+    const { deps, manager } = fixture();
+    await manager.configure(tunnelOnly, pin);
+    expect(deps.trust).toHaveBeenCalledWith([...tunnelOnly.localUrls, tunnelUrl], pin);
+    manager.environment(true, true); await manager.recover();
+    expect(manager.current).toEqual({ state: 'remote', url: tunnelUrl });
+    manager.environment(false, false);
+  });
+
+  it('does not wait for the tailnet node when the tunnel answers', async () => {
+    const remoteReady = jest.fn(async () => false);
+    const deps = { probe: jest.fn(async (url: string) => url === tunnelUrl), discover: jest.fn(async () => null),
+      trust: jest.fn(async () => undefined), changed: jest.fn(), remoteReady };
+    const manager = new ConnectionManager(deps);
+    await manager.configure({ ...profile, tunnelUrl }, pin);
+    manager.environment(true, true); await manager.recover();
+    expect(manager.current).toEqual({ state: 'remote', url: tunnelUrl });
+    manager.environment(false, false);
+  });
+
+  it('keeps a remembered tunnel route only while the profile still names it', async () => {
+    const routes = new Map();
+    const make = () => new ConnectionManager({ probe: jest.fn(async () => true), discover: jest.fn(async () => null),
+      trust: jest.fn(async () => undefined), changed: jest.fn(), routes });
+    const first = make();
+    await first.configure(tunnelOnly, pin); first.environment(true, true); await first.recover();
+    first.environment(false, false);
+    const second = make();
+    await second.configure(tunnelOnly, pin);
+    expect(second.current).toEqual({ state: 'remote', url: tunnelUrl });
+    const third = make();
+    await third.configure({ ...tunnelOnly, tunnelUrl: undefined }, pin);
+    expect(third.current.state).toBe('reconnecting');
+  });
+});

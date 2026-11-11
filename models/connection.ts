@@ -7,6 +7,11 @@ export interface ConnectionProfile {
   port: number;
   localUrls: string[];
   remoteUrl?: string;
+  /**
+   * The Pond's public tunnel (the household's own ngrok), learned from an authenticated
+   * `/system/info` while home. Reached directly under the same pin; no embedded node.
+   */
+  tunnelUrl?: string;
   /** Missing on older profiles means local only until explicit activation. */
   remoteAccess?: { mode: 'local' } | { mode: 'embedded'; controlUrl: string };
 }
@@ -293,8 +298,47 @@ export function parseConnectionProfile(raw: unknown): ConnectionProfile | null {
         ? { mode: 'embedded' as const, controlUrl: normalizeHttpsUrl(remote.controlUrl) }
         : { mode: 'local' as const } } : {}),
       ...(p.remoteUrl ? { remoteUrl: normalizeHttpsUrl(p.remoteUrl) } : {}),
+      ...(p.tunnelUrl ? { tunnelUrl: tunnelOrigin(p.tunnelUrl) } : {}),
     };
   } catch { return null; }
+}
+
+/** Every saved way to reach the Pond from away: the tailnet address once enabled, and the tunnel. */
+export function remoteRoutes(profile: ConnectionProfile): string[] {
+  return [
+    ...(profile.remoteAccess?.mode === 'embedded' && profile.remoteUrl ? [profile.remoteUrl] : []),
+    ...(profile.tunnelUrl ? [profile.tunnelUrl] : []),
+  ];
+}
+
+/**
+ * The HTTPS origin of a Pond's public tunnel, from `host:port` or an origin. Refuses an address
+ * literal and anything this phone would treat as its own network: a tunnel is never a LAN route.
+ */
+export function tunnelOrigin(raw: string): string {
+  const origin = normalizeHttpsUrl(/^https:\/\//i.test(raw) ? raw : `https://${raw}`);
+  const host = new URL(origin).hostname;
+  if (/^[\d.]+$/.test(host) || host.includes(':') || host.startsWith('[') || isLocalPairingUrl(origin)) {
+    throw new Error('Invalid Pond tunnel origin');
+  }
+  return origin;
+}
+
+/**
+ * What the saved tunnel becomes once the Pond, asked while home, reports `reported`: `null`
+ * when nothing changes. A Pond too old to report the field (`undefined`) leaves it alone; one
+ * reporting `null` has no tunnel running, so the saved one is dropped. An address this phone
+ * cannot use is ignored rather than saved.
+ */
+export function tunnelChange(saved: string | undefined, reported: string | null | undefined): { tunnelUrl: string | undefined } | null {
+  if (reported === undefined) return null;
+  if (reported === null) return saved ? { tunnelUrl: undefined } : null;
+  let next: string;
+  try { next = tunnelOrigin(reported); } catch {
+    console.warn('[connection] Pond reported an unusable tunnel address:', JSON.stringify(reported).slice(0, 120));
+    return null;
+  }
+  return next === saved ? null : { tunnelUrl: next };
 }
 
 /** The phone rejects known remote addresses; the server checks the actual source subnet. */

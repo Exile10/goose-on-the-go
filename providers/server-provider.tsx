@@ -18,7 +18,7 @@ import { ConnectionManager, type ConnectionSnapshot } from '@/services/connectio
 import { PondTrustError } from '@/services/pond-trust';
 import { probePond as probe, trustPond as trust } from '@/services/pond-session';
 import { findPondAt, findPondByHost } from '@/services/discovery';
-import { parseConnectionProfile, validPin, isInsecureDevOrigin, isLocalPairingUrl, type ConnectionOutage, type ConnectionProfile } from '@/models/connection';
+import { parseConnectionProfile, tunnelChange, validPin, isInsecureDevOrigin, isLocalPairingUrl, type ConnectionOutage, type ConnectionProfile } from '@/models/connection';
 import i18n from '@/services/i18n';
 import { stayConnectedEnabled } from '@/services/background-connection';
 import { cancelRemoteAccess, pauseRemoteAccess, remoteNodeRunning, restoreRemoteAccess, resumeRemoteAccess } from '@/services/remote-access';
@@ -661,6 +661,44 @@ export function ServerProvider({ children }: PropsWithChildren) {
     committing.current = commit;
     try { await commit; } finally { if (committing.current === commit) committing.current = null; }
   }, [manager, restore]);
+  /**
+   * Save or drop the Pond's tunnel address, learned while home. Serialised with the other
+   * profile writes; the manager is re-pointed only after the new profile is durable.
+   */
+  const learnTunnel = useCallback(async (tunnelUrl: string | undefined) => {
+    await committing.current?.catch(() => undefined);
+    const current = saved.current;
+    if (!current || staged.current) return;
+    const base: ConnectionProfile = { ...current.profile };
+    delete base.tunnelUrl;
+    const profile = parseConnectionProfile({ ...base, ...(tunnelUrl ? { tunnelUrl } : {}) });
+    if (!profile) return;
+    const commit = (async () => {
+      saved.current = await commitPairedProfile(current, { identity: current.identity, profile });
+      await manager.configure(profile, current.identity.pin);
+      manager.environment(environment.current.cellular, environment.current.active);
+    })();
+    committing.current = commit;
+    try {
+      await commit;
+      console.info('[connection] tunnel address', { kind: tunnelUrl ? 'tunnel_learned' : 'tunnel_dropped' });
+    } catch (error) {
+      console.warn('[connection] could not save the tunnel address; asking again on the next home connection', error);
+    } finally { if (committing.current === commit) committing.current = null; }
+  }, [manager]);
+  // The tunnel's address is only given with a valid token, and it changes each time the Pond
+  // restarts its tunnel, so the phone asks every time it reaches the Pond at home.
+  useEffect(() => {
+    if (snapshot.state !== 'local' || !identity) return;
+    let live = true;
+    void api.systemInfo().then((info) => {
+      const current = saved.current;
+      if (!live || !current || staged.current) return;
+      const change = tunnelChange(current.profile.tunnelUrl, info.tunnel_address);
+      if (change) void learnTunnel(change.tunnelUrl);
+    }).catch(() => { /* Asked again on the next home connection. */ });
+    return () => { live = false; };
+  }, [snapshot.state, snapshot.url, identity, learnTunnel]);
   const setRemoteEndpoint = useCallback((url: string, control: string, check: () => void) =>
     updateRemoteProfile(url, control, check), [updateRemoteProfile]);
   const keepLocalOnly = useCallback(async () => {
