@@ -6,7 +6,7 @@
  * in a list and the large picture in the sheet are one read between them.
  */
 
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import { Image } from 'expo-image';
 import { useInkTheme } from '@jarida/ink/native';
@@ -33,6 +33,8 @@ export interface PondPictureProps {
 /** Shapes of pictures already drawn, so a frame drawn again starts right instead of jumping. */
 const RATIOS = new Map<string, number>();
 const MAX_RATIOS = 256;
+/** Below this relative change a picture's shape is the same shape. */
+const RATIO_TOLERANCE = 0.01;
 
 /** A picture's width over its height, `fallback` until it has loaded once. */
 export function usePictureRatio(path: string | null, fallback: number) {
@@ -41,6 +43,10 @@ export function usePictureRatio(path: string | null, fallback: number) {
     ({ width, height }: { width: number; height: number }) => {
       if (!path || width <= 0 || height <= 0) return;
       const next = width / height;
+      // A picture decoded again at its frame's new size reports a ratio a hair off the last one;
+      // taking it would resize the frame, decode again, and never settle.
+      const known = RATIOS.get(path);
+      if (known !== undefined && Math.abs(known - next) / known < RATIO_TOLERANCE) return;
       if (RATIOS.size >= MAX_RATIOS && !RATIOS.has(path)) {
         const oldest = RATIOS.keys().next().value;
         if (oldest !== undefined) RATIOS.delete(oldest);
@@ -64,14 +70,16 @@ export const PondPicture = React.memo(function PondPicture({
 }: PondPictureProps) {
   const theme = useInkTheme();
   const { uri, failed } = usePondImage(path, version);
+  // One source object per picture: a new one on every render makes the image view load it again.
+  const source = useMemo(() => (uri ? { uri } : null), [uri]);
   const standIn = path === null || failed;
   const icon: IconName = path === null ? 'camera' : 'eye-off';
 
   return (
     <View style={[{ backgroundColor: theme.color.line, overflow: 'hidden' }, style]}>
-      {uri ? (
+      {source ? (
         <Image
-          source={{ uri }}
+          source={source}
           style={StyleSheet.absoluteFill}
           contentFit={contentFit}
           transition={120}
