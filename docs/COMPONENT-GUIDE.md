@@ -291,7 +291,7 @@ offline and empty" in [VIEW-LAYER.md](./VIEW-LAYER.md).
 | VoiceOrb | state, level, size, onPress, accessibilityLabel | The voice control, and the face Goose talks with |
 | Goose | state, size, water | The Pond's bird, afloat |
 | ChromePuck, ChromePill | icon / label, onPress | One control floating over content: opaque `chrome`, not the bar's glass |
-| PondPicture | path, version, label, contentFit | A picture the Pond serves, read over the pinned transport and kept (`services/pond-images.ts`); a stand-in for one that was never kept or would not load |
+| PondPicture | path, version, label, contentFit | A picture the Pond serves, read over the pinned transport and kept (`services/pond-images.ts`); a stand-in for one that was never kept or would not load. It hands the image view one source per picture, and `usePictureRatio` ignores a change under 1%: a new source, or a frame resized by a hair, makes the image view load the picture again, and the two together looped until Android refused to draw it |
 | CameraFrameView | frame, state, sentence, camera | The pond camera's latest frame in a fixed 16:9 box with what the camera is doing as a badge, and a stand-in when there is none |
 | VisionEventRow, VisionEventSheet | event, nameOf, onOpen / event, onAcknowledge, onCreateRule | One event as a flat row between hairlines, and in full: large picture, every measure, Acknowledge, and the automation form prefilled |
 | FaceSheet | person, defaultThreshold, onChanged, onForget, onStrictness | One household member's face: samples at the pond's camera or from a photo, strictness, forget |
