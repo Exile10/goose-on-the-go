@@ -97,7 +97,7 @@ export default function GooseTodosScreen() {
             <View>
               {upcoming.map((todo, i) => (
                 <View key={todo.id} style={divided(i)}>
-                  <TodoRow todo={todo} sources={todos.sources} access={todos.access} onToggle={() => void todos.actions.setDone(todo, true)} onNeedsLocation={() => setSheet(true)} />
+                  <TodoRow todo={todo} sources={todos.sources} access={todos.access} onToggle={() => todos.actions.setDone(todo, true)} onNeedsLocation={() => setSheet(true)} />
                 </View>
               ))}
             </View>
@@ -119,7 +119,7 @@ export default function GooseTodosScreen() {
         <View>
           {done.map((todo, i) => (
             <View key={todo.id} style={divided(i)}>
-              <TodoRow todo={todo} sources={todos.sources} access={todos.access} onToggle={() => void todos.actions.setDone(todo, false)} />
+              <TodoRow todo={todo} sources={todos.sources} access={todos.access} onToggle={() => todos.actions.setDone(todo, false)} />
             </View>
           ))}
         </View>

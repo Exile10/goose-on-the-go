@@ -352,7 +352,7 @@ function Todos({ g, onNeedsLocation }: { g: UseMyGooseHub; onNeedsLocation: () =
         <View>
           {upcoming.slice(0, SHOWN_TODOS).map((todo, i) => (
             <View key={todo.id} style={i > 0 ? [styles.divided, { borderTopColor: theme.color.line }] : null}>
-              <TodoRow todo={todo} sources={g.todos.sources} access={g.todos.access} onToggle={() => void g.todos.actions.setDone(todo, true)} onNeedsLocation={onNeedsLocation} />
+              <TodoRow todo={todo} sources={g.todos.sources} access={g.todos.access} onToggle={() => g.todos.actions.setDone(todo, true)} onNeedsLocation={onNeedsLocation} />
             </View>
           ))}
           {upcoming.length > SHOWN_TODOS ? <MoreLink label={t('goose.todos.more', { count: upcoming.length - SHOWN_TODOS })} onPress={() => router.push('/(stack)/goose-todos')} /> : null}
