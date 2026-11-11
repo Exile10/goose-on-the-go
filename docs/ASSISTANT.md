@@ -53,6 +53,15 @@ The choose button opens `Settings.ACTION_VOICE_INPUT_SETTINGS`, falling back to
 `RoleManager.createRequestRoleIntent(ROLE_ASSISTANT)`: the assistant role is not requestable, so
 that intent returns `RESULT_CANCELED` without showing anything.
 
+## When the connection drops
+
+The overlay and voice mode share `view-models/use-voice.ts`. When a recording gets no answer at
+all, as when Wi-Fi goes off mid-question or a hand-over to mobile data has not finished, the panel
+says the connection dropped and keeps the recording. Try again asks the connection manager to
+check every route at once (`retryNow`) and, once one answers, sends that same recording, so nothing
+is said twice; while none answers it says so and keeps it. A Pond that answered and could not make
+the speech out still says so, and a tap listens again.
+
 ## What Android does not allow
 
 - **No always-on "Hey Goose" through this role.** The platform's hotword path
