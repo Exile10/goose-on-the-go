@@ -27,7 +27,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { VoiceState } from '@/models/voice';
-import { useServer } from '@/providers/server-provider';
+import { useOptionalServer } from '@/providers/server-provider';
 import { api } from '@/services/api-client';
 import { bytesToBase64, type Attachment } from '@/services/media';
 import {
@@ -167,8 +167,9 @@ export function useVoice(chat: {
   }, [chat.send, chat.stop]);
 
   // A recording the Pond never received because nothing answered: Try again sends it once a
-  // route answers, rather than asking the person to say it again.
-  const { retryNow } = useServer();
+  // route answers, rather than asking the person to say it again. The assistant overlay has no
+  // connection manager; there Try again sends it straight away.
+  const retryNow = useOptionalServer()?.retryNow;
   const retryRef = useRef(retryNow);
   useEffect(() => {
     retryRef.current = retryNow;
@@ -477,7 +478,7 @@ export function useVoice(chat: {
     if (!pending) return;
     setError(null);
     setState('thinking');
-    const route = await retryRef.current();
+    const route = retryRef.current ? await retryRef.current() : 'unchecked';
     if (!alive.current) return;
     if (!route) {
       setError(t('chat.voice.stillUnreachable'));

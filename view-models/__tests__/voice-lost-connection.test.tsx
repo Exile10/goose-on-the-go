@@ -18,7 +18,9 @@ jest.mock('@/services/api-client', () => {
   const actual = jest.requireActual('@/services/api-client');
   return { ...actual, api: { transcribe: (...a: unknown[]) => mockTranscribe(...a), speak: jest.fn() } };
 });
-jest.mock('@/providers/server-provider', () => ({ useServer: () => ({ retryNow: () => mockRetryNow() }) }));
+/** The app's server context, or null as in the assistant overlay, which renders outside it. */
+let mockServer: { retryNow: () => Promise<string | null> } | null = { retryNow: () => mockRetryNow() };
+jest.mock('@/providers/server-provider', () => ({ useOptionalServer: () => mockServer }));
 jest.mock('@/services/voice-io', () => ({
   requestMicrophone: async () => ({ granted: true, canAskAgain: true }),
   beginVoiceSession: async () => undefined,
@@ -59,6 +61,7 @@ async function sayAndFinish() {
 
 beforeEach(async () => {
   jest.clearAllMocks();
+  mockServer = { retryNow: () => mockRetryNow() };
   jest.spyOn(console, 'warn').mockImplementation(() => undefined);
   act(() => {
     create(<Harness />);
@@ -105,5 +108,22 @@ describe('a recording nobody received', () => {
     await flush();
     expect(mockRetryNow).not.toHaveBeenCalled();
     expect(voice.data.state).toBe('wait');
+  });
+
+  it('works in the assistant overlay, which has no server context, and resends straight away', async () => {
+    mockServer = null;
+    act(() => {
+      create(<Harness />);
+    });
+    await flush();
+    mockTranscribe.mockRejectedValueOnce(new TypeError('Network request failed')).mockResolvedValueOnce('hello again');
+    await sayAndFinish();
+    expect(voice.data.error).toMatch(/connection to your Pond dropped/);
+
+    act(() => voice.actions.tap());
+    await flush();
+    await flush();
+    expect(mockRetryNow).not.toHaveBeenCalled();
+    expect(send).toHaveBeenCalledWith('hello again', [], expect.objectContaining({ voice: true }));
   });
 });

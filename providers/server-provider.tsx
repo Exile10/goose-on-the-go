@@ -684,3 +684,11 @@ export function useServer(): ServerContextValue {
   if (!context) throw new Error('useServer must be used within a ServerProvider');
   return context;
 }
+
+/**
+ * The server context where there is one. The assistant overlay renders its own root, outside the
+ * app's ServerProvider, so a hook it shares with the app must not require one.
+ */
+export function useOptionalServer(): ServerContextValue | null {
+  return useContext(ServerContext);
+}
