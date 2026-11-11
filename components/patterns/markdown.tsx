@@ -28,10 +28,11 @@ interface Span {
 }
 
 /**
- * How large the text is set: a reply's body (`md`), a card's title, or quieter lines in Ink's own
- * `base`, `sm` and `xs`. Below `md`, headings shrink with it: a card has no room for a reply's.
+ * How large the text is set: a reply's body (`md`), the story reader's large text (`lg`), a card's
+ * title, or quieter lines in Ink's own `base`, `sm` and `xs`. Below `md`, headings shrink with it:
+ * a card has no room for a reply's.
  */
-export type MarkdownSize = 'md' | 'title' | 'base' | 'sm' | 'xs';
+export type MarkdownSize = 'lg' | 'md' | 'title' | 'base' | 'sm' | 'xs';
 
 /** Where a block sits: a quote recolours what it holds, and a nested list changes its bullet. */
 interface Place {
@@ -164,7 +165,8 @@ function bodySpec(place: Place): InkTextSpec {
   if (place.size === 'title') {
     return { role: 'display', size: 'lg', weight: theme.weight.bold, tracking: 'snug', leading: 'snug', color: tone };
   }
-  return { size: place.size, leading: 'base', color: tone };
+  // The reader's large text is for reading at length, so it takes the loose leading.
+  return { size: place.size, leading: place.size === 'lg' ? 'loose' : 'base', color: tone };
 }
 
 function bodySpan(place: Place): Span {
@@ -186,7 +188,7 @@ function paragraph(tokens: Token[] | undefined, text: string, place: Place, key:
 function heading(token: Tokens.Heading, place: Place, key: number) {
   const { theme, tone } = place;
   const spec: InkTextSpec =
-    place.size !== 'md'
+    place.size !== 'md' && place.size !== 'lg'
       ? { ...bodySpec(place), weight: token.depth <= 3 ? theme.weight.bold : theme.weight.semibold, leading: 'snug' }
       : token.depth === 1
       ? { role: 'display', size: 'xl', weight: theme.weight.bold, tracking: 'title', leading: 'snug', color: tone }
@@ -379,7 +381,7 @@ export const Markdown = React.memo(function Markdown({
   const color =
     tone === 'secondary' ? theme.color.textSecondary : tone === 'tertiary' ? theme.color.textTertiary : theme.color.text;
   return (
-    <View style={size === 'md' ? styles.page : styles.compact}>
+    <View style={size === 'md' || size === 'lg' ? styles.page : styles.compact}>
       {blocks(tokens, { theme, tone: color, depth: 0, size, selectable, sources })}
     </View>
   );
