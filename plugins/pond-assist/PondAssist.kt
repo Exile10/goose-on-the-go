@@ -71,6 +71,17 @@ class GooseInteractionService : VoiceInteractionService() {
       Log.i(TAG, "assist session requested by the wake word")
       return true
     }
+
+    /**
+     * Whether this app holds the assistant role, or null below Android 10, where there is no
+     * role to ask about. Not the same as [showOverlay] working: Android binds the service a
+     * moment after the app's process starts, and may unbind it briefly, while the role stays put.
+     */
+    fun holdsRole(context: Context): Boolean? {
+      if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return null
+      val roles = context.getSystemService(RoleManager::class.java)
+      return roles.isRoleAvailable(RoleManager.ROLE_ASSISTANT) && roles.isRoleHeld(RoleManager.ROLE_ASSISTANT)
+    }
   }
 }
 
@@ -236,8 +247,7 @@ class PondAssistModule(context: ReactApplicationContext) : ReactContextBaseJavaM
       return
     }
     try {
-      val roles = reactApplicationContext.getSystemService(RoleManager::class.java)
-      promise.resolve(roles.isRoleAvailable(RoleManager.ROLE_ASSISTANT) && roles.isRoleHeld(RoleManager.ROLE_ASSISTANT))
+      promise.resolve(GooseInteractionService.holdsRole(reactApplicationContext))
     } catch (error: Exception) {
       promise.reject("E_ASSIST_ROLE", error.javaClass.simpleName, error)
     }

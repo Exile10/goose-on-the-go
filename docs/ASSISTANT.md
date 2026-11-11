@@ -62,6 +62,13 @@ that intent returns `RESULT_CANCELED` without showing anything.
 With Goose as the assistant, Settings, Voice, **On this phone**, **Listen for "Hey Goose"** lets the
 phone listen for the phrase itself and open the same voice orb as the side key.
 
+It opens the orb through the assistant service Android binds while Goose holds the role. That
+service can be unbound for a moment, as just after the app's process starts, while the role stays
+with Goose: a wake then waits a second for it and, if it is still not there, is missed and
+listening carries on. Only when another app holds the assistant role does the phone stop
+listening and switch the setting off, saying "Goose stopped listening because it is no longer
+this phone's assistant".
+
 - **What listens.** `GooseWakeService` (`plugins/pond-wake/PondWake.kt`), a foreground service of
   type microphone, built on the Pond's own ear: the `pond-ear` crate, built for Android by
   `scripts/build-embedded-ear.sh` from the Pond checkout beside this repository (`native/pondear`,

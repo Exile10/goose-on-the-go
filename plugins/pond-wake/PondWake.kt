@@ -624,9 +624,28 @@ class GooseWakeService : Service() {
    * through the assistant. The overlay counts as an app screen while it shows, so listening
    * resumes when it closes; the check after [OVERLAY_MS] resumes it if the overlay never came.
    */
-  private fun heard() {
+  private fun heard(retried: Boolean = false) {
     if (GooseInteractionService.showOverlay()) {
       main.postDelayed({ update("after the overlay was asked for") }, OVERLAY_MS)
+      return
+    }
+    // The service is unbound, but that alone is not the role gone: Android binds it a moment
+    // after the process starts and may unbind it briefly. Only a role held elsewhere switches
+    // listening off; otherwise try once more, then keep listening.
+    val role = try {
+      GooseInteractionService.holdsRole(this)
+    } catch (error: Exception) {
+      Log.w(TAG, "kind=wake_role_unreadable error=${error.javaClass.simpleName}")
+      null
+    }
+    if (role != false) {
+      if (!retried) {
+        Log.i(TAG, "kind=wake_overlay_waiting reason=assistant_not_bound role=$role")
+        main.postDelayed({ heard(retried = true) }, BIND_WAIT_MS)
+      } else {
+        Log.w(TAG, "kind=wake_overlay_missed reason=assistant_not_bound role=$role: listening resumes")
+        update("the assistant service was not bound")
+      }
       return
     }
     Log.w(TAG, "kind=wake_refused reason=$REFUSED_NOT_ASSISTANT: Goose is not the phone's assistant now")
@@ -658,6 +677,8 @@ class GooseWakeService : Service() {
     private const val JOIN_MS = 500L
     private const val RETRY_MS = 5_000L
     private const val OVERLAY_MS = 3_000L
+    /** How long a wake waits once for Android to bind the assistant service before it is missed. */
+    private const val BIND_WAIT_MS = 1_000L
     private const val KEY_MODE = "mode"
     /** Segments waiting for the app to send them; more are dropped until one is answered. */
     private const val MAX_PENDING = 2
