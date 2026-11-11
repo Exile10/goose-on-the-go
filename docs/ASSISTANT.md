@@ -77,6 +77,11 @@ phone listen for the phrase itself and open the same voice orb as the side key.
     app's cache until it is sent, at most two at once, and is deleted when answered or after
     30 s. This needs the Pond reachable; the settings row says that speech near the phone goes
     to the Pond.
+- **Teaching, one sentence at a time.** On the teach flow's done screen, each sentence the Pond's
+  detector missed has **Say it again**: it records just that sentence and sends it with `replaces`
+  (the missed take's `take_id`), so the Pond counts it in place of the miss and the run stays five
+  takes. Within 15 minutes of the run only; after that the Pond answers `retake_not_found` and the
+  screen says to teach all five again.
 - **Whose voice.** Once anyone teaches Goose their voice on this phone (the teach flow, with
   Recognise my voice on), only the voices taught here can wake it. Each take the Pond accepts is
   also kept on the phone (`enrolPhoneTake`, `services/phone-wake-voices.ts`) as its "hey goose"
@@ -102,9 +107,9 @@ phone listen for the phrase itself and open the same voice orb as the side key.
 - **The wake test** (Settings, under the switch: **Test the wake word**, `app/(stack)/wake-test.tsx`).
   The phrase ten times, then a minute of talk, each recorded and run through the same pipeline
   (`testWake` in `PondWake.kt`), listening at 0.5 so near misses show. It reports how many of the
-  ten woke the phone and how often the talk did, with why the rest did not, and offers the line
-  the phrase suggests (0.8 of its weakest peak in a taught voice; at least three needed), which
-  the service then uses until it is reset or the last voice is forgotten. The recordings are
+  ten woke the phone and how often the talk did, with why the rest did not. A switch, **Tuned to
+  this test**, makes the service listen at the line the phrase suggests (0.8 of its weakest peak
+  in a taught voice; at least three needed) until it is turned off or the last voice is forgotten. The recordings are
   deleted once scored; candidates the phone would ask the Pond about are sent to the Pond.
 - **When the phrase changes.** The app hands the service the phrase from the Pond's settings,
   which it re-reads while open (`PhoneWakeSync` in `app/_layout.tsx`), and every answer to a

@@ -17,6 +17,8 @@ import { InkButton, InkCard, InkNotice, InkSpinner, InkText, InkTitle } from '@j
 import type { ThemeColors } from '@/constants/colors';
 import { Spacing } from '@/constants/spacing';
 import { useThemedStyles } from '@/hooks/use-themed-styles';
+import { SwitchRow } from '@/components/settings/setting-controls';
+import { SettingsGroup } from '@/components/settings/settings-list';
 import { PHRASE_TIMES } from '@/models/wake-test';
 import { CNN_PHRASE } from '@/services/phone-wake';
 import { useWakeTest } from '@/view-models/use-wake-test';
@@ -84,13 +86,25 @@ export default function WakeTestScreen() {
             {vm.result.phrase.pondRefused > 0 ? (
               <InkText tone="secondary">{t('wakeTest.result.pondRefused', { count: vm.result.phrase.pondRefused })}</InkText>
             ) : null}
-            {vm.result.line !== null && !vm.kept ? (
-              <InkNotice tone="neutral">
-                {t(vm.result.line < vm.result.cnn ? 'wakeTest.result.lower' : 'wakeTest.result.higher')}
-              </InkNotice>
-            ) : null}
-            {vm.kept ? <InkNotice tone="success">{t('wakeTest.result.kept')}</InkNotice> : null}
           </View>
+        ) : null}
+
+        {vm.phase === 'done' && vm.voices && (vm.result?.line != null || vm.voices.chosen) ? (
+          <SettingsGroup footer={t('wakeTest.line.footer')}>
+            <SwitchRow
+              label={t('wakeTest.line.label')}
+              description={
+                vm.voices.chosen
+                  ? t('wakeTest.line.on')
+                  : vm.result?.line != null && vm.result.line < vm.result.cnn
+                    ? t('wakeTest.line.offLower')
+                    : t('wakeTest.line.offHigher')
+              }
+              value={vm.voices.chosen}
+              disabled={vm.saving || (!vm.voices.chosen && vm.result?.line == null)}
+              onChange={(on) => void vm.actions.chooseTestLine(on)}
+            />
+          </SettingsGroup>
         ) : null}
 
         {vm.error ? <InkNotice tone="warning">{vm.error}</InkNotice> : null}
@@ -108,21 +122,9 @@ export default function WakeTestScreen() {
           </InkButton>
         ) : null}
         {vm.phase === 'done' ? (
-          <>
-            {vm.result?.line !== null && !vm.kept ? (
-              <InkButton variant="primary" block onPress={() => void vm.actions.keepLine()}>
-                {t('wakeTest.result.keep')}
-              </InkButton>
-            ) : null}
-            {vm.voices?.chosen ? (
-              <InkButton variant="quiet" block onPress={() => void vm.actions.resetLine()}>
-                {t('wakeTest.result.reset')}
-              </InkButton>
-            ) : null}
-            <InkButton variant="quiet" block onPress={vm.actions.again}>
-              {t('wakeTest.again')}
-            </InkButton>
-          </>
+          <InkButton variant="quiet" block onPress={vm.actions.again}>
+            {t('wakeTest.again')}
+          </InkButton>
         ) : null}
       </View>
     </SafeAreaView>

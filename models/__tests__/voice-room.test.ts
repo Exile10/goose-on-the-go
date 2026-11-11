@@ -275,6 +275,7 @@ describe('teaching Goose a voice', () => {
 
   it('reads a take, and refuses a body without the detector verdict', () => {
     const take = {
+      take_id: 'take-2',
       take: 2,
       of: 5,
       wake: { heard: true, heard_as: 'hey goose', new_detector: true },
@@ -283,6 +284,8 @@ describe('teaching Goose a voice', () => {
     };
     expect(readVoiceTake(take)).toEqual(take);
     expect(readVoiceTake({ ...take, voice_match: null })?.voice_match).toBeNull();
+    // An older Pond names no take, so its missed sentences cannot be said again on their own.
+    expect(readVoiceTake({ ...take, take_id: undefined })?.take_id).toBeNull();
     expect(readVoiceTake({ ...take, wake: { heard: false, heard_as: null } })?.wake.new_detector).toBe(false);
     expect(readVoiceTake({ ...take, wake_detector: undefined })).toBeNull();
   });

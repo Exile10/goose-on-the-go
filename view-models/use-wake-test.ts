@@ -47,14 +47,14 @@ export interface UseWakeTest {
   left: number;
   result: WakeTestResult | null;
   error: string | null;
-  /** Whether the suggested line was kept. */
-  kept: boolean;
+  /** A change of sensitivity is being saved. */
+  saving: boolean;
   actions: {
     start: () => Promise<void>;
     /** The phrase part is done: on to the talking part. */
     next: () => void;
-    keepLine: () => Promise<void>;
-    resetLine: () => Promise<void>;
+    /** Listen at the sensitivity this test found (on), or the one from the recorded sentences (off). */
+    chooseTestLine: (on: boolean) => Promise<void>;
     again: () => void;
   };
 }
@@ -65,7 +65,7 @@ export function useWakeTest(): UseWakeTest {
   const [left, setLeft] = useState(TALK_MS);
   const [result, setResult] = useState<WakeTestResult | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [kept, setKept] = useState(false);
+  const [saving, setSaving] = useState(false);
   const phaseRef = useRef<WakeTestPhase>('intro');
   const rec = useRef({ chunks: [] as Int16Array[], rate: SPEECH_RATE, since: 0 });
   const recordings = useRef<{ phrase: string | null; talk: string | null }>({ phrase: null, talk: null });
@@ -174,7 +174,6 @@ export function useWakeTest(): UseWakeTest {
   const start = useCallback(async () => {
     setError(null);
     setResult(null);
-    setKept(false);
     const permission = await requestMicrophone();
     if (!permission.granted) {
       fail(i18n.t(permission.canAskAgain ? 'chat.voice.micDenied' : 'chat.voice.micBlocked'));
@@ -197,21 +196,24 @@ export function useWakeTest(): UseWakeTest {
     setPhase('talk');
   }, [cut, setPhase]);
 
-  const keepLine = useCallback(async () => {
-    if (!result?.line) return;
-    if (await chooseWakeLine(result.line)) setKept(true);
-    else setError(i18n.t('wakeTest.keepFailed'));
-    await reload();
-  }, [reload, result]);
-
-  const resetLine = useCallback(async () => {
-    if (!(await chooseWakeLine(null))) setError(i18n.t('wakeTest.keepFailed'));
-    await reload();
-  }, [reload]);
+  const chooseTestLine = useCallback(
+    async (on: boolean) => {
+      const line = on ? (result?.line ?? null) : null;
+      if (on && line === null) return;
+      setError(null);
+      setSaving(true);
+      try {
+        if (!(await chooseWakeLine(line))) setError(i18n.t('wakeTest.keepFailed'));
+        await reload();
+      } finally {
+        if (alive.current) setSaving(false);
+      }
+    },
+    [reload, result],
+  );
 
   const again = useCallback(() => {
     setResult(null);
-    setKept(false);
     setError(null);
     setPhase('intro');
   }, [setPhase]);
@@ -228,5 +230,5 @@ export function useWakeTest(): UseWakeTest {
     [],
   );
 
-  return { phase, voices, left, result, error, kept, actions: { start, next, keepLine, resetLine, again } };
+  return { phase, voices, left, result, error, saving, actions: { start, next, chooseTestLine, again } };
 }

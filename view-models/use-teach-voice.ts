@@ -42,6 +42,8 @@ export interface TeachMember {
 export interface TeachResult {
   prompt: string;
   detector: boolean;
+  /** The Pond's id for the take, which saying a missed sentence again replaces; null from an older Pond. */
+  takeId: string | null;
 }
 
 export interface UseTeachVoice {
@@ -60,6 +62,10 @@ export interface UseTeachVoice {
   said: string | null;
   /** Takes accepted in this run, so leaving asks first once there is one. */
   recorded: number;
+  /** On the done screen: the missed sentence being said again, by its place in `results`. */
+  retaking: number | null;
+  /** Why saying a sentence again stopped, in plain words, or null. */
+  retakeError: string | null;
   voiceMatch: {
     on: boolean;
     /** A print needs a person, and a Pond with Voice Match. */
@@ -80,6 +86,10 @@ export interface UseTeachVoice {
     start: () => Promise<void>;
     /** After silence or a failure: the same sentence again. */
     retry: () => Promise<void>;
+    /** On the done screen: say one missed sentence again, in place of its take. */
+    retake: (index: number) => Promise<void>;
+    /** Back to the done screen without saying it again. */
+    cancelRetake: () => void;
     stop: () => void;
     retryModel: () => Promise<void>;
   };
@@ -95,6 +105,8 @@ function refusalCode(e: unknown): string | null {
 /** A refused take in plain words, or null for a failure that ends the run. */
 export function refusalWords(e: unknown, phrase: string): string | null {
   if (!(e instanceof ApiError) || e.status !== 422) return null;
+  // The run it belonged to has ended: saying it again cannot count, which ends the retake.
+  if (refusalCode(e) === 'retake_not_found') return null;
   if (refusalCode(e) === 'no_wake_phrase') {
     const heardAs = (e.body as { heard_as?: unknown } | null)?.heard_as;
     const opening = teachSentences(phrase)[0].split(',')[0];
@@ -109,6 +121,7 @@ export function refusalWords(e: unknown, phrase: string): string | null {
 export function describeTeachError(e: unknown): string {
   if (e instanceof ApiError) {
     if (e.status === 409 || refusalCode(e) === 'model_not_ready') return i18n.t('teachVoice.error.modelNotReady');
+    if (refusalCode(e) === 'retake_not_found') return i18n.t('teachVoice.error.retakeTooLate');
     if (e.status === 404) return i18n.t('teachVoice.error.missing');
     if (e.status === 403) return i18n.t('teachVoice.error.notAllowed');
   }
@@ -133,10 +146,12 @@ export function useTeachVoice({ member, phrase }: { member: TeachMember | null; 
 
   const available = member !== null && !prints.missing;
   const matchOn = wantMatch && available;
-  const run = useRef({ index: 0, matchOn, sentences });
+  const run = useRef({ index: 0, matchOn, sentences, retaking: null as number | null, results: [] as TeachResult[] });
+  const [retaking, setRetaking] = useState<number | null>(null);
   useEffect(() => {
     run.current.matchOn = matchOn;
     run.current.sentences = sentences;
+    run.current.results = results;
   });
 
   // Every sentence starts with the wake phrase, so the room would answer each one: it is asked not to
@@ -181,10 +196,18 @@ export function useTeachVoice({ member, phrase }: { member: TeachMember | null; 
     describe: describeTeachError,
     take: async (uri) => {
       const r = run.current;
-      const prompt = r.sentences[r.index] ?? r.sentences[0];
+      const again = r.retaking;
+      const missed = again === null ? null : r.results[again];
+      const prompt = missed?.prompt ?? r.sentences[r.index] ?? r.sentences[0];
       let result: VoiceTakeResult;
       try {
-        result = await source.take({ fileUri: uri, prompt, profileId: member?.id ?? null, voiceMatch: r.matchOn });
+        result = await source.take({
+          fileUri: uri,
+          prompt,
+          profileId: member?.id ?? null,
+          voiceMatch: r.matchOn,
+          replaces: missed?.takeId ?? null,
+        });
       } catch (e) {
         const words = refusalWords(e, phrase);
         if (!words) throw e;
@@ -195,11 +218,23 @@ export function useTeachVoice({ member, phrase }: { member: TeachMember | null; 
       // This phone's wake word listens only for the voices taught on it; the take's voice is kept
       // here too while the file still exists. It never fails the take, which the Pond already has.
       if (member && r.matchOn && source === POND_VOICE) await enrolPhoneTake(uri, member.id);
-      r.index += 1;
       setDetector(result.wake_detector);
-      setResults((was) => [...was, { prompt, detector: result.wake.new_detector }]);
-      setSaid(null);
       if (result.voice_match) setMatch(result.voice_match);
+      const accepted: TeachResult = { prompt, detector: result.wake.new_detector, takeId: result.take_id };
+      if (again !== null) {
+        // One missed sentence said again: it takes its place, and the done screen stays.
+        console.info('[teach-voice] a missed sentence was said again', { kind: 'teach_retake', heard: accepted.detector });
+        setResults((was) => was.map((x, i) => (i === again ? accepted : x)));
+        setSaid(null);
+        r.retaking = null;
+        setRetaking(null);
+        resumeRoom();
+        void prints.actions.refresh();
+        return 'done';
+      }
+      r.index += 1;
+      setResults((was) => [...was, accepted]);
+      setSaid(null);
       if (r.index >= Math.min(result.of, r.sentences.length)) {
         setPhase('done');
         if (profileId) void finishChecklistItem(profileId, 'wake');
@@ -250,8 +285,42 @@ export function useTeachVoice({ member, phrase }: { member: TeachMember | null; 
     await recorder.start();
   }, [recorder]);
 
+  const retake = useCallback(
+    async (i: number) => {
+      const r = run.current;
+      if (r.retaking !== null || !r.results[i]?.takeId) return;
+      setSaid(null);
+      // The sentence starts with the wake phrase, so the room is asked not to answer it.
+      if (!room.current.quiet && (await pauseRoom())) {
+        room.current.quiet = true;
+        setQuiet(true);
+      }
+      r.retaking = i;
+      setRetaking(i);
+      await recorder.start();
+    },
+    [pauseRoom, recorder],
+  );
+
+  const cancelRetake = useCallback(() => {
+    if (run.current.retaking === null) return;
+    recorder.stop();
+    run.current.retaking = null;
+    setRetaking(null);
+    setSaid(null);
+    resumeRoom();
+  }, [recorder, resumeRoom]);
+
   const { state } = recorder;
   const stopped = phase === 'takes' && state === 'error';
+  // A retake that stopped (silence, the microphone, a run that ended) leaves the done screen as it was.
+  const retakeStopped = phase === 'done' && state === 'error';
+  useEffect(() => {
+    if (!retakeStopped || run.current.retaking === null) return;
+    run.current.retaking = null;
+    setRetaking(null);
+    resumeRoom();
+  }, [retakeStopped, resumeRoom]);
   return {
     phase,
     phrase,
@@ -263,6 +332,8 @@ export function useTeachVoice({ member, phrase }: { member: TeachMember | null; 
     stopped,
     said: stopped ? (recorder.error ?? said) : said,
     recorded: results.length,
+    retaking,
+    retakeError: retakeStopped ? recorder.error : null,
     voiceMatch: { on: matchOn, available, model: prints.data.model },
     results,
     detector,
@@ -276,6 +347,8 @@ export function useTeachVoice({ member, phrase }: { member: TeachMember | null; 
       setVoiceMatch: setWantMatch,
       start,
       retry,
+      retake,
+      cancelRetake,
       stop: recorder.stop,
       retryModel: prints.actions.retryModel,
     },

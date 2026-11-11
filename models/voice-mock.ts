@@ -13,6 +13,7 @@ import type {
   VoicePrintMember,
   VoicePrints,
   VoiceRoom,
+  VoiceTakeInput,
   VoiceTakeResult,
   VoiceThinking,
   WakeDetectorVerdict,
@@ -36,7 +37,8 @@ export interface VoiceSource {
   /** Lets the room listen again before its pause runs out (`POST /voice/room/resume`). */
   resumeRoom(): Promise<void>;
   /** One sentence read while teaching Goose a voice (`POST /voice/takes`). */
-  take(take: { fileUri: string; prompt: string; profileId: string | null; voiceMatch: boolean }): Promise<VoiceTakeResult>;
+  /** `replaces`: the id of a missed take of this run, when its sentence is said again on its own. */
+  take(take: VoiceTakeInput): Promise<VoiceTakeResult>;
   /** Clears what earlier runs taught about the wake phrase (`DELETE /voice/calibrate`). */
   resetCalibration(): Promise<void>;
   forget(profileId: string): Promise<void>;
@@ -318,9 +320,23 @@ export function createMockVoice(
       modelFailed = false;
       modelFrom = now();
     },
-    take: async ({ prompt, profileId, voiceMatch }) => {
+    take: async ({ prompt, profileId, voiceMatch, replaces }) => {
       const m = voiceMatch ? member(profileId ?? '') : null;
       if (m && model().state !== 'ready') throw new ApiError('mock take → 409', 409, null, null, { error: 'model_not_ready' });
+      if (replaces) {
+        // A missed sentence said again: it takes the missed take's place, and the detector hears it.
+        if (!replaces.startsWith('mock-take-')) throw new ApiError('mock take → 422', 422, null, null, { error: 'retake_not_found' });
+        detector = { ...detector, heard: detector.heard + 1 };
+        if (detector.heard * 5 >= detector.of * 4) detector = { ...detector, kind: 'hey_goose', reason: 'calibrated' };
+        return {
+          take_id: `mock-take-retake-${detector.heard}`,
+          take: run.taken,
+          of: VOICE_PRINT_TAKES,
+          wake: { heard: true, heard_as: prompt.split(',')[0], new_detector: true },
+          voice_match: null,
+          wake_detector: { ...detector },
+        };
+      }
       if (run.taken >= VOICE_PRINT_TAKES) run = { taken: 0, tries: 0 };
       run.tries += 1;
       if (run.taken === 1 && run.tries === 2) {
@@ -347,6 +363,7 @@ export function createMockVoice(
         match = { stored: true, enrolled: m.enrolled, consistency: m.consistency };
       }
       return {
+        take_id: `mock-take-${run.taken}`,
         take: run.taken,
         of: VOICE_PRINT_TAKES,
         wake: { heard: true, heard_as: prompt.split(',')[0], new_detector: fired },

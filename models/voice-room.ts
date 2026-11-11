@@ -453,6 +453,7 @@ export function readVoiceTake(raw: unknown): VoiceTakeResult | null {
   if (!r || typeof r.take !== 'number' || !wake || !verdictOf) return null;
   const match = record(r.voice_match);
   return {
+    take_id: typeof r.take_id === 'string' && r.take_id ? r.take_id : null,
     take: count(r.take),
     of: count(r.of, VOICE_PRINT_TAKES) || VOICE_PRINT_TAKES,
     wake: {

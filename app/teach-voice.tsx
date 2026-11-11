@@ -102,8 +102,8 @@ export default function TeachVoiceScreen() {
       {vm.phase === 'intro' ? (
         <Intro vm={vm} member={member} handed={handed} from={params.from} onLater={later} onChangePhrase={() => router.push('/(stack)/wake-word')} />
       ) : null}
-      {vm.phase === 'takes' ? <Takes vm={vm} onLater={later} /> : null}
-      {vm.phase === 'done' ? <Done vm={vm} member={member} handed={handed} onDone={() => router.back()} /> : null}
+      {vm.phase === 'takes' || vm.retaking !== null ? <Takes vm={vm} onLater={later} /> : null}
+      {vm.phase === 'done' && vm.retaking === null ? <Done vm={vm} member={member} handed={handed} onDone={() => router.back()} /> : null}
     </SafeAreaView>
   );
 }
@@ -205,10 +205,12 @@ function Intro({
   );
 }
 
+/** One sentence to say: the next of the run, or on the done screen a missed one said again. */
 function Takes({ vm, onLater }: { vm: UseTeachVoice; onLater: () => void }) {
   const { t } = useTranslation();
   const theme = useInkTheme();
-  const sentence = vm.sentences[vm.index] ?? '';
+  const again = vm.retaking;
+  const sentence = (again !== null ? vm.results[again]?.prompt : vm.sentences[vm.index]) ?? '';
   const say = inkText(theme, { role: 'display', size: '2xl', weight: theme.weight.bold, color: theme.color.text });
   // At rest the sentence is slate, which still reads at 5.97:1; heard, it is full ink.
   const words = inkText(theme, { role: 'display', size: '2xl', weight: theme.weight.semibold, color: vm.lit ? theme.color.text : theme.color.textSecondary });
@@ -229,15 +231,23 @@ function Takes({ vm, onLater }: { vm: UseTeachVoice; onLater: () => void }) {
         </View>
       </View>
       <View style={styles.foot}>
-        <Text style={[note.style, styles.count]}>{t('teachVoice.count', { step: vm.index + 1, count: vm.of })}</Text>
+        <Text style={[note.style, styles.count]}>
+          {again !== null ? t('teachVoice.again.count', { step: again + 1, count: vm.of }) : t('teachVoice.count', { step: vm.index + 1, count: vm.of })}
+        </Text>
         {vm.stopped ? (
           <InkButton variant="primary" block icon="mic" onPress={() => void vm.actions.retry()}>
             {t('teachVoice.tryAgain')}
           </InkButton>
         ) : null}
-        <InkButton variant="quiet" block onPress={onLater}>
-          {t('teachVoice.later')}
-        </InkButton>
+        {again !== null ? (
+          <InkButton variant="quiet" block onPress={vm.actions.cancelRetake}>
+            {t('teachVoice.again.cancel')}
+          </InkButton>
+        ) : (
+          <InkButton variant="quiet" block onPress={onLater}>
+            {t('teachVoice.later')}
+          </InkButton>
+        )}
       </View>
     </>
   );
@@ -282,10 +292,18 @@ function Done({ vm, member, handed, onDone }: { vm: UseTeachVoice; member: Teach
                 <InkText size="sm" tone="secondary">
                   {r.detector ? t('teachVoice.done.heard') : t('teachVoice.done.missed')}
                 </InkText>
+                {!r.detector && r.takeId ? (
+                  <View style={styles.again}>
+                    <InkButton variant="quiet" size="sm" icon="mic" onPress={() => void vm.actions.retake(i)}>
+                      {t('teachVoice.again.action')}
+                    </InkButton>
+                  </View>
+                ) : null}
               </View>
             </View>
           ))}
         </View>
+        {vm.retakeError ? <InkNotice tone="warning">{vm.retakeError}</InkNotice> : null}
         {steadiness ? <InkText tone="secondary">{steadiness}</InkText> : null}
       </ScrollView>
       <View style={styles.foot}>
@@ -313,4 +331,5 @@ const styles = StyleSheet.create({
   lines: { gap: Spacing.sm },
   result: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.sm },
   resultText: { flex: 1, gap: 2 },
+  again: { alignItems: 'flex-start', marginTop: Spacing.xs },
 });

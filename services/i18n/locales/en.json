@@ -4587,7 +4587,8 @@
       "modelNotReady": "The speaker model is still on its way to your Pond. Try again once it’s ready.",
       "missing": "Your Pond can’t learn voices yet. Update it to teach Goose your voice.",
       "notAllowed": "Only a household member can teach your Pond a voice.",
-      "failed": "Your Pond couldn’t learn from that sentence. Try again."
+      "failed": "Your Pond couldn’t learn from that sentence. Try again.",
+      "retakeTooLate": "Too long has passed since these sentences to say one again. Teach all five again."
     },
     "leave": {
       "title": "Stop teaching Goose your voice?",
@@ -4604,6 +4605,11 @@
       "missed": "The “hey goose” detector missed this one.",
       "runHeard": "The “hey goose” detector heard {{heard}} of these {{of}} sentences.",
       "listensHeyGoose": "Your Pond listens for “hey goose” with its own detector."
+    },
+    "again": {
+      "action": "Say it again",
+      "count": "Sentence {{step}} of {{count}}, again",
+      "cancel": "Cancel"
     }
   },
   "assist": {
@@ -4649,16 +4655,18 @@
       "voiceRefused_one": "One was turned away because the voice did not match.",
       "voiceRefused_other": "{{count}} were turned away because the voice did not match.",
       "pondRefused_one": "Your Pond did not hear the whole phrase once, or could not be asked.",
-      "pondRefused_other": "Your Pond did not hear the whole phrase {{count}} times, or could not be asked.",
-      "lower": "Your phrase scored lower than the phone expects. Keeping a lower line should catch more of them; your voice and your Pond still check each one.",
-      "higher": "Your phrase scored higher than the phone's line. Keeping a higher line should mean fewer false wakes.",
-      "keep": "Keep the new line",
-      "kept": "Kept. Run the test again to see the difference.",
-      "reset": "Go back to the line from my sentences"
+      "pondRefused_other": "Your Pond did not hear the whole phrase {{count}} times, or could not be asked."
     },
     "start": "Start the test",
     "again": "Test again",
     "failed": "The test could not be scored. Try again.",
-    "keepFailed": "The phone did not keep the change. Try again."
+    "keepFailed": "The phone did not save the change. Try again.",
+    "line": {
+      "label": "Tuned to this test",
+      "on": "The phone listens at the sensitivity this test found for your voice.",
+      "offLower": "Turn on to catch quieter “hey goose”s: the test heard yours below where the phone listens now.",
+      "offHigher": "Turn on for fewer false wakes: the test heard yours well above where the phone listens now.",
+      "footer": "Off, the phone listens at the sensitivity your recorded sentences set. Either way, your voice and your Pond still check each wake."
+    }
   }
 }

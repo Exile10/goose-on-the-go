@@ -46,6 +46,7 @@ import type {
   VoiceAgent,
   VoiceAgentPatch,
   VoicePrints,
+  VoiceTakeInput,
   VoiceTakeResult,
   WakeCheck,
   VoiceRoom,
@@ -1370,14 +1371,16 @@ export class PondApiClient {
   /**
    * One sentence read while teaching Goose a voice, as a 16 kHz mono WAV. `voiceMatch` false tunes
    * the wake phrase only and stores no print. 422 `no_speech` and `no_wake_phrase` (with `heard_as`)
-   * and 409 `model_not_ready` are refusals by name.
+   * and 409 `model_not_ready` are refusals by name. `replaces` says a missed sentence again on its
+   * own, in place of that take; 422 `retake_not_found` when the run it was in has ended.
    */
-  async voiceTake(take: { fileUri: string; prompt: string; profileId: string | null; voiceMatch: boolean }): Promise<VoiceTakeResult> {
+  async voiceTake(take: VoiceTakeInput): Promise<VoiceTakeResult> {
     const form = new FormData();
     form.append('audio', new File(take.fileUri), 'take.wav');
     form.append('prompt', take.prompt);
     if (take.profileId) form.append('profile_id', take.profileId);
     form.append('voice_match', take.voiceMatch ? 'true' : 'false');
+    if (take.replaces) form.append('replaces', take.replaces);
     const res = await this.send(`${this.baseUrl}/api/v1/voice/takes`, {
       method: 'POST',
       // No Content-Type: the runtime writes the multipart boundary itself.
