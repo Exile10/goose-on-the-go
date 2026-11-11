@@ -56,7 +56,7 @@ export default function WakeTestScreen() {
         {vm.phase === 'phrase' ? (
           <View style={styles.part} accessibilityLiveRegion="polite">
             <InkTitle level={2}>{t('wakeTest.phrase.title', { phrase: CNN_PHRASE, count: PHRASE_TIMES })}</InkTitle>
-            <InkText tone="secondary">{t('wakeTest.phrase.body')}</InkText>
+            <InkText tone="secondary">{t('wakeTest.phrase.body', { count: PHRASE_TIMES })}</InkText>
           </View>
         ) : null}
 
