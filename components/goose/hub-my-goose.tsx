@@ -14,6 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { InkButton, InkCard, InkSpinner, InkText, inkText, useInkTheme } from '@jarida/ink/native';
 
 import { ContentUnavailable } from '@/components/patterns/content-unavailable';
+import { Goose } from '@/components/patterns/goose';
 import { GlyphRow, WatchShelf } from '@/components/patterns/goose-shelves';
 import { GIcon } from '@/components/ui/g-icon';
 import { GPressable } from '@/components/ui/g-pressable';
@@ -32,6 +33,7 @@ import { formatPrice } from '@/models/my-goose';
 import { splitStories } from '@/models/news';
 import type { WebWatch } from '@/models/web-watches';
 import { useBottomBarInset, useChromeScroll } from '@/providers/chrome-provider';
+import { useTheme } from '@/providers/theme-provider';
 import { selectionTick, tap } from '@/services/haptics';
 import { Storage } from '@/services/storage';
 import { useContentState } from '@/view-models/use-content-state';
@@ -77,19 +79,29 @@ function targetHref(clause: HubClause): Parameters<typeof router.push>[0] {
   }
 }
 
-function Header() {
+/** Width of the goose on its pond beside the title, as the older My Goose had it. */
+const GOOSE_SIZE = 88;
+
+/** The title and today's date, with the goose afloat on its pond beside them, working while the hub loads. */
+function Header({ working }: { working: boolean }) {
   const theme = useInkTheme();
   const { t, i18n } = useTranslation();
+  const styles = useThemedStyles(makeStyles);
+  // The pond's ripples are drawn in the colour behind it: the page's own.
+  const { colors } = useTheme();
   const title = inkText(theme, { role: 'display', size: '3xl', weight: 700, tracking: 'title', color: theme.color.text }).style;
   const today = new Date().toLocaleDateString(i18n.language, { weekday: 'long', day: 'numeric', month: 'long' });
   return (
-    <View>
-      <Text style={title} accessibilityRole="header">
-        {t('myGoose.title')}
-      </Text>
-      <InkText size="lg" weight="semibold" tone="secondary">
-        {today}
-      </InkText>
+    <View style={styles.head}>
+      <View style={styles.headText}>
+        <Text style={title} accessibilityRole="header">
+          {t('myGoose.title')}
+        </Text>
+        <InkText size="lg" weight="semibold" tone="secondary">
+          {today}
+        </InkText>
+      </View>
+      <Goose state={working ? 'working' : 'idle'} size={GOOSE_SIZE} ground={colors.background} />
     </View>
   );
 }
@@ -535,7 +547,7 @@ export function HubMyGoose({ hub }: { hub: MeHub }) {
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl {...pull} />}
       >
-        <Header />
+        <Header working={g.loading} />
         {g.loading && !anything ? <InkSpinner label={t('myGoose.loading')} /> : <HubSentence clauses={clauses} quiet={t('goose.say.quiet')} />}
         {state === 'unreachable' || state === 'failed' ? <ContentUnavailable state={state} onRetry={reload} /> : null}
         {g.newMember ? <InterviewInvite /> : null}
@@ -560,6 +572,8 @@ const makeStyles = (c: ThemeColors) =>
     safe: { flex: 1, backgroundColor: c.background },
     page: { flex: 1 },
     scroll: { paddingHorizontal: Spacing.lg, paddingTop: Spacing.md, gap: Spacing['3xl'] },
+    head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: Spacing.md },
+    headText: { flex: 1 },
     section: { gap: Spacing.md },
     group: { gap: Spacing.xs },
     invite: { gap: Spacing.sm },
