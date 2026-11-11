@@ -38,6 +38,12 @@ const KEYS = {
   homeIdeasCollapsed: '@goose/home-ideas-collapsed',
   /** What the paired Pond said it can do, with its pin. Not a secret. */
   pondCapabilities: '@goose/pond-capabilities',
+  /** The story reader's text size, a preference of this phone. */
+  readerTextSize: '@goose/reader-text-size',
+  /** The order the member put their interests in on My Goose; the Pond keeps no order. */
+  interestOrder: '@goose/interest-order',
+  /** Which of My Goose's following groups the member folded away. */
+  followingFolded: '@goose/following-folded',
 } as const;
 
 /**

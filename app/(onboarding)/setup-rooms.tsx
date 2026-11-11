@@ -4,8 +4,8 @@
  * Add that opens the code screen carrying the room chosen here.
  *
  * It follows owner setup rather than sitting among its steps, because the Pond answers `/rooms` and
- * `/devices` only once setup is done. Nothing here is required: Done and Skip both go on to where
- * setup would have gone, the owner's interview over Home, or Home.
+ * `/devices` only once setup is done. Nothing here is required: Done and Skip both go on to setup's last
+ * step, the interests interview, and from there to the owner's interview over Home, or Home.
  */
 
 import React, { useCallback, useRef, useState } from 'react';
@@ -142,12 +142,13 @@ export default function SetupRoomsScreen() {
     [actions, ask, t],
   );
 
-  // Where setup would have gone: the interview over Home, so leaving it lands on Home, or Home.
+  // On to setup's last step, what the member is into, which passes straight through on a Pond
+  // without it to where setup would have gone: the notes interview over Home, or Home.
   const leave = useCallback(() => {
-    router.replace('/(tabs)');
-    if (params.session && params.interview) {
-      router.push({ pathname: '/conversation', params: { session: params.session, interview: params.interview } });
-    }
+    router.replace({
+      pathname: '/(onboarding)/interests',
+      params: params.session && params.interview ? { session: params.session, interview: params.interview } : {},
+    });
   }, [params.interview, params.session, router]);
 
   return (
