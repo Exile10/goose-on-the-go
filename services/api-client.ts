@@ -18,6 +18,7 @@ import {
 import { assertPondTrust, PondTrustError, pondTrustFailed } from './pond-trust';
 import { isInsecureDevOrigin, isLocalPairingUrl, normalizePondUrl } from '@/models/connection';
 import { readWebSearch } from '@/models/web-search';
+import { readRoute, type RemoteRoute, type RouteState } from '@/models/ngrok-tunnel';
 import { readPrefills } from '@/models/agents';
 import { readRoomVoiceEvent, readVoiceAgent, readVoicePrints, readVoiceRoom, readVoiceTake } from '@/models/voice-room';
 import { readInterview, readInterviewOffer, readMemberNotes } from '@/models/interview';
@@ -227,6 +228,13 @@ import { MODEL_CATEGORIES } from './types';
  * Without `retryAfterSecs` a caller can only guess, and guessing badly is how
  * a client ends up hammering an endpoint it has already been throttled on.
  */
+/** A route answer, or a throw: a body that is not one must not pass for the Pond's state. */
+function routeOrThrow(raw: unknown): RouteState {
+  const state = readRoute(raw);
+  if (!state) throw new Error('The Pond answered the remote access route with something unexpected');
+  return state;
+}
+
 export class ApiError extends Error {
   readonly status: number;
   readonly retryAfterSecs: number | null;
@@ -2294,6 +2302,31 @@ export class PondApiClient {
   /** `DELETE /web-search/key`, a 204. Goose stops being offered the tool on the next turn. */
   removeWebSearchKey(): Promise<void> {
     return this.del<void>('/api/v1/web-search/key');
+  }
+
+  // ── Remote access route (ngrok) ─────────────────────────────
+
+  /** Which way phones reach the Pond from outside, and what this phone may change from here. */
+  async remoteRoute(): Promise<RouteState> {
+    return routeOrThrow(await this.get<unknown>('/api/v1/remote-access/route'));
+  }
+
+  /**
+   * Switch between the built-in network and ngrok. `reservedAddress` is sent only when it
+   * changes: empty clears it. The Pond refuses ngrok from away without a reserved address.
+   */
+  async chooseRemoteRoute(route: RemoteRoute, reservedAddress?: string): Promise<RouteState> {
+    const body = reservedAddress === undefined ? { route } : { route, reservedAddress };
+    return routeOrThrow(await this.put<unknown>('/api/v1/remote-access/route', body));
+  }
+
+  /** Store the household's ngrok authtoken. The Pond opens one session with it first. */
+  async setNgrokAuthtoken(authtoken: string): Promise<RouteState> {
+    return routeOrThrow(await this.put<unknown>('/api/v1/remote-access/route/token', { authtoken }));
+  }
+
+  async forgetNgrokAuthtoken(): Promise<RouteState> {
+    return routeOrThrow(await this.del<unknown>('/api/v1/remote-access/route/token'));
   }
 
   // ── Pond settings ───────────────────────────────────────────

@@ -1722,7 +1722,8 @@
     "gooseConnector": "Connector",
     "gooseInterests": "Your interests",
     "gooseInterview": "Your interests",
-    "gooseCatalog": "More your Goose can do"
+    "gooseCatalog": "More your Goose can do",
+    "ngrokTunnel": "ngrok tunnel"
   },
   "nav": {
     "goose": "Goose",
@@ -5374,6 +5375,72 @@
       "notYet": "Not yet",
       "add": "Add",
       "no": "No"
+    }
+  },
+  "ngrok": {
+    "intro": "Use your own ngrok account as the way into your Pond from outside your home, instead of the built-in network. Your phone's connection stays encrypted end to end.",
+    "loading": "Reading how phones reach your Pond…",
+    "unsupported": "This Pond can't choose its way in from a phone yet. Update the Pond, or use ngrok from the Pond's own screen.",
+    "privacy": "ngrok carries your phone's encrypted connection without being able to read it. Your authtoken stays on the Pond and is never sent back to this phone.",
+    "status": {
+      "builtIn": "Phones reach your Pond from outside through the built-in network.",
+      "builtInOff": "Phones can't reach your Pond from outside: the built-in network is off and ngrok isn't on.",
+      "running": "Phones reach your Pond from outside through ngrok at {{address}}.",
+      "starting": "Starting the ngrok tunnel…",
+      "failed": "The ngrok tunnel isn't running: {{reason}}",
+      "off": "ngrok is chosen but the tunnel is off.",
+      "fallback": "ngrok gave your Pond a new address when the tunnel restarted, and phones away from home don't know it yet. The built-in network is back on meanwhile. Turn ngrok on again here on your home Wi-Fi, and open Goose On The Go on your other phones at home, to switch back."
+    },
+    "switch": {
+      "label": "Use ngrok",
+      "onHint": "On: phones away from home come in through your ngrok tunnel.",
+      "offHint": "Off: phones away from home use the built-in network.",
+      "needsToken": "Add your ngrok authtoken below to turn this on.",
+      "awayUnreserved": "Away from home, ngrok needs a reserved address. Without one the address changes whenever the tunnel starts, and phones learn the new one only on your home Wi-Fi. Turn this on at home, or reserve an address below.",
+      "offTitle": "Go back to the built-in network?",
+      "offBody": "The ngrok tunnel stops and phones away from home use the built-in network.",
+      "offConfirm": "Use the built-in network"
+    },
+    "steps": {
+      "title": "Set up ngrok",
+      "account": "1. Create an ngrok account",
+      "accountLink": "Sign up at dashboard.ngrok.com",
+      "card": "2. Add a payment method",
+      "cardHelp": "ngrok opens TCP addresses only for accounts with a card on file, even on the free plan. Add one under Billing in the ngrok dashboard. The free plan isn't charged.",
+      "token": "3. Copy your authtoken",
+      "tokenLink": "Open Your Authtoken in the ngrok dashboard",
+      "paste": "4. Paste it here and save",
+      "linkHint": "Opens the ngrok website in the browser"
+    },
+    "token": {
+      "label": "ngrok authtoken",
+      "help": "Your Pond checks the authtoken with ngrok before keeping it.",
+      "stored": "Your Pond has an authtoken. Paste a new one to replace it.",
+      "placeholder": "Paste your authtoken",
+      "placeholderReplace": "Paste a new authtoken",
+      "save": "Save authtoken",
+      "checking": "Checking with ngrok…",
+      "awayNote": "Add or change the authtoken on your home Wi-Fi.",
+      "removeTitle": "Remove the ngrok authtoken?",
+      "removeBody": "The tunnel stops, and phones away from home use the built-in network."
+    },
+    "reserved": {
+      "title": "Reserved address (paid plans)",
+      "help": "On ngrok's free plan the address changes every time the tunnel starts, such as when your Pond restarts. A reserved TCP address, on the Hobbyist and Pay-as-you-go plans, never changes, so you can switch to ngrok from anywhere. In the ngrok dashboard open Gateway, then TCP Addresses, create one and paste it here.",
+      "link": "Open the ngrok dashboard",
+      "label": "Reserved TCP address",
+      "placeholder": "1.tcp.eu.ngrok.io:12345",
+      "save": "Save address",
+      "current": "Reserved address: {{address}}. Change it on your home Wi-Fi.",
+      "awayNote": "No reserved address. Add one on your home Wi-Fi."
+    },
+    "error": {
+      "tokenRefused": "ngrok didn't accept that authtoken. Copy it again from the ngrok dashboard.",
+      "atHomeOnly": "Do this on your home Wi-Fi.",
+      "needsReserved": "Away from home, switch to ngrok only with a reserved address.",
+      "noToken": "Add your ngrok authtoken first.",
+      "badAddress": "Enter the address as ngrok shows it, like 1.tcp.eu.ngrok.io:12345.",
+      "builtInUnavailable": "The built-in network couldn't start, so the ngrok tunnel is still on."
     }
   }
 }

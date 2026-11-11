@@ -64,6 +64,15 @@ it('offers Web search beside the other ways the Pond reaches out', () => {
   );
 });
 
+/** Choosing ngrok over the built-in network belongs with the other ways in from outside. */
+it('offers the ngrok tunnel beside remote access', () => {
+  const connection = PROFILE_NAV.find((group) => group.groupKey === 'settings.menu.connection');
+
+  expect(connection?.items).toContainEqual(
+    expect.objectContaining({ id: 'ngrokTunnel', labelKey: 'screens.ngrokTunnel', route: '/(stack)/ngrok-tunnel' }),
+  );
+});
+
 /** The way in to Secrets is a row on the Tools page, beside the extensions whose keys these are. */
 it('offers Secrets beside Extensions on the Tools page', () => {
   const links = SETTINGS_PAGES.tools.sections.flatMap((section) => section.items).filter((item) => item.kind === 'link');

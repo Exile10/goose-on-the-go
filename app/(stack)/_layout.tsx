@@ -159,6 +159,7 @@ export default function StackLayout() {
       <Stack.Screen name="voice-match" options={{ title: t('screens.voiceMatch') }} />
       <Stack.Screen name="extensions" options={{ title: t('screens.extensions') }} />
       <Stack.Screen name="web-search" options={{ title: t('screens.webSearch') }} />
+      <Stack.Screen name="ngrok-tunnel" options={{ title: t('screens.ngrokTunnel') }} />
       <Stack.Screen name="secrets" options={{ title: t('screens.secrets') }} />
       <Stack.Screen name="add-users" options={{ title: t('screens.addUsers') }} />
       <Stack.Screen name="privacy" options={{ title: t('screens.privacy') }} />
