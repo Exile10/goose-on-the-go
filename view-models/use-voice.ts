@@ -27,6 +27,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { VoiceState } from '@/models/voice';
+import { useServer } from '@/providers/server-provider';
 import { api } from '@/services/api-client';
 import { bytesToBase64, type Attachment } from '@/services/media';
 import {
@@ -57,6 +58,7 @@ import {
   type MicBuffer,
 } from '@/services/voice-io';
 import type { UseChat } from '@/view-models/use-chat';
+import { failureKind } from '@/view-models/describe-error';
 
 /** Listening this long with nothing said puts the microphone away. */
 const NO_SPEECH_MS = 8_000;
@@ -163,6 +165,15 @@ export function useVoice(chat: {
     sendRef.current = chat.send;
     stopRef.current = chat.stop;
   }, [chat.send, chat.stop]);
+
+  // A recording the Pond never received because nothing answered: Try again sends it once a
+  // route answers, rather than asking the person to say it again.
+  const { retryNow } = useServer();
+  const retryRef = useRef(retryNow);
+  useEffect(() => {
+    retryRef.current = retryNow;
+  }, [retryNow]);
+  const unsent = useRef<{ wav: Uint8Array; count: number; rate: number } | null>(null);
 
   // What the microphone has heard this turn, and what it has decided.
   const take = useRef({
@@ -403,6 +414,45 @@ export function useVoice(chat: {
     [listen, pump, setState],
   );
 
+  /** Sends a recording to be transcribed, then on to the conversation. */
+  const hear = useCallback(
+    async (wav: Uint8Array, count: number, rate: number) => {
+      setState('thinking');
+      const uri = cacheFile('speech', wav);
+      let text = '';
+      try {
+        text = await api.transcribe(uri);
+      } catch (e) {
+        console.warn('[voice] transcribe failed:', e);
+        if (!alive.current) return;
+        // Nothing answered is not the Pond mishearing: say so, and keep the words for Try again.
+        const lost = failureKind(e) === 'network';
+        unsent.current = lost ? { wav, count, rate } : null;
+        setError(t(lost ? 'chat.voice.lostConnection' : 'chat.voice.hearFailed'));
+        setState('error');
+        return;
+      } finally {
+        discardFile(uri);
+      }
+      unsent.current = null;
+      if (!alive.current) return;
+      if (isPhantom(text)) {
+        void listen();
+        return;
+      }
+      const dismissal = checkDismissal(text);
+      if (dismissal.dismissed) {
+        void speakFarewell(t(dismissal.isExit ? 'chat.voice.farewellExit' : 'chat.voice.farewellPause'));
+        return;
+      }
+      void converse(
+        text,
+        recordingsRef.current ? spokenClip(text, wav, Math.round((count / rate) * 1000)) : undefined,
+      );
+    },
+    [converse, listen, setState, speakFarewell, t],
+  );
+
   const finish = useCallback(
     async (heard: boolean) => {
       const tk = take.current;
@@ -416,37 +466,26 @@ export function useVoice(chat: {
       const samples = downsample(concatSamples(tk.chunks), tk.rate);
       tk.chunks = [];
       const rate = tk.rate >= SPEECH_RATE ? SPEECH_RATE : tk.rate;
-      const wav = encodeWav(samples, rate);
-      const uri = cacheFile('speech', wav);
-      let text = '';
-      try {
-        text = await api.transcribe(uri);
-      } catch (e) {
-        console.warn('[voice] transcribe failed:', e);
-        if (!alive.current) return;
-        setError(t('chat.voice.hearFailed'));
-        setState('error');
-        return;
-      } finally {
-        discardFile(uri);
-      }
-      if (!alive.current) return;
-      if (isPhantom(text)) {
-        void listen();
-        return;
-      }
-      const dismissal = checkDismissal(text);
-      if (dismissal.dismissed) {
-        void speakFarewell(t(dismissal.isExit ? 'chat.voice.farewellExit' : 'chat.voice.farewellPause'));
-        return;
-      }
-      void converse(
-        text,
-        recordingsRef.current ? spokenClip(text, wav, Math.round((samples.length / rate) * 1000)) : undefined,
-      );
+      await hear(encodeWav(samples, rate), samples.length, rate);
     },
-    [converse, listen, setState, speakFarewell, t],
+    [hear, setState],
   );
+
+  /** Try again after a lost connection: find a route that answers, then send what was said. */
+  const resend = useCallback(async () => {
+    const pending = unsent.current;
+    if (!pending) return;
+    setError(null);
+    setState('thinking');
+    const route = await retryRef.current();
+    if (!alive.current) return;
+    if (!route) {
+      setError(t('chat.voice.stillUnreachable'));
+      setState('error');
+      return;
+    }
+    await hear(pending.wav, pending.count, pending.rate);
+  }, [hear, setState, t]);
 
   // The microphone callback is created before `finish` exists, and must always
   // reach the current one.
@@ -456,7 +495,9 @@ export function useVoice(chat: {
 
   const tap = useCallback(() => {
     const s = stateRef.current;
-    if (s === 'idle' || s === 'error') {
+    if (s === 'error' && unsent.current) {
+      void resend();
+    } else if (s === 'idle' || s === 'error') {
       void listen();
     } else if (s === 'wait') {
       finishRef.current(false);
@@ -471,7 +512,7 @@ export function useVoice(chat: {
       stopRef.current();
       setState('idle');
     }
-  }, [listen, setState, stopSpeaking]);
+  }, [listen, resend, setState, stopSpeaking]);
 
   const toggleSpeaker = useCallback(() => {
     const next = !speakerRef.current;
