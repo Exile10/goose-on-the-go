@@ -39,7 +39,7 @@ function IdeaActions({ idea, busy, made, onGoose, onMine, compact }: { idea: Ide
   const { t } = useTranslation();
   if (idea.state === 'working') {
     return (
-      <View style={[styles.state, { backgroundColor: theme.color.accentSofter }]}>
+      <View style={styles.state}>
         <InkSpinner size={14} label={t('goose.ideas.working')} />
         <InkText size="sm" weight="semibold" numberOfLines={2} style={{ flex: 1 }}>
           {idea.gooseCan ? t('goose.ideas.workingOn', { what: inSentence(idea.gooseCan.label) }) : t('goose.ideas.working')}
@@ -186,7 +186,7 @@ const styles = StyleSheet.create({
   sources: { gap: 6 },
   source: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   actions: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm },
-  state: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, padding: Spacing.sm, borderRadius: 10 },
+  state: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
   made: { gap: 5 },
   doneLine: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   dismiss: { alignSelf: 'flex-start' },

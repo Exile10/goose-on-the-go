@@ -19,14 +19,20 @@ import {
   InkSegmented as InkSegmentedBase,
   InkSelect as InkSelectBase,
   InkSwitch as InkSwitchBase,
+  InkIcon,
+  inkText,
+  renderIconSlot,
+  useInkTheme,
   type InkButtonProps,
   type InkCardProps,
   type InkChipProps,
   type InkChoiceProps,
+  type InkNoticeProps,
   type InkSegmentedProps,
   type InkSwitchProps,
 } from '@jarida/ink/native';
 import React, { type ComponentProps } from 'react';
+import { Text, View } from 'react-native';
 
 import { selectionTick, tap, toggle } from '@/services/haptics';
 
@@ -94,4 +100,29 @@ export function InkRadioGroup<T extends string>(props: ComponentProps<typeof Ink
 export function InkMenu(props: ComponentProps<typeof InkMenuBase>) {
   const items = props.items.map((item) => ({ ...item, onPress: withFeel(item.onPress, tap) }));
   return <InkMenuBase {...props} items={items} />;
+}
+
+const NOTICE_ICON = { neutral: 'info', brand: 'info', info: 'info', success: 'done', warning: 'alert', danger: 'alert' } as const;
+
+/**
+ * A notice as a plain line: an icon in the notice's tone and the words beside it, with no tinted
+ * box around them. Only a danger notice puts its words in its tone, and only it interrupts.
+ */
+export function InkNotice({ tone = 'neutral', icon, action, children }: InkNoticeProps) {
+  const theme = useInkTheme();
+  const assertive = tone === 'danger';
+  const { style } = inkText(theme, { size: 'sm', leading: 'base', color: assertive ? theme.color.dangerFg : theme.color.textSecondary });
+  return (
+    <View
+      accessibilityRole={assertive ? 'alert' : undefined}
+      accessibilityLiveRegion={assertive ? 'assertive' : 'polite'}
+      style={{ flexDirection: 'row', alignItems: 'flex-start', gap: theme.space[2] }}
+    >
+      {icon === undefined || typeof icon === 'string' ? <InkIcon name={icon ?? NOTICE_ICON[tone]} size={18} tone={tone} /> : renderIconSlot(icon, 18)}
+      <View style={{ flex: 1, gap: theme.space[2] }}>
+        <Text style={style}>{children}</Text>
+        {action ? <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: theme.space[2] }}>{action}</View> : null}
+      </View>
+    </View>
+  );
 }
