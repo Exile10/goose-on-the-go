@@ -164,7 +164,7 @@ See ink's own docs for full prop lists; these are the ones the app leans on.
 | InkRow, InkGroup | Settings-style rows and the group that titles them (the Profile hub) |
 | InkChoice, InkSegmented | Filters and segmented choices |
 | InkSwitch | Toggle switch |
-| InkNotice, InkEmptyState, InkSpinner, InkSkeleton | Standing conditions, field and form errors, empty and loading states. Not for what an action came to: that is the snackbar |
+| InkNotice, InkEmptyState, InkSpinner, InkSkeleton | Standing conditions, field and form errors, empty and loading states. Not for what an action came to: that is the snackbar. `InkNotice` is the app's own (`components/ui/ink.tsx`): a plain line, an icon in its tone and the words beside it, never a tinted or bordered box; only `tone="danger"` colours the words and announces itself as an alert |
 | InkBadge, InkBubble | Badges; chat bubbles |
 | InkIcon | Ink's icon slot, resolving from the same registry as `GIcon` |
 | InkBottomBar, InkNavbar | The tab bar and screen title bars |
