@@ -519,7 +519,7 @@ class GooseWakeService : Service() {
     }
     val minimum = AudioRecord.getMinBufferSize(RATE, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT)
     val record = AudioRecord(
-      MediaRecorder.AudioSource.VOICE_RECOGNITION,
+      SOURCE,
       RATE,
       AudioFormat.CHANNEL_IN_MONO,
       AudioFormat.ENCODING_PCM_16BIT,
@@ -531,7 +531,7 @@ class GooseWakeService : Service() {
         return End.MICROPHONE
       }
       record.startRecording()
-      Log.i(TAG, "kind=wake_detector rung=${PondEar.nativeRung()} cnn=${check.cnn} taught=${check.taught}")
+      Log.i(TAG, "kind=wake_detector rung=${PondEar.nativeRung()} cnn=${check.cnn} taught=${check.taught} source=mic")
       val chunk = ShortArray(HOP)
       while (listening) {
         val read = record.read(chunk, 0, HOP)
@@ -581,7 +581,7 @@ class GooseWakeService : Service() {
     }
     val minimum = AudioRecord.getMinBufferSize(RATE, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT)
     val record = AudioRecord(
-      MediaRecorder.AudioSource.VOICE_RECOGNITION,
+      SOURCE,
       RATE,
       AudioFormat.CHANNEL_IN_MONO,
       AudioFormat.ENCODING_PCM_16BIT,
@@ -678,6 +678,13 @@ class GooseWakeService : Service() {
     private const val KEY_STOP = "stop"
     private const val KEY_CHANNEL = "channel"
     private const val RATE = WakeVoices.RATE
+    /**
+     * The microphone as the app records the teach sentences and the wake test (expo-audio opens
+     * `MIC`). The voice check compares what it hears here with those sentences, and Samsung
+     * processes `VOICE_RECOGNITION` audio differently enough that a taught voice scored as a
+     * stranger's; the same source keeps the two alike.
+     */
+    private const val SOURCE = MediaRecorder.AudioSource.MIC
     /** 80 ms: the detector scores a window every 8 frames of 10 ms. */
     const val HOP = 1_280
     private const val JOIN_MS = 500L
