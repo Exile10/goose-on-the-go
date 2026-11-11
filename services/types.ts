@@ -14,6 +14,8 @@
 
 // ── Devices ───────────────────────────────────────────────────
 
+import type { ReportImage, ReportOption } from '@/models/web-watches';
+
 export interface Device {
   id: string;
   name: string;
@@ -182,6 +184,8 @@ export interface SessionSummary {
   title?: string;
   /** How the conversation opened, for a history card. Absent on older servers. */
   preview?: string;
+  /** A picture the Pond kept for the first page the conversation cited or read. Absent on older servers. */
+  picture?: unknown;
   created_at: string;
   updated_at: string;
   message_count?: number;
@@ -248,6 +252,8 @@ export interface AudioAttachment {
   mime_type: string;
   /** A file's own name, which the Pond saves in its place; a held voice note sends none. */
   name?: string;
+  /** A spoken turn's words as Whisper heard them: what the model gets where it cannot hear. */
+  heard_as?: string;
 }
 
 /** A PDF whose text the Pond reads out and puts after the message, under its name. */
@@ -1986,6 +1992,10 @@ export interface LongTaskReportWire {
   sections: number;
   sources: { title: string; url: string }[];
   calendar_events: number;
+  /** Pictures the Pond kept from the pages the report cites; none from an older Pond. */
+  images: ReportImage[];
+  /** The options a compare step wrote, as cards; none from an older Pond. */
+  options: ReportOption[];
 }
 
 /** What `GET /long-tasks/{id}/export` gives: Markdown, a self-contained page, or a calendar file. */
@@ -2123,4 +2133,333 @@ export interface AdminPower {
 export interface PowerModeChange {
   mode: PowerMode | null;
   reboot_required: boolean;
+}
+
+// ── My Goose: the member's hub (`/api/v1/me/...`, docs/MY-GOOSE-HUB.md) ──
+// The Pond's own shapes, snake_case as sent. The readers in `models/` turn each into what the
+// screens use, and take any field of the wrong shape as missing.
+
+export interface MeHubWire {
+  version: number;
+  interests: boolean;
+  news: boolean;
+  todos: boolean;
+  cart: boolean;
+  connectors: boolean;
+  ideas: boolean;
+  catalog: boolean;
+}
+
+export interface MoneyWire {
+  amount: number;
+  currency: string;
+}
+
+export type InterestCategoryWire =
+  | 'sport' | 'tech' | 'science' | 'business' | 'money' | 'politics' | 'culture' | 'film_tv' | 'music'
+  | 'games' | 'books' | 'food' | 'travel' | 'health' | 'home' | 'cars' | 'shopping' | 'people'
+  | 'places' | 'learning' | 'other';
+export type InterestDepthWire = 'curious' | 'keen' | 'devoted';
+export type InterestNewsWire = 'off' | 'tiles' | 'digest' | 'both';
+
+export interface InterestWire {
+  id: string;
+  topic: string;
+  category: InterestCategoryWire;
+  facets: string[];
+  depth: InterestDepthWire;
+  news: InterestNewsWire;
+  avoid: boolean;
+  origin: 'interview' | 'chat' | 'you';
+  evidence: number;
+  confirmed: boolean;
+  /** The topic's own picture (Wikipedia's lead image), when one was found. */
+  picture: string | null;
+  updated_at: string;
+}
+
+/** What `POST /me/interests` and `PATCH /me/interests/{id}` take; every field optional on a PATCH. */
+export interface InterestWriteWire {
+  topic?: string;
+  category?: InterestCategoryWire;
+  facets?: string[];
+  depth?: InterestDepthWire;
+  news?: InterestNewsWire;
+  avoid?: boolean;
+  confirmed?: true;
+}
+
+export interface InterviewTurnWire {
+  id: string;
+  role: 'goose' | 'you';
+  text: string;
+  choices: string[];
+  multi: boolean;
+  allow_free: boolean;
+  at: string;
+}
+
+export type InterestInterviewStatusWire = 'not_started' | 'asking' | 'thinking' | 'review' | 'done';
+
+export interface InterestInterviewWire {
+  status: InterestInterviewStatusWire;
+  turns: InterviewTurnWire[];
+  draft: InterestWire[];
+  asked: number;
+  planned: number;
+}
+
+export interface InterviewApproveWire {
+  keep: string[];
+  edits: Record<string, InterestWriteWire>;
+}
+
+export interface PortraitWire {
+  summary: string;
+  into: string[];
+  working_on: string[];
+  likes: string[];
+  updated_at: string;
+}
+
+export interface NewsSettingsWire {
+  digest: boolean;
+  digest_time: string;
+  spoken_on_speaker: boolean;
+  tiles: boolean;
+  timezone: string;
+}
+
+export type StoryKindWire = 'news' | 'long_read';
+
+export interface StoryWire {
+  id: string;
+  /** A long read is an occasional evergreen deep dive, not a headline. */
+  kind: StoryKindWire;
+  headline: string;
+  dek: string;
+  picture: string | null;
+  source: { name: string; url: string };
+  interest: { id: string; topic: string; category: InterestCategoryWire };
+  published_at: string | null;
+  written_at: string;
+  /** The member has opened it. */
+  read: boolean;
+}
+
+/** A story in `GET /me/news/history`, with when the member read it. */
+export interface ReadStoryWire extends StoryWire {
+  read_at: string;
+}
+
+export type StoryVoteWire = 'up' | 'down' | 'wrong';
+
+export interface SourceRefWire {
+  title: string;
+  url: string;
+  site: string;
+}
+
+export interface StoryDetailWire extends StoryWire {
+  summary: string;
+  why_you: string;
+  sources: SourceRefWire[];
+}
+
+export interface DigestSectionWire {
+  interest: { id: string; topic: string };
+  heading: string;
+  body: string;
+  pictures: { path: string; caption: string; source_url: string }[];
+  references: SourceRefWire[];
+}
+
+export interface DigestWire {
+  id: string;
+  title: string;
+  written_at: string;
+  intro: string;
+  sections: DigestSectionWire[];
+  listen: string;
+}
+
+export interface NewsFeedWire {
+  stories: StoryWire[];
+  digest: DigestWire | null;
+  state: 'idle' | 'writing';
+  next_digest_at: string | null;
+  last_written_at: string | null;
+  /** Why the Pond cannot write news yet: no interests to write from, or no web search to read with. */
+  blocked?: 'no_interests' | 'web_search' | null;
+}
+
+export type HookKindWire = 'time' | 'repeat' | 'place' | 'event' | 'connector';
+export type RepeatEveryWire = 'day' | 'weekday' | 'week' | 'month';
+export type PlaceTransitionWire = 'arrive' | 'leave';
+
+export type HookSpecWire =
+  | { at: string }
+  | { every: RepeatEveryWire; at: string; days?: number[] }
+  | { place_id: string; transition: PlaceTransitionWire }
+  | { source_id: string; event: string }
+  | { connector_id: string; event: string; filter: string | null };
+
+export interface HookWire {
+  id: string;
+  kind: HookKindWire;
+  label: string;
+  spec: HookSpecWire;
+  next_fire_at: string | null;
+  last_fired_at: string | null;
+}
+
+export interface TodoWire {
+  id: string;
+  kind: 'todo' | 'reminder';
+  text: string;
+  notes: string | null;
+  state: 'open' | 'done' | 'dropped';
+  due_at: string | null;
+  hooks: HookWire[];
+  ask: boolean;
+  source: 'you' | 'chat' | 'goose' | 'idea';
+  last_asked_at: string | null;
+  asked: number;
+  snoozed_until: string | null;
+  created_at: string;
+  done_at: string | null;
+}
+
+/** A hook as the phone sends it: the Pond writes its id, label and fire times. */
+export interface HookWriteWire {
+  kind: HookKindWire;
+  spec: HookSpecWire;
+}
+
+export interface TodoWriteWire {
+  kind?: 'todo' | 'reminder';
+  text?: string;
+  notes?: string | null;
+  due_at?: string | null;
+  ask?: boolean;
+  state?: 'open' | 'done' | 'dropped';
+  /** Replaces every hook the to-do had. */
+  hooks?: HookWriteWire[];
+}
+
+export type TodoAnswerWire = 'done' | 'not_yet' | 'drop';
+
+/** A dated mention lifted from a chat, offered as a to-do. */
+export interface TodoOfferWire {
+  reminder_id: string;
+  text: string;
+  when_said: string;
+  due_at: string | null;
+  said_at: string;
+}
+
+export interface PlaceWire {
+  id: string;
+  label: string;
+  lat: number;
+  lng: number;
+  radius_m: number;
+}
+
+export type HookSourceKindWire = 'presence' | 'camera' | 'device' | 'sensor' | 'web_watch' | 'cart' | 'connector';
+
+export interface HookSourceWire {
+  id: string;
+  kind: HookSourceKindWire;
+  label: string;
+  events: { id: string; label: string }[];
+}
+
+export interface HookSourcesWire {
+  places: PlaceWire[];
+  sources: HookSourceWire[];
+}
+
+export interface CartItemWire {
+  id: string;
+  url: string;
+  title: string;
+  picture: string | null;
+  site: string;
+  price: MoneyWire | null;
+  previous: MoneyWire | null;
+  lowest: MoneyWire | null;
+  highest: MoneyWire | null;
+  target: MoneyWire | null;
+  in_stock: boolean | null;
+  history: { at: string; amount: number }[];
+  status: 'ok' | 'checking' | 'failing';
+  checked_at: string | null;
+  next_check_at: string | null;
+  every_hours: number;
+  collection: string | null;
+  notify: 'drop' | 'target' | 'stock' | 'any';
+}
+
+export interface CartWriteWire {
+  url?: string;
+  target?: MoneyWire | null;
+  collection?: string | null;
+  every_hours?: number;
+  notify?: CartItemWire['notify'];
+}
+
+export type ConnectorCategoryWire = 'mail' | 'calendar' | 'home' | 'web' | 'travel' | 'weather' | 'music' | 'money' | 'custom';
+
+export interface ConnectorFieldWire {
+  key: string;
+  label: string;
+  kind: 'text' | 'secret' | 'url' | 'toggle' | 'select';
+  options?: string[];
+  required: boolean;
+  help?: string;
+}
+
+export interface ConnectorWire {
+  id: string;
+  name: string;
+  summary: string;
+  icon: string;
+  category: ConnectorCategoryWire;
+  status: 'connected' | 'available' | 'needs_setup' | 'error';
+  status_detail: string | null;
+  kind: 'built_in' | 'account' | 'mcp' | 'webhook';
+  provides: { tools: number; events: { id: string; label: string }[]; feeds: ('news' | 'todos' | 'ideas')[] };
+  setup: { fields: ConnectorFieldWire[]; oauth: string | null };
+  /** Only on the answer to `POST /me/connectors/webhook`, and only that once. */
+  webhook_url?: string;
+}
+
+export interface IdeaWire {
+  id: string;
+  title: string;
+  pitch: string;
+  why: string;
+  grounded_in: { kind: 'interest' | 'memory' | 'conversation'; label: string }[];
+  sources: SourceRefWire[];
+  picture: string | null;
+  goose_can: { label: string; kind: 'research' | 'watch' | 'todo' | 'schedule' | 'chat' } | null;
+  you_can: string[];
+  state: 'new' | 'working' | 'done' | 'dismissed';
+  progress: { task_id: string } | null;
+  created_at: string;
+}
+
+export type CatalogOpensWire =
+  | 'news' | 'todos' | 'cart' | 'connectors' | 'ideas' | 'interests' | 'agents' | 'web_watches' | 'cameras'
+  | 'voice' | 'models' | 'settings';
+
+export interface CatalogItemWire {
+  id: string;
+  title: string;
+  body: string;
+  icon: string;
+  state: 'on' | 'off' | 'needs_setup';
+  try: string | null;
+  opens: CatalogOpensWire | null;
 }

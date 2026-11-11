@@ -124,6 +124,28 @@ export default function StackLayout() {
       <Stack.Screen name="schedule" options={{ title: t('screens.schedule') }} />
       <Stack.Screen name="schedule-detail" options={{ title: t('screens.scheduleDetail') }} />
       <Stack.Screen name="reminders" options={{ title: t('screens.reminders') }} />
+      <Stack.Screen name="web-watches" options={{ title: t('screens.webWatches') }} />
+      <Stack.Screen name="web-watch" options={{ title: t('screens.webWatch') }} />
+      <Stack.Screen name="saved" options={{ title: t('screens.saved') }} />
+      <Stack.Screen name="saved-item" options={{ title: t('screens.savedItem') }} />
+      <Stack.Screen name="goose-cart" options={{ title: t('screens.gooseCart') }} />
+      <Stack.Screen name="goose-news" options={{ title: t('screens.gooseNews') }} />
+      <Stack.Screen name="goose-ideas" options={{ title: t('screens.gooseIdeas') }} />
+      <Stack.Screen name="goose-story" options={{ title: t('screens.gooseStory'), headerShown: false }} />
+      <Stack.Screen name="goose-digest" options={{ title: t('screens.gooseDigest') }} />
+      <Stack.Screen name="goose-news-settings" options={{ title: t('screens.gooseNewsSettings') }} />
+      <Stack.Screen name="goose-interest" options={{ title: t('screens.gooseInterest'), headerShown: false }} />
+      <Stack.Screen name="goose-section" options={{ title: t('screens.gooseSection') }} />
+      <Stack.Screen name="goose-history" options={{ title: t('screens.gooseHistory') }} />
+      <Stack.Screen name="goose-search" options={{ title: t('screens.gooseSearch') }} />
+      <Stack.Screen name="goose-todos" options={{ title: t('screens.gooseTodos') }} />
+      <Stack.Screen name="goose-todo" options={{ title: t('screens.gooseTodo') }} />
+      <Stack.Screen name="goose-cart-item" options={{ title: t('screens.gooseCartItem') }} />
+      <Stack.Screen name="goose-connectors" options={{ title: t('screens.gooseConnectors') }} />
+      <Stack.Screen name="goose-connector" options={{ title: t('screens.gooseConnector') }} />
+      <Stack.Screen name="goose-interests" options={{ title: t('screens.gooseInterests') }} />
+      <Stack.Screen name="goose-interview" options={{ title: t('screens.gooseInterview') }} />
+      <Stack.Screen name="goose-catalog" options={{ title: t('screens.gooseCatalog') }} />
       <Stack.Screen name="ride" options={{ title: t('screens.ride') }} />
       <Stack.Screen name="agents" options={{ title: t('screens.agents') }} />
       <Stack.Screen name="task-report" options={{ title: t('screens.taskReport') }} />

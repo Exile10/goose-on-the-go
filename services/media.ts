@@ -38,6 +38,8 @@ export interface Attachment {
   text?: string;
   /** Voice notes: how long it runs. */
   durationMs?: number;
+  /** Voice mode: what the Pond's Whisper made of the clip, used where its model cannot hear. */
+  heardAs?: string;
   width?: number;
   height?: number;
 }

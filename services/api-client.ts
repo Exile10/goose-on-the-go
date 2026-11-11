@@ -1,4 +1,19 @@
 import { File, Paths } from 'expo-file-system';
+import {
+  readCollection,
+  readList,
+  readReportImage,
+  readSavedItem,
+  readWebWatch,
+  readWebWatchDetail,
+  type ReportImage,
+  type SavedCollection,
+  type SavedItem,
+  type SavedKind,
+  type WatchFilters,
+  type WebWatch,
+  type WebWatchDetail,
+} from '@/models/web-watches';
 
 import { assertPondTrust, PondTrustError, pondTrustFailed } from './pond-trust';
 import { isInsecureDevOrigin, isLocalPairingUrl, normalizePondUrl } from '@/models/connection';
@@ -6,6 +21,37 @@ import { readWebSearch } from '@/models/web-search';
 import { readPrefills } from '@/models/agents';
 import { readRoomVoiceEvent, readVoiceAgent, readVoicePrints, readVoiceRoom, readVoiceTake } from '@/models/voice-room';
 import { readInterview, readInterviewOffer, readMemberNotes } from '@/models/interview';
+import { readHub, type MeHub } from '@/models/hub';
+import { readInterest, readInterests, readInterestInterview, readPortrait, type InterestInterview, type Interest, type Portrait } from '@/models/interests';
+import {
+  readDigest,
+  readDigestList,
+  readHistory,
+  readNewsFeed,
+  readNewsSettings,
+  readStoryDetail,
+  type Digest,
+  type DigestSummary,
+  type NewsFeed,
+  type NewsSettings,
+  type Story,
+  type StoryDetail,
+} from '@/models/news';
+import {
+  readHookSources,
+  readPlace,
+  readTodo,
+  readTodoOffers,
+  readTodos,
+  type HookSources,
+  type Place,
+  type Todo,
+  type TodoOffer,
+} from '@/models/todos';
+import { readCart, readCartItem, type CartItem } from '@/models/cart';
+import { readConnector, readConnectors, type Connector } from '@/models/connectors';
+import { readIdea, readIdeas, type Idea } from '@/models/ideas';
+import { readCatalog, type CatalogItem } from '@/models/catalog';
 import { readLongTask, readLongTaskReport, readResearchAvailability, reportFileName } from '@/models/long-tasks';
 import {
   readAdminKey,
@@ -88,6 +134,13 @@ import type {
   DeviceSelf,
   MemberNotes,
   ProfileInterview,
+  CartWriteWire,
+  InterestWriteWire,
+  InterviewApproveWire,
+  NewsSettingsWire,
+  StoryVoteWire,
+  TodoAnswerWire,
+  TodoWriteWire,
   DeviceStatePatch,
   EventCategory,
   Extension,
@@ -2691,6 +2744,335 @@ export class PondApiClient {
   /** A 202; a 409 `long_task_running` unless `force`, which loses the running step. */
   async adminRestart(force: boolean): Promise<void> {
     await this.post<unknown>('/api/v1/admin/power/restart', force ? { force: true } : {});
+  }
+
+  // ── Web watches and saved cards ─────────────────────────────
+
+  /** The caller's own web watches, newest first. */
+  async listWebWatches(): Promise<WebWatch[]> {
+    return readList(await this.get<unknown>('/api/v1/web-watches'), readWebWatch);
+  }
+
+  /** One watch with the items it last saw and its newest changes. */
+  async webWatch(id: string): Promise<WebWatchDetail> {
+    const watch = readWebWatchDetail(await this.get<unknown>(`/api/v1/web-watches/${encodeURIComponent(id)}`));
+    if (!watch) throw new Error('The Pond answered the watch with something unexpected');
+    return watch;
+  }
+
+  async editWebWatch(
+    id: string,
+    edit: { paused?: boolean; interval_hours?: number; filters?: WatchFilters; looking_for?: string },
+  ): Promise<WebWatch> {
+    const watch = readWebWatch(await this.patch<unknown>(`/api/v1/web-watches/${encodeURIComponent(id)}`, edit));
+    if (!watch) throw new Error('The Pond answered the watch with something unexpected');
+    return watch;
+  }
+
+  deleteWebWatch(id: string): Promise<void> {
+    return this.del<void>(`/api/v1/web-watches/${encodeURIComponent(id)}`);
+  }
+
+  /** The caller's cards and the household's shared ones, of one collection when named. */
+  async listSavedItems(collection?: string): Promise<SavedItem[]> {
+    const query = collection ? `?collection=${encodeURIComponent(collection)}` : '';
+    return readList(await this.get<unknown>(`/api/v1/saved-items${query}`), readSavedItem);
+  }
+
+  async savedCollections(): Promise<SavedCollection[]> {
+    return readList(await this.get<unknown>('/api/v1/saved-items/collections'), readCollection);
+  }
+
+  async savedItem(id: string): Promise<SavedItem> {
+    const item = readSavedItem(await this.get<unknown>(`/api/v1/saved-items/${encodeURIComponent(id)}`));
+    if (!item) throw new Error('The Pond answered the card with something unexpected');
+    return item;
+  }
+
+  /** Keeps a card, such as an option a task found; the Pond bounds what it stores. */
+  async saveItem(card: Record<string, unknown> & { kind: SavedKind; title: string }): Promise<SavedItem> {
+    const item = readSavedItem(await this.post<unknown>('/api/v1/saved-items', card));
+    if (!item) throw new Error('The Pond answered the card with something unexpected');
+    return item;
+  }
+
+  /** `collection: null` takes the card out of its collection. */
+  async editSavedItem(
+    id: string,
+    edit: { title?: string; body?: string; collection?: string | null; shared?: boolean },
+  ): Promise<SavedItem> {
+    const item = readSavedItem(await this.patch<unknown>(`/api/v1/saved-items/${encodeURIComponent(id)}`, edit));
+    if (!item) throw new Error('The Pond answered the card with something unexpected');
+    return item;
+  }
+
+  deleteSavedItem(id: string): Promise<void> {
+    return this.del<void>(`/api/v1/saved-items/${encodeURIComponent(id)}`);
+  }
+
+  /** Pictures the Pond keeps for the pages an answer cites or read; none from an older Pond. */
+  async pagePictures(pages: string[]): Promise<ReportImage[]> {
+    try {
+      return readList(await this.post<unknown>('/api/v1/report-images/for-pages', { pages }), readReportImage);
+    } catch (e) {
+      if (e instanceof ApiError && (e.status === 404 || e.status === 405)) return [];
+      throw e;
+    }
+  }
+
+  /** "Watch price": a watch on the card's own page, which tells this member when its price drops. */
+  async watchSavedItem(id: string, body: { max_price?: number } = {}): Promise<WebWatch> {
+    const watch = readWebWatch(await this.post<unknown>(`/api/v1/saved-items/${encodeURIComponent(id)}/watch`, body));
+    if (!watch) throw new Error('The Pond answered the watch with something unexpected');
+    return watch;
+  }
+
+  // ── My Goose: the member's hub (docs/MY-GOOSE-HUB.md) ────────
+  // Every route acts for the calling member. A Pond without `/me/hub` answers 404, and the phone
+  // keeps its older My Goose; a route that starts work on the Pond's lane answers 202.
+
+  /** What this Pond serves of My Goose, or null for an answer that is not the hub. */
+  async meHub(): Promise<MeHub | null> {
+    return readHub(await this.get<unknown>('/api/v1/me/hub'));
+  }
+
+  async interests(): Promise<Interest[]> {
+    return readInterests(await this.get<unknown>('/api/v1/me/interests'));
+  }
+
+  async addInterest(body: InterestWriteWire & { topic: string }): Promise<Interest> {
+    return required(readInterest(await this.post<unknown>('/api/v1/me/interests', body)), 'the interest');
+  }
+
+  async editInterest(id: string, body: InterestWriteWire): Promise<Interest> {
+    return required(readInterest(await this.patch<unknown>(`/api/v1/me/interests/${encodeURIComponent(id)}`, body)), 'the interest');
+  }
+
+  async deleteInterest(id: string): Promise<void> {
+    await this.del<unknown>(`/api/v1/me/interests/${encodeURIComponent(id)}`);
+  }
+
+  async interestInterview(): Promise<InterestInterview> {
+    return readInterestInterview(await this.get<unknown>('/api/v1/me/interests/interview'));
+  }
+
+  /** Starts the interview, resumes it, or begins a new round once one is done. */
+  async startInterestInterview(): Promise<InterestInterview> {
+    return readInterestInterview(await this.post<unknown>('/api/v1/me/interests/interview', {}));
+  }
+
+  /** Answers `thinking` until the next question is written; the phone reads it again until then. */
+  async answerInterestInterview(answer: { text?: string; choices?: string[] }): Promise<InterestInterview> {
+    return readInterestInterview(await this.post<unknown>('/api/v1/me/interests/interview/answer', answer));
+  }
+
+  async finishInterestInterview(): Promise<InterestInterview> {
+    return readInterestInterview(await this.post<unknown>('/api/v1/me/interests/interview/finish', {}));
+  }
+
+  /** How many interests were saved. */
+  async approveInterestInterview(body: InterviewApproveWire): Promise<number> {
+    const res = await this.post<{ saved?: unknown }>('/api/v1/me/interests/interview/approve', body);
+    return typeof res?.saved === 'number' && Number.isFinite(res.saved) ? res.saved : body.keep.length;
+  }
+
+  /** The Pond's account of the member, or null before the first is written (a 404). */
+  async portrait(): Promise<Portrait | null> {
+    try {
+      return readPortrait(await this.get<unknown>('/api/v1/me/portrait'));
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 404) return null;
+      throw e;
+    }
+  }
+
+  async newsSettings(): Promise<NewsSettings> {
+    return readNewsSettings(await this.get<unknown>('/api/v1/me/news/settings'));
+  }
+
+  /** A partial write: only the fields sent change. */
+  async saveNewsSettings(change: Partial<NewsSettingsWire>): Promise<NewsSettings> {
+    return readNewsSettings(await this.put<unknown>('/api/v1/me/news/settings', change));
+  }
+
+  async news(): Promise<NewsFeed> {
+    return readNewsFeed(await this.get<unknown>('/api/v1/me/news'));
+  }
+
+  /** One interest's page: only its stories, newest first, up to 30. */
+  async newsFor(interestId: string): Promise<NewsFeed> {
+    return readNewsFeed(await this.get<unknown>(`/api/v1/me/news?interest=${encodeURIComponent(interestId)}`));
+  }
+
+  async markStoryRead(id: string): Promise<void> {
+    await this.post<unknown>(`/api/v1/me/news/stories/${encodeURIComponent(id)}/read`, {});
+  }
+
+  /** What the member read in the last 30 days. */
+  async newsHistory(): Promise<Story[]> {
+    return readHistory(await this.get<unknown>('/api/v1/me/news/history'));
+  }
+
+  /** Up and down tune that interest's topics; `wrong` hides the story and keeps the note. */
+  async storyFeedback(id: string, vote: StoryVoteWire, note?: string): Promise<void> {
+    await this.post<unknown>(`/api/v1/me/news/stories/${encodeURIComponent(id)}/feedback`, note ? { vote, note } : { vote });
+  }
+
+  async story(id: string): Promise<StoryDetail> {
+    return required(readStoryDetail(await this.get<unknown>(`/api/v1/me/news/stories/${encodeURIComponent(id)}`)), 'the story');
+  }
+
+  async digests(): Promise<DigestSummary[]> {
+    return readDigestList(await this.get<unknown>('/api/v1/me/news/digests'));
+  }
+
+  async digest(id: string): Promise<Digest> {
+    return required(readDigest(await this.get<unknown>(`/api/v1/me/news/digests/${encodeURIComponent(id)}`)), 'the digest');
+  }
+
+  /**
+   * The digest read aloud in the Pond's voice, as WAV bytes. `path` is the digest's own `listen`,
+   * which the reader has already kept to the Pond's API. Synthesis can take a while on a small
+   * Pond, so it gets the voice timeout rather than the usual one.
+   */
+  async digestAudio(path: string, signal?: AbortSignal): Promise<ArrayBuffer> {
+    if (!path.startsWith('/api/') || path.startsWith('//')) throw new Error('Invalid Pond API path');
+    const res = await this.open(path, { headers: { Accept: 'audio/wav' }, signal: timeoutSignal(VOICE_TIMEOUT_MS, signal) });
+    return res.arrayBuffer();
+  }
+
+  /** Reads the digest on the house speaker now. */
+  async speakDigest(id: string): Promise<void> {
+    await this.post<unknown>(`/api/v1/me/news/digests/${encodeURIComponent(id)}/speak`, {});
+  }
+
+  async refreshNews(): Promise<void> {
+    await this.post<unknown>('/api/v1/me/news/refresh', {});
+  }
+
+  async todos(state: 'open' | 'done' | 'all' = 'open'): Promise<Todo[]> {
+    return readTodos(await this.get<unknown>(`/api/v1/me/todos?state=${state}`));
+  }
+
+  async addTodo(body: TodoWriteWire & { kind: 'todo' | 'reminder'; text: string }): Promise<Todo> {
+    return required(readTodo(await this.post<unknown>('/api/v1/me/todos', body)), 'the to-do');
+  }
+
+  /** `hooks`, when sent, replaces every hook the to-do had. */
+  async editTodo(id: string, body: TodoWriteWire): Promise<Todo> {
+    return required(readTodo(await this.patch<unknown>(`/api/v1/me/todos/${encodeURIComponent(id)}`, body)), 'the to-do');
+  }
+
+  async deleteTodo(id: string): Promise<void> {
+    await this.del<unknown>(`/api/v1/me/todos/${encodeURIComponent(id)}`);
+  }
+
+  /** The member's answer to Goose asking whether it is done. */
+  async answerTodo(id: string, answer: TodoAnswerWire, snoozeMinutes?: number): Promise<Todo> {
+    const body = snoozeMinutes ? { answer, snooze_minutes: snoozeMinutes } : { answer };
+    return required(readTodo(await this.post<unknown>(`/api/v1/me/todos/${encodeURIComponent(id)}/answer`, body)), 'the to-do');
+  }
+
+  /** Dated mentions from chats, offered as to-dos. */
+  async todoOffers(): Promise<TodoOffer[]> {
+    return readTodoOffers(await this.get<unknown>('/api/v1/me/todos/offers'));
+  }
+
+  /** Adds the offer as a to-do, at the time the Pond worked out or the one sent. */
+  async acceptTodoOffer(reminderId: string, dueAt?: string): Promise<Todo> {
+    const body = dueAt ? { due_at: dueAt } : {};
+    return required(readTodo(await this.post<unknown>(`/api/v1/me/todos/offers/${encodeURIComponent(reminderId)}/accept`, body)), 'the to-do');
+  }
+
+  async declineTodoOffer(reminderId: string): Promise<void> {
+    await this.post<unknown>(`/api/v1/me/todos/offers/${encodeURIComponent(reminderId)}/decline`, {});
+  }
+
+  /** The places and the things a to-do can be hooked to; a connector added on the Pond shows up here. */
+  async hookSources(): Promise<HookSources> {
+    return readHookSources(await this.get<unknown>('/api/v1/me/hooks/sources'));
+  }
+
+  async addPlace(body: { label: string; lat: number; lng: number; radius_m?: number }): Promise<Place> {
+    return required(readPlace(await this.post<unknown>('/api/v1/me/places', body)), 'the place');
+  }
+
+  async deletePlace(id: string): Promise<void> {
+    await this.del<unknown>(`/api/v1/me/places/${encodeURIComponent(id)}`);
+  }
+
+  /** The phone's geofence saying the member arrived at or left a place. */
+  async placeEvent(id: string, transition: 'arrive' | 'leave'): Promise<void> {
+    await this.post<unknown>(`/api/v1/me/places/${encodeURIComponent(id)}/event`, { transition });
+  }
+
+  async cart(): Promise<CartItem[]> {
+    return readCart(await this.get<unknown>('/api/v1/me/cart'));
+  }
+
+  /** Starts watching a link; the item answers `checking` until the Pond has read the page. */
+  async addToCart(body: CartWriteWire & { url: string }): Promise<CartItem> {
+    return required(readCartItem(await this.post<unknown>('/api/v1/me/cart', body)), 'the watched link');
+  }
+
+  async cartItem(id: string): Promise<CartItem> {
+    return required(readCartItem(await this.get<unknown>(`/api/v1/me/cart/${encodeURIComponent(id)}`)), 'the watched link');
+  }
+
+  async editCartItem(id: string, body: CartWriteWire): Promise<CartItem> {
+    return required(readCartItem(await this.patch<unknown>(`/api/v1/me/cart/${encodeURIComponent(id)}`, body)), 'the watched link');
+  }
+
+  async deleteCartItem(id: string): Promise<void> {
+    await this.del<unknown>(`/api/v1/me/cart/${encodeURIComponent(id)}`);
+  }
+
+  async checkCartItem(id: string): Promise<CartItem> {
+    return required(readCartItem(await this.post<unknown>(`/api/v1/me/cart/${encodeURIComponent(id)}/check`, {})), 'the watched link');
+  }
+
+  async connectors(): Promise<Connector[]> {
+    return readConnectors(await this.get<unknown>('/api/v1/me/connectors'));
+  }
+
+  async connectConnector(id: string, fields: Record<string, string | boolean>): Promise<Connector> {
+    return required(readConnector(await this.post<unknown>(`/api/v1/me/connectors/${encodeURIComponent(id)}/connect`, { fields })), 'the connector');
+  }
+
+  async disconnectConnector(id: string): Promise<Connector> {
+    return required(readConnector(await this.post<unknown>(`/api/v1/me/connectors/${encodeURIComponent(id)}/disconnect`, {})), 'the connector');
+  }
+
+  /** A new webhook connector. Its address comes back on this answer only. */
+  async makeWebhook(name: string): Promise<Connector> {
+    return required(readConnector(await this.post<unknown>('/api/v1/me/connectors/webhook', { name })), 'the webhook');
+  }
+
+  async ideas(): Promise<{ ideas: Idea[]; state: 'idle' | 'thinking' }> {
+    return readIdeas(await this.get<unknown>('/api/v1/me/ideas'));
+  }
+
+  /** Goose starts its part; the idea answers `working`. */
+  async ideaGoose(id: string): Promise<Idea> {
+    return required(readIdea(await this.post<unknown>(`/api/v1/me/ideas/${encodeURIComponent(id)}/goose`, {})), 'the idea');
+  }
+
+  /** The idea's steps become the member's to-dos. */
+  async ideaMine(id: string): Promise<{ idea: Idea; todos: Todo[] }> {
+    const res = await this.post<{ idea?: unknown; todos?: unknown }>(`/api/v1/me/ideas/${encodeURIComponent(id)}/mine`, {});
+    return { idea: required(readIdea(res?.idea), 'the idea'), todos: readTodos(res?.todos) };
+  }
+
+  async dismissIdea(id: string): Promise<void> {
+    await this.post<unknown>(`/api/v1/me/ideas/${encodeURIComponent(id)}/dismiss`, {});
+  }
+
+  async refreshIdeas(): Promise<void> {
+    await this.post<unknown>('/api/v1/me/ideas/refresh', {});
+  }
+
+  async catalog(): Promise<CatalogItem[]> {
+    return readCatalog(await this.get<unknown>('/api/v1/me/catalog'));
   }
 
   // ── Verb helpers ────────────────────────────────────────────
