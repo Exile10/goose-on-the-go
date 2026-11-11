@@ -357,10 +357,12 @@ export function PhoneAssistantRow() {
 /**
  * "Listen for <the household's phrase>": the phone's wake word, which opens the same voice orb as
  * the assist gesture. Android only, and only where this build carries the detector. Says which way
- * the phone listens, because for any phrase but "hey goose" speech near it goes to the Pond.
+ * the phone listens, because for any phrase but "hey goose" speech near it goes to the Pond. For
+ * "hey goose", a second row says whose voices can wake the phone and opens the wake test.
  */
 export function PhoneWakeRow() {
   const { t } = useTranslation();
+  const router = useRouter();
   const { data, actions } = usePhoneWake();
   if (!data.supported) {
     return (
@@ -370,13 +372,32 @@ export function PhoneWakeRow() {
     );
   }
   return (
-    <SwitchRow
-      label={t('settings.phoneWake.label', { phrase: data.phrase })}
-      description={t(data.mode === 'pond' ? 'settings.phoneWake.descriptionPond' : 'settings.phoneWake.description')}
-      value={data.on}
-      disabled={data.busy}
-      error={data.error}
-      onChange={(next) => void actions.set(next)}
-    />
+    <>
+      <SwitchRow
+        label={t('settings.phoneWake.label', { phrase: data.phrase })}
+        description={t(data.mode === 'pond' ? 'settings.phoneWake.descriptionPond' : 'settings.phoneWake.description')}
+        value={data.on}
+        disabled={data.busy}
+        error={data.error}
+        onChange={(next) => void actions.set(next)}
+      />
+      {data.mode === 'hey_goose' ? (
+        <>
+          <RowSeparator />
+          <SettingsRow
+            label={t('settings.phoneWake.test')}
+            description={
+              data.taught === null
+                ? undefined
+                : data.taught > 0
+                  ? t('settings.phoneWake.voices', { count: data.taught })
+                  : t('settings.phoneWake.anyVoice')
+            }
+            accessory="next"
+            onPress={() => router.push('/wake-test')}
+          />
+        </>
+      ) : null}
+    </>
   );
 }

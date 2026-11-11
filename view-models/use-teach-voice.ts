@@ -16,6 +16,7 @@ import { useServer } from '@/providers/server-provider';
 import { ApiError } from '@/services/api-client';
 import { reject } from '@/services/haptics';
 import i18n from '@/services/i18n';
+import { enrolPhoneTake, forgetPhoneVoice } from '@/services/phone-wake-voices';
 import type { VoicePrints, VoiceTakeResult, WakeDetectorVerdict } from '@/services/types';
 import { VOICE_PRINT_TAKES, teachSentences } from '@/models/voice-room';
 import { isMissingRoute } from './agents-source';
@@ -24,7 +25,7 @@ import { usePondSettings } from './use-pond-settings';
 import { finishChecklistItem } from './use-setup-checklist';
 import { useTakeRecorder } from './use-take-recorder';
 import { useVoicePrints } from './use-voice-prints';
-import { useVoiceSource } from './voice-source';
+import { POND_VOICE, useVoiceSource } from './voice-source';
 
 export type TeachPhase = 'intro' | 'takes' | 'done';
 
@@ -191,6 +192,9 @@ export function useTeachVoice({ member, phrase }: { member: TeachMember | null; 
         setSaid(words);
         return 'again';
       }
+      // This phone's wake word listens only for the voices taught on it; the take's voice is kept
+      // here too while the file still exists. It never fails the take, which the Pond already has.
+      if (member && r.matchOn && source === POND_VOICE) await enrolPhoneTake(uri, member.id);
       r.index += 1;
       setDetector(result.wake_detector);
       setResults((was) => [...was, { prompt, detector: result.wake.new_detector }]);
@@ -225,7 +229,10 @@ export function useTeachVoice({ member, phrase }: { member: TeachMember | null; 
           await source.resetCalibration();
           if (!(await update('voice_wake_word', phrase.trim()))) throw new Error('The wake phrase was not saved');
         }
-        if (run.current.matchOn && member && memberTakes > 0) await source.forget(member.id);
+        if (run.current.matchOn && member && memberTakes > 0) {
+          await source.forget(member.id);
+          if (source === POND_VOICE) await forgetPhoneVoice(member.id);
+        }
         run.current.index = 0;
         setIndex(0);
         setResults([]);

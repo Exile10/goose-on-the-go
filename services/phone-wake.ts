@@ -54,16 +54,62 @@ interface WakeBridge {
   state(): Promise<PhoneWakeState>;
   choose(on: boolean, words: WakeNotificationWords | Record<string, never>): Promise<boolean>;
   resume(): Promise<boolean>;
+  voices(): Promise<PhoneVoices>;
+  installSpeakerModel(uri: string): Promise<boolean>;
+  enrolTake(uri: string, profileId: string): Promise<{ peak: number; takes: number }>;
+  forgetVoice(profileId: string): Promise<null>;
+  chooseWakeThreshold(cnn: number): Promise<null>;
+  testWake(uri: string): Promise<WakeTestRun>;
 }
 
-function bridge(): WakeBridge | null {
+/** What the wake word's voice check knows on this phone (`WakeVoices` in PondWake.kt). */
+export interface PhoneVoices {
+  /** Whether the Pond's speaker model is here. */
+  model: boolean;
+  /** Who is taught on this phone, and with how many takes. Only they can wake it once anyone is. */
+  people: { profileId: string; takes: number }[];
+  /** The CNN's line for "hey goose": the takes' own, or one a wake test chose. */
+  cnn: number;
+  /** A voice at or above `accept` is taken as taught; below `reject` it is ignored. */
+  accept: number;
+  reject: number;
+  /** The range the CNN's line stays in. */
+  floor: number;
+  strict: number;
+  /** Whether a wake test chose the CNN's line. */
+  chosen: boolean;
+}
+
+/** What the service would do with a candidate: "below" is one it would not have heard at all. */
+export type WakeTestDecision = 'below' | 'ignore' | 'wake' | 'ask_pond';
+
+export interface WakeTestCandidate {
+  /** Seconds into the recording. */
+  t: number;
+  /** The CNN's peak probability. */
+  p: number;
+  /** The best match among the taught voices; null when nothing was scored. */
+  voice: number | null;
+  decision: WakeTestDecision;
+  /** For "ask_pond": the speech, as a WAV in the cache, to send to the Pond and then delete. */
+  segment: string | null;
+}
+
+export interface WakeTestRun {
+  cnn: number;
+  taught: boolean;
+  candidates: WakeTestCandidate[];
+}
+
+/** The module; null off Android or without the plugin. The voice check's calls use it too. */
+export function wakeBridge(): WakeBridge | null {
   if (Platform.OS !== 'android') return null;
   return (NativeModules.PondWake as WakeBridge | undefined) ?? null;
 }
 
 /** Whether this build, CPU and Android version can listen for "Hey Goose". */
 export function phoneWakeSupported(): boolean {
-  const native = bridge();
+  const native = wakeBridge();
   if (!native) return false;
   try {
     return native.available();
@@ -75,7 +121,7 @@ export function phoneWakeSupported(): boolean {
 
 /** What the switch and the service are doing; null where that cannot be known. */
 export async function phoneWakeState(): Promise<PhoneWakeState | null> {
-  const native = bridge();
+  const native = wakeBridge();
   if (!native) return null;
   try {
     return await native.state();
@@ -90,7 +136,7 @@ export async function phoneWakeState(): Promise<PhoneWakeState | null> {
  * false when the start was refused, which the state's `refusal` then explains.
  */
 export async function choosePhoneWake(on: boolean, words: WakeNotificationWords): Promise<boolean> {
-  const native = bridge();
+  const native = wakeBridge();
   if (!native) return false;
   try {
     const accepted = await native.choose(on, on ? words : {});
@@ -107,7 +153,7 @@ export async function choosePhoneWake(on: boolean, words: WakeNotificationWords)
  * app is in front, so a reboot or a force stop ends it until the app next opens.
  */
 export async function resumePhoneWake(): Promise<void> {
-  const native = bridge();
+  const native = wakeBridge();
   if (!native) return;
   try {
     await native.resume();
@@ -135,7 +181,7 @@ export function wakeMode(phrase: string): WakeMode {
 
 /** Tell the service the household's phrase, with the notification's words that name it. */
 export function configurePhoneWake(phrase: string, words: WakeNotificationWords): void {
-  const native = bridge();
+  const native = wakeBridge();
   if (!native) return;
   try {
     native.configure(wakeMode(phrase), words);
@@ -156,7 +202,7 @@ let segments: { remove(): void } | null = null;
  * `phraseHeard` receives the phrase each answer names. Installing again replaces the handlers.
  */
 export function answerWakeSegments(check: SegmentCheck, phraseHeard: (phrase: string) => void): void {
-  const native = bridge();
+  const native = wakeBridge();
   if (!native) return;
   segments?.remove();
   segments = DeviceEventEmitter.addListener('PondWakeSegment', (path: string) => {

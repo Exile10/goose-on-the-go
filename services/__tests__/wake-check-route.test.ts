@@ -10,8 +10,8 @@ jest.mock('expo-file-system', () => ({
   },
 }));
 /**
- * `checkWakeSegment`: one segment to `POST /voice/wake/check` as multipart `audio`, behind the
- * session token, and only `{heard, phrase}` read back.
+ * `checkWakeSegment`: one segment to `POST /voice/wake/check` as multipart `audio` with
+ * `phrase_only`, behind the session token, and only `{heard, phrase}` read back.
  */
 
 import { ApiError, PondApiClient } from '@/services/api-client';
@@ -49,8 +49,9 @@ beforeEach(() => {
   appended = [];
   const append = FormData.prototype.append;
   jest.spyOn(FormData.prototype, 'append').mockImplementation(function (this: FormData, name: string, value: string | Blob, file?: string) {
-    appended.push([name, (value as Blob & { uri: string }).uri, file]);
-    append.call(this, name, value as Blob, file);
+    appended.push([name, typeof value === 'string' ? value : (value as Blob & { uri: string }).uri, file]);
+    if (typeof value === 'string') (append as (this: FormData, n: string, v: string) => void).call(this, name, value);
+    else append.call(this, name, value, file);
   });
 });
 
@@ -68,7 +69,11 @@ it('sends the segment as audio with the token and reads the verdict', async () =
   expect(seen[0].method).toBe('POST');
   expect(seen[0].auth).toBe('Bearer session-token');
   expect(seen[0].body).toBeInstanceOf(FormData);
-  expect(appended).toEqual([['audio', 'file:///cache/wake-segments/segment-1.wav', 'segment.wav']]);
+  // The whole phrase: the phone only sends what was already near it (`phrase_only`).
+  expect(appended).toEqual([
+    ['audio', 'file:///cache/wake-segments/segment-1.wav', 'segment.wav'],
+    ['phrase_only', 'true', undefined],
+  ]);
 });
 
 it('names a refusal, and rejects an answer of another shape', async () => {

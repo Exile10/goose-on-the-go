@@ -1618,7 +1618,7 @@
     },
     "phoneWake": {
       "label": "Listen for “{{phrase}}”",
-      "description": "Say it while the phone is unlocked to open the voice orb over any app. The phone listens for “hey goose” itself; nothing it hears leaves the phone until the orb opens.",
+      "description": "Say it while the phone is unlocked to open the voice orb over any app. The phone listens for “hey goose” itself, and once someone teaches Goose their voice here, only their voices wake it. When the phone is unsure, it asks your Pond about that moment of speech and nowhere else.",
       "needsAssistant": "Make Goose this phone's assistant first: the wake word opens the same voice orb.",
       "microphone": "Goose needs the microphone to hear the wake word.",
       "microphoneSettings": "Allow the microphone for Goose On The Go in the phone's Settings, then try again.",
@@ -1635,7 +1635,11 @@
         "stop": "Stop",
         "channel": "Hey Goose"
       },
-      "descriptionPond": "Say it while the phone is unlocked to open the voice orb over any app. Only your Pond knows this phrase, so what is said near the phone goes to your Pond to be checked, and nowhere else."
+      "descriptionPond": "Say it while the phone is unlocked to open the voice orb over any app. Only your Pond knows this phrase, so what is said near the phone goes to your Pond to be checked, and nowhere else.",
+      "test": "Test the wake word",
+      "voices_one": "Only the voice taught on this phone can wake it.",
+      "voices_other": "Only the {{count}} voices taught on this phone can wake it.",
+      "anyVoice": "Any voice can wake it until someone teaches Goose their voice on this phone."
     }
   },
   "screens": {
@@ -1709,7 +1713,8 @@
     "settingsPhoneNotifications": "Notifications",
     "voiceAgent": "Voice agent",
     "voiceMatch": "Voice Match",
-    "teachVoice": "Teach Goose your voice"
+    "teachVoice": "Teach Goose your voice",
+    "wakeTest": "Test the wake word"
   },
   "nav": {
     "goose": "Goose",
@@ -4606,5 +4611,54 @@
     "connecting": "Reaching your Pond",
     "unreachable": "Goose cannot reach your Pond from here. Open the app to pair this phone or check its connection.",
     "openApp": "Open Goose On The Go"
+  },
+  "wakeTest": {
+    "voices": {
+      "title": "Who can wake this phone",
+      "taught_one": "One person is taught here, from {{takes}} recorded sentences. Only that voice wakes the phone.",
+      "taught_other": "{{count}} people are taught here, from {{takes}} recorded sentences. Only their voices wake the phone.",
+      "nobody": "Nobody is taught on this phone yet, so any voice can wake it and the phone listens at its strictest. Teach Goose your voice for fewer misses and fewer false wakes.",
+      "noModel": "The voice check is not ready: this phone could not get the speaker model from your Pond yet. Teach your voice again when the Pond is reachable.",
+      "teach": "Teach Goose your voice",
+      "teachAgain": "Teach a voice again"
+    },
+    "intro": {
+      "title": "How well does it hear you?",
+      "body": "First say “{{phrase}}” {{count}} times, with a pause between each. Then talk normally for a minute, or leave the TV on: none of that should wake it.",
+      "privacy": "The recording stays on this phone and is deleted once scored. Moments the phone would ask your Pond about are sent to your Pond, as when it listens."
+    },
+    "phrase": {
+      "title": "Say “{{phrase}}” {{count}} times",
+      "body": "Pause for a second or two between each. Tap Next when you have said it {{count}} times.",
+      "next": "Next"
+    },
+    "talk": {
+      "title": "Now talk normally",
+      "body": "Talk, read aloud or let the TV play. Do not say “{{phrase}}”.",
+      "left": "{{seconds}} seconds left"
+    },
+    "scoring": "Scoring what the phone heard",
+    "result": {
+      "title": "What the phone would have done",
+      "caught": "Woke for {{caught}} of {{said}}.",
+      "falseWakes_one": "Woke once while you talked.",
+      "falseWakes_other": "Woke {{count}} times while you talked.",
+      "falseWakes_zero": "Did not wake while you talked.",
+      "below_one": "One near miss was too faint for its line.",
+      "below_other": "{{count}} near misses were too faint for its line.",
+      "voiceRefused_one": "One was turned away because the voice did not match.",
+      "voiceRefused_other": "{{count}} were turned away because the voice did not match.",
+      "pondRefused_one": "Your Pond did not hear the whole phrase once, or could not be asked.",
+      "pondRefused_other": "Your Pond did not hear the whole phrase {{count}} times, or could not be asked.",
+      "lower": "Your phrase scored lower than the phone expects. Keeping a lower line should catch more of them; your voice and your Pond still check each one.",
+      "higher": "Your phrase scored higher than the phone's line. Keeping a higher line should mean fewer false wakes.",
+      "keep": "Keep the new line",
+      "kept": "Kept. Run the test again to see the difference.",
+      "reset": "Go back to the line from my sentences"
+    },
+    "start": "Start the test",
+    "again": "Test again",
+    "failed": "The test could not be scored. Try again.",
+    "keepFailed": "The phone did not keep the change. Try again."
   }
 }

@@ -41,6 +41,7 @@ app: the overlay is a new conversation each time it opens.
 | `GooseWakeService`, `PondWakeModule` (`PondWake`), `PondEar` | `plugins/pond-wake/PondWake.kt` | "Hey Goose": the listening service, its module, and the detector's JNI (below). |
 | `with-pond-wake.js`, `native/pondear` | `plugins/`, `native/` | Declares the service, copies the Kotlin and the detector libraries in; the JNI shim over the Pond's `pond-ear`. |
 | `services/phone-wake.ts`, `view-models/use-phone-wake.ts`, `PhoneWakeRow` | `components/settings/special-rows.tsx` | The "Listen for Hey Goose" switch. |
+| `services/phone-wake-voices.ts`, `models/wake-test.ts`, `view-models/use-wake-test.ts` | `app/(stack)/wake-test.tsx` | The voices taught on this phone, the speaker model, and the wake test. |
 
 Two React surfaces share one JavaScript runtime: MainActivity's `main` (expo-router) and
 AssistActivity's `assist`. They do not share a tree, which is why the overlay does not mount a
@@ -76,6 +77,35 @@ phone listen for the phrase itself and open the same voice orb as the side key.
     app's cache until it is sent, at most two at once, and is deleted when answered or after
     30 s. This needs the Pond reachable; the settings row says that speech near the phone goes
     to the Pond.
+- **Whose voice.** Once anyone teaches Goose their voice on this phone (the teach flow, with
+  Recognise my voice on), only the voices taught here can wake it. Each take the Pond accepts is
+  also kept on the phone (`enrolPhoneTake`, `services/phone-wake-voices.ts`) as its "hey goose"
+  score and a voice embedding, never as audio, in the app's private files (`WakeVoices` in
+  `PondWake.kt`). The embedding comes from the Pond's own speaker model (ResNet34, the one Voice
+  Match uses), which the phone fetches once from `GET /voice/prints/model/file` and keeps only if
+  its SHA-256 is the one the app carries. Forgetting a voice on the Pond, or teaching it again,
+  forgets it here too. Nobody taught here: the phone listens as before, at its strictest line.
+- **How a candidate is judged** (`native/pondear/src/verify.rs`, the same code for the service
+  and the wake test):
+  - The detector listens at a personal line set from the takes: 0.8 of the weakest take's
+    score, kept between 0.5 and 0.97. After it crosses, it keeps scoring for three more hops and
+    takes the peak, so a phrase is judged at its strongest.
+  - The speech is embedded and matched against the taught voices. Clearly not one of them
+    (below the reject line): ignored. One of them, at the detector's own 0.97: wakes. One of
+    them below 0.97, or the voice unsure: the speech goes to the Pond with `phrase_only`, which
+    wants the whole phrase (or a pronunciation learned for it), with nothing but "um" or "uh"
+    before it; a bare "goose" after other words does not count. Pond unreachable then: ignored.
+  - The voice lines come from the takes: accept is the weakest leave-one-out match among a
+    person's takes less 0.05, kept between 0.3 and 0.8; reject is 0.15 below it.
+  - For any other phrase, each segment is matched the same way first, and a voice clearly not
+    taught here is not sent at all; the rest go to the Pond with `phrase_only`.
+- **The wake test** (Settings, under the switch: **Test the wake word**, `app/(stack)/wake-test.tsx`).
+  The phrase ten times, then a minute of talk, each recorded and run through the same pipeline
+  (`testWake` in `PondWake.kt`), listening at 0.5 so near misses show. It reports how many of the
+  ten woke the phone and how often the talk did, with why the rest did not, and offers the line
+  the phrase suggests (0.8 of its weakest peak in a taught voice; at least three needed), which
+  the service then uses until it is reset or the last voice is forgotten. The recordings are
+  deleted once scored; candidates the phone would ask the Pond about are sent to the Pond.
 - **When the phrase changes.** The app hands the service the phrase from the Pond's settings,
   which it re-reads while open (`PhoneWakeSync` in `app/_layout.tsx`), and every answer to a
   segment names the phrase. A change made on the dashboard or another phone therefore counts
@@ -101,9 +131,13 @@ phone listen for the phrase itself and open the same voice orb as the side key.
   switch and resumes each time the app opens (`resumePhoneWake` at launch, and `PondWakeModule` on
   each return to the front); after a reboot it waits for the app to be opened once.
 - **Logs.** `adb logcat -s PondWake` shows `kind=wake_listening state=on|off mode=... why=...`,
-  `kind=wake_detector rung=...` or `kind=wake_segmenter rung=...`, `kind=wake_heard p=...` or
-  `by=pond`, `kind=wake_segment_dropped reason=...`, and every `kind=wake_refused reason=...`. The
-  Pond logs `kind=wake_check heard=true` for a phone's wake, and its misses only at debug.
+  `kind=wake_detector rung=... cnn=... taught=...` or `kind=wake_segmenter rung=... taught=...`,
+  one `kind=wake_decision mode=... p=... voice=... decision=wake|ask_pond|ignore elapsed_ms=...`
+  per candidate (scores only), `kind=wake_heard by=pond`, `kind=wake_segment_dropped reason=...`,
+  `kind=wake_voice_enrolled`, `kind=wake_voice_forgotten`, `kind=wake_speaker_installed` or
+  `kind=wake_speaker_refused reason=checksum`, `kind=wake_check_degraded` (voices taught but no
+  model), `kind=wake_test`, and every `kind=wake_refused reason=...`. The Pond logs
+  `kind=wake_check heard=true phrase_only=true` for a phone's wake, and its misses only at debug.
 
 To build it: `npm run build:ear` (add `--emulator` for x86_64), then prebuild as usual. The
 `with-pond-wake` plugin stops the prebuild if a packaged ABI's library is missing.

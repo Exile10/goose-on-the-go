@@ -1,4 +1,4 @@
-import { File } from 'expo-file-system';
+import { File, Paths } from 'expo-file-system';
 
 import { assertPondTrust, PondTrustError, pondTrustFailed } from './pond-trust';
 import { isInsecureDevOrigin, isLocalPairingUrl, normalizePondUrl } from '@/models/connection';
@@ -355,6 +355,8 @@ const STREAM_IDLE_MS = 60_000;
 
 /** Transcription pads every clip to a 30s window, and the first speech call loads a model. */
 const VOICE_TIMEOUT_MS = 45_000;
+/** The speaker model is about 26 MB; over a slow Wi-Fi it takes a while. */
+const MODEL_DOWNLOAD_TIMEOUT_MS = 180_000;
 
 /** A face sample is detected, aligned and embedded on the Pond's own CPU before it answers. */
 const FACE_TIMEOUT_MS = 45_000;
@@ -1340,6 +1342,26 @@ export class PondApiClient {
     return prints;
   }
 
+  /**
+   * `GET /voice/prints/model/file`: the Pond's speaker model, written to the app's cache for the
+   * wake word's voice check; the native side checks its checksum before keeping it. 409
+   * `model_not_ready` while the Pond has not finished fetching it.
+   */
+  async downloadSpeakerModel(): Promise<string> {
+    const path = '/api/v1/voice/prints/model/file';
+    const res = await this.send(`${this.baseUrl}${path}`, {
+      headers: this.token ? { Authorization: `Bearer ${this.token}` } : {},
+    }, MODEL_DOWNLOAD_TIMEOUT_MS);
+    if (!res.ok) {
+      const body = await errorBody(res);
+      throw new ApiError(`GET ${path} → ${res.status}`, res.status, parseRetryAfter(res), detailOf(body), body);
+    }
+    const file = new File(Paths.cache, `speaker-model-${Date.now().toString(36)}.onnx`);
+    file.create({ overwrite: true });
+    file.write(new Uint8Array(await res.arrayBuffer()));
+    return file.uri;
+  }
+
   /** A 202: the Pond fetches the speaker model again. */
   retryVoicePrintModel(): Promise<void> {
     return this.post<void>('/api/v1/voice/prints/model', {});
@@ -1376,11 +1398,13 @@ export class PondApiClient {
    * `POST /voice/wake/check`: whether a speech segment this phone heard opens with the household's
    * wake phrase, matched by the Pond with its learned pronunciations. Only the verdict and the phrase
    * come back; the Pond keeps nothing. 503 `speech_recognition_unavailable` and 413
-   * `segment_too_long` are refusals by name.
+   * `segment_too_long` are refusals by name. The phone asks for the whole phrase (`phrase_only`): a
+   * segment it sends was already near the phrase, so a bare "goose" after other words is not enough.
    */
   async checkWakeSegment(fileUri: string): Promise<WakeCheck> {
     const form = new FormData();
     form.append('audio', new File(fileUri), 'segment.wav');
+    form.append('phrase_only', 'true');
     const res = await this.send(`${this.baseUrl}/api/v1/voice/wake/check`, {
       method: 'POST',
       // No Content-Type: the runtime writes the multipart boundary itself.

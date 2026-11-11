@@ -25,6 +25,8 @@ jest.mock('@/services/phone-wake', () => ({
   choosePhoneWake: (on: boolean, words: Record<string, string>) => mockWake.choose(on, words),
 }));
 jest.mock('@/services/api-client', () => ({ api: {} }));
+// One person taught on this phone: the row says only that voice wakes it.
+jest.mock('@/services/phone-wake-voices', () => ({ phoneVoices: async () => ({ people: [{ profileId: 'me', takes: 5 }] }) }));
 jest.mock('@/view-models/use-pond-settings', () => ({ usePondSettings: () => ({ settings: mockSettings }) }));
 jest.mock('@/services/phone-assistant', () => ({ isPhoneAssistant: () => mockAssistant() }));
 jest.mock('@/services/voice-io', () => ({ requestMicrophone: () => mockMicrophone() }));
@@ -69,11 +71,11 @@ it('turns on with the notification in the app language, once the role and microp
   mockWake.state.mockResolvedValueOnce(off).mockResolvedValue(on);
   mockWake.choose.mockResolvedValue(true);
   const view = await mount();
-  expect(view.vm.data).toEqual({ supported: true, phrase: 'hey goose', mode: 'hey_goose', on: false, busy: false, error: null });
+  expect(view.vm.data).toEqual({ supported: true, phrase: 'hey goose', mode: 'hey_goose', on: false, busy: false, taught: 1, error: null });
 
   await act(async () => view.vm.actions.set(true));
   expect(mockWake.choose).toHaveBeenCalledWith(true, wakeNotificationWords('hey goose'));
-  expect(view.vm.data).toEqual({ supported: true, phrase: 'hey goose', mode: 'hey_goose', on: true, busy: false, error: null });
+  expect(view.vm.data).toEqual({ supported: true, phrase: 'hey goose', mode: 'hey_goose', on: true, busy: false, taught: 1, error: null });
 });
 
 it('asks for Goose to be the assistant first, and starts nothing', async () => {

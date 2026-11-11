@@ -24,6 +24,7 @@ import {
   type WakeRefusal,
 } from '@/services/phone-wake';
 import { wakeNotificationWords } from '@/services/phone-wake-pond';
+import { phoneVoices } from '@/services/phone-wake-voices';
 import { requestMicrophone } from '@/services/voice-io';
 import { usePondSettings } from './use-pond-settings';
 
@@ -38,6 +39,8 @@ export interface UsePhoneWake {
     /** The switch: the person's choice. */
     on: boolean;
     busy: boolean;
+    /** How many people are taught on this phone, whose voices alone can wake it; null until read. */
+    taught: number | null;
     /** Why it is not listening when it should be, or why turning it on failed. */
     error: string | null;
   };
@@ -65,6 +68,7 @@ export function usePhoneWake(): UsePhoneWake {
   const [state, setState] = useState<PhoneWakeState | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [taught, setTaught] = useState<number | null>(null);
 
   const apply = useCallback(
     (next: PhoneWakeState | null) => {
@@ -82,6 +86,10 @@ export function usePhoneWake(): UsePhoneWake {
     const refresh = () => {
       void phoneWakeState().then((next) => {
         if (live) apply(next);
+      });
+      // Read with the state: when the row appears and each time the app returns to the front.
+      void phoneVoices().then((voices) => {
+        if (live) setTaught(voices ? voices.people.length : null);
       });
     };
     refresh();
@@ -121,7 +129,7 @@ export function usePhoneWake(): UsePhoneWake {
   );
 
   return {
-    data: { supported, phrase, mode: wakeMode(phrase), on: state?.chosen ?? false, busy, error },
+    data: { supported, phrase, mode: wakeMode(phrase), on: state?.chosen ?? false, busy, taught, error },
     actions: { set },
   };
 }

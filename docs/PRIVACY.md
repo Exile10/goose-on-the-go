@@ -107,8 +107,23 @@ talks to Google or Apple directly. We are not in that path either.
 When you open voice mode to talk to Goose, the app listens through the microphone for you
 to speak, and records what you say. Only the stretches where you are speaking are sent, to
 your Pond, which turns them into text; the copy on your phone is deleted as soon as it has
-been sent. The microphone is used only while voice mode is open. The app is not allowed to
-record in the background, and it does not.
+been sent. Apart from listening for the wake word, if you turn it on (below), the microphone is
+used only while voice mode is open.
+
+On Android, you can turn on **Listen for "Hey Goose"**. The phone then listens while it is unlocked
+and Goose is not open, with a notification saying so that also stops it. For "hey goose", what it
+hears is checked on the phone and dropped; nothing is written or sent unless the phone is unsure
+whether it heard the phrase, when that moment of speech goes to your Pond to be checked and
+nowhere else. For any other phrase, moments of speech go to your Pond to be checked, and are
+deleted from the phone once answered.
+
+If you teach Goose your voice on a phone, that phone keeps, in the app's private storage, a
+numerical summary of your voice and a score for each sentence you recorded, never the recording
+itself, so that only voices taught on it can wake it. To make that summary it uses your Pond's
+voice model, which it fetches from your Pond. Forgetting your voice, in Voice Match or by teaching
+it again, deletes it from the phone as well as from your Pond, and uninstalling the app deletes it.
+The wake test records you on the phone, scores the recording there, and deletes it; moments it is
+unsure of go to your Pond to be checked, as when it listens.
 
 ## Camera, photos and files
 

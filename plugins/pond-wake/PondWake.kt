@@ -57,14 +57,261 @@ object PondEar {
     false
   }
 
-  @JvmStatic external fun nativeOpen(): Long
+  /** A listener at `threshold`; 0 when the embedded model did not convert. */
+  @JvmStatic external fun nativeOpen(threshold: Float): Long
   @JvmStatic external fun nativeRung(): String
+  /** A candidate's peak probability once one was heard (its speech then waits in [nativeHeard]), else -1. */
   @JvmStatic external fun nativePush(handle: Long, pcm: ShortArray, count: Int): Float
+  /** The speech of the candidate [nativePush] last reported, once; null when none waits. */
+  @JvmStatic external fun nativeHeard(handle: Long): ShortArray?
   @JvmStatic external fun nativeClose(handle: Long)
   @JvmStatic external fun nativeOpenSegments(): Long
   /** A finished speech segment as PCM16, or null while speech goes on or none was heard. */
   @JvmStatic external fun nativeSegment(handle: Long, pcm: ShortArray, count: Int): ShortArray?
   @JvmStatic external fun nativeCloseSegments(handle: Long)
+
+  /** The Pond's speaker model from the ONNX at `path`; 0 when it cannot be read or converted. */
+  @JvmStatic external fun nativeOpenSpeaker(path: String): Long
+  /** The unit embedding of `pcm`; null when it is too short to embed. */
+  @JvmStatic external fun nativeEmbed(handle: Long, pcm: ShortArray): FloatArray?
+  /** One teach take as `[peak, embedding...]`, scored as the service hears it; null when too short. */
+  @JvmStatic external fun nativeEnrol(handle: Long, pcm: ShortArray): FloatArray?
+  @JvmStatic external fun nativeCloseSpeaker(handle: Long)
+
+  /** `[cnn, accept, reject]` from the takes: per person `counts[i]` takes of `[peak, embedding...]` in `flat`. */
+  @JvmStatic external fun nativeCalibrate(flat: FloatArray, counts: IntArray): FloatArray
+  /** `[floor, strict]`: the range a personal "hey goose" threshold stays in. */
+  @JvmStatic external fun nativeLimits(): FloatArray
+  @JvmStatic external fun nativeOpenVerifier(flat: FloatArray, counts: IntArray, cnn: Float, accept: Float, reject: Float): Long
+  /** The best match for `emb` among the taught voices; -1 with nobody taught. */
+  @JvmStatic external fun nativeVoice(handle: Long, emb: FloatArray): Float
+  /** A "hey goose" candidate: [IGNORE], [WAKE] or [ASK_POND]. `voice` is NaN when it was not scored. */
+  @JvmStatic external fun nativeDecide(handle: Long, p: Float, voice: Float): Int
+  /** A speech segment for another phrase: [IGNORE] or [ASK_POND]. */
+  @JvmStatic external fun nativeDecideSegment(handle: Long, voice: Float): Int
+  @JvmStatic external fun nativeCloseVerifier(handle: Long)
+
+  const val IGNORE = 0
+  const val WAKE = 1
+  const val ASK_POND = 2
+
+  fun decisionName(code: Int) = when (code) {
+    WAKE -> "wake"
+    ASK_POND -> "ask_pond"
+    else -> "ignore"
+  }
+}
+
+/**
+ * The voices taught on this phone, for the second check on what the service hears: only these
+ * can wake it once anyone is taught. Each teach take the app records (`enrolTake`) is kept as its
+ * CNN peak and its voice embedding, never as audio, in the app's private files with the Pond's
+ * speaker model, which the app downloads from the Pond and this checks against [SPEAKER_SHA256].
+ * Forgetting a voice deletes its takes here.
+ */
+object WakeVoices {
+  /** `voice_match_model::SHA256` in the Pond (`pond-core`): the ResNet34 it serves to phones. */
+  private const val SPEAKER_SHA256 = "7bb2f06e9df17cdf1ef14ee8a15ab08ed28e8d0ef5054ee135741560df2ec068"
+  /** A person's newest takes are kept; teaching again replaces the oldest. */
+  private const val MAX_TAKES = 10
+  private const val KEY_CNN = "cnn_threshold"
+
+  private fun dir(context: Context) = File(context.filesDir, "wake-voice").apply { mkdirs() }
+  fun modelFile(context: Context) = File(dir(context), "speaker.onnx")
+  private fun takesFile(context: Context) = File(dir(context), "voices.json")
+
+  fun modelReady(context: Context) = modelFile(context).isFile
+
+  /** Each taught person's takes, `[peak, embedding...]` each, by profile id. */
+  @Synchronized
+  fun load(context: Context): Map<String, List<FloatArray>> {
+    val file = takesFile(context)
+    if (!file.isFile) return emptyMap()
+    return try {
+      val json = org.json.JSONObject(file.readText())
+      json.keys().asSequence().associateWith { id ->
+        val takes = json.getJSONArray(id)
+        (0 until takes.length()).map { i ->
+          val take = takes.getJSONArray(i)
+          FloatArray(take.length()) { take.getDouble(it).toFloat() }
+        }
+      }
+    } catch (error: org.json.JSONException) {
+      Log.w(TAG, "kind=wake_voices_unreadable error=${error.message}")
+      emptyMap()
+    }
+  }
+
+  @Synchronized
+  private fun save(context: Context, people: Map<String, List<FloatArray>>) {
+    val json = org.json.JSONObject()
+    people.filterValues { it.isNotEmpty() }.forEach { (id, takes) ->
+      json.put(id, org.json.JSONArray(takes.map { take -> org.json.JSONArray(take.map { it.toDouble() }) }))
+    }
+    val file = takesFile(context)
+    val partial = File(file.parentFile, "${file.name}.partial")
+    partial.writeText(json.toString())
+    if (!partial.renameTo(file)) throw java.io.IOException("could not replace ${file.name}")
+  }
+
+  /** The takes laid out for the native calls. */
+  fun flat(people: Map<String, List<FloatArray>>): Pair<FloatArray, IntArray> {
+    val takes = people.values.toList()
+    return takes.flatten().flatMap { it.asList() }.toFloatArray() to takes.map { it.size }.toIntArray()
+  }
+
+  /** `[cnn, accept, reject]` for the voices taught here, the CNN's line moved by a wake test if one set it. */
+  fun thresholds(context: Context, people: Map<String, List<FloatArray>> = load(context)): FloatArray {
+    val (flat, counts) = flat(people)
+    val t = PondEar.nativeCalibrate(flat, counts)
+    val chosen = GooseWakeService.prefs(context).getFloat(KEY_CNN, Float.NaN)
+    if (!chosen.isNaN() && people.isNotEmpty()) {
+      val (floor, strict) = PondEar.nativeLimits().let { it[0] to it[1] }
+      t[0] = chosen.coerceIn(floor, strict)
+    }
+    return t
+  }
+
+  /** Whether a wake test chose the CNN's line. */
+  fun thresholdChosen(context: Context) = GooseWakeService.prefs(context).contains(KEY_CNN)
+
+  /** Keep the CNN line a wake test chose, or go back to the takes' own with null. */
+  fun chooseThreshold(context: Context, cnn: Float?) {
+    val edit = GooseWakeService.prefs(context).edit()
+    if (cnn == null) edit.remove(KEY_CNN) else edit.putFloat(KEY_CNN, cnn)
+    edit.apply()
+  }
+
+  /** The speaker model, or 0 when it is not here or does not convert. */
+  fun openSpeaker(context: Context): Long {
+    val model = modelFile(context)
+    if (!model.isFile) return 0L
+    val handle = PondEar.nativeOpenSpeaker(model.absolutePath)
+    if (handle == 0L) Log.e(TAG, "kind=wake_speaker_failed: the speaker model did not convert")
+    return handle
+  }
+
+  /** Move a downloaded model into place if its checksum is the Pond's; the download is deleted either way. */
+  fun installModel(context: Context, download: File): Boolean {
+    try {
+      val digest = java.security.MessageDigest.getInstance("SHA-256")
+      download.inputStream().use { input ->
+        val buffer = ByteArray(1 shl 16)
+        while (true) {
+          val n = input.read(buffer)
+          if (n < 0) break
+          digest.update(buffer, 0, n)
+        }
+      }
+      val sha = digest.digest().joinToString("") { "%02x".format(it) }
+      if (sha != SPEAKER_SHA256) {
+        Log.w(TAG, "kind=wake_speaker_refused reason=checksum sha256=$sha")
+        return false
+      }
+      download.copyTo(modelFile(context), overwrite = true)
+      Log.i(TAG, "kind=wake_speaker_installed bytes=${download.length()}")
+      return true
+    } finally {
+      download.delete()
+    }
+  }
+
+  /** Keep one take for `profile`; returns its CNN peak and how many takes the person now has. */
+  fun enrol(context: Context, profile: String, pcm: ShortArray): Pair<Float, Int> {
+    val speaker = openSpeaker(context)
+    if (speaker == 0L) throw IllegalStateException("speaker model not ready")
+    val take = try {
+      PondEar.nativeEnrol(speaker, pcm) ?: throw IllegalArgumentException("take too short")
+    } finally {
+      PondEar.nativeCloseSpeaker(speaker)
+    }
+    synchronized(this) {
+      val people = load(context).toMutableMap()
+      val takes = (people[profile].orEmpty() + listOf(take)).takeLast(MAX_TAKES)
+      people[profile] = takes
+      save(context, people)
+      Log.i(TAG, "kind=wake_voice_enrolled peak=${take[0]} takes=${takes.size} people=${people.size}")
+      return take[0] to takes.size
+    }
+  }
+
+  /** Delete `profile`'s takes; the wake test's line goes with the last person. */
+  fun forget(context: Context, profile: String) {
+    synchronized(this) {
+      val people = load(context).toMutableMap()
+      if (people.remove(profile) == null) return
+      save(context, people)
+      if (people.isEmpty()) chooseThreshold(context, null)
+      Log.i(TAG, "kind=wake_voice_forgotten people=${people.size}")
+    }
+  }
+
+  /** A take's or a recording's samples: 16 kHz mono PCM16 WAV, as the app writes them. */
+  fun readWav(file: File): ShortArray {
+    val bytes = java.nio.ByteBuffer.wrap(file.readBytes()).order(java.nio.ByteOrder.LITTLE_ENDIAN)
+    require(bytes.remaining() >= 12 && String(bytes.array(), 0, 4) == "RIFF" && String(bytes.array(), 8, 4) == "WAVE") { "not a WAV file" }
+    bytes.position(12)
+    var format = false
+    while (bytes.remaining() >= 8) {
+      val id = String(bytes.array(), bytes.position(), 4)
+      bytes.position(bytes.position() + 4)
+      val size = bytes.int
+      val start = bytes.position()
+      require(size >= 0 && size <= bytes.remaining()) { "a chunk runs past the file" }
+      when (id) {
+        "fmt " -> {
+          val pcm = bytes.short.toInt() == 1
+          val channels = bytes.short.toInt()
+          val rate = bytes.int
+          bytes.position(start + 14)
+          val bits = bytes.short.toInt()
+          require(pcm && channels == 1 && rate == RATE && bits == 16) { "wanted 16 kHz mono PCM16, got rate=$rate channels=$channels bits=$bits" }
+          format = true
+        }
+        "data" -> {
+          require(format) { "data before format" }
+          val out = ShortArray(size / 2)
+          bytes.asShortBuffer().get(out)
+          return out
+        }
+      }
+      bytes.position(start + size + (size and 1))
+    }
+    throw IllegalArgumentException("no audio in the file")
+  }
+
+  const val RATE = 16_000
+}
+
+/**
+ * The second check, opened for one listening thread or one wake test: the voices taught here,
+ * the lines from their takes and the speaker model. With nobody taught, or no model yet, nothing
+ * is scored and the verifier answers as the phone always did.
+ */
+class WakeCheck(val verifier: Long, private val speaker: Long, val cnn: Float, val taught: Boolean) {
+  /** The heard speech's best match among the taught voices, or NaN when it was not scored. */
+  fun voice(speech: ShortArray?): Float {
+    if (!taught || speaker == 0L || speech == null) return Float.NaN
+    val emb = PondEar.nativeEmbed(speaker, speech) ?: return Float.NaN
+    return PondEar.nativeVoice(verifier, emb)
+  }
+
+  fun close() {
+    PondEar.nativeCloseVerifier(verifier)
+    if (speaker != 0L) PondEar.nativeCloseSpeaker(speaker)
+  }
+
+  companion object {
+    fun open(context: Context): WakeCheck {
+      val people = WakeVoices.load(context)
+      val taught = people.isNotEmpty()
+      val (flat, counts) = WakeVoices.flat(people)
+      val t = WakeVoices.thresholds(context, people)
+      val speaker = if (taught) WakeVoices.openSpeaker(context) else 0L
+      if (taught && speaker == 0L) Log.w(TAG, "kind=wake_check_degraded reason=no_speaker_model people=${people.size}")
+      return WakeCheck(PondEar.nativeOpenVerifier(flat, counts, t[0], t[1], t[2]), speaker, t[0], taught)
+    }
+  }
 }
 
 /**
@@ -221,6 +468,13 @@ class GooseWakeService : Service() {
     update("the household's phrase changed")
   }
 
+  /** Main thread: the voices taught here changed; a listening thread starts again with them. */
+  private fun voicesChanged() {
+    if (listener == null) return
+    stopListening("the voices taught here changed")
+    update("the voices taught here changed")
+  }
+
   /** Main thread, from a listening thread that ended by itself: what to do about how it ended. */
   private fun ended(thread: Thread, end: End) {
     main.post {
@@ -255,8 +509,10 @@ class GooseWakeService : Service() {
       refusal = REFUSED_MICROPHONE
       return End.REFUSED
     }
-    val detector = PondEar.nativeOpen()
+    val check = WakeCheck.open(this)
+    val detector = PondEar.nativeOpen(check.cnn)
     if (detector == 0L) {
+      check.close()
       Log.e(TAG, "kind=wake_refused reason=$REFUSED_MODEL: the embedded model did not convert")
       refusal = REFUSED_MODEL
       return End.REFUSED
@@ -275,7 +531,7 @@ class GooseWakeService : Service() {
         return End.MICROPHONE
       }
       record.startRecording()
-      Log.i(TAG, "kind=wake_detector rung=${PondEar.nativeRung()}")
+      Log.i(TAG, "kind=wake_detector rung=${PondEar.nativeRung()} cnn=${check.cnn} taught=${check.taught}")
       val chunk = ShortArray(HOP)
       while (listening) {
         val read = record.read(chunk, 0, HOP)
@@ -284,17 +540,25 @@ class GooseWakeService : Service() {
           return End.MICROPHONE
         }
         val p = PondEar.nativePush(detector, chunk, read)
-        if (p >= 0f) {
-          Log.i(TAG, "kind=wake_heard p=$p")
-          return End.HEARD
+        if (p < 0f) continue
+        val started = System.nanoTime()
+        val speech = PondEar.nativeHeard(detector)
+        val voice = check.voice(speech)
+        val decision = PondEar.nativeDecide(check.verifier, p, voice)
+        Log.i(TAG, "kind=wake_decision mode=$MODE_HEY_GOOSE p=$p voice=$voice decision=${PondEar.decisionName(decision)} elapsed_ms=${(System.nanoTime() - started) / 1_000_000}")
+        when (decision) {
+          PondEar.WAKE -> return End.HEARD
+          PondEar.ASK_POND -> speech?.let(::handOver)
         }
       }
       return End.STOPPED
     } finally {
       record.release()
       PondEar.nativeClose(detector)
+      check.close()
     }
   }
+
 
   /**
    * The listening thread for any other phrase: speech segments, each handed to the app to ask the
@@ -307,8 +571,10 @@ class GooseWakeService : Service() {
       refusal = REFUSED_MICROPHONE
       return End.REFUSED
     }
+    val check = WakeCheck.open(this)
     val segments = PondEar.nativeOpenSegments()
     if (segments == 0L) {
+      check.close()
       Log.e(TAG, "kind=wake_refused reason=$REFUSED_MODEL: the embedded voice activity model did not convert")
       refusal = REFUSED_MODEL
       return End.REFUSED
@@ -327,7 +593,7 @@ class GooseWakeService : Service() {
         return End.MICROPHONE
       }
       record.startRecording()
-      Log.i(TAG, "kind=wake_segmenter rung=${PondEar.nativeRung()}")
+      Log.i(TAG, "kind=wake_segmenter rung=${PondEar.nativeRung()} taught=${check.taught}")
       val chunk = ShortArray(HOP)
       while (listening) {
         val read = record.read(chunk, 0, HOP)
@@ -335,12 +601,18 @@ class GooseWakeService : Service() {
           Log.w(TAG, "kind=wake_microphone_unavailable read=$read")
           return End.MICROPHONE
         }
-        PondEar.nativeSegment(segments, chunk, read)?.let(::handOver)
+        val speech = PondEar.nativeSegment(segments, chunk, read) ?: continue
+        val started = System.nanoTime()
+        val voice = check.voice(speech)
+        val decision = PondEar.nativeDecideSegment(check.verifier, voice)
+        Log.i(TAG, "kind=wake_decision mode=$MODE_POND voice=$voice decision=${PondEar.decisionName(decision)} elapsed_ms=${(System.nanoTime() - started) / 1_000_000}")
+        if (decision == PondEar.ASK_POND) handOver(speech)
       }
       return End.STOPPED
     } finally {
       record.release()
       PondEar.nativeCloseSegments(segments)
+      check.close()
     }
   }
 
@@ -405,9 +677,9 @@ class GooseWakeService : Service() {
     private const val KEY_BODY = "body"
     private const val KEY_STOP = "stop"
     private const val KEY_CHANNEL = "channel"
-    private const val RATE = 16_000
+    private const val RATE = WakeVoices.RATE
     /** 80 ms: the detector scores a window every 8 frames of 10 ms. */
-    private const val HOP = 1_280
+    const val HOP = 1_280
     private const val JOIN_MS = 500L
     private const val RETRY_MS = 5_000L
     private const val OVERLAY_MS = 3_000L
@@ -460,6 +732,11 @@ class GooseWakeService : Service() {
       service.modeChanged()
     }
 
+    /** Main thread: listen with the voices taught here as they are now. */
+    fun voicesChanged() {
+      running?.voicesChanged()
+    }
+
     /** Main thread: the app's answer from the Pond for one segment was a wake. */
     fun heardByPond(): Boolean {
       val service = running ?: return false
@@ -480,7 +757,7 @@ class GooseWakeService : Service() {
     private fun segmentDir(context: Context) = File(context.cacheDir, SEGMENT_DIR).apply { mkdirs() }
 
     /** PCM16 mono 16 kHz as a WAV file's bytes, as the Pond's routes read them. */
-    private fun wav(pcm: ShortArray): ByteArray {
+    fun wav(pcm: ShortArray): ByteArray {
       val data = pcm.size * 2
       val out = java.nio.ByteBuffer.allocate(44 + data).order(java.nio.ByteOrder.LITTLE_ENDIAN)
       out.put("RIFF".toByteArray()).putInt(36 + data).put("WAVE".toByteArray())
@@ -588,6 +865,8 @@ class PondWakeModule(context: ReactApplicationContext) : ReactContextBaseJavaMod
   }
 
   companion object {
+    /** Where the wake test leaves the speech it asks the app to send to the Pond. */
+    private const val TEST_DIR = "wake-test"
     /** JavaScript's event for a segment to send: its file's path (services/phone-wake.ts). */
     private const val SEGMENT_EVENT = "PondWakeSegment"
 
@@ -652,6 +931,147 @@ class PondWakeModule(context: ReactApplicationContext) : ReactContextBaseJavaMod
   @ReactMethod
   fun heard(promise: Promise) {
     reactApplicationContext.runOnUiQueueThread { promise.resolve(GooseWakeService.heardByPond()) }
+  }
+
+  /**
+   * `{ model, people: [{ profileId, takes }], cnn, accept, reject, floor, strict, chosen }`: what the
+   * second check knows here. `chosen` is whether a wake test set the CNN's line.
+   */
+  @ReactMethod
+  fun voices(promise: Promise) = background(promise) {
+    val context = reactApplicationContext
+    val people = WakeVoices.load(context)
+    val t = WakeVoices.thresholds(context, people)
+    val limits = PondEar.nativeLimits()
+    Arguments.createMap().apply {
+      putBoolean("model", WakeVoices.modelReady(context))
+      putArray(
+        "people",
+        Arguments.createArray().apply {
+          people.forEach { (id, takes) ->
+            pushMap(Arguments.createMap().apply {
+              putString("profileId", id)
+              putInt("takes", takes.size)
+            })
+          }
+        },
+      )
+      putDouble("cnn", t[0].toDouble())
+      putDouble("accept", t[1].toDouble())
+      putDouble("reject", t[2].toDouble())
+      putDouble("floor", limits[0].toDouble())
+      putDouble("strict", limits[1].toDouble())
+      putBoolean("chosen", WakeVoices.thresholdChosen(context))
+    }
+  }
+
+  /** Check the speaker model downloaded to `uri` against the Pond's checksum and keep it; resolves whether it was kept. */
+  @ReactMethod
+  fun installSpeakerModel(uri: String, promise: Promise) = background(promise) {
+    WakeVoices.installModel(reactApplicationContext, cacheFile(uri))
+  }
+
+  /** Keep one teach take (a WAV at `uri`) for `profileId`; resolves `{ peak, takes }`. */
+  @ReactMethod
+  fun enrolTake(uri: String, profileId: String, promise: Promise) = background(promise) {
+    val (peak, takes) = WakeVoices.enrol(reactApplicationContext, profileId, WakeVoices.readWav(cacheFile(uri)))
+    voicesChanged()
+    Arguments.createMap().apply {
+      putDouble("peak", peak.toDouble())
+      putInt("takes", takes)
+    }
+  }
+
+  /** Delete `profileId`'s takes from this phone. */
+  @ReactMethod
+  fun forgetVoice(profileId: String, promise: Promise) = background(promise) {
+    WakeVoices.forget(reactApplicationContext, profileId)
+    voicesChanged()
+    null
+  }
+
+  /** Keep the CNN line a wake test chose (`cnn` > 0), or go back to the takes' own (`cnn` <= 0). */
+  @ReactMethod
+  fun chooseWakeThreshold(cnn: Double, promise: Promise) = background(promise) {
+    WakeVoices.chooseThreshold(reactApplicationContext, if (cnn > 0) cnn.toFloat() else null)
+    voicesChanged()
+    null
+  }
+
+  /**
+   * The wake test: the service's own pipeline over a recording (a WAV at `uri`), listening at the
+   * floor so near misses show too. Resolves `{ cnn, taught, candidates: [{ t, p, voice, decision,
+   * segment }] }`; `decision` is "below" for a candidate the service would not have heard at `cnn`,
+   * else the verifier's, and a candidate it would ask the Pond about carries its speech as a WAV
+   * `segment` in the cache for the app to send and then delete.
+   */
+  @ReactMethod
+  fun testWake(uri: String, promise: Promise) = background(promise) {
+    val context = reactApplicationContext
+    val pcm = WakeVoices.readWav(cacheFile(uri))
+    val check = WakeCheck.open(context)
+    val detector = PondEar.nativeOpen(PondEar.nativeLimits()[0])
+    try {
+      if (detector == 0L) throw IllegalStateException("the embedded model did not convert")
+      val candidates = Arguments.createArray()
+      val dir = File(context.cacheDir, TEST_DIR).apply { mkdirs() }
+      var at = 0
+      while (at < pcm.size) {
+        val count = minOf(GooseWakeService.HOP, pcm.size - at)
+        val p = PondEar.nativePush(detector, pcm.copyOfRange(at, at + count), count)
+        at += count
+        if (p < 0f) continue
+        val speech = PondEar.nativeHeard(detector)
+        val voice = check.voice(speech)
+        val decision = if (p < check.cnn) "below" else PondEar.decisionName(PondEar.nativeDecide(check.verifier, p, voice))
+        candidates.pushMap(Arguments.createMap().apply {
+          putDouble("t", at.toDouble() / WakeVoices.RATE)
+          putDouble("p", p.toDouble())
+          if (voice.isNaN()) putNull("voice") else putDouble("voice", voice.toDouble())
+          putString("decision", decision)
+          if (decision == "ask_pond" && speech != null) {
+            val file = File(dir, "candidate-${System.nanoTime()}.wav")
+            file.writeBytes(GooseWakeService.wav(speech))
+            putString("segment", android.net.Uri.fromFile(file).toString())
+          } else {
+            putNull("segment")
+          }
+        })
+      }
+      Log.i(TAG, "kind=wake_test seconds=${pcm.size / WakeVoices.RATE} candidates=${candidates.size()} cnn=${check.cnn} taught=${check.taught}")
+      Arguments.createMap().apply {
+        putDouble("cnn", check.cnn.toDouble())
+        putBoolean("taught", check.taught)
+        putArray("candidates", candidates)
+      }
+    } finally {
+      if (detector != 0L) PondEar.nativeClose(detector)
+      check.close()
+    }
+  }
+
+  /** A file the app wrote to its cache, from its `file://` URI; anything else is refused. */
+  private fun cacheFile(uri: String): File {
+    val file = File(android.net.Uri.parse(uri).path ?: throw IllegalArgumentException("not a file URI"))
+    val cache = reactApplicationContext.cacheDir.canonicalPath + File.separator
+    require(file.canonicalPath.startsWith(cache)) { "not in the app's cache" }
+    return file
+  }
+
+  private fun voicesChanged() {
+    reactApplicationContext.runOnUiQueueThread { GooseWakeService.voicesChanged() }
+  }
+
+  /** Run `work` off the bridge's thread and settle `promise` with its result or its failure. */
+  private fun background(promise: Promise, work: () -> Any?) {
+    Thread({
+      try {
+        promise.resolve(work())
+      } catch (error: Exception) {
+        Log.w(TAG, "kind=wake_voice_call_failed error=${error.javaClass.simpleName}: ${error.message}")
+        promise.reject("pond_wake", error.message, error)
+      }
+    }, "goose-wake-voices").start()
   }
 
   /** Start the service again if it was chosen; called once at launch. */
