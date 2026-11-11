@@ -119,6 +119,7 @@ export default function WebWatchScreen() {
                   .filter(Boolean)
                   .join(' · ')}
               </InkText>
+              {item.snippet ? <InkText size="sm" numberOfLines={3}>{item.snippet}</InkText> : null}
               {item.link ? (
                 <InkButton variant="quiet" icon="external" onPress={() => void WebBrowser.openBrowserAsync(item.link!)}>
                   {t('webWatches.openListing')}

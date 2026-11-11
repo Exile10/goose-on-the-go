@@ -4,9 +4,9 @@
  * report's option; this is where the cards are found again.
  */
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { InkCard, InkChip, InkEmptyState, InkNotice, InkSpinner, InkText } from '@jarida/ink/native';
 
@@ -25,6 +25,14 @@ export default function SavedScreen() {
   const styles = useThemedStyles(makeStyles);
   const { data, loading, error, actions } = useSavedItems();
   const pull = usePullToRefresh(actions.refresh);
+  // My Goose opens this on one collection (Saved stories), or on what others shared with the member.
+  const params = useLocalSearchParams<{ collection?: string; shared?: string }>();
+  const sharedOnly = params.shared === '1';
+  const { setCollection } = actions;
+  useEffect(() => {
+    if (params.collection) setCollection(params.collection);
+  }, [params.collection, setCollection]);
+  const items = sharedOnly ? data.items.filter((i) => i.shared && !i.mine) : data.items;
 
   const open = (item: SavedItem) => {
     void selectionTick();
@@ -51,14 +59,14 @@ export default function SavedScreen() {
           ))}
         </ScrollView>
       ) : null}
-      {loading && data.items.length === 0 ? <InkSpinner label={t('saved.loading')} /> : null}
+      {loading && items.length === 0 ? <InkSpinner label={t('saved.loading')} /> : null}
       {error ? <InkNotice tone="danger">{error}</InkNotice> : null}
-      {!loading && !error && data.items.length === 0 ? (
+      {!loading && !error && items.length === 0 ? (
         <InkEmptyState icon="folder" title={t('saved.emptyTitle')}>
           <InkText>{t('saved.emptyBody')}</InkText>
         </InkEmptyState>
       ) : null}
-      {data.items.map((item) => (
+      {items.map((item) => (
         <GPressable key={item.id} onPress={() => open(item)} accessibilityRole="button" accessibilityLabel={item.title}>
           <InkCard>
             <InkText size="xs" tone="tertiary">

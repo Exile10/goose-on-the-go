@@ -17,6 +17,7 @@ export interface WatchItem {
   year?: string;
   link?: string;
   image?: string;
+  snippet?: string;
 }
 
 export interface WebWatch {
@@ -40,7 +41,7 @@ export interface WatchChange {
   foundAt: string;
   line: string;
   matched: boolean;
-  kind: 'new' | 'gone' | 'price_changed';
+  kind: 'new' | 'gone' | 'price_changed' | 'updated';
 }
 
 export interface WebWatchDetail extends WebWatch {
@@ -162,10 +163,11 @@ function readItem(raw: unknown): WatchItem | null {
     year: str(raw.year),
     link: webUrl(raw.link),
     image: webUrl(raw.image),
+    snippet: str(raw.snippet),
   };
 }
 
-const CHANGE_KINDS = ['new', 'gone', 'price_changed'] as const;
+const CHANGE_KINDS = ['new', 'gone', 'price_changed', 'updated'] as const;
 
 function readChange(raw: unknown): WatchChange | null {
   if (!isRecord(raw) || typeof raw.line !== 'string') return null;

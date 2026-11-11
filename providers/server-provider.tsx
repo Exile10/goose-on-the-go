@@ -131,6 +131,7 @@ export const MIGRATION_SCREENS = [
   'agents',
   'pond',
   'voice',
+  'myGoose',
 ] as const;
 
 export type MigrationScreen = (typeof MIGRATION_SCREENS)[number];
@@ -174,7 +175,9 @@ export type ScreenModes = Record<MigrationScreen, boolean>;
 // would offer to delete a made-up Pond's files.
 // `voice` (room voice, the Voice agent and Voice Match) starts real as `agents` does: a Pond without
 // the routes says so, where the mock would show a made-up household's voices.
-const REAL_BY_DEFAULT: readonly MigrationScreen[] = ['chat', 'logs', 'webSearch', 'settings', 'schedule', 'memory', 'agents', 'pond', 'voice'];
+// `myGoose` (the hub's `/me` routes) starts real as `agents` does: a Pond without `/me/hub` keeps the
+// older My Goose, where the mock would show a made-up member's news, to-dos and cart.
+const REAL_BY_DEFAULT: readonly MigrationScreen[] = ['chat', 'logs', 'webSearch', 'settings', 'schedule', 'memory', 'agents', 'pond', 'voice', 'myGoose'];
 
 export const DEFAULT_SCREEN_MODES: ScreenModes = MIGRATION_SCREENS.reduce(
   (acc, screen) => ({ ...acc, [screen]: REAL_BY_DEFAULT.includes(screen) }),
