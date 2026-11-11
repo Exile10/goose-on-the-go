@@ -4,5 +4,5 @@
     android:sessionService="io.jarida.pondassist.GooseSessionService"
     android:recognitionService="io.jarida.pondassist.GooseRecognitionService"
     android:supportsAssist="true"
-    android:supportsLaunchVoiceAssistFromKeyguard="false"
+    android:supportsLaunchVoiceAssistFromKeyguard="true"
     android:supportsLocalInteraction="false" />

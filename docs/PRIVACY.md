@@ -110,8 +110,10 @@ your Pond, which turns them into text; the copy on your phone is deleted as soon
 been sent. Apart from listening for the wake word, if you turn it on (below), the microphone is
 used only while voice mode is open.
 
-On Android, you can turn on **Listen for "Hey Goose"**. The phone then listens while it is unlocked
-and Goose is not open, with a notification saying so that also stops it. For "hey goose", what it
+On Android, you can turn on **Listen for "Hey Goose"**. The phone then listens whenever Goose is not
+open, the lock screen included, with a notification saying so that also stops it. Over the lock
+screen, Goose answers only what needs nothing personal: your memories and notes, messages,
+calendar, cameras, sensor history and anything bought or booked wait until you unlock the phone. For "hey goose", what it
 hears is checked on the phone and dropped; nothing is written or sent unless the phone is unsure
 whether it heard the phrase, when that moment of speech goes to your Pond to be checked and
 nowhere else. For any other phrase, moments of speech go to your Pond to be checked, and are

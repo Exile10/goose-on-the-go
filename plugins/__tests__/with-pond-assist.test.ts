@@ -79,7 +79,8 @@ describe('the resources the manifest names', () => {
     expect(xml).toContain(`android:sessionService="${PACKAGE}.GooseSessionService"`);
     expect(xml).toContain(`android:recognitionService="${PACKAGE}.GooseRecognitionService"`);
     expect(xml).toContain('android:supportsAssist="true"');
-    expect(xml).toContain('android:supportsLaunchVoiceAssistFromKeyguard="false"');
+    // The orb opens over the lock screen, where the Pond answers with no personal data.
+    expect(xml).toContain('android:supportsLaunchVoiceAssistFromKeyguard="true"');
   });
 
   it('keeps the recognition service out of the Voice input picker', () => {

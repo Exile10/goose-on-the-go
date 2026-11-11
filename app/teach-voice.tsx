@@ -26,6 +26,7 @@ import { Spacing } from '@/constants/spacing';
 import { consistencyWords, wakeReasonWords } from '@/models/voice-room';
 import { useConfirm } from '@/providers/confirm-provider';
 import { selectionTick, tap } from '@/services/haptics';
+import { phoneWakeSupported } from '@/services/phone-wake';
 import { useMember } from '@/view-models/use-household';
 import { usePondSettings } from '@/view-models/use-pond-settings';
 import { useTeachVoice, type TeachMember, type UseTeachVoice } from '@/view-models/use-teach-voice';
@@ -271,7 +272,9 @@ function Done({ vm, member, handed, onDone }: { vm: UseTeachVoice; member: Teach
       <ScrollView contentContainerStyle={styles.introScroll}>
         <InkTitle level={1}>{title}</InkTitle>
         <View style={styles.lines} accessibilityLiveRegion="polite">
-          <InkText weight="semibold">{t('teachVoice.done.runHeard', { heard: firedCount, of: vm.results.length })}</InkText>
+          {/* What the phone learned leads: the room's detector below is the Pond's, and stricter. */}
+          {vm.voiceMatch.on && phoneWakeSupported() ? <InkText weight="semibold">{t('teachVoice.done.phone')}</InkText> : null}
+          <InkText>{t('teachVoice.done.runHeard', { heard: firedCount, of: vm.results.length })}</InkText>
           {d ? (
             <InkText>{d.kind === 'hey_goose' ? t('teachVoice.done.listensHeyGoose') : t('teachVoice.done.whisper', { phrase: vm.phrase })}</InkText>
           ) : null}

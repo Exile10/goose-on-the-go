@@ -83,20 +83,6 @@ export async function forgetPhoneVoice(profileId: string): Promise<void> {
   }
 }
 
-/** Keep the "hey goose" line a wake test suggested, or go back to the takes' own with null. */
-export async function chooseWakeLine(line: number | null): Promise<boolean> {
-  const native = wakeBridge();
-  if (!native) return false;
-  try {
-    await native.chooseWakeThreshold(line ?? 0);
-    console.info('[wake] wake line chosen', { kind: 'phone_wake_voices', line });
-    return true;
-  } catch (e) {
-    console.warn('[wake] could not keep the wake line', { kind: 'phone_wake_voices', error: String(e) });
-    return false;
-  }
-}
-
 /**
  * The service's pipeline over the recording at `fileUri`, with the Pond's answer for each candidate
  * it would have asked about. Every file the run leaves in the cache is deleted.

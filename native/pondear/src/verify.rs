@@ -258,6 +258,12 @@ pub struct Thresholds {
 /// voice is accepted down to its own spread: each take scored against the person's other takes
 /// (leave one out), the lowest of those, less [`ACCEPT_MARGIN`].
 pub fn calibrate(people: &[Vec<Take>]) -> Thresholds {
+    // A take the detector did not hear as the phrase at all says nothing about either line: its
+    // window may hold no phrase. The app does not keep one; this guards takes kept before that.
+    let people: Vec<Vec<&Take>> = people
+        .iter()
+        .map(|takes| takes.iter().filter(|t| t.peak >= CNN_FLOOR).collect())
+        .collect();
     let quietest = people
         .iter()
         .flatten()
@@ -315,13 +321,21 @@ pub struct Verifier {
 
 impl Verifier {
     pub fn new(people: &[Vec<Take>], thresholds: Thresholds) -> Verifier {
+        // As in `calibrate`: a take the detector did not hear as the phrase is not this voice's.
         let prints = people
             .iter()
-            .filter(|t| !t.is_empty())
-            .map(|takes| Print {
+            .map(|takes| -> Vec<Vec<f32>> {
+                takes
+                    .iter()
+                    .filter(|t| t.peak >= CNN_FLOOR)
+                    .map(|t| t.emb.clone())
+                    .collect()
+            })
+            .filter(|embs| !embs.is_empty())
+            .map(|embs| Print {
                 id: String::new(),
                 name: String::new(),
-                embs: takes.iter().map(|t| t.emb.clone()).collect(),
+                embs,
             })
             .collect();
         Verifier { prints, thresholds }
@@ -427,10 +441,23 @@ mod tests {
     fn the_cnn_listens_below_the_quietest_take_and_never_below_the_floor() {
         let t = calibrate(&[takes(1, &[0.9, 0.8, 0.7])]);
         assert!((t.cnn - 0.56).abs() < 1e-5, "{t:?}");
-        assert_eq!(calibrate(&[takes(1, &[0.1, 0.9])]).cnn, CNN_FLOOR);
+        // A quiet take the CNN still heard: the line stops at the floor.
+        assert_eq!(calibrate(&[takes(1, &[0.55, 0.9])]).cnn, CNN_FLOOR);
         // Takes the CNN was certain of still leave room below them.
         assert!((calibrate(&[takes(1, &[1.0, 1.0])]).cnn - 0.8).abs() < 1e-6);
         assert_eq!(calibrate(&[]).cnn, STRICT);
+    }
+
+    #[test]
+    fn a_take_the_detector_did_not_hear_moves_neither_line() {
+        let heard = takes(1, &[0.9, 0.85, 0.95]);
+        let mut with_a_stray = heard.clone();
+        with_a_stray.extend(takes(9, &[0.003]));
+        assert_eq!(calibrate(&[with_a_stray.clone()]), calibrate(&[heard]));
+        // Nor does it make somebody taught.
+        let only_strays = vec![takes(9, &[0.003, 0.2])];
+        assert!(!Verifier::new(&only_strays, calibrate(&only_strays)).taught());
+        assert_eq!(calibrate(&only_strays).cnn, STRICT);
     }
 
     #[test]

@@ -17,8 +17,6 @@ import { InkButton, InkCard, InkNotice, InkSpinner, InkText, InkTitle } from '@j
 import type { ThemeColors } from '@/constants/colors';
 import { Spacing } from '@/constants/spacing';
 import { useThemedStyles } from '@/hooks/use-themed-styles';
-import { SwitchRow } from '@/components/settings/setting-controls';
-import { SettingsGroup } from '@/components/settings/settings-list';
 import { PHRASE_TIMES } from '@/models/wake-test';
 import { CNN_PHRASE } from '@/services/phone-wake';
 import { useWakeTest } from '@/view-models/use-wake-test';
@@ -87,24 +85,6 @@ export default function WakeTestScreen() {
               <InkText tone="secondary">{t('wakeTest.result.pondRefused', { count: vm.result.phrase.pondRefused })}</InkText>
             ) : null}
           </View>
-        ) : null}
-
-        {vm.phase === 'done' && vm.voices && (vm.result?.line != null || vm.voices.chosen) ? (
-          <SettingsGroup footer={t('wakeTest.line.footer')}>
-            <SwitchRow
-              label={t('wakeTest.line.label')}
-              description={
-                vm.voices.chosen
-                  ? t('wakeTest.line.on')
-                  : vm.result?.line != null && vm.result.line < vm.result.cnn
-                    ? t('wakeTest.line.offLower')
-                    : t('wakeTest.line.offHigher')
-              }
-              value={vm.voices.chosen}
-              disabled={vm.saving || (!vm.voices.chosen && vm.result?.line == null)}
-              onChange={(on) => void vm.actions.chooseTestLine(on)}
-            />
-          </SettingsGroup>
         ) : null}
 
         {vm.error ? <InkNotice tone="warning">{vm.error}</InkNotice> : null}

@@ -92,6 +92,8 @@ phone listen for the phrase itself and open the same voice orb as the side key.
   forgets it here too. Nobody taught here: the phone listens as before, at its strictest line.
 - **How a candidate is judged** (`native/pondear/src/verify.rs`, the same code for the service
   and the wake test):
+  - A take the detector did not hear as the phrase at all (under 0.5) is not kept: its window may
+    hold no phrase, and it would drag both lines.
   - The detector listens at a personal line set from the takes: 0.8 of the weakest take's
     score, kept between 0.5 and 0.97. After it crosses, it keeps scoring for three more hops and
     takes the peak, so a phrase is judged at its strongest.
@@ -107,10 +109,10 @@ phone listen for the phrase itself and open the same voice orb as the side key.
 - **The wake test** (Settings, under the switch: **Test the wake word**, `app/(stack)/wake-test.tsx`).
   The phrase ten times, then a minute of talk, each recorded and run through the same pipeline
   (`testWake` in `PondWake.kt`), listening at 0.5 so near misses show. It reports how many of the
-  ten woke the phone and how often the talk did, with why the rest did not. A switch, **Tuned to
-  this test**, makes the service listen at the line the phrase suggests (0.8 of its weakest peak
-  in a taught voice; at least three needed) until it is turned off or the last voice is forgotten. The recordings are
-  deleted once scored; candidates the phone would ask the Pond about are sent to the Pond.
+  ten woke the phone and how often the talk did, with why the rest did not. It is a check and
+  changes nothing: the lines come from the taught sentences alone, so teaching a voice is the one
+  step. The recordings are deleted once scored; candidates the phone would ask the Pond about are
+  sent to the Pond.
 - **When the phrase changes.** The app hands the service the phrase from the Pond's settings,
   which it re-reads while open (`PhoneWakeSync` in `app/_layout.tsx`), and every answer to a
   segment names the phrase. A change made on the dashboard or another phone therefore counts
@@ -118,10 +120,18 @@ phone listen for the phrase itself and open the same voice orb as the side key.
   Learned pronunciations live only on the Pond, so calibrating or clearing them applies at once.
   The one gap: a phrase changed from "hey goose" while the app is closed and its background link
   is down is learned when the app next opens or the orb next reaches the Pond.
-- **When it listens.** Only while the screen is on, the phone unlocked, and no screen of the app in
-  front: the overlay does not open over the lock screen, and the app's own voice mode and the
-  overlay record with their own microphone, so the service lets go while either shows. The
-  notification says so, and its **Stop** turns the switch off.
+- **When it listens.** Whenever no screen of the app is in front, the lock screen and a dark
+  screen included; the app's own voice mode and the overlay record with their own microphone, so
+  the service lets go while either shows. It records through `MIC`, the source the app's teach
+  sentences and wake test use: on a Galaxy A57 `VOICE_RECOGNITION` audio scored a taught voice
+  as a stranger's. The notification says so, and its **Stop** turns the switch off.
+- **On a locked phone.** The orb opens over the lock screen and turns the screen on
+  (`AssistActivity`: `setShowWhenLocked`, `setTurnScreenOn`; `supportsLaunchVoiceAssistFromKeyguard`
+  is true, so the side key does too). Its turns go to the Pond with `device_locked`, which runs
+  them as an unidentified speaker's (`ProfileScope::Guest`): no memories, notes, connected
+  accounts, cameras, sensor history, rides or tasks, and the model is told to say to unlock for
+  those. The orb shows that it is locked, with **Unlock**, which asks for the phone's own check
+  (`requestDismissKeyguard`); later turns are the member's. Opening the app from it unlocks first.
 - **What happens to the audio.** For "hey goose", each 80 ms is scored and dropped; the detector
   keeps the last 20 seconds in memory to place the phrase, and nothing is written or sent until the
   orb opens. For another phrase, each speech segment (at most 8 s) goes to the household's own
@@ -153,8 +163,6 @@ To build it: `npm run build:ear` (add `--emulator` for x86_64), then prebuild as
   (`HotwordDetectionService`, the always-on hotword detector) is a system API for preinstalled
   assistants. A third-party assistant gets the assist gesture and nothing more, so "Hey Goose" is
   the app's own foreground service; see below.
-- **No lock screen.** `supportsLaunchVoiceAssistFromKeyguard` is false: a locked phone does not
-  open a conversation with the household's Pond.
 - **No speech recognition for other apps.** Android 11 and earlier also make an assistant's
   `recognitionService` the system speech recogniser, so on those versions apps that ask the
   default `SpeechRecognizer` for dictation get an error while Goose is the assistant. From

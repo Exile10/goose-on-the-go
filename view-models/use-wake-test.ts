@@ -1,16 +1,16 @@
 /**
  * The wake test (app/(stack)/wake-test.tsx): the phrase said ten times, then a minute of ordinary
  * talk, each recorded and run through the listening service's own pipeline (`runWakeTest`). It
- * reports how many of the ten woke the phone and how many times the talk did, and offers the
- * "hey goose" line the phrase part suggests. The recordings are deleted once scored.
+ * reports how many of the ten woke the phone and how many times the talk did. It changes nothing:
+ * the phone's lines come from the taught sentences. The recordings are deleted once scored.
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { falseWakes, PHRASE_TIMES, scorePhrase, suggestedLine, type PhraseScore, type ResolvedCandidate } from '@/models/wake-test';
+import { falseWakes, PHRASE_TIMES, scorePhrase, type PhraseScore, type ResolvedCandidate } from '@/models/wake-test';
 import i18n from '@/services/i18n';
 import type { PhoneVoices } from '@/services/phone-wake';
-import { chooseWakeLine, phoneVoices, runWakeTest } from '@/services/phone-wake-voices';
+import { phoneVoices, runWakeTest } from '@/services/phone-wake-voices';
 import { SPEECH_RATE, concatSamples, downsample, encodeWav } from '@/services/speech';
 import {
   beginVoiceSession,
@@ -33,9 +33,7 @@ export interface WakeTestResult {
   phrase: PhraseScore;
   /** Times the talk would have opened the orb. */
   falseWakes: number;
-  /** The "hey goose" line the phrase part suggests; null when it would not move. */
-  line: number | null;
-  /** The line the test ran with. */
+  /** The "hey goose" line the test ran with. */
   cnn: number;
 }
 
@@ -47,14 +45,10 @@ export interface UseWakeTest {
   left: number;
   result: WakeTestResult | null;
   error: string | null;
-  /** A change of sensitivity is being saved. */
-  saving: boolean;
   actions: {
     start: () => Promise<void>;
     /** The phrase part is done: on to the talking part. */
     next: () => void;
-    /** Listen at the sensitivity this test found (on), or the one from the recorded sentences (off). */
-    chooseTestLine: (on: boolean) => Promise<void>;
     again: () => void;
   };
 }
@@ -65,7 +59,6 @@ export function useWakeTest(): UseWakeTest {
   const [left, setLeft] = useState(TALK_MS);
   const [result, setResult] = useState<WakeTestResult | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
   const phaseRef = useRef<WakeTestPhase>('intro');
   const rec = useRef({ chunks: [] as Int16Array[], rate: SPEECH_RATE, since: 0 });
   const recordings = useRef<{ phrase: string | null; talk: string | null }>({ phrase: null, talk: null });
@@ -129,14 +122,12 @@ export function useWakeTest(): UseWakeTest {
       const next: WakeTestResult = {
         phrase: scorePhrase(said, PHRASE_TIMES),
         falseWakes: falseWakes(chatter),
-        line: known ? suggestedLine(said, known) : null,
         cnn: known?.cnn ?? 0,
       };
       console.info('[wake] wake test scored', {
         kind: 'phone_wake_test',
         caught: next.phrase.caught,
         falseWakes: next.falseWakes,
-        line: next.line,
         cnn: next.cnn,
       });
       setResult(next);
@@ -196,22 +187,6 @@ export function useWakeTest(): UseWakeTest {
     setPhase('talk');
   }, [cut, setPhase]);
 
-  const chooseTestLine = useCallback(
-    async (on: boolean) => {
-      const line = on ? (result?.line ?? null) : null;
-      if (on && line === null) return;
-      setError(null);
-      setSaving(true);
-      try {
-        if (!(await chooseWakeLine(line))) setError(i18n.t('wakeTest.keepFailed'));
-        await reload();
-      } finally {
-        if (alive.current) setSaving(false);
-      }
-    },
-    [reload, result],
-  );
-
   const again = useCallback(() => {
     setResult(null);
     setError(null);
@@ -230,5 +205,5 @@ export function useWakeTest(): UseWakeTest {
     [],
   );
 
-  return { phase, voices, left, result, error, saving, actions: { start, next, chooseTestLine, again } };
+  return { phase, voices, left, result, error, actions: { start, next, again } };
 }

@@ -1618,7 +1618,7 @@
     },
     "phoneWake": {
       "label": "Listen for “{{phrase}}”",
-      "description": "Say it while the phone is unlocked to open the voice orb over any app. The phone listens for “hey goose” itself, and once someone teaches Goose their voice here, only their voices wake it. When the phone is unsure, it asks your Pond about that moment of speech and nowhere else.",
+      "description": "Say it to open the voice orb over any app, or over the lock screen, where personal things wait until you unlock. The phone listens for “hey goose” itself, and once someone teaches Goose their voice here, only their voices wake it. When the phone is unsure, it asks your Pond about that moment of speech and nowhere else.",
       "needsAssistant": "Make Goose this phone's assistant first: the wake word opens the same voice orb.",
       "microphone": "Goose needs the microphone to hear the wake word.",
       "microphoneSettings": "Allow the microphone for Goose On The Go in the phone's Settings, then try again.",
@@ -1631,11 +1631,11 @@
       },
       "notification": {
         "title": "Listening for “{{phrase}}”",
-        "body": "Say “{{phrase}}” to talk to your Pond. Paused while the phone is locked or Goose is open.",
+        "body": "Say “{{phrase}}” to talk to your Pond, even on the lock screen. Paused while Goose is open.",
         "stop": "Stop",
         "channel": "Hey Goose"
       },
-      "descriptionPond": "Say it while the phone is unlocked to open the voice orb over any app. Only your Pond knows this phrase, so what is said near the phone goes to your Pond to be checked, and nowhere else.",
+      "descriptionPond": "Say it to open the voice orb over any app, or over the lock screen, where personal things wait until you unlock. Only your Pond knows this phrase, so what is said near the phone goes to your Pond to be checked, and nowhere else.",
       "test": "Test the wake word",
       "voices_one": "Only the voice taught on this phone can wake it.",
       "voices_other": "Only the {{count}} voices taught on this phone can wake it.",
@@ -4601,10 +4601,11 @@
       "titleOther": "Goose knows {{name}}’s voice",
       "phraseTitle": "Goose knows how you say “{{phrase}}”",
       "whisper": "Your Pond listens for “{{phrase}}” with Whisper.",
-      "heard": "The “hey goose” detector heard this one.",
-      "missed": "The “hey goose” detector missed this one.",
-      "runHeard": "The “hey goose” detector heard {{heard}} of these {{of}} sentences.",
-      "listensHeyGoose": "Your Pond listens for “hey goose” with its own detector."
+      "heard": "Your Pond’s room detector heard this one.",
+      "missed": "Your Pond’s room detector missed this one. Saying it again helps only the room, not this phone.",
+      "runHeard": "Your Pond’s room detector heard {{heard}} of these {{of}} sentences.",
+      "listensHeyGoose": "Your Pond listens for “hey goose” with its own detector.",
+      "phone": "This phone now wakes for your voice. It learned from these sentences, so nothing here needs saying again for the phone."
     },
     "again": {
       "action": "Say it again",
@@ -4616,7 +4617,9 @@
     "close": "Close Goose",
     "connecting": "Reaching your Pond",
     "unreachable": "Goose cannot reach your Pond from here. Open the app to pair this phone or check its connection.",
-    "openApp": "Open Goose On The Go"
+    "openApp": "Open Goose On The Go",
+    "locked": "The phone is locked, so personal things wait until you unlock it.",
+    "unlock": "Unlock"
   },
   "wakeTest": {
     "voices": {
@@ -4659,14 +4662,6 @@
     },
     "start": "Start the test",
     "again": "Test again",
-    "failed": "The test could not be scored. Try again.",
-    "keepFailed": "The phone did not save the change. Try again.",
-    "line": {
-      "label": "Tuned to this test",
-      "on": "The phone listens at the sensitivity this test found for your voice.",
-      "offLower": "Turn on to catch quieter “hey goose”s: the test heard yours below where the phone listens now.",
-      "offHigher": "Turn on for fewer false wakes: the test heard yours well above where the phone listens now.",
-      "footer": "Off, the phone listens at the sensitivity your recorded sentences set. Either way, your voice and your Pond still check each wake."
-    }
+    "failed": "The test could not be scored. Try again."
   }
 }

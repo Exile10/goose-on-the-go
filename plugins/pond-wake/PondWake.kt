@@ -5,16 +5,13 @@ import android.annotation.SuppressLint
 import android.app.Activity
 import android.app.ActivityManager
 import android.app.Application
-import android.app.KeyguardManager
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
-import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.media.AudioFormat
@@ -25,7 +22,6 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
-import android.os.PowerManager
 import android.util.Log
 import com.facebook.react.ReactPackage
 import com.facebook.react.bridge.Arguments
@@ -114,7 +110,6 @@ object WakeVoices {
   private const val SPEAKER_SHA256 = "7bb2f06e9df17cdf1ef14ee8a15ab08ed28e8d0ef5054ee135741560df2ec068"
   /** A person's newest takes are kept; teaching again replaces the oldest. */
   private const val MAX_TAKES = 10
-  private const val KEY_CNN = "cnn_threshold"
 
   private fun dir(context: Context) = File(context.filesDir, "wake-voice").apply { mkdirs() }
   fun modelFile(context: Context) = File(dir(context), "speaker.onnx")
@@ -160,26 +155,10 @@ object WakeVoices {
     return takes.flatten().flatMap { it.asList() }.toFloatArray() to takes.map { it.size }.toIntArray()
   }
 
-  /** `[cnn, accept, reject]` for the voices taught here, the CNN's line moved by a wake test if one set it. */
-  fun thresholds(context: Context, people: Map<String, List<FloatArray>> = load(context)): FloatArray {
+  /** `[cnn, accept, reject]`: the lines the takes of the voices taught here set. */
+  fun thresholds(people: Map<String, List<FloatArray>>): FloatArray {
     val (flat, counts) = flat(people)
-    val t = PondEar.nativeCalibrate(flat, counts)
-    val chosen = GooseWakeService.prefs(context).getFloat(KEY_CNN, Float.NaN)
-    if (!chosen.isNaN() && people.isNotEmpty()) {
-      val (floor, strict) = PondEar.nativeLimits().let { it[0] to it[1] }
-      t[0] = chosen.coerceIn(floor, strict)
-    }
-    return t
-  }
-
-  /** Whether a wake test chose the CNN's line. */
-  fun thresholdChosen(context: Context) = GooseWakeService.prefs(context).contains(KEY_CNN)
-
-  /** Keep the CNN line a wake test chose, or go back to the takes' own with null. */
-  fun chooseThreshold(context: Context, cnn: Float?) {
-    val edit = GooseWakeService.prefs(context).edit()
-    if (cnn == null) edit.remove(KEY_CNN) else edit.putFloat(KEY_CNN, cnn)
-    edit.apply()
+    return PondEar.nativeCalibrate(flat, counts)
   }
 
   /** The speaker model, or 0 when it is not here or does not convert. */
@@ -216,7 +195,11 @@ object WakeVoices {
     }
   }
 
-  /** Keep one take for `profile`; returns its CNN peak and how many takes the person now has. */
+  /**
+   * Keep one take for `profile`; returns its CNN peak and how many takes the person now has. A
+   * take the detector did not hear as "hey goose" at all (under the floor) is not kept: its best
+   * window may hold no phrase, and its voice and its score would only mislead the lines.
+   */
   fun enrol(context: Context, profile: String, pcm: ShortArray): Pair<Float, Int> {
     val speaker = openSpeaker(context)
     if (speaker == 0L) throw IllegalStateException("speaker model not ready")
@@ -227,6 +210,10 @@ object WakeVoices {
     }
     synchronized(this) {
       val people = load(context).toMutableMap()
+      if (take[0] < PondEar.nativeLimits()[0]) {
+        Log.i(TAG, "kind=wake_voice_take_skipped peak=${take[0]} reason=no_phrase_heard")
+        return take[0] to people[profile].orEmpty().size
+      }
       val takes = (people[profile].orEmpty() + listOf(take)).takeLast(MAX_TAKES)
       people[profile] = takes
       save(context, people)
@@ -235,13 +222,12 @@ object WakeVoices {
     }
   }
 
-  /** Delete `profile`'s takes; the wake test's line goes with the last person. */
+  /** Delete `profile`'s takes. */
   fun forget(context: Context, profile: String) {
     synchronized(this) {
       val people = load(context).toMutableMap()
       if (people.remove(profile) == null) return
       save(context, people)
-      if (people.isEmpty()) chooseThreshold(context, null)
       Log.i(TAG, "kind=wake_voice_forgotten people=${people.size}")
     }
   }
@@ -306,7 +292,7 @@ class WakeCheck(val verifier: Long, private val speaker: Long, val cnn: Float, v
       val people = WakeVoices.load(context)
       val taught = people.isNotEmpty()
       val (flat, counts) = WakeVoices.flat(people)
-      val t = WakeVoices.thresholds(context, people)
+      val t = WakeVoices.thresholds(people)
       val speaker = if (taught) WakeVoices.openSpeaker(context) else 0L
       if (taught && speaker == 0L) Log.w(TAG, "kind=wake_check_degraded reason=no_speaker_model people=${people.size}")
       return WakeCheck(PondEar.nativeOpenVerifier(flat, counts, t[0], t[1], t[2]), speaker, t[0], taught)
@@ -319,11 +305,10 @@ class WakeCheck(val verifier: Long, private val speaker: Long, val cnn: Float, v
  *
  * Android gives a third-party assistant no hotword path (docs/ASSISTANT.md), so this is the app's
  * own foreground service, of type microphone, with a notification that says it is listening and
- * stops it. It listens only while it could do something useful and nothing else is better placed:
- *
- * - the screen is on and the phone unlocked: the overlay does not open over the lock screen;
- * - no screen of this app is in front: the app has its own voice mode, and the overlay records
- *   with its own microphone, so the service lets go of the microphone while either is showing.
+ * stops it. It listens whenever no screen of this app is in front, the lock screen and a dark
+ * screen included: the orb opens over the lock screen (`AssistActivity`), where a turn runs with
+ * no personal data until the phone is unlocked. The app has its own voice mode, and the overlay
+ * records with its own microphone, so the service lets go of the microphone while either shows.
  *
  * It listens in one of two ways ([MODE_HEY_GOOSE], [MODE_POND]), which the app sets from the
  * household's phrase (`configure`):
@@ -348,12 +333,6 @@ class GooseWakeService : Service() {
   private var listener: Thread? = null
   @Volatile private var listening = false
   private var appScreens = 0
-
-  private val screenEvents = object : BroadcastReceiver() {
-    override fun onReceive(context: Context, intent: Intent) {
-      update("screen ${intent.action?.substringAfterLast('.')}")
-    }
-  }
 
   private val screens = object : Application.ActivityLifecycleCallbacks {
     override fun onActivityStarted(activity: Activity) {
@@ -383,12 +362,6 @@ class GooseWakeService : Service() {
     ActivityManager.getMyMemoryState(state)
     appScreens = if (state.importance == ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND) 1 else 0
     application.registerActivityLifecycleCallbacks(screens)
-    val filter = IntentFilter().apply {
-      addAction(Intent.ACTION_SCREEN_ON)
-      addAction(Intent.ACTION_SCREEN_OFF)
-      addAction(Intent.ACTION_USER_PRESENT)
-    }
-    registerReceiver(screenEvents, filter)
   }
 
   override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -431,18 +404,13 @@ class GooseWakeService : Service() {
     if (running === this) running = null
     main.removeCallbacksAndMessages(null)
     application.unregisterActivityLifecycleCallbacks(screens)
-    unregisterReceiver(screenEvents)
     stopListening("service stopped")
     stopForeground(STOP_FOREGROUND_REMOVE)
     super.onDestroy()
   }
 
   /** Whether listening could open the overlay now (see the class comment). */
-  private fun shouldListen(): Boolean {
-    val interactive = getSystemService(PowerManager::class.java).isInteractive
-    val unlocked = !getSystemService(KeyguardManager::class.java).isKeyguardLocked
-    return active && interactive && unlocked && appScreens == 0
-  }
+  private fun shouldListen(): Boolean = active && appScreens == 0
 
   /** Main thread: start or stop the microphone to match [shouldListen]. */
   private fun update(why: String) {
@@ -941,14 +909,14 @@ class PondWakeModule(context: ReactApplicationContext) : ReactContextBaseJavaMod
   }
 
   /**
-   * `{ model, people: [{ profileId, takes }], cnn, accept, reject, floor, strict, chosen }`: what the
-   * second check knows here. `chosen` is whether a wake test set the CNN's line.
+   * `{ model, people: [{ profileId, takes }], cnn, accept, reject, floor, strict }`: what the
+   * second check knows here.
    */
   @ReactMethod
   fun voices(promise: Promise) = background(promise) {
     val context = reactApplicationContext
     val people = WakeVoices.load(context)
-    val t = WakeVoices.thresholds(context, people)
+    val t = WakeVoices.thresholds(people)
     val limits = PondEar.nativeLimits()
     Arguments.createMap().apply {
       putBoolean("model", WakeVoices.modelReady(context))
@@ -968,7 +936,6 @@ class PondWakeModule(context: ReactApplicationContext) : ReactContextBaseJavaMod
       putDouble("reject", t[2].toDouble())
       putDouble("floor", limits[0].toDouble())
       putDouble("strict", limits[1].toDouble())
-      putBoolean("chosen", WakeVoices.thresholdChosen(context))
     }
   }
 
@@ -993,14 +960,6 @@ class PondWakeModule(context: ReactApplicationContext) : ReactContextBaseJavaMod
   @ReactMethod
   fun forgetVoice(profileId: String, promise: Promise) = background(promise) {
     WakeVoices.forget(reactApplicationContext, profileId)
-    voicesChanged()
-    null
-  }
-
-  /** Keep the CNN line a wake test chose (`cnn` > 0), or go back to the takes' own (`cnn` <= 0). */
-  @ReactMethod
-  fun chooseWakeThreshold(cnn: Double, promise: Promise) = background(promise) {
-    WakeVoices.chooseThreshold(reactApplicationContext, if (cnn > 0) cnn.toFloat() else null)
     voicesChanged()
     null
   }

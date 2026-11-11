@@ -58,7 +58,6 @@ interface WakeBridge {
   installSpeakerModel(uri: string): Promise<boolean>;
   enrolTake(uri: string, profileId: string): Promise<{ peak: number; takes: number }>;
   forgetVoice(profileId: string): Promise<null>;
-  chooseWakeThreshold(cnn: number): Promise<null>;
   testWake(uri: string): Promise<WakeTestRun>;
 }
 
@@ -68,7 +67,7 @@ export interface PhoneVoices {
   model: boolean;
   /** Who is taught on this phone, and with how many takes. Only they can wake it once anyone is. */
   people: { profileId: string; takes: number }[];
-  /** The CNN's line for "hey goose": the takes' own, or one a wake test chose. */
+  /** The CNN's line for "hey goose", which the takes set. */
   cnn: number;
   /** A voice at or above `accept` is taken as taught; below `reject` it is ignored. */
   accept: number;
@@ -76,8 +75,6 @@ export interface PhoneVoices {
   /** The range the CNN's line stays in. */
   floor: number;
   strict: number;
-  /** Whether a wake test chose the CNN's line. */
-  chosen: boolean;
 }
 
 /** What the service would do with a candidate: "below" is one it would not have heard at all. */

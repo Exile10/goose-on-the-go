@@ -275,6 +275,8 @@ export interface ChatStreamRequest {
   deep_research?: boolean;
   /** With `deep_research` only, and left out for `auto`, so an older Pond sees the body it knows. */
   deep_research_answer?: Exclude<AnswerShape, 'auto'>;
+  /** Asked from a locked phone: the Pond runs the turn with no personal data or tools. */
+  device_locked?: boolean;
 }
 
 /**

@@ -1,25 +1,13 @@
-// The wake test's counting: what woke the phone, what the Pond turned away, and the line it suggests.
+// The wake test's counting: what woke the phone, and what the voice check or the Pond turned away.
 
 import {
   falseWakes,
   outcome,
   resolveCandidates,
   scorePhrase,
-  suggestedLine,
   type ResolvedCandidate,
 } from '@/models/wake-test';
-import type { PhoneVoices, WakeTestCandidate } from '@/services/phone-wake';
-
-const voices: PhoneVoices = {
-  model: true,
-  people: [{ profileId: 'me', takes: 5 }],
-  cnn: 0.6,
-  accept: 0.5,
-  reject: 0.35,
-  floor: 0.5,
-  strict: 0.97,
-  chosen: false,
-};
+import type { WakeTestCandidate } from '@/services/phone-wake';
 
 function cand(over: Partial<ResolvedCandidate>): ResolvedCandidate {
   return { t: 1, p: 0.9, voice: 0.7, decision: 'wake', segment: null, pond: null, ...over };
@@ -63,28 +51,4 @@ it('asks the Pond only about the candidates the phone would have asked it about'
   const resolved = await resolveCandidates(run, ask);
   expect(ask.mock.calls).toEqual([['file:///a.wav'], ['file:///b.wav']]);
   expect(resolved.map((c) => c.pond)).toEqual([null, true, null, null]);
-});
-
-describe('the suggested line', () => {
-  const said = (ps: number[], voice = 0.6): WakeTestCandidate[] =>
-    ps.map((p, i) => ({ t: i * 2, p, voice, decision: 'ask_pond', segment: null }));
-
-  it('sits just under the weakest peak in a taught voice', () => {
-    expect(suggestedLine(said([0.9, 0.8, 0.7]), voices)).toBeCloseTo(0.56);
-  });
-
-  it('stays inside the line range', () => {
-    expect(suggestedLine(said([0.3, 0.9, 0.9]), voices)).toBe(0.5);
-    expect(suggestedLine(said([1, 1, 1]), { ...voices, cnn: 0.6 })).toBeCloseTo(0.8);
-  });
-
-  it('ignores voices the check turned away, and needs three to go on', () => {
-    expect(suggestedLine([...said([0.9, 0.9, 0.9]), ...said([0.2, 0.2], 0.1)], voices)).toBeCloseTo(0.72);
-    expect(suggestedLine(said([0.9, 0.9]), voices)).toBeNull();
-  });
-
-  it('says nothing with nobody taught, or when the line would not move', () => {
-    expect(suggestedLine(said([0.9, 0.9, 0.9]), { ...voices, people: [] })).toBeNull();
-    expect(suggestedLine(said([0.75, 0.9, 0.9]), voices)).toBeNull();
-  });
 });

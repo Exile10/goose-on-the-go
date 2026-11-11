@@ -1,5 +1,7 @@
 package io.jarida.pondassist
 
+import android.app.Activity
+import android.app.KeyguardManager
 import android.app.role.RoleManager
 import android.content.ActivityNotFoundException
 import android.content.Context
@@ -8,6 +10,7 @@ import android.os.Build
 import android.os.Bundle
 import android.os.RemoteException
 import android.provider.Settings
+import android.view.WindowManager
 import android.service.voice.VoiceInteractionService
 import android.service.voice.VoiceInteractionSession
 import android.service.voice.VoiceInteractionSessionService
@@ -167,11 +170,23 @@ class GooseRecognitionService : RecognitionService() {
  * app's JavaScript, its Pond connection included, is reused rather than started twice.
  *
  * The wake word opens it the same way as the gesture, through [GooseInteractionService.showOverlay].
+ *
+ * It shows over the lock screen and turns the screen on, so "Hey Goose" works on a locked phone.
+ * There the overlay's turns ask the Pond as a locked phone (`device_locked`), which answers with
+ * no personal data or tools, until [PondAssistModule.unlock] dismisses the lock screen.
  */
 class AssistActivity : ReactActivity() {
   override fun onCreate(savedInstanceState: Bundle?) {
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+      setShowWhenLocked(true)
+      setTurnScreenOn(true)
+    } else {
+      @Suppress("DEPRECATION")
+      window.addFlags(WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON)
+    }
     // Nothing is restored: a recreated overlay starts a new conversation, as a new gesture would.
     super.onCreate(null)
+    Log.i(TAG, "assist overlay created locked=${locked(this)}")
   }
 
   override fun getMainComponentName(): String = COMPONENT
@@ -200,6 +215,9 @@ class AssistActivity : ReactActivity() {
   companion object {
     /** The name `index.ts` registers the overlay's root component under. */
     const val COMPONENT = "assist"
+
+    /** Whether the lock screen is up, so the overlay's turns must ask as a locked phone. */
+    fun locked(context: Context) = context.getSystemService(KeyguardManager::class.java).isKeyguardLocked
   }
 }
 
@@ -249,6 +267,49 @@ class PondAssistModule(context: ReactApplicationContext) : ReactContextBaseJavaM
       }
     }
     promise.resolve(false)
+  }
+
+  /** Whether the phone is locked now: the overlay asks the Pond as a locked phone while it is. */
+  @ReactMethod(isBlockingSynchronousMethod = true)
+  fun locked(): Boolean = AssistActivity.locked(reactApplicationContext)
+
+  /**
+   * Ask for the lock screen to be dismissed over the overlay (fingerprint, face or PIN). Resolves
+   * true once the phone is unlocked, false when the person backs out or nothing could be asked.
+   */
+  @ReactMethod
+  fun unlock(promise: Promise) {
+    UiThreadUtil.runOnUiThread {
+      val activity: Activity? = reactApplicationContext.currentActivity
+      if (!AssistActivity.locked(reactApplicationContext)) {
+        promise.resolve(true)
+        return@runOnUiThread
+      }
+      if (activity == null || Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+        Log.w(TAG, "kind=assist_unlock_unavailable activity=${activity != null} sdk=${Build.VERSION.SDK_INT}")
+        promise.resolve(false)
+        return@runOnUiThread
+      }
+      activity.getSystemService(KeyguardManager::class.java).requestDismissKeyguard(
+        activity,
+        object : KeyguardManager.KeyguardDismissCallback() {
+          override fun onDismissSucceeded() {
+            Log.i(TAG, "kind=assist_unlocked")
+            promise.resolve(true)
+          }
+
+          override fun onDismissCancelled() {
+            Log.i(TAG, "kind=assist_unlock_cancelled")
+            promise.resolve(false)
+          }
+
+          override fun onDismissError() {
+            Log.w(TAG, "kind=assist_unlock_failed")
+            promise.resolve(false)
+          }
+        },
+      )
+    }
   }
 
   /** Close the assist overlay. Resolves false when the activity in front is not the overlay. */
