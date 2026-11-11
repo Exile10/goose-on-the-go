@@ -26,7 +26,7 @@ import Svg, { ClipPath, Defs, Ellipse, G, LinearGradient, Path, RadialGradient, 
 import { useInkTheme, useReduceMotion } from '@jarida/ink/native';
 
 import {
-  BACK_SHEEN, BANDS, BELLY, BODY, CHEST_SHEEN, GLINTS, HEAD_DETAIL, PRIMARIES, SCALLOPS, TAIL, WAKE, WAVES, WING,
+  BACK_SHEEN, BANDS, BELLY, BODY, CHEST_SHEEN, GLINTS, HEAD_DETAIL, PRIMARIES, RIPPLE, SCALLOPS, TAIL, WAKE, WAVES, WING,
   WING_LINES, easeListen, neckFrame, neckPose, partsFrame, restingParts, wavePath,
   type GooseMood, type NeckFrame, type PartsFrame,
 } from '@/components/patterns/goose-motion';
@@ -214,7 +214,8 @@ function Ripple({ frame, i, color }: { frame: SharedValue<Frame>; i: number; col
     const r = frame.get().parts.ripples[i];
     return { matrix: about(r.scale, 0, 0, r.scale, 88, 98), opacity: r.opacity };
   });
-  return <AEllipse animatedProps={props} cx={88} cy={98} rx={30} ry={5.5} fill="none" stroke={color} strokeWidth={1.3} />;
+  // Hung from the waterline: its top edge stays on it as it spreads, so the ring lies on the water.
+  return <AEllipse animatedProps={props} cx={RIPPLE[0]} cy={RIPPLE[1]} rx={RIPPLE[2]} ry={RIPPLE[3]} fill="none" stroke={color} strokeWidth={1.3} />;
 }
 
 function Shadow({ frame, id }: { frame: SharedValue<Frame>; id: string }) {
