@@ -28,10 +28,11 @@ interface Span {
 }
 
 /**
- * How large the text is set: a reply's body (`md`), a card's title, or quieter lines in Ink's own
- * `base`, `sm` and `xs`. Below `md`, headings shrink with it: a card has no room for a reply's.
+ * How large the text is set: a reply's body (`md`), the story reader's large text (`lg`), a card's
+ * title, or quieter lines in Ink's own `base`, `sm` and `xs`. Below `md`, headings shrink with it:
+ * a card has no room for a reply's.
  */
-export type MarkdownSize = 'md' | 'title' | 'base' | 'sm' | 'xs';
+export type MarkdownSize = 'lg' | 'md' | 'title' | 'base' | 'sm' | 'xs';
 
 /** Where a block sits: a quote recolours what it holds, and a nested list changes its bullet. */
 interface Place {
@@ -41,6 +42,14 @@ interface Place {
   size: MarkdownSize;
   /** Off inside a card: selectable text on Android takes the touch the card is waiting for. */
   selectable: boolean;
+  /** A report's citations: a cited page draws as its number, and a tap opens its card. */
+  sources?: SourceChips;
+}
+
+/** How a report numbers the pages it cites, and what a tap on one does. */
+export interface SourceChips {
+  numberOf: (url: string) => number | undefined;
+  open: (url: string) => void;
 }
 
 /** Quicksand at 13px, erring wide; every row of a column needs one width, so it is estimated, not measured. */
@@ -61,6 +70,21 @@ function face(theme: Theme, span: Span): TextStyle {
 function link(href: string, children: React.ReactNode, place: Place, key: number) {
   const url = webLink(href);
   if (!url) return <React.Fragment key={key}>{children}</React.Fragment>;
+  const n = place.sources?.numberOf(url);
+  if (n !== undefined && place.sources) {
+    const { open } = place.sources;
+    return (
+      <Text
+        key={key}
+        accessibilityRole="button"
+        accessibilityLabel={`Source ${n}`}
+        onPress={() => open(url)}
+        style={[styles.chip, { color: place.theme.color.accentLine }]}
+      >
+        {`\u2009[${n}]`}
+      </Text>
+    );
+  }
   // A map opens where the phone opens maps; the rest in the in-app browser, beside the reply.
   const open = () => void (isMapLink(url) ? Linking.openURL(url) : WebBrowser.openBrowserAsync(url));
   return (
@@ -141,7 +165,8 @@ function bodySpec(place: Place): InkTextSpec {
   if (place.size === 'title') {
     return { role: 'display', size: 'lg', weight: theme.weight.bold, tracking: 'snug', leading: 'snug', color: tone };
   }
-  return { size: place.size, leading: 'base', color: tone };
+  // The reader's large text is for reading at length, so it takes the loose leading.
+  return { size: place.size, leading: place.size === 'lg' ? 'loose' : 'base', color: tone };
 }
 
 function bodySpan(place: Place): Span {
@@ -163,7 +188,7 @@ function paragraph(tokens: Token[] | undefined, text: string, place: Place, key:
 function heading(token: Tokens.Heading, place: Place, key: number) {
   const { theme, tone } = place;
   const spec: InkTextSpec =
-    place.size !== 'md'
+    place.size !== 'md' && place.size !== 'lg'
       ? { ...bodySpec(place), weight: token.depth <= 3 ? theme.weight.bold : theme.weight.semibold, leading: 'snug' }
       : token.depth === 1
       ? { role: 'display', size: 'xl', weight: theme.weight.bold, tracking: 'title', leading: 'snug', color: tone }
@@ -340,6 +365,8 @@ export interface MarkdownProps {
   size?: MarkdownSize;
   tone?: 'primary' | 'secondary' | 'tertiary';
   selectable?: boolean;
+  /** Draw the cited pages as numbered chips; a report passes its own numbering. */
+  sources?: SourceChips;
 }
 
 export const Markdown = React.memo(function Markdown({
@@ -347,14 +374,15 @@ export const Markdown = React.memo(function Markdown({
   size = 'md',
   tone = 'primary',
   selectable = true,
+  sources,
 }: MarkdownProps) {
   const theme = useInkTheme();
   const tokens = useMemo(() => parseReply(source), [source]);
   const color =
     tone === 'secondary' ? theme.color.textSecondary : tone === 'tertiary' ? theme.color.textTertiary : theme.color.text;
   return (
-    <View style={size === 'md' ? styles.page : styles.compact}>
-      {blocks(tokens, { theme, tone: color, depth: 0, size, selectable })}
+    <View style={size === 'md' || size === 'lg' ? styles.page : styles.compact}>
+      {blocks(tokens, { theme, tone: color, depth: 0, size, selectable, sources })}
     </View>
   );
 });
@@ -364,6 +392,7 @@ const styles = StyleSheet.create({
   compact: { gap: 6 },
   headingGap: { marginTop: 8 },
   link: { textDecorationLine: 'underline' },
+  chip: { fontSize: 12, fontWeight: '600' },
   struck: { textDecorationLine: 'line-through' },
   quote: { borderLeftWidth: 2, paddingLeft: 12, gap: 8 },
   rule: { marginVertical: 4 },

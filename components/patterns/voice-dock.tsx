@@ -52,6 +52,8 @@ const ORB_ACTIONS: Record<VoiceState, TranslationKey> = {
 export interface VoiceDockProps {
   send: UseChat['actions']['send'];
   stop: UseChat['actions']['stop'];
+  /** The Pond takes a spoken turn's recording: its model hears it, or Whisper's words stand in. */
+  sendsRecordings?: boolean;
   /** Back to the keyboard. */
   onClose: () => void;
   bottomInset: number;
@@ -59,10 +61,10 @@ export interface VoiceDockProps {
   onStateChange?: (state: VoiceState) => void;
 }
 
-export function VoiceDock({ send, stop, onClose, bottomInset, onStateChange }: VoiceDockProps) {
+export function VoiceDock({ send, stop, sendsRecordings, onClose, bottomInset, onStateChange }: VoiceDockProps) {
   const theme = useInkTheme();
   const { t } = useTranslation();
-  const voice = useVoice({ send, stop });
+  const voice = useVoice({ send, stop, sendsRecordings });
   const { state, level, speaker, error, micBlocked } = voice.data;
   useEffect(() => {
     onStateChange?.(state);

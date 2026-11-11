@@ -58,11 +58,12 @@
       [
         "expo-location",
         {
-          "locationWhenInUsePermission": "Goose On The Go uses your location when you ask for a ride fare, so the driver is sent to where you are, and at home to tell your Pond where home is, so its weather and local answers are for your area. It is sent to your Pond, and for a ride to the ride company, and nowhere else.",
-          "locationAlwaysAndWhenInUsePermission": false,
-          "locationAlwaysPermission": false,
-          "isIosBackgroundLocationEnabled": false,
-          "isAndroidBackgroundLocationEnabled": false
+          "locationWhenInUsePermission": "Goose On The Go uses your location when you ask for a ride fare, so the driver is sent to where you are; when you save a place for a reminder, such as home; and at home, to tell your Pond where home is so its weather and local answers are for your area. A ride's location goes to your Pond and the ride company for that ride; anything else goes to your Pond and nowhere else.",
+          "locationAlwaysAndWhenInUsePermission": "Goose On The Go watches only the places you save for reminders, like home or the office, so it can remind you when you arrive or leave. Your Pond hears which place and whether you came or went. Where you are never leaves your phone.",
+          "locationAlwaysPermission": "Goose On The Go watches only the places you save for reminders, like home or the office, so it can remind you when you arrive or leave. Your Pond hears which place and whether you came or went. Where you are never leaves your phone.",
+          "isIosBackgroundLocationEnabled": true,
+          "isAndroidBackgroundLocationEnabled": true,
+          "isAndroidForegroundServiceEnabled": false
         }
       ],
       [

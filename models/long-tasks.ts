@@ -1,6 +1,7 @@
 // A long task the assistant started from the chat with `task_start`, which runs later, outside the
 // turn. The chat finds it by the id in that tool's answer and follows it from there.
 
+import { readList, readReportImage, readReportOption } from '@/models/web-watches';
 import { bareToolName } from '@/constants/tools';
 import type { ToolCall } from '@/models/chat';
 import type {
@@ -210,6 +211,8 @@ export function readLongTaskReport(raw: unknown): LongTaskReportWire | null {
     sections: count(r.sections),
     sources,
     calendar_events: count(r.calendar_events),
+    images: readList(r.images, readReportImage),
+    options: readList(r.options, readReportOption),
   };
 }
 

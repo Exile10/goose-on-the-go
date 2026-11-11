@@ -28,6 +28,12 @@ export const MIN_POLL_MS = 5_000;
  */
 export const LIVE_VIEW_POLL_MS = 1_000;
 
+/**
+ * The interests interview while the Pond writes its next question: the contract asks for a read
+ * every 1.5 s, and only while the answer is `thinking` on a screen in front, a few reads at most.
+ */
+export const INTERVIEW_POLL_MS = 1_500;
+
 export interface LiveLoop {
   start(): void;
   stop(): void;
