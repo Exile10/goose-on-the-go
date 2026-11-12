@@ -5506,7 +5506,8 @@
       "restored": "Brought back",
       "saved": "Saved",
       "deleted": "Deleted",
-      "factLabel": "{{content}}. Filed under {{word}}."
+      "factLabel": "{{content}}. Filed under {{word}}.",
+      "loading": "Reading what Goose remembers"
     },
     "interviewOne": {
       "lead": "About three minutes. Tap your answers and skip anything you like. Nothing is kept until you say so.",
@@ -5545,7 +5546,9 @@
       "seeAbout": "See About you",
       "editFact": "Reword",
       "editFactTitle": "Reword this",
-      "factToggle": "{{content}}. Double tap to keep or drop."
+      "factToggle": "{{content}}. Double tap to keep or drop.",
+      "loading": "Getting your interview ready",
+      "savedNews": "Your news is set. Nothing else was kept."
     },
     "notes": {
       "lead": "Goose writes these for itself as it works for you. You can read them and delete any.",
@@ -5555,7 +5558,8 @@
       "emptyBody": "Goose writes a note when it learns something about working for you.",
       "delete": "Delete note",
       "deleted": "Note deleted",
-      "shared": "For the whole household"
+      "shared": "For the whole household",
+      "loading": "Reading Goose's notes"
     },
     "shots": {
       "lead": "Let Goose suggest ideas from what you screenshot: a trail, a recipe, a pair of shoes.",
@@ -5584,7 +5588,12 @@
       "deleteAllConfirmTitle": "Delete everything Goose noted?",
       "deleteAllConfirmBody": "Every line goes, and any screenshot still waiting is dropped.",
       "turnedOn": "On. Choose screenshots to send.",
-      "turnedOff": "Off. Screenshots still waiting were dropped."
+      "turnedOff": "Off. Screenshots still waiting were dropped.",
+      "loading": "Reading your screenshot notes",
+      "pickerFailed": "The photo picker would not open. If it keeps happening, close the app and open it again.",
+      "needsUpdate": "This needs the newest build of the app. Update it to choose screenshots.",
+      "unreadable": "One screenshot could not be read.",
+      "deletedAll": "All deleted"
     }
   }
 }
