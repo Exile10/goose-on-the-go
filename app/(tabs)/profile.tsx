@@ -12,7 +12,6 @@ import { InkButton, InkEdge, InkSearchField, InkTitle } from '@jarida/ink/native
 
 import { IssueRows } from '@/components/settings/issue-page';
 import { PAGE_GUTTER } from '@/components/settings/settings-scroll';
-import { SwitchRow } from '@/components/settings/setting-controls';
 import { SettingsGroup, SettingsMessage, SettingsRow, TILE_INSET } from '@/components/settings/settings-list';
 import {
   useSettingsColors,
@@ -30,7 +29,7 @@ import type { SummaryId } from '@/models/pond-settings';
 import { useBottomBarInset, useChromeScroll } from '@/providers/chrome-provider';
 import { useServer } from '@/providers/server-provider';
 import { hostOf } from '@/services/discovery';
-import { hapticsEnabled, saveHapticsPreference, selectionTick } from '@/services/haptics';
+import { selectionTick } from '@/services/haptics';
 import { initialOf, useHousehold } from '@/view-models/use-household';
 import { usePondSettings } from '@/view-models/use-pond-settings';
 import { PullSectionsProvider, useReloadOnPull, usePullSections, usePullToRefresh } from '@/view-models/use-pull-to-refresh';
@@ -118,7 +117,6 @@ export default function ProfileHub() {
   const { t } = useTranslation();
   const router = useRouter();
   const { unpairing, start: confirmUnpair } = useUnpair();
-  const [hapticsOn, setHapticsOn] = useState(hapticsEnabled);
   const chrome = useChromeScroll();
   const bottomInset = useBottomBarInset();
   const { settings, actions: settingsActions } = usePondSettings();
@@ -206,17 +204,6 @@ export default function ProfileHub() {
                     onPress={() => go(item.route)}
                   />
                 ))}
-                {group.groupKey === 'settings.menu.phone' ? (
-                  <SwitchRow
-                    key="haptics"
-                    label={t('settings.hapticsLabel')}
-                    value={hapticsOn}
-                    onChange={(next) => {
-                      setHapticsOn(next);
-                      void saveHapticsPreference(next);
-                    }}
-                  />
-                ) : null}
               </SettingsGroup>
             </View>
           ))}
