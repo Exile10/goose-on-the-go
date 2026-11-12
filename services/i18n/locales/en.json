@@ -296,6 +296,8 @@
       "addOnNotReady": "Your Pond's model will hear voice notes once its picture and sound add-on is ready.",
       "openModels": "Open Models",
       "unreadable": "Your Pond could not read that voice note. Try recording it again.",
+      "noWords": "Your Pond could not make out any words in that voice note. Check nothing else is using the microphone, then record it again.",
+      "untranscribed": "Your Pond could not listen to that voice note just now. Try again in a moment.",
       "playFile": "Play {{name}}",
       "stopFile": "Stop {{name}}"
     },

@@ -87,6 +87,17 @@ describe('a refused note', () => {
     );
     expect(describeTurnError(refusal('audio_invalid'), t)).toBe('Your Pond could not read that voice note. Try recording it again.');
   });
+
+  it('says why a note it could not turn into words went nowhere', () => {
+    const noWords = new ApiError('POST /api/v1/chat/stream → 422', 422, null, 'English', { code: 'voice_note_no_words' });
+    const untranscribed = new ApiError('POST /api/v1/chat/stream → 503', 503, null, 'English', {
+      code: 'voice_note_untranscribed',
+    });
+    expect(describeTurnError(noWords, t)).toBe(
+      'Your Pond could not make out any words in that voice note. Check nothing else is using the microphone, then record it again.',
+    );
+    expect(describeTurnError(untranscribed, t)).toBe('Your Pond could not listen to that voice note just now. Try again in a moment.');
+  });
 });
 
 describe('a note read back from the Pond', () => {

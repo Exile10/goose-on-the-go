@@ -85,6 +85,8 @@ export function describeTurnError(e: unknown, t: TFunction): string {
     if (code === 'audio_unsupported') return t('chat.voiceNote.modelCannotHear');
     if (code === 'audio_not_ready') return t('chat.voiceNote.addOnNotReady');
     if (code === 'audio_invalid') return t('chat.voiceNote.unreadable');
+    if (code === 'voice_note_no_words') return t('chat.voiceNote.noWords');
+    if (code === 'voice_note_untranscribed') return t('chat.voiceNote.untranscribed');
     if (code === 'audio_too_long') return t('chat.composer.audioTooLong');
     if (code === 'audio_too_large') return t('chat.composer.audioTooLargeForPond');
     if (code === 'document_invalid') return t('chat.composer.pdfInvalid');
