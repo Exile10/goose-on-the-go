@@ -145,6 +145,12 @@ export default function StackLayout() {
       <Stack.Screen name="goose-connector" options={{ title: t('screens.gooseConnector') }} />
       <Stack.Screen name="goose-interests" options={{ title: t('screens.gooseInterests') }} />
       <Stack.Screen name="goose-interview" options={{ title: t('screens.gooseInterview') }} />
+      <Stack.Screen name="goose-member-interview" options={{ title: t('screens.gooseMemberInterview') }} />
+      <Stack.Screen name="goose-idea" options={{ title: t('screens.gooseIdea') }} />
+      <Stack.Screen name="goose-about" options={{ title: t('screens.gooseAbout') }} />
+      <Stack.Screen name="goose-about-archived" options={{ title: t('screens.gooseAboutArchived') }} />
+      <Stack.Screen name="goose-notes" options={{ title: t('screens.gooseNotes') }} />
+      <Stack.Screen name="goose-screenshots" options={{ title: t('screens.gooseScreenshots') }} />
       <Stack.Screen name="goose-catalog" options={{ title: t('screens.gooseCatalog') }} />
       <Stack.Screen name="ride" options={{ title: t('screens.ride') }} />
       <Stack.Screen name="agents" options={{ title: t('screens.agents') }} />
