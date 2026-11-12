@@ -772,7 +772,7 @@ export function createMockHub({ fresh = false, clock = Date.now }: MockHubOption
   return {
     async hub() {
       await delay();
-      return { version: 1, interests: true, news: true, todos: true, cart: true, connectors: true, ideas: true, catalog: true, about: false, interview: false, screenshots: false, cards: [] };
+      return { version: 1, interests: true, news: true, todos: true, cart: true, connectors: true, ideas: true, catalog: true, about: false, interview: false, screenshots: false, activity: false, cards: [] };
     },
     async interests() {
       await delay();

@@ -36,6 +36,7 @@ import { useBottomBarInset, useChromeScroll } from '@/providers/chrome-provider'
 import { selectionTick, tap } from '@/services/haptics';
 import { Storage } from '@/services/storage';
 import { useContentState } from '@/view-models/use-content-state';
+import { useGooseActivity } from '@/view-models/use-goose-activity';
 import { useMyGooseHub, type UseMyGooseHub } from '@/view-models/use-my-goose';
 import { useListen, useStoryActions } from '@/view-models/use-news';
 import { usePullToRefresh } from '@/view-models/use-pull-to-refresh';
@@ -138,6 +139,7 @@ function FindAndJump({ hub }: { hub: MeHub }) {
     { shown: hub.interests, key: 'interests', icon: 'sparkle', label: t('goose.find.interests'), href: '/(stack)/goose-interests' },
     { shown: true, key: 'saved', icon: 'archive', label: t('goose.find.saved'), href: '/(stack)/saved' },
     { shown: hub.about, key: 'notes', icon: 'file-text', label: t('goose.find.notes'), href: '/(stack)/goose-notes' },
+    { shown: hub.activity, key: 'activity', icon: 'activity', label: t('goose.find.activity'), href: '/(stack)/goose-activity' },
     { shown: hub.connectors, key: 'connectors', icon: 'plug', label: t('goose.find.connectors'), href: '/(stack)/goose-connectors' },
     { shown: hub.catalog, key: 'more', icon: 'more', label: t('goose.find.more'), href: '/(stack)/goose-catalog' },
   ];
@@ -179,8 +181,13 @@ function FindAndJump({ hub }: { hub: MeHub }) {
 function YouAndGoose({ hub }: { hub: MeHub }) {
   const { t } = useTranslation();
   const styles = useThemedStyles(makeStyles);
-  if (!hub.about && !hub.interview && !hub.screenshots) return null;
+  const activity = useGooseActivity(hub.activity);
+  if (!hub.about && !hub.interview && !hub.screenshots && !hub.activity) return null;
+  const { items, unseen } = activity.data;
+  // What it did last says more than a caption; a count says there is something new to read.
+  const did = unseen > 0 ? t('goose.you.activityNew', { count: unseen }) : (items[0]?.summary ?? t('goose.you.activityDetail'));
   const all: (Jump & { shown: boolean; detail: string | null })[] = [
+    { shown: hub.activity, key: 'activity', icon: 'activity', label: t('goose.you.activity'), detail: did, href: '/(stack)/goose-activity' },
     { shown: hub.about, key: 'about', icon: 'profile', label: t('goose.you.about'), detail: null, href: '/(stack)/goose-about' },
     { shown: hub.interview, key: 'interview', icon: 'chat', label: t('goose.you.interview'), detail: t('goose.you.interviewStart'), href: '/(stack)/goose-member-interview' },
     { shown: hub.about, key: 'notes', icon: 'file-text', label: t('goose.you.notes'), detail: t('goose.you.notesDetail'), href: '/(stack)/goose-notes' },

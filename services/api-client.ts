@@ -52,6 +52,7 @@ import { readCart, readCartItem, type CartItem } from '@/models/cart';
 import { readConnector, readConnectors, type Connector } from '@/models/connectors';
 import { readAbout, readArchived, readFact, type AboutFact, type AboutProfile, type ArchivedFact } from '@/models/about';
 import { readCard, type CardKind, type ContextCard } from '@/models/cards';
+import { readGooseActivity, type GooseActivityList } from '@/models/goose-activity';
 import { readGooseNotes, type GooseNotes } from '@/models/goose-notes';
 import { readIdea, readIdeas, type Idea } from '@/models/ideas';
 import {
@@ -3125,6 +3126,20 @@ export class PondApiClient {
 
   async deleteGooseNote(id: string): Promise<void> {
     await this.del<unknown>(`/api/v1/me/notes/${encodeURIComponent(id)}`);
+  }
+
+  // ── What Goose did by itself ─────────────────────────────────
+
+  async gooseActivity(): Promise<GooseActivityList> {
+    return readGooseActivity(await this.get<unknown>('/api/v1/me/goose/activity'));
+  }
+
+  async undoGooseActivity(id: string): Promise<void> {
+    await this.post<unknown>(`/api/v1/me/goose/activity/${encodeURIComponent(id)}/undo`, {});
+  }
+
+  async markGooseActivitySeen(): Promise<void> {
+    await this.post<unknown>('/api/v1/me/goose/activity/seen', {});
   }
 
   // ── Ideas from screenshots (opt-in) ──────────────────────────

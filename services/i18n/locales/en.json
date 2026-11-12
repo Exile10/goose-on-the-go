@@ -1729,7 +1729,8 @@
     "gooseAboutArchived": "Set aside",
     "gooseNotes": "Goose's notes",
     "gooseScreenshots": "Ideas from screenshots",
-    "gooseMemberInterview": "Interview"
+    "gooseMemberInterview": "Interview",
+    "gooseActivity": "What Goose did"
   },
   "nav": {
     "goose": "Goose",
@@ -5451,7 +5452,8 @@
       "saved": "Saved",
       "notes": "Goose's notes",
       "connectors": "Connected",
-      "more": "More"
+      "more": "More",
+      "activity": "What Goose did"
     },
     "you": {
       "title": "You and Goose",
@@ -5472,7 +5474,11 @@
       "instructionsDetail": "Its soul, what it checks on its own, how it remembers",
       "screenshots": "Ideas from screenshots",
       "screenshotsOn": "On",
-      "screenshotsOff": "Off"
+      "screenshotsOff": "Off",
+      "activity": "What Goose did",
+      "activityDetail": "What it did for you on its own, and how to take it back",
+      "activityNew_one": "{{count}} new",
+      "activityNew_other": "{{count}} new"
     },
     "about": {
       "lead": "What Goose remembers about you. Add, reword or delete anything.",
@@ -5594,6 +5600,29 @@
       "needsUpdate": "This needs the newest build of the app. Update it to choose screenshots.",
       "unreadable": "One screenshot could not be read.",
       "deletedAll": "All deleted"
+    },
+    "activity": {
+      "lead": "What Goose did for you without being asked. It sets reminders, keeps notes for itself, pauses a watch that keeps failing and looks things up. Anything bigger it asks you first.",
+      "loading": "Reading what Goose did",
+      "emptyTitle": "Nothing yet",
+      "emptyBody": "When Goose does something for you on its own, it tells you here.",
+      "today": "Today",
+      "earlier": "Earlier",
+      "undo": "Take it back",
+      "undone": "Taken back",
+      "undoneNow": "Taken back",
+      "undoConfirmTitle": "Take this back?",
+      "undoConfirmReminder": "The reminder is removed from your list.",
+      "undoConfirmNote": "Goose's note is deleted.",
+      "undoConfirmWatch": "The watch starts checking again.",
+      "kind": {
+        "reminder": "Reminder",
+        "note": "Note to itself",
+        "note_closed": "Note closed",
+        "watch_paused": "Watch paused",
+        "suggestion": "Asked you",
+        "errand": "Looked into"
+      }
     }
   }
 }

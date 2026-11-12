@@ -44,6 +44,7 @@ export default function GooseSearchScreen() {
     { key: 'about', icon: 'profile', label: t('goose.find.about'), href: '/(stack)/goose-about', shown: Boolean(hub?.about) },
     { key: 'interview', icon: 'chat', label: t('goose.you.interview'), href: '/(stack)/goose-member-interview', shown: Boolean(hub?.interview) },
     { key: 'notes', icon: 'file-text', label: t('goose.find.notes'), href: '/(stack)/goose-notes', shown: Boolean(hub?.about) },
+    { key: 'activity', icon: 'activity', label: t('goose.find.activity'), href: '/(stack)/goose-activity', shown: Boolean(hub?.activity) },
     { key: 'instructions', icon: 'prompts', label: t('goose.you.instructions'), href: '/(stack)/settings-prompt-templates', shown: Boolean(hub?.about) },
     { key: 'screenshots', icon: 'photo', label: t('goose.you.screenshots'), href: '/(stack)/goose-screenshots', shown: Boolean(hub?.screenshots) },
     { key: 'news', icon: 'news', label: t('goose.find.news'), href: '/(stack)/goose-news', shown: Boolean(hub?.news) },

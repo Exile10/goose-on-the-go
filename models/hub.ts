@@ -19,13 +19,15 @@ export interface MeHub {
   interview: boolean;
   /** Ideas from screenshots, `/me/screenshots`. */
   screenshots: boolean;
+  /** What Goose did by itself, `/me/goose/activity`. */
+  activity: boolean;
   /** The kinds of card this Pond can send to chat; empty on a Pond that sends none. */
   cards: CardKind[];
 }
 
 export type HubPart = Exclude<keyof MeHub, 'version' | 'cards'>;
 
-export const HUB_PARTS: readonly HubPart[] = ['interests', 'news', 'todos', 'cart', 'connectors', 'ideas', 'catalog', 'about', 'interview', 'screenshots'];
+export const HUB_PARTS: readonly HubPart[] = ['interests', 'news', 'todos', 'cart', 'connectors', 'ideas', 'catalog', 'about', 'interview', 'screenshots', 'activity'];
 
 /** Null for an answer that is not the hub at all, which the phone treats as no hub. */
 export function readHub(raw: unknown): MeHub | null {

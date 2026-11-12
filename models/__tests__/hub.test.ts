@@ -18,6 +18,7 @@ describe('reading /me/hub', () => {
       about: false,
       interview: false,
       screenshots: false,
+      activity: false,
       cards: [],
     });
   });

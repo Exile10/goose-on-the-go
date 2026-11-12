@@ -26,7 +26,8 @@ else Goose can do. This document is the contract between the Pond and the phone.
 ## 0. What this Pond serves
 
 `GET /me/hub` → `{"version":1,"about":bool,"interests":bool,"interview":bool,"news":bool,
-"todos":bool,"cart":bool,"connectors":bool,"ideas":bool,"screenshots":bool,"catalog":bool,
+"todos":bool,"cart":bool,"connectors":bool,"ideas":bool,"screenshots":bool,"activity":bool,
+"catalog":bool,
 "cards":[kind]}`. A Pond without the route answers 404 and the phone
 keeps its older My Goose.
 
@@ -63,6 +64,19 @@ follow-ups. `DELETE /me/notes/{id}` → `204`. A member does not write them; Goo
 (the Pond's `docs/architecture/agent-documents.md`). The soul, the heartbeat's checklist and the
 scratchpad's rules are read and saved with `GET/PUT /prompts/{soul|heartbeat|scratchpad}` and
 `POST /prompts/{name}/reset`.
+
+## 0b-1. What Goose did by itself
+
+`GET /me/goose/activity` → `{"activity":[Entry], "unseen": n, "seen_at": time|null}`, newest
+first. `Entry = {"id","kind","summary","detail": text|null,"at","can_undo": bool,"undone": bool}`;
+`kind` is `reminder`, `note`, `note_closed`, `watch_paused`, `suggestion` or `errand` (`detail`
+is what an errand found). `POST /me/goose/activity/seen` → `204`. `POST
+/me/goose/activity/{id}/undo` → `{"undone":true}`, `409` when it cannot be taken back. Only the
+heartbeat writes entries. The hub part is `activity`; a notification with
+`{"open":"goose_activity"}` opens the list.
+
+The screen is `app/(stack)/goose-activity.tsx`, read through `use-goose-activity`. A kind this
+app does not know still shows its line and offers nothing. Opening the list marks it read.
 
 ## 0c. The interview
 

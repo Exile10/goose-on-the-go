@@ -121,6 +121,7 @@ describe('openRouteFromData', () => {
     expect(openRouteFromData({ open: 'my_pond' })).toEqual({ open: 'my_pond' });
     expect(openRouteFromData({ open: 'ideas' })).toEqual({ open: 'ideas' });
     expect(openRouteFromData({ open: 'ideas', idea_id: 'idea-1' })).toEqual({ open: 'ideas', ideaId: 'idea-1' });
+    expect(openRouteFromData({ open: 'goose_activity' })).toEqual({ open: 'goose_activity' });
   });
 
   it('keeps the schedule screen but drops an id that is not a Pond id', () => {
@@ -171,6 +172,7 @@ describe('screenPath', () => {
       params: { session: 's-1' },
     });
     expect(screenPath({ open: 'ideas' })).toBe('/(stack)/goose-ideas');
+    expect(screenPath({ open: 'goose_activity' })).toBe('/(stack)/goose-activity');
   });
 
   it('opens the schedules list on the schedule the notification names', () => {

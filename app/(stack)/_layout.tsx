@@ -150,6 +150,7 @@ export default function StackLayout() {
       <Stack.Screen name="goose-about" options={{ title: t('screens.gooseAbout') }} />
       <Stack.Screen name="goose-about-archived" options={{ title: t('screens.gooseAboutArchived') }} />
       <Stack.Screen name="goose-notes" options={{ title: t('screens.gooseNotes') }} />
+      <Stack.Screen name="goose-activity" options={{ title: t('screens.gooseActivity') }} />
       <Stack.Screen name="goose-screenshots" options={{ title: t('screens.gooseScreenshots') }} />
       <Stack.Screen name="goose-catalog" options={{ title: t('screens.gooseCatalog') }} />
       <Stack.Screen name="ride" options={{ title: t('screens.ride') }} />

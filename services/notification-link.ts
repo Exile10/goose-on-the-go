@@ -118,7 +118,8 @@ export type OpenRoute =
   | { open: 'todos'; todoId?: string }
   | { open: 'news'; storyId?: string }
   | { open: 'cart'; cartId?: string }
-  | { open: 'ideas'; ideaId?: string };
+  | { open: 'ideas'; ideaId?: string }
+  | { open: 'goose_activity' };
 
 /** A Pond id: a UUID, optionally prefixed (`timer-...`). Nothing that could be a path. */
 const POND_ID = /^[A-Za-z0-9_-]{1,128}$/;
@@ -187,6 +188,9 @@ export function openRouteFromData(data: unknown): OpenRoute | null {
       const ideaId = pondId(data.idea_id);
       return ideaId ? { open: 'ideas', ideaId } : { open: 'ideas' };
     }
+    // What Goose did by itself: the list, where the newest entry is the one the notice is about.
+    case 'goose_activity':
+      return { open: 'goose_activity' };
     default:
       return null;
   }
@@ -226,6 +230,7 @@ type ScreenHref =
   | '/(stack)/extensions'
   | '/(stack)/remote-access'
   | '/(stack)/pond'
+  | '/(stack)/goose-activity'
   | { pathname: '/conversation'; params: { session: string } }
   | '/(stack)/web-watches'
   | { pathname: '/(stack)/web-watch'; params: { id: string } }
@@ -272,5 +277,7 @@ export function screenPath(route: OpenRoute): ScreenHref {
       return route.cartId ? { pathname: '/(stack)/goose-cart-item', params: { id: route.cartId } } : '/(stack)/goose-cart';
     case 'ideas':
       return '/(stack)/goose-ideas';
+    case 'goose_activity':
+      return '/(stack)/goose-activity';
   }
 }
