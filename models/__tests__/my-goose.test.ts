@@ -32,6 +32,8 @@ const watch = (id: string, matchingCount: number, extra: Partial<WebWatch> = {})
   lookingFor: 'Fielder',
   filters: {},
   filtersWords: '',
+  standing: null,
+  hasRule: false,
   intervalHours: 6,
   paused: false,
   itemsCount: 20,

@@ -1,9 +1,10 @@
 /**
- * My Goose as the hub, for a Pond that serves `/me/hub`. It is ordered by what needs the member:
- * the sentence, then what Goose is asking, then the news written for them, then what Goose found
- * (ideas, prices, long reads), then the to-dos, the watches, what is connected and what else Goose
- * can do, and at the foot what the member keeps and follows. A section with nothing in it folds
- * away or becomes an invitation; nothing is drawn as an empty box.
+ * My Goose as the hub, for a Pond that serves `/me/hub`. A find bar and a strip of jumps sit at
+ * the top, so every part is one tap away. Under them it is ordered by what needs the member: the
+ * sentence, what Goose is asking, the news, what Goose found (ideas, prices), the to-dos, the
+ * watches, what Goose knows of them and how it works for them, what is connected, and what they
+ * keep and follow. Each section is a heading over a few short rows that open the full screen; a
+ * section with nothing in it folds away.
  */
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
@@ -14,11 +15,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { InkButton, InkCard, InkSpinner, InkText, inkText, useInkTheme } from '@jarida/ink/native';
 
 import { ContentUnavailable } from '@/components/patterns/content-unavailable';
-import { GlyphRow, WatchShelf } from '@/components/patterns/goose-shelves';
+import { GlyphRow } from '@/components/patterns/goose-shelves';
 import { GIcon } from '@/components/ui/g-icon';
 import { GPressable } from '@/components/ui/g-pressable';
 import type { ThemeColors } from '@/constants/colors';
-import { iconOr } from '@/constants/icons';
+import { iconOr, type IconName } from '@/constants/icons';
 import { Spacing } from '@/constants/spacing';
 import { useThemedStyles } from '@/hooks/use-themed-styles';
 import { catalogHref, type CatalogItem } from '@/models/catalog';
@@ -40,14 +41,13 @@ import { useListen, useStoryActions } from '@/view-models/use-news';
 import { usePullToRefresh } from '@/view-models/use-pull-to-refresh';
 import { usePriceWords } from './cart-parts';
 import { DigestCard } from './digest-card';
-import { Carousel, PortraitCard } from './featured';
 import { GroupHeading, GroupRow, InsetGroup } from './following';
 import { MoreLink, RoundButton, SectionHead, useAgo } from './hub-parts';
 import { HubSentence } from './hub-sentence';
-import { IdeaPortrait } from './idea-card';
+import { IdeaRow } from './idea-card';
 import { InterestsGroup } from './interests-group';
 import { ConnectorStrip } from './connector-strip';
-import { CompactStory, HeroStory, LongReadShelf } from './news-cards';
+import { CompactStory, LongReadShelf } from './news-cards';
 import { CheckinRow, LocationSheet, OfferRow, TodoRow, openTodo } from './todo-parts';
 
 function go(href: Parameters<typeof router.push>[0]) {
@@ -55,9 +55,10 @@ function go(href: Parameters<typeof router.push>[0]) {
   router.push(href);
 }
 
-/** How many compact stories follow the hero on the tab. */
-const COMPACT_STORIES = 3;
+/** How many of each thing the tab shows before "more": a screenful holds several sections. */
+const COMPACT_STORIES = 4;
 const SHOWN_TODOS = 4;
+const SHOWN_ROWS = 3;
 
 function targetHref(clause: HubClause): Parameters<typeof router.push>[0] {
   const target = clause.target;
@@ -94,9 +95,10 @@ function Header() {
   );
 }
 
-function InterviewInvite() {
+function InterviewInvite({ hub }: { hub: MeHub }) {
   const { t } = useTranslation();
   const styles = useThemedStyles(makeStyles);
+  const interview = hub.interview ? '/(stack)/goose-member-interview' : '/(stack)/goose-interview';
   return (
     <InkCard>
       <View style={styles.invite}>
@@ -107,7 +109,7 @@ function InterviewInvite() {
           {t('goose.invite.body')}
         </InkText>
         <View style={styles.inviteActions}>
-          <InkButton variant="primary" icon="chat" onPress={() => go('/(stack)/goose-interview')}>
+          <InkButton variant="primary" icon="chat" onPress={() => go(interview)}>
             {t('goose.invite.start')}
           </InkButton>
           <InkButton variant="quiet" icon="plus" onPress={() => go('/(stack)/goose-interests')}>
@@ -116,6 +118,85 @@ function InterviewInvite() {
         </View>
       </View>
     </InkCard>
+  );
+}
+
+type Jump = { key: string; icon: IconName; label: string; href: Parameters<typeof router.push>[0] };
+
+/** The find bar and the jumps: every part of My Goose, one tap from the top. */
+function FindAndJump({ hub }: { hub: MeHub }) {
+  const { t } = useTranslation();
+  const styles = useThemedStyles(makeStyles);
+  const theme = useInkTheme();
+  const all: (Jump & { shown: boolean })[] = [
+    { shown: hub.news, key: 'news', icon: 'news', label: t('goose.find.news'), href: '/(stack)/goose-news' },
+    { shown: hub.ideas, key: 'ideas', icon: 'light', label: t('goose.find.ideas'), href: '/(stack)/goose-ideas' },
+    { shown: hub.todos, key: 'todos', icon: 'checklist', label: t('goose.find.todos'), href: '/(stack)/goose-todos' },
+    { shown: hub.cart, key: 'prices', icon: 'tag', label: t('goose.find.prices'), href: '/(stack)/goose-cart' },
+    { shown: true, key: 'watching', icon: 'eye', label: t('goose.find.watching'), href: '/(stack)/web-watches' },
+    { shown: hub.about, key: 'about', icon: 'profile', label: t('goose.find.about'), href: '/(stack)/goose-about' },
+    { shown: hub.interests, key: 'interests', icon: 'sparkle', label: t('goose.find.interests'), href: '/(stack)/goose-interests' },
+    { shown: true, key: 'saved', icon: 'archive', label: t('goose.find.saved'), href: '/(stack)/saved' },
+    { shown: hub.about, key: 'notes', icon: 'file-text', label: t('goose.find.notes'), href: '/(stack)/goose-notes' },
+    { shown: hub.connectors, key: 'connectors', icon: 'plug', label: t('goose.find.connectors'), href: '/(stack)/goose-connectors' },
+    { shown: hub.catalog, key: 'more', icon: 'more', label: t('goose.find.more'), href: '/(stack)/goose-catalog' },
+  ];
+  const jumps = all.filter((jump) => jump.shown);
+  return (
+    <View style={styles.find}>
+      <GPressable
+        onPress={() => go('/(stack)/goose-search')}
+        accessibilityRole="search"
+        accessibilityLabel={t('goose.find.placeholder')}
+        style={[styles.findBar, { backgroundColor: theme.color.chrome, borderColor: theme.color.line }]}
+      >
+        <GIcon name="search" size={18} color={theme.color.textTertiary} />
+        <InkText size="md" tone="secondary" style={{ flex: 1 }}>
+          {t('goose.find.placeholder')}
+        </InkText>
+      </GPressable>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.jumps} accessibilityLabel={t('goose.find.jumpTo')}>
+        {jumps.map((jump) => (
+          <GPressable
+            key={jump.key}
+            onPress={() => go(jump.href)}
+            accessibilityRole="button"
+            accessibilityLabel={jump.label}
+            style={[styles.jump, { backgroundColor: theme.color.chrome, borderColor: theme.color.line }]}
+          >
+            <GIcon name={jump.icon} size={14} color={theme.color.accentLine} />
+            <InkText size="sm" weight="semibold">
+              {jump.label}
+            </InkText>
+          </GPressable>
+        ))}
+      </ScrollView>
+    </View>
+  );
+}
+
+/** What Goose knows of the member and how it works for them: the profile, the interview, its notes. */
+function YouAndGoose({ hub }: { hub: MeHub }) {
+  const { t } = useTranslation();
+  const styles = useThemedStyles(makeStyles);
+  if (!hub.about && !hub.interview && !hub.screenshots) return null;
+  const all: (Jump & { shown: boolean; detail: string | null })[] = [
+    { shown: hub.about, key: 'about', icon: 'profile', label: t('goose.you.about'), detail: null, href: '/(stack)/goose-about' },
+    { shown: hub.interview, key: 'interview', icon: 'chat', label: t('goose.you.interview'), detail: t('goose.you.interviewStart'), href: '/(stack)/goose-member-interview' },
+    { shown: hub.about, key: 'notes', icon: 'file-text', label: t('goose.you.notes'), detail: t('goose.you.notesDetail'), href: '/(stack)/goose-notes' },
+    { shown: hub.about, key: 'instructions', icon: 'prompts', label: t('goose.you.instructions'), detail: t('goose.you.instructionsDetail'), href: '/(stack)/settings-prompt-templates' },
+    { shown: hub.screenshots, key: 'screenshots', icon: 'photo', label: t('goose.you.screenshots'), detail: null, href: '/(stack)/goose-screenshots' },
+  ];
+  const rows = all.filter((row) => row.shown);
+  return (
+    <View style={styles.section}>
+      <SectionHead title={t('goose.you.title')} subtitle={t('goose.you.subtitle')} size="small" />
+      <InsetGroup>
+        {rows.map((row, i) => (
+          <GroupRow key={row.key} first={i === 0} icon={row.icon} label={row.label} detail={row.detail} onPress={() => go(row.href)} />
+        ))}
+      </InsetGroup>
+    </View>
   );
 }
 
@@ -169,7 +250,7 @@ function News({ g }: { g: UseMyGooseHub }) {
   const { data, loading } = g.news;
   const followed = useMemo(() => new Map(g.interests.data.map((i) => [i.id, i.news !== 'off'])), [g.interests.data]);
   const { news } = splitStories(data.stories);
-  const [hero, ...rest] = news;
+  const hero = news[0];
   const digest = data.digest;
 
   if (loading && news.length === 0 && !digest) return null;
@@ -211,14 +292,13 @@ function News({ g }: { g: UseMyGooseHub }) {
         trailing={<RoundButton icon="sliders" label={t('goose.newsSettings.title')} onPress={() => go('/(stack)/goose-news-settings')} />}
       />
       {blocked}
-      {hero ? <HeroStory story={hero} actions={actions} followed={hero.interest ? (followed.get(hero.interest.id) ?? null) : null} /> : null}
-      {rest.slice(0, COMPACT_STORIES).map((story) => (
+      {news.slice(0, COMPACT_STORIES).map((story) => (
         <CompactStory key={story.id} story={story} actions={actions} followed={story.interest ? (followed.get(story.interest.id) ?? null) : null} />
       ))}
       {digest ? (
         <DigestCard digest={digest} listen={listen.state} onPlay={() => digest.listen && void listen.play(digest.listen)} onStop={listen.stop} />
       ) : null}
-      {news.length > COMPACT_STORIES + 1 || digest ? <MoreLink label={t('goose.news.more')} onPress={() => router.push('/(stack)/goose-news')} /> : null}
+      {news.length > COMPACT_STORIES || digest ? <MoreLink label={t('goose.news.more')} onPress={() => router.push('/(stack)/goose-news')} /> : null}
     </View>
   );
 }
@@ -240,19 +320,11 @@ function Ideas({ g }: { g: UseMyGooseHub }) {
         subtitle={t('goose.ideas.subtitle')}
         onOpen={() => go('/(stack)/goose-ideas')}
       />
-      <Carousel>
-        {ideas.map((idea) => (
-          <IdeaPortrait
-            key={idea.id}
-            idea={idea}
-            busy={g.ideas.busy === idea.id}
-            made={g.ideas.made[idea.id]}
-            onGoose={() => void g.ideas.actions.gooseDoIt(idea)}
-            onMine={() => void g.ideas.actions.illDoIt(idea)}
-            onOpen={() => go('/(stack)/goose-ideas')}
-          />
+      <InsetGroup>
+        {ideas.slice(0, SHOWN_ROWS).map((idea, i) => (
+          <IdeaRow key={idea.id} idea={idea} first={i === 0} onOpen={() => go({ pathname: '/(stack)/goose-idea', params: { id: idea.id } })} />
         ))}
-      </Carousel>
+      </InsetGroup>
       <MoreLink label={t('goose.ideas.more')} onPress={() => router.push('/(stack)/goose-ideas')} />
     </View>
   );
@@ -274,25 +346,23 @@ function Prices({ g }: { g: UseMyGooseHub }) {
         onOpen={() => go('/(stack)/goose-cart')}
       />
       {items.length ? (
-        <Carousel>
-          {items.map((item) => {
+        <InsetGroup>
+          {items.slice(0, SHOWN_ROWS).map((item, i) => {
             const moved = words(item);
             return (
-              <PortraitCard
+              <GroupRow
                 key={item.id}
-                band={item.site}
-                bandIcon="tag"
+                first={i === 0}
                 picture={item.picture}
-                pictureIcon="cart"
-                title={item.title}
-                meta={[item.price ? formatMoney(item.price) : t('goose.cart.noPrice'), moved?.text].filter(Boolean).join(', ')}
-                metaIcon={moved?.tone === 'warn' ? 'warn' : moved?.tone === 'good' ? 'trending-down' : 'tag'}
-                metaTone={moved?.tone ?? null}
+                initial={item.title.charAt(0)}
+                label={item.title}
+                detail={[item.site, moved?.text].filter(Boolean).join(', ')}
+                value={item.price ? formatMoney(item.price) : t('goose.cart.noPrice')}
                 onPress={() => go({ pathname: '/(stack)/goose-cart-item', params: { id: item.id } })}
               />
             );
           })}
-        </Carousel>
+        </InsetGroup>
       ) : null}
       {kept.length ? (
         <InsetGroup>
@@ -372,7 +442,12 @@ function Watching({ g }: { g: UseMyGooseHub }) {
   return (
     <View style={styles.section}>
       <SectionHead title={t('goose.watching.title')} subtitle={t('goose.watching.subtitle')} onOpen={() => go('/(stack)/web-watches')} size="small" />
-      <WatchShelf watches={ordered} onOpen={open} />
+      <InsetGroup>
+        {ordered.slice(0, SHOWN_ROWS).map((w, i) => (
+          <GroupRow key={w.id} first={i === 0} icon="eye" label={w.title} detail={w.filtersWords || w.lookingFor} value={w.matchingCount ? String(w.matchingCount) : null} onPress={() => open(w)} />
+        ))}
+      </InsetGroup>
+      {ordered.length > SHOWN_ROWS ? <MoreLink label={t('goose.watching.all')} onPress={() => router.push('/(stack)/web-watches')} /> : null}
     </View>
   );
 }
@@ -536,9 +611,10 @@ export function HubMyGoose({ hub }: { hub: MeHub }) {
         refreshControl={<RefreshControl {...pull} />}
       >
         <Header />
+        <FindAndJump hub={hub} />
         {g.loading && !anything ? <InkSpinner label={t('myGoose.loading')} /> : <HubSentence clauses={clauses} quiet={t('goose.say.quiet')} />}
         {state === 'unreachable' || state === 'failed' ? <ContentUnavailable state={state} onRetry={reload} /> : null}
-        {g.newMember ? <InterviewInvite /> : null}
+        {g.newMember ? <InterviewInvite hub={hub} /> : null}
         {hub.todos ? <Asking g={g} /> : null}
         {hub.news ? <News g={g} /> : null}
         {hub.ideas ? <Ideas g={g} /> : null}
@@ -546,6 +622,7 @@ export function HubMyGoose({ hub }: { hub: MeHub }) {
         {hub.news ? <LongReads g={g} /> : null}
         {hub.todos ? <Todos g={g} onNeedsLocation={() => setPlacesSheet(true)} /> : null}
         <Watching g={g} />
+        <YouAndGoose hub={hub} />
         <Connectors g={g} />
         {hub.catalog ? <MoreGooseCanDo g={g} /> : null}
         <Following g={g} />
@@ -559,7 +636,11 @@ const makeStyles = (c: ThemeColors) =>
   StyleSheet.create({
     safe: { flex: 1, backgroundColor: c.background },
     page: { flex: 1 },
-    scroll: { paddingHorizontal: Spacing.lg, paddingTop: Spacing.md, gap: Spacing['3xl'] },
+    scroll: { paddingHorizontal: Spacing.lg, paddingTop: Spacing.md, gap: Spacing['2xl'] },
+    find: { gap: Spacing.sm },
+    findBar: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, paddingHorizontal: Spacing.md, paddingVertical: 10, borderRadius: 12, borderWidth: StyleSheet.hairlineWidth },
+    jumps: { gap: Spacing.sm, paddingRight: Spacing.lg },
+    jump: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: Spacing.md, paddingVertical: 7, borderRadius: 999, borderWidth: StyleSheet.hairlineWidth },
     section: { gap: Spacing.md },
     group: { gap: Spacing.xs },
     invite: { gap: Spacing.sm },

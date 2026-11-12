@@ -1,6 +1,7 @@
 /**
- * Search across the stories Goose wrote, the ones the member read, and their saved cards, on the
- * phone: every word, in any order, in a headline, a line under it, a topic or a title.
+ * Find anything in My Goose, on the phone: the stories Goose wrote and the ones the member read,
+ * their ideas and saved cards, and the screens themselves, so "about" or "notes" leads straight
+ * there. Every word, in any order.
  */
 
 import React, { useMemo, useState } from 'react';
@@ -10,10 +11,15 @@ import { useTranslation } from 'react-i18next';
 import { InkSearchField, InkText, useInkTheme } from '@jarida/ink/native';
 
 import { GroupRow, InsetGroup } from '@/components/goose/following';
+import { IdeaRow } from '@/components/goose/idea-card';
 import { ScreenScroll, SectionHead } from '@/components/goose/hub-parts';
 import { StoryRow } from '@/components/goose/news-cards';
+import type { IconName } from '@/constants/icons';
 import { Spacing } from '@/constants/spacing';
+import { shownIdeas } from '@/models/ideas';
 import type { Story } from '@/models/news';
+import { useHub } from '@/view-models/use-hub';
+import { useIdeas } from '@/view-models/use-ideas';
 import { useNews, useNewsHistory } from '@/view-models/use-news';
 import { useSavedItems } from '@/view-models/use-saved-items';
 
@@ -29,7 +35,28 @@ export default function GooseSearchScreen() {
   const news = useNews();
   const history = useNewsHistory();
   const saved = useSavedItems();
+  const { hub } = useHub();
+  const ideas = useIdeas(Boolean(hub?.ideas));
   const words = query.toLowerCase().split(/\s+/).filter(Boolean);
+
+  // The screens of My Goose, found by their own names: only the ones this Pond serves.
+  const places: { key: string; icon: IconName; label: string; href: Parameters<typeof router.push>[0]; shown: boolean }[] = [
+    { key: 'about', icon: 'profile', label: t('goose.find.about'), href: '/(stack)/goose-about', shown: Boolean(hub?.about) },
+    { key: 'interview', icon: 'chat', label: t('goose.you.interview'), href: '/(stack)/goose-member-interview', shown: Boolean(hub?.interview) },
+    { key: 'notes', icon: 'file-text', label: t('goose.find.notes'), href: '/(stack)/goose-notes', shown: Boolean(hub?.about) },
+    { key: 'instructions', icon: 'prompts', label: t('goose.you.instructions'), href: '/(stack)/settings-prompt-templates', shown: Boolean(hub?.about) },
+    { key: 'screenshots', icon: 'photo', label: t('goose.you.screenshots'), href: '/(stack)/goose-screenshots', shown: Boolean(hub?.screenshots) },
+    { key: 'news', icon: 'news', label: t('goose.find.news'), href: '/(stack)/goose-news', shown: Boolean(hub?.news) },
+    { key: 'ideas', icon: 'light', label: t('goose.find.ideas'), href: '/(stack)/goose-ideas', shown: Boolean(hub?.ideas) },
+    { key: 'todos', icon: 'checklist', label: t('goose.find.todos'), href: '/(stack)/goose-todos', shown: Boolean(hub?.todos) },
+    { key: 'prices', icon: 'tag', label: t('goose.find.prices'), href: '/(stack)/goose-cart', shown: Boolean(hub?.cart) },
+    { key: 'watching', icon: 'eye', label: t('goose.find.watching'), href: '/(stack)/web-watches', shown: true },
+    { key: 'interests', icon: 'sparkle', label: t('goose.find.interests'), href: '/(stack)/goose-interests', shown: Boolean(hub?.interests) },
+    { key: 'saved', icon: 'archive', label: t('goose.find.saved'), href: '/(stack)/saved', shown: true },
+    { key: 'connectors', icon: 'plug', label: t('goose.find.connectors'), href: '/(stack)/goose-connectors', shown: Boolean(hub?.connectors) },
+  ];
+  const foundPlaces = words.length ? places.filter((p) => p.shown && matches(words, p.label)) : [];
+  const foundIdeas = words.length ? shownIdeas(ideas.data.ideas).filter((i) => matches(words, i.title, i.hook, i.pitch, i.kindLabel)) : [];
 
   const stories = useMemo(() => {
     const seen = new Map<string, Story>();
@@ -42,10 +69,30 @@ export default function GooseSearchScreen() {
   return (
     <ScreenScroll gap={Spacing.xl}>
       <InkSearchField value={query} onChange={setQuery} label={t('goose.search.title')} placeholder={t('goose.search.placeholder')} />
-      {words.length && foundStories.length + foundSaved.length === 0 ? (
+      {words.length && foundStories.length + foundSaved.length + foundIdeas.length + foundPlaces.length === 0 ? (
         <InkText tone="secondary">{t('goose.search.none', { query: query.trim() })}</InkText>
       ) : null}
       {!words.length ? <InkText tone="secondary">{t('goose.search.hint')}</InkText> : null}
+      {foundPlaces.length ? (
+        <View style={styles.section}>
+          <SectionHead title={t('goose.search.places')} size="small" />
+          <InsetGroup>
+            {foundPlaces.map((place, i) => (
+              <GroupRow key={place.key} first={i === 0} icon={place.icon} label={place.label} onPress={() => router.push(place.href)} />
+            ))}
+          </InsetGroup>
+        </View>
+      ) : null}
+      {foundIdeas.length ? (
+        <View style={styles.section}>
+          <SectionHead title={t('goose.search.ideas')} size="small" />
+          <InsetGroup>
+            {foundIdeas.map((idea, i) => (
+              <IdeaRow key={idea.id} idea={idea} first={i === 0} onOpen={() => router.push({ pathname: '/(stack)/goose-idea', params: { id: idea.id } })} />
+            ))}
+          </InsetGroup>
+        </View>
+      ) : null}
       {foundStories.length ? (
         <View style={styles.section}>
           <SectionHead title={t('goose.search.stories')} size="small" />

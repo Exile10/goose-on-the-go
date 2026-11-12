@@ -16,7 +16,8 @@ import { useContentState } from '@/view-models/use-content-state';
 import { useIdeas } from '@/view-models/use-ideas';
 import { usePullToRefresh } from '@/view-models/use-pull-to-refresh';
 import { ScreenScroll, SectionHead } from './hub-parts';
-import { IdeaPanel } from './idea-card';
+import { InsetGroup } from './following';
+import { IdeaRow } from './idea-card';
 
 export function HubIdeas() {
   const { t } = useTranslation();
@@ -46,18 +47,13 @@ export function HubIdeas() {
           <InkText tone="secondary">{t('goose.ideas.emptyBody')}</InkText>
         </InkEmptyState>
       ) : null}
-      {shown.map((idea) => (
-        <IdeaPanel
-          key={idea.id}
-          idea={idea}
-          busy={ideas.busy === idea.id}
-          made={ideas.made[idea.id]}
-          onGoose={() => void ideas.actions.gooseDoIt(idea)}
-          onMine={() => void ideas.actions.illDoIt(idea)}
-          onDismiss={() => void ideas.actions.dismiss(idea)}
-          onChat={() => router.push({ pathname: '/conversation', params: { ask: t('goose.ideas.askAbout', { title: idea.title }) } })}
-        />
-      ))}
+      {shown.length ? (
+        <InsetGroup>
+          {shown.map((idea, i) => (
+            <IdeaRow key={idea.id} idea={idea} first={i === 0} onOpen={() => router.push({ pathname: '/(stack)/goose-idea', params: { id: idea.id } })} />
+          ))}
+        </InsetGroup>
+      ) : null}
       {shown.length && !thinking ? (
         <InkButton variant="quiet" icon="sparkle" onPress={() => void ideas.actions.thinkAgain()} style={styles.left}>
           {t('goose.ideas.thinkAgain')}

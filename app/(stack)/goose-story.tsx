@@ -21,6 +21,7 @@ import { ContentUnavailable } from '@/components/patterns/content-unavailable';
 import { Markdown } from '@/components/patterns/markdown';
 import { GIcon } from '@/components/ui/g-icon';
 import { GPressable } from '@/components/ui/g-pressable';
+import { SendToChat } from '@/components/goose/send-to-chat';
 import { Spacing } from '@/constants/spacing';
 import { isUnavailable } from '@/models/content-state';
 import { selectionTick, tap } from '@/services/haptics';
@@ -152,6 +153,7 @@ export default function GooseStoryScreen() {
                   {t('goose.story.readOn', { site: site || t('goose.story.thePage') })}
                 </InkButton>
               ) : null}
+              <SendToChat kind="news" id={detail.id} title={detail.headline} />
             </View>
           </View>
         ) : null}

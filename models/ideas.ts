@@ -1,12 +1,27 @@
 // Ideas Goose researched for the member: something new about what they care about, sourced, with a
 // part Goose can take on and steps the member can take (docs/MY-GOOSE-HUB.md, part 6).
 
+import type { TranslationKey } from '@/services/i18n';
 import { list, oneOf, pondPath, readAll, readSourceRefs, record, strings, text, time, type SourceRef } from './me-read';
 
 export type IdeaState = 'new' | 'working' | 'done' | 'dismissed';
 export type GooseCanKind = 'research' | 'watch' | 'todo' | 'schedule' | 'chat';
 export const IDEA_KINDS = ['outing', 'activity', 'date', 'solo_date', 'trip', 'recipe', 'interest', 'project'] as const;
 export type IdeaKind = (typeof IDEA_KINDS)[number];
+
+/** The phone's own name for a kind, for a Pond that sends no label. Written out so each key is checked. */
+export function ideaKindKey(kind: IdeaKind): TranslationKey {
+  switch (kind) {
+    case 'outing': return 'goose.ideas.kinds.outing';
+    case 'activity': return 'goose.ideas.kinds.activity';
+    case 'date': return 'goose.ideas.kinds.date';
+    case 'solo_date': return 'goose.ideas.kinds.solo_date';
+    case 'trip': return 'goose.ideas.kinds.trip';
+    case 'recipe': return 'goose.ideas.kinds.recipe';
+    case 'interest': return 'goose.ideas.kinds.interest';
+    case 'project': return 'goose.ideas.kinds.project';
+  }
+}
 
 /** One thing worth seeing at a glance on an idea's page: where, when, the cost. */
 export interface IdeaFact {

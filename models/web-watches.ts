@@ -27,6 +27,10 @@ export interface WebWatch {
   lookingFor: string;
   filters: WatchFilters;
   filtersWords: string;
+  /** For a watch with a rule (words appearing, a number passing a value): how the page stood at the last check. */
+  standing: string | null;
+  /** Whether the watch tells about one rule read off the whole page rather than its items. */
+  hasRule: boolean;
   intervalHours: number;
   paused: boolean;
   itemsCount: number;
@@ -41,7 +45,7 @@ export interface WatchChange {
   foundAt: string;
   line: string;
   matched: boolean;
-  kind: 'new' | 'gone' | 'price_changed' | 'updated';
+  kind: 'new' | 'gone' | 'price_changed' | 'updated' | 'condition';
 }
 
 export interface WebWatchDetail extends WebWatch {
@@ -143,6 +147,8 @@ export function readWebWatch(raw: unknown): WebWatch | null {
     lookingFor: str(raw.looking_for) ?? '',
     filters: readFilters(raw.filters),
     filtersWords: str(raw.filters_words) ?? '',
+    standing: str(raw.standing) ?? null,
+    hasRule: isRecord(raw.filters) && isRecord(raw.filters.tell_when),
     intervalHours: num(raw.interval_hours) ?? 6,
     paused: raw.paused === true,
     itemsCount: num(raw.items_count) ?? 0,
@@ -167,7 +173,7 @@ function readItem(raw: unknown): WatchItem | null {
   };
 }
 
-const CHANGE_KINDS = ['new', 'gone', 'price_changed', 'updated'] as const;
+const CHANGE_KINDS = ['new', 'gone', 'price_changed', 'updated', 'condition'] as const;
 
 function readChange(raw: unknown): WatchChange | null {
   if (!isRecord(raw) || typeof raw.line !== 'string') return null;

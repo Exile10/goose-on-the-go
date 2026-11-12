@@ -18,6 +18,7 @@ import { ContentUnavailable } from '@/components/patterns/content-unavailable';
 import { Markdown } from '@/components/patterns/markdown';
 import { GIcon } from '@/components/ui/g-icon';
 import { GPressable } from '@/components/ui/g-pressable';
+import { SendToChat } from '@/components/goose/send-to-chat';
 import { Spacing } from '@/constants/spacing';
 import { isUnavailable } from '@/models/content-state';
 import { useContentState } from '@/view-models/use-content-state';
@@ -57,6 +58,7 @@ export default function GooseDigestScreen() {
               <InkButton size="sm" variant="quiet" icon="speaker" loading={speaker.asking} onPress={() => void speaker.speak(d.id)}>
                 {t('goose.digest.onSpeaker')}
               </InkButton>
+              <SendToChat kind="digest" id={d.id} title={d.title || t('goose.digest.title')} />
             </View>
           </View>
           {d.sections.map((section, i) => (

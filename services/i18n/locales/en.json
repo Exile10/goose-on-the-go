@@ -5292,7 +5292,8 @@
       "title": "Watching",
       "subtitle": "Pages Goose checks for new listings.",
       "tellsYou": "Tells you {{rule}}",
-      "standing": "At the last check, {{standing}}"
+      "standing": "At the last check, {{standing}}",
+      "all": "All watches"
     },
     "catalog": {
       "title": "More your Goose can do",
@@ -5331,11 +5332,13 @@
     },
     "search": {
       "title": "Search",
-      "placeholder": "Stories and saved things",
-      "hint": "Search the stories Goose wrote for you, the ones you read, and what you saved.",
+      "placeholder": "Stories, ideas, saved things, or a screen",
+      "hint": "Find a story, an idea, something you saved, or a part of My Goose by its name.",
       "none": "Nothing matches “{{query}}”.",
       "stories": "Stories",
-      "saved": "Saved"
+      "saved": "Saved",
+      "places": "In My Goose",
+      "ideas": "Ideas"
     },
     "interest": {
       "topStories": "Top stories",
