@@ -506,6 +506,21 @@ export interface PromptExtra {
   sort_order: number;
 }
 
+/**
+ * A built-in or customized agent prompt template: `GET /api/v1/prompts`.
+ * Templates include core agent identity (`soul`), autonomous pulse (`heartbeat`),
+ * its rules for remembering (`scratchpad`), and tone presets (`balanced`, `concise`, etc.).
+ */
+export interface PromptTemplate {
+  name: string;
+  content: string;
+  description?: string;
+  is_system: boolean;
+  is_customized?: boolean;
+  factory_version?: number;
+  updated_at?: string;
+}
+
 /** `POST /api/v1/agent/extras`: creates the note, or replaces the one already under `key`. */
 export type SavePromptExtraRequest = PromptExtra;
 

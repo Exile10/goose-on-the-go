@@ -138,6 +138,12 @@ export default function AssistantNotesScreen() {
     >
       <InkNotice tone="warning">{t('promptNotes.everyTurn')}</InkNotice>
 
+      <View style={styles.header}>
+        <InkButton variant="quiet" icon="sparkle" onPress={() => router.push('/(stack)/settings-prompt-templates')}>
+          {t('promptTemplates.openCore')}
+        </InkButton>
+      </View>
+
       {mine.data.available ? (
         <>
           <InkTitle level={3}>{t('interview.notes.title')}</InkTitle>

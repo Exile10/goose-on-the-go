@@ -5,6 +5,7 @@
 
 import React from 'react';
 import { StyleSheet } from 'react-native';
+import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { InkButton, InkEmptyState, InkSpinner, InkText } from '@jarida/ink/native';
 
@@ -19,6 +20,7 @@ import { IdeaPanel } from './idea-card';
 
 export function HubIdeas() {
   const { t } = useTranslation();
+  const router = useRouter();
   const ideas = useIdeas();
   const pull = usePullToRefresh(ideas.reload);
   const shown = shownIdeas(ideas.data.ideas);
@@ -53,6 +55,7 @@ export function HubIdeas() {
           onGoose={() => void ideas.actions.gooseDoIt(idea)}
           onMine={() => void ideas.actions.illDoIt(idea)}
           onDismiss={() => void ideas.actions.dismiss(idea)}
+          onChat={() => router.push({ pathname: '/conversation', params: { ask: t('goose.ideas.askAbout', { title: idea.title }) } })}
         />
       ))}
       {shown.length && !thinking ? (

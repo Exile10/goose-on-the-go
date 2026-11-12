@@ -41,6 +41,7 @@ const assistant: SettingsPage = {
       footerKey: 'settings.footer.standingInstructions',
       items: [
         { kind: 'text', key: 'prompt_addendum', multiline: true, labelKey: 'settings.field.prompt_addendum.label', placeholderKey: 'settings.field.prompt_addendum.placeholder' },
+        { kind: 'link', route: '/(stack)/settings-prompt-templates', icon: 'sparkle', tile: 'amber', labelKey: 'screens.settingsPromptTemplates' },
         { kind: 'link', route: '/(stack)/settings-prompt-notes', icon: 'prompts', tile: 'purple', labelKey: 'screens.settingsPromptNotes' },
       ],
     },

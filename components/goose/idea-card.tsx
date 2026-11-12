@@ -34,7 +34,7 @@ function gooseIcon(kind: GooseCanKind): IconName {
   }
 }
 
-function IdeaActions({ idea, busy, made, onGoose, onMine, compact }: { idea: Idea; busy: boolean; made: Todo[] | undefined; onGoose: () => void; onMine: () => void; compact?: boolean }) {
+function IdeaActions({ idea, busy, made, onGoose, onMine, onChat, compact }: { idea: Idea; busy: boolean; made: Todo[] | undefined; onGoose: () => void; onMine: () => void; onChat?: () => void; compact?: boolean }) {
   const theme = useInkTheme();
   const { t } = useTranslation();
   if (idea.state === 'working') {
@@ -79,6 +79,11 @@ function IdeaActions({ idea, busy, made, onGoose, onMine, compact }: { idea: Ide
           {t('goose.ideas.illDoIt')}
         </InkButton>
       ) : null}
+      {onChat ? (
+        <InkButton size="sm" variant="quiet" icon="chat" disabled={busy} onPress={onChat}>
+          {t('goose.ideas.chat')}
+        </InkButton>
+      ) : null}
     </View>
   );
 }
@@ -116,7 +121,7 @@ export function IdeaPortrait({ idea, busy, made, onGoose, onMine, onOpen }: { id
 }
 
 /** An idea in full, on the Ideas screen. */
-export function IdeaPanel({ idea, busy, made, onGoose, onMine, onDismiss }: { idea: Idea; busy: boolean; made: Todo[] | undefined; onGoose: () => void; onMine: () => void; onDismiss: () => void }) {
+export function IdeaPanel({ idea, busy, made, onGoose, onMine, onDismiss, onChat }: { idea: Idea; busy: boolean; made: Todo[] | undefined; onGoose: () => void; onMine: () => void; onDismiss: () => void; onChat?: () => void }) {
   const theme = useInkTheme();
   const { t } = useTranslation();
   return (
@@ -162,7 +167,7 @@ export function IdeaPanel({ idea, busy, made, onGoose, onMine, onDismiss }: { id
             ))}
           </View>
         ) : null}
-        <IdeaActions idea={idea} busy={busy} made={made} onGoose={onGoose} onMine={onMine} />
+        <IdeaActions idea={idea} busy={busy} made={made} onGoose={onGoose} onMine={onMine} onChat={onChat} />
         {idea.state === 'new' ? (
           <InkButton size="sm" variant="quiet" onPress={onDismiss} style={styles.dismiss}>
             {t('goose.ideas.notForMe')}

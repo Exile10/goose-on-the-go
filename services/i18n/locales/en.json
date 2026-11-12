@@ -1656,6 +1656,7 @@
     "ride": "Ride",
     "settings": "Settings",
     "settingsAssistant": "Assistant",
+    "settingsPromptTemplates": "Goose's instructions",
     "settingsPromptNotes": "Assistant notes",
     "settingsVoice": "Voice",
     "settingsListening": "Listening",
@@ -3396,6 +3397,31 @@
       "decideFailed": "Could not save that decision."
     }
   },
+  "promptTemplates": {
+    "title": "Goose's instructions",
+    "lead": "Who Goose is, what it checks on its own, how it remembers, and how it talks.",
+    "customized": "Customized",
+    "factory": "Factory default",
+    "save": "Save changes",
+    "saving": "Saving",
+    "reset": "Reset to default",
+    "resetConfirmTitle": "Reset {{name}} to default?",
+    "resetConfirmBody": "Your custom edits will be discarded and replaced with the built-in factory template.",
+    "savedToast": "Instructions saved",
+    "resetToast": "Reset to default",
+    "emptyTitle": "No templates available",
+    "emptyBody": "The Pond did not send them. Pull down to try again.",
+    "openCore": "Edit Soul, Heartbeat & Scratchpad",
+    "presetDescriptions": {
+      "soul": "Who Goose is in this home. Only you change it.",
+      "heartbeat": "What Goose checks on its own each hour, and what it may do without asking.",
+      "scratchpad": "How Goose remembers: the rules it follows when it saves, changes or forgets something.",
+      "balanced": "Natural conversation, medium-length responses.",
+      "concise": "Short, direct answers with minimal explanation.",
+      "technical": "Precise, detailed reasoning. Favors accuracy over brevity.",
+      "warm": "Friendly, encouraging tone with conversational style."
+    }
+  },
   "promptNotes": {
     "intro": "Short notes Goose follows in every conversation, such as \"Always answer in Swahili\". Each note that is on is added to its instructions, in this order.",
     "everyTurn": "Every note that is on is read again on every turn, so long notes slow down the small model on your Pond. Keep each one to a sentence or two.",
@@ -5026,6 +5052,8 @@
       "gooseCan": "Goose can {{what}}",
       "gooseDoIt": "Goose, do it",
       "illDoIt": "I’ll do it",
+      "chat": "Chat about this",
+      "askAbout": "Tell me more about {{title}}",
       "working": "Goose is on it",
       "workingOn": "Goose is on it: {{what}}",
       "done": "Done",

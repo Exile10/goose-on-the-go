@@ -218,6 +218,7 @@ import type {
   FaceThreshold,
   VisionConfig,
   VisionStatus,
+  PromptTemplate,
 } from './types';
 import { MODEL_CATEGORIES } from './types';
 
@@ -1568,6 +1569,31 @@ export class PondApiClient {
 
   deletePromptExtra(key: string): Promise<void> {
     return this.del<void>(`/api/v1/agent/extras/${encodeURIComponent(key)}`);
+  }
+
+  // ── Prompt templates (soul, heartbeat, scratchpad, presets) ──────
+
+  /** Lists built-in and customized prompt templates: `GET /api/v1/prompts`. */
+  async listPromptTemplates(): Promise<PromptTemplate[]> {
+    return this.get<PromptTemplate[]>('/api/v1/prompts');
+  }
+
+  /** Gets a single prompt template by name. */
+  async getPromptTemplate(name: string): Promise<PromptTemplate> {
+    return this.get<PromptTemplate>(`/api/v1/prompts/${encodeURIComponent(name)}`);
+  }
+
+  /** Saves a customized prompt template content: `PUT /api/v1/prompts/{name}`. */
+  async updatePromptTemplate(name: string, content: string, description?: string): Promise<PromptTemplate> {
+    return this.put<PromptTemplate>(`/api/v1/prompts/${encodeURIComponent(name)}`, {
+      content,
+      ...(description === undefined ? {} : { description }),
+    });
+  }
+
+  /** Resets a customized prompt template to its built-in factory default: `POST /api/v1/prompts/{name}/reset`. */
+  async resetPromptTemplate(name: string): Promise<PromptTemplate> {
+    return this.post<PromptTemplate>(`/api/v1/prompts/${encodeURIComponent(name)}/reset`, {});
   }
 
   /**

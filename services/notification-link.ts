@@ -117,7 +117,8 @@ export type OpenRoute =
   | { open: 'watch'; watchId?: string }
   | { open: 'todos'; todoId?: string }
   | { open: 'news'; storyId?: string }
-  | { open: 'cart'; cartId?: string };
+  | { open: 'cart'; cartId?: string }
+  | { open: 'ideas'; ideaId?: string };
 
 /** A Pond id: a UUID, optionally prefixed (`timer-...`). Nothing that could be a path. */
 const POND_ID = /^[A-Za-z0-9_-]{1,128}$/;
@@ -182,6 +183,10 @@ export function openRouteFromData(data: unknown): OpenRoute | null {
       const cartId = pondId(data.cart_id);
       return cartId ? { open: 'cart', cartId } : { open: 'cart' };
     }
+    case 'ideas': {
+      const ideaId = pondId(data.idea_id);
+      return ideaId ? { open: 'ideas', ideaId } : { open: 'ideas' };
+    }
     default:
       return null;
   }
@@ -228,7 +233,8 @@ type ScreenHref =
   | '/(stack)/goose-news'
   | { pathname: '/(stack)/goose-story'; params: { id: string } }
   | '/(stack)/goose-cart'
-  | { pathname: '/(stack)/goose-cart-item'; params: { id: string } };
+  | { pathname: '/(stack)/goose-cart-item'; params: { id: string } }
+  | '/(stack)/goose-ideas';
 
 /**
  * The expo-router location a route opens. A schedule notification names the
@@ -264,5 +270,7 @@ export function screenPath(route: OpenRoute): ScreenHref {
       return route.storyId ? { pathname: '/(stack)/goose-story', params: { id: route.storyId } } : '/(stack)/goose-news';
     case 'cart':
       return route.cartId ? { pathname: '/(stack)/goose-cart-item', params: { id: route.cartId } } : '/(stack)/goose-cart';
+    case 'ideas':
+      return '/(stack)/goose-ideas';
   }
 }

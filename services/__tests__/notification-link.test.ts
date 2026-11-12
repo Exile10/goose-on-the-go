@@ -119,6 +119,8 @@ describe('openRouteFromData', () => {
     expect(openRouteFromData({ open: 'extensions' })).toEqual({ open: 'extensions' });
     expect(openRouteFromData({ open: 'remote_access' })).toEqual({ open: 'remote_access' });
     expect(openRouteFromData({ open: 'my_pond' })).toEqual({ open: 'my_pond' });
+    expect(openRouteFromData({ open: 'ideas' })).toEqual({ open: 'ideas' });
+    expect(openRouteFromData({ open: 'ideas', idea_id: 'idea-1' })).toEqual({ open: 'ideas', ideaId: 'idea-1' });
   });
 
   it('keeps the schedule screen but drops an id that is not a Pond id', () => {
@@ -168,6 +170,7 @@ describe('screenPath', () => {
       pathname: '/conversation',
       params: { session: 's-1' },
     });
+    expect(screenPath({ open: 'ideas' })).toBe('/(stack)/goose-ideas');
   });
 
   it('opens the schedules list on the schedule the notification names', () => {
