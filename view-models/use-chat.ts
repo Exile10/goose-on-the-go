@@ -342,6 +342,7 @@ export function streamBody(
     resumable: true,
     ...(options.research ? { deep_research: true } : {}),
     ...(options.research && options.answer && options.answer !== 'auto' ? { deep_research_answer: options.answer } : {}),
+    ...(options.card ? { card: { kind: options.card.kind, id: options.card.id } } : {}),
   };
 }
 
@@ -352,6 +353,8 @@ export interface SendOptions {
   research?: boolean;
   /** How much the research should write; read only with `research`. */
   answer?: AnswerShape;
+  /** A card the member sent to chat with this turn; the Pond reads it and Goose's notes on it. */
+  card?: { kind: string; id: string };
   /** The reply so far, each time it grows — voice mode speaks it as it comes. */
   onText?: (text: string) => void;
 }

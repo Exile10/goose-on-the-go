@@ -5,13 +5,30 @@ import { list, oneOf, pondPath, readAll, readSourceRefs, record, strings, text, 
 
 export type IdeaState = 'new' | 'working' | 'done' | 'dismissed';
 export type GooseCanKind = 'research' | 'watch' | 'todo' | 'schedule' | 'chat';
+export const IDEA_KINDS = ['outing', 'activity', 'date', 'solo_date', 'trip', 'recipe', 'interest', 'project'] as const;
+export type IdeaKind = (typeof IDEA_KINDS)[number];
+
+/** One thing worth seeing at a glance on an idea's page: where, when, the cost. */
+export interface IdeaFact {
+  label: string;
+  value: string;
+}
 
 export interface Idea {
   id: string;
+  /** What sort of thing it is; an older Pond's ideas read as `interest`. */
+  kind: IdeaKind;
+  /** The Pond's own label for the kind, such as "Recipe"; empty from an older Pond. */
+  kindLabel: string;
   title: string;
+  /** The card's one line; an older Pond's ideas show their pitch. */
+  hook: string;
   pitch: string;
   why: string;
-  groundedIn: { kind: 'interest' | 'memory' | 'conversation'; label: string }[];
+  facts: IdeaFact[];
+  /** What Goose kept to work from when the member asks about the idea. */
+  notes: string;
+  groundedIn: { kind: 'interest' | 'memory' | 'conversation' | 'screenshot'; label: string }[];
   sources: SourceRef[];
   picture: string | null;
   gooseCan: { label: string; kind: GooseCanKind } | null;
@@ -28,15 +45,26 @@ export function readIdea(raw: unknown): Idea | null {
   if (!r || !id || !title) return null;
   const gooseCan = record(r.goose_can);
   const gooseLabel = text(gooseCan?.label);
+  const pitch = text(r.pitch);
   return {
     id,
+    kind: oneOf(r.kind, IDEA_KINDS, 'interest'),
+    kindLabel: text(r.kind_label),
     title,
-    pitch: text(r.pitch),
+    hook: text(r.hook) || pitch,
+    pitch,
     why: text(r.why),
+    facts: list(r.facts).flatMap((f) => {
+      const o = record(f);
+      const label = text(o?.label);
+      const value = text(o?.value);
+      return label && value ? [{ label, value }] : [];
+    }),
+    notes: text(r.notes),
     groundedIn: list(r.grounded_in).flatMap((g) => {
       const o = record(g);
       const label = text(o?.label);
-      return label ? [{ kind: oneOf(o?.kind, ['interest', 'memory', 'conversation'] as const, 'conversation'), label }] : [];
+      return label ? [{ kind: oneOf(o?.kind, ['interest', 'memory', 'conversation', 'screenshot'] as const, 'conversation'), label }] : [];
     }),
     sources: readSourceRefs(r.sources),
     picture: pondPath(r.picture),

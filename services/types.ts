@@ -281,6 +281,11 @@ export interface ChatStreamRequest {
   deep_research?: boolean;
   /** With `deep_research` only, and left out for `auto`, so an older Pond sees the body it knows. */
   deep_research_answer?: Exclude<AnswerShape, 'auto'>;
+  /**
+   * A card the member sent to chat, by kind and id. The Pond reads it as the speaker and gives
+   * the turn the card's content with Goose's notes on it; an older Pond ignores the field.
+   */
+  card?: { kind: string; id: string };
 }
 
 /**

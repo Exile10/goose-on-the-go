@@ -50,7 +50,19 @@ import {
 } from '@/models/todos';
 import { readCart, readCartItem, type CartItem } from '@/models/cart';
 import { readConnector, readConnectors, type Connector } from '@/models/connectors';
+import { readAbout, readArchived, readFact, type AboutFact, type AboutProfile, type ArchivedFact } from '@/models/about';
+import { readCard, type CardKind, type ContextCard } from '@/models/cards';
+import { readGooseNotes, type GooseNotes } from '@/models/goose-notes';
 import { readIdea, readIdeas, type Idea } from '@/models/ideas';
+import {
+  readKept,
+  readMemberInterview,
+  type InterviewAnswer,
+  type InterviewApproval,
+  type InterviewKept,
+  type MemberInterview,
+} from '@/models/member-interview';
+import { readScreenshots, type Screenshots } from '@/models/screenshots';
 import { readCatalog, type CatalogItem } from '@/models/catalog';
 import { readLongTask, readLongTaskReport, readResearchAvailability, reportFileName } from '@/models/long-tasks';
 import {
@@ -3039,6 +3051,110 @@ export class PondApiClient {
 
   async refreshIdeas(): Promise<void> {
     await this.post<unknown>('/api/v1/me/ideas/refresh', {});
+  }
+
+  /** One idea's own page: `GET /me/ideas/{id}`. */
+  async idea(id: string): Promise<Idea> {
+    return required(readIdea(await this.get<unknown>(`/api/v1/me/ideas/${encodeURIComponent(id)}`)), 'the idea');
+  }
+
+  // ── Cards sent to chat ───────────────────────────────────────
+
+  /** What a chat about this card would be given: what the member read, and Goose's notes. */
+  async card(kind: CardKind, id: string): Promise<ContextCard> {
+    return required(readCard(await this.get<unknown>(`/api/v1/me/cards/${kind}/${encodeURIComponent(id)}`)), 'the card');
+  }
+
+  // ── About you: the member's profile ──────────────────────────
+
+  async about(): Promise<AboutProfile> {
+    return readAbout(await this.get<unknown>('/api/v1/me/about'));
+  }
+
+  /** A fact the member writes about themselves, filed under the word they pick. */
+  async addAboutFact(content: string, about: string): Promise<AboutFact> {
+    return required(readFact(await this.post<unknown>('/api/v1/me/about', { content, about })), 'the fact');
+  }
+
+  async editAboutFact(id: string, change: { content?: string; about?: string }): Promise<AboutFact> {
+    return required(readFact(await this.patch<unknown>(`/api/v1/me/about/${encodeURIComponent(id)}`, change)), 'the fact');
+  }
+
+  async deleteAboutFact(id: string): Promise<void> {
+    await this.del<unknown>(`/api/v1/me/about/${encodeURIComponent(id)}`);
+  }
+
+  /** Rows the Pond set aside when it re-sorted older memories, each with its reason. */
+  async archivedAbout(): Promise<ArchivedFact[]> {
+    return readArchived(await this.get<unknown>('/api/v1/me/about/archived'));
+  }
+
+  async restoreAboutFact(id: string): Promise<AboutFact> {
+    return required(readFact(await this.post<unknown>(`/api/v1/me/about/${encodeURIComponent(id)}/restore`, {})), 'the fact');
+  }
+
+  // ── The one interview ────────────────────────────────────────
+
+  async memberInterview(): Promise<MemberInterview> {
+    return readMemberInterview(await this.get<unknown>('/api/v1/me/interview'));
+  }
+
+  /** Starts it, picks it up where it stopped, or begins again once done. */
+  async startMemberInterview(): Promise<MemberInterview> {
+    return readMemberInterview(await this.post<unknown>('/api/v1/me/interview', {}));
+  }
+
+  async answerMemberInterview(answer: InterviewAnswer): Promise<MemberInterview> {
+    return readMemberInterview(await this.post<unknown>('/api/v1/me/interview/answer', answer));
+  }
+
+  /** Stops asking and writes up what there is. */
+  async finishMemberInterview(): Promise<MemberInterview> {
+    return readMemberInterview(await this.post<unknown>('/api/v1/me/interview/finish', {}));
+  }
+
+  async approveMemberInterview(approval: InterviewApproval): Promise<InterviewKept> {
+    return readKept(await this.post<unknown>('/api/v1/me/interview/approve', approval));
+  }
+
+  // ── Goose's own notes ────────────────────────────────────────
+
+  async gooseNotes(): Promise<GooseNotes> {
+    return readGooseNotes(await this.get<unknown>('/api/v1/me/notes'));
+  }
+
+  async deleteGooseNote(id: string): Promise<void> {
+    await this.del<unknown>(`/api/v1/me/notes/${encodeURIComponent(id)}`);
+  }
+
+  // ── Ideas from screenshots (opt-in) ──────────────────────────
+
+  async screenshots(): Promise<Screenshots> {
+    return readScreenshots(await this.get<unknown>('/api/v1/me/screenshots'));
+  }
+
+  /** Turning it off forgets every screenshot still waiting to be read. */
+  async setScreenshots(enabled: boolean): Promise<Screenshots> {
+    return readScreenshots(await this.put<unknown>('/api/v1/me/screenshots', { enabled }));
+  }
+
+  /** One screenshot for the Pond to read once; answers how many are waiting. */
+  async sendScreenshot(image: string, mimeType: string, takenAt?: string): Promise<number> {
+    const res = await this.post<{ pending?: unknown }>('/api/v1/me/screenshots', {
+      image,
+      mime_type: mimeType,
+      ...(takenAt ? { taken_at: takenAt } : {}),
+    });
+    return typeof res?.pending === 'number' ? res.pending : 0;
+  }
+
+  async deleteScreenshotNote(id: string): Promise<void> {
+    await this.del<unknown>(`/api/v1/me/screenshots/${encodeURIComponent(id)}`);
+  }
+
+  /** Every note, and every screenshot still waiting. */
+  async deleteAllScreenshotNotes(): Promise<void> {
+    await this.del<unknown>('/api/v1/me/screenshots');
   }
 
   async catalog(): Promise<CatalogItem[]> {

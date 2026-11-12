@@ -547,7 +547,12 @@ function seedIdeas(now: number): Idea[] {
   return [
     {
       id: 'idea-rehearse',
+      kind: 'project',
+      kindLabel: 'For your projects',
       title: 'Rehearse your summit talk out loud, twice',
+      hook: 'Two timed run-throughs before the summit.',
+      facts: [{ label: 'When', value: 'This week, then the day before' }, { label: 'Length', value: '25 minutes' }],
+      notes: '',
       pitch: 'Run the talk once this week and once the day before, with Goose keeping time and noting the slides you rush. Talks at this summit are 25 minutes, and the programme puts yours just after lunch.',
       why: 'You are speaking at MCP Dev Summit Nairobi on 19 November, and the slides are still open on your to-do list.',
       groundedIn: [
@@ -564,7 +569,12 @@ function seedIdeas(now: number): Idea[] {
     },
     {
       id: 'idea-history',
+      kind: 'interest',
+      kindLabel: 'From your interests',
       title: 'Check a Fielder’s history before you pay',
+      hook: 'Check a Fielder\'s past owners before you view it.',
+      facts: [{ label: 'Where', value: 'NTSA logbook search' }],
+      notes: '',
       pitch: 'NTSA’s logbook search shows past owners and whether a car was ever written off. Goose can look up the Autochek Fielder and tell you what it finds.',
       why: 'You are watching three Fielders, and the Autochek one just dropped KSh 40,000.',
       groundedIn: [{ kind: 'interest', label: 'Toyota Fielder' }],
@@ -578,7 +588,12 @@ function seedIdeas(now: number): Idea[] {
     },
     {
       id: 'idea-amapiano',
+      kind: 'activity',
+      kindLabel: 'Something to do',
       title: 'An Amapiano night worth the drive',
+      hook: 'A Saturday set in Kilimani that ends before midnight.',
+      facts: [{ label: 'Where', value: 'Kilimani' }, { label: 'When', value: 'Saturday' }],
+      notes: '',
       pitch: 'The Saturday set in Kilimani has a South African headliner and finishes early enough for Sunday. Goose can watch for tickets and tell you when they open.',
       why: 'You go out for Amapiano, and you have nothing on Saturday night.',
       groundedIn: [{ kind: 'interest', label: 'Amapiano nights' }],
@@ -757,7 +772,7 @@ export function createMockHub({ fresh = false, clock = Date.now }: MockHubOption
   return {
     async hub() {
       await delay();
-      return { version: 1, interests: true, news: true, todos: true, cart: true, connectors: true, ideas: true, catalog: true };
+      return { version: 1, interests: true, news: true, todos: true, cart: true, connectors: true, ideas: true, catalog: true, about: false, interview: false, screenshots: false, cards: [] };
     },
     async interests() {
       await delay();
