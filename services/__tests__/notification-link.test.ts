@@ -209,3 +209,16 @@ describe('a news notice', () => {
     expect(openRouteFromData({ open: 'news', digest_id: '../x' })).toEqual({ open: 'news' });
   });
 });
+
+describe('a phone asking to pair', () => {
+  it('opens the page that answers it, not the devices list', () => {
+    const route = openRouteFromData({ action: 'pairing_request', request_id: 'req-1', open: 'devices' });
+    expect(route).toEqual({ open: 'pairing', requestId: 'req-1' });
+    expect(screenPath(route!)).toBe('/(stack)/pairing-lock');
+  });
+
+  it('keeps the page and drops a request id that is not a Pond id', () => {
+    expect(openRouteFromData({ action: 'pairing_request', request_id: 'a/b', open: 'devices' })).toEqual({ open: 'pairing' });
+    expect(openRouteFromData({ open: 'devices' })).toEqual({ open: 'devices' });
+  });
+});

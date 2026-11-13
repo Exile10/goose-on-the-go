@@ -98,7 +98,9 @@ export function rideOfferFromData(data: unknown): RideOffer | null {
  * is "Route hints" in the Pond's `docs/architecture/notifications.md`). The
  * phone's own notice that a reply finished names
  * `{ open: "conversation", session_id }`, and a Pond `chat` hint with a
- * conversation becomes the same route.
+ * conversation becomes the same route. A phone asking to pair arrives as
+ * `{ action: "pairing_request", request_id, open: "devices" }` and opens the
+ * page that answers it, not the devices list.
  *
  * Only these screens are accepted, and only ids of the shape the Pond
  * mints, so a notification can open one of them and nothing else. An older Pond
@@ -119,7 +121,8 @@ export type OpenRoute =
   | { open: 'news'; storyId?: string; digestId?: string }
   | { open: 'cart'; cartId?: string }
   | { open: 'ideas'; ideaId?: string }
-  | { open: 'goose_activity' };
+  | { open: 'goose_activity' }
+  | { open: 'pairing'; requestId?: string };
 
 /** A Pond id: a UUID, optionally prefixed (`timer-...`). Nothing that could be a path. */
 const POND_ID = /^[A-Za-z0-9_-]{1,128}$/;
@@ -135,6 +138,10 @@ function pondId(raw: unknown): string | undefined {
  */
 export function openRouteFromData(data: unknown): OpenRoute | null {
   if (!isRecord(data)) return null;
+  if (data.action === 'pairing_request') {
+    const requestId = pondId(data.request_id);
+    return requestId ? { open: 'pairing', requestId } : { open: 'pairing' };
+  }
   switch (data.open) {
     case 'schedule': {
       const route: OpenRoute = { open: 'schedule' };
@@ -242,7 +249,8 @@ type ScreenHref =
   | { pathname: '/(stack)/goose-story'; params: { id: string } }
   | '/(stack)/goose-cart'
   | { pathname: '/(stack)/goose-cart-item'; params: { id: string } }
-  | '/(stack)/goose-ideas';
+  | '/(stack)/goose-ideas'
+  | '/(stack)/pairing-lock';
 
 /**
  * The expo-router location a route opens. A schedule notification names the
@@ -282,5 +290,7 @@ export function screenPath(route: OpenRoute): ScreenHref {
       return '/(stack)/goose-ideas';
     case 'goose_activity':
       return '/(stack)/goose-activity';
+    case 'pairing':
+      return '/(stack)/pairing-lock';
   }
 }

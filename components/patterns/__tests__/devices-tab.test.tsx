@@ -26,6 +26,9 @@ jest.mock('react-native-safe-area-context', () => {
 jest.mock('@/providers/chrome-provider', () => ({ useChromeScroll: () => ({}), useBottomBarInset: () => 0 }));
 jest.mock('@/providers/server-provider', () => ({ useServer: () => ({ hydrated: true }) }));
 
+// The pairing lock's row reads the Pond on focus, which this test's router has none of.
+jest.mock('@/view-models/use-pairing-lock', () => ({ usePairingLockSummary: () => ({ data: null, actions: { refresh: jest.fn() } }) }));
+
 let mockDevices: Device[] = [];
 jest.mock('@/view-models/use-devices', () => {
   const actual = jest.requireActual('@/view-models/use-devices');

@@ -10,6 +10,9 @@
  * Reachable devices sort first. A household accumulates rows for things that
  * were unplugged or replaced, and the one being reached for is almost never the
  * dead one.
+ *
+ * Above them, one row for the pairing lock: whether a new phone has to ask, and
+ * how many are asking. It leads to the page that answers them.
  */
 
 import React, { useCallback, useMemo, useState } from 'react';
@@ -36,6 +39,7 @@ import { useThemedStyles } from '@/hooks/use-themed-styles';
 import { selectionTick, toggle } from '@/services/haptics';
 import { deviceStyle } from '@/constants/device-style';
 import { ALL_ROOMS, UNASSIGNED_ROOM, isAppWindow, roomLabel, supports, useDevices } from '@/view-models/use-devices';
+import { lockSummaryWords, usePairingLockSummary } from '@/view-models/use-pairing-lock';
 import { ContentUnavailable } from '@/components/patterns/content-unavailable';
 import { DeviceEditSheet } from '@/components/patterns/device-edit-sheet';
 import { isUnavailable } from '@/models/content-state';
@@ -126,6 +130,7 @@ export default function DevicesTab() {
   const { t } = useTranslation();
   const router = useRouter();
   const { data, loading, failed, error, actions } = useDevices();
+  const pairing = usePairingLockSummary();
   // A pull draws its own spinner at the top of the list, so the one in the
   // list body stands down while it runs rather than showing two.
   const [pulling, setPulling] = useState(false);
@@ -146,19 +151,21 @@ export default function DevicesTab() {
     [actions],
   );
 
+  const refreshPairing = pairing.actions.refresh;
   const handleRefresh = useCallback(() => {
     void selectionTick();
     void actions.refresh();
-  }, [actions]);
+    void refreshPairing();
+  }, [actions, refreshPairing]);
 
   const handlePull = useCallback(async () => {
     setPulling(true);
     try {
-      await actions.refresh();
+      await Promise.all([actions.refresh(), refreshPairing()]);
     } finally {
       setPulling(false);
     }
-  }, [actions]);
+  }, [actions, refreshPairing]);
 
   const handleEdit = useCallback((device: Device) => {
     void selectionTick();
@@ -287,6 +294,26 @@ export default function DevicesTab() {
           </InkCard>
         ) : null}
 
+        {pairing.data ? (
+          <InkCard
+            style={styles.pairing}
+            pressable
+            onPress={() => {
+              void selectionTick();
+              router.push('/(stack)/pairing-lock');
+            }}
+          >
+            <View style={styles.pairingRow}>
+              <GIcon name={pairing.data.locked ? 'lock' : 'unlock'} size={18} color={Grey[500]} />
+              <View style={styles.pairingText}>
+                <Text style={styles.name}>{t('screens.pairingLock')}</Text>
+                <Text style={styles.detail}>{lockSummaryWords(pairing.data)}</Text>
+              </View>
+              <GIcon name="chevron-right" size={18} color={Grey[500]} />
+            </View>
+          </InkCard>
+        ) : null}
+
         {loading && !pulling ? <InkSpinner label={t('pond.checking')} /> : null}
 
         {/* A pull that failed with the grid already on screen. A list that did not load is said
@@ -358,6 +385,9 @@ const makeStyles = (c: ThemeColors) =>
     safe: { flex: 1, backgroundColor: c.background },
     notice: { marginBottom: Spacing.md },
     queuedRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+    pairing: { marginBottom: Spacing.lg },
+    pairingRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md },
+    pairingText: { flex: 1, gap: 2 },
 
     header: {
       flexDirection: 'row',

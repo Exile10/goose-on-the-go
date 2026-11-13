@@ -1771,7 +1771,8 @@
     "gooseNotes": "Goose's notes",
     "gooseScreenshots": "Ideas from screenshots",
     "gooseMemberInterview": "Interview",
-    "gooseActivity": "What Goose did"
+    "gooseActivity": "What Goose did",
+    "pairingLock": "Pairing lock"
   },
   "nav": {
     "goose": "Goose",
@@ -4073,7 +4074,8 @@
       "tasksCount_one": "{{count}} task",
       "tasksCount_other": "{{count}} tasks",
       "health": "Disk, memory and heat",
-      "power": "Power mode and restart"
+      "power": "Power mode and restart",
+      "pairing": "Who may add a phone, and the phones asking"
     },
     "lock": {
       "title": "Unlock with the admin card",

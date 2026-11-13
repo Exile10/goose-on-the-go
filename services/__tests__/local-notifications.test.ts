@@ -155,6 +155,12 @@ describe('openTapped', () => {
     tap({ open: 'devices' }, 'same');
     expect(mockNavigate).toHaveBeenCalledTimes(1);
   });
+
+  it('opens the page that answers a phone asking to pair', () => {
+    tap({ id: 'pairing-request-r1', category: 'alert', action: 'pairing_request', request_id: 'r1', open: 'devices' });
+    expect(mockPush.mock.calls).toEqual([['/(stack)/pairing-lock']]);
+    expect(mockNavigate).not.toHaveBeenCalled();
+  });
 });
 
 describe('telling the Pond a notice was opened', () => {
