@@ -199,6 +199,7 @@ import type {
   UpdateScheduleRequest,
   SessionMessage,
   SessionSummary,
+  OfferAnswer,
   SuggestionList,
   SystemInfo,
   ToolCallResult,
@@ -1466,6 +1467,14 @@ export class PondApiClient {
 
   deleteSession(id: string): Promise<void> {
     return this.del<void>(`/api/v1/sessions/${encodeURIComponent(id)}`);
+  }
+
+  /** Take or pass over what a message offers. A 409 means it was already answered. */
+  answerOffer(sessionId: string, messageId: string, take: boolean): Promise<OfferAnswer> {
+    return this.post<OfferAnswer>(
+      `/api/v1/sessions/${encodeURIComponent(sessionId)}/messages/${encodeURIComponent(messageId)}/offer`,
+      { take },
+    );
   }
 
   renameSession(id: string, title: string): Promise<void> {

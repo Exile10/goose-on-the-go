@@ -61,6 +61,34 @@ describe('applyFrame', () => {
     ]);
   });
 
+  // What a reply set comes from the tool's own answer, never from the reply's words.
+  it('collects a receipt from each tool result as it arrives, once, however the result is replayed', () => {
+    const set = { kind: 'reminder', outcome: 'set', what: 'Call the dentist, tomorrow 9:00', id: 'rem-1' };
+    const refused = { kind: 'timer', outcome: 'not_set', what: 'A 10 minute timer', reason: 'No speaker is connected.' };
+    const frames = [
+      { type: 'tool_call', tool: 'giap-schedule__create_reminder', id: 'c1', input: {} },
+      { type: 'tool_result', tool: 'giap-schedule__create_reminder', id: 'c1', content: 'ok', receipt: set },
+      { type: 'tool_result', tool: 'giap-schedule__create_reminder', id: 'c1', content: 'ok', receipt: set },
+      { type: 'tool_result', tool: 'giap-schedule__set_timer', id: 'c2', content: 'failed', receipt: refused },
+      { type: 'text', content: 'I set the reminder and the timer.' },
+    ] as Parameters<typeof applyFrame>[1][];
+    const reply = frames.reduce(applyFrame, empty());
+    expect(reply.note?.receipts).toEqual([
+      { kind: 'reminder', outcome: 'set', what: 'Call the dentist, tomorrow 9:00', reason: null },
+      { kind: 'timer', outcome: 'not_set', what: 'A 10 minute timer', reason: 'No speaker is connected.' },
+    ]);
+  });
+
+  it('draws no receipt from a result that carries none, or one that does not say what happened', () => {
+    const frames = [
+      { type: 'tool_call', tool: 'giap-schedule__create_reminder', id: 'c1', input: {} },
+      { type: 'tool_result', tool: 'giap-schedule__create_reminder', id: 'c1', content: 'I set a reminder for 9:00.' },
+      { type: 'tool_result', tool: 'x', id: 'c2', content: 'ok', receipt: { kind: 'todo', outcome: 'maybe', what: 'Milk' } },
+      { type: 'text', content: 'Done, I set it.' },
+    ] as Parameters<typeof applyFrame>[1][];
+    expect(frames.reduce(applyFrame, empty()).note).toBeUndefined();
+  });
+
   it('lets a review pass replace what streamed, and keeps reasoning passages', () => {
     let reply = applyFrame(empty(), { type: 'text', content: 'draft' });
     reply = applyFrame(reply, { type: 'thinking', content: 'hm' });
@@ -243,6 +271,47 @@ describe('fromHistory', () => {
     expect(messages[1].tools).toEqual([
       { id: 'c1', name: 'giap-weather__get_current_weather', args: '{}', status: 'ok', result: '23C' },
     ]);
+  });
+
+  it('carries the note the Pond stored: where a message came from, what it set, and what it offers', () => {
+    const messages = fromHistory([
+      row({
+        id: 'brief',
+        role: 'assistant',
+        content: 'The dollar is at 129 shillings.',
+        note: { from: { kind: 'schedule', label: 'Daily Briefing', ref_id: 'sched-1' } },
+      }),
+      row({
+        id: 'set',
+        role: 'assistant',
+        content: 'Done.',
+        note: {
+          receipts: [
+            { kind: 'reminder', outcome: 'set', what: 'Bins out, Thursday 7:00', id: 'r1' },
+            { kind: 'watch', outcome: 'not_set', what: 'Flights to Kisumu', reason: 'The page could not be read.' },
+            { kind: 'todo', outcome: 'unknown', what: 'ignored' } as never,
+          ],
+        },
+      }),
+      row({
+        id: 'offer',
+        role: 'assistant',
+        content: '',
+        note: { suggestion: { noticed: 'You asked about the bins twice this week.', action: 'Remind me weekly', prompt: 'Remind me every Thursday to take the bins out', state: 'open' } },
+      }),
+    ]);
+    expect(messages.map((m) => m.id)).toEqual(['brief', 'set', 'offer']);
+    expect(messages[0].note).toEqual({ from: { kind: 'schedule', label: 'Daily Briefing', refId: 'sched-1' } });
+    expect(messages[1].note?.receipts).toEqual([
+      { kind: 'reminder', outcome: 'set', what: 'Bins out, Thursday 7:00', reason: null },
+      { kind: 'watch', outcome: 'not_set', what: 'Flights to Kisumu', reason: 'The page could not be read.' },
+    ]);
+    expect(messages[2].note?.offer).toEqual({
+      noticed: 'You asked about the bins twice this week.',
+      action: 'Remind me weekly',
+      prompt: 'Remind me every Thursday to take the bins out',
+      state: 'open',
+    });
   });
 
   it('leaves out system rows and assistant rows that said and did nothing', () => {

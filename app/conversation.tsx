@@ -174,7 +174,7 @@ export default function ChatScreen() {
     interview?: string;
   }>();
   const openedRef = useRef<string | null>(null);
-  const { open, unqueue, watch } = actions;
+  const { open, unqueue, watch, answerOffer } = actions;
   useEffect(() => {
     if (!session || openedRef.current === session) return;
     openedRef.current = session;
@@ -416,9 +416,10 @@ export default function ChatScreen() {
         turnSeed={turnSeed}
         queued={item.queued}
         onUnqueue={unqueue}
+        onOffer={answerOffer}
       />
     ),
-    [status, turnSeed, unqueue],
+    [status, turnSeed, unqueue, answerOffer],
   );
 
   const started = messages.length > 0 || queued.length > 0;

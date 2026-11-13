@@ -8,6 +8,8 @@
  * never reach the screen.
  */
 
+import type { MessageNote } from './message-note';
+
 export type MessageRole = 'user' | 'assistant' | 'system' | 'tool';
 
 /** Where a tool call has got to. `running` only exists while a turn streams. */
@@ -90,6 +92,11 @@ export interface Message {
   stepFrom?: number;
   /** Still arriving: text may grow, tools may still be running. */
   pending?: boolean;
+  /**
+   * Where the message came from, what it really set and what it offers. From the saved message,
+   * or for a live turn from its tool results as they arrive.
+   */
+  note?: MessageNote;
 }
 
 export interface SessionSummary {

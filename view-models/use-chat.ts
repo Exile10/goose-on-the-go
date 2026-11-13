@@ -39,6 +39,7 @@ import type { TFunction } from 'i18next';
 import type { BubblePosition } from '@jarida/ink/native';
 
 import type { Message, ToolCall } from '@/models/chat';
+import { readNote, withOfferState } from '@/models/message-note';
 import { toolWords, humanizeTool } from '@/constants/tools';
 import { useServer, type MigrationScreen } from '@/providers/server-provider';
 import { ApiError, api } from '@/services/api-client';
@@ -172,6 +173,8 @@ export function toMessage(m: SessionMessage): Message | null {
     }));
   }
   if (m.thinking?.length) message.thinking = m.thinking;
+  const note = readNote(m.note);
+  if (note) message.note = note;
   return message;
 }
 
@@ -235,7 +238,7 @@ export function fromHistory(rows: SessionMessage[], cards: CardsByCall = {}): Me
         return tool;
       });
     }
-    if (row.role === 'assistant' && !message.content.trim() && !message.tools?.length) continue;
+    if (row.role === 'assistant' && !message.content.trim() && !message.tools?.length && !message.note) continue;
     out.push(message);
   }
   return out;
@@ -404,6 +407,11 @@ export interface UseChat {
      * otherwise.
      */
     open: (sessionId: string, title?: string) => void;
+    /**
+     * Answer what a message offers. Taking it sends the offer's prompt as the person's own turn
+     * in this conversation; passing it over only records that.
+     */
+    answerOffer: (messageId: string, take: boolean) => Promise<void>;
     dismissError: () => void;
   };
 }
@@ -804,6 +812,30 @@ export function useChatOn({ hydrated, isScreenReal }: ChatConnection): UseChat {
     [queue],
   );
 
+  const answerOffer = useCallback(
+    async (messageId: string, take: boolean) => {
+      const th = viewRef.current;
+      const id = th.session;
+      const offer = th.messages.find((m) => m.id === messageId)?.note?.offer;
+      if (!id || !offer || offer.state !== 'open') return;
+      try {
+        const answer = await api.answerOffer(id, messageId, take);
+        const state = answer?.state === 'done' || answer?.state === 'dismissed' ? answer.state : take ? 'done' : 'dismissed';
+        th.messages = th.messages.map((m) => (m.id === messageId && m.note ? { ...m, note: withOfferState(m.note, state) } : m));
+        changed(th);
+        if (take) void send((typeof answer?.prompt === 'string' && answer.prompt.trim()) || offer.prompt);
+      } catch (e) {
+        // Answered already, here or on another screen: the saved message says how.
+        if (e instanceof ApiError && e.status === 409) {
+          await reload(th, false);
+          return;
+        }
+        sayFor(th, describeTurnError(e, t));
+      }
+    },
+    [reload, sayFor, send, t],
+  );
+
   const unqueue = useCallback(
     (id: string) => queue.remove((job) => job.kind === 'ask' && job.question.id === id),
     [queue],
@@ -848,6 +880,6 @@ export function useChatOn({ hydrated, isScreenReal }: ChatConnection): UseChat {
     },
     loading,
     error,
-    actions: { send, unqueue, stop, newConversation, open, dismissError, watch },
+    actions: { send, unqueue, stop, newConversation, open, answerOffer, dismissError, watch },
   };
 }

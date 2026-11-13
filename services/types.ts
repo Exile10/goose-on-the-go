@@ -208,6 +208,45 @@ export interface SessionMessageImage {
   url: string;
 }
 
+/** What a message came from, when the Pond wrote it for itself. */
+export interface MessageNoteFrom {
+  kind: 'schedule' | 'reminder' | 'task' | 'lookup' | 'watch' | 'heartbeat' | 'suggestion';
+  label: string;
+  ref_id?: string;
+}
+
+/** Whether something a reply said it set was really set, as the tool answered. */
+export interface MessageReceipt {
+  kind: 'reminder' | 'todo' | 'timer' | 'schedule' | 'watch' | 'task' | 'standing';
+  outcome: 'set' | 'not_set';
+  what: string;
+  id?: string;
+  /** Why it was not set. */
+  reason?: string;
+}
+
+/** Something Goose noticed and offers to do, answered at `/sessions/{id}/messages/{id}/offer`. */
+export interface MessageSuggestion {
+  noticed: string;
+  action: string;
+  /** What is sent as the person's own turn when they take the offer. */
+  prompt: string;
+  state: 'open' | 'done' | 'dismissed';
+  suggestion_id?: string;
+}
+
+export interface MessageNote {
+  from?: MessageNoteFrom;
+  receipts?: MessageReceipt[];
+  suggestion?: MessageSuggestion;
+}
+
+/** The Pond's answer to an offer: where it now stands, and what to send when it was taken. */
+export interface OfferAnswer {
+  state: MessageSuggestion['state'];
+  prompt: string;
+}
+
 export interface SessionMessage {
   id: string;
   session_id: string;
@@ -233,6 +272,8 @@ export interface SessionMessage {
    * a client accepts it.
    */
   transient?: boolean;
+  /** Where the message came from, what it really set, and anything it offers. Stored, never inferred. */
+  note?: MessageNote;
 }
 
 /**
@@ -318,6 +359,8 @@ export interface ChatFrame {
    * phone must not keep its card either.
    */
   transient?: boolean;
+  /** `tool_result`: what the call set or failed to set, as the saved reply's note will hold it. */
+  receipt?: MessageReceipt;
   run_id?: string;
   session_id?: string;
   epoch?: number | string;

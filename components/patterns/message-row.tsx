@@ -18,6 +18,10 @@
  * with a note that it is queued and a way to take it back. pond-desktop marks
  * a queued message the same way, in place rather than in a tray, so the queue
  * is visible and not a silent buffer.
+ *
+ * A message the Pond wrote for itself says where it came from in one quiet line
+ * above it, and a reply carries a chip for each thing it set or could not set,
+ * and what it offers to do (`message-note.tsx`).
  */
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
@@ -29,6 +33,7 @@ import { InkBubble, inkText, useInkTheme, type BubblePosition } from '@jarida/in
 import { PagePictures, SourcesChipRow, useSources } from '@/components/patterns/cited-sources';
 import { citedLinks, mergeSources } from '@/models/sources';
 import { Markdown } from '@/components/patterns/markdown';
+import { FromLine, OfferPanel, ReceiptChips } from '@/components/patterns/message-note';
 import { sourcesOf } from '@/constants/tools';
 import { usePagePictures } from '@/view-models/use-page-pictures';
 import { ThinkingQuips } from '@/components/patterns/thinking-quips';
@@ -168,6 +173,8 @@ export interface MessageRowProps {
   queued?: boolean;
   /** Take a queued message back, by id. */
   onUnqueue?: (id: string) => void;
+  /** Answer what a message offers, by the message's id. */
+  onOffer?: (id: string, take: boolean) => Promise<void> | void;
 }
 
 export const MessageRow = React.memo(function MessageRow({
@@ -177,10 +184,12 @@ export const MessageRow = React.memo(function MessageRow({
   turnSeed,
   queued = false,
   onUnqueue,
+  onOffer,
 }: MessageRowProps) {
   if (message.role === 'user') {
     return (
       <View style={styles.mine}>
+        {message.note?.from ? <FromLine from={message.note.from} mine /> : null}
         {message.images?.length ? (
           <View style={queued ? styles.waiting : null}>
             <Pictures images={message.images} />
@@ -201,7 +210,7 @@ export const MessageRow = React.memo(function MessageRow({
     );
   }
 
-  return <TheirMessage message={message} status={status} turnSeed={turnSeed} />;
+  return <TheirMessage message={message} status={status} turnSeed={turnSeed} onOffer={onOffer} />;
 });
 
 /** Pages an answer's pictures are asked for at most. */
@@ -211,7 +220,17 @@ const PICTURE_PAGES = 6;
  * What Goose said: its text with each cited page a numbered chip, then once the turn is done the
  * Pond's pictures for those pages and the pages folded into one chip, then what its tools did.
  */
-function TheirMessage({ message, status, turnSeed }: { message: Message; status: string | null; turnSeed: number }) {
+function TheirMessage({
+  message,
+  status,
+  turnSeed,
+  onOffer,
+}: {
+  message: Message;
+  status: string | null;
+  turnSeed: number;
+  onOffer?: (id: string, take: boolean) => Promise<void> | void;
+}) {
   const theme = useInkTheme();
   const done = !message.pending;
   const sources = useMemo(
@@ -229,20 +248,26 @@ function TheirMessage({ message, status, turnSeed }: { message: Message; status:
   );
   const waiting = message.pending && !message.content;
   const unfinished = Boolean(message.pending && message.content);
-  const note = inkText(theme, { role: 'mono', size: 'xs', color: theme.color.textTertiary });
+  const statusLine = inkText(theme, { role: 'mono', size: 'xs', color: theme.color.textTertiary });
+  const note = message.note;
 
   return (
     <View style={styles.theirs}>
+      {note?.from ? <FromLine from={note.from} /> : null}
       {message.content ? <Markdown source={message.content} sources={done ? cited.chips : undefined} /> : null}
       {done ? <PagePictures pictures={pictures} /> : null}
       {done ? <SourcesChipRow state={cited} pictures={pictures} /> : null}
       {waiting ? <ThinkingQuips status={status} seed={turnSeed} /> : null}
       {unfinished && status ? (
-        <Text style={note.style} numberOfLines={1} accessibilityLiveRegion="polite">
+        <Text style={statusLine.style} numberOfLines={1} accessibilityLiveRegion="polite">
           {status}
         </Text>
       ) : null}
       {message.tools?.length ? <ToolTrail tools={message.tools} steps={message.steps} done={!message.pending} /> : null}
+      {note?.receipts?.length ? <ReceiptChips receipts={note.receipts} /> : null}
+      {note?.offer ? (
+        <OfferPanel offer={note.offer} onAnswer={onOffer ? (take) => onOffer(message.id, take) : undefined} />
+      ) : null}
     </View>
   );
 }

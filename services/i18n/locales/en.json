@@ -583,6 +583,33 @@
       "sourcesCount_one": "One source",
       "sourcesCount_other": "{{count}} sources",
       "closeSource": "Close"
+    },
+    "note": {
+      "from": {
+        "schedule": "From your schedule: {{label}}",
+        "scheduleBare": "From your schedule",
+        "reminder": "Reminder",
+        "reminderNamed": "Reminder: {{label}}",
+        "task": "Task finished: {{label}}",
+        "taskBare": "Task finished",
+        "lookup": "Looked up: {{label}}",
+        "lookupBare": "Looked up",
+        "watch": "Watch: {{label}}",
+        "watchBare": "Watch",
+        "heartbeat": "On its own: {{label}}",
+        "heartbeatBare": "Goose, on its own",
+        "suggestion": "Suggestion"
+      },
+      "receipt": {
+        "set": "Set: {{what}}",
+        "notSet": "Not set: {{what}}"
+      },
+      "offer": {
+        "take": "Do it",
+        "pass": "Not now",
+        "done": "Done",
+        "dismissed": "Passed over"
+      }
     }
   },
   "devices": {
