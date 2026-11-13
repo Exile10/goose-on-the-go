@@ -198,3 +198,14 @@ describe('a watch notice', () => {
     expect(openRouteFromData({ open: 'watch', watch_id: '../etc' })).toEqual({ open: 'watch' });
   });
 });
+
+describe('a news notice', () => {
+  it('opens the news list for the digest the Pond names, and still opens a story by its id', () => {
+    const digest = openRouteFromData({ open: 'news', digest_id: 'd1' });
+    expect(digest).toEqual({ open: 'news', digestId: 'd1' });
+    expect(screenPath(digest!)).toBe('/(stack)/goose-news');
+    const story = openRouteFromData({ open: 'news', story_id: 's1', digest_id: 'd1' });
+    expect(screenPath(story!)).toEqual({ pathname: '/(stack)/goose-story', params: { id: 's1' } });
+    expect(openRouteFromData({ open: 'news', digest_id: '../x' })).toEqual({ open: 'news' });
+  });
+});

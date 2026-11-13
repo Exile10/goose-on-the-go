@@ -116,7 +116,7 @@ export type OpenRoute =
   | { open: 'conversation'; sessionId: string }
   | { open: 'watch'; watchId?: string }
   | { open: 'todos'; todoId?: string }
-  | { open: 'news'; storyId?: string }
+  | { open: 'news'; storyId?: string; digestId?: string }
   | { open: 'cart'; cartId?: string }
   | { open: 'ideas'; ideaId?: string }
   | { open: 'goose_activity' };
@@ -177,8 +177,11 @@ export function openRouteFromData(data: unknown): OpenRoute | null {
       return todoId ? { open: 'todos', todoId } : { open: 'todos' };
     }
     case 'news': {
+      // The Pond names the digest it wrote; a story id is an older hint, kept.
       const storyId = pondId(data.story_id);
-      return storyId ? { open: 'news', storyId } : { open: 'news' };
+      const digestId = pondId(data.digest_id);
+      if (storyId) return { open: 'news', storyId };
+      return digestId ? { open: 'news', digestId } : { open: 'news' };
     }
     case 'cart': {
       const cartId = pondId(data.cart_id);

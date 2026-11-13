@@ -247,7 +247,9 @@ function openData(data: unknown): Record<string, unknown> {
   if (route.open === 'conversation') return { open: route.open, session_id: route.sessionId };
   if (route.open === 'watch') return { open: route.open, ...(route.watchId ? { watch_id: route.watchId } : {}) };
   if (route.open === 'todos') return { open: route.open, ...(route.todoId ? { todo_id: route.todoId } : {}) };
-  if (route.open === 'news') return { open: route.open, ...(route.storyId ? { story_id: route.storyId } : {}) };
+  if (route.open === 'news') {
+    return { open: route.open, ...(route.storyId ? { story_id: route.storyId } : {}), ...(route.digestId ? { digest_id: route.digestId } : {}) };
+  }
   if (route.open === 'cart') return { open: route.open, ...(route.cartId ? { cart_id: route.cartId } : {}) };
   if (route.open !== 'schedule') return { open: route.open };
   return {
