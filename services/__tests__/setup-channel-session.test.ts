@@ -96,6 +96,49 @@ describe('setup channel session', () => {
     await expect(channel.exchange(claim)).resolves.toMatchObject({ accepted: false, rejection_reason: 'setup_code_unavailable' });
   });
 
+  // A Pond whose pairing lock is on proves it holds the request before the phone waits on it.
+  const heldVerify = (proof?: string) => (type: string, a: Record<string, unknown>) =>
+    type === 'pake_verify'
+      ? {
+          id: a.id,
+          type: a.type,
+          ok: false,
+          accepted: false,
+          error: 'approval_required',
+          rejection_reason: 'approval_required',
+          server_proof: proof ?? a.server_proof,
+          pairing_request: { request_id: 'req-1', claim_secret: 'claim-secret', expires_at: '2026-11-13T10:10:00Z' },
+        }
+      : a;
+
+  it('reads a pairing the lock holds, once the Pond\'s proof verifies, and stays unsealed', async () => {
+    const { channel } = open({ rewrite: heldVerify() });
+    await channel.greet();
+    const answer = await channel.exchange(claim);
+    expect(answer).toMatchObject({
+      accepted: false,
+      rejection_reason: 'approval_required',
+      session_token: null,
+      held: { requestId: 'req-1', claimSecret: 'claim-secret' },
+    });
+    expect(channel.sealed).toBe(false);
+  });
+
+  it('does not wait on a held pairing whose proof does not verify, and ends the session', async () => {
+    const { channel } = open({ rewrite: heldVerify('00'.repeat(64)) });
+    await channel.greet();
+    await expect(channel.exchange(claim)).rejects.toBeInstanceOf(PondTrustError);
+    expect(channel.isClosed).toBe(true);
+  });
+
+  it('reads a hold with no request to come back for as a plain refusal', async () => {
+    const { channel } = open({ refuse: { pake_verify: { ok: false, accepted: false, error: 'approval_required', rejection_reason: 'approval_required' } } });
+    await channel.greet();
+    const answer = await channel.exchange(claim);
+    expect(answer).toMatchObject({ accepted: false, rejection_reason: 'approval_required' });
+    expect(answer.held).toBeUndefined();
+  });
+
   it('carries a verify refusal that is not a rejection, such as the attempt limit, as an error', async () => {
     const { channel } = open({ refuse: { pake_verify: { ok: false, error: 'internal_error' } } });
     await channel.greet();

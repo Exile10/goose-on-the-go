@@ -1,6 +1,7 @@
 /**
- * Ponds near the phone that need this phone: new ones, and someone's that lost their network. The
- * claim for the one picked opens under its own row, and nothing moves to another screen until it works.
+ * Ponds near the phone that need this phone: new ones, and someone's heard over Bluetooth, which
+ * is asked to pair rather than set up. The claim for the one picked opens under its own row, and
+ * nothing moves to another screen until it works.
  */
 
 import React, { useState } from 'react';
@@ -13,12 +14,15 @@ import { GPressable } from '@/components/ui/g-pressable';
 import { Spacing } from '@/constants/spacing';
 import type { NearbyPond } from '@/models/nearby-pond';
 import { readSetupCode } from '@/models/setup-card';
+import { useServer } from '@/providers/server-provider';
 import { selectionTick } from '@/services/haptics';
 import type { FindPhase, UseFindPond } from '@/view-models/use-find-pond';
 import { DigitsField } from './claim-fields';
+import { PairingWait } from './pairing-wait';
 
 function ClaimPanel({ pond, find, onScanCard }: { pond: NearbyPond; find: UseFindPond; onScanCard: () => void }) {
   const { t } = useTranslation();
+  const { claimPairing, recoverPairing } = useServer();
   const { phase, coolingSecs, spoken, claimedIds } = find.data;
   const claimed = claimedIds.includes(pond.id);
   const credential = phase.kind === 'entering' || phase.kind === 'failed' ? phase.credential : 'setup';
@@ -30,6 +34,21 @@ function ClaimPanel({ pond, find, onScanCard }: { pond: NearbyPond; find: UseFin
     setTyped('');
   }
 
+  if (phase.kind === 'waiting') {
+    return (
+      <View style={styles.panel}>
+        <PairingWait
+          held={phase.held}
+          claim={claimPairing}
+          recover={recoverPairing}
+          onPaired={find.actions.heldPaired}
+          onAgain={find.actions.askAgain}
+          onCancel={find.actions.cancel}
+        />
+      </View>
+    );
+  }
+
   if (phase.kind === 'claiming' || phase.kind === 'connecting') {
     return (
       <View style={styles.panel} accessibilityLiveRegion="polite">
@@ -39,18 +58,20 @@ function ClaimPanel({ pond, find, onScanCard }: { pond: NearbyPond; find: UseFin
               ? t('bleSetup.find.connecting', { id: pond.id })
               : phase.resuming
                 ? t('bleSetup.find.resuming', { id: pond.id })
-                : t('bleSetup.find.claiming', { id: pond.id })
+                : claimed
+                  ? t('bleSetup.find.asking', { id: pond.id })
+                  : t('bleSetup.find.claiming', { id: pond.id })
           }
         />
       </View>
     );
   }
 
-  // Someone's Pond that lost its network: its card no longer works, so it says a code instead.
+  // Someone's Pond: its card no longer works, so it says a code instead.
   if (claimed && phase.kind === 'entering' && !phase.spoken) {
     return (
       <View style={styles.panel}>
-        {/* The row above already says it needs Wi-Fi; this says what to do about it. */}
+        {/* The row above already says it is set up; this says what to do about it. */}
         <InkText tone="secondary">{t('bleSetup.find.claimedBody', { id: pond.id })}</InkText>
         {spoken.error ? <InkNotice tone="warning">{spoken.error}</InkNotice> : null}
         <InkButton variant="primary" block icon="volume" disabled={spoken.asking} onPress={find.actions.askSpoken}>
@@ -107,7 +128,7 @@ function ClaimPanel({ pond, find, onScanCard }: { pond: NearbyPond; find: UseFin
       {failure ? <InkNotice tone="danger">{failure}</InkNotice> : null}
       {spoken.error ? <InkNotice tone="warning">{spoken.error}</InkNotice> : null}
       <InkButton variant="primary" block disabled={!ready || coolingSecs > 0} onPress={submit}>
-        {t('bleSetup.find.claim')}
+        {claimed ? t('bleSetup.find.askToPair') : t('bleSetup.find.claim')}
       </InkButton>
       <View style={styles.alternatives}>
         {credential === 'setup' ? (
@@ -140,7 +161,7 @@ function ClaimPanel({ pond, find, onScanCard }: { pond: NearbyPond; find: UseFin
 }
 
 function pickedId(phase: FindPhase): string | null {
-  return phase.kind === 'entering' || phase.kind === 'claiming' || phase.kind === 'failed' || phase.kind === 'connecting' ? phase.pondId : null;
+  return phase.kind === 'browsing' || phase.kind === 'looking' ? null : phase.pondId;
 }
 
 export function NearbyPonds({ ponds, find, onScanCard }: { ponds: NearbyPond[]; find: UseFindPond; onScanCard: () => void }) {
@@ -154,7 +175,7 @@ export function NearbyPonds({ ponds, find, onScanCard }: { ponds: NearbyPond[]; 
         const open = pond.id === picked;
         const claimed = find.data.claimedIds.includes(pond.id);
         const where = claimed
-          ? t('bleSetup.find.needsWifi')
+          ? t('bleSetup.find.setUp')
           : pond.url
           ? pond.hostname
             ? t('bleSetup.find.onNetworkAt', { host: pond.hostname })
@@ -185,6 +206,8 @@ export function NearbyPonds({ ponds, find, onScanCard }: { ponds: NearbyPond[]; 
                   <View style={styles.trail}>
                     {/* Only the network says a Pond is unclaimed before connecting; Bluetooth's name does not. */}
                     {pond.url && !claimed ? <InkBadge tone="brand">{t('onboarding.notSetUp')}</InkBadge> : null}
+                    {/* Someone's Pond is never offered as one to set up. */}
+                    {claimed ? <InkBadge>{t('bleSetup.find.askToPair')}</InkBadge> : null}
                     <GIcon name="chevron-right" size={18} />
                   </View>
                 )}

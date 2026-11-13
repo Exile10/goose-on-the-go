@@ -10,6 +10,8 @@
 
 import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js';
 
+import { APPROVAL_REQUIRED, readHeldPairing } from '@/models/pairing-lock';
+
 import { ApiError, PondOutdatedError, type HandshakeResponse, type SpokenCode } from '../api-client';
 import { confirmationMatches, NONCE_BYTES, respond, type CpaceResponse, type PakeCredential } from '../cpace';
 import { PondTrustError } from '../pond-trust';
@@ -236,10 +238,10 @@ export class SetupChannel {
       } catch (e) {
         // Every refusal is `ok: false`; a refused verify carries its reason as HTTPS's `rejection_reason`.
         const body = e instanceof ApiError ? (e.body as Message | null) : null;
-        if (body?.accepted === false) return refusedVerify(str(body.rejection_reason) || str(body.error) || null);
+        if (body?.accepted === false) return await this.refusedOrHeld(body, run);
         throw e;
       }
-      if (verify.accepted === false) return refusedVerify(str(verify.rejection_reason) || null);
+      if (verify.accepted === false) return await this.refusedOrHeld(verify, run);
       // Without the Pond's confirmation nothing in `sealed` can be trusted to be the Pond's.
       if (!confirmationMatches(parseTag(verify.server_proof), run.expectedServerConfirm)) {
         await this.close();
@@ -277,6 +279,21 @@ export class SetupChannel {
     } finally {
       isk.fill(0);
     }
+  }
+
+  /**
+   * A refused verify, as HTTPS answers it. One the pairing lock holds keeps its request, but only
+   * once the Pond's confirmation verifies: the phone goes back to that Pond for its tokens.
+   */
+  private async refusedOrHeld(answer: Message, run: CpaceResponse): Promise<HandshakeResponse> {
+    const reason = str(answer.rejection_reason) || str(answer.error) || null;
+    const held = reason === APPROVAL_REQUIRED ? readHeldPairing(answer.pairing_request) : null;
+    if (!held) return refusedVerify(reason);
+    if (!confirmationMatches(parseTag(answer.server_proof), run.expectedServerConfirm)) {
+      await this.close();
+      throw new PondTrustError();
+    }
+    return { ...refusedVerify(reason), held };
   }
 
   async status(): Promise<ChannelStatus> {

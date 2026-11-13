@@ -3,7 +3,8 @@
  *   0. Find the GIAP server: discovered over mDNS, scanned from the QR or a setup card, or typed
  *   1. Enter the 6-digit pairing code shown or said by the GIAP host, or its setup card's code
  *   2. Pair under the phone's own name, shown on the code step with Change
- *   3. Run the two-phase handshake and confirm
+ *   3. Run the two-phase handshake and confirm; on a Pond whose pairing lock is on, wait there
+ *      for its main member to let this phone in
  */
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
@@ -41,7 +42,10 @@ import {
 } from '@/models/connection';
 import { isValidSetupCode, readSetupCode, type SetupCard } from '@/models/setup-card';
 import { defaultPhoneName } from '@/models/ble-setup';
+import { PairingWait } from '@/components/setup/pairing-wait';
 import { PhoneName } from '@/components/setup/phone-name';
+import type { HeldPairing } from '@/models/pairing-lock';
+import type { PairingWaitDeps } from '@/view-models/use-pairing-wait';
 import * as Device from 'expo-device';
 import { insecureDevMode } from '@/services/dev-mode';
 import { randomBytes } from '@/services/secure-random';
@@ -688,25 +692,39 @@ function WaitStep({ title, body }: { title: string; body?: string }) {
   );
 }
 
-/** Step 3: run the handshake, then say how it went. */
+/** Step 3: run the handshake, then say how it went, or wait where the Pond's lock holds this phone. */
 function CompleteStep({
   state,
   reason,
   retryLabel,
   retryDisabled,
   onRetry,
+  held,
+  wait,
 }: {
-  state: 'pending' | 'error';
+  state: 'pending' | 'error' | 'waiting';
   reason: string | null;
   retryLabel?: string;
   /** While the Pond is cooling between setup code attempts, a retry could only be refused. */
   retryDisabled?: boolean;
   onRetry: () => void;
+  /** The request this phone waits on, for `waiting`. */
+  held: HeldPairing | null;
+  wait: PairingWaitDeps;
 }) {
   const styles = useThemedStyles(makeStyles);
   const { colors } = useTheme();
   const { t } = useTranslation();
 
+  if (state === 'waiting' && held) {
+    return (
+      <StepBody>
+        <GIcon name="lock" size={28} color={JaridaPurple[500]} />
+        <InkTitle level={2}>{t('pairingLock.wait.title')}</InkTitle>
+        <PairingWait held={held} {...wait} onAgain={onRetry} onCancel={onRetry} />
+      </StepBody>
+    );
+  }
   if (state === 'pending') {
     return (
       <StepBody>
@@ -742,7 +760,7 @@ export default function PondPairingScreen() {
   const styles = useThemedStyles(makeStyles);
   const { t } = useTranslation();
   const router = useRouter();
-  const { serverUrl, stagePairing, cancelPairing, pair, profileId } = useServer();
+  const { serverUrl, stagePairing, cancelPairing, pair, claimPairing, recoverPairing, profileId } = useServer();
   /**
    * Whether this screen was reached with somewhere to go back to, decided once.
    *
@@ -921,8 +939,10 @@ export default function PondPairingScreen() {
     return () => { cancelled = true; };
   }, [reaching, stage, t]);
 
-  const [completionState, setCompletionState] = useState<'pending' | 'error'>('pending');
+  const [completionState, setCompletionState] = useState<'pending' | 'error' | 'waiting'>('pending');
   const [completionReason, setCompletionReason] = useState<string | null>(null);
+  // The request a locked Pond is holding for this phone. In this component's memory and nowhere else.
+  const [held, setHeld] = useState<HeldPairing | null>(null);
   // Set when the Pond turned out to be claimed, so the way on is a pairing code instead of the card.
   const [claimed, setClaimed] = useState(false);
   const { left: coolingLeft, start: startCooling, stop: stopCooling } = useCountdown();
@@ -932,6 +952,7 @@ export default function PondPairingScreen() {
       setStep(3);
       setCompletionState('pending');
       setCompletionReason(null);
+      setHeld(null);
       setClaimed(false);
       stopCooling();
       const toPairingCode = () => { setCredential('pairing'); setCode(''); setClaimed(true); };
@@ -943,6 +964,10 @@ export default function PondPairingScreen() {
           // Leave on success rather than waiting to be dismissed: for Home, or for owner setup on a
           // Pond nobody has set up yet, as a freshly claimed one is.
           router.replace((await setupNeededNow()) ? '/(onboarding)/owner-setup' : '/(tabs)');
+        } else if (resp.held) {
+          // The code was right and the Pond's lock is on: its main member decides.
+          setHeld(resp.held);
+          setCompletionState('waiting');
         } else {
           setCompletionState('error');
           setCompletionReason(explainRefusedPairing(resp.rejection_reason, t, credential));
@@ -961,6 +986,11 @@ export default function PondPairingScreen() {
     },
     [code, credential, pair, router, startCooling, stopCooling, t],
   );
+
+  // Let in by the main member or by the recovery PIN: the pairing is kept, and this leaves as any pairing does.
+  const onPaired = useCallback(() => {
+    void setupNeededNow().then((needed) => router.replace(needed ? '/(onboarding)/owner-setup' : '/(tabs)'));
+  }, [router]);
 
   // Step 2 is the moment everything is in hand; pairing starts by itself, under the name shown.
   useEffect(() => {
@@ -1067,7 +1097,9 @@ export default function PondPairingScreen() {
           reason={coolingLeft > 0 ? t('pairingErrors.setupCooling', { count: coolingLeft }) : completionReason}
           retryLabel={claimed ? t('pairing.claimedNext') : undefined}
           retryDisabled={coolingLeft > 0}
-          onRetry={() => setStep(1)}
+          onRetry={() => { setHeld(null); setStep(1); }}
+          held={held}
+          wait={{ claim: claimPairing, recover: recoverPairing, onPaired }}
         />
       )}
     </GKeyboardView>
