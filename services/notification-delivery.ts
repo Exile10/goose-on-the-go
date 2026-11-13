@@ -13,13 +13,16 @@
  *   runtimes (a headless wake-up, then the app) the shade replaces rather than
  *   duplicates;
  * - an acknowledgement to the Pond, so it stops holding the notice for the next
- *   wake-up to fetch again.
+ *   wake-up to fetch again, saying whether the shade took it;
+ * - on an iPhone, the Pond's fixed wake line taken out of the shade once a fetch
+ *   has shown what it stood for (`services/wake-alert.ts`).
  */
 
 import type { PondApiClient } from './api-client';
 import { presentLocally } from './local-notifications';
 import { NotificationDeduplicator, type ServerNotification } from './notification-stream';
 import { withEventTime } from './pull-notifications';
+import { dismissWakeAlerts, noteDrained, noteFetched } from './wake-alert';
 
 /** Shared by every delivery path in this runtime. */
 const deliveryDeduplicator = new NotificationDeduplicator();
@@ -53,14 +56,23 @@ export function readNotification(raw: unknown): ServerNotification | null {
   };
 }
 
+/** Notices the shade took in this runtime, so a repeat's acknowledgement still says it was shown. */
+const shadeTook = new Set<string>();
+const SHADE_TOOK_CAPACITY = 400;
+
+function noteShown(id: string): void {
+  shadeTook.add(id);
+  if (shadeTook.size > SHADE_TOOK_CAPACITY) shadeTook.delete(shadeTook.values().next().value as string);
+}
+
 /**
- * Acknowledge one notice. Never throws: a lost acknowledgement means the Pond
- * offers the notice again, and the deduplicator and the shared identifier keep
- * that from showing twice.
+ * Acknowledge one notice, saying whether the shade took it. Never throws: a lost
+ * acknowledgement means the Pond offers the notice again, and the deduplicator
+ * and the shared identifier keep that from showing twice.
  */
 export async function acknowledge(client: DeliveryClient, id: string, source: string): Promise<boolean> {
   try {
-    await client.ackNotification(id);
+    await client.ackNotification(id, shadeTook.has(id));
     return true;
   } catch (e) {
     console.warn('[notifications] ack failed', { kind: 'notification_ack', source, id, error: String(e) });
@@ -82,7 +94,9 @@ async function show(notification: ServerNotification, shade: ServerNotification)
       console.warn('[notifications] delivery listener failed', { kind: 'notification_listener', error: String(e) });
     }
   }
-  return (await presentLocally(shade)) ? 'shown' : 'refused';
+  if (!(await presentLocally(shade))) return 'refused';
+  noteShown(notification.id);
+  return 'shown';
 }
 
 /**
@@ -116,19 +130,25 @@ export interface DrainResult { fetched: number; presented: number; acked: number
 /**
  * Fetch the notices the Pond is holding for this phone, show the new ones with
  * the time each happened, and acknowledge every one -- including those already
- * shown, which the Pond would otherwise keep offering. Throws only when the
- * fetch itself fails.
+ * shown, which the Pond would otherwise keep offering. Then the iPhone's fixed
+ * wake line goes, unless the shade refused a notice it still stands for. Throws
+ * only when the fetch itself fails.
  */
 export async function drainPending(client: DeliveryClient, source: 'wake' | 'foreground'): Promise<DrainResult> {
   const raw = await client.pendingNotifications();
   const result: DrainResult = { fetched: raw.length, presented: 0, acked: 0 };
-  for (const item of raw) {
+  const notices = raw.flatMap((item) => {
     const notification = readNotification(item);
-    if (!notification) {
-      console.warn('[notifications] pending item ignored: not a notification', { kind: 'notification_pending', source });
-      continue;
-    }
-    const outcome = await show(notification, withEventTime(notification));
+    if (!notification) console.warn('[notifications] pending item ignored: not a notification', { kind: 'notification_pending', source });
+    return notification ? [notification] : [];
+  });
+  noteFetched(notices);
+  const shown: ServerNotification[] = [];
+  let refused = 0;
+  for (const notification of notices) {
+    const shade = withEventTime(notification);
+    const outcome = await show(notification, shade);
+    if (outcome === 'refused') refused++;
     // After a wake-up the shade is the only place a notice shows, so one it refused stays with
     // the Pond for the next wake. In the foreground the in-app list already has it.
     if (outcome === 'refused' && source === 'wake') {
@@ -136,8 +156,11 @@ export async function drainPending(client: DeliveryClient, source: 'wake' | 'for
       continue;
     }
     if (outcome !== 'repeat') result.presented++;
+    if (outcome === 'shown') shown.push(shade);
     if (await acknowledge(client, notification.id, source)) result.acked++;
   }
+  if (refused === 0) await dismissWakeAlerts(shown, presentLocally);
+  noteDrained();
   console.info('[notifications] pending drained', { kind: 'notification_pending', source, ...result });
   return result;
 }

@@ -34,6 +34,11 @@ describe('handleWakePing', () => {
     expect(mockPresent.mock.calls[0][0]).toMatchObject({ id: 'n-1:phone-a', category: 'alert' });
   });
 
+  it('shows no stand-in over the line an iPhone already drew for the wake', async () => {
+    await expect(handleWakePing({ ...PING, visible: true }, async () => null)).resolves.toBe('unreachable');
+    expect(mockPresent).not.toHaveBeenCalled();
+  });
+
   it('shows no stand-in when the alert itself was shown, or nothing was waiting', async () => {
     mockPull.mockResolvedValueOnce(1).mockResolvedValueOnce(0);
     await handleWakePing(PING, async () => POND);

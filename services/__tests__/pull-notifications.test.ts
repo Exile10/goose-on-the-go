@@ -8,6 +8,8 @@ jest.mock('@/services/local-notifications', () => ({
 }));
 // The default client is never used here; every test hands in its own.
 jest.mock('@/services/api-client', () => ({ api: {} }));
+const mockDismiss = jest.fn().mockResolvedValue(0);
+jest.mock('@/services/wake-alert', () => ({ dismissWakeAlerts: (...args: unknown[]) => mockDismiss(...args) }));
 
 const DOOR: ServerNotification = {
   id: 'n-1:phone-a', target: 'phone-a', category: 'alert',
@@ -26,7 +28,10 @@ function client(pending: ServerNotification[], ack = jest.fn().mockResolvedValue
   return { pond, events, ack };
 }
 
-beforeEach(() => mockPresent.mockReset());
+beforeEach(() => {
+  mockPresent.mockReset();
+  mockDismiss.mockClear();
+});
 
 describe('pullPendingNotifications', () => {
   it('presents each waiting notification, oldest first, and acknowledges it after', async () => {
@@ -35,6 +40,16 @@ describe('pullPendingNotifications', () => {
     await expect(pullPendingNotifications(pond)).resolves.toBe(2);
 
     expect(events).toEqual([`present ${DOOR.id}`, `ack ${DOOR.id}`, `present ${BACK.id}`, `ack ${BACK.id}`]);
+  });
+
+  it('tells the Pond each one was shown, and clears the iPhone wake line once all of them are', async () => {
+    const { pond, ack } = client([DOOR, BACK]);
+
+    await pullPendingNotifications(pond);
+
+    expect(ack.mock.calls).toEqual([[DOOR.id, true], [BACK.id, true]]);
+    expect(mockDismiss).toHaveBeenCalledTimes(1);
+    expect((mockDismiss.mock.calls[0][0] as ServerNotification[]).map((n) => n.id)).toEqual([DOOR.id, BACK.id]);
   });
 
   it('does nothing when nothing is waiting', async () => {
@@ -61,6 +76,8 @@ describe('pullPendingNotifications', () => {
     await expect(pullPendingNotifications(pond)).resolves.toBe(1);
 
     expect(events).toEqual([`present ${BACK.id}`, `ack ${BACK.id}`]);
+    // The wake line still stands for the one that was not shown.
+    expect(mockDismiss).not.toHaveBeenCalled();
   });
 
   it('lets a failed read reach the caller, which decides what to show instead', async () => {

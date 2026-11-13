@@ -86,9 +86,37 @@ describe('acknowledgeNotification', () => {
     expect(seen[0].method).toBe('POST');
   });
 
+  it('says a notice was shown only when asked to', async () => {
+    const seen: Seen[] = [];
+    recordInto(seen, JSON.stringify({ id: DOOR.id, acknowledged: true }));
+    const api = new PondApiClient('https://pond.test:4000');
+
+    await api.acknowledgeNotification(DOOR.id, true);
+    await api.ackNotification(DOOR.id, true);
+    await api.ackNotification(DOOR.id);
+
+    expect(seen.map((s) => s.body)).toEqual([{ shown: true }, { shown: true }, {}]);
+  });
+
   it('surfaces a 404 for a notification that is not this phone’s', async () => {
     recordInto([], JSON.stringify({ error: 'no such notification for this device' }), 404);
     await expect(new PondApiClient('https://pond.test:4000').acknowledgeNotification('x'))
       .rejects.toBeInstanceOf(ApiError);
+  });
+});
+
+describe('notificationOpened', () => {
+  it('posts to the opened route with the id escaped and no body', async () => {
+    const seen: Seen[] = [];
+    recordInto(seen, JSON.stringify({ id: DOOR.id, opened: true }));
+
+    await new PondApiClient('https://pond.test:4000').notificationOpened(DOOR.id);
+
+    expect(seen).toEqual([{ url: 'https://pond.test:4000/api/v1/notifications/n-1%3Aphone-a/opened', method: 'POST', body: undefined }]);
+  });
+
+  it('surfaces a 404 for a notice that is not this phone’s', async () => {
+    recordInto([], JSON.stringify({ error: 'no such notification for this device' }), 404);
+    await expect(new PondApiClient('https://pond.test:4000').notificationOpened('x')).rejects.toBeInstanceOf(ApiError);
   });
 });

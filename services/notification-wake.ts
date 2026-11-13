@@ -1,19 +1,21 @@
 /**
  * What the app does when the Pond's push wake-up arrives.
  *
- * The Pond sends FCM a data-only message at high priority carrying
- * `{ notification_id, category, wake: "1" }` and nothing a person could read:
- * the text never transits Google or Apple. The phone wakes, reaches the Pond
- * over its own pinned channel, fetches what is pending, shows it, and
- * acknowledges it. Android may run this headless, with the app closed, and gives
- * it seconds rather than minutes, so the whole pass is bounded and it never
- * throws -- a background task that throws is retried by nobody.
+ * The Pond's push carries `{ notification_id, category, wake: "1" }` and none of
+ * the notice's words: the text never transits Google or Apple. Android gets it
+ * as a data-only FCM message; an iPhone gets it under one fixed line. The phone
+ * wakes, reaches the Pond over its own pinned channel, fetches what is pending,
+ * shows it, acknowledges it, and takes the fixed line out of the shade. Either
+ * system may run this headless, with the app closed, and gives it seconds rather
+ * than minutes, so the whole pass is bounded and it never throws -- a background
+ * task that throws is retried by nobody.
  *
  * Kept free of expo-task-manager so it can be tested; the task itself is
  * registered in `services/background-notifications.ts`.
  */
 
 import { drainPending, type DeliveryClient, type DrainResult } from './notification-delivery';
+import { wakeFields } from './wake-ping';
 
 /** Longer than a pass needs on a reachable Pond; well inside what Android allows a high-priority message. */
 export const WAKE_BUDGET_MS = 20_000;
@@ -26,29 +28,6 @@ export interface WakeDependencies {
 }
 
 export type WakeOutcome = 'ignored' | 'unpaired' | 'delivered' | 'failed';
-
-/**
- * The FCM data fields, wherever this platform's payload put them.
- *
- * Android hands the message's data map over as `data` (each value a string).
- * iOS puts custom keys at the top of the payload beside `aps`. expo-notifications
- * also carries a `dataString` copy of a `body` field; it is read when present.
- */
-export function wakeFields(payload: unknown): Record<string, unknown> {
-  if (!payload || typeof payload !== 'object') return {};
-  const top = payload as Record<string, unknown>;
-  const data = top.data && typeof top.data === 'object' ? (top.data as Record<string, unknown>) : {};
-  let parsed: Record<string, unknown> = {};
-  if (typeof data.dataString === 'string') {
-    try {
-      const value: unknown = JSON.parse(data.dataString);
-      if (value && typeof value === 'object') parsed = value as Record<string, unknown>;
-    } catch {
-      // Not JSON: the plain fields beside it still count.
-    }
-  }
-  return { ...top, ...parsed, ...data };
-}
 
 /** Whether this payload is the Pond asking the phone to come and fetch. */
 export function isWake(payload: unknown): boolean {

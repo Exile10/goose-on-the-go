@@ -22,7 +22,8 @@ export type WakeOutcome = 'pulled' | 'nothing' | 'unreachable';
 
 export async function handleWakePing(ping: WakePing, connect = pondForBackground): Promise<WakeOutcome> {
   const outcome = await pull(ping, connect);
-  if (outcome === 'unreachable') await presentLocally(standIn(ping));
+  // An iPhone's wake is already a line in the shade, which says as much as the stand-in would.
+  if (outcome === 'unreachable' && !ping.visible) await presentLocally(standIn(ping));
   return outcome;
 }
 

@@ -1497,9 +1497,15 @@ export class PondApiClient {
   /**
    * Marks one notification delivered to this phone, so it is not pulled or
    * flushed to the stream again. A 404 means it was never this phone's.
+   * `shown` says the phone put it in front of the person, which the Pond records apart.
    */
-  async acknowledgeNotification(id: string): Promise<void> {
-    await this.post(`/api/v1/notifications/${encodeURIComponent(id)}/ack`, {});
+  async acknowledgeNotification(id: string, shown = false): Promise<void> {
+    await this.post(`/api/v1/notifications/${encodeURIComponent(id)}/ack`, shown ? { shown: true } : {});
+  }
+
+  /** Tells the Pond the person tapped one of this phone's notices. A 404 means it was never this phone's. */
+  async notificationOpened(id: string): Promise<void> {
+    await this.request<unknown>(`/api/v1/notifications/${encodeURIComponent(id)}/opened`, { method: 'POST' });
   }
 
   // ── Reminders ───────────────────────────────────────────────
@@ -3198,9 +3204,9 @@ export class PondApiClient {
     return this.post<void>(`/api/v1/devices/${encodeURIComponent(deviceId)}/heartbeat`, {});
   }
 
-  /** Tell the Pond this phone has put a notice in front of the user, so it stops holding it. */
-  ackNotification(id: string): Promise<void> {
-    return this.post<void>(`/api/v1/notifications/${encodeURIComponent(id)}/ack`, {});
+  /** Tell the Pond this phone has taken a notice, so it stops holding it; `shown` when the person was shown it. */
+  ackNotification(id: string, shown = false): Promise<void> {
+    return this.post<void>(`/api/v1/notifications/${encodeURIComponent(id)}/ack`, shown ? { shown: true } : {});
   }
 
   private post<T>(path: string, body: unknown): Promise<T> {

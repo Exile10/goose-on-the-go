@@ -31,6 +31,8 @@ import { markdownToPlain } from './markdown';
 import { linkFromData, openRouteFromData, rideOfferFromData, screenPath, todoPromptFromData, type OpenRoute } from './notification-link';
 import { answerFrom, categoryFor, handleTodoResponse, promptData, registerTodoCategories } from './todo-prompts';
 import type { ServerNotification } from './notification-stream';
+import { noteWakeTap, watchWakeTaps } from './wake-alert';
+import { wakePingOfNotification } from './wake-ping';
 
 /**
  * How each category of notice reaches the user on Android, decided here and nowhere else.
@@ -126,6 +128,10 @@ let configured: Promise<void> | null = null;
 function installHandler(Notifications: NotificationsModule): void {
   Notifications.setNotificationHandler({
     handleNotification: async (notification) => {
+      // An iPhone's wake line says nothing the stream is not already bringing while the app is open.
+      if (wakePingOfNotification(notification)) {
+        return { shouldShowBanner: false, shouldShowList: false, shouldPlaySound: false, shouldSetBadge: false };
+      }
       const { popsUp } = channelSpec(notification.request.content.data?.category);
       return {
         shouldShowBanner: true, // iOS draws a banner either way; Android follows the sound.
@@ -262,26 +268,18 @@ function openData(data: unknown): Record<string, unknown> {
 /** Notifications whose tap has been handled in this JS session, by identifier. */
 const handledTaps = new Set<string>();
 
-/** Act on a tapped notification, checking what it carries again first. */
-function openTapped(Notifications: NotificationsModule, response: NotificationResponse | null): void {
-  if (!response) return;
-  // Done, Not yet, Add or No on one of Goose's questions: answered where it is, nothing opened.
-  if (answerFrom(response.actionIdentifier, response.notification.request.content.data)) {
-    void handleTodoResponse(response, api, Notifications);
-    return;
-  }
-  // The listener and the read of the last response can both deliver one tap; it opens once.
-  const id = response.notification.request.identifier;
-  if (handledTaps.has(id)) return;
-  handledTaps.add(id);
-  // expo-notifications keeps the last response for as long as its native module lives, so
-  // one left in place would reopen its link on every later mount, with no tap at all.
+/** Tell the Pond a notice was opened. Never throws and never waited for: the tap has somewhere to go. */
+async function reportOpened(id: unknown): Promise<void> {
+  if (typeof id !== 'string' || !id) return;
   try {
-    Notifications.clearLastNotificationResponse();
-  } catch {
-    // Not available on this platform; the identifier check still covers this session.
+    await api.notificationOpened(id);
+  } catch (e) {
+    console.info('[notifications] could not say a notice was opened', { kind: 'notification_opened', error: String(e) });
   }
-  const data = response.notification.request.content.data;
+}
+
+/** Open what a notice's `data` asks for: a ride, a link, or a screen. Nothing when it asks for none. */
+function openFromData(data: unknown): void {
   const offer = rideOfferFromData(data);
   if (offer) {
     const { name, latitude, longitude } = offer.dropoff;
@@ -313,6 +311,39 @@ function openTapped(Notifications: NotificationsModule, response: NotificationRe
   void conversationOrWall(route).then((opened) => router.push(screenPath(opened)));
 }
 
+/** Act on a tapped notification, checking what it carries again first. */
+function openTapped(Notifications: NotificationsModule, response: NotificationResponse | null, onWakeTap?: () => void): void {
+  if (!response) return;
+  // Done, Not yet, Add or No on one of Goose's questions: answered where it is, nothing opened.
+  if (answerFrom(response.actionIdentifier, response.notification.request.content.data)) {
+    void handleTodoResponse(response, api, Notifications);
+    return;
+  }
+  // The listener and the read of the last response can both deliver one tap; it opens once.
+  const id = response.notification.request.identifier;
+  if (handledTaps.has(id)) return;
+  handledTaps.add(id);
+  // expo-notifications keeps the last response for as long as its native module lives, so
+  // one left in place would reopen its link on every later mount, with no tap at all.
+  try {
+    Notifications.clearLastNotificationResponse();
+  } catch {
+    // Not available on this platform; the identifier check still covers this session.
+  }
+  // The iPhone's fixed wake line: it names a notice and carries none, so the fetch decides where it leads.
+  const ping = wakePingOfNotification(response.notification);
+  if (ping) {
+    void reportOpened(ping.notificationId);
+    noteWakeTap();
+    onWakeTap?.();
+    return;
+  }
+  const data = response.notification.request.content.data;
+  // The phone's own notice that a reply finished is not one the Pond keeps a record of.
+  if (data?.category !== 'reply') void reportOpened(data?.id);
+  openFromData(data);
+}
+
 /**
  * The conversation a tap names, or the chat wall when the Pond says there is no such
  * conversation for this phone: deleted since, or another member's, which the Pond answers as
@@ -339,14 +370,20 @@ async function conversationOrWall(route: Extract<OpenRoute, { open: 'conversatio
  * screen the Pond names (schedules, devices, chat, models, extensions or remote
  * access), or the conversation a Pond notice or a reply notice names, when
  * their notification is tapped, including the tap that launched the app.
+ * A tap on an iPhone's wake line calls `onWakeTap`, for the caller to fetch what
+ * the Pond holds, and then opens the one notice that fetch found, if it found one.
  * Returns the unsubscribe.
  */
-export function watchLinkTaps(): () => void {
+export function watchLinkTaps(onWakeTap?: () => void): () => void {
   const Notifications = notifications;
   if (!Notifications) return () => {}; // Expo Go: see notifications-module.ts
-  const sub = Notifications.addNotificationResponseReceivedListener((response) => openTapped(Notifications, response));
+  const sub = Notifications.addNotificationResponseReceivedListener((response) => openTapped(Notifications, response, onWakeTap));
   Notifications.getLastNotificationResponseAsync()
-    .then((response) => openTapped(Notifications, response))
+    .then((response) => openTapped(Notifications, response, onWakeTap))
     .catch(() => {});
-  return () => sub.remove();
+  const stopLeads = watchWakeTaps((notice) => openFromData(notice.data));
+  return () => {
+    sub.remove();
+    stopLeads();
+  };
 }

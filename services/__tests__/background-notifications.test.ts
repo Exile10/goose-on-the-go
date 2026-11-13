@@ -71,6 +71,18 @@ describe('defineWakeTask', () => {
     expect(mockHandle).toHaveBeenCalledWith({ notificationId: 'n-1:phone-a', category: 'alert' });
   });
 
+  it('reads an iPhone wake, whose push drew its own line, when the restored session could not handle it', async () => {
+    mockHandle.mockResolvedValue('unreachable');
+    const { task } = define();
+    const iphone = {
+      data: { wake: '1', notification_id: 'n-1:phone-a', category: 'alert', dataString: null },
+      notification: { title: 'Goose', body: 'Something new from your Pond.' },
+      aps: { 'content-available': 1 },
+    };
+    await expect(task({ data: iphone })).resolves.toBe(RESULT.Failed);
+    expect(mockHandle).toHaveBeenCalledWith({ notificationId: 'n-1:phone-a', category: 'alert', visible: true });
+  });
+
   it('reports what the restored session delivered without pulling a second time', async () => {
     mockWake.mockResolvedValue('delivered');
     const { task } = define();

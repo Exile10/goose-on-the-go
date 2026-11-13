@@ -17,13 +17,14 @@
  * for them itself, so the notice the user sees is the one fetched from the Pond.
  * iOS needs `content-available: 1` on the APNs payload and the
  * `remote-notification` background mode (set in app.json), and decides itself
- * how often to honour it.
+ * how often to honour it. The Pond's APNs push is therefore also one fixed,
+ * visible line, which the fetch takes out of the shade once the notice is shown.
  *
  * While the app is open the notification stream already delivers the alert, and
  * pulling it as well would show it a second time, so the task leaves it alone.
  * When the restored session reaches no Pond, the wake ping's own pull
  * (`services/wake-handler.ts`) tries the home addresses directly, and shows a
- * stand-in when it cannot reach one either.
+ * stand-in when it cannot reach one either and the push drew no line of its own.
  */
 
 import { AppState, Platform } from 'react-native';
