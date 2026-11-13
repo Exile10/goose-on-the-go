@@ -1303,15 +1303,16 @@ export class PondApiClient {
   }
 
   /**
-   * Text to speech: the whole text as a 24 kHz mono WAV. Synthesis finishes
-   * before the first byte, so speak a reply a clause at a time. The first
-   * call after the Pond starts loads its voice model, which can take seconds.
+   * Text to speech: the whole text as a 24 kHz mono WAV, and Kokoro shapes its
+   * pauses. `last: false` when more of the same reply follows, so the audio
+   * ends in the gap before it instead of at rest. The first call after the
+   * Pond starts loads its voice model, which can take seconds.
    */
-  async speak(text: string, signal?: AbortSignal): Promise<ArrayBuffer> {
+  async speak(text: string, signal?: AbortSignal, last = true): Promise<ArrayBuffer> {
     const res = await this.send(`${this.baseUrl}/api/v1/tts`, {
       method: 'POST',
       headers: this.headers(),
-      body: JSON.stringify({ text }),
+      body: JSON.stringify({ text, last }),
       signal: timeoutSignal(VOICE_TIMEOUT_MS, signal),
     });
     if (!res.ok) {
