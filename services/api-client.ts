@@ -1446,9 +1446,14 @@ export class PondApiClient {
 
   // ── Sessions ────────────────────────────────────────────────
 
-  async listSessions(): Promise<SessionSummary[]> {
+  /**
+   * Every conversation, or with `surfaces` only those begun there. `unknown` names the ones begun
+   * before the Pond recorded where; a Pond older than the filter ignores it and answers them all.
+   */
+  async listSessions(surfaces?: readonly string[]): Promise<SessionSummary[]> {
+    const query = surfaces?.length ? `?surface=${surfaces.map(encodeURIComponent).join(',')}` : '';
     const res = await this.request<{ sessions?: SessionSummary[] } | SessionSummary[]>(
-      '/api/v1/sessions',
+      `/api/v1/sessions${query}`,
     );
     return collection<SessionSummary>(res, 'sessions');
   }

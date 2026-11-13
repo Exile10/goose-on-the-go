@@ -79,6 +79,42 @@ describe('pending notifications', () => {
   });
 });
 
+describe('conversations by where they were begun', () => {
+  it('asks for every conversation, or only those begun on the surfaces named', async () => {
+    const calls: string[] = [];
+    setFetch(async (url: string) => {
+      calls.push(url);
+      return reply('{"sessions":[{"id":"goose-m1","surface":"goose"}]}');
+    });
+    const api = new PondApiClient('https://pond.test:4000');
+
+    await api.listSessions();
+    await expect(api.listSessions(['phone', 'goose'])).resolves.toEqual([{ id: 'goose-m1', surface: 'goose' }]);
+    await api.listSessions(['desktop', 'cli', 'pond', 'unknown']);
+
+    expect(calls).toEqual([
+      'https://pond.test:4000/api/v1/sessions',
+      'https://pond.test:4000/api/v1/sessions?surface=phone,goose',
+      'https://pond.test:4000/api/v1/sessions?surface=desktop,cli,pond,unknown',
+    ]);
+  });
+
+  it('answers an offer on the message that made it', async () => {
+    const seen: { url: string; method?: string; body?: string }[] = [];
+    setFetch(async (url: string, init: { method?: string; body?: string }) => {
+      seen.push({ url, method: init.method, body: init.body });
+      return reply('{"state":"done","prompt":"Remind me on Thursday"}');
+    });
+    const api = new PondApiClient('https://pond.test:4000');
+
+    await expect(api.answerOffer('goose-m1', 'msg/1', true)).resolves.toEqual({ state: 'done', prompt: 'Remind me on Thursday' });
+
+    expect(seen).toEqual([
+      { url: 'https://pond.test:4000/api/v1/sessions/goose-m1/messages/msg%2F1/offer', method: 'POST', body: '{"take":true}' },
+    ]);
+  });
+});
+
 describe('empty bodies', () => {
   /**
    * DELETE answers 204. `res.json()` throws on an empty body, so without this

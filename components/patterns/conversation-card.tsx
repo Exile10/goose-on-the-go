@@ -23,6 +23,10 @@
  * "chosen", so the wall says it that way too. The circle in the corner is the
  * platform's mark for the mode rather than for the choice: it is on every
  * card, so a reader can see that a tap will choose rather than open.
+ *
+ * The Goose thread, and what a schedule reported in it, are not the wall's to
+ * delete: they answer no long press and carry no circle. The Goose thread
+ * wears its own mark beside its name.
  */
 
 import React, { useMemo, useState } from 'react';
@@ -82,10 +86,12 @@ export const SELECT_MARK = 22;
  * list's rows use this too, so the two layouts read a conversation out alike.
  */
 export function cardWords(card: HistoryCard, t: TFunction) {
-  const title = card.title ?? t('chat.history.untitled');
+  const title = card.title ?? (card.goose ? t('chat.history.gooseTitle') : t('chat.history.untitled'));
   const count =
     card.messageCount > 0 ? t('chat.history.messages', { count: card.messageCount }) : '';
-  const foot = [card.routine ? t('chat.history.routine') : '', count].filter(Boolean).join(' · ');
+  const foot = card.goose
+    ? t('chat.history.gooseFoot')
+    : [card.routine ? t('chat.history.routine') : '', count].filter(Boolean).join(' · ');
   const answering = card.answering ? t('chat.history.answeringLabel') : '';
   return { title, foot, label: [title, card.when, answering, foot].filter(Boolean).join(', ') };
 }
@@ -114,7 +120,8 @@ export function AnsweringMark() {
  * so the pills inside cannot be reached on their own; while it is asking, the
  * two answers are actions on the element instead.
  */
-export function deleteActions(confirming: boolean, t: TFunction) {
+export function deleteActions(confirming: boolean, t: TFunction, deletable = true) {
+  if (!deletable) return undefined;
   return confirming
     ? [
         { name: 'delete', label: t('chat.history.delete') },
@@ -157,6 +164,12 @@ function useCardText() {
       }).style,
     };
   }, [theme]);
+}
+
+/** The Goose thread's own mark, beside its name on a card and on a row. */
+export function GooseMark({ size = 16 }: { size?: number }) {
+  const theme = useInkTheme();
+  return <GIcon name="sparkle" size={size} color={theme.color.accentLine} />;
 }
 
 /**
@@ -276,6 +289,7 @@ export const ConversationCard = React.memo(function ConversationCard({
   const { title, foot, label } = cardWords(card, t);
   // Flat while the wall is being chosen from; back on its plate once chosen.
   const raised = !selecting || selected;
+  const choosable = selecting && card.deletable;
 
   const onAction = (e: AccessibilityActionEvent) => {
     const name = e.nativeEvent.actionName;
@@ -290,21 +304,25 @@ export const ConversationCard = React.memo(function ConversationCard({
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={label}
-      accessibilityHint={t(
-        selecting
-          ? selected
-            ? 'chat.history.deselectHint'
-            : 'chat.history.selectHint'
-          : 'chat.history.openHint',
-      )}
-      accessibilityState={selecting ? { selected } : undefined}
-      accessibilityActions={selecting ? undefined : deleteActions(confirming, t)}
-      onAccessibilityAction={selecting ? undefined : onAction}
+      accessibilityHint={
+        selecting && !choosable
+          ? undefined
+          : t(
+              selecting
+                ? selected
+                  ? 'chat.history.deselectHint'
+                  : 'chat.history.selectHint'
+                : 'chat.history.openHint',
+            )
+      }
+      accessibilityState={choosable ? { selected } : undefined}
+      accessibilityActions={selecting ? undefined : deleteActions(confirming, t, card.deletable)}
+      onAccessibilityAction={selecting || !card.deletable ? undefined : onAction}
       // While the card is asking a question, touching it anywhere else is the
       // answer "never mind", not a request to open it. While the wall is being
-      // chosen from, touching it is choosing it.
-      onPress={() => (selecting ? onToggle?.(card.id) : confirming ? onKeep() : onOpen(card.id))}
-      onLongPress={selecting ? undefined : () => onAskDelete(card.id)}
+      // chosen from, touching it is choosing it, and one that cannot be deleted is left alone.
+      onPress={() => (selecting ? (choosable ? onToggle?.(card.id) : undefined) : confirming ? onKeep() : onOpen(card.id))}
+      onLongPress={selecting || !card.deletable ? undefined : () => onAskDelete(card.id)}
       delayLongPress={LONG_PRESS_MS}
       onPressIn={() => setPressed(true)}
       onPressOut={() => setPressed(false)}
@@ -323,7 +341,14 @@ export const ConversationCard = React.memo(function ConversationCard({
             and the circle's corner inset means the same thing on every Yoga. */}
         <View style={{ padding: theme.space[4], gap: theme.space[2] }}>
           <InkEyebrow>{card.when}</InkEyebrow>
-          <Text style={text.title}>{title}</Text>
+          {card.goose ? (
+            <View style={[local.named, { gap: theme.space[2] }]}>
+              <GooseMark />
+              <Text style={[text.title, local.shrink]}>{title}</Text>
+            </View>
+          ) : (
+            <Text style={text.title}>{title}</Text>
+          )}
           {card.preview && card.picture ? (
             <Text style={text.preview} numberOfLines={PICTURED_PREVIEW_LINES}>
               {card.preview}
@@ -345,7 +370,7 @@ export const ConversationCard = React.memo(function ConversationCard({
             </Text>
           ) : null}
         </View>
-        {selecting ? (
+        {choosable ? (
           <SelectMark
             selected={selected}
             style={[local.corner, { top: theme.space[3], right: theme.space[3] }]}
@@ -429,4 +454,6 @@ const local = StyleSheet.create({
   corner: { position: 'absolute' },
   ghost: { opacity: 0.7 },
   answering: { flexDirection: 'row', alignItems: 'center' },
+  named: { flexDirection: 'row', alignItems: 'center' },
+  shrink: { flexShrink: 1 },
 });

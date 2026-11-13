@@ -179,8 +179,13 @@ export interface ChatTurn {
   model_role: string;
 }
 
+/** Where a conversation was begun. The Goose thread, `goose`, is where the Pond posts what it did by itself. */
+export type SessionSurface = 'phone' | 'desktop' | 'cli' | 'pond' | 'room' | 'schedule' | 'goose';
+
 export interface SessionSummary {
   id: string;
+  /** Absent on a conversation begun before the Pond recorded it, which `?surface=unknown` matches. */
+  surface?: SessionSurface | null;
   title?: string;
   /** How the conversation opened, for a history card. Absent on older servers. */
   preview?: string;

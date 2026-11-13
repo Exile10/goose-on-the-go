@@ -6,10 +6,15 @@
  * the "when" ladder, and search over the title and the preview. A conversation
  * should not read as long on the desktop and short on the phone.
  *
- * `GET /api/v1/sessions` answers the whole household at once, newest first,
- * with no paging and no search. So the list is held here and narrowed on the
- * device: the Pond cannot search it, and a round trip per keystroke would be
- * slower than the filter it replaced.
+ * `GET /api/v1/sessions` answers newest first, with no paging and no search.
+ * So the list is held here and narrowed on the device: the Pond cannot search
+ * it, and a round trip per keystroke would be slower than the filter it
+ * replaced.
+ *
+ * The wall is cut by where a conversation was begun (`?surface=`): on this
+ * phone, in the room, on another screen. This phone's tab is the default, and
+ * holds the Goose thread first, where the Pond posts what it did by itself.
+ * What the schedules reported is read out of that thread, one card a report.
  *
  * Two fields arrive as JSON `null` rather than absent — `title` and `preview` —
  * whatever `services/types.ts` says, so every read of them tolerates both.
@@ -33,7 +38,8 @@ import { showSnackbar } from '@/services/snackbar';
 import { Storage } from '@/services/storage';
 import { matchesQuery } from '@/utils/search';
 import { describeApiError, logFailure } from '@/view-models/describe-error';
-import type { SessionSummary } from '@/services/types';
+import type { SessionMessage, SessionSummary } from '@/services/types';
+import { readNote } from '@/models/message-note';
 import { readReportImage } from '@/models/web-watches';
 
 /** How much conversation a card has to show, which is how tall it gets. */
@@ -50,6 +56,65 @@ export const WEIGHT_SPAN: Record<CardWeight, number> = { tile: 3, card: 4, colum
 
 /** Which conversations the wall shows. */
 export type HistoryFilter = 'all' | 'chats' | 'routines';
+
+/** Where the conversations shown were begun. `scheduled` is what the schedules reported, read from the Goose thread. */
+export type HistoryTab = 'phone' | 'room' | 'scheduled' | 'other';
+
+export const HISTORY_TABS: readonly HistoryTab[] = ['phone', 'room', 'scheduled', 'other'];
+
+/** What each tab asks the Pond for. `unknown` is a conversation begun before the Pond recorded where. */
+export const TAB_SURFACES: Record<HistoryTab, readonly string[]> = {
+  phone: ['phone', 'goose'],
+  room: ['room'],
+  scheduled: ['goose'],
+  other: ['desktop', 'cli', 'pond', 'unknown'],
+};
+
+/** How much of the Goose thread is read for what the schedules reported. */
+export const SCHEDULED_LIMIT = 200;
+
+/**
+ * Whether the Pond answered a narrowed read with everything: one older than `?surface=` ignores
+ * it and names no surface on any row, which a narrowed read of a newer Pond never returns.
+ */
+export function ignoresSurfaces(rows: readonly Pick<SessionSummary, 'surface'>[], tab: HistoryTab): boolean {
+  return tab !== 'other' && rows.some((row) => !row.surface);
+}
+
+/**
+ * The rows a tab shows, the Goose thread first. On a Pond that names no surfaces the whole wall
+ * stays under This phone, as it was, and the other tabs are empty.
+ */
+export function rowsForTab<T extends Pick<SessionSummary, 'surface'>>(rows: readonly T[], tab: HistoryTab, unsurfaced: boolean): T[] {
+  if (unsurfaced) return tab === 'phone' ? [...rows] : [];
+  const wanted = TAB_SURFACES[tab];
+  const kept = rows.filter((row) => (row.surface ? wanted.includes(row.surface) : wanted.includes('unknown')));
+  return [...kept.filter((row) => row.surface === 'goose'), ...kept.filter((row) => row.surface !== 'goose')];
+}
+
+/** One report a schedule left in the Goose thread. */
+export interface ScheduledNote {
+  /** The message's id. */
+  id: string;
+  /** The schedule's name. */
+  label: string;
+  text: string;
+  at: string;
+  /** The Goose thread it was posted in, and what that thread is called. */
+  sessionId: string;
+  sessionTitle: string | null;
+}
+
+/** What the schedules reported in a Goose thread, newest first. */
+export function scheduledNotes(messages: readonly SessionMessage[], thread: Pick<SessionSummary, 'id' | 'title'>): ScheduledNote[] {
+  return messages
+    .flatMap((m) => {
+      const from = readNote(m.note)?.from;
+      if (from?.kind !== 'schedule') return [];
+      return [{ id: m.id, label: from.label, text: m.content, at: m.created_at, sessionId: thread.id, sessionTitle: thread.title?.trim() || null }];
+    })
+    .sort((a, b) => (Date.parse(b.at) || 0) - (Date.parse(a.at) || 0));
+}
 
 /** How they are laid out: the wall of cards, or the quieter list. */
 export type HistoryView = 'grid' | 'list';
@@ -82,6 +147,14 @@ export interface HistoryCard {
   answering: boolean;
   /** The first picture sent in it, else the Pond's picture for the first page it cited, or null. */
   picture: CardPicture | null;
+  /** The Goose thread, where the Pond posts what it did by itself: first on the wall, and kept. */
+  goose: boolean;
+  /** The conversation a touch opens: its own, or the Goose thread for something a schedule reported there. */
+  opens: string;
+  /** What the opened conversation is called, where that is not this card's title. */
+  opensTitle?: string | null;
+  /** Whether the wall may delete it. The Goose thread and what is read out of it are not the wall's to delete. */
+  deletable: boolean;
 }
 
 /** A conversation card's picture, and what a screen reader hears for it (null: a sent picture). */
@@ -395,6 +468,30 @@ export function toCard(
     routine: isRoutine(session.id),
     answering: false,
     picture: readCardPicture(session.picture),
+    goose: session.surface === 'goose',
+    opens: session.id,
+    deletable: session.surface !== 'goose',
+  };
+}
+
+/** A schedule's report as a card: named for the schedule, opening the Goose thread it is in. */
+export function noteCard(note: ScheduledNote, now: Date, locale: string | undefined, yesterday: string): HistoryCard {
+  const preview = note.text.trim() || null;
+  return {
+    id: `note:${note.id}`,
+    title: note.label || null,
+    preview,
+    when: relativeWhen(note.at, now, locale, yesterday),
+    updatedAt: Date.parse(note.at),
+    messageCount: 0,
+    weight: cardWeight({ message_count: 0, preview: preview ?? undefined }),
+    routine: true,
+    answering: false,
+    picture: null,
+    goose: false,
+    opens: note.sessionId,
+    opensTitle: note.sessionTitle,
+    deletable: false,
   };
 }
 
@@ -414,6 +511,8 @@ export interface UseChatHistory {
     total: number;
     query: string;
     filter: HistoryFilter;
+    /** Where the conversations shown were begun. This phone, every time the wall is opened. */
+    tab: HistoryTab;
     /** The layout last chosen on this device; the wall until one has been. */
     view: HistoryView;
   };
@@ -434,6 +533,8 @@ export interface UseChatHistory {
     refresh: () => Promise<void>;
     setQuery: (query: string) => void;
     setFilter: (filter: HistoryFilter) => void;
+    /** Shows what was begun somewhere else, reading it from the Pond when it has not been read yet. */
+    setTab: (tab: HistoryTab) => void;
     /**
      * Kept on the device rather than the Pond: it is how this phone likes to
      * read, not a fact about the conversations.
@@ -450,9 +551,17 @@ export interface UseChatHistory {
   };
 }
 
+/** What one tab holds once it has been read. */
+interface TabRows {
+  sessions: SessionSummary[];
+  notes: ScheduledNote[];
+}
+
 export function useChatHistory(): UseChatHistory {
   const { t, i18n } = useTranslation();
-  const [sessions, setSessions] = useState<SessionSummary[] | null>(null);
+  const [tab, setTabState] = useState<HistoryTab>('phone');
+  // Each tab as it was last read, so going back to one shows it at once while it is read again.
+  const [rows, setRows] = useState<Partial<Record<HistoryTab, TabRows>>>({});
   // Two, because they end differently: a load failure ends when a load works,
   // and a refused delete ends when the reader moves on — not when the re-read
   // that follows it succeeds a moment later. A failed re-read after the wall
@@ -498,39 +607,61 @@ export function useChatHistory(): UseChatHistory {
 
   // Mounting and focusing both ask for the list, on the same frame. One
   // request answers both: the Pond runs several queries per session to build
-  // this, so a second copy of it is not free.
-  const inFlight = useRef<Promise<void> | null>(null);
-  // Whether a list has ever arrived; see `refresh`.
-  const arrived = useRef(false);
+  // this, so a second copy of it is not free. A read of another tab is not joined.
+  const inFlight = useRef<{ tab: HistoryTab; run: Promise<void> } | null>(null);
+  // The tabs a read has ever arrived for; see `refresh`.
+  const arrived = useRef(new Set<HistoryTab>());
+  const tabRef = useRef(tab);
+  // The Pond named no surface on a narrowed read, so it predates them: see `rowsForTab`.
+  const unsurfaced = useRef(false);
 
   // Sets nothing until the answer lands, so the effect below can call it
   // without rendering twice. The spinner a pull wants is the screen's `usePullToRefresh`.
   const load = useCallback(() => {
     if (!hydrated) return Promise.resolve();
-    if (inFlight.current) return inFlight.current;
-    const run = (async () => {
+    const reading = tabRef.current;
+    if (inFlight.current?.tab === reading) return inFlight.current.run;
+    const mine = { tab: reading, run: Promise.resolve() };
+    inFlight.current = mine;
+    mine.run = (async () => {
       try {
-        const next = await api.listSessions();
-        setSessions(next);
-        arrived.current = true;
-        setLoadFailed(false);
-        setLoadReason(null);
+        const answered = await api.listSessions(TAB_SURFACES[reading]);
+        if (reading !== 'other') unsurfaced.current = ignoresSurfaces(answered, reading);
+        const sessions = rowsForTab(answered, reading, unsurfaced.current);
+        // What the schedules reported is in the Goose thread's messages, not in the list of conversations.
+        const notes =
+          reading === 'scheduled'
+            ? (
+                await Promise.all(
+                  sessions.map(async (thread) => scheduledNotes(await api.listSessionMessages(thread.id, SCHEDULED_LIMIT), thread)),
+                )
+              )
+                .flat()
+                .sort((a, b) => (Date.parse(b.at) || 0) - (Date.parse(a.at) || 0))
+            : [];
+        setRows((all) => ({ ...all, [reading]: { sessions, notes } }));
+        arrived.current.add(reading);
+        if (tabRef.current === reading) {
+          setLoadFailed(false);
+          setLoadReason(null);
+        }
       } catch (e) {
         logFailure('history', 'read failed', e);
-        setLoadFailed(true);
-        setLoadReason(describeApiError(e));
+        if (tabRef.current === reading) {
+          setLoadFailed(true);
+          setLoadReason(describeApiError(e));
+        }
       } finally {
-        inFlight.current = null;
+        if (inFlight.current === mine) inFlight.current = null;
       }
     })();
-    inFlight.current = run;
-    return run;
+    return mine.run;
   }, [hydrated]);
 
   // A read that must start after now. Joining one already in flight could
   // hand back a list the Pond built before the change it is meant to show.
   const resync = useCallback(
-    () => (inFlight.current ?? Promise.resolve()).then(load),
+    () => (inFlight.current?.run ?? Promise.resolve()).then(load),
     [load],
   );
 
@@ -538,10 +669,22 @@ export function useChatHistory(): UseChatHistory {
   const refresh = useCallback(() => {
     // Asking again after a wall that never arrived goes back to the loading ghosts, so a pull
     // visibly does something rather than leaving the failure up until the answer lands.
-    // A ref, not `sessions`: the screen re-runs its focus effect whenever this changes identity.
-    if (!arrived.current) setLoadFailed(false);
+    // A ref, not the rows: the screen re-runs its focus effect whenever this changes identity.
+    if (!arrived.current.has(tabRef.current)) setLoadFailed(false);
     return load();
   }, [load]);
+
+  const setTab = useCallback(
+    (next: HistoryTab) => {
+      if (tabRef.current === next) return;
+      tabRef.current = next;
+      setTabState(next);
+      setLoadFailed(false);
+      setLoadReason(null);
+      void load();
+    },
+    [load],
+  );
 
   useEffect(() => {
     if (!hydrated) return;
@@ -559,9 +702,18 @@ export function useChatHistory(): UseChatHistory {
     if (ended && focused) void load();
   }, [answering, focused, load]);
 
+  /** Take conversations off every tab that holds them, ahead of the Pond's answer. */
+  const drop = useCallback((doomed: ReadonlySet<string>) => {
+    setRows((all) =>
+      Object.fromEntries(
+        Object.entries(all).map(([key, held]) => [key, { ...held, sessions: held.sessions.filter((s) => !doomed.has(s.id)) }]),
+      ),
+    );
+  }, []);
+
   const remove = useCallback(
     async (id: string) => {
-      setSessions((all) => all?.filter((s) => s.id !== id) ?? all);
+      drop(new Set([id]));
       try {
         await api.deleteSession(id);
         // The cards, thread and draft this phone kept for it go with it.
@@ -581,14 +733,13 @@ export function useChatHistory(): UseChatHistory {
         void resync();
       }
     },
-    [resync, t],
+    [drop, resync, t],
   );
 
   const removeMany = useCallback(
     async (ids: string[]) => {
       if (ids.length === 0) return { deleted: [], failed: [] };
-      const doomed = new Set(ids);
-      setSessions((all) => all?.filter((s) => !doomed.has(s.id)) ?? all);
+      drop(new Set(ids));
       const { fulfilled, rejected } = await settleEach(
         ids,
         (id) => api.deleteSession(id),
@@ -610,11 +761,13 @@ export function useChatHistory(): UseChatHistory {
       void resync();
       return { deleted: fulfilled, failed: rejected };
     },
-    [resync, t],
+    [drop, resync, t],
   );
   useEffect(() => {
     retry.current = { remove, removeMany };
   }, [remove, removeMany]);
+
+  const held = rows[tab] ?? null;
 
   // Shaped once per answer rather than per keystroke: the "when" labels and the
   // weights do not change while someone types. The moment they were written at
@@ -624,11 +777,14 @@ export function useChatHistory(): UseChatHistory {
     const yesterday = t('chat.history.yesterday');
     return {
       now: at,
-      all: (sessions ?? [])
-        .filter((s) => !isEmpty(s))
-        .map((s) => toCard(s, at, i18n.language, yesterday)),
+      all:
+        tab === 'scheduled'
+          ? (held?.notes ?? []).map((n) => noteCard(n, at, i18n.language, yesterday))
+          : (held?.sessions ?? [])
+              .filter((s) => !isEmpty(s))
+              .map((s) => toCard(s, at, i18n.language, yesterday)),
     };
-  }, [sessions, t, i18n.language]);
+  }, [held, tab, t, i18n.language]);
 
   const cards = useMemo(
     () =>
@@ -638,23 +794,29 @@ export function useChatHistory(): UseChatHistory {
     [all, filter, query, answering],
   );
 
-  const sections = useMemo(
-    () =>
-      sectionByRecency(cards, now, i18n.language, {
+  const sections = useMemo(() => {
+    const dated = sectionByRecency(
+      cards.filter((c) => !c.goose),
+      now,
+      i18n.language,
+      {
         today: t('chat.history.sectionToday'),
         yesterday: t('chat.history.sectionYesterday'),
         week: t('chat.history.sectionWeek'),
         month: t('chat.history.sectionMonth'),
         undated: t('chat.history.sectionUndated'),
-      }),
-    [cards, now, i18n.language, t],
-  );
+      },
+    );
+    // The Goose thread keeps its place at the head of the list, whenever it last moved.
+    const pinned = cards.filter((c) => c.goose);
+    return pinned.length ? [{ key: 'pinned', title: t('chat.history.sectionPinned'), data: pinned }, ...dated] : dated;
+  }, [cards, now, i18n.language, t]);
 
   return {
-    data: { cards, sections, total: all.length, query, filter, view: view ?? 'grid' },
-    loading: (sessions === null && !loadFailed) || view === null,
-    failed: loadFailed && sessions === null,
-    error: sessions === null ? loadReason : null,
-    actions: { refresh, setQuery, setFilter, setView, remove, removeMany },
+    data: { cards, sections, total: all.length, query, filter, tab, view: view ?? 'grid' },
+    loading: (held === null && !loadFailed) || view === null,
+    failed: loadFailed && held === null,
+    error: held === null ? loadReason : null,
+    actions: { refresh, setQuery, setFilter, setTab, setView, remove, removeMany },
   };
 }
