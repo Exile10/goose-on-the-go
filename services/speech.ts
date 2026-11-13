@@ -167,10 +167,19 @@ export function envelope(wav: Uint8Array, stepMs = 50): { stepMs: number; levels
   return { stepMs, levels: [] };
 }
 
+/** How long a 16-bit PCM WAV plays, in seconds; 0 for anything else. */
+export function wavSeconds(wav: Uint8Array): number {
+  const { stepMs, levels } = envelope(wav, 10);
+  return (levels.length * stepMs) / 1000;
+}
+
+const LIST_ITEM = String.raw`[ \t]*(?:[-*+•]|\d{1,3}[.)])\s`;
+const UNMARKED = String.raw`.*[^.,;:!?…—\s]`;
+
 /**
  * What a speaker should say of a reply: no markdown, no symbols read aloud.
  *
- * pond-desktop cleans each sentence the same way before `/tts`. A voice reading
+ * pond-desktop cleans its text the same way before `/tts`. A voice reading
  * "asterisk asterisk" or a URL character by character is worse than one that
  * skips them.
  */
@@ -181,6 +190,9 @@ export function speakable(text: string): string {
     .replace(/!\[[^\]]*\]\([^)]*\)/g, ' ')
     .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
     .replace(/https?:\/\/\S+/g, ' ')
+    // A list line with no mark of its own would run into the next one unpaused.
+    .replace(new RegExp(`^(${LIST_ITEM}${UNMARKED})[ \\t]*(?=\\n[ \\t]*\\S)`, 'gm'), '$1,')
+    .replace(new RegExp(`^(${UNMARKED})[ \\t]*(?=\\n${LIST_ITEM})`, 'gm'), '$1,')
     .replace(/^[#>\s]*[-*+]\s+/gm, '')
     .replace(/^#{1,6}\s+/gm, '')
     .replace(/[*_~#>|]/g, '')
@@ -188,131 +200,111 @@ export function speakable(text: string): string {
     .trim();
 }
 
+/** Text the Pond's Kokoro says in one pass, and whether more of the same reply follows it. */
+export interface SpeechUnit {
+  text: string;
+  /** Nothing follows: the Pond ends the audio at rest instead of in the gap before more. */
+  last: boolean;
+}
+
 /**
- * The Pond's Kokoro renders each `/tts` request whole, at about real time, so
- * the first sound waits on the length of the first thing sent. These are the
- * limits of the Pond's own voice loop (`split_speech_units` in pond-voice), and
- * a cap on the first unit for when no clause mark comes.
+ * The most the Pond's Kokoro says well in one pass, in its estimated tokens (about 1.1 a
+ * character): `UNIT_TOKEN_BUDGET` in pond-voice. Past it Kokoro speaks faster.
  */
-const MIN_CLAUSE_WORDS = 3;
-const FIRST_UNIT_MAX_WORDS = 6;
-const MAX_UNIT_CHARS = 250;
-
-const TERMINALS = '.!?…';
-const CLAUSE_MARKS = ',;:—';
+const UNIT_TOKEN_BUDGET = 200;
+const UNIT_CHARS = Math.floor((UNIT_TOKEN_BUDGET * 10) / 11);
 const CLOSERS = `"')]”’`;
-
-/** pond-voice's list: a full stop after one of these, or after a single letter, ends no sentence. */
-const ABBREVIATIONS = new Set([
-  'dr', 'mr', 'mrs', 'ms', 'prof', 'st', 'jr', 'sr', 'vs', 'etc', 'approx', 'dept', 'govt', 'inc',
-  'ltd', 'corp', 'min', 'max', 'temp', 'est', 'jan', 'feb', 'mar', 'apr', 'jun', 'jul', 'aug',
-  'sep', 'sept', 'oct', 'nov', 'dec', 'e.g', 'i.e', 'u.s', 'a.m', 'p.m',
-]);
 
 /** Something a voice would say, as opposed to punctuation or markup alone. */
 const SAYABLE = /[^\s.,;:!?…—–'"“”‘’()[\]{}*_~#>|`-]/;
 
-function isAbbreviation(word: string): boolean {
-  const clean = word.replace(/^[^A-Za-z0-9]+/, '').toLowerCase();
-  return /^[a-z]$/.test(clean) || ABBREVIATIONS.has(clean);
-}
+const fitsOnePass = (text: string) => Math.ceil((Array.from(text).length * 11) / 10) <= UNIT_TOKEN_BUDGET;
 
 /**
- * Whether the run of terminals from `at` to `end`, after `word`, closes a
- * sentence. It need not wait for the next token, except where that token could
- * still make it a decimal ("25." then "3") or part of a link.
+ * Where a text too long for one unit ends its first: the last sentence or line end that fits,
+ * failing that the last space. Gives the unit's end and where the next one starts. pond-voice's
+ * `fitting_cut`.
  */
-function endsSentence(text: string, word: string, at: number, end: number): boolean {
-  const streaming = end >= text.length;
-  if (!streaming && !/\s/.test(text[end])) return false;
-  if (text[at] === '.' && end - at === 1) {
-    if (isAbbreviation(word)) return false;
-    if (streaming && /\d$/.test(word)) return false;
+function fittingCut(text: string): [number, number] {
+  let limit = text.length;
+  let count = 0;
+  for (let i = 0; i < text.length; count += 1) {
+    if (count === UNIT_CHARS) {
+      limit = i;
+      break;
+    }
+    i += (text.codePointAt(i) ?? 0) > 0xffff ? 2 : 1;
   }
-  return !(streaming && /:\/\/|^www\./i.test(word));
+  const pastSpace = (from: number) => from + (/^\s*/.exec(text.slice(from))?.[0].length ?? 0);
+  let best: [number, number] | null = null;
+  let lastSpace: [number, number] | null = null;
+  for (let i = 0; i < limit; i += 1) {
+    const c = text[i];
+    if (c === '\n') {
+      if (text.slice(0, i).trim()) best = [i, pastSpace(i)];
+      // A full stop after a digit is a decimal or a list number.
+    } else if ('.?!…'.includes(c) && !(c === '.' && /[0-9]/.test(text[i - 1] ?? ''))) {
+      let end = i + 1;
+      while (end < text.length && '.?!'.includes(text[end])) end += 1;
+      while (end < text.length && CLOSERS.includes(text[end])) end += 1;
+      if (end <= limit && /\s/.test(text[end] ?? '')) best = [end, pastSpace(end)];
+    } else if (/\s/.test(c) && i > 0) {
+      lastSpace = [i, pastSpace(i)];
+    }
+  }
+  return best ?? lastSpace ?? [limit, limit];
 }
 
 /**
- * Split off the parts of a streaming reply that are ready to be spoken.
+ * Take what is ready to be spoken of a streaming reply.
  *
- * Returns them and how far into `text` they reach, so the caller can hand each
- * to `/tts` while the reply is still being written. The first ends at a clause
- * mark once it has three words, or after six words when none comes; later ones
- * at a clause or a sentence. `final` flushes whatever is left when the turn is
- * done.
+ * The Pond's Kokoro shapes the pauses of whatever it is given in one pass, so a
+ * reply is kept whole: nothing is handed over while it is still being written
+ * unless it has grown past one pass, and then only the longest start of it
+ * that fits. `final` hands over whatever is left, the last unit closing the
+ * reply. Returns the units and how far into `text` they reach.
  */
 export function takeSpeechUnits(
   text: string,
   from: number,
   final = false,
-): { units: string[]; next: number } {
-  const units: string[] = [];
+): { units: SpeechUnit[]; next: number } {
+  const units: SpeechUnit[] = [];
   let start = from;
-  let first = !SAYABLE.test(speakable(text.slice(0, from)));
-  let words = 0;
-  let wordAt = -1;
-  // Inside a link or inline code; a clause cut there leaves speakable() half of it.
-  let nesting = 0;
-  let inCode = false;
-  let fenced = false;
-
-  const cut = (end: number) => {
+  const take = (end: number) => {
     const unit = speakable(text.slice(start, end));
-    if (SAYABLE.test(unit)) {
-      units.push(unit);
-      first = false;
-    }
-    start = end;
-    words = 0;
-    wordAt = -1;
-    nesting = 0;
-    inCode = false;
+    if (SAYABLE.test(unit)) units.push({ text: unit, last: false });
   };
-  // A word counts once something follows it: "sun" may yet become "sunny".
-  const wordsBefore = (i: number) =>
-    words + (wordAt >= 0 && SAYABLE.test(text.slice(wordAt, i)) ? 1 : 0);
-
-  for (let i = start; i < text.length; i += 1) {
-    const c = text[i];
-    // speakable() can only drop a code block it sees whole.
-    if (text.startsWith('```', i)) {
-      fenced = !fenced;
-      i += 2;
-      continue;
-    }
-    if (fenced) continue;
-
-    if (/\s/.test(c)) {
-      words = wordsBefore(i);
-      wordAt = -1;
-      if (c === '\n') cut(i + 1);
-      else if (
-        (first && words >= FIRST_UNIT_MAX_WORDS && nesting === 0 && !inCode) ||
-        i - start >= MAX_UNIT_CHARS
-      ) {
-        cut(i);
-      }
-      continue;
-    }
-    if (wordAt < 0) wordAt = i;
-
-    if (c === '[' || c === '(') nesting += 1;
-    else if ((c === ']' || c === ')') && nesting > 0) nesting -= 1;
-    else if (c === '`') inCode = !inCode;
-    else if (CLAUSE_MARKS.includes(c)) {
-      // Only before a space, so "1,000" and "7:30" are not clauses.
-      const spaced = /\s/.test(text[i + 1] ?? '');
-      if (spaced && wordsBefore(i) >= MIN_CLAUSE_WORDS && nesting === 0 && !inCode) cut(i + 1);
-    } else if (TERMINALS.includes(c)) {
-      let end = i;
-      while (end < text.length && TERMINALS.includes(text[end])) end += 1;
-      while (end < text.length && CLOSERS.includes(text[end])) end += 1;
-      if (endsSentence(text, text.slice(wordAt, i), i, end)) {
-        cut(end);
-        i = end - 1;
-      }
-    }
+  for (;;) {
+    start += /^\s*/.exec(text.slice(start))?.[0].length ?? 0;
+    const rest = text.slice(start);
+    if (fitsOnePass(rest)) break;
+    const [end, resume] = fittingCut(rest);
+    take(start + end);
+    start += resume;
   }
-  if (final) cut(text.length);
+  if (final) {
+    take(text.length);
+    start = text.length;
+    if (units.length > 0) units[units.length - 1].last = true;
+  }
   return { units, next: start };
+}
+
+/**
+ * How long to hold `readySeconds` of audio so each unit still owed, given as the
+ * seconds its synthesis and its speech take, is ready when the audio before it
+ * ends. A Pond whose Kokoro is slower than its own speech would otherwise stop
+ * between the units of a long reply. The Pond's `hold_secs`.
+ */
+export function holdSeconds(readySeconds: number, owed: readonly (readonly [number, number])[]): number {
+  let work = 0;
+  let audio = readySeconds;
+  let hold = 0;
+  for (const [synth, speech] of owed) {
+    work += synth;
+    hold = Math.max(hold, work - audio);
+    audio += speech;
+  }
+  return hold;
 }
