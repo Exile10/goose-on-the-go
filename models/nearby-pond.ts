@@ -65,18 +65,26 @@ export interface NetworkPondLike {
   hostname?: string;
 }
 
+/** The card ids of Ponds this network already lists as set up. */
+function setUpOnNetwork(network: readonly NetworkPondLike[]): Set<string> {
+  return new Set(network.flatMap((p) => (!p.unclaimed && p.setupId ? [p.setupId.toLowerCase()] : [])));
+}
+
 /**
  * One row per card id. A Pond on the network as well is one Pond, and the network path is preferred
- * for it later: HTTPS needs no Wi-Fi step.
+ * for it later: HTTPS needs no Wi-Fi step. A set-up Pond whose pairing lock holds advertises over
+ * Bluetooth too; when this network already lists it as set up it is joined from that list, and is
+ * no row here, so it is never offered as a new Pond.
  */
 export function mergeNearby(
   ble: ReadonlyMap<string, BleSightingLike & { seenAt: number }>,
   network: readonly NetworkPondLike[],
 ): NearbyPond[] {
   const byId = new Map<string, NearbyPond>();
+  const joinable = setUpOnNetwork(network);
   for (const s of ble.values()) {
     const id = cardIdOf(s);
-    if (!id) continue;
+    if (!id || joinable.has(id)) continue;
     const held = byId.get(id);
     // Two advertisers with one card id: keep the louder, which is the nearer.
     if (held && (held.rssi ?? -999) >= s.rssi) continue;

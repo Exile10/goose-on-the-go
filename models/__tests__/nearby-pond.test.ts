@@ -57,6 +57,14 @@ describe('nearby Ponds', () => {
     expect(rows).toEqual([]);
   });
 
+  // A set-up Pond whose pairing lock holds advertises over Bluetooth while it is on the network.
+  it('lists no row for a Pond heard over Bluetooth that this network already lists as set up', () => {
+    const rows = mergeNearby(new Map([sighting('a', 'beef', -50), sighting('b', '7f3a', -60)]), [
+      { url: 'https://192.168.1.9:4443', pin: 'sha256/x', setupId: 'BEEF', unclaimed: false, hostname: 'nano' },
+    ]);
+    expect(rows.map((r) => r.id)).toEqual(['7f3a']);
+  });
+
   it('keeps the louder of two advertisers with one card id', () => {
     const rows = mergeNearby(new Map([sighting('far', 'c1cd', -90), sighting('near', 'c1cd', -40)]), []);
     expect(rows.map((r) => r.peripheral)).toEqual(['near']);
