@@ -59,6 +59,7 @@ import type { SendOptions } from '@/view-models/use-chat';
 import { RESEARCH_ANSWERS, researchAnswerWords, researchItem, useResearchMode } from '@/view-models/use-deep-research';
 import { useVoiceNote, type VoiceNote } from '@/view-models/use-voice-note';
 import { Spacing } from '@/constants/spacing';
+import { REPLY_CARD, pictureAttachment, replyHead, replyQuote, withReply, type ReplyTarget } from '@/services/reply';
 
 /** The controls' diameter, and the field's height on one line: the touch floor. */
 const CONTROL = 44;
@@ -73,6 +74,12 @@ const SEND = { width: 40, height: 28 };
 const PLATE = 4;
 /** Send's gap from the field's corner, which centres it on a one-line field. */
 const SEND_INSET = (CONTROL - SEND.height - PLATE) / 2;
+
+/** The strip's words for what the next message answers. */
+function replyingKey(target: ReplyTarget) {
+  if (target.kind === 'picture') return target.from === 'goose' ? 'chat.replying.goosePicture' : 'chat.replying.yourPicture';
+  return target.from === 'goose' ? 'chat.replying.goose' : 'chat.replying.you';
+}
 
 /** Past this many the Pond's turn gets heavy and the strip stops fitting a thumb. */
 export const MAX_ATTACHMENTS = 4;
@@ -105,6 +112,10 @@ export interface ChatDockProps {
   initialDraft?: string;
   /** Each edit to the draft, sending included. */
   onDraftChange?: (text: string) => void;
+  /** What the next message answers, chosen in the thread; null when it answers nothing in particular. */
+  replyTo?: ReplyTarget | null;
+  /** The reply was sent or set aside. */
+  onClearReply?: () => void;
 }
 
 export function ChatDock({
@@ -119,6 +130,8 @@ export function ChatDock({
   conversation = null,
   initialDraft = '',
   onDraftChange,
+  replyTo = null,
+  onClearReply,
 }: ChatDockProps) {
   const theme = useInkTheme();
   const field = inkText(theme, { size: 'md' });
@@ -135,7 +148,7 @@ export function ChatDock({
   const [menu, setMenu] = useState(false);
   // The keyboard's height, 0 while it is down.
   const [keyboard, setKeyboard] = useState(0);
-  const { height: screen } = useWindowDimensions();
+  const { width, height: screen } = useWindowDimensions();
   // A long draft stands as tall as it needs, as in a messages app, while the thread keeps a strip above
   // it. Edge-to-edge never shrinks the window for the keyboard, so its height is taken off here.
   const tallest = Math.max(132, Math.round((screen - keyboard) * 0.55));
@@ -178,6 +191,27 @@ export function ChatDock({
     if (research !== 'available') clearResearch();
   }, [research, clearResearch]);
 
+  // A reply to a picture carries the picture, so the model sees what is being asked about; it
+  // leaves with the reply if the reply is set aside.
+  const replyPicture = useRef<string | null>(null);
+  useEffect(() => {
+    if (!replyTo) return;
+    input.current?.focus();
+    if (replyTo.kind !== 'picture') return;
+    let live = true;
+    void pictureAttachment(replyTo.picture).then((picture) => {
+      if (!live || !picture) return;
+      replyPicture.current = picture.id;
+      setAttachments((current) => [...current, picture].slice(0, MAX_ATTACHMENTS));
+    });
+    return () => {
+      live = false;
+      const id = replyPicture.current;
+      replyPicture.current = null;
+      if (id) setAttachments((current) => current.filter((a) => a.id !== id));
+    };
+  }, [replyTo]);
+
   const hasContent = draft.trim().length > 0 || attachments.length > 0;
   const voiceNote = useVoiceNote((note) => onVoiceNote?.(note));
   const recording = voiceNote.state !== 'idle';
@@ -188,10 +222,14 @@ export function ChatDock({
     if (!hasContent) return;
     void tap();
     const asResearch = mode.take();
-    onSend(draft, attachments, asResearch ? { research: true, answer: mode.answer } : undefined);
+    const text = replyTo ? withReply(replyHead(replyTo, t), replyQuote(replyTo), draft) : draft;
+    onSend(text, attachments, asResearch ? { research: true, answer: mode.answer } : undefined);
     setDraft('');
+    // Sent: the picture went with it, so clearing the reply must not take it out of anything.
+    replyPicture.current = null;
     setAttachments([]);
-  }, [attachments, draft, hasContent, mode, onSend, setDraft]);
+    onClearReply?.();
+  }, [attachments, draft, hasContent, mode, onClearReply, onSend, replyTo, setDraft, t]);
 
   const startResearch = useCallback(() => {
     if (!mode.start(attachments.length)) return;
@@ -221,6 +259,7 @@ export function ChatDock({
     borderWidth: theme.edge.hairlineWidth,
   };
   const hint = inkText(theme, { size: 'sm', color: theme.color.textSecondary });
+  const replyWho = inkText(theme, { size: 'xs', weight: theme.weight.semibold, color: theme.color.accentLine });
   const placeholder = mode.on ? t('chat.research.placeholder') : busy ? t('chat.queuePlaceholder') : t('chat.placeholder');
   // Clear of the keyboard by a full step, not half of one. Vendor keyboards
   // (Samsung's among them) draw a toolbar row of their own inside the height
@@ -250,6 +289,43 @@ export function ChatDock({
             }}
           />
           <Text style={hint.style}>{t(researchAnswerWords(mode.answer).hintKey)}</Text>
+        </View>
+      ) : null}
+
+      {replyTo ? (
+        <View
+          style={[
+            styles.replying,
+            material,
+            {
+              width: Math.round(width * REPLY_CARD),
+              borderLeftColor: theme.color.accentLine,
+              borderLeftWidth: 3,
+              borderRadius: theme.radius.md,
+            },
+          ]}
+        >
+          <View style={styles.replyWords}>
+            <Text style={replyWho.style} numberOfLines={1}>
+              {t(replyingKey(replyTo))}
+            </Text>
+            {replyQuote(replyTo) ? (
+              <Text style={hint.style} numberOfLines={2}>
+                {replyQuote(replyTo)}
+              </Text>
+            ) : null}
+          </View>
+          <Pressable
+            onPress={() => {
+              void selectionTick();
+              onClearReply?.();
+            }}
+            accessibilityRole="button"
+            accessibilityLabel={t('chat.replying.cancel')}
+            hitSlop={12}
+          >
+            <GIcon name="x" size={16} color={theme.color.textSecondary} />
+          </Pressable>
         </View>
       ) : null}
 
@@ -469,6 +545,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   strip: { flexDirection: 'row', gap: Spacing.sm, paddingLeft: CONTROL + Spacing.sm },
+  replying: {
+    alignSelf: 'flex-end',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.md,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+  },
+  replyWords: { flex: 1, gap: 2 },
   research: { alignItems: 'flex-start', gap: Spacing.sm, paddingLeft: CONTROL + Spacing.sm },
   thumb: { width: 60, height: 60, overflow: 'hidden' },
   thumbImage: { width: '100%', height: '100%' },

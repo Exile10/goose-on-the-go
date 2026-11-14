@@ -62,6 +62,7 @@ import { GreetingCard } from '@/components/patterns/greeting-card';
 import { JumpToLatest } from '@/components/patterns/jump-to-latest';
 import { InterviewDraft, InterviewProgress, InterviewSaved } from '@/components/patterns/interview-panels';
 import { MessageRow } from '@/components/patterns/message-row';
+import type { ReplyTarget } from '@/services/reply';
 import { VoiceDock } from '@/components/patterns/voice-dock';
 import { GIcon } from '@/components/ui/g-icon';
 import { cardFromParams, type CardRef } from '@/models/cards';
@@ -406,6 +407,15 @@ export default function ChatScreen() {
       .reverse();
   }, [messages, queued]);
 
+  // What the next message answers. It belongs to this conversation, so another one starts without it.
+  const [replyTo, setReplyTo] = useState<ReplyTarget | null>(null);
+  const [replyFor, setReplyFor] = useState(sessionId);
+  if (replyFor !== sessionId) {
+    setReplyFor(sessionId);
+    setReplyTo(null);
+  }
+  const clearReply = useCallback(() => setReplyTo(null), []);
+
   const keyExtractor = useCallback((row: Row) => row.message.id, []);
   const renderItem = useCallback(
     ({ item }: { item: Row }) => (
@@ -417,6 +427,7 @@ export default function ChatScreen() {
         queued={item.queued}
         onUnqueue={unqueue}
         onOffer={answerOffer}
+        onReply={setReplyTo}
       />
     ),
     [status, turnSeed, unqueue, answerOffer],
@@ -544,6 +555,8 @@ export default function ChatScreen() {
               bottomInset={insets.bottom}
               research={research}
               conversation={sessionId}
+              replyTo={replyTo}
+              onClearReply={clearReply}
             />
           </>
         )}

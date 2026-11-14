@@ -10,6 +10,11 @@ import { MessageRow } from '@/components/patterns/message-row';
 import type { Message } from '@/models/chat';
 
 jest.mock('expo-web-browser', () => ({ openBrowserAsync: jest.fn() }));
+// The swipe runs on gesture-handler and worklets, which jest's stand-ins cannot carry; the sheet and viewer are modals.
+jest.mock('@/components/patterns/swipe-to-reply', () => ({ SwipeToReply: ({ children }: { children: React.ReactNode }) => children }));
+jest.mock('@/components/patterns/picture-viewer', () => ({ PictureViewer: () => null }));
+jest.mock('@/components/patterns/reply-part-sheet', () => ({ ReplyPartSheet: () => null }));
+jest.mock('@/components/patterns/pond-picture', () => ({ PondPicture: (props: { path: string }) => `pond:${props.path}` }));
 jest.mock('@/components/ui/g-icon', () => ({ GIcon: () => null }));
 jest.mock('@/components/patterns/voice-note-mic', () => ({ clockWords: () => '' }));
 jest.mock('@/components/patterns/message-note', () => ({ FromLine: () => null, OfferPanel: () => null, ReceiptChips: () => null }));
@@ -86,4 +91,20 @@ it('reads in order once done, with reading aloud and copying beside the chip', a
   const read = tree.root.find((n: ReactTestInstance) => n.props.accessibilityLabel === 'Read aloud' && Boolean(n.props.onPress));
   act(() => read.props.onPress());
   expect(mockToggle).toHaveBeenCalledWith(content);
+});
+
+it("draws a reply's quote above the bubble, and a photo from the Pond through its connection", async () => {
+  const tree = await draw({
+    id: 'u',
+    role: 'user',
+    content: '> Goose said:\n> Jarida builds privacy-first software.\n\nWho funds it?',
+    images: [{ id: 'p', uri: '/api/v1/attachments/p', local: false }],
+    timestamp: 0,
+  });
+  const drawn = lines(tree);
+  expect(drawn).toContain('Goose said:');
+  expect(drawn).toContain('Jarida builds privacy-first software.');
+  expect(drawn).toContain('Who funds it?');
+  expect(drawn.some((l) => l.startsWith('>'))).toBe(false);
+  expect(JSON.stringify(tree.toJSON())).toContain('pond:/api/v1/attachments/p');
 });

@@ -313,13 +313,37 @@
       "playFile": "Play {{name}}",
       "stopFile": "Stop {{name}}"
     },
+    "replyTo": {
+      "goose": "Goose said:",
+      "you": "I said:",
+      "goosePicture": "About your picture:",
+      "yourPicture": "About my photo:"
+    },
+    "replying": {
+      "goose": "Replying to Goose",
+      "you": "Replying to your message",
+      "goosePicture": "Replying to Goose's picture",
+      "yourPicture": "Replying to your photo",
+      "cancel": "Stop replying"
+    },
+    "replyPart": {
+      "title": "Reply",
+      "hint": "Select the words you want to answer, or answer all of it.",
+      "selection": "Reply to the selection",
+      "all": "Reply to all of it"
+    },
+    "picture": {
+      "close": "Close",
+      "reply": "Reply to this picture"
+    },
     "reply": {
       "readAloud": "Read aloud",
       "stopReading": "Stop reading",
       "readFailed": "Your Pond could not read this aloud. Check that its voice is set up in Models.",
       "copy": "Copy reply",
       "copyCode": "Copy code",
-      "copied": "Copied"
+      "copied": "Copied",
+      "reply": "Reply"
     },
     "trail": {
       "sources_one": "{{count}} source",

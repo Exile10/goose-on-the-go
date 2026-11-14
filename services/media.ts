@@ -152,7 +152,7 @@ const documents = () => load<Documents>(() => require('expo-document-picker'));
 const manipulator = () => load<Manipulator>(() => require('expo-image-manipulator'));
 
 let counter = 0;
-const nextId = () => `attach-${Date.now().toString(36)}-${(counter += 1)}`;
+export const nextId = () => `attach-${Date.now().toString(36)}-${(counter += 1)}`;
 
 /**
  * Open a system picker, and say so plainly when it will not open. Nothing the
@@ -167,6 +167,11 @@ async function launch<T>(open: () => Promise<T>): Promise<T> {
   } catch {
     throw new AttachError('chat.composer.pickerFailed');
   }
+}
+
+/** A picture already on this phone, made ready to send again: a reply to a photo carries it. */
+export function attachFile(uri: string, name: string): Promise<Attachment> {
+  return prepareImage(uri, {}, name);
 }
 
 /**

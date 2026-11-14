@@ -14,6 +14,7 @@ import { InkButton, InkCard, InkChip, InkText, useInkTheme } from '@jarida/ink/n
 
 import type { SourceChips } from '@/components/patterns/markdown';
 import { PondPicture, usePictureRatio } from '@/components/patterns/pond-picture';
+import { GPressable } from '@/components/ui/g-pressable';
 import { Spacing } from '@/constants/spacing';
 import type { CitedSource } from '@/models/sources';
 import { siteOf, type ReportImage } from '@/models/web-watches';
@@ -136,7 +137,17 @@ const TALLEST = 0.62;
 const SMALLEST = 120;
 
 /** A picture framed in its own shape once its size is known, so nothing of it is cut away. */
-function FittedPicture({ image, width: widest, height: tallest }: { image: ReportImage; width: number; height: number }) {
+function FittedPicture({
+  image,
+  width: widest,
+  height: tallest,
+  onOpen,
+}: {
+  image: ReportImage;
+  width: number;
+  height: number;
+  onOpen?: (image: ReportImage) => void;
+}) {
   const theme = useInkTheme();
   const [ratio, onSize] = usePictureRatio(image.src, 4 / 3);
   // A tall picture held to the height cap narrows with it, so the frame stays its shape.
@@ -144,13 +155,21 @@ function FittedPicture({ image, width: widest, height: tallest }: { image: Repor
   const height = Math.round(width / ratio);
   return (
     <View style={[styles.picture, { width: widest }]}>
-      <PondPicture
-        path={image.src}
-        label={image.caption ?? image.credit}
-        contentFit="contain"
-        style={[styles.frame, { width, height, borderRadius: theme.radius.xl }]}
-        onSize={onSize}
-      />
+      <GPressable
+        feedback="lift"
+        disabled={!onOpen}
+        onPress={() => onOpen?.(image)}
+        accessibilityRole="imagebutton"
+        accessibilityLabel={image.caption ?? image.credit}
+      >
+        <PondPicture
+          path={image.src}
+          label={image.caption ?? image.credit}
+          contentFit="contain"
+          style={[styles.frame, { width, height, borderRadius: theme.radius.xl }]}
+          onSize={onSize}
+        />
+      </GPressable>
       <InkText size="xs" tone="tertiary" numberOfLines={2} style={styles.credit}>
         {image.credit}
       </InkText>
@@ -163,7 +182,16 @@ function FittedPicture({ image, width: widest, height: tallest }: { image: Repor
  * screen's edges: one alone centred, several in a strip that stops on each. `inset` is how far the
  * column it sits in starts from the screen's left edge.
  */
-export function PagePictures({ pictures, inset = 0 }: { pictures: ReportImage[]; inset?: number }) {
+export function PagePictures({
+  pictures,
+  inset = 0,
+  onOpen,
+}: {
+  pictures: ReportImage[];
+  inset?: number;
+  /** A tap on a picture, to open it. */
+  onOpen?: (image: ReportImage) => void;
+}) {
   const screen = useWindowDimensions();
   if (pictures.length === 0) return null;
   const several = pictures.length > 1;
@@ -180,7 +208,7 @@ export function PagePictures({ pictures, inset = 0 }: { pictures: ReportImage[];
       contentContainerStyle={[styles.pictures, several ? null : styles.alone]}
     >
       {pictures.map((image) => (
-        <FittedPicture key={image.key} image={image} width={width} height={height} />
+        <FittedPicture key={image.key} image={image} width={width} height={height} onOpen={onOpen} />
       ))}
     </ScrollView>
   );

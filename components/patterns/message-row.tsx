@@ -25,7 +25,7 @@
  */
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { Image } from 'expo-image';
 import { useTranslation } from 'react-i18next';
 import { hitSlop } from '@jarida/ink';
@@ -34,6 +34,10 @@ import { InkBubble, inkText, useInkTheme, type BubblePosition } from '@jarida/in
 import { TrailChip, TrailSheet, useTrail, type TrailState } from '@/components/patterns/answer-trail';
 import { ACTION_HEIGHT, CopyButton } from '@/components/patterns/copy-button';
 import { PagePictures } from '@/components/patterns/cited-sources';
+import { PictureViewer } from '@/components/patterns/picture-viewer';
+import { PondPicture } from '@/components/patterns/pond-picture';
+import { ReplyPartSheet } from '@/components/patterns/reply-part-sheet';
+import { SwipeToReply } from '@/components/patterns/swipe-to-reply';
 import { citedLinks, mergeSources } from '@/models/sources';
 import { Markdown } from '@/components/patterns/markdown';
 import { FromLine, OfferPanel, ReceiptChips } from '@/components/patterns/message-note';
@@ -46,7 +50,8 @@ import { GIcon } from '@/components/ui/g-icon';
 import { GPressable } from '@/components/ui/g-pressable';
 import { clockWords } from '@/components/patterns/voice-note-mic';
 import type { ChatImage, ChatVoiceNote, Message, ToolCall } from '@/models/chat';
-import { api } from '@/services/api-client';
+import { markdownToPlain } from '@/services/markdown';
+import { REPLY_CARD, splitReply, type ReplyPicture, type ReplyTarget } from '@/services/reply';
 import { selectionTick } from '@/services/haptics';
 import { playFile } from '@/services/voice-io';
 import { Spacing } from '@/constants/spacing';
@@ -55,7 +60,10 @@ import { Spacing } from '@/constants/spacing';
 const SINGLE = 220;
 const TILE = 104;
 
-function Pictures({ images }: { images: ChatImage[] }) {
+/** A picture as the thread holds it, in the shape a reply to it and the viewer take. */
+const asPicture = (image: ChatImage): ReplyPicture => ({ uri: image.uri, local: image.local });
+
+function Pictures({ images, onOpen }: { images: ChatImage[]; onOpen?: (picture: ReplyPicture) => void }) {
   const theme = useInkTheme();
   const { t } = useTranslation();
   const single = images.length === 1;
@@ -65,17 +73,56 @@ function Pictures({ images }: { images: ChatImage[] }) {
         const ratio = image.width && image.height ? image.width / image.height : 1;
         const width = single ? SINGLE : TILE;
         const height = single ? Math.round(SINGLE / Math.max(0.5, Math.min(2, ratio))) : TILE;
+        const frame = { width, height, borderRadius: theme.radius.lg, backgroundColor: theme.color.line };
+        const label = t('chat.attachedPicture', { index: i + 1 });
         return (
-          <Image
+          <GPressable
             key={image.id}
-            source={image.local ? { uri: image.uri } : api.imageSource(image.uri)}
-            style={{ width, height, borderRadius: theme.radius.lg, backgroundColor: theme.color.line }}
-            contentFit="cover"
-            transition={120}
-            accessibilityLabel={t('chat.attachedPicture', { index: i + 1 })}
-          />
+            feedback="lift"
+            disabled={!onOpen}
+            onPress={() => onOpen?.(asPicture(image))}
+            accessibilityRole="imagebutton"
+            accessibilityLabel={label}
+          >
+            {/* One the Pond holds loads through its pinned connection, which the image view's own loader cannot use. */}
+            {image.local ? (
+              <Image source={{ uri: image.uri }} style={frame} contentFit="cover" transition={120} />
+            ) : (
+              <PondPicture path={image.uri} label={label} style={frame} />
+            )}
+          </GPressable>
         );
       })}
+    </View>
+  );
+}
+
+/** Above a reply: whose words or picture it answers, and the words, in the quote's own quiet type. */
+function QuoteLine({ head, quote }: { head: string; quote: string }) {
+  const theme = useInkTheme();
+  const screen = useWindowDimensions();
+  const who = inkText(theme, { size: 'xs', weight: theme.weight.semibold, color: theme.color.textSecondary });
+  const words = inkText(theme, { size: 'sm', color: theme.color.textSecondary });
+  return (
+    <View
+      style={[
+        styles.quote,
+        {
+          width: Math.round(screen.width * REPLY_CARD),
+          borderLeftColor: theme.color.accentLine,
+          backgroundColor: theme.color.neutralSoft,
+          borderRadius: theme.radius.md,
+        },
+      ]}
+    >
+      <Text style={who.style} numberOfLines={1}>
+        {head}
+      </Text>
+      {quote ? (
+        <Text style={words.style} numberOfLines={3}>
+          {quote}
+        </Text>
+      ) : null}
     </View>
   );
 }
@@ -180,6 +227,8 @@ export interface MessageRowProps {
   onUnqueue?: (id: string) => void;
   /** Answer what a message offers, by the message's id. */
   onOffer?: (id: string, take: boolean) => Promise<void> | void;
+  /** Answer this message, a part of it, or one of its pictures, from the composer. */
+  onReply?: (target: ReplyTarget) => void;
 }
 
 export const MessageRow = React.memo(function MessageRow({
@@ -190,14 +239,45 @@ export const MessageRow = React.memo(function MessageRow({
   queued = false,
   onUnqueue,
   onOffer,
+  onReply,
 }: MessageRowProps) {
   if (message.role === 'user') {
-    return (
+    return <MyMessage message={message} position={position} queued={queued} onUnqueue={onUnqueue} onReply={onReply} />;
+  }
+  return <TheirMessage message={message} status={status} turnSeed={turnSeed} onOffer={onOffer} onReply={onReply} />;
+});
+
+/** What the person said: any quote it answers, their pictures, a voice note, and the bubble. */
+function MyMessage({
+  message,
+  position,
+  queued,
+  onUnqueue,
+  onReply,
+}: Pick<MessageRowProps, 'message' | 'position' | 'queued' | 'onUnqueue' | 'onReply'>) {
+  const [viewing, setViewing] = useState<ReplyPicture | null>(null);
+  const [part, setPart] = useState<string | null>(null);
+  const reply = message.content ? splitReply(message.content) : null;
+  const words = reply ? reply.body : message.content;
+  // A message still waiting to be sent is not one to answer yet.
+  const answer = queued ? undefined : onReply;
+  const first = message.images?.[0];
+  const whole = answer
+    ? () =>
+        words
+          ? answer({ kind: 'text', from: 'you', text: words, part: false })
+          : first
+            ? answer({ kind: 'picture', from: 'you', picture: asPicture(first) })
+            : undefined
+    : undefined;
+  return (
+    <SwipeToReply onReply={whole}>
       <View style={styles.mine}>
         {message.note?.from ? <FromLine from={message.note.from} mine /> : null}
+        {reply ? <QuoteLine head={reply.head} quote={reply.quote} /> : null}
         {message.images?.length ? (
           <View style={queued ? styles.waiting : null}>
-            <Pictures images={message.images} />
+            <Pictures images={message.images} onOpen={setViewing} />
           </View>
         ) : null}
         {message.voice ? (
@@ -205,18 +285,30 @@ export const MessageRow = React.memo(function MessageRow({
             <VoiceNoteChip note={message.voice} />
           </View>
         ) : null}
-        {message.content ? (
-          <InkBubble mine position={position} status={queued ? 'sending' : 'sent'}>
-            {message.content}
-          </InkBubble>
+        {words ? (
+          <Pressable disabled={!answer} onLongPress={() => setPart(words)} delayLongPress={350}>
+            <InkBubble mine position={position} status={queued ? 'sending' : 'sent'}>
+              {words}
+            </InkBubble>
+          </Pressable>
         ) : null}
         {queued && onUnqueue ? <QueuedNote onRemove={() => onUnqueue(message.id)} /> : null}
       </View>
-    );
-  }
-
-  return <TheirMessage message={message} status={status} turnSeed={turnSeed} onOffer={onOffer} />;
-});
+      <PictureViewer
+        picture={viewing}
+        onClose={() => setViewing(null)}
+        onReply={answer ? (picture) => answer({ kind: 'picture', from: 'you', picture }) : undefined}
+      />
+      {answer ? (
+        <ReplyPartSheet
+          text={part}
+          onClose={() => setPart(null)}
+          onReply={(text, chosen) => answer({ kind: 'text', from: 'you', text, part: chosen })}
+        />
+      ) : null}
+    </SwipeToReply>
+  );
+}
 
 /** Pages an answer's pictures are asked for at most. */
 const PICTURE_PAGES = 6;
@@ -231,14 +323,21 @@ function TheirMessage({
   status,
   turnSeed,
   onOffer,
+  onReply,
 }: {
   message: Message;
   status: string | null;
   turnSeed: number;
   onOffer?: (id: string, take: boolean) => Promise<void> | void;
+  onReply?: (target: ReplyTarget) => void;
 }) {
   const theme = useInkTheme();
   const done = !message.pending;
+  const [viewing, setViewing] = useState<ReplyPicture | null>(null);
+  const [part, setPart] = useState<string | null>(null);
+  // Answered as the words it reads as, not the markdown it was written in.
+  const plain = useMemo(() => (done && message.content ? markdownToPlain(message.content) : ''), [done, message.content]);
+  const answer = done ? onReply : undefined;
   const sources = useMemo(
     () =>
       mergeSources(
@@ -269,9 +368,20 @@ function TheirMessage({
   const parts = done
     ? [
         text,
-        <ReplyActions key="actions" message={message} trail={shown} tools={folded} />,
+        <ReplyActions
+          key="actions"
+          message={message}
+          trail={shown}
+          tools={folded}
+          onReply={answer && plain ? () => setPart(plain) : undefined}
+        />,
         /* The thread's own padding (app/conversation.tsx), which the pictures reach past. */
-        <PagePictures key="pictures" pictures={pictures} inset={Spacing.lg} />,
+        <PagePictures
+          key="pictures"
+          pictures={pictures}
+          inset={Spacing.lg}
+          onOpen={(image) => setViewing({ uri: image.src, local: false, label: image.caption ?? image.credit })}
+        />,
         tools,
       ]
     : [
@@ -287,20 +397,47 @@ function TheirMessage({
       ];
 
   return (
-    <View style={styles.theirs}>
-      {note?.from ? <FromLine from={note.from} /> : null}
-      {parts}
-      {trail.mounted ? <TrailSheet state={shown} tools={folded} /> : null}
-      {note?.receipts?.length ? <ReceiptChips receipts={note.receipts} /> : null}
-      {note?.offer ? (
-        <OfferPanel offer={note.offer} onAnswer={onOffer ? (take) => onOffer(message.id, take) : undefined} />
+    <SwipeToReply
+      onReply={answer && plain ? () => answer({ kind: 'text', from: 'goose', text: plain, part: false }) : undefined}
+    >
+      <View style={styles.theirs}>
+        {note?.from ? <FromLine from={note.from} /> : null}
+        {parts}
+        {trail.mounted ? <TrailSheet state={shown} tools={folded} /> : null}
+        {note?.receipts?.length ? <ReceiptChips receipts={note.receipts} /> : null}
+        {note?.offer ? (
+          <OfferPanel offer={note.offer} onAnswer={onOffer ? (take) => onOffer(message.id, take) : undefined} />
+        ) : null}
+      </View>
+      <PictureViewer
+        picture={viewing}
+        onClose={() => setViewing(null)}
+        onReply={answer ? (picture) => answer({ kind: 'picture', from: 'goose', picture }) : undefined}
+      />
+      {answer ? (
+        <ReplyPartSheet
+          text={part}
+          onClose={() => setPart(null)}
+          onReply={(text, chosen) => answer({ kind: 'text', from: 'goose', text, part: chosen })}
+        />
       ) : null}
-    </View>
+    </SwipeToReply>
   );
 }
 
-/** Under a finished reply: the chip, then reading the reply aloud and copying it as written. */
-function ReplyActions({ message, trail, tools }: { message: Message; trail: TrailState; tools: ToolCall[] }) {
+/** Under a finished reply: the chip, then reading it aloud, copying it as written, and answering it. */
+function ReplyActions({
+  message,
+  trail,
+  tools,
+  onReply,
+}: {
+  message: Message;
+  trail: TrailState;
+  tools: ToolCall[];
+  /** Opens the reply's words to answer all of them or a part. */
+  onReply?: () => void;
+}) {
   const theme = useInkTheme();
   const { t } = useTranslation();
   const { reading, toggle } = useReadAloud(message.id);
@@ -323,6 +460,21 @@ function ReplyActions({ message, trail, tools }: { message: Message; trail: Trai
             <GIcon name={reading ? 'stop' : 'volume'} size={15} color={reading ? theme.color.accentLine : theme.color.textSecondary} />
           </GPressable>
           <CopyButton text={message.content} />
+          {onReply ? (
+            <GPressable
+              feedback="tint"
+              onPress={() => {
+                void selectionTick();
+                onReply();
+              }}
+              accessibilityRole="button"
+              accessibilityLabel={t('chat.reply.reply')}
+              hitSlop={hitSlop(ACTION_HEIGHT)}
+              style={styles.action}
+            >
+              <GIcon name="reply" size={15} color={theme.color.textSecondary} />
+            </GPressable>
+          ) : null}
         </>
       ) : null}
     </View>
@@ -341,5 +493,6 @@ const styles = StyleSheet.create({
   unqueue: { width: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-end', gap: 6, maxWidth: 3 * TILE + 12 },
   actions: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs },
+  quote: { borderLeftWidth: 3, paddingHorizontal: 10, paddingVertical: 6, gap: 2 },
   action: { height: ACTION_HEIGHT, minWidth: 32, alignItems: 'center', justifyContent: 'center' },
 });

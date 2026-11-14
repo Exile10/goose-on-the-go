@@ -10,6 +10,11 @@ import { MessageRow } from '@/components/patterns/message-row';
 import type { Message } from '@/models/chat';
 
 jest.mock('expo-web-browser', () => ({ openBrowserAsync: jest.fn() }));
+// The swipe runs on gesture-handler and worklets, which jest's stand-ins cannot carry; the sheet and viewer are modals.
+jest.mock('@/components/patterns/swipe-to-reply', () => ({ SwipeToReply: ({ children }: { children: React.ReactNode }) => children }));
+jest.mock('@/components/patterns/picture-viewer', () => ({ PictureViewer: () => null }));
+jest.mock('@/components/patterns/reply-part-sheet', () => ({ ReplyPartSheet: () => null }));
+jest.mock('@/components/patterns/pond-picture', () => ({ PondPicture: (props: { path: string }) => `pond:${props.path}` }));
 jest.mock('@/components/ui/g-icon', () => ({ GIcon: () => null }));
 // A user bubble draws none of these; loading them would start Reanimated and the network.
 jest.mock('@/components/patterns/voice-note-mic', () => ({ clockWords: () => '' }));
