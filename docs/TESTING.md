@@ -86,6 +86,16 @@ Two pieces of configuration are load-bearing and non-obvious:
   to run with zero tests** — a config error rather than a test failure, so the
   output blames the mapping and not the change that moved the package.
 
+One trap runs the other way, a test that is wrong where the app is right:
+
+- **Under jest, marked does not read emphasis around a code span.** `marked` is
+  ESM, so it is in `transformIgnorePatterns`' allow list and Babel rewrites its
+  regexes. The named-group transform turns `blockSkip`'s `\k<b>` into `\1`
+  rather than `\3`, code spans stop being masked, and `` **`$HOME`** `` stays
+  literal asterisks in a test. Metro's Hermes profile leaves the regex native,
+  and the phone draws it bold. Keep emphasis-around-code out of renderer test
+  fixtures, or assert on it on a device.
+
 The preset is `jest-expo`, matched to the Expo SDK (`jest-expo@56` for SDK 56).
 Upgrading the SDK means upgrading `jest-expo` in step — a mismatch fails at
 `@react-native/jest-preset`, which is pinned to the React Native minor.
