@@ -15,7 +15,7 @@
  */
 
 import React, { useEffect } from 'react';
-import { Platform } from 'react-native';
+import { Animated as RNAnimated, Easing, Platform, StyleSheet, View } from 'react-native';
 import Animated, {
   type SharedValue,
   useAnimatedProps,
@@ -55,9 +55,10 @@ export interface GooseProps {
 
 type Matrix = [number, number, number, number, number, number];
 
-/** Frames a second while it swims or listens, and while it only drifts and blinks. */
+/** Frames a second while it swims or listens, and while it only drifts and blinks. Both divide a 60,
+ * 90 or 120 Hz screen evenly; 20 on a 90 Hz Android alternated four and five refreshes, a judder. */
 const FPS = 30;
-const IDLE_FPS = 20;
+const IDLE_FPS = 30;
 
 /** The native components take `matrix`; the JS ones only reach it through `transform`. */
 type WithMatrix<P> = React.ComponentType<P & { matrix?: Matrix }>;
@@ -394,18 +395,37 @@ function usePalette(ground: string | undefined): Palette {
 }
 
 /** The drawing itself, around whichever frame it is given. */
-function Drawing({ id, frame, p, size, water, rest }: { id: string; frame: SharedValue<Frame>; p: Palette; size: number; water: boolean; rest: Frame }) {
+function Drawing({
+  id,
+  frame,
+  p,
+  size,
+  water,
+  rest,
+  bird = true,
+}: {
+  id: string;
+  frame: SharedValue<Frame>;
+  p: Palette;
+  size: number;
+  water: boolean;
+  rest: Frame;
+  /** False for the pond alone, with the goose laid over it as a view of its own. */
+  bird?: boolean;
+}) {
   const ratio = water ? 140 / 160 : 96 / 136;
   return (
     <Svg width={size} height={size * ratio} viewBox={water ? '0 0 160 140' : '22 6 136 96'} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
       {water ? <Pond id={id} frame={frame} p={p} rest={rest} /> : null}
-      <Moving frame={frame} at={(f) => {
-        'worklet';
-        const b = f.parts.bob;
-        return times(shift(0, b.y), times(about(b.sx, 0, 0, b.sy, 88, 98), turn(f.parts.roll, 88, 98)));
-      }}>
-        <Bird id={id} tag="b" frame={frame} p={p} />
-      </Moving>
+      {bird ? (
+        <Moving frame={frame} at={(f) => {
+          'worklet';
+          const b = f.parts.bob;
+          return times(shift(0, b.y), times(about(b.sx, 0, 0, b.sy, 88, 98), turn(f.parts.roll, 88, 98)));
+        }}>
+          <Bird id={id} tag="b" frame={frame} p={p} />
+        </Moving>
+      ) : null}
       {water ? <Path d="M10 98.4h140" fill="none" stroke={p.light} strokeWidth={0.9} strokeLinecap="round" opacity={0.7} /> : null}
     </Svg>
   );
@@ -416,7 +436,13 @@ function Drawing({ id, frame, p, size, water, rest }: { id: string; frame: Share
  * goose that never moves, such as the one beside each finished reply's thoughts, it costs no more
  * than an icon.
  */
-export const GooseStill = React.memo(function GooseStill({ state = 'idle', size = 150, water = true, ground }: Partial<Pick<GooseProps, 'state'>> & Omit<GooseProps, 'state' | 'still'>) {
+export const GooseStill = React.memo(function GooseStill({
+  state = 'idle',
+  size = 150,
+  water = true,
+  ground,
+  bird = true,
+}: Partial<Pick<GooseProps, 'state'>> & Omit<GooseProps, 'state' | 'still'> & { bird?: boolean }) {
   const p = usePalette(ground);
   const [id] = React.useState(() => `goose${gooseIds++}`);
   const rest = React.useMemo(() => restFrame(state), [state]);
@@ -424,12 +450,96 @@ export const GooseStill = React.memo(function GooseStill({ state = 'idle', size 
   const frame = useSharedValue(rest);
   return (
     <Still.Provider value={rest}>
-      <Drawing id={id} frame={frame} p={p} size={size} water={water} rest={rest} />
+      <Drawing id={id} frame={frame} p={p} size={size} water={water} rest={rest} bird={bird} />
     </Still.Provider>
   );
 });
 
-export const Goose = React.memo(function Goose({ state, size = 150, water = true, ground, still = false }: GooseProps) {
+/**
+ * The goose drawn once and moved as a whole, for Android. There react-native-svg paints the whole
+ * picture in software on the UI thread whenever any part of it changes: on an A16 that was about
+ * 230 ms for this goose, every tick, so the screen around it ran at a few frames a second. Here the
+ * pond is painted once, and the goose once over it; what moves is the views they sit in, on the
+ * native driver, which repaints nothing. It bobs and rocks afloat, faster while it works, and rings
+ * spread from it then.
+ */
+function GooseAfloat({ state, size = 150, water = true, ground, still = false }: GooseProps) {
+  const reduced = useReduceMotion();
+  const theme = useInkTheme();
+  const [clock] = React.useState(() => new RNAnimated.Value(0));
+  const moving = !reduced && !still;
+  const working = state !== 'idle';
+
+  useEffect(() => {
+    if (!moving) return;
+    clock.setValue(0);
+    const loop = RNAnimated.loop(
+      RNAnimated.timing(clock, { toValue: 1, duration: working ? 1800 : 4200, easing: Easing.linear, useNativeDriver: true }),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [clock, moving, working]);
+
+  // Drawing units to points: the pond's box is 160 wide, the goose's own crop 136 from x 22, y 6.
+  const k = water ? size / 160 : size / 136;
+  const lift = working ? 1.6 : 1;
+  const afloat = moving
+    ? {
+        transform: [
+          { translateY: clock.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0, 2.2 * k * lift, 0] }) },
+          { rotate: clock.interpolate({ inputRange: [0, 0.25, 0.75, 1], outputRange: ['0deg', `${-1.6 * lift}deg`, `${1.6 * lift}deg`, '0deg'] }) },
+        ],
+      }
+    : null;
+  const bird = <GooseStill state={state} size={136 * k} water={false} ground={ground} />;
+  if (!water) return <RNAnimated.View style={afloat}>{bird}</RNAnimated.View>;
+
+  // The rings start under the goose, on the waterline at (88, 98) of the pond's box.
+  const ring = (offset: number) => {
+    const at = clock.interpolate({
+      inputRange: offset === 0 ? [0, 1] : [0, 1 - offset, 1 - offset + 0.0001, 1],
+      outputRange: offset === 0 ? [0, 1] : [offset, 1, 0, offset],
+    });
+    const scale = at.interpolate({ inputRange: [0, 1], outputRange: [0.35, 1] });
+    return (
+      <RNAnimated.View
+        key={offset}
+        style={[
+          afloatStyles.ring,
+          {
+            left: (88 - 40) * k,
+            top: (98 - 40) * k,
+            width: 80 * k,
+            height: 80 * k,
+            borderRadius: 40 * k,
+            borderColor: theme.color.accent,
+            opacity: at.interpolate({ inputRange: [0, 0.15, 1], outputRange: [0, 0.55, 0] }),
+            transform: [{ scaleX: scale }, { scaleY: RNAnimated.multiply(scale, 0.16) }],
+          },
+        ]}
+      />
+    );
+  };
+  return (
+    <View style={{ width: size, height: size * (140 / 160) }}>
+      <GooseStill state={state} size={size} water ground={ground} bird={false} />
+      {moving && working ? [0, 0.5].map(ring) : null}
+      <RNAnimated.View style={[afloatStyles.bird, { left: 22 * k, top: 6 * k }, afloat]}>{bird}</RNAnimated.View>
+    </View>
+  );
+}
+
+const afloatStyles = StyleSheet.create({
+  bird: { position: 'absolute' },
+  ring: { position: 'absolute', borderWidth: 1.2 },
+});
+
+/** The goose as it moves: Android's afloat, every other platform's drawn frame by frame. */
+export const Goose = React.memo(function Goose(props: GooseProps) {
+  return Platform.OS === 'android' ? <GooseAfloat {...props} /> : <GooseDrawn {...props} />;
+});
+
+const GooseDrawn = React.memo(function GooseDrawn({ state, size = 150, water = true, ground, still = false }: GooseProps) {
   // The web preview draws the resting frame too: the old goose's motion took a chat down there
   // (2b8aafd), and this one's matrices go through react-native-svg's native props.
   const reduced = useReduceMotion() || Platform.OS === 'web' || still;
