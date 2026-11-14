@@ -1,7 +1,7 @@
 /**
  * What Goose thought and noted on the way to an answer, tucked into one line at the top of the
  * reply. While it thinks, the line is the newest of its thinking, cut from the front so the words
- * arriving stay in view, beside a pond that ripples while the turn runs. Before any thinking comes,
+ * arriving stay in view, beside the goose swimming on a pond that ripples while the turn runs. Before any thinking comes,
  * the line is a quip, so the wait still reads as alive; the quips stop once there is thinking to
  * show. A tap opens the whole of it, the thinking and then the steps, and closes it again.
  */
@@ -106,7 +106,7 @@ export function ReplyThoughts({
 
 const styles = StyleSheet.create({
   block: { gap: 6 },
-  line: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 24 },
+  line: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 30 },
   words: { flex: 1 },
   // A synthesised oblique, as the quips have: Quicksand has no italic face, and here the slant is a tone of voice.
   italic: { fontStyle: 'italic' },

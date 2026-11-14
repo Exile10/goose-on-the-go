@@ -10,6 +10,8 @@ import { InkProvider } from '@jarida/ink/native';
 import { lastLine, ReplyThoughts, thoughtOf } from '../reply-thoughts';
 
 jest.mock('@/services/haptics', () => ({ selectionTick: jest.fn(async () => {}) }));
+// The goose runs on Reanimated's worklets, which jest's stand-ins cannot carry; its motion has tests of its own.
+jest.mock('@/components/patterns/goose', () => ({ Goose: () => null }));
 jest.mock('@/components/ui/g-icon', () => ({ GIcon: 'GIcon' }));
 jest.mock('@/components/patterns/thinking-quips', () => {
   const { Text: T } = jest.requireActual('react-native');
