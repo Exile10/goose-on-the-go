@@ -43,6 +43,8 @@ import {
   orbLevel,
   rms,
   takeSpeechUnits,
+  wavSeconds,
+  type SpeechUnit,
 } from '@/services/speech';
 import { TTS_LIMITS, createSpeechLine } from '@/services/speech-line';
 import {
@@ -176,9 +178,13 @@ export function useVoice(chat: {
     levelAt: 0,
   });
 
-  // The reply being spoken: clauses waiting, and the one playing.
+  // The reply being spoken: units waiting, and the one playing.
   const voice = useRef({
-    line: createSpeechLine((text, signal) => api.speak(text, signal), TTS_LIMITS),
+    line: createSpeechLine(
+      (unit, signal) => api.speak(unit.text, signal, unit.last),
+      TTS_LIMITS,
+      (audio) => wavSeconds(new Uint8Array(audio)),
+    ),
     pumping: false,
     stopPlaying: null as null | (() => void),
     turnDone: false,
@@ -297,15 +303,17 @@ export function useVoice(chat: {
   }, [setState, t]);
 
   /**
-   * Speak whatever is queued, in order. While one clause plays the next ones
-   * are already being synthesised, because `/tts` renders a whole request
-   * before it sends a byte and the gap would otherwise fall between clauses.
+   * Speak whatever is queued, in order. While one unit plays the next ones are
+   * already being synthesised, because `/tts` renders a whole request before it
+   * sends a byte. A Pond slower than its own speech still cannot keep up, so
+   * sound that starts from silence is held until the rest can follow it.
    */
   const pump = useCallback(async () => {
     const v = voice.current;
     if (v.pumping) return;
     v.pumping = true;
     const generation = v.generation;
+    let afterSilence = true;
     try {
       while (generation === v.generation) {
         const audio = v.line.next();
@@ -313,6 +321,12 @@ export function useVoice(chat: {
         const bytes = await audio;
         if (generation !== v.generation) break;
         const wav = new Uint8Array(bytes);
+        const hold = v.line.hold(wavSeconds(wav), afterSilence);
+        afterSilence = false;
+        if (hold > 0.05) {
+          await new Promise((resolve) => setTimeout(resolve, hold * 1000));
+          if (generation !== v.generation) break;
+        }
         const env = envelope(wav);
         const uri = cacheFile('reply', wav);
         setState('speaking');
@@ -377,7 +391,7 @@ export function useVoice(chat: {
       v.line.clear();
       let cursor = 0;
       setState('thinking');
-      const enqueue = (units: string[]) => {
+      const enqueue = (units: SpeechUnit[]) => {
         if (!speakerRef.current || units.length === 0) return;
         v.line.push(units);
         void pump();
