@@ -2,7 +2,7 @@
 // phone does not know rather than the raw id.
 
 import '@/services/i18n';
-import type { AdminHealth, AdminTask } from '@/services/types';
+import type { AdminHealth, AdminReliability, AdminTask } from '@/services/types';
 import {
   areaGroupLabel,
   cacheEffect,
@@ -17,6 +17,8 @@ import {
   healthSummaryWords,
   keptLine,
   powerModeWords,
+  reliabilitySections,
+  shareWords,
   taskMetaWords,
   taskStateTone,
 } from '@/view-models/pond-admin-words';
@@ -171,5 +173,52 @@ describe('tasks', () => {
       `Finished today ${time(ended)} · 4 artifacts · its words stay theirs`,
     );
     expect(taskMetaWords({ ...base, finished_at: null }, now)).toBe('0 artifacts');
+  });
+});
+
+describe('the reliability report', () => {
+  const REPORT: AdminReliability = {
+    days: 7,
+    notices: { queued: 20, woken: 14, fetched: 19, fetched_within_a_minute: 9, fetched_after_an_hour: 2, shown: 18, opened: 6, spoken: 1 },
+    turns: { asked: 40, answered: 39 },
+    phones: { paired: 3, test: 0, unseen: 1, with_push_token: 2 },
+    stops: 2,
+    android_push_key: true,
+    apple_push_key: false,
+  };
+  const row = (sections: ReturnType<typeof reliabilitySections>, key: string) =>
+    sections.flatMap((s) => s.rows).find((r) => r.key === key);
+
+  it('says a share as a part of a whole, rounded down as the Pond rounds it', () => {
+    expect(shareWords(9, 20)).toBe('9 of 20 (45%)');
+    expect(shareWords(2, 3)).toBe('2 of 3 (66%)');
+    expect(shareWords(0, 0)).toBe('0');
+  });
+
+  it('reads each count in plain words, in the order the Pond prints them', () => {
+    const sections = reliabilitySections(REPORT);
+    expect(sections.map((s) => s.title)).toEqual(['Notices', 'Messages', 'Phones', 'Pond']);
+    expect(row(sections, 'withinAMinute')).toMatchObject({ label: 'Fetched within a minute', value: '9 of 20 (45%)' });
+    expect(row(sections, 'neverFetched')).toMatchObject({ value: '1', warn: true });
+    expect(row(sections, 'unanswered')).toMatchObject({ label: 'Left without a reply', value: '1', warn: true });
+    expect(row(sections, 'withPush')).toMatchObject({ value: '2 of 3 (66%)' });
+    expect(row(sections, 'appleKey')).toMatchObject({ label: 'Apple push key', value: 'Missing', warn: true });
+    expect(row(sections, 'androidKey')).toMatchObject({ value: 'Present' });
+    expect(row(sections, 'androidKey')?.warn).toBeFalsy();
+  });
+
+  it('names test devices only when there are some', () => {
+    expect(row(reliabilitySections(REPORT), 'test')).toBeUndefined();
+    expect(row(reliabilitySections({ ...REPORT, phones: { ...REPORT.phones, test: 1 } }), 'test')).toMatchObject({ value: '1' });
+  });
+
+  it('flags nothing when everything arrived and was answered', () => {
+    const fine = reliabilitySections({
+      ...REPORT,
+      notices: { ...REPORT.notices, fetched: 20 },
+      turns: { asked: 40, answered: 40 },
+      apple_push_key: true,
+    });
+    expect(fine.flatMap((s) => s.rows).filter((r) => r.warn)).toEqual([]);
   });
 });

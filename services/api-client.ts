@@ -50,7 +50,29 @@ import {
 } from '@/models/todos';
 import { readCart, readCartItem, type CartItem } from '@/models/cart';
 import { readConnector, readConnectors, type Connector } from '@/models/connectors';
+import { readAbout, readArchived, readFact, type AboutFact, type AboutProfile, type ArchivedFact } from '@/models/about';
+import { readCard, type CardKind, type ContextCard } from '@/models/cards';
+import { readGooseActivity, type GooseActivityList } from '@/models/goose-activity';
+import { readGooseNotes, type GooseNotes } from '@/models/goose-notes';
 import { readIdea, readIdeas, type Idea } from '@/models/ideas';
+import {
+  readKept,
+  readMemberInterview,
+  type InterviewAnswer,
+  type InterviewApproval,
+  type InterviewKept,
+  type MemberInterview,
+} from '@/models/member-interview';
+import {
+  APPROVAL_REQUIRED,
+  readHeldPairing,
+  readPairingLock,
+  readPairingRequests,
+  type HeldPairing,
+  type PairingLock,
+  type PairingRequest,
+} from '@/models/pairing-lock';
+import { readScreenshots, type Screenshots } from '@/models/screenshots';
 import { readCatalog, type CatalogItem } from '@/models/catalog';
 import { readLongTask, readLongTaskReport, readResearchAvailability, reportFileName } from '@/models/long-tasks';
 import {
@@ -63,6 +85,7 @@ import {
   readModeChange,
   readOverview,
   readPower,
+  readReliability,
   readTasks,
   readUnlocked,
 } from '@/models/pond-admin';
@@ -98,6 +121,7 @@ import type {
   AdminCacheId,
   AdminFileListing,
   AdminHealth,
+  AdminReliability,
   AdminOverview,
   AdminPower,
   AdminStatus,
@@ -186,6 +210,7 @@ import type {
   UpdateScheduleRequest,
   SessionMessage,
   SessionSummary,
+  OfferAnswer,
   SuggestionList,
   SystemInfo,
   ToolCallResult,
@@ -218,6 +243,7 @@ import type {
   FaceThreshold,
   VisionConfig,
   VisionStatus,
+  PromptTemplate,
 } from './types';
 import { MODEL_CATEGORIES } from './types';
 
@@ -276,11 +302,30 @@ export interface HandshakeResponse {
   rejection_reason: string | null;
   /**
    * The Pond's CPace confirmation tag, T_server, as lowercase hex. Present on an
-   * accepted pairing, and checked by {@link PondApiClient.pair} before any token
-   * in this response is kept.
+   * accepted pairing and on one held by the pairing lock, and checked by
+   * {@link PondApiClient.pair} before any token or request in this response is kept.
    */
   server_proof?: string | null;
+  /**
+   * The Pond's pairing lock is on: the code was right, and the phone now waits for the main
+   * member. Present only once the Pond's confirmation has verified. In memory only.
+   */
+  held?: HeldPairing;
 }
+
+/** What the Pond says of a phone that came back for its held request. */
+export type PairingClaim =
+  | { status: 'waiting' }
+  | { status: 'paired'; response: HandshakeResponse }
+  | { status: 'declined' }
+  | { status: 'gone' };
+
+/** What the Pond says of a recovery PIN: the pairing, or why not. */
+export type PairingRecovery =
+  | PairingClaim
+  | { status: 'wrong_pin'; triesLeft: number | null }
+  | { status: 'cooling'; retryAfterSecs: number }
+  | { status: 'no_pin' };
 
 /** The Pond's answer to `pake/init`: the challenge and its CPace share. */
 export interface PakeChallenge {
@@ -455,11 +500,28 @@ async function parseBody<T>(res: Response): Promise<T | undefined> {
 
 /** A handshake refusal, read from one body: the Pond names a wait in `retry_after` as well as in Retry-After. */
 async function handshakeRefusal(message: string, res: Response): Promise<ApiError> {
-  const body = (await parseBody<{ error?: unknown; retry_after?: unknown }>(res).catch(() => undefined)) ?? {};
+  return refusalOf(message, res, (await parseBody<Record<string, unknown>>(res).catch(() => undefined)) ?? {});
+}
+
+function refusalOf(message: string, res: Response, body: Record<string, unknown>): ApiError {
   const detail = typeof body.error === 'string' && body.error.trim() ? body.error : null;
   const wait = body.retry_after;
   const bodyWait = typeof wait === 'number' && Number.isFinite(wait) && wait >= 0 ? wait : null;
-  return new ApiError(message, res.status, parseRetryAfter(res) ?? bodyWait, detail);
+  return new ApiError(message, res.status, parseRetryAfter(res) ?? bodyWait, detail, body);
+}
+
+/** Why a verify was refused: the Pond names it in `rejection_reason` and again in `error`. */
+function heldReason(resp: HandshakeResponse): string | null {
+  const error = (resp as { error?: unknown }).error;
+  return resp.rejection_reason ?? (typeof error === 'string' ? error : null);
+}
+
+/** A verify's answer with the held request read, and its secret under no other name. */
+function withHeld(resp: HandshakeResponse, held: HeldPairing | null): HandshakeResponse {
+  const out: HandshakeResponse & { pairing_request?: unknown } = { ...resp, rejection_reason: heldReason(resp) };
+  delete out.pairing_request;
+  if (held) out.held = held;
+  return out;
 }
 
 /** A refusal's JSON body, or null for any other body. */
@@ -800,20 +862,93 @@ export class PondApiClient {
     // connection with its own certificate could invent an acceptance and a token
     // of its own, and this phone would be paired with the interceptor. Only the
     // party that ran CPace with the right code and the same pin can produce it.
-    if (resp.accepted && !confirmationMatches(parseTag(resp.server_proof), exchange.expectedServerConfirm)) {
+    // A pairing the lock holds is confirmed the same way: the phone will come back to this Pond
+    // for tokens, and must not come back to something that only claimed to hold it.
+    const held = !resp.accepted && heldReason(resp) === APPROVAL_REQUIRED ? readHeldPairing((resp as { pairing_request?: unknown }).pairing_request) : null;
+    if ((resp.accepted || held) && !confirmationMatches(parseTag(resp.server_proof), exchange.expectedServerConfirm)) {
       console.warn('[pairing] the Pond\'s confirmation did not verify; no token kept');
       this.token = null;
       this.refreshToken = null;
       throw new PondTrustError();
     }
-    if (resp.accepted && resp.session_token) {
-      this.token = resp.session_token;
-      this.refreshToken = resp.refresh_token ?? null;
-      if (resp.refresh_token && this.onTokensRotated) {
-        this.onTokensRotated(resp.session_token, resp.refresh_token);
-      }
+    if (resp.accepted && resp.session_token) this.keepPairing(resp);
+    if (held && Array.isArray(resp.capabilities)) held.capabilities = resp.capabilities;
+    return withHeld(resp, held);
+  }
+
+  /** Keep an accepted pairing's tokens on this client, and tell whoever persists them. */
+  private keepPairing(resp: HandshakeResponse): void {
+    if (!resp.session_token) return;
+    this.token = resp.session_token;
+    this.refreshToken = resp.refresh_token ?? null;
+    if (resp.refresh_token && this.onTokensRotated) {
+      this.onTokensRotated(resp.session_token, resp.refresh_token);
     }
-    return resp;
+  }
+
+  /** The answer to a claim or a recovery, when it is one of the four a waiting phone can get. */
+  private readClaim(status: number, body: Record<string, unknown>, held: HeldPairing): PairingClaim | null {
+    if (status === 202) return { status: 'waiting' };
+    if (status === 410) return { status: 'gone' };
+    if (status === 403) return body.status === 'declined' ? { status: 'declined' } : null;
+    if (status !== 200) return null;
+    if (body.status === 'waiting') return { status: 'waiting' };
+    const session = typeof body.session_token === 'string' ? body.session_token : '';
+    if (body.accepted !== true || !session) return null;
+    const response: HandshakeResponse = {
+      accepted: true,
+      session_token: session,
+      refresh_token: typeof body.refresh_token === 'string' ? body.refresh_token : null,
+      expires_at: typeof body.expires_at === 'string' ? body.expires_at : null,
+      hostname: typeof body.hostname === 'string' ? body.hostname : '',
+      server_version: typeof body.server_version === 'string' ? body.server_version : '',
+      capabilities: Array.isArray(body.capabilities) ? body.capabilities.filter((c): c is string => typeof c === 'string') : (held.capabilities ?? []),
+      rejection_reason: null,
+    };
+    this.keepPairing(response);
+    return { status: 'paired', response };
+  }
+
+  /** Ask one of the two routes a waiting phone has. The body carries the claim secret, so nothing here logs it. */
+  private async askHeld(route: 'claim' | 'recover', held: HeldPairing, pin?: string) {
+    const epoch = this.identityEpoch;
+    const res = await this.send(`${this.baseUrl}/api/v1/handshake/pairing-request/${route}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ request_id: held.requestId, claim_secret: held.claimSecret, ...(pin === undefined ? {} : { pin }) }),
+    });
+    const parsed = await errorBody(res);
+    if (epoch !== this.identityEpoch) throw new Error('Pond profile changed');
+    const body = parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? (parsed as Record<string, unknown>) : {};
+    return { claim: this.readClaim(res.status, body, held), refusal: refusalOf(`handshake/pairing-request/${route} failed: ${res.status}`, res, body) };
+  }
+
+  /**
+   * Come back for a pairing the lock is holding. Answers whether the phone still waits, was let
+   * in (the tokens are then kept on this client, as `pair` keeps them), was declined, or waited
+   * too long. Throws only for an answer that is none of those: off the home network, or no answer.
+   */
+  async claimPairingRequest(held: HeldPairing): Promise<PairingClaim> {
+    const { claim, refusal } = await this.askHeld('claim', held);
+    if (!claim) throw refusal;
+    return claim;
+  }
+
+  /** The main member's new phone lets itself in with the Pond's recovery PIN. */
+  async recoverPairingRequest(held: HeldPairing, pin: string): Promise<PairingRecovery> {
+    const { claim, refusal } = await this.askHeld('recover', held, pin);
+    if (claim) return claim;
+    if (refusal.detail === 'wrong_pin') {
+      const left = (refusal.body as { tries_left?: unknown } | null)?.tries_left;
+      return { status: 'wrong_pin', triesLeft: typeof left === 'number' && Number.isFinite(left) && left >= 0 ? left : null };
+    }
+    if (refusal.detail === 'pin_cooling') {
+      const wait = (refusal.body as { retry_after_secs?: unknown } | null)?.retry_after_secs;
+      const secs = typeof wait === 'number' && Number.isFinite(wait) && wait > 0 ? wait : refusal.retryAfterSecs;
+      return { status: 'cooling', retryAfterSecs: secs && secs > 0 ? Math.ceil(secs) : 60 };
+    }
+    if (refusal.detail === 'no_recovery_pin') return { status: 'no_pin' };
+    throw refusal;
   }
 
   /**
@@ -1432,9 +1567,14 @@ export class PondApiClient {
 
   // ── Sessions ────────────────────────────────────────────────
 
-  async listSessions(): Promise<SessionSummary[]> {
+  /**
+   * Every conversation, or with `surfaces` only those begun there. `unknown` names the ones begun
+   * before the Pond recorded where; a Pond older than the filter ignores it and answers them all.
+   */
+  async listSessions(surfaces?: readonly string[]): Promise<SessionSummary[]> {
+    const query = surfaces?.length ? `?surface=${surfaces.map(encodeURIComponent).join(',')}` : '';
     const res = await this.request<{ sessions?: SessionSummary[] } | SessionSummary[]>(
-      '/api/v1/sessions',
+      `/api/v1/sessions${query}`,
     );
     return collection<SessionSummary>(res, 'sessions');
   }
@@ -1453,6 +1593,14 @@ export class PondApiClient {
 
   deleteSession(id: string): Promise<void> {
     return this.del<void>(`/api/v1/sessions/${encodeURIComponent(id)}`);
+  }
+
+  /** Take or pass over what a message offers. A 409 means it was already answered. */
+  answerOffer(sessionId: string, messageId: string, take: boolean): Promise<OfferAnswer> {
+    return this.post<OfferAnswer>(
+      `/api/v1/sessions/${encodeURIComponent(sessionId)}/messages/${encodeURIComponent(messageId)}/offer`,
+      { take },
+    );
   }
 
   renameSession(id: string, title: string): Promise<void> {
@@ -1484,9 +1632,15 @@ export class PondApiClient {
   /**
    * Marks one notification delivered to this phone, so it is not pulled or
    * flushed to the stream again. A 404 means it was never this phone's.
+   * `shown` says the phone put it in front of the person, which the Pond records apart.
    */
-  async acknowledgeNotification(id: string): Promise<void> {
-    await this.post(`/api/v1/notifications/${encodeURIComponent(id)}/ack`, {});
+  async acknowledgeNotification(id: string, shown = false): Promise<void> {
+    await this.post(`/api/v1/notifications/${encodeURIComponent(id)}/ack`, shown ? { shown: true } : {});
+  }
+
+  /** Tells the Pond the person tapped one of this phone's notices. A 404 means it was never this phone's. */
+  async notificationOpened(id: string): Promise<void> {
+    await this.request<unknown>(`/api/v1/notifications/${encodeURIComponent(id)}/opened`, { method: 'POST' });
   }
 
   // ── Reminders ───────────────────────────────────────────────
@@ -1569,6 +1723,31 @@ export class PondApiClient {
 
   deletePromptExtra(key: string): Promise<void> {
     return this.del<void>(`/api/v1/agent/extras/${encodeURIComponent(key)}`);
+  }
+
+  // ── Prompt templates (soul, heartbeat, scratchpad, presets) ──────
+
+  /** Lists built-in and customized prompt templates: `GET /api/v1/prompts`. */
+  async listPromptTemplates(): Promise<PromptTemplate[]> {
+    return this.get<PromptTemplate[]>('/api/v1/prompts');
+  }
+
+  /** Gets a single prompt template by name. */
+  async getPromptTemplate(name: string): Promise<PromptTemplate> {
+    return this.get<PromptTemplate>(`/api/v1/prompts/${encodeURIComponent(name)}`);
+  }
+
+  /** Saves a customized prompt template content: `PUT /api/v1/prompts/{name}`. */
+  async updatePromptTemplate(name: string, content: string, description?: string): Promise<PromptTemplate> {
+    return this.put<PromptTemplate>(`/api/v1/prompts/${encodeURIComponent(name)}`, {
+      content,
+      ...(description === undefined ? {} : { description }),
+    });
+  }
+
+  /** Resets a customized prompt template to its built-in factory default: `POST /api/v1/prompts/{name}/reset`. */
+  async resetPromptTemplate(name: string): Promise<PromptTemplate> {
+    return this.post<PromptTemplate>(`/api/v1/prompts/${encodeURIComponent(name)}/reset`, {});
   }
 
   /**
@@ -2606,6 +2785,39 @@ export class PondApiClient {
     return this.post<void>(`/api/v1/long-tasks/${encodeURIComponent(id)}/cancel`, {});
   }
 
+  // The pairing lock, as a paired member sees it. Changing it, and answering the phones that
+  // wait, is the main member's: anyone else is refused with 403 `pairing_main_member_only`.
+
+  async pairingLock(): Promise<PairingLock> {
+    return required(readPairingLock(await this.get<unknown>('/api/v1/pairing/lock')), 'the pairing lock');
+  }
+
+  async setPairingLock(locked: boolean): Promise<void> {
+    await this.put<unknown>('/api/v1/pairing/lock', { locked });
+  }
+
+  /** A 400 `pin_not_six_to_twelve_digits` for a PIN the Pond will not take. */
+  async setRecoveryPin(pin: string): Promise<void> {
+    await this.put<unknown>('/api/v1/pairing/recovery-pin', { pin });
+  }
+
+  async clearRecoveryPin(): Promise<void> {
+    await this.del<unknown>('/api/v1/pairing/recovery-pin');
+  }
+
+  async pairingRequests(): Promise<PairingRequest[]> {
+    return readPairingRequests(await this.get<unknown>('/api/v1/pairing/requests'));
+  }
+
+  /** Let a waiting phone in, as the member its code named unless `profileId` names another. */
+  async approvePairingRequest(id: string, profileId?: string): Promise<void> {
+    await this.post<unknown>(`/api/v1/pairing/requests/${encodeURIComponent(id)}/approve`, profileId ? { profile_id: profileId } : {});
+  }
+
+  async declinePairingRequest(id: string): Promise<void> {
+    await this.post<unknown>(`/api/v1/pairing/requests/${encodeURIComponent(id)}/decline`, {});
+  }
+
   // My Pond: every route below but status, unlock and lock answers 403 `admin_locked` until unlocked.
 
   /** Reading the status never renews the unlock, so it is the one admin route that may be polled. */
@@ -2676,6 +2888,11 @@ export class PondApiClient {
 
   async adminHealth(): Promise<AdminHealth> {
     return required(readHealth(await this.get<unknown>('/api/v1/admin/health')), 'the health report');
+  }
+
+  /** Whether notices arrived and messages were answered, over the last `days` (the Pond takes 1 to 90). */
+  async adminReliability(days: number): Promise<AdminReliability> {
+    return required(readReliability(await this.get<unknown>(`/api/v1/admin/reliability?days=${Math.round(days)}`)), 'the reliability report');
   }
 
   async adminPower(): Promise<AdminPower> {
@@ -3016,6 +3233,124 @@ export class PondApiClient {
     await this.post<unknown>('/api/v1/me/ideas/refresh', {});
   }
 
+  /** One idea's own page: `GET /me/ideas/{id}`. */
+  async idea(id: string): Promise<Idea> {
+    return required(readIdea(await this.get<unknown>(`/api/v1/me/ideas/${encodeURIComponent(id)}`)), 'the idea');
+  }
+
+  // ── Cards sent to chat ───────────────────────────────────────
+
+  /** What a chat about this card would be given: what the member read, and Goose's notes. */
+  async card(kind: CardKind, id: string): Promise<ContextCard> {
+    return required(readCard(await this.get<unknown>(`/api/v1/me/cards/${kind}/${encodeURIComponent(id)}`)), 'the card');
+  }
+
+  // ── About you: the member's profile ──────────────────────────
+
+  async about(): Promise<AboutProfile> {
+    return readAbout(await this.get<unknown>('/api/v1/me/about'));
+  }
+
+  /** A fact the member writes about themselves, filed under the word they pick. */
+  async addAboutFact(content: string, about: string): Promise<AboutFact> {
+    return required(readFact(await this.post<unknown>('/api/v1/me/about', { content, about })), 'the fact');
+  }
+
+  async editAboutFact(id: string, change: { content?: string; about?: string }): Promise<AboutFact> {
+    return required(readFact(await this.patch<unknown>(`/api/v1/me/about/${encodeURIComponent(id)}`, change)), 'the fact');
+  }
+
+  async deleteAboutFact(id: string): Promise<void> {
+    await this.del<unknown>(`/api/v1/me/about/${encodeURIComponent(id)}`);
+  }
+
+  /** Rows the Pond set aside when it re-sorted older memories, each with its reason. */
+  async archivedAbout(): Promise<ArchivedFact[]> {
+    return readArchived(await this.get<unknown>('/api/v1/me/about/archived'));
+  }
+
+  async restoreAboutFact(id: string): Promise<AboutFact> {
+    return required(readFact(await this.post<unknown>(`/api/v1/me/about/${encodeURIComponent(id)}/restore`, {})), 'the fact');
+  }
+
+  // ── The one interview ────────────────────────────────────────
+
+  async memberInterview(): Promise<MemberInterview> {
+    return readMemberInterview(await this.get<unknown>('/api/v1/me/interview'));
+  }
+
+  /** Starts it, picks it up where it stopped, or begins again once done. */
+  async startMemberInterview(): Promise<MemberInterview> {
+    return readMemberInterview(await this.post<unknown>('/api/v1/me/interview', {}));
+  }
+
+  async answerMemberInterview(answer: InterviewAnswer): Promise<MemberInterview> {
+    return readMemberInterview(await this.post<unknown>('/api/v1/me/interview/answer', answer));
+  }
+
+  /** Stops asking and writes up what there is. */
+  async finishMemberInterview(): Promise<MemberInterview> {
+    return readMemberInterview(await this.post<unknown>('/api/v1/me/interview/finish', {}));
+  }
+
+  async approveMemberInterview(approval: InterviewApproval): Promise<InterviewKept> {
+    return readKept(await this.post<unknown>('/api/v1/me/interview/approve', approval));
+  }
+
+  // ── Goose's own notes ────────────────────────────────────────
+
+  async gooseNotes(): Promise<GooseNotes> {
+    return readGooseNotes(await this.get<unknown>('/api/v1/me/notes'));
+  }
+
+  async deleteGooseNote(id: string): Promise<void> {
+    await this.del<unknown>(`/api/v1/me/notes/${encodeURIComponent(id)}`);
+  }
+
+  // ── What Goose did by itself ─────────────────────────────────
+
+  async gooseActivity(): Promise<GooseActivityList> {
+    return readGooseActivity(await this.get<unknown>('/api/v1/me/goose/activity'));
+  }
+
+  async undoGooseActivity(id: string): Promise<void> {
+    await this.post<unknown>(`/api/v1/me/goose/activity/${encodeURIComponent(id)}/undo`, {});
+  }
+
+  async markGooseActivitySeen(): Promise<void> {
+    await this.post<unknown>('/api/v1/me/goose/activity/seen', {});
+  }
+
+  // ── Ideas from screenshots (opt-in) ──────────────────────────
+
+  async screenshots(): Promise<Screenshots> {
+    return readScreenshots(await this.get<unknown>('/api/v1/me/screenshots'));
+  }
+
+  /** Turning it off forgets every screenshot still waiting to be read. */
+  async setScreenshots(enabled: boolean): Promise<Screenshots> {
+    return readScreenshots(await this.put<unknown>('/api/v1/me/screenshots', { enabled }));
+  }
+
+  /** One screenshot for the Pond to read once; answers how many are waiting. */
+  async sendScreenshot(image: string, mimeType: string, takenAt?: string): Promise<number> {
+    const res = await this.post<{ pending?: unknown }>('/api/v1/me/screenshots', {
+      image,
+      mime_type: mimeType,
+      ...(takenAt ? { taken_at: takenAt } : {}),
+    });
+    return typeof res?.pending === 'number' ? res.pending : 0;
+  }
+
+  async deleteScreenshotNote(id: string): Promise<void> {
+    await this.del<unknown>(`/api/v1/me/screenshots/${encodeURIComponent(id)}`);
+  }
+
+  /** Every note, and every screenshot still waiting. */
+  async deleteAllScreenshotNotes(): Promise<void> {
+    await this.del<unknown>('/api/v1/me/screenshots');
+  }
+
   async catalog(): Promise<CatalogItem[]> {
     return readCatalog(await this.get<unknown>('/api/v1/me/catalog'));
   }
@@ -3042,9 +3377,9 @@ export class PondApiClient {
     return this.post<void>(`/api/v1/devices/${encodeURIComponent(deviceId)}/heartbeat`, {});
   }
 
-  /** Tell the Pond this phone has put a notice in front of the user, so it stops holding it. */
-  ackNotification(id: string): Promise<void> {
-    return this.post<void>(`/api/v1/notifications/${encodeURIComponent(id)}/ack`, {});
+  /** Tell the Pond this phone has taken a notice, so it stops holding it; `shown` when the person was shown it. */
+  ackNotification(id: string, shown = false): Promise<void> {
+    return this.post<void>(`/api/v1/notifications/${encodeURIComponent(id)}/ack`, shown ? { shown: true } : {});
   }
 
   private post<T>(path: string, body: unknown): Promise<T> {

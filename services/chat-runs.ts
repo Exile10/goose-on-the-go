@@ -17,6 +17,7 @@
 import { AppState } from 'react-native';
 
 import type { CardHint, Message, ToolCall } from '@/models/chat';
+import { readReceipt, withReceipt } from '@/models/message-note';
 
 import { ApiError, api } from './api-client';
 import { rememberCard } from './card-cache';
@@ -86,12 +87,16 @@ export function applyFrame(reply: Message, frame: ChatFrame): Message {
         result: frame.content ?? call.result,
         card: card ?? call.card,
       });
-      if (tools.some((t) => t.id === frame.id)) {
-        return { ...reply, tools: tools.map((t) => (t.id === frame.id ? done(t) : t)) };
+      const known = tools.find((t) => t.id === frame.id);
+      // A replayed result brings its receipt a second time; the call it answered is already done.
+      const receipt = known && known.status !== 'running' ? null : readReceipt(frame.receipt);
+      const noted = receipt ? { ...reply, note: withReceipt(reply.note, receipt) } : reply;
+      if (known) {
+        return { ...noted, tools: tools.map((t) => (t.id === frame.id ? done(t) : t)) };
       }
       // A result for a call this reply never saw — joined mid-turn. Keep it.
       return {
-        ...reply,
+        ...noted,
         tools: [...tools, done({ id: frame.id, name: frame.tool ?? '', args: '{}', status: 'ok' })],
       };
     }

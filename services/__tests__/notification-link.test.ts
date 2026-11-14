@@ -119,6 +119,9 @@ describe('openRouteFromData', () => {
     expect(openRouteFromData({ open: 'extensions' })).toEqual({ open: 'extensions' });
     expect(openRouteFromData({ open: 'remote_access' })).toEqual({ open: 'remote_access' });
     expect(openRouteFromData({ open: 'my_pond' })).toEqual({ open: 'my_pond' });
+    expect(openRouteFromData({ open: 'ideas' })).toEqual({ open: 'ideas' });
+    expect(openRouteFromData({ open: 'ideas', idea_id: 'idea-1' })).toEqual({ open: 'ideas', ideaId: 'idea-1' });
+    expect(openRouteFromData({ open: 'goose_activity' })).toEqual({ open: 'goose_activity' });
   });
 
   it('keeps the schedule screen but drops an id that is not a Pond id', () => {
@@ -168,6 +171,8 @@ describe('screenPath', () => {
       pathname: '/conversation',
       params: { session: 's-1' },
     });
+    expect(screenPath({ open: 'ideas' })).toBe('/(stack)/goose-ideas');
+    expect(screenPath({ open: 'goose_activity' })).toBe('/(stack)/goose-activity');
   });
 
   it('opens the schedules list on the schedule the notification names', () => {
@@ -191,5 +196,29 @@ describe('a watch notice', () => {
     expect(openRouteFromData({ open: 'watch' })).toEqual({ open: 'watch' });
     expect(screenPath({ open: 'watch' })).toBe('/(stack)/web-watches');
     expect(openRouteFromData({ open: 'watch', watch_id: '../etc' })).toEqual({ open: 'watch' });
+  });
+});
+
+describe('a news notice', () => {
+  it('opens the news list for the digest the Pond names, and still opens a story by its id', () => {
+    const digest = openRouteFromData({ open: 'news', digest_id: 'd1' });
+    expect(digest).toEqual({ open: 'news', digestId: 'd1' });
+    expect(screenPath(digest!)).toBe('/(stack)/goose-news');
+    const story = openRouteFromData({ open: 'news', story_id: 's1', digest_id: 'd1' });
+    expect(screenPath(story!)).toEqual({ pathname: '/(stack)/goose-story', params: { id: 's1' } });
+    expect(openRouteFromData({ open: 'news', digest_id: '../x' })).toEqual({ open: 'news' });
+  });
+});
+
+describe('a phone asking to pair', () => {
+  it('opens the page that answers it, not the devices list', () => {
+    const route = openRouteFromData({ action: 'pairing_request', request_id: 'req-1', open: 'devices' });
+    expect(route).toEqual({ open: 'pairing', requestId: 'req-1' });
+    expect(screenPath(route!)).toBe('/(stack)/pairing-lock');
+  });
+
+  it('keeps the page and drops a request id that is not a Pond id', () => {
+    expect(openRouteFromData({ action: 'pairing_request', request_id: 'a/b', open: 'devices' })).toEqual({ open: 'pairing' });
+    expect(openRouteFromData({ open: 'devices' })).toEqual({ open: 'devices' });
   });
 });

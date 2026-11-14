@@ -16,6 +16,7 @@
 import { api, type PondApiClient } from './api-client';
 import { presentLocally } from './local-notifications';
 import type { ServerNotification } from './notification-stream';
+import { dismissWakeAlerts } from './wake-alert';
 
 /** The notification with the time it happened appended to its text: the time alone today, with the date before that. */
 export function withEventTime(notification: ServerNotification, now = new Date()): ServerNotification {
@@ -28,18 +29,23 @@ export function withEventTime(notification: ServerNotification, now = new Date()
   return { ...notification, body: notification.body ? `${notification.body} · ${when}` : when };
 }
 
-/** Present and acknowledge every waiting notification. Returns how many were presented. */
+/**
+ * Present and acknowledge every waiting notification, then take the iPhone's fixed wake line out
+ * of the shade unless it still stands for one the shade refused. Returns how many were presented.
+ */
 export async function pullPendingNotifications(client: PondApiClient = api): Promise<number> {
   const pending = await client.pendingNotifications();
-  let presented = 0;
+  const shown: ServerNotification[] = [];
   for (const notification of pending) {
+    const shade = withEventTime(notification);
     // Left unacknowledged, it is pulled again on the next wake or flushed to the stream.
-    if (!(await presentLocally(withEventTime(notification)))) continue;
-    presented++;
+    if (!(await presentLocally(shade))) continue;
+    shown.push(shade);
     // A failed ack only means the next wake presents it again, in place.
-    await client.acknowledgeNotification(notification.id).catch((e) => {
+    await client.acknowledgeNotification(notification.id, true).catch((e) => {
       console.warn('[notifications] could not acknowledge', notification.id, e);
     });
   }
-  return presented;
+  if (shown.length === pending.length) await dismissWakeAlerts(shown, presentLocally);
+  return shown.length;
 }

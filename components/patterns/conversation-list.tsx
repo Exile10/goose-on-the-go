@@ -41,6 +41,7 @@ import { InkSkeleton, InkTitle, inkText, useInkTheme } from '@jarida/ink/native'
 import {
   AnsweringMark,
   DeleteOrKeep,
+  GooseMark,
   LONG_PRESS_MS,
   SelectMark,
   cardWords,
@@ -121,6 +122,7 @@ export const ConversationRow = React.memo(function ConversationRow({
   const { t } = useTranslation();
 
   const { title, label } = cardWords(card, t);
+  const choosable = selecting && card.deletable;
   // Beside the time rather than on a line of its own, so a routine's row is no
   // taller than a chat's.
   const meta = [card.routine ? t('chat.history.routine') : '', card.when]
@@ -141,20 +143,24 @@ export const ConversationRow = React.memo(function ConversationRow({
       feedback="tint"
       accessibilityRole="button"
       accessibilityLabel={label}
-      accessibilityHint={t(
-        selecting
-          ? selected
-            ? 'chat.history.deselectHint'
-            : 'chat.history.selectHint'
-          : 'chat.history.openHint',
-      )}
-      accessibilityState={selecting ? { selected } : undefined}
-      accessibilityActions={selecting ? undefined : deleteActions(confirming, t)}
-      onAccessibilityAction={selecting ? undefined : onAction}
+      accessibilityHint={
+        selecting && !choosable
+          ? undefined
+          : t(
+              selecting
+                ? selected
+                  ? 'chat.history.deselectHint'
+                  : 'chat.history.selectHint'
+                : 'chat.history.openHint',
+            )
+      }
+      accessibilityState={choosable ? { selected } : undefined}
+      accessibilityActions={selecting ? undefined : deleteActions(confirming, t, card.deletable)}
+      onAccessibilityAction={selecting || !card.deletable ? undefined : onAction}
       // As on a card: while the row is asking, a touch anywhere else on it is
       // "never mind", and while the list is being chosen from it is a choice.
-      onPress={() => (selecting ? onToggle(card.id) : confirming ? onKeep() : onOpen(card.id))}
-      onLongPress={selecting ? undefined : () => onAskDelete(card.id)}
+      onPress={() => (selecting ? (choosable ? onToggle(card.id) : undefined) : confirming ? onKeep() : onOpen(card.id))}
+      onLongPress={selecting || !card.deletable ? undefined : () => onAskDelete(card.id)}
       delayLongPress={LONG_PRESS_MS}
       style={[
         local.row,
@@ -163,12 +169,13 @@ export const ConversationRow = React.memo(function ConversationRow({
           paddingVertical: theme.space[3],
           minHeight: theme.touch.tapMin,
         },
-        selecting && selected ? { backgroundColor: theme.color.accentSofter } : null,
+        choosable && selected ? { backgroundColor: theme.color.accentSofter } : null,
       ]}
     >
-      {selecting ? <SelectMark selected={selected} /> : null}
+      {choosable ? <SelectMark selected={selected} /> : null}
       <View style={local.body}>
         <View style={[local.line, { gap: theme.space[3] }]}>
+          {card.goose ? <GooseMark size={15} /> : null}
           <Text style={[text.title, local.title]} numberOfLines={1}>
             {title}
           </Text>

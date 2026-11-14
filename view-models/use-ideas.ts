@@ -78,3 +78,10 @@ export function useIdeas(enabled = true) {
 }
 
 export type UseIdeas = ReturnType<typeof useIdeas>;
+
+/** One idea by id, from the member's ideas, with the actions its page offers. */
+export function useIdea(id: string | undefined) {
+  const ideas = useIdeas();
+  const idea = id ? (ideas.data.ideas.find((i) => i.id === id) ?? null) : null;
+  return { idea, ideas };
+}

@@ -85,6 +85,7 @@ export default function StackLayout() {
       }}
     >
       <Stack.Screen name="settings-assistant" options={{ title: t('screens.settingsAssistant') }} />
+      <Stack.Screen name="settings-prompt-templates" options={{ title: t('screens.settingsPromptTemplates') }} />
       <Stack.Screen name="settings-prompt-notes" options={{ title: t('screens.settingsPromptNotes') }} />
       <Stack.Screen name="settings-voice" options={{ title: t('screens.settingsVoice') }} />
       <Stack.Screen name="settings-speaking" options={{ title: t('screens.settingsSpeaking') }} />
@@ -144,6 +145,13 @@ export default function StackLayout() {
       <Stack.Screen name="goose-connector" options={{ title: t('screens.gooseConnector') }} />
       <Stack.Screen name="goose-interests" options={{ title: t('screens.gooseInterests') }} />
       <Stack.Screen name="goose-interview" options={{ title: t('screens.gooseInterview') }} />
+      <Stack.Screen name="goose-member-interview" options={{ title: t('screens.gooseMemberInterview') }} />
+      <Stack.Screen name="goose-idea" options={{ title: t('screens.gooseIdea') }} />
+      <Stack.Screen name="goose-about" options={{ title: t('screens.gooseAbout') }} />
+      <Stack.Screen name="goose-about-archived" options={{ title: t('screens.gooseAboutArchived') }} />
+      <Stack.Screen name="goose-notes" options={{ title: t('screens.gooseNotes') }} />
+      <Stack.Screen name="goose-activity" options={{ title: t('screens.gooseActivity') }} />
+      <Stack.Screen name="goose-screenshots" options={{ title: t('screens.gooseScreenshots') }} />
       <Stack.Screen name="goose-catalog" options={{ title: t('screens.gooseCatalog') }} />
       <Stack.Screen name="ride" options={{ title: t('screens.ride') }} />
       <Stack.Screen name="agents" options={{ title: t('screens.agents') }} />
@@ -153,6 +161,7 @@ export default function StackLayout() {
       <Stack.Screen name="pond-caches" options={{ title: t('screens.pondCaches') }} />
       <Stack.Screen name="pond-tasks" options={{ title: t('screens.pondTasks') }} />
       <Stack.Screen name="pond-health" options={{ title: t('screens.pondHealth') }} />
+      <Stack.Screen name="pond-reliability" options={{ title: t('screens.pondReliability') }} />
       <Stack.Screen name="pond-power" options={{ title: t('screens.pondPower') }} />
       <Stack.Screen name="agent" options={{ title: t('screens.agent') }} />
       <Stack.Screen name="voice-agent" options={{ title: t('screens.voiceAgent') }} />
@@ -165,6 +174,7 @@ export default function StackLayout() {
       <Stack.Screen name="remote-access" options={{ title: t('screens.remoteAccess') }} />
       <Stack.Screen name="home-management" options={{ title: t('screens.homeManagement') }} />
       <Stack.Screen name="pond-pairing" options={{ title: t('screens.pondPairing') }} />
+      <Stack.Screen name="pairing-lock" options={{ title: t('screens.pairingLock') }} />
       <Stack.Screen name="developer" options={{ title: t('screens.developer') }} />
       <Stack.Screen name="debug" options={{ title: t('screens.debug') }} />
       <Stack.Screen name="commission-device" options={{ title: t('screens.commissionDevice') }} />

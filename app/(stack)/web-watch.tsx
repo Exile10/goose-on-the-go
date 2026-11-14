@@ -9,6 +9,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import { useTranslation } from 'react-i18next';
 import { InkButton, InkCard, InkChip, InkEyebrow, InkNotice, InkSpinner, InkSwitch, InkText } from '@jarida/ink/native';
+import { SendToChat } from '@/components/goose/send-to-chat';
 
 import type { ThemeColors } from '@/constants/colors';
 import { Spacing } from '@/constants/spacing';
@@ -70,7 +71,16 @@ export default function WebWatchScreen() {
           <InkCard>
             <InkText weight="semibold">{watch.title}</InkText>
             <InkText size="sm" tone="secondary">{siteOf(watch.address)}</InkText>
-            <InkText>{t('webWatches.lookingFor', { what: watch.filtersWords || watch.lookingFor })}</InkText>
+            {watch.hasRule ? (
+              <InkText>{t('goose.watching.tellsYou', { rule: watch.filtersWords })}</InkText>
+            ) : (
+              <InkText>{t('webWatches.lookingFor', { what: watch.filtersWords || watch.lookingFor })}</InkText>
+            )}
+            {watch.standing ? (
+              <InkText size="sm" tone="secondary">
+                {t('goose.watching.standing', { standing: watch.standing })}
+              </InkText>
+            ) : null}
             <InkSwitch
               checked={!watch.paused}
               disabled={saving}
@@ -128,6 +138,7 @@ export default function WebWatchScreen() {
             </InkCard>
           ))}
 
+          <SendToChat kind="watch" id={watch.id} title={watch.title} size="md" />
           <InkButton variant="quiet" icon="trash" disabled={saving} onPress={() => void stop()}>
             {t('webWatches.stop')}
           </InkButton>

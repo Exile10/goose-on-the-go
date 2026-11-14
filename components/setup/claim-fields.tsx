@@ -45,6 +45,7 @@ export function DigitsField({
   placeholder,
   invalid,
   disabled,
+  secret,
   onSubmit,
 }: {
   label: string;
@@ -53,6 +54,8 @@ export function DigitsField({
   placeholder?: string;
   invalid?: string;
   disabled?: boolean;
+  /** A PIN rather than a code read off something: masked, and never offered from a message. */
+  secret?: boolean;
   onSubmit?: () => void;
 }) {
   const field = useFieldStyle(!!invalid);
@@ -66,8 +69,9 @@ export function DigitsField({
           placeholderTextColor={field.theme.color.textTertiary}
           keyboardType="number-pad"
           autoCorrect={false}
-          autoComplete="one-time-code"
-          textContentType="oneTimeCode"
+          secureTextEntry={secret}
+          autoComplete={secret ? 'off' : 'one-time-code'}
+          textContentType={secret ? 'none' : 'oneTimeCode'}
           editable={!disabled}
           returnKeyType="go"
           onSubmitEditing={onSubmit}

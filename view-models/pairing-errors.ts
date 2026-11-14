@@ -91,6 +91,12 @@ export function explainRejection(
     // The phone only ever names pairing or setup, so a Pond refusing either does not know this exchange.
     case 'invalid_credential':
       return t('pairingErrors.pondOutdated');
+    // The pairing lock's queue is full: nothing was wrong with the code.
+    case 'pairing_requests_full':
+      return t('pairingLock.refused.full');
+    // Held by the pairing lock with no request to come back for, as over Bluetooth: the wait runs on the home network.
+    case 'approval_required':
+      return t('pairingLock.refused.needsNetwork');
     default:
       return null;
   }

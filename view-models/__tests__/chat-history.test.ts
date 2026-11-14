@@ -17,7 +17,12 @@ import {
   isEmpty,
   isHistoryView,
   isRoutine,
+  ignoresSurfaces,
+  noteCard,
   passesFilter,
+  rowsForTab,
+  scheduledNotes,
+  TAB_SURFACES,
   turnEnded,
   placeOnWall,
   recencyKey,
@@ -27,7 +32,7 @@ import {
   toCard,
   type HistorySection,
 } from '@/view-models/use-chat-history';
-import type { SessionSummary } from '@/services/types';
+import type { SessionMessage, SessionSummary } from '@/services/types';
 
 const LOCALE = 'en-US';
 
@@ -445,7 +450,15 @@ describe('toCard', () => {
       messageCount: 21,
       weight: 'column',
       routine: true,
+      goose: false,
+      opens: 'sched-x-1',
+      deletable: true,
     });
+  });
+
+  it('marks the Goose thread, which the wall may not delete', () => {
+    const card = toCard(session({ id: 'goose-p1', title: 'Goose', surface: 'goose' }), at(2026, 9, 24), LOCALE, 'Yesterday');
+    expect(card).toMatchObject({ goose: true, deletable: false, opens: 'goose-p1' });
   });
 
   it('carries the Pond’s picture only when it is one the Pond serves', () => {
@@ -484,5 +497,95 @@ describe('turnEnded', () => {
     expect(turnEnded(new Set(['a', 'b']), new Set(['b']))).toBe(true);
     expect(turnEnded(new Set(['a']), new Set(['a', 'b']))).toBe(false);
     expect(turnEnded(new Set(), new Set())).toBe(false);
+  });
+});
+
+// The wall is cut by where a conversation was begun, and opens on what was begun on this phone.
+describe('the tabs', () => {
+  const rows = [
+    session({ id: 'p1', surface: 'phone', started_here: true }),
+    session({ id: 'goose-m1', surface: 'goose' }),
+    session({ id: 'p2', surface: 'phone', started_here: true }),
+    session({ id: 'other-phone', surface: 'phone', started_here: false }),
+    session({ id: 'r1', surface: 'room' }),
+    session({ id: 'd1', surface: 'desktop' }),
+    session({ id: 'old' }),
+    session({ id: 'sched-1', surface: 'schedule' }),
+  ];
+
+  it('asks the Pond for this phone and the Goose thread by default, and for unrecorded ones under Other screens', () => {
+    expect(TAB_SURFACES.phone).toEqual(['here', 'goose']);
+    expect(TAB_SURFACES.room).toEqual(['room']);
+    expect(TAB_SURFACES.other).toEqual(['desktop', 'cli', 'pond', 'unknown', 'elsewhere']);
+  });
+
+  it('keeps what belongs to a tab, the Goose thread first', () => {
+    expect(rowsForTab(rows, 'phone', false).map((r) => r.id)).toEqual(['goose-m1', 'p1', 'p2']);
+    expect(rowsForTab(rows, 'room', false).map((r) => r.id)).toEqual(['r1']);
+    expect(rowsForTab(rows, 'other', false).map((r) => r.id)).toEqual(['other-phone', 'd1', 'old']);
+  });
+
+  it('shows a schedule\'s own conversation under no tab: its report is in the Goose thread', () => {
+    for (const tab of ['phone', 'room', 'other'] as const) {
+      expect(rowsForTab(rows, tab, false).map((r) => r.id)).not.toContain('sched-1');
+    }
+  });
+
+  // A Pond older than the filter answers everything and names no surface on any of it.
+  it('keeps the whole wall under This phone on a Pond that names no surfaces', () => {
+    const older = [session({ id: 'a' }), session({ id: 'b' })];
+    expect(ignoresSurfaces(older, 'phone')).toBe(true);
+    expect(rowsForTab(older, 'phone', true).map((r) => r.id)).toEqual(['a', 'b']);
+    expect(rowsForTab(older, 'room', true)).toEqual([]);
+    expect(rowsForTab(older, 'other', true)).toEqual([]);
+  });
+
+  it('does not take a narrowed answer from a newer Pond, or rows with no surface under Other screens, for an older one', () => {
+    expect(ignoresSurfaces([session({ surface: 'phone' }), session({ surface: 'goose' })], 'phone')).toBe(false);
+    expect(ignoresSurfaces([], 'phone')).toBe(false);
+    expect(ignoresSurfaces([session({ id: 'old' })], 'other')).toBe(false);
+  });
+});
+
+describe('what the schedules reported', () => {
+  const message = (overrides: Partial<SessionMessage>): SessionMessage => ({
+    id: 'm',
+    session_id: 'goose-m1',
+    role: 'assistant',
+    content: 'text',
+    created_at: '2026-11-12T08:00:00+00:00',
+    ...overrides,
+  });
+  const thread = { id: 'goose-m1', title: 'Goose' };
+
+  it('reads only the messages a schedule left, newest first, named for the schedule', () => {
+    const notes = scheduledNotes(
+      [
+        message({ id: 'm1', content: 'Rain by noon.', note: { from: { kind: 'schedule', label: 'Daily Briefing' } } }),
+        message({ id: 'm2', content: 'I set a reminder.', note: { from: { kind: 'reminder', label: 'Bins' } } }),
+        message({ id: 'm3', content: 'No note at all.' }),
+        message({ id: 'm4', content: 'The dollar is at 129.', created_at: '2026-11-13T08:00:00+00:00', note: { from: { kind: 'schedule', label: 'Markets' } } }),
+      ],
+      thread,
+    );
+    expect(notes.map((n) => [n.id, n.label, n.text])).toEqual([
+      ['m4', 'Markets', 'The dollar is at 129.'],
+      ['m1', 'Daily Briefing', 'Rain by noon.'],
+    ]);
+    expect(notes[0]).toMatchObject({ sessionId: 'goose-m1', sessionTitle: 'Goose' });
+  });
+
+  it('draws a report as a card that opens the Goose thread and cannot be deleted', () => {
+    const [note] = scheduledNotes([message({ id: 'm1', content: ' Rain by noon. ', note: { from: { kind: 'schedule', label: 'Daily Briefing' } } })], thread);
+    const card = noteCard(note, at(2026, 11, 13), LOCALE, 'Yesterday');
+    expect(card).toMatchObject({
+      id: 'note:m1',
+      title: 'Daily Briefing',
+      preview: 'Rain by noon.',
+      opens: 'goose-m1',
+      opensTitle: 'Goose',
+      deletable: false,
+      goose: false,
+    });
   });
 });

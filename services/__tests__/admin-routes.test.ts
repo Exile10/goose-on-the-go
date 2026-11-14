@@ -210,6 +210,21 @@ describe('tasks', () => {
   });
 });
 
+describe('reliability', () => {
+  it('asks for the days wanted, with the bearer', async () => {
+    const seen: Seen[] = [];
+    recordInto(seen, '{"days":30,"notices":{"queued":2},"turns":{},"phones":{},"stops":0,"android_push_key":true,"apple_push_key":false}');
+    const report = await paired().adminReliability(30);
+    expect(report).toMatchObject({ days: 30, notices: { queued: 2 }, apple_push_key: false });
+    expect(seen[0]).toMatchObject({ url: `${BASE}/reliability?days=30`, authorization: 'Bearer session-token' });
+  });
+
+  it('refuses an answer that is not a report', async () => {
+    recordInto([], '{"days":7}');
+    await expect(paired().adminReliability(7)).rejects.toThrow('the reliability report');
+  });
+});
+
 describe('health and power', () => {
   it('reads health and power', async () => {
     const seen: Seen[] = [];

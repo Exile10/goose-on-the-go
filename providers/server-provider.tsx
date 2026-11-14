@@ -12,7 +12,8 @@ import { forgetPushRegistration } from '@/services/push-token';
 import { forgetAllThreads } from '@/services/chat-threads';
 import { Storage, purgeLegacyStorage, storageFamily } from '@/services/storage';
 import { SecureStorage } from '@/services/secure-storage';
-import { ApiError, api, PondApiClient, type HandshakeResponse, type SpokenCode } from '@/services/api-client';
+import { ApiError, api, PondApiClient, type HandshakeResponse, type PairingClaim, type PairingRecovery, type SpokenCode } from '@/services/api-client';
+import type { HeldPairing } from '@/models/pairing-lock';
 import type { PakeCredential } from '@/services/cpace';
 import { ConnectionManager, type ConnectionSnapshot } from '@/services/connection-manager';
 import { PondTrustError } from '@/services/pond-trust';
@@ -66,6 +67,13 @@ interface ServerContextValue {
   stagePairing: (profile: ConnectionProfile, pin: string) => Promise<void>;
   cancelPairing: () => Promise<void>;
   pair: (opts: PairOptions) => Promise<HandshakeResponse>;
+  /**
+   * Come back for a pairing the staged Pond's lock is holding. One it has let in is kept exactly
+   * as `pair` keeps an accepted one. Rejects with no staged Pond, off Wi-Fi, or with no answer.
+   */
+  claimPairing: (held: HeldPairing) => Promise<PairingClaim>;
+  /** The same, let in by the Pond's recovery PIN rather than by its main member. */
+  recoverPairing: (held: HeldPairing, pin: string) => Promise<PairingRecovery>;
   /**
    * Keep a pairing the setup channel made: its pin proven by CPace over BLE, its tokens opened from
    * the sealed answer, its address from `wifi_join`. Nothing is probed first, since the phone may not
@@ -511,6 +519,25 @@ export function ServerProvider({ children }: PropsWithChildren) {
     }
   }, [manager, restore]);
 
+  /** Keep a pairing the staged Pond accepted: its tokens and addresses saved, then the app restored onto it. */
+  const keepStaged = useCallback(async (pending: NonNullable<typeof staged.current>, resp: HandshakeResponse) => {
+    if (!resp.session_token) return;
+    const next: Identity = { id: `${Date.now()}-${Math.random().toString(36).slice(2)}`, pin: pending.pin,
+      session: resp.session_token, refresh: resp.refresh_token ?? null };
+    // Write addresses first, retaining the previous entry until the atomic secure commit.
+    const previous = saved.current;
+    const commit = (async () => {
+      await tokenWrite.current;
+      saved.current = await commitPairedProfile(previous, { identity: next, profile: pending.profile });
+      void rememberCapabilities(next.pin, resp.capabilities);
+      setHasPairing(true);
+      staged.current = null;
+      await restore();
+    })();
+    committing.current = commit;
+    try { await commit; } finally { if (committing.current === commit) committing.current = null; }
+  }, [restore]);
+
   const pair = useCallback(async (opts: PairOptions) => {
     const pending = staged.current;
     const op = operation.current;
@@ -524,24 +551,36 @@ export function ServerProvider({ children }: PropsWithChildren) {
     // failure rather than a pair with the wrong Pond.
     const resp = await pending.client.pair({ ...opts, channelBinding: pending.pin });
     if (op !== operation.current) throw new Error(i18n.t('pairing.failed'));
-    if (resp.accepted && resp.session_token) {
-      const next: Identity = { id: `${Date.now()}-${Math.random().toString(36).slice(2)}`, pin: pending.pin,
-        session: resp.session_token, refresh: resp.refresh_token ?? null };
-      // Write addresses first, retaining the previous entry until the atomic secure commit.
-      const previous = saved.current;
-      const commit = (async () => {
-        await tokenWrite.current;
-        saved.current = await commitPairedProfile(previous, { identity: next, profile: pending.profile });
-        void rememberCapabilities(next.pin, resp.capabilities);
-        setHasPairing(true);
-        staged.current = null;
-        await restore();
-      })();
-      committing.current = commit;
-      try { await commit; } finally { if (committing.current === commit) committing.current = null; }
-    }
+    if (resp.accepted && resp.session_token) await keepStaged(pending, resp);
     return resp;
-  }, [restore]);
+  }, [keepStaged]);
+
+  /** The staged Pond, for a phone coming back for a pairing its lock holds: on Wi-Fi, and still the same attempt. */
+  const heldAt = useCallback(async () => {
+    const pending = staged.current;
+    if (!pending) throw new Error(i18n.t('pairing.lan'));
+    const net = await NetInfo.fetch();
+    if (!['wifi', 'ethernet'].includes(net.type)) throw new Error(i18n.t('pairing.lan'));
+    return pending;
+  }, []);
+
+  const claimPairing = useCallback(async (held: HeldPairing) => {
+    const op = operation.current;
+    const pending = await heldAt();
+    const claim = await pending.client.claimPairingRequest(held);
+    if (op !== operation.current) throw new Error(i18n.t('pairing.failed'));
+    if (claim.status === 'paired') await keepStaged(pending, claim.response);
+    return claim;
+  }, [heldAt, keepStaged]);
+
+  const recoverPairing = useCallback(async (held: HeldPairing, pin: string) => {
+    const op = operation.current;
+    const pending = await heldAt();
+    const answer = await pending.client.recoverPairingRequest(held, pin);
+    if (op !== operation.current) throw new Error(i18n.t('pairing.failed'));
+    if (answer.status === 'paired') await keepStaged(pending, answer.response);
+    return answer;
+  }, [heldAt, keepStaged]);
 
   const adoptPairing = useCallback(async (rawProfile: ConnectionProfile, pin: string, resp: HandshakeResponse) => {
     await committing.current?.catch(() => undefined);
@@ -675,8 +714,8 @@ export function ServerProvider({ children }: PropsWithChildren) {
     pondUrls: [...new Set([...(snapshot.url ? [snapshot.url] : []), ...(manager.savedProfile?.localUrls ?? [])])],
     profileId: identity?.id ?? '', paired: hasPairing, remoteEnabled: saved.current?.profile.remoteAccess?.mode === 'embedded',
     keepLocalOnly, hydrated, screenModes, isScreenReal, setScreenMode,
-    checkHealth, setRemoteEndpoint, recover: manager.recover, retryNow: manager.retryNow, tryAddress: manager.tryAddress, revoke: manager.revoke.bind(manager), stagePairing, cancelPairing, pair, adoptPairing, requestSpokenCode, unpair, forgetLocally,
-  }), [snapshot, identity, hasPairing, hydrated, screenModes, isScreenReal, setScreenMode, checkHealth, setRemoteEndpoint, keepLocalOnly, keepRotatedTokens, manager, stagePairing, cancelPairing, pair, adoptPairing, requestSpokenCode, unpair, forgetLocally]);
+    checkHealth, setRemoteEndpoint, recover: manager.recover, retryNow: manager.retryNow, tryAddress: manager.tryAddress, revoke: manager.revoke.bind(manager), stagePairing, cancelPairing, pair, claimPairing, recoverPairing, adoptPairing, requestSpokenCode, unpair, forgetLocally,
+  }), [snapshot, identity, hasPairing, hydrated, screenModes, isScreenReal, setScreenMode, checkHealth, setRemoteEndpoint, keepLocalOnly, keepRotatedTokens, manager, stagePairing, cancelPairing, pair, claimPairing, recoverPairing, adoptPairing, requestSpokenCode, unpair, forgetLocally]);
   return <ServerContext.Provider value={value}>{children}</ServerContext.Provider>;
 }
 export function useServer(): ServerContextValue {

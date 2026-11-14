@@ -8,7 +8,8 @@
  *   is in the foreground and, on Android with "Stay connected in the background"
  *   on, kept open behind a foreground service after the user leaves
  *   (`services/background-connection.ts`).
- * - The push wake-up: the Pond sends a content-free FCM/APNs message and the
+ * - The push wake-up: the Pond sends a push with no notice text (data-only on
+ *   Android, one fixed line on an iPhone) and the
  *   phone fetches what is pending (`services/notification-wake.ts`). This is
  *   what covers a phone whose stream Android has paused, and all of iOS.
  *   While the app is in the background or closed, the Pond's FCM/APNs wake ping
@@ -196,7 +197,14 @@ export function NotificationsProvider({ children }: PropsWithChildren) {
   }, [serverUrl, token, online]);
 
   // Taps work whether or not a Pond is reachable: a link goes to Uber or a maps app, a screen opens here.
-  useEffect(() => watchLinkTaps(), []);
+  // A tap on an iPhone's wake line fetches now when the app was already running; a starting app
+  // fetches above once its pairing is restored, and the tap waits for that.
+  useEffect(() => watchLinkTaps(() => {
+    if (!api.hasSession) return;
+    drainPending(api, 'foreground').catch((e: unknown) => {
+      console.warn('[notifications] pending fetch failed', { kind: 'notification_pending', source: 'wake_tap', error: String(e) });
+    });
+  }), []);
 
   // The Pond says nothing when a turn ends, so the phone says it, to whoever was not reading.
   useEffect(() => chatRuns.onAnnounce((notice) => void announceTurn(notice)), []);

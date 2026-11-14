@@ -179,8 +179,15 @@ export interface ChatTurn {
   model_role: string;
 }
 
+/** Where a conversation was begun. The Goose thread, `goose`, is where the Pond posts what it did by itself. */
+export type SessionSurface = 'phone' | 'desktop' | 'cli' | 'pond' | 'room' | 'schedule' | 'goose';
+
 export interface SessionSummary {
   id: string;
+  /** Absent on a conversation begun before the Pond recorded it, which `?surface=unknown` matches. */
+  surface?: SessionSurface | null;
+  /** Whether this phone began it; `?surface=here` keeps those, `elsewhere` another phone's. */
+  started_here?: boolean;
   title?: string;
   /** How the conversation opened, for a history card. Absent on older servers. */
   preview?: string;
@@ -208,6 +215,45 @@ export interface SessionMessageImage {
   url: string;
 }
 
+/** What a message came from, when the Pond wrote it for itself. */
+export interface MessageNoteFrom {
+  kind: 'schedule' | 'reminder' | 'task' | 'lookup' | 'watch' | 'heartbeat' | 'suggestion';
+  label: string;
+  ref_id?: string;
+}
+
+/** Whether something a reply said it set was really set, as the tool answered. */
+export interface MessageReceipt {
+  kind: 'reminder' | 'todo' | 'timer' | 'schedule' | 'watch' | 'task' | 'standing';
+  outcome: 'set' | 'not_set';
+  what: string;
+  id?: string;
+  /** Why it was not set. */
+  reason?: string;
+}
+
+/** Something Goose noticed and offers to do, answered at `/sessions/{id}/messages/{id}/offer`. */
+export interface MessageSuggestion {
+  noticed: string;
+  action: string;
+  /** What is sent as the person's own turn when they take the offer. */
+  prompt: string;
+  state: 'open' | 'done' | 'dismissed';
+  suggestion_id?: string;
+}
+
+export interface MessageNote {
+  from?: MessageNoteFrom;
+  receipts?: MessageReceipt[];
+  suggestion?: MessageSuggestion;
+}
+
+/** The Pond's answer to an offer: where it now stands, and what to send when it was taken. */
+export interface OfferAnswer {
+  state: MessageSuggestion['state'];
+  prompt: string;
+}
+
 export interface SessionMessage {
   id: string;
   session_id: string;
@@ -233,6 +279,8 @@ export interface SessionMessage {
    * a client accepts it.
    */
   transient?: boolean;
+  /** Where the message came from, what it really set, and anything it offers. Stored, never inferred. */
+  note?: MessageNote;
 }
 
 /**
@@ -281,6 +329,11 @@ export interface ChatStreamRequest {
   deep_research?: boolean;
   /** With `deep_research` only, and left out for `auto`, so an older Pond sees the body it knows. */
   deep_research_answer?: Exclude<AnswerShape, 'auto'>;
+  /**
+   * A card the member sent to chat, by kind and id. The Pond reads it as the speaker and gives
+   * the turn the card's content with Goose's notes on it; an older Pond ignores the field.
+   */
+  card?: { kind: string; id: string };
 }
 
 /**
@@ -313,6 +366,8 @@ export interface ChatFrame {
    * phone must not keep its card either.
    */
   transient?: boolean;
+  /** `tool_result`: what the call set or failed to set, as the saved reply's note will hold it. */
+  receipt?: MessageReceipt;
   run_id?: string;
   session_id?: string;
   epoch?: number | string;
@@ -504,6 +559,21 @@ export interface PromptExtra {
   instruction: string;
   active: boolean;
   sort_order: number;
+}
+
+/**
+ * A built-in or customized agent prompt template: `GET /api/v1/prompts`.
+ * Templates include core agent identity (`soul`), autonomous pulse (`heartbeat`),
+ * its rules for remembering (`scratchpad`), and tone presets (`balanced`, `concise`, etc.).
+ */
+export interface PromptTemplate {
+  name: string;
+  content: string;
+  description?: string;
+  is_system: boolean;
+  is_customized?: boolean;
+  factory_version?: number;
+  updated_at?: string;
 }
 
 /** `POST /api/v1/agent/extras`: creates the note, or replaces the one already under `key`. */
@@ -1496,6 +1566,16 @@ export interface PondSettings {
   unprompted_speech_categories: string;
   quiet_hours_start: string;
   quiet_hours_end: string;
+  /** In quiet hours only alerts and what was asked for then reach a phone; the rest wait for one notice. */
+  notices_wait_in_quiet_hours: boolean;
+  /** A reminder no phone fetched within five minutes is said once in the room, outside quiet hours. */
+  speak_unfetched_reminders: boolean;
+  /** Days unseen before a phone stops being notified; 0 never stops. */
+  unseen_phone_skip_days: number;
+  /** Days unseen before the Pond removes a phone; 0 never removes. */
+  unseen_phone_remove_days: number;
+  /** In a household of one, a voice the Pond cannot identify sets reminders and to-dos as that member. */
+  lone_voice_sets_reminders: boolean;
   proactive_review_enabled: boolean;
   suggestions_muted: string[];
   session_titling_enabled: boolean;
@@ -2077,6 +2157,27 @@ export interface AdminTask {
 
 export type AdminCheckId = 'disk_space' | 'memory' | 'temperature' | 'other';
 export type AdminCheckStatus = 'ok' | 'warning' | 'critical';
+
+/** `GET /admin/reliability?days=`: whether notices arrived and messages were answered over a stretch of days. */
+export interface AdminReliability {
+  days: number;
+  notices: {
+    queued: number;
+    woken: number;
+    fetched: number;
+    fetched_within_a_minute: number;
+    fetched_after_an_hour: number;
+    shown: number;
+    opened: number;
+    spoken: number;
+  };
+  turns: { asked: number; answered: number };
+  phones: { paired: number; test: number; unseen: number; with_push_token: number };
+  /** Times the Pond was told to stop. */
+  stops: number;
+  android_push_key: boolean;
+  apple_push_key: boolean;
+}
 
 export interface AdminHealth {
   version: string;

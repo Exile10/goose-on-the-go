@@ -11,6 +11,7 @@ import type {
   AdminFileListing,
   AdminHealth,
   AdminKeepReason,
+  AdminReliability,
   AdminOverview,
   AdminPower,
   AdminStatus,
@@ -44,6 +45,7 @@ export interface PondAdminSource {
   deleteTask(id: string): Promise<void>;
   deleteTaskArtifact(taskId: string, artifactId: string): Promise<void>;
   health(): Promise<AdminHealth>;
+  reliability(days: number): Promise<AdminReliability>;
   power(): Promise<AdminPower>;
   setPowerMode(id: number): Promise<PowerModeChange>;
   restart(force: boolean): Promise<void>;
@@ -502,6 +504,30 @@ export function createMockPond(options: MockPondOptions = {}, now: () => number 
       if (!found || !found.task.artifacts.some((a) => a.id === artifactId)) throw refuse(404, 'not_found');
       if (!isTaskFinished(found.task.state)) throw refuse(409, 'task_active');
       found.task = { ...found.task, artifacts: found.task.artifacts.filter((a) => a.id !== artifactId) };
+    },
+
+    reliability: async (days) => {
+      admit();
+      // A month holds about four weeks of the same household, with one Apple key never added.
+      const weeks = days >= 30 ? 4 : 1;
+      return {
+        days,
+        notices: {
+          queued: 20 * weeks,
+          woken: 14 * weeks,
+          fetched: 19 * weeks,
+          fetched_within_a_minute: 9 * weeks,
+          fetched_after_an_hour: 2 * weeks,
+          shown: 18 * weeks,
+          opened: 6 * weeks,
+          spoken: weeks,
+        },
+        turns: { asked: 40 * weeks, answered: 40 * weeks - 1 },
+        phones: { paired: 3, test: 0, unseen: 1, with_push_token: 2 },
+        stops: weeks,
+        android_push_key: true,
+        apple_push_key: false,
+      };
     },
 
     health: async () => {

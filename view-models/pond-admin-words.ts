@@ -5,9 +5,9 @@ import type { InkTone } from '@jarida/ink';
 
 import type { TileColor } from '@/constants/colors';
 import type { IconName } from '@/constants/icons';
-import { checkReading, healthSummary, isTaskFinished, type AreaGroupId } from '@/models/pond-admin';
+import { checkReading, healthSummary, isTaskFinished, percentOf, type AreaGroupId } from '@/models/pond-admin';
 import i18n from '@/services/i18n';
-import type { AdminCacheId, AdminCheckId, AdminCheckStatus, AdminHealth, AdminKeepReason, AdminTask, LongTaskState } from '@/services/types';
+import type { AdminCacheId, AdminCheckId, AdminCheckStatus, AdminHealth, AdminKeepReason, AdminReliability, AdminTask, LongTaskState } from '@/services/types';
 import { taskStateLabel } from './long-task-words';
 import { calendarDaysBetween } from './use-chat-history';
 
@@ -290,4 +290,78 @@ export function powerModeWords(name: string): string | null {
     default:
       return null;
   }
+}
+
+/** One line of the reliability report: what was counted, and how it came out. */
+export interface ReliabilityRow {
+  key: string;
+  label: string;
+  value: string;
+  /** Something that keeps notices from arriving or messages from being answered. */
+  warn?: boolean;
+}
+
+export interface ReliabilitySection {
+  key: 'notices' | 'messages' | 'phones' | 'pond';
+  title: string;
+  rows: ReliabilityRow[];
+}
+
+/** "9 of 20 (45%)", or the part alone when there is no whole to be a share of. */
+export function shareWords(part: number, whole: number): string {
+  const percent = percentOf(part, whole);
+  return percent === null ? String(part) : i18n.t('myPond.reliability.share', { part, whole, percent });
+}
+
+/** The report in plain words, in the order the Pond's own `reliability` command prints it. */
+export function reliabilitySections(r: AdminReliability): ReliabilitySection[] {
+  const n = r.notices;
+  const neverFetched = Math.max(0, n.queued - n.fetched);
+  const unanswered = Math.max(0, r.turns.asked - r.turns.answered);
+  const key = (present: boolean) => (present ? i18n.t('myPond.reliability.present') : i18n.t('myPond.reliability.missing'));
+  return [
+    {
+      key: 'notices',
+      title: i18n.t('myPond.reliability.notices'),
+      rows: [
+        { key: 'queued', label: i18n.t('myPond.reliability.queued'), value: String(n.queued) },
+        { key: 'woken', label: i18n.t('myPond.reliability.woken'), value: String(n.woken) },
+        { key: 'fetched', label: i18n.t('myPond.reliability.fetched'), value: shareWords(n.fetched, n.queued) },
+        { key: 'withinAMinute', label: i18n.t('myPond.reliability.withinAMinute'), value: shareWords(n.fetched_within_a_minute, n.queued) },
+        { key: 'afterAnHour', label: i18n.t('myPond.reliability.afterAnHour'), value: String(n.fetched_after_an_hour) },
+        { key: 'neverFetched', label: i18n.t('myPond.reliability.neverFetched'), value: String(neverFetched), warn: neverFetched > 0 },
+        { key: 'shown', label: i18n.t('myPond.reliability.shown'), value: String(n.shown) },
+        { key: 'opened', label: i18n.t('myPond.reliability.opened'), value: String(n.opened) },
+        { key: 'spoken', label: i18n.t('myPond.reliability.spoken'), value: String(n.spoken) },
+      ],
+    },
+    {
+      key: 'messages',
+      title: i18n.t('myPond.reliability.messages'),
+      rows: [
+        { key: 'asked', label: i18n.t('myPond.reliability.asked'), value: String(r.turns.asked) },
+        { key: 'answered', label: i18n.t('myPond.reliability.answered'), value: shareWords(r.turns.answered, r.turns.asked) },
+        { key: 'unanswered', label: i18n.t('myPond.reliability.unanswered'), value: String(unanswered), warn: unanswered > 0 },
+      ],
+    },
+    {
+      key: 'phones',
+      title: i18n.t('myPond.reliability.phones'),
+      rows: [
+        { key: 'paired', label: i18n.t('myPond.reliability.paired'), value: String(r.phones.paired) },
+        { key: 'withPush', label: i18n.t('myPond.reliability.withPush'), value: shareWords(r.phones.with_push_token, r.phones.paired) },
+        { key: 'unseen', label: i18n.t('myPond.reliability.unseen'), value: String(r.phones.unseen) },
+        ...(r.phones.test > 0 ? [{ key: 'test', label: i18n.t('myPond.reliability.test'), value: String(r.phones.test) }] : []),
+      ],
+    },
+    {
+      key: 'pond',
+      title: i18n.t('myPond.reliability.pond'),
+      rows: [
+        { key: 'stops', label: i18n.t('myPond.reliability.stops'), value: String(r.stops) },
+        { key: 'androidKey', label: i18n.t('myPond.reliability.androidKey'), value: key(r.android_push_key), warn: !r.android_push_key },
+        { key: 'appleKey', label: i18n.t('myPond.reliability.appleKey'), value: key(r.apple_push_key), warn: !r.apple_push_key },
+      ],
+    },
+  ];
 }

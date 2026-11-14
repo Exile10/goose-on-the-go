@@ -13,7 +13,20 @@ import * as WebBrowser from 'expo-web-browser';
 import { inkText, useInkTheme, type InkTextSpec } from '@jarida/ink/native';
 
 import { GIcon } from '@/components/ui/g-icon';
-import { decodeEntities, htmlAsText, isMapLink, parseReply, webLink, type MarkedToken, type Token, type Tokens } from '@/services/markdown';
+import {
+  decodeEntities,
+  htmlAsText,
+  isMapLink,
+  isMath,
+  mathText,
+  parseReply,
+  splitDisplayMath,
+  webLink,
+  type MarkedToken,
+  type MathToken,
+  type Token,
+  type Tokens,
+} from '@/services/markdown';
 
 type Theme = ReturnType<typeof useInkTheme>;
 type Role = NonNullable<InkTextSpec['role']>;
@@ -100,7 +113,7 @@ function link(href: string, children: React.ReactNode, place: Place, key: number
 }
 
 function spans(tokens: Token[] | undefined, place: Place, span: Span): React.ReactNode[] {
-  return (tokens ?? []).map((token, i) => inline(token as MarkedToken, place, span, i));
+  return (tokens ?? []).map((token, i) => (isMath(token) ? mathText(token) : inline(token as MarkedToken, place, span, i)));
 }
 
 function inline(token: MarkedToken, place: Place, span: Span, key: number): React.ReactNode {
@@ -175,9 +188,44 @@ function bodySpan(place: Place): Span {
   return { role: spec.role ?? 'body', weight: spec.weight ?? theme.weight.regular, italic: false, size: theme.size[spec.size ?? 'md'] };
 }
 
+/** An equation on a line of its own: centred, and sideways-scrolling when wider than the page. */
+function displayMath(token: MathToken, place: Place, key: number) {
+  const body = inkText(place.theme, bodySpec(place));
+  const text = mathText(token);
+  const rows = text.includes('\n');
+  const line = (
+    <Text selectable={place.selectable} style={[body.style, rows ? null : styles.centred]}>
+      {text}
+    </Text>
+  );
+  // A card's preview is pressed, not scrolled; a sideways scroller there would take the press.
+  if (!place.selectable) return <View key={key}>{line}</View>;
+  return (
+    <ScrollView key={key} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.mathScroll}>
+      {line}
+    </ScrollView>
+  );
+}
+
 function paragraph(tokens: Token[] | undefined, text: string, place: Place, key: number) {
   const body = inkText(place.theme, bodySpec(place));
   const span = bodySpan(place);
+  const runs = tokens ? splitDisplayMath(tokens) : [];
+  if (runs.length > 1 || (runs[0] && 'math' in runs[0])) {
+    return (
+      <View key={key} style={place.size === 'md' || place.size === 'lg' ? styles.page : styles.compact}>
+        {runs.map((run, i) =>
+          'math' in run ? (
+            displayMath(run.math, place, i)
+          ) : (
+            <Text key={i} selectable={place.selectable} style={body.style}>
+              {spans(run.tokens, place, span)}
+            </Text>
+          ),
+        )}
+      </View>
+    );
+  }
   return (
     <Text key={key} selectable={place.selectable} style={body.style}>
       {tokens ? spans(tokens, place, span) : decodeEntities(text)}
@@ -357,7 +405,7 @@ function block(token: MarkedToken, place: Place, key: number): React.ReactNode {
 }
 
 function blocks(tokens: Token[] | undefined, place: Place): React.ReactNode[] {
-  return (tokens ?? []).map((token, i) => block(token as MarkedToken, place, i));
+  return (tokens ?? []).map((token, i) => (isMath(token) ? displayMath(token, place, i) : block(token as MarkedToken, place, i)));
 }
 
 export interface MarkdownProps {
@@ -394,6 +442,8 @@ const styles = StyleSheet.create({
   link: { textDecorationLine: 'underline' },
   chip: { fontSize: 12, fontWeight: '600' },
   struck: { textDecorationLine: 'line-through' },
+  centred: { textAlign: 'center' },
+  mathScroll: { flexGrow: 1, justifyContent: 'center' },
   quote: { borderLeftWidth: 2, paddingLeft: 12, gap: 8 },
   rule: { marginVertical: 4 },
   code: { overflow: 'hidden' },

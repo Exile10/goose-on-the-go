@@ -348,6 +348,46 @@ describe('the run on the wire', () => {
     expect(rotated).toHaveBeenCalledWith('session', 'refresh');
   });
 
+  // The pairing lock: the code was right, and the phone is to come back for its tokens.
+  const heldAnswer = {
+    accepted: false,
+    session_token: null,
+    refresh_token: null,
+    rejection_reason: 'approval_required',
+    error: 'approval_required',
+    capabilities: ['voice_notes'],
+    pairing_request: { request_id: 'req-1', claim_secret: 'claim-secret', expires_at: '2026-11-13T10:10:00Z' },
+  };
+
+  it('a held pairing: checks the Pond\'s confirmation, keeps no token, and hands back the request to come back with', async () => {
+    serve({ '/api/v1/handshake/pake/verify': heldAnswer });
+    const client = new PondApiClient(origin);
+    const rotated = jest.fn(); client.setOnTokensRotated(rotated);
+    const resp = await client.pair({ clientId: inputs.client_id, pairingCode: inputs.code, channelBinding: inputs.spki_pin });
+    expect(resp.accepted).toBe(false);
+    expect(resp.rejection_reason).toBe('approval_required');
+    expect(resp.held).toEqual({ requestId: 'req-1', claimSecret: 'claim-secret', expiresAt: '2026-11-13T10:10:00Z', capabilities: ['voice_notes'] });
+    // The secret is kept under one name only.
+    expect(JSON.stringify(resp).match(/claim-secret/g)).toHaveLength(1);
+    expect(rotated).not.toHaveBeenCalled();
+    expect(client.signedIn).toBe(false);
+  });
+
+  it('a held pairing whose confirmation does not verify is not waited on', async () => {
+    const v = negative('tampered_server_tag');
+    serve({ '/api/v1/handshake/pake/verify': { ...heldAnswer, server_proof: v.T_server } });
+    const client = new PondApiClient(origin);
+    await expect(client.pair({ clientId: inputs.client_id, pairingCode: inputs.code, channelBinding: inputs.spki_pin }))
+      .rejects.toBeInstanceOf(PondTrustError);
+  });
+
+  it('a Pond with too many phones waiting hands back no request, only the reason', async () => {
+    serve({ '/api/v1/handshake/pake/verify': { ...heldAnswer, rejection_reason: null, error: 'pairing_requests_full', pairing_request: undefined } });
+    const resp = await new PondApiClient(origin).pair({ clientId: inputs.client_id, pairingCode: inputs.code, channelBinding: inputs.spki_pin });
+    expect(resp.held).toBeUndefined();
+    expect(resp.rejection_reason).toBe('pairing_requests_full');
+  });
+
   it('tampered_server_tag: refuses the acceptance and keeps no token', async () => {
     const v = negative('tampered_server_tag');
     expect(v.phone_result).toBe('invalid_server_proof');

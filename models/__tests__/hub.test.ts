@@ -15,6 +15,11 @@ describe('reading /me/hub', () => {
       connectors: true,
       ideas: false,
       catalog: true,
+      about: false,
+      interview: false,
+      screenshots: false,
+      activity: false,
+      cards: [],
     });
   });
 

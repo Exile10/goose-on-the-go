@@ -16,6 +16,7 @@ import { Labelled } from '@/components/goose/labelled';
 import { ScreenScroll, SectionHead, useAgo } from '@/components/goose/hub-parts';
 import { ContentUnavailable } from '@/components/patterns/content-unavailable';
 import { DangerQuietButton } from '@/components/pond/danger-quiet-button';
+import { SendToChat } from '@/components/goose/send-to-chat';
 import { Spacing } from '@/constants/spacing';
 import { CHECK_EVERY, DEFAULT_CURRENCY, NOTIFY_CHOICES, targetFrom, type CartNotify } from '@/models/cart';
 import { isUnavailable } from '@/models/content-state';
@@ -117,6 +118,7 @@ export default function GooseCartItemScreen() {
               <InkButton variant="quiet" icon="external" onPress={() => void Linking.openURL(item.url)}>
                 {t('goose.cart.openPage')}
               </InkButton>
+              <SendToChat kind="cart" id={item.id} title={item.title} size="md" />
             </View>
           </View>
 

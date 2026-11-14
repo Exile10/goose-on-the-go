@@ -98,7 +98,9 @@ export function rideOfferFromData(data: unknown): RideOffer | null {
  * is "Route hints" in the Pond's `docs/architecture/notifications.md`). The
  * phone's own notice that a reply finished names
  * `{ open: "conversation", session_id }`, and a Pond `chat` hint with a
- * conversation becomes the same route.
+ * conversation becomes the same route. A phone asking to pair arrives as
+ * `{ action: "pairing_request", request_id, open: "devices" }` and opens the
+ * page that answers it, not the devices list.
  *
  * Only these screens are accepted, and only ids of the shape the Pond
  * mints, so a notification can open one of them and nothing else. An older Pond
@@ -116,8 +118,11 @@ export type OpenRoute =
   | { open: 'conversation'; sessionId: string }
   | { open: 'watch'; watchId?: string }
   | { open: 'todos'; todoId?: string }
-  | { open: 'news'; storyId?: string }
-  | { open: 'cart'; cartId?: string };
+  | { open: 'news'; storyId?: string; digestId?: string }
+  | { open: 'cart'; cartId?: string }
+  | { open: 'ideas'; ideaId?: string }
+  | { open: 'goose_activity' }
+  | { open: 'pairing'; requestId?: string };
 
 /** A Pond id: a UUID, optionally prefixed (`timer-...`). Nothing that could be a path. */
 const POND_ID = /^[A-Za-z0-9_-]{1,128}$/;
@@ -133,6 +138,10 @@ function pondId(raw: unknown): string | undefined {
  */
 export function openRouteFromData(data: unknown): OpenRoute | null {
   if (!isRecord(data)) return null;
+  if (data.action === 'pairing_request') {
+    const requestId = pondId(data.request_id);
+    return requestId ? { open: 'pairing', requestId } : { open: 'pairing' };
+  }
   switch (data.open) {
     case 'schedule': {
       const route: OpenRoute = { open: 'schedule' };
@@ -175,13 +184,23 @@ export function openRouteFromData(data: unknown): OpenRoute | null {
       return todoId ? { open: 'todos', todoId } : { open: 'todos' };
     }
     case 'news': {
+      // The Pond names the digest it wrote; a story id is an older hint, kept.
       const storyId = pondId(data.story_id);
-      return storyId ? { open: 'news', storyId } : { open: 'news' };
+      const digestId = pondId(data.digest_id);
+      if (storyId) return { open: 'news', storyId };
+      return digestId ? { open: 'news', digestId } : { open: 'news' };
     }
     case 'cart': {
       const cartId = pondId(data.cart_id);
       return cartId ? { open: 'cart', cartId } : { open: 'cart' };
     }
+    case 'ideas': {
+      const ideaId = pondId(data.idea_id);
+      return ideaId ? { open: 'ideas', ideaId } : { open: 'ideas' };
+    }
+    // What Goose did by itself: the list, where the newest entry is the one the notice is about.
+    case 'goose_activity':
+      return { open: 'goose_activity' };
     default:
       return null;
   }
@@ -221,6 +240,7 @@ type ScreenHref =
   | '/(stack)/extensions'
   | '/(stack)/remote-access'
   | '/(stack)/pond'
+  | '/(stack)/goose-activity'
   | { pathname: '/conversation'; params: { session: string } }
   | '/(stack)/web-watches'
   | { pathname: '/(stack)/web-watch'; params: { id: string } }
@@ -228,7 +248,9 @@ type ScreenHref =
   | '/(stack)/goose-news'
   | { pathname: '/(stack)/goose-story'; params: { id: string } }
   | '/(stack)/goose-cart'
-  | { pathname: '/(stack)/goose-cart-item'; params: { id: string } };
+  | { pathname: '/(stack)/goose-cart-item'; params: { id: string } }
+  | '/(stack)/goose-ideas'
+  | '/(stack)/pairing-lock';
 
 /**
  * The expo-router location a route opens. A schedule notification names the
@@ -264,5 +286,11 @@ export function screenPath(route: OpenRoute): ScreenHref {
       return route.storyId ? { pathname: '/(stack)/goose-story', params: { id: route.storyId } } : '/(stack)/goose-news';
     case 'cart':
       return route.cartId ? { pathname: '/(stack)/goose-cart-item', params: { id: route.cartId } } : '/(stack)/goose-cart';
+    case 'ideas':
+      return '/(stack)/goose-ideas';
+    case 'goose_activity':
+      return '/(stack)/goose-activity';
+    case 'pairing':
+      return '/(stack)/pairing-lock';
   }
 }

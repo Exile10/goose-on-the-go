@@ -20,7 +20,10 @@ keeps a notice from being shown twice:
    `services/local-notifications.ts`). A headless wake-up and the app later are separate runtimes;
    the second presentation of the same id replaces the first rather than adding a row.
 3. **Every delivered notice is acknowledged** with `POST /api/v1/notifications/{id}/ack`, so the
-   Pond stops offering it. The pending path acknowledges everything it fetched, including notices
+   Pond stops offering it. The body is `{"shown": true}` when the shade took the notice, and empty
+   otherwise; the Pond records the two apart. A tap on a notice also sends
+   `POST /api/v1/notifications/{id}/opened`, never waited for: the tap opens its screen whatever the
+   Pond answers. The pending path acknowledges everything it fetched, including notices
    it had already shown. The stream path acknowledges only through a client whose token rotation
    is persisted (`PondApiClient.hasSession`): an acknowledgement that triggered an unpersisted
    refresh would strand the phone's refresh token.
@@ -103,6 +106,14 @@ wake: "1" }`, with no title or body. Nothing readable transits Google or Apple; 
   later start with a refresh token the Pond has retired.
 - `POST_NOTIFICATIONS` (Android 13 and later) is requested by `registerPushToken`. Without it the
   task still runs and acknowledges, but Android shows nothing.
+- **iOS** gets the same three keys at the top of the APNs payload under one visible line, "Something
+  new from your Pond.", because iOS throttles silent pushes and drops them for an app the person
+  swiped away. `readWakePing` reads the keys there as well as under `data`. Once a fetch of the
+  pending list has shown and acknowledged what it stood for, the line is taken out of the shade
+  (`services/wake-alert.ts`); while the shade refuses a notice the line stays. While the app is open
+  the line is not drawn at all. A tap on it opens the app, fetches, and opens the notice's screen
+  when the fetch found exactly one; with several it leaves the app where it is. No stand-in is shown
+  over it when the Pond cannot be reached: the line already says as much.
 - **iOS** needs `content-available: 1` on the APNs payload and the `remote-notification`
   background mode, which `app.json` turns on through expo-notifications'
   `enableBackgroundRemoteNotifications`. iOS decides how often a background push is honoured, and

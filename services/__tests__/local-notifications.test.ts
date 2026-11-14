@@ -6,11 +6,13 @@
 import { Linking } from 'react-native';
 
 import { presentLocally, watchLinkTaps } from '@/services/local-notifications';
+import { noteDrained, noteFetched, resetWakeAlerts } from '@/services/wake-alert';
 
 const mockPush = jest.fn();
 const mockNavigate = jest.fn();
 const mockSchedule = jest.fn().mockResolvedValue('id');
 const mockSessionMessages = jest.fn().mockResolvedValue([]);
+const mockOpened = jest.fn().mockResolvedValue(undefined);
 jest.mock('@/services/api-client', () => {
   class ApiError extends Error {
     readonly status: number;
@@ -19,7 +21,13 @@ jest.mock('@/services/api-client', () => {
       this.status = mockStatus;
     }
   }
-  return { ApiError, api: { listSessionMessages: (...args: unknown[]) => mockSessionMessages(...args) } };
+  return {
+    ApiError,
+    api: {
+      listSessionMessages: (...args: unknown[]) => mockSessionMessages(...args),
+      notificationOpened: (...args: unknown[]) => mockOpened(...args),
+    },
+  };
 });
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { ApiError: MockApiError } = require('@/services/api-client');
@@ -147,6 +155,100 @@ describe('openTapped', () => {
     tap({ open: 'devices' }, 'same');
     expect(mockNavigate).toHaveBeenCalledTimes(1);
   });
+
+  it('opens the page that answers a phone asking to pair', () => {
+    tap({ id: 'pairing-request-r1', category: 'alert', action: 'pairing_request', request_id: 'r1', open: 'devices' });
+    expect(mockPush.mock.calls).toEqual([['/(stack)/pairing-lock']]);
+    expect(mockNavigate).not.toHaveBeenCalled();
+  });
+});
+
+describe('telling the Pond a notice was opened', () => {
+  let stop: () => void;
+  beforeEach(() => {
+    mockPush.mockClear();
+    mockNavigate.mockClear();
+    mockOpened.mockReset().mockResolvedValue(undefined);
+    stop = watchLinkTaps();
+  });
+  afterEach(() => stop());
+
+  it('says so once for a tapped notice, by the Pond\'s own id', () => {
+    tap({ id: 'briefing:phone-1', category: 'info', open: 'devices' }, 'opened-once');
+    tap({ id: 'briefing:phone-1', category: 'info', open: 'devices' }, 'opened-once');
+    expect(mockOpened.mock.calls).toEqual([['briefing:phone-1']]);
+  });
+
+  it('says nothing for the phone\'s own reply notice, or a notice with no id', () => {
+    tap({ id: 'reply-r1', category: 'reply', open: 'conversation', session_id: 's-1' });
+    tap({ open: 'devices' });
+    expect(mockOpened).not.toHaveBeenCalled();
+  });
+
+  it('still opens the screen when the Pond cannot be told', async () => {
+    const info = jest.spyOn(console, 'info').mockImplementation(() => {});
+    mockOpened.mockRejectedValue(new TypeError('Network request failed'));
+    tap({ id: 'n-404', category: 'info', open: 'models' });
+    await settle();
+    expect(mockPush.mock.calls).toEqual([['/(stack)/models']]);
+    info.mockRestore();
+  });
+});
+
+// An iPhone's wake is one fixed line that names a notice and carries none of it.
+describe('a tap on the iPhone wake line', () => {
+  const wakeLine = (identifier: string) => ({
+    notification: {
+      request: {
+        identifier,
+        content: { title: 'Goose', body: 'Something new from your Pond.', data: null },
+        trigger: {
+          type: 'push',
+          payload: { wake: '1', notification_id: 'briefing:phone-1', category: 'info', aps: { alert: { title: 'Goose' } } },
+        },
+      },
+    },
+  });
+  const briefing = {
+    id: 'briefing:phone-1', target: 'phone-1', category: 'info', title: 'Schedule: Daily Briefing', body: 'b', timestamp: '',
+    data: { open: 'schedule', schedule_id: 'sched-1' },
+  };
+  const onWakeTap = jest.fn();
+  let stop: () => void;
+  beforeEach(() => {
+    resetWakeAlerts();
+    mockPush.mockClear();
+    mockNavigate.mockClear();
+    mockOpened.mockReset().mockResolvedValue(undefined);
+    onWakeTap.mockClear();
+    stop = watchLinkTaps(onWakeTap);
+  });
+  afterEach(() => stop());
+
+  it('asks for a fetch, opens nothing itself, and says the notice it names was opened', () => {
+    mockListener?.(wakeLine('wake-a'));
+    expect(onWakeTap).toHaveBeenCalledTimes(1);
+    expect(mockOpened.mock.calls).toEqual([['briefing:phone-1']]);
+    expect(mockPush).not.toHaveBeenCalled();
+    expect(mockNavigate).not.toHaveBeenCalled();
+  });
+
+  it('opens the one notice the fetch found', () => {
+    mockListener?.(wakeLine('wake-b'));
+    noteFetched([briefing]);
+    noteDrained();
+    expect(mockPush.mock.calls).toEqual([[{ pathname: '/(stack)/schedule', params: { schedule_id: 'sched-1' } }]]);
+  });
+
+  it('leaves the app where it is when the fetch found several, or none', () => {
+    mockListener?.(wakeLine('wake-c'));
+    noteFetched([briefing, { ...briefing, id: 'other:phone-1' }]);
+    noteDrained();
+    mockListener?.(wakeLine('wake-d'));
+    noteDrained(Date.now() + 20_000);
+    expect(mockPush).not.toHaveBeenCalled();
+    expect(mockNavigate).not.toHaveBeenCalled();
+  });
 });
 
 describe('presentLocally', () => {
@@ -228,7 +330,7 @@ describe('notification channels', () => {
     jest.restoreAllMocks();
   });
 
-  type Handler = { handleNotification: (n: unknown) => Promise<{ shouldPlaySound: boolean; shouldShowBanner: boolean }> };
+  type Handler = { handleNotification: (n: unknown) => Promise<{ shouldPlaySound: boolean; shouldShowBanner: boolean; shouldShowList: boolean; shouldSetBadge: boolean }> };
 
   function configureOn(os: 'android' | 'ios') {
     const setNotificationChannelAsync = jest.fn(async (_id: string, _channel: unknown) => null);
@@ -250,12 +352,13 @@ describe('notification channels', () => {
       // eslint-disable-next-line @typescript-eslint/no-require-imports
       ({ configureLocalNotifications: configure, presentLocally: present } = require('@/services/local-notifications'));
     });
-    const handler = async (category: unknown) => {
+    const handle = async (notification: unknown) => {
       await configure();
       const installed = setNotificationHandler.mock.calls[0][0];
-      return installed.handleNotification({ request: { content: { data: { category } } } });
+      return installed.handleNotification(notification);
     };
-    return { configure, present, handler, fake, setNotificationChannelAsync, deleteNotificationChannelAsync };
+    const handler = (category: unknown) => handle({ request: { content: { data: { category } } } });
+    return { configure, present, handler, handle, fake, setNotificationChannelAsync, deleteNotificationChannelAsync };
   }
 
   function channel(calls: unknown[][], id: string) {
@@ -306,6 +409,19 @@ describe('notification channels', () => {
       expect(await handler(category)).toMatchObject({ shouldPlaySound: true, shouldShowBanner: true });
     }
     expect(await handler('reply')).toMatchObject({ shouldPlaySound: false });
+  });
+
+  // The stream brings the notice itself while the app is open, so the line would be a second one.
+  it('draws nothing for an iPhone wake line that arrives while the app is open', async () => {
+    const { handle } = configureOn('ios');
+    const line = {
+      request: {
+        identifier: 'briefing:phone-1',
+        content: { title: 'Goose', data: null },
+        trigger: { type: 'push', payload: { wake: '1', notification_id: 'briefing:phone-1', category: 'alert', aps: { alert: {} } } },
+      },
+    };
+    expect(await handle(line)).toEqual({ shouldShowBanner: false, shouldShowList: false, shouldPlaySound: false, shouldSetBadge: false });
   });
 
   it('creates no channels on iOS', async () => {

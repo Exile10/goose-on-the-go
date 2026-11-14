@@ -46,6 +46,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   FlatList,
   StyleSheet,
+  Text,
   View,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
@@ -63,6 +64,7 @@ import { InterviewDraft, InterviewProgress, InterviewSaved } from '@/components/
 import { MessageRow } from '@/components/patterns/message-row';
 import { VoiceDock } from '@/components/patterns/voice-dock';
 import { GIcon } from '@/components/ui/g-icon';
+import { cardFromParams, type CardRef } from '@/models/cards';
 import { GKeyboardView } from '@/components/ui/g-keyboard-view';
 import { GPressable } from '@/components/ui/g-pressable';
 import { useThemedStyles } from '@/hooks/use-themed-styles';
@@ -159,16 +161,20 @@ export default function ChatScreen() {
   // for it; without an id the screen opens a new conversation, which is what
   // the wall's compose button means. The ref is what stops a re-render
   // re-reading a conversation already on screen.
-  const { session, title: linkedTitle, ask, interview: interviewOf } = useLocalSearchParams<{
+  const { session, title: linkedTitle, ask, interview: interviewOf, card_kind, card_id, card_title } = useLocalSearchParams<{
     session?: string;
     title?: string;
     /** A prompt handed over from Home's chips, to be asked on arrival. */
     ask?: string;
+    /** A card sent to chat from My Goose: it rides the first message, and Goose works from it. */
+    card_kind?: string;
+    card_id?: string;
+    card_title?: string;
     /** The member whose setup interview this conversation is, which turns its panels on. */
     interview?: string;
   }>();
   const openedRef = useRef<string | null>(null);
-  const { open, unqueue, watch } = actions;
+  const { open, unqueue, watch, answerOffer } = actions;
   useEffect(() => {
     if (!session || openedRef.current === session) return;
     openedRef.current = session;
@@ -287,6 +293,10 @@ export default function ChatScreen() {
     [files, t, vision],
   );
 
+  const ink = useInkTheme();
+  // The card waits above the composer until the first message takes it; the member can drop it.
+  const [card, setCard] = useState<CardRef | null>(() => cardFromParams({ card_kind, card_id, card_title }));
+
   const onSend = useCallback(
     (text: string, attachments: Attachment[], options?: Pick<SendOptions, 'research' | 'answer'>) => {
       if (!withinTurnLimit(attachments)) {
@@ -302,9 +312,10 @@ export default function ChatScreen() {
       // What the reader just wrote is where they are now, however far back
       // they had been reading.
       scrollToFoot();
-      void actions.send(text, attachments, options);
+      void actions.send(text, attachments, card ? { ...options, card: { kind: card.kind, id: card.id } } : options);
+      setCard(null);
     },
-    [actions, maxPdfs, scrollToFoot, t],
+    [actions, card, maxPdfs, scrollToFoot, t],
   );
 
   // The sound itself goes to the model, never a transcript of it. The phone keeps a copy to replay,
@@ -405,9 +416,10 @@ export default function ChatScreen() {
         turnSeed={turnSeed}
         queued={item.queued}
         onUnqueue={unqueue}
+        onOffer={answerOffer}
       />
     ),
-    [status, turnSeed, unqueue],
+    [status, turnSeed, unqueue, answerOffer],
   );
 
   const started = messages.length > 0 || queued.length > 0;
@@ -502,20 +514,38 @@ export default function ChatScreen() {
             bottomInset={insets.bottom}
           />
         ) : (
-          <ChatDock
-            key={dock.key}
-            initialDraft={dock.draft}
-            onDraftChange={onDraftChange}
-            onSend={onSend}
-            onVoice={() => setVoice(true)}
-            onVoiceNote={onVoiceNote}
-            voiceNoteRefusal={voiceNoteRefusal}
-            onAttach={onAttach}
-            busy={streaming}
-            bottomInset={insets.bottom}
-            research={research}
-            conversation={sessionId}
-          />
+          <>
+            {card ? (
+              <View style={styles.cardChip}>
+                <GIcon name="link" size={14} color={ink.color.textTertiary} />
+                <View style={styles.flex}>
+                  <Text style={styles.cardChipTitle} numberOfLines={1}>
+                    {t('goose.cards.chip', { title: card.title })}
+                  </Text>
+                  <Text style={styles.cardChipHint} numberOfLines={1}>
+                    {t('goose.cards.chipHint')}
+                  </Text>
+                </View>
+                <GPressable onPress={() => setCard(null)} accessibilityRole="button" accessibilityLabel={t('goose.cards.remove', { title: card.title })} hitSlop={10}>
+                  <GIcon name="x" size={16} color={ink.color.textTertiary} />
+                </GPressable>
+              </View>
+            ) : null}
+            <ChatDock
+              key={dock.key}
+              initialDraft={dock.draft}
+              onDraftChange={onDraftChange}
+              onSend={onSend}
+              onVoice={() => setVoice(true)}
+              onVoiceNote={onVoiceNote}
+              voiceNoteRefusal={voiceNoteRefusal}
+              onAttach={onAttach}
+              busy={streaming}
+              bottomInset={insets.bottom}
+              research={research}
+              conversation={sessionId}
+            />
+          </>
         )}
       </GKeyboardView>
     </SafeAreaView>
@@ -535,6 +565,21 @@ const makeStyles = (c: ThemeColors) =>
     },
 
     notice: { paddingHorizontal: Spacing.lg, paddingBottom: Spacing.sm },
+    cardChip: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: Spacing.sm,
+      marginHorizontal: Spacing.lg,
+      marginBottom: Spacing.xs,
+      paddingHorizontal: Spacing.md,
+      paddingVertical: 8,
+      borderRadius: 12,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: c.border,
+      backgroundColor: c.card,
+    },
+    cardChipTitle: { color: c.text, fontSize: 14, fontWeight: '600' },
+    cardChipHint: { color: c.textSecondary, fontSize: 12 },
     foot: { paddingTop: Spacing.md },
 
     // Over the foot of the thread, centred, clear of the composer under it.

@@ -15,6 +15,7 @@ import { Labelled } from '@/components/goose/labelled';
 import { LocationSheet, hookIcon, useHookWords } from '@/components/goose/todo-parts';
 import { DangerQuietButton } from '@/components/pond/danger-quiet-button';
 import { GIcon } from '@/components/ui/g-icon';
+import { SendToChat } from '@/components/goose/send-to-chat';
 import { Spacing } from '@/constants/spacing';
 import { draftOf, type Hook, type TodoDraft, type TodoKind } from '@/models/todos';
 import { useConfirm } from '@/providers/confirm-provider';
@@ -110,6 +111,7 @@ export default function GooseTodoScreen() {
           <InkButton variant="primary" block loading={saving} disabled={!draft.text.trim() || !loaded} onPress={() => void save()}>
             {id ? t('goose.todo.save') : draft.kind === 'reminder' ? t('goose.todo.addReminder') : t('goose.todo.addTodo')}
           </InkButton>
+          {existing ? <SendToChat kind="todo" id={existing.id} title={existing.text} size="md" /> : null}
           {existing ? (
             <DangerQuietButton icon="trash" onPress={() => void remove()}>
               {t('goose.todo.delete')}

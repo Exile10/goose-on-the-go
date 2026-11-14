@@ -23,14 +23,20 @@
  * The list is re-read whenever the wall comes back into view. The Pond names a
  * conversation after its first exchange, so the one just left may have a title
  * now that it did not have when it was opened.
+ *
+ * Under the title, where each conversation was begun: on this phone, which is
+ * what the wall opens on, in the room, by a schedule, or on another screen.
+ * The Goose thread, where the Pond posts what it did by itself, leads this
+ * phone's wall and cannot be deleted from it.
  */
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { BackHandler, Keyboard, LayoutAnimation, StyleSheet, View } from 'react-native';
+import { BackHandler, Keyboard, LayoutAnimation, ScrollView, StyleSheet, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
+  InkChoice,
   InkEmptyState,
   InkText,
   InkTitle,
@@ -59,8 +65,10 @@ import { isUnavailable } from '@/models/content-state';
 import { useContentState } from '@/view-models/use-content-state';
 import { usePullToRefresh } from '@/view-models/use-pull-to-refresh';
 import {
+  HISTORY_TABS,
   useChatHistory,
   type HistoryFilter,
+  type HistoryTab,
   type HistoryView,
 } from '@/view-models/use-chat-history';
 
@@ -78,6 +86,21 @@ const FILTER_LABELS = {
   routines: 'chat.history.filterRoutines',
 } as const satisfies Record<HistoryFilter, TranslationKey>;
 
+const TAB_LABELS = {
+  phone: 'chat.history.tabPhone',
+  room: 'chat.history.tabRoom',
+  scheduled: 'chat.history.tabScheduled',
+  other: 'chat.history.tabOther',
+} as const satisfies Record<HistoryTab, TranslationKey>;
+
+/** What an empty tab says: nothing begun there yet, and what would show if something were. */
+const TAB_EMPTY = {
+  phone: { title: 'home.noConversations', body: 'home.noConversationsBody' },
+  room: { title: 'chat.history.noRoom', body: 'chat.history.noRoomBody' },
+  scheduled: { title: 'chat.history.noScheduled', body: 'chat.history.noScheduledBody' },
+  other: { title: 'chat.history.noOther', body: 'chat.history.noOtherBody' },
+} as const satisfies Record<HistoryTab, { title: TranslationKey; body: TranslationKey }>;
+
 /** One empty selection, shared, so clearing one that is already clear renders nothing. */
 const NOTHING_SELECTED: ReadonlySet<string> = new Set();
 
@@ -91,8 +114,8 @@ export default function ConversationsScreen() {
   const restoreChrome = useChromeRestore();
   const barInset = useBottomBarInset();
 
-  const { cards, sections, total, query, filter, view } = history.data;
-  const { refresh, setQuery, setFilter, setView, remove, removeMany } = history.actions;
+  const { cards, sections, total, query, filter, tab, view } = history.data;
+  const { refresh, setQuery, setFilter, setTab, setView, remove, removeMany } = history.actions;
 
   const [searching, setSearching] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -128,11 +151,28 @@ export default function ConversationsScreen() {
     (id: string) => {
       setConfirmingId(null);
       // The title travels with the link, so the conversation's bar names it
-      // on its first frame instead of after a read of the whole list.
-      const title = cards.find((c) => c.id === id)?.title;
-      router.push({ pathname: '/conversation', params: title ? { session: id, title } : { session: id } });
+      // on its first frame instead of after a read of the whole list. What a
+      // schedule reported opens the Goose thread it is in, under that thread's name.
+      const card = cards.find((c) => c.id === id);
+      const session = card?.opens ?? id;
+      const title = card?.opens === id ? card.title : card?.opensTitle;
+      router.push({ pathname: '/conversation', params: title ? { session, title } : { session } });
     },
     [cards, router],
+  );
+
+  // Another tab is another wall: nothing asked or chosen on the last one carries over.
+  const pickTab = useCallback(
+    (next: HistoryTab) => {
+      void selectionTick();
+      setConfirmingId(null);
+      setSelecting(false);
+      setSelected(NOTHING_SELECTED);
+      setConfirmingMany(false);
+      setTab(next);
+      restoreChrome();
+    },
+    [restoreChrome, setTab],
   );
 
   const compose = useCallback(() => {
@@ -217,19 +257,22 @@ export default function ConversationsScreen() {
     });
   }, []);
 
+  // The Goose thread, and what is read out of it, are not the wall's to delete.
+  const deletable = useMemo(() => cards.filter((card) => card.deletable), [cards]);
+
   // Only what is on the wall counts. A refresh can take a chosen conversation
   // away, and a count that still held it would delete something nobody sees.
   const chosen = useMemo(
-    () => cards.filter((card) => selected.has(card.id)).map((card) => card.id),
-    [cards, selected],
+    () => deletable.filter((card) => selected.has(card.id)).map((card) => card.id),
+    [deletable, selected],
   );
-  const allChosen = cards.length > 0 && chosen.length === cards.length;
+  const allChosen = deletable.length > 0 && chosen.length === deletable.length;
 
   const toggleAll = useCallback(() => {
     void selectionTick();
     setConfirmingMany(false);
-    setSelected(allChosen ? NOTHING_SELECTED : new Set(cards.map((card) => card.id)));
-  }, [allChosen, cards]);
+    setSelected(allChosen ? NOTHING_SELECTED : new Set(deletable.map((card) => card.id)));
+  }, [allChosen, deletable]);
 
   const askDeleteMany = useCallback(() => {
     if (chosen.length === 0) return;
@@ -278,6 +321,21 @@ export default function ConversationsScreen() {
           </InkText>
         ) : null}
       </View>
+      {/* The Devices tab's room pills: a row that scrolls rather than wraps. */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        accessibilityRole="radiogroup"
+        accessibilityLabel={t('chat.history.tabsLabel')}
+        style={styles.tabs}
+        contentContainerStyle={styles.tabsRow}
+      >
+        {HISTORY_TABS.map((id) => (
+          <InkChoice key={id} role="radio" shape="pill" selected={tab === id} onSelect={() => pickTab(id)}>
+            {t(TAB_LABELS[id])}
+          </InkChoice>
+        ))}
+      </ScrollView>
     </View>
   );
 
@@ -296,8 +354,8 @@ export default function ConversationsScreen() {
       {t('chat.history.noneBody')}
     </InkEmptyState>
   ) : (
-    <InkEmptyState icon="chat" title={t('home.noConversations')}>
-      {t('home.noConversationsBody')}
+    <InkEmptyState icon="chat" title={t(TAB_EMPTY[tab].title)}>
+      {t(TAB_EMPTY[tab].body)}
     </InkEmptyState>
   );
 
@@ -356,7 +414,7 @@ export default function ConversationsScreen() {
         {selecting ? (
           <WallSelectionBar
             count={chosen.length}
-            available={cards.length}
+            available={deletable.length}
             confirming={confirmingMany}
             onToggleAll={toggleAll}
             onAskDelete={askDeleteMany}
@@ -385,7 +443,7 @@ export default function ConversationsScreen() {
           onViewChange={changeView}
           filter={filter}
           onFilterChange={setFilter}
-          canSelect={!history.loading && cards.length > 0}
+          canSelect={!history.loading && deletable.length > 0}
           onSelect={startSelecting}
           top={CORNER_TOP + PUCK_SIZE + Spacing.sm}
           right={WALL_GUTTER}
@@ -407,5 +465,8 @@ const makeStyles = (c: ThemeColors) =>
     },
     // Clear of the corner control, which floats over this corner.
     heading: { paddingRight: PUCK_SIZE + Spacing.md, gap: Spacing.xs },
+    // Out to the screen's edges, so a pill scrolls off the edge and not into a margin.
+    tabs: { flexGrow: 0, marginHorizontal: -WALL_GUTTER },
+    tabsRow: { paddingHorizontal: WALL_GUTTER, gap: Spacing.sm, alignItems: 'center' },
     corner: { position: 'absolute', top: CORNER_TOP, right: WALL_GUTTER },
   });

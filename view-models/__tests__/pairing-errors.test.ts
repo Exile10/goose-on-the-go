@@ -53,6 +53,16 @@ describe('a setup card that is refused', () => {
   });
 });
 
+describe('a Pond whose pairing lock is on', () => {
+  it('says to try later when too many phones are waiting', () => {
+    expect(explainRefusedPairing('pairing_requests_full', t)).toBe('Too many phones are waiting to pair with this Pond. Try again in a few minutes.');
+  });
+
+  it('sends a phone held with no request to come back for to the home network', () => {
+    expect(explainRefusedPairing('approval_required', t)).toMatch(/main member has to accept new phones/);
+  });
+});
+
 describe('the refusals pairing already had', () => {
   it('keep their sentences', () => {
     expect(explainRefusedPairing('invalid_confirmation', t)).toBe(t('pairingErrors.badCode'));

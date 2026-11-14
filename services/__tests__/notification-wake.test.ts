@@ -5,8 +5,10 @@
  * throws.
  */
 
+import { Platform } from 'react-native';
+
 import { presentLocally } from '@/services/local-notifications';
-import { deliver, deliverAndAcknowledge, onDelivered, type DeliveryClient } from '@/services/notification-delivery';
+import { deliver, deliverAndAcknowledge, drainPending, onDelivered, type DeliveryClient } from '@/services/notification-delivery';
 import type { ServerNotification } from '@/services/notification-stream';
 import { handleWake, isWake } from '@/services/notification-wake';
 
@@ -17,6 +19,23 @@ jest.mock('@/services/local-notifications', () => ({
 }));
 const presented = mockPresented;
 const present = presentLocally as jest.Mock;
+
+// What iOS has in the shade, for the wake line's removal after a fetch.
+const mockShade: unknown[] = [];
+const mockDismissed: string[] = [];
+jest.mock('@/services/notifications-module', () => ({
+  notifications: {
+    getPresentedNotificationsAsync: jest.fn(async () => mockShade),
+    dismissNotificationAsync: jest.fn(async (id: string) => { mockDismissed.push(id); }),
+  },
+}));
+const wakeLine = (identifier: string) => ({
+  request: {
+    identifier,
+    content: { title: 'Goose', data: null },
+    trigger: { type: 'push', payload: { wake: '1', notification_id: 'n-x', category: 'info', aps: { alert: {} } } },
+  },
+});
 
 let seq = 0;
 /** Ids unique per test: the delivery deduplicator lives for the whole runtime, as it does in the app. */
@@ -40,6 +59,9 @@ function fakeClient(pending: unknown): DeliveryClient & { acked: string[] } {
 const androidWake = (id = 'n-x') => ({ data: { notification_id: id, category: 'info', wake: '1' }, notification: null });
 
 beforeEach(() => {
+  Platform.OS = 'ios';
+  mockShade.length = 0;
+  mockDismissed.length = 0;
   presented.length = 0;
   present.mockClear();
   present.mockImplementation(async (n: { id: string }) => { presented.push(n.id); return true; });
@@ -183,5 +205,80 @@ describe('deliverAndAcknowledge', () => {
 
     expect(presented).toEqual([n.id]);
     expect(client.acked).toEqual([n.id, n.id]);
+  });
+});
+
+// The Pond records "shown" apart from "fetched": only the shade taking a notice counts.
+describe('saying what was shown', () => {
+  it('acknowledges a notice the shade took as shown, repeats included', async () => {
+    const a = notice();
+    const client = fakeClient([a]);
+
+    await handleWake(androidWake(a.id), { ensureSession: async () => true, client });
+    await handleWake(androidWake(a.id), { ensureSession: async () => true, client });
+
+    expect((client.ackNotification as jest.Mock).mock.calls).toEqual([[a.id, true], [a.id, true]]);
+  });
+
+  it('acknowledges a notice the shade refused in the foreground without claiming it was shown', async () => {
+    const a = notice();
+    const client = fakeClient([a]);
+    present.mockImplementationOnce(async () => false);
+
+    await drainPending(client, 'foreground');
+
+    expect((client.ackNotification as jest.Mock).mock.calls).toEqual([[a.id, false]]);
+  });
+});
+
+// An iPhone's wake is one fixed line in the shade; the notice it stood for replaces it.
+describe('the iPhone wake line', () => {
+  const iosWake = (id: string) => ({
+    data: { notification_id: id, category: 'info', wake: '1', dataString: null },
+    notification: { title: 'Goose', body: 'Something new from your Pond.' },
+    aps: { 'content-available': 1, 'mutable-content': 1 },
+  });
+
+  it('is dismissed after its notices are shown and acknowledged', async () => {
+    const a = notice();
+    const client = fakeClient([a]);
+    mockShade.push(wakeLine('apns-collapse-1'), { request: { identifier: a.id, content: { data: { id: a.id } }, trigger: null } });
+
+    await expect(handleWake(iosWake(a.id), { ensureSession: async () => true, client })).resolves.toBe('delivered');
+
+    expect(presented).toEqual([a.id]);
+    expect(client.acked).toEqual([a.id]);
+    expect(mockDismissed).toEqual(['apns-collapse-1']);
+  });
+
+  it('is dismissed when nothing was waiting, since some other path already showed the notice', async () => {
+    mockShade.push(wakeLine('apns-collapse-2'));
+    await handleWake(iosWake('n-gone'), { ensureSession: async () => true, client: fakeClient([]) });
+    expect(mockDismissed).toEqual(['apns-collapse-2']);
+  });
+
+  it('stays while the shade refuses a notice it stands for, and while the Pond cannot be reached', async () => {
+    mockShade.push(wakeLine('apns-collapse-3'));
+    present.mockImplementationOnce(async () => false);
+    await handleWake(iosWake('n-1'), { ensureSession: async () => true, client: fakeClient([notice()]) });
+    await handleWake(iosWake('n-1'), { ensureSession: async () => true, client: fakeClient(new Error('503')) });
+    expect(mockDismissed).toEqual([]);
+  });
+
+  it('puts the notice back when the line it dismissed shared the notice\'s identifier', async () => {
+    const a = notice();
+    mockShade.push(wakeLine(a.id));
+
+    await handleWake(iosWake(a.id), { ensureSession: async () => true, client: fakeClient([a]) });
+
+    expect(mockDismissed).toEqual([a.id]);
+    expect(presented).toEqual([a.id, a.id]);
+  });
+
+  it('is not looked for on Android', async () => {
+    Platform.OS = 'android';
+    mockShade.push(wakeLine('apns-collapse-4'));
+    await handleWake(androidWake(), { ensureSession: async () => true, client: fakeClient([notice()]) });
+    expect(mockDismissed).toEqual([]);
   });
 });

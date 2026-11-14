@@ -1,7 +1,9 @@
 /**
  * Find your Pond: pick a new Pond, give it the card's code (scanned, typed, or said aloud by the
  * Pond), and claim it, all on one screen. A scanned card picks its own Pond and claims at once.
- * The phone's name defaults to the device's own and is changed on the same screen.
+ * The phone's name defaults to the device's own and is changed on the same screen. A Pond that
+ * is already someone's is asked to pair with a code it says aloud, and when its pairing lock
+ * holds this phone, the wait for its main member is on the same row.
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -12,10 +14,12 @@ import { useTranslation } from 'react-i18next';
 import { useCountdown } from '@/hooks/use-countdown';
 import { channelErrorKey, defaultPhoneName } from '@/models/ble-setup';
 import { keepPicked, type NearbyPond } from '@/models/nearby-pond';
+import type { HeldPairing } from '@/models/pairing-lock';
 import { useServer } from '@/providers/server-provider';
 import { ApiError } from '@/services/api-client';
 import { BleUnreachableError, connectPond, WrongPondError } from '@/services/ble';
 import { devicePassword, type PakeCredential } from '@/services/cpace';
+import { findPondBySetupId } from '@/services/discovery';
 import { confirm, reject } from '@/services/haptics';
 import { getInstallId } from '@/services/install-id';
 import { takeSetupCard } from '@/services/pairing-handoff';
@@ -41,6 +45,8 @@ export type FindPhase =
   /** A Pond is picked and the code is being typed. */
   | { kind: 'entering'; pondId: string; credential: PakeCredential; spoken: boolean }
   | { kind: 'claiming'; pondId: string; resuming?: boolean }
+  /** The Pond's pairing lock holds this phone until its main member lets it in. */
+  | { kind: 'waiting'; pondId: string; held: HeldPairing }
   | { kind: 'failed'; pondId: string; credential: PakeCredential; message: string };
 
 export interface UseFindPond {
@@ -65,6 +71,10 @@ export interface UseFindPond {
     useCard: () => void;
     setPhoneName: (name: string) => void;
     cancel: () => void;
+    /** The held pairing was let in and kept: go on as after any pairing. */
+    heldPaired: () => void;
+    /** The wait ended without a pairing: back to a code, since the last one is spent. */
+    askAgain: () => void;
   };
 }
 
@@ -76,6 +86,7 @@ export function useFindPond(fresh: NearbyPond[], rescan?: () => void): UseFindPo
   const { t } = useTranslation();
   const router = useRouter();
   const { stagePairing, pair, requestSpokenCode, cancelPairing, pairedPin, refreshToken, keepRotatedTokens } = useServer();
+  const waitingRef = useRef(false);
   const [phase, setPhase] = useState<FindPhase>({ kind: 'browsing' });
   const [phoneName, setPhoneName] = useState(() => defaultPhoneName(Device.deviceName, Device.modelName));
   const [spoken, setSpoken] = useState<{ asking: boolean; error: string | null }>({ asking: false, error: null });
@@ -119,6 +130,30 @@ export function useFindPond(fresh: NearbyPond[], rescan?: () => void): UseFindPo
     [t],
   );
 
+  /**
+   * Where a held request is answered: the home network. A request made over Bluetooth is followed
+   * there by finding the Pond under its card id and the pin its hello gave, which the exchange proved.
+   */
+  const reachHeld = useCallback(
+    async (pond: NearbyPond, run: ClaimDriver): Promise<boolean> => {
+      if (run.transport === 'network') return true;
+      try {
+        const greeted = await run.greet();
+        const found = await findPondBySetupId(pond.id);
+        if (!greeted?.pin || !found?.pin || found.pin !== greeted.pin) return false;
+        const url = new URL(found.url);
+        await stagePairing({ version: 2, host: url.hostname, port: Number(url.port) || 443, localUrls: [found.url] }, found.pin);
+        return true;
+      } catch {
+        return false;
+      } finally {
+        run.close();
+        if (driver.current?.claim === run) driver.current = null;
+      }
+    },
+    [stagePairing],
+  );
+
   const claim = useCallback(
     async (pond: NearbyPond, credential: PakeCredential, code: string) => {
       setChosen(pond);
@@ -128,6 +163,16 @@ export function useFindPond(fresh: NearbyPond[], rescan?: () => void): UseFindPo
       try {
         const clientId = await getInstallId();
         const resp = await run.claim({ credential, code, clientId, deviceName: phoneName.trim() || defaultPhoneName(Device.deviceName, Device.modelName) });
+        if (!resp.accepted && resp.held) {
+          if (await reachHeld(pond, run)) {
+            waitingRef.current = true;
+            setPhase({ kind: 'waiting', pondId: pond.id, held: resp.held });
+          } else {
+            void reject();
+            setPhase({ kind: 'failed', pondId: pond.id, credential: 'pairing', message: t('pairingLock.refused.needsNetwork') });
+          }
+          return;
+        }
         if (!resp.accepted) {
           void reject();
           // Another phone claimed it between the card and now: only a spoken code joins it.
@@ -152,7 +197,7 @@ export function useFindPond(fresh: NearbyPond[], rescan?: () => void): UseFindPo
         setPhase({ kind: 'failed', pondId: pond.id, credential: isClaimedRefusal(e) ? 'pairing' : credential, message: describe(e, credential) });
       }
     },
-    [stopCooling, startCooling, describe, driverFor, phoneName, router, t],
+    [stopCooling, startCooling, describe, driverFor, phoneName, reachHeld, router, t],
   );
 
   // A scanned card comes back here from the scanner, and names the Pond it belongs to.
@@ -205,8 +250,16 @@ export function useFindPond(fresh: NearbyPond[], rescan?: () => void): UseFindPo
     [keepRotatedTokens, phoneName, router, t],
   );
 
+  /** Let go of a wait: the Pond staged for it over the home network is no longer wanted. */
+  const dropWait = useCallback(() => {
+    if (!waitingRef.current) return;
+    waitingRef.current = false;
+    void cancelPairing();
+  }, [cancelPairing]);
+
   const pick = useCallback(
     (pond: NearbyPond) => {
+      dropWait();
       setSpoken({ asking: false, error: null });
       setChosen(pond);
       if (card.current?.id === pond.id) {
@@ -234,11 +287,11 @@ export function useFindPond(fresh: NearbyPond[], rescan?: () => void): UseFindPo
         }
       })();
     },
-    [claim, describe, driverFor, pairedPin, refreshToken, resume],
+    [claim, describe, driverFor, dropWait, pairedPin, refreshToken, resume],
   );
 
   const picked = (): NearbyPond | null => {
-    const id = phase.kind === 'entering' || phase.kind === 'failed' || phase.kind === 'claiming' || phase.kind === 'connecting' ? phase.pondId : null;
+    const id = phase.kind === 'browsing' || phase.kind === 'looking' ? null : phase.pondId;
     return ponds.current.find((p) => p.id === id) ?? null;
   };
 
@@ -278,16 +331,37 @@ export function useFindPond(fresh: NearbyPond[], rescan?: () => void): UseFindPo
   const cancel = useCallback(() => {
     driver.current?.claim.close();
     driver.current = null;
+    dropWait();
     card.current = null;
     stopCooling();
     setSpoken({ asking: false, error: null });
     setChosen(null);
     setPhase({ kind: 'browsing' });
     rescan?.();
-  }, [stopCooling, rescan]);
+  }, [stopCooling, rescan, dropWait]);
+
+  useEffect(() => dropWait, [dropWait]);
+
+  const heldPaired = useCallback(() => {
+    void confirm();
+    // The pairing is kept, so there is nothing staged left to cancel.
+    waitingRef.current = false;
+    card.current = null;
+    driver.current = null;
+    void setupNeededNow().then((needed) => router.replace(needed ? '/(onboarding)/owner-setup' : '/(tabs)'));
+  }, [router]);
+
+  const askAgain = useCallback(() => {
+    if (phase.kind !== 'waiting') return;
+    driver.current?.claim.close();
+    driver.current = null;
+    dropWait();
+    setClaimedIds((ids) => (ids.includes(phase.pondId) ? ids : [...ids, phase.pondId]));
+    setPhase({ kind: 'entering', pondId: phase.pondId, credential: 'pairing', spoken: false });
+  }, [phase, dropWait]);
 
   return {
     data: { ponds: listed, phase, claimedIds, phoneName, coolingSecs, spoken },
-    actions: { pick, submit, askSpoken, useCard, setPhoneName, cancel },
+    actions: { pick, submit, askSpoken, useCard, setPhoneName, cancel, heldPaired, askAgain },
   };
 }

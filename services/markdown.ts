@@ -6,20 +6,174 @@
  * `components/patterns/markdown.tsx` draws the tokens in Ink's type.
  */
 
-import { lexer, type MarkedToken, type Token, type Tokens } from 'marked';
+import { Marked, type MarkedToken, type Token, type TokenizerExtension, type Tokens } from 'marked';
+
+import { latexToUnicode } from './latex';
 
 export type { MarkedToken, Token, Tokens };
 
-/** Safe on a reply still streaming in: an unclosed fence is code to the end. */
-export function parseReply(source: string): Token[] {
-  return lexer(source, { gfm: true });
+/** A run of TeX the model wrote: in a sentence, or set apart on its own line. */
+export interface MathToken {
+  type: 'math';
+  raw: string;
+  text: string;
+  display: boolean;
 }
 
-const NAMED: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ' };
+export function isMath(token: Token): token is Token & MathToken {
+  return token.type === 'math';
+}
 
-/** marked decodes numeric entities and leaves named ones for a browser, which this is not. */
+/** A `\[` that holds no math is a model escaping a bracket, as in a citation `\[1\]`. */
+const looksLikeMath = (tex: string) => /[\\^_{}=<>+\-*/|]|^\s*[A-Za-z]\s*$/.test(tex);
+
+const BLOCK_DOLLARS = /^ {0,3}\$\$((?:[^$]|\$(?!\$))+?)\$\$[ \t]*(?:\n+|$)/;
+const BLOCK_BRACKETS = /^ {0,3}\\\[((?:[^\\]|\\(?!\]))+?)\\\][ \t]*(?:\n+|$)/;
+
+function displayBlock(src: string): MathToken | undefined {
+  const brackets = BLOCK_BRACKETS.exec(src);
+  const m = BLOCK_DOLLARS.exec(src) ?? brackets;
+  const text = m?.[1].trim();
+  if (!m || !text || (m === brackets && !looksLikeMath(text))) return undefined;
+  return { type: 'math', raw: m[0], text, display: true };
+}
+
+/**
+ * `$…$` only where it cannot be money or a shell variable: the opening `$` touches what follows it
+ * and does not follow a word, the closing one touches what precedes it and no word follows it, and
+ * an amount ("$5 and 10$") has to carry TeX to count.
+ */
+function dollarMath(src: string, before: string): MathToken | undefined {
+  if (/[\w\\$]/.test(before) || src.length < 3 || /[\s$]/.test(src[1])) return undefined;
+  for (let i = 1; i < src.length; i += 1) {
+    const ch = src[i];
+    if (ch === '\\') {
+      i += 1;
+      continue;
+    }
+    if (ch === '\n' && src[i + 1] === '\n') return undefined;
+    if (ch !== '$') continue;
+    if (/\s/.test(src[i - 1]) || /\w/.test(src[i + 1] ?? '')) return undefined;
+    const text = src.slice(1, i);
+    if (/^\d/.test(text) && !/[\\^_{}=+]/.test(text)) return undefined;
+    return { type: 'math', raw: src.slice(0, i + 1), text, display: false };
+  }
+  return undefined;
+}
+
+function inlineMath(src: string, previous: Token | undefined): MathToken | undefined {
+  const before = previous?.raw.slice(-1) ?? '';
+  // Set apart when it is the whole line or opens onto lines of its own, as `Here: $$⏎…⏎$$` does.
+  const alone = (raw: string) =>
+    /^\S{2}[ \t]*\n|\n[ \t]*\S{2}$/.test(raw) ||
+    ((before === '' || before === '\n') && /^[ \t]*(?:\n|$)/.test(src.slice(raw.length)));
+  const paren = /^\\\(((?:[^\\]|\\(?!\)))+?)\\\)/.exec(src);
+  if (paren && paren[1].trim()) return { type: 'math', raw: paren[0], text: paren[1].trim(), display: false };
+  const bracket = /^\\\[((?:[^\\]|\\(?!\]))+?)\\\]/.exec(src);
+  if (bracket && bracket[1].trim() && looksLikeMath(bracket[1])) {
+    return { type: 'math', raw: bracket[0], text: bracket[1].trim(), display: alone(bracket[0]) };
+  }
+  const dollars = /^\$\$((?:[^$]|\$(?!\$))+?)\$\$/.exec(src);
+  if (dollars && dollars[1].trim()) {
+    return { type: 'math', raw: dollars[0], text: dollars[1].trim(), display: alone(dollars[0]) };
+  }
+  return src[0] === '$' && src[1] !== '$' ? dollarMath(src, before) : undefined;
+}
+
+const mathBlock: TokenizerExtension = {
+  name: 'mathBlock',
+  level: 'block',
+  // Only where a whole equation follows, or a paragraph would be cut at every line opening with `$$`.
+  start(src) {
+    for (const m of src.matchAll(/(^|\n) {0,3}(?:\$\$|\\\[)/g)) {
+      const at = (m.index ?? 0) + m[1].length;
+      if (displayBlock(src.slice(at))) return at;
+    }
+    return undefined;
+  },
+  tokenizer: (src) => displayBlock(src),
+};
+
+const mathInline: TokenizerExtension = {
+  name: 'math',
+  level: 'inline',
+  start(src) {
+    const at = src.search(/\$|\\[([]/);
+    return at < 0 ? undefined : at;
+  },
+  tokenizer: (src, tokens) => inlineMath(src, tokens.at(-1)),
+};
+
+const reader = new Marked({ gfm: true, extensions: [mathBlock, mathInline] });
+
+/** Safe on a reply still streaming in: an unclosed fence is code to the end, an unclosed `$$` is text. */
+export function parseReply(source: string): Token[] {
+  return reader.lexer(source);
+}
+
+/** The math in a reply, as the characters it reads as. */
+export function mathText(token: MathToken): string {
+  return latexToUnicode(token.text);
+}
+
+/** A paragraph's inline tokens, split where an equation is set on its own line. */
+export type ParagraphRun = { math: MathToken } | { tokens: Token[] };
+
+export function splitDisplayMath(tokens: Token[]): ParagraphRun[] {
+  if (!tokens.some((t) => isMath(t) && t.display)) return [{ tokens }];
+  const runs: ParagraphRun[] = [];
+  let run: Token[] = [];
+  const flush = () => {
+    const trimmed = trimRun(run);
+    if (trimmed.length) runs.push({ tokens: trimmed });
+    run = [];
+  };
+  for (const token of tokens) {
+    if (isMath(token) && token.display) {
+      flush();
+      runs.push({ math: token });
+    } else {
+      run.push(token);
+    }
+  }
+  flush();
+  return runs;
+}
+
+/** The line breaks that stood around an equation, taken off the text either side of it. */
+function trimRun(tokens: Token[]): Token[] {
+  const plain = (t: Token | undefined): t is Tokens.Text => t?.type === 'text' && !('tokens' in t && t.tokens);
+  const out = tokens.filter((t, i) => !(t.type === 'br' && (i === 0 || i === tokens.length - 1)));
+  const first = out[0];
+  if (plain(first)) out[0] = { ...first, text: first.text.replace(/^\s+/, '') };
+  const last = out[out.length - 1];
+  if (plain(last)) out[out.length - 1] = { ...last, text: last.text.replace(/\s+$/, '') };
+  return out.filter((t) => !(plain(t) && t.text === ''));
+}
+
+const NAMED: Record<string, string> = {
+  amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ', ensp: ' ', emsp: ' ',
+  thinsp: ' ', mdash: '—', ndash: '–', hellip: '…', lsquo: '‘', rsquo: '’', ldquo: '“', rdquo: '”',
+  laquo: '«', raquo: '»', bull: '•', middot: '·', copy: '©', reg: '®', trade: '™', deg: '°', para: '¶',
+  sect: '§', dagger: '†', times: '×', divide: '÷', plusmn: '±', minus: '−', le: '≤', ge: '≥', ne: '≠',
+  asymp: '≈', infin: '∞', frac12: '½', frac14: '¼', frac34: '¾', sup2: '²', sup3: '³', micro: 'µ',
+  euro: '€', pound: '£', yen: '¥', cent: '¢', larr: '←', rarr: '→', uarr: '↑', darr: '↓', harr: '↔',
+  check: '✓', shy: '',
+};
+const ENTITY = new RegExp(`&(?:(${Object.keys(NAMED).join('|')})|#(\\d{1,7})|#[xX]([0-9a-fA-F]{1,6}));`, 'g');
+
+function codePoint(n: number, raw: string): string {
+  return n > 0 && n <= 0x10ffff && !(n >= 0xd800 && n <= 0xdfff) ? String.fromCodePoint(n) : raw;
+}
+
+/**
+ * marked leaves entities for a browser to decode, which this is not. One pass, so `&amp;lt;`
+ * shows as the `&lt;` it spells rather than being decoded twice into `<`.
+ */
 export function decodeEntities(text: string): string {
-  return text.replace(/&(amp|lt|gt|quot|apos|nbsp);/g, (_, name: string) => NAMED[name]);
+  return text.replace(ENTITY, (raw, name?: string, dec?: string, hex?: string) =>
+    name ? NAMED[name] : codePoint(dec ? Number(dec) : parseInt(hex ?? '', 16), raw),
+  );
 }
 
 /** The model's text does not get to launch an app scheme or a script, so only the web opens. */
@@ -48,6 +202,7 @@ export function htmlAsText(raw: string): string {
 function inlineWords(tokens: Token[]): string {
   return tokens
     .map((token) => {
+      if (isMath(token)) return mathText(token);
       const t = token as MarkedToken;
       if (t.type === 'br') return '\n';
       if (t.type === 'html') return htmlAsText(t.raw);
@@ -61,6 +216,7 @@ function inlineWords(tokens: Token[]): string {
 /** Block tokens as plain lines: a list keeps its bullets or numbers, a table its cells. */
 function blockLines(tokens: Token[]): string[] {
   return tokens.flatMap((token): string[] => {
+    if (isMath(token)) return [mathText(token)];
     const t = token as MarkedToken;
     switch (t.type) {
       case 'space':
