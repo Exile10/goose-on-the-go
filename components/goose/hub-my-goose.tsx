@@ -8,8 +8,8 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { router } from 'expo-router';
+import { RefreshControl, ScrollView, StyleSheet, Text, View, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
+import { router, useIsFocused } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { InkButton, InkCard, InkSpinner, InkText, inkText, useInkTheme } from '@jarida/ink/native';
@@ -85,12 +85,17 @@ function targetHref(clause: HubClause): Parameters<typeof router.push>[0] {
 const GOOSE_SIZE = 88;
 
 /** The title and today's date, with the goose afloat on its pond beside them, working while the hub loads. */
-function Header({ working }: { working: boolean }) {
+/** Past this the header has scrolled out of sight, and its goose rests. */
+const HEADER_OUT = GOOSE_SIZE + Spacing.lg;
+
+function Header({ working, out }: { working: boolean; out: boolean }) {
   const theme = useInkTheme();
   const { t, i18n } = useTranslation();
   const styles = useThemedStyles(makeStyles);
   // The pond's ripples are drawn in the colour behind it: the page's own.
   const { colors } = useTheme();
+  // The tab stays mounted behind the others, and a goose moving there costs the screen in front.
+  const focused = useIsFocused();
   const title = inkText(theme, { role: 'display', size: '3xl', weight: 700, tracking: 'title', color: theme.color.text }).style;
   const today = new Date().toLocaleDateString(i18n.language, { weekday: 'long', day: 'numeric', month: 'long' });
   return (
@@ -103,7 +108,7 @@ function Header({ working }: { working: boolean }) {
           {today}
         </InkText>
       </View>
-      <Goose state={working ? 'working' : 'idle'} size={GOOSE_SIZE} ground={colors.background} />
+      <Goose state={working ? 'working' : 'idle'} size={GOOSE_SIZE} ground={colors.background} still={!focused || out} />
     </View>
   );
 }
@@ -603,6 +608,17 @@ export function HubMyGoose({ hub }: { hub: MeHub }) {
   const { t } = useTranslation();
   const styles = useThemedStyles(makeStyles);
   const chrome = useChromeScroll();
+  // The header's goose works only while it can be seen; the bail-out keeps a scroll from re-rendering.
+  const [headerOut, setHeaderOut] = useState(false);
+  const { onScroll: chromeScroll } = chrome;
+  const onScroll = useCallback(
+    (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+      chromeScroll(e);
+      const out = e.nativeEvent.contentOffset.y > HEADER_OUT;
+      setHeaderOut((was) => (was === out ? was : out));
+    },
+    [chromeScroll],
+  );
   const bottomInset = useBottomBarInset();
   const g = useMyGooseHub(hub);
   const pull = usePullToRefresh(g.reload);
@@ -624,12 +640,13 @@ export function HubMyGoose({ hub }: { hub: MeHub }) {
     <SafeAreaView style={styles.safe} edges={['top']}>
       <ScrollView
         {...chrome}
+        onScroll={onScroll}
         style={styles.page}
         contentContainerStyle={[styles.scroll, { paddingBottom: bottomInset + Spacing.xl }]}
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl {...pull} />}
       >
-        <Header working={g.loading} />
+        <Header working={g.loading} out={headerOut} />
         <FindAndJump hub={hub} />
         {g.loading && !anything ? <InkSpinner label={t('myGoose.loading')} /> : <HubSentence clauses={clauses} quiet={t('goose.say.quiet')} />}
         {state === 'unreachable' || state === 'failed' ? <ContentUnavailable state={state} onRetry={reload} /> : null}

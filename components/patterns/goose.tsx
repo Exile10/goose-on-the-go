@@ -49,11 +49,15 @@ export interface GooseProps {
    * match what is there; the theme's surface, a card's face, by default.
    */
   ground?: string;
-  /** One resting frame and no clock: one goose of many, as on every finished reply in a thread. */
+  /** One resting frame and no clock: a goose that is small, or on a screen out of sight. */
   still?: boolean;
 }
 
 type Matrix = [number, number, number, number, number, number];
+
+/** Frames a second while it swims or listens, and while it only drifts and blinks. */
+const FPS = 30;
+const IDLE_FPS = 20;
 
 /** The native components take `matrix`; the JS ones only reach it through `transform`. */
 type WithMatrix<P> = React.ComponentType<P & { matrix?: Matrix }>;
@@ -104,19 +108,56 @@ interface Palette { accent: string; light: string; deep: string; darkest: string
 
 interface Frame { neck: NeckFrame; lid: number; parts: PartsFrame }
 
+/**
+ * A frame given outright. The parts under it draw it as plain props, once, instead of following a
+ * shared value every frame: a goose that never moves, and the reflection of one that does.
+ */
+const Still = React.createContext<Frame | null>(null);
+
+/** The goose at rest in `mood`, as reduced motion draws it, worked out on the JS thread. */
+function restFrame(mood: GooseMood): Frame {
+  const pose = neckPose(0, mood, mood === 'listening' ? 1 : 0);
+  return { neck: neckFrame(pose), lid: pose.lid, parts: restingParts(mood) };
+}
+
+type MovingProps = { frame: SharedValue<Frame>; at: (f: Frame) => Matrix; children: React.ReactNode };
+
 /** One part whose transform the frame sets. */
-function Moving({ frame, at, children }: { frame: SharedValue<Frame>; at: (f: Frame) => Matrix; children: React.ReactNode }) {
+function Moving(props: MovingProps) {
+  const still = React.useContext(Still);
+  return still ? <G transform={props.at(still)}>{props.children}</G> : <LiveMoving {...props} />;
+}
+
+function LiveMoving({ frame, at, children }: MovingProps) {
   const props = useAnimatedProps(() => ({ matrix: at(frame.get()) }));
   return <AG animatedProps={props}>{children}</AG>;
 }
 
+type RebuiltProps = { frame: SharedValue<Frame>; pick: (n: NeckFrame) => string } & React.ComponentProps<typeof Path>;
+
 /** The neck, its highlight and the head: outlines the frame rebuilds. */
-function Rebuilt({ frame, pick, ...rest }: { frame: SharedValue<Frame>; pick: (n: NeckFrame) => string } & React.ComponentProps<typeof Path>) {
+function Rebuilt(props: RebuiltProps) {
+  const still = React.useContext(Still);
+  if (!still) return <LiveRebuilt {...props} />;
+  const { frame: _frame, pick, ...rest } = props;
+  return <Path d={pick(still.neck)} {...rest} />;
+}
+
+function LiveRebuilt({ frame, pick, ...rest }: RebuiltProps) {
   const props = useAnimatedProps(() => ({ d: pick(frame.get().neck) }));
   return <APath animatedProps={props} {...rest} />;
 }
 
-function Ring({ frame, i, color }: { frame: SharedValue<Frame>; i: number; color: string }) {
+type RingProps = { frame: SharedValue<Frame>; i: number; color: string };
+
+function Ring(props: RingProps) {
+  const still = React.useContext(Still);
+  if (!still) return <LiveRing {...props} />;
+  const c = still.neck.ringCentre, r = still.parts.rings[props.i];
+  return <Ellipse cx={c[0]} cy={c[1]} rx={r.r} ry={r.r} opacity={r.opacity} fill="none" stroke={props.color} strokeWidth={1.3} />;
+}
+
+function LiveRing({ frame, i, color }: RingProps) {
   const props = useAnimatedProps(() => {
     const c = frame.get().neck.ringCentre, r = frame.get().parts.rings[i];
     return { cx: c[0], cy: c[1], rx: r.r, ry: r.r, opacity: r.opacity };
@@ -198,21 +239,52 @@ function Bird({ id, tag, frame, p }: { id: string; tag: string; frame: SharedVal
   );
 }
 
-function Wake({ frame, i, d, color }: { frame: SharedValue<Frame>; i: number; d: string; color: string }) {
+type WakeProps = { frame: SharedValue<Frame>; i: number; d: string; color: string };
+
+function Wake(props: WakeProps) {
+  const still = React.useContext(Still);
+  if (!still) return <LiveWake {...props} />;
+  const w = still.parts.wake[props.i];
+  return <Path strokeDashoffset={w.offset} opacity={w.opacity} d={props.d} fill="none" stroke={props.color} strokeWidth={1.3} strokeLinecap="round" strokeDasharray="14 60" />;
+}
+
+function LiveWake({ frame, i, d, color }: WakeProps) {
   const props = useAnimatedProps(() => ({ strokeDashoffset: frame.get().parts.wake[i].offset, opacity: frame.get().parts.wake[i].opacity }));
   return <APath animatedProps={props} d={d} fill="none" stroke={color} strokeWidth={1.3} strokeLinecap="round" strokeDasharray="14 60" />;
 }
 
-function Glint({ frame, i, color }: { frame: SharedValue<Frame>; i: number; color: string }) {
+type GlintProps = { frame: SharedValue<Frame>; i: number; color: string };
+
+function glintMatrix(f: Frame, i: number): Matrix {
+  'worklet';
+  const [cx, cy] = GLINTS[i];
+  const g = f.parts.glints[i];
+  return times(shift(g.x, 0), about(g.sx, 0, 0, 1, cx, cy));
+}
+
+function Glint(props: GlintProps) {
+  const still = React.useContext(Still);
+  if (!still) return <LiveGlint {...props} />;
+  const [cx, cy, rx, ry] = GLINTS[props.i];
+  return <Ellipse transform={glintMatrix(still, props.i)} opacity={still.parts.glints[props.i].opacity} fill={props.color} cx={cx} cy={cy} rx={rx} ry={ry} />;
+}
+
+function LiveGlint({ frame, i, color }: GlintProps) {
   const [cx, cy, rx, ry] = GLINTS[i];
-  const props = useAnimatedProps(() => {
-    const g = frame.get().parts.glints[i];
-    return { matrix: times(shift(g.x, 0), about(g.sx, 0, 0, 1, cx, cy)), opacity: g.opacity };
-  });
+  const props = useAnimatedProps(() => ({ matrix: glintMatrix(frame.get(), i), opacity: frame.get().parts.glints[i].opacity }));
   return <AEllipse animatedProps={props} fill={color} cx={cx} cy={cy} rx={rx} ry={ry} />;
 }
 
-function Ripple({ frame, i, color }: { frame: SharedValue<Frame>; i: number; color: string }) {
+type RippleProps = { frame: SharedValue<Frame>; i: number; color: string };
+
+function Ripple(props: RippleProps) {
+  const still = React.useContext(Still);
+  if (!still) return <LiveRipple {...props} />;
+  const r = still.parts.ripples[props.i];
+  return <Ellipse transform={about(r.scale, 0, 0, r.scale, 88, 98)} opacity={r.opacity} cx={RIPPLE[0]} cy={RIPPLE[1]} rx={RIPPLE[2]} ry={RIPPLE[3]} fill="none" stroke={props.color} strokeWidth={1.3} />;
+}
+
+function LiveRipple({ frame, i, color }: RippleProps) {
   const props = useAnimatedProps(() => {
     const r = frame.get().parts.ripples[i];
     return { matrix: about(r.scale, 0, 0, r.scale, 88, 98), opacity: r.opacity };
@@ -221,7 +293,20 @@ function Ripple({ frame, i, color }: { frame: SharedValue<Frame>; i: number; col
   return <AEllipse animatedProps={props} cx={RIPPLE[0]} cy={RIPPLE[1]} rx={RIPPLE[2]} ry={RIPPLE[3]} fill="none" stroke={color} strokeWidth={1.3} />;
 }
 
-function Shadow({ frame, id }: { frame: SharedValue<Frame>; id: string }) {
+type ShadowProps = { frame: SharedValue<Frame>; id: string };
+
+function Shadow(props: ShadowProps) {
+  const still = React.useContext(Still);
+  if (!still) return <LiveShadow {...props} />;
+  const s = still.parts.shadow;
+  return (
+    <G transform={about(s.scale, 0, 0, s.scale, 90, 99)} opacity={s.opacity}>
+      <Ellipse fill={`url(#${props.id}-shadow)`} cx={90} cy={99} rx={46} ry={4.2} />
+    </G>
+  );
+}
+
+function LiveShadow({ frame, id }: ShadowProps) {
   const props = useAnimatedProps(() => {
     const s = frame.get().parts.shadow;
     return { matrix: about(s.scale, 0, 0, s.scale, 90, 99), opacity: s.opacity };
@@ -238,7 +323,7 @@ function Shadow({ frame, id }: { frame: SharedValue<Frame>; id: string }) {
  * ry, so here the ground itself is laid over the pond with linear gradients, clear in the middle and
  * solid at the sides and toward the bottom. The reflection is cut at the waterline with a clip path.
  */
-function Pond({ id, frame, p }: { id: string; frame: SharedValue<Frame>; p: Palette }) {
+function Pond({ id, frame, p, rest }: { id: string; frame: SharedValue<Frame>; p: Palette; rest: Frame }) {
   return (
     <>
       <Defs>
@@ -264,7 +349,11 @@ function Pond({ id, frame, p }: { id: string; frame: SharedValue<Frame>; p: Pale
           const r = f.parts.reflection;
           return times(shift(0, r.y), about(1, 0, Math.tan((r.skew * Math.PI) / 180) * r.sy, r.sy, 88, 98));
         }}>
-          <G opacity={0.42} transform={[1, 0, 0, -1, 0, 196]}><Bird id={id} tag="r" frame={frame} p={p} /></G>
+          {/* At rest inside, moving only as a whole with the swell: redrawn every frame, the second bird
+              doubled the work of each, under a fade and the bands that break it up anyway. */}
+          <Still.Provider value={rest}>
+            <G opacity={0.42} transform={[1, 0, 0, -1, 0, 196]}><Bird id={id} tag="r" frame={frame} p={p} /></G>
+          </Still.Provider>
         </Moving>
       </G>
       <Rect x="0" y="98" width="160" height="42" fill={`url(#${id}-deep)`} />
@@ -290,14 +379,10 @@ function Pond({ id, frame, p }: { id: string; frame: SharedValue<Frame>; p: Pale
 
 let gooseIds = 0;
 
-export const Goose = React.memo(function Goose({ state, size = 150, water = true, ground, still = false }: GooseProps) {
-  const theme = useInkTheme();
-  // The web preview draws the resting frame too: the old goose's motion took a chat down there
-  // (2b8aafd), and this one's matrices go through react-native-svg's native props.
-  const reduced = useReduceMotion() || Platform.OS === 'web' || still;
-  const [id] = React.useState(() => `goose${gooseIds++}`);
-  const c = theme.color;
-  const p: Palette = {
+/** The goose's colours, from the theme's accent. */
+function usePalette(ground: string | undefined): Palette {
+  const c = useInkTheme().color;
+  return {
     accent: c.accent,
     light: mix(c.accent, '#ffffff', 0.42),
     deep: c.accentPressed,
@@ -306,6 +391,51 @@ export const Goose = React.memo(function Goose({ state, size = 150, water = true
     beakDeep: mix(c.warning, '#000000', 0.24),
     ground: ground ?? c.surface,
   };
+}
+
+/** The drawing itself, around whichever frame it is given. */
+function Drawing({ id, frame, p, size, water, rest }: { id: string; frame: SharedValue<Frame>; p: Palette; size: number; water: boolean; rest: Frame }) {
+  const ratio = water ? 140 / 160 : 96 / 136;
+  return (
+    <Svg width={size} height={size * ratio} viewBox={water ? '0 0 160 140' : '22 6 136 96'} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+      {water ? <Pond id={id} frame={frame} p={p} rest={rest} /> : null}
+      <Moving frame={frame} at={(f) => {
+        'worklet';
+        const b = f.parts.bob;
+        return times(shift(0, b.y), times(about(b.sx, 0, 0, b.sy, 88, 98), turn(f.parts.roll, 88, 98)));
+      }}>
+        <Bird id={id} tag="b" frame={frame} p={p} />
+      </Moving>
+      {water ? <Path d="M10 98.4h140" fill="none" stroke={p.light} strokeWidth={0.9} strokeLinecap="round" opacity={0.7} /> : null}
+    </Svg>
+  );
+}
+
+/**
+ * The goose at rest, drawn once as plain SVG: no clock, and nothing following a shared value. For a
+ * goose that never moves, such as the one beside each finished reply's thoughts, it costs no more
+ * than an icon.
+ */
+export const GooseStill = React.memo(function GooseStill({ state = 'idle', size = 150, water = true, ground }: Partial<Pick<GooseProps, 'state'>> & Omit<GooseProps, 'state' | 'still'>) {
+  const p = usePalette(ground);
+  const [id] = React.useState(() => `goose${gooseIds++}`);
+  const rest = React.useMemo(() => restFrame(state), [state]);
+  // The parts take a shared value for when they move; under `Still` they never read it.
+  const frame = useSharedValue(rest);
+  return (
+    <Still.Provider value={rest}>
+      <Drawing id={id} frame={frame} p={p} size={size} water={water} rest={rest} />
+    </Still.Provider>
+  );
+});
+
+export const Goose = React.memo(function Goose({ state, size = 150, water = true, ground, still = false }: GooseProps) {
+  // The web preview draws the resting frame too: the old goose's motion took a chat down there
+  // (2b8aafd), and this one's matrices go through react-native-svg's native props.
+  const reduced = useReduceMotion() || Platform.OS === 'web' || still;
+  const [id] = React.useState(() => `goose${gooseIds++}`);
+  const p = usePalette(ground);
+  const rest = React.useMemo(() => restFrame(state), [state]);
 
   const mood = useSharedValue<GooseMood>(state);
   const clock = useSharedValue(0);
@@ -315,10 +445,19 @@ export const Goose = React.memo(function Goose({ state, size = 150, water = true
     if (reduced) listen.set(state === 'listening' ? 1 : 0);
   }, [state, reduced, mood, listen]);
 
+  // Every frame drawn sends the whole bird through react-native-svg's props, so it is drawn at `FPS`,
+  // or `IDLE_FPS` afloat, rather than the screen's rate: the motion is slow enough not to show it.
+  const drawn = useSharedValue(-1);
   useFrameCallback((info) => {
     'worklet';
-    const dt = Math.min(0.1, (info.timeSincePreviousFrame ?? 16) / 1000);
-    clock.set(info.timeSinceFirstFrame / 1000);
+    const now = info.timeSinceFirstFrame;
+    const since = now - drawn.get();
+    const step = 1000 / (mood.get() === 'idle' ? IDLE_FPS : FPS);
+    // A clock that restarts on resuming reads as negative, and draws at once.
+    if (drawn.get() >= 0 && since >= 0 && since < step) return;
+    const dt = Math.min(0.1, (since > 0 && drawn.get() >= 0 ? since : step) / 1000);
+    drawn.set(now);
+    clock.set(now / 1000);
     listen.set(easeListen(listen.get(), mood.get(), dt));
   }, !reduced);
 
@@ -333,18 +472,5 @@ export const Goose = React.memo(function Goose({ state, size = 150, water = true
     };
   });
 
-  const ratio = water ? 140 / 160 : 96 / 136;
-  return (
-    <Svg width={size} height={size * ratio} viewBox={water ? '0 0 160 140' : '22 6 136 96'} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-      {water ? <Pond id={id} frame={frame} p={p} /> : null}
-      <Moving frame={frame} at={(f) => {
-        'worklet';
-        const b = f.parts.bob;
-        return times(shift(0, b.y), times(about(b.sx, 0, 0, b.sy, 88, 98), turn(f.parts.roll, 88, 98)));
-      }}>
-        <Bird id={id} tag="b" frame={frame} p={p} />
-      </Moving>
-      {water ? <Path d="M10 98.4h140" fill="none" stroke={p.light} strokeWidth={0.9} strokeLinecap="round" opacity={0.7} /> : null}
-    </Svg>
-  );
+  return <Drawing id={id} frame={frame} p={p} size={size} water={water} rest={rest} />;
 });

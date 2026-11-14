@@ -1,16 +1,17 @@
 /**
  * The goose on a small pond beside Goose's thinking: rings spread from under it and fade, one after
- * another, on water seen at a slant, while the goose swims hard, so the line reads as alive without a
- * spinner. One looping value drives every ring, each a third of a cycle behind the last, on the native
- * driver. When the thinking is done, or for a reader who asked for less motion, the water holds still
- * with two rings on it and the goose rests: a finished reply in a long thread should cost nothing.
+ * another, on water seen at a slant, and the goose bobs on them, so the line reads as alive without a
+ * spinner. All of it runs on the native driver from one looping value, each ring a third of a cycle
+ * behind the last. The goose is drawn once, at rest, and moves as a whole: redrawing the bird every
+ * frame, as the large goose does, cost the thread's scrolling while the reply streamed. Done, the
+ * water holds still with two rings on it and the goose rests there, plain SVG drawn once.
  */
 
 import React, { useEffect, useState } from 'react';
 import { Animated, Easing, StyleSheet, View } from 'react-native';
 import { useInkTheme, useReduceMotion } from '@jarida/ink/native';
 
-import { Goose } from '@/components/patterns/goose';
+import { GooseStill } from '@/components/patterns/goose';
 
 const WIDTH = 40;
 /** The water seen at a slant: rings are ellipses this much flatter than they are wide. */
@@ -66,6 +67,13 @@ export function PondRipple({ live }: { live: boolean }) {
     return () => loop.stop();
   }, [clock, moving]);
 
+  // Twice a cycle: down as each ring leaves it, up between, and rocking a little on the swell.
+  const bob = {
+    transform: [
+      { translateY: clock.interpolate({ inputRange: [0, 0.25, 0.5, 0.75, 1], outputRange: [0, 1.2, 0, 1.2, 0] }) },
+      { rotate: clock.interpolate({ inputRange: [0, 0.5, 1], outputRange: ['-3deg', '3deg', '-3deg'] }) },
+    ],
+  };
   const ink = theme.color.accentLine;
   return (
     <View style={styles.pond} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
@@ -75,9 +83,9 @@ export function PondRipple({ live }: { live: boolean }) {
           ? Array.from({ length: RINGS }, (_, i) => <Ring key={i} progress={ringProgress(clock, i)} color={ink} />)
           : AT_REST.map((at) => <Ring key={at} progress={new Animated.Value(at)} color={ink} />)}
       </View>
-      <View style={styles.bird}>
-        <Goose state={live ? 'working' : 'idle'} size={BIRD} water={false} still={!live} />
-      </View>
+      <Animated.View style={[styles.bird, moving ? bob : null]}>
+        <GooseStill state={live ? 'working' : 'idle'} size={BIRD} water={false} />
+      </Animated.View>
     </View>
   );
 }

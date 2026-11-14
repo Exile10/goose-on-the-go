@@ -7,7 +7,7 @@
 
 import React, { useCallback, useState } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
-import { router } from 'expo-router';
+import { router, useIsFocused } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { InkNotice, InkSpinner, InkTitle } from '@jarida/ink/native';
@@ -52,6 +52,8 @@ function go(href: string) {
 
 export function OlderMyGoose() {
   const { t } = useTranslation();
+  // The tab stays mounted behind the others, and a goose moving there costs the screen in front.
+  const focused = useIsFocused();
   const styles = useThemedStyles(makeStyles);
   const chrome = useChromeScroll();
   const bottomInset = useBottomBarInset();
@@ -96,7 +98,7 @@ export function OlderMyGoose() {
       >
         <View style={styles.head}>
           <InkTitle level={1}>{t('myGoose.title')}</InkTitle>
-          <Goose state={loading ? 'working' : 'idle'} size={60} water={false} />
+          <Goose state={loading ? 'working' : 'idle'} size={60} water={false} still={!focused} />
         </View>
 
         {loading && !anything ? (

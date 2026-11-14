@@ -17,6 +17,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { Animated, Easing, StyleSheet, Text, View } from 'react-native';
+import { useIsFocused } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import {
   InkChoice,
@@ -54,6 +55,8 @@ export interface GreetingCardProps {
 
 export function GreetingCard({ name, seed, busy, prompts, onPick }: GreetingCardProps) {
   const theme = useInkTheme();
+  // The conversation stays mounted under screens pushed over it; its goose rests while it is hidden.
+  const focused = useIsFocused();
   const reduced = useReduceMotion();
   const { t } = useTranslation();
   const [arrival] = useState(() => new Animated.Value(0));
@@ -100,7 +103,7 @@ export function GreetingCard({ name, seed, busy, prompts, onPick }: GreetingCard
             </Text>
             <Text style={hint.style}>{subtitle}</Text>
           </View>
-          <Goose state={busy ? 'working' : 'idle'} size={104} />
+          <Goose state={busy ? 'working' : 'idle'} size={104} still={!focused} />
         </View>
       </InkEdge>
       <View style={styles.prompts}>
