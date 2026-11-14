@@ -98,6 +98,45 @@ describe('the catalogue', () => {
   });
 });
 
+// How notices reach phones, and who may set reminders by voice: the Pond's defaults, on the pages they belong to.
+describe('the reliability settings', () => {
+  const where = (key: string) => Object.values(SETTINGS_PAGES).find((page) => pageKeys(page).includes(key as never))?.id;
+
+  it('start where the Pond starts them', () => {
+    expect(SAMPLE_SETTINGS).toMatchObject({
+      notices_wait_in_quiet_hours: true,
+      speak_unfetched_reminders: true,
+      unseen_phone_skip_days: 14,
+      unseen_phone_remove_days: 30,
+      lone_voice_sets_reminders: true,
+    });
+  });
+
+  it('sit with quiet hours and the household', () => {
+    expect(where('notices_wait_in_quiet_hours')).toBe('announcements');
+    expect(where('speak_unfetched_reminders')).toBe('announcements');
+    expect(where('unseen_phone_skip_days')).toBe('announcements');
+    expect(where('unseen_phone_remove_days')).toBe('announcements');
+    expect(where('lone_voice_sets_reminders')).toBe('household');
+  });
+
+  it('say what they do in the words the Pond uses', () => {
+    expect(lookup('settings.field.notices_wait_in_quiet_hours.label')).toBe('Hold notices in quiet hours');
+    expect(lookup('settings.field.speak_unfetched_reminders.label')).toBe('Say a reminder no phone picked up');
+    expect(lookup('settings.field.unseen_phone_skip_days.label')).toBe('Stop notifying a phone not seen for');
+    expect(lookup('settings.field.unseen_phone_remove_days.label')).toBe('Remove a phone not seen for');
+    expect(lookup('settings.field.lone_voice_sets_reminders.label')).toBe('A voice the Pond does not know may set reminders');
+  });
+
+  it('let a phone go unseen from never up to a year', () => {
+    const days = Object.values(SETTINGS_PAGES)
+      .flatMap((page) => page.sections.flatMap((section) => section.items))
+      .filter((item) => item.kind === 'number' && (item.key === 'unseen_phone_skip_days' || item.key === 'unseen_phone_remove_days'));
+    expect(days).toHaveLength(2);
+    for (const item of days) expect(item).toMatchObject({ min: 0, max: 365, step: 1 });
+  });
+});
+
 describe('reading the record', () => {
   it('fills what an older Pond leaves out with the defaults', () => {
     const s = readSettings({ assistant_name: 'Kuku', voice_tts_speed: 1.25 });

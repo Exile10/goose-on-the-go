@@ -1564,6 +1564,16 @@ export interface PondSettings {
   unprompted_speech_categories: string;
   quiet_hours_start: string;
   quiet_hours_end: string;
+  /** In quiet hours only alerts and what was asked for then reach a phone; the rest wait for one notice. */
+  notices_wait_in_quiet_hours: boolean;
+  /** A reminder no phone fetched within five minutes is said once in the room, outside quiet hours. */
+  speak_unfetched_reminders: boolean;
+  /** Days unseen before a phone stops being notified; 0 never stops. */
+  unseen_phone_skip_days: number;
+  /** Days unseen before the Pond removes a phone; 0 never removes. */
+  unseen_phone_remove_days: number;
+  /** In a household of one, a voice the Pond cannot identify sets reminders and to-dos as that member. */
+  lone_voice_sets_reminders: boolean;
   proactive_review_enabled: boolean;
   suggestions_muted: string[];
   session_titling_enabled: boolean;

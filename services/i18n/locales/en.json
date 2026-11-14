@@ -771,7 +771,8 @@
       "faces": "Faces",
       "inTheRoom": "In this room",
       "whisperDetector": "Whisper detector",
-      "phoneAssistant": "On this phone"
+      "phoneAssistant": "On this phone",
+      "phones": "Phones"
     },
     "footer": {
       "standingInstructions": "Added to everything Goose already knows, in every conversation.",
@@ -1217,6 +1218,26 @@
       "vision_face_on_motion": {
         "label": "Look for faces in plain movement too",
         "hint": "Check for a face even when the detector saw only movement. A face found turns the event into a person."
+      },
+      "notices_wait_in_quiet_hours": {
+        "label": "Hold notices in quiet hours",
+        "hint": "In quiet hours, alerts and reminders set for that time still arrive; everything else waits for one notice when quiet hours end."
+      },
+      "speak_unfetched_reminders": {
+        "label": "Say a reminder no phone picked up",
+        "hint": "When no phone fetches a reminder within five minutes, the Pond says it once in the room, outside quiet hours."
+      },
+      "unseen_phone_skip_days": {
+        "label": "Stop notifying a phone not seen for",
+        "hint": "In days. 0 never stops."
+      },
+      "unseen_phone_remove_days": {
+        "label": "Remove a phone not seen for",
+        "hint": "In days. 0 never removes it."
+      },
+      "lone_voice_sets_reminders": {
+        "label": "A voice the Pond does not know may set reminders",
+        "hint": "In a household of one, a voice the Pond cannot identify may set reminders and to-dos as that member."
       }
     },
     "option": {

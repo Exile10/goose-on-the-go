@@ -459,6 +459,9 @@ const home: SettingsPage = {
   ],
 };
 
+/** Days a phone may go unseen, as the steppers offer them; 0 is never. */
+const UNSEEN_PHONE_DAYS = [0, 7, 14, 30, 60, 90, 180, 365] as const;
+
 const household: SettingsPage = {
   id: 'household',
   icon: 'users',
@@ -471,6 +474,12 @@ const household: SettingsPage = {
       items: [
         { kind: 'text', key: 'user_name', labelKey: 'settings.field.user_name.label', hintKey: 'settings.field.user_name.hint', placeholderKey: 'settings.field.user_name.placeholder' },
         { kind: 'special', id: 'primaryProfile' },
+      ],
+    },
+    {
+      titleKey: 'settings.section.inTheRoom',
+      items: [
+        { kind: 'switch', key: 'lone_voice_sets_reminders', labelKey: 'settings.field.lone_voice_sets_reminders.label', hintKey: 'settings.field.lone_voice_sets_reminders.hint' },
       ],
     },
     {
@@ -557,6 +566,15 @@ const announcements: SettingsPage = {
       items: [
         { kind: 'time', key: 'quiet_hours_start', labelKey: 'settings.field.quiet_hours_start.label' },
         { kind: 'time', key: 'quiet_hours_end', labelKey: 'settings.field.quiet_hours_end.label' },
+        { kind: 'switch', key: 'notices_wait_in_quiet_hours', labelKey: 'settings.field.notices_wait_in_quiet_hours.label', hintKey: 'settings.field.notices_wait_in_quiet_hours.hint' },
+      ],
+    },
+    {
+      titleKey: 'settings.section.phones',
+      items: [
+        { kind: 'switch', key: 'speak_unfetched_reminders', labelKey: 'settings.field.speak_unfetched_reminders.label', hintKey: 'settings.field.speak_unfetched_reminders.hint' },
+        { kind: 'number', key: 'unseen_phone_skip_days', min: 0, max: 365, step: 1, stops: UNSEEN_PHONE_DAYS, unitKey: 'settings.unit.days', labelKey: 'settings.field.unseen_phone_skip_days.label', hintKey: 'settings.field.unseen_phone_skip_days.hint' },
+        { kind: 'number', key: 'unseen_phone_remove_days', min: 0, max: 365, step: 1, stops: UNSEEN_PHONE_DAYS, unitKey: 'settings.unit.days', labelKey: 'settings.field.unseen_phone_remove_days.label', hintKey: 'settings.field.unseen_phone_remove_days.hint' },
       ],
     },
     {
