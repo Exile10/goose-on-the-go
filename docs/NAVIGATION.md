@@ -405,12 +405,13 @@ them:
 |---|---|---|
 | `schedule` (with `schedule_id`, `run_id`) | `/(stack)/schedule`, going on to that schedule | a schedule result |
 | `devices` | `/(tabs)/devices` | pairing, a Matter device, and a device removed |
+| `devices` with `action: "pairing_request"` | `/(stack)/pairing-lock` | a phone asking a locked Pond to pair |
 | `chat` | `/(tabs)/chat` | a suggestion |
 | `models` | `/(stack)/models` | a model download finished or failed, the disk running low or recovering, a start with speech or voice down |
 | `extensions` | `/(stack)/extensions` | a start where a saved extension failed |
 | `remote_access` | `/(stack)/remote-access` | remote access stopped, needs signing in, or works again |
 | `todos` (with `todo_id`) | `/(stack)/goose-todos` | a reminder or a hook firing |
-| `news` (with `story_id`) | `/(stack)/goose-story`, else `/(stack)/goose-news` | a story or the digest |
+| `news` (with `story_id`, or `digest_id`) | `/(stack)/goose-story` for a story, else `/(stack)/goose-news` | a story or the digest |
 | `cart` (with `cart_id`) | `/(stack)/goose-cart-item`, else `/(stack)/goose-cart` | a watched price moved |
 
 Goose's questions carry buttons, answered without opening the app (`services/todo-prompts.ts`):
