@@ -124,6 +124,19 @@ describe('setup channel session', () => {
     expect(channel.sealed).toBe(false);
   });
 
+  it('opens a held pairing the Pond sealed for this phone, and stays unsealed', async () => {
+    const { channel } = open({ holds: true });
+    await channel.greet();
+    const answer = await channel.exchange(claim);
+    expect(answer).toMatchObject({
+      accepted: false,
+      rejection_reason: 'approval_required',
+      session_token: null,
+      held: { requestId: 'req-ble', claimSecret: 'ble-claim-secret' },
+    });
+    expect(channel.sealed).toBe(false);
+  });
+
   it('does not wait on a held pairing whose proof does not verify, and ends the session', async () => {
     const { channel } = open({ rewrite: heldVerify('00'.repeat(64)) });
     await channel.greet();

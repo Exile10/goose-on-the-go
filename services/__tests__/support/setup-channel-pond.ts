@@ -64,6 +64,8 @@ export interface FakePondOptions {
   rewrite?: (type: string, answer: Message) => Message;
   /** Sends nothing back for these types. */
   silent?: string[];
+  /** Holds a confirmed phone as a locked Pond does: its request sealed for it, no sealed phase. */
+  holds?: boolean;
 }
 
 export interface FakePond {
@@ -162,6 +164,13 @@ export function fakePond(options: FakePondOptions = {}): FakePond {
           return refusedVerify(base, 'invalid_confirmation');
         }
         const keys = channelKeys(isk, sid);
+        const serverProof = bytesToHex(confirmationTag(SERVER_CONFIRM_LABEL, macKey, share, yb));
+        if (options.holds) {
+          const request = { request_id: 'req-ble', claim_secret: 'ble-claim-secret', expires_at: '2026-11-14T10:10:00Z' };
+          const held = sealMessage(new SealedDirection(keys.pondToPhone), { pairing_request: request });
+          return { ...base, ok: false, accepted: false, error: 'approval_required', rejection_reason: 'approval_required',
+            server_proof: serverProof, ...held };
+        }
         toPhone = new SealedDirection(keys.pondToPhone);
         fromPhone = new SealedDirection(keys.phoneToPond);
         // Each confirmed run mints a session; a device run rotates it, so the old refresh token dies.
@@ -169,7 +178,7 @@ export function fakePond(options: FakePondOptions = {}): FakePond {
         const tokens = mints === 1 ? { session_token: 'session', refresh_token: 'refresh' } : { session_token: `session-${mints}`, refresh_token: `refresh-${mints}` };
         heldRefresh = tokens.refresh_token;
         const sealed = sealMessage(toPhone, { ...tokens, expires_at: '2026-10-18T00:00:00Z' });
-        return { ...base, ok: true, accepted: true, server_proof: bytesToHex(confirmationTag(SERVER_CONFIRM_LABEL, macKey, share, yb)), ...sealed };
+        return { ...base, ok: true, accepted: true, server_proof: serverProof, ...sealed };
       }
       case 'status':
         if (!fromPhone) return { ...base, ok: false, error: 'wrong_phase' };
