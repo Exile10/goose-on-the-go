@@ -1,12 +1,16 @@
 // What Goose did for this member without being asked: a reminder it set, a note it wrote
-// itself, a failing watch it paused, something it looked up. The member reads the list and
-// takes back what can be taken back; only Goose writes it.
+// itself, a failing watch it paused, something it looked up, a phone it removed because it had
+// stopped connecting. The member reads the list and takes back what can be taken back; only
+// Goose writes it.
 
 import type { IconName } from '@/constants/icons';
 import { count, list, oneOf, record, text, textOrNull, time } from './me-read';
 
-export const ACTIVITY_KINDS = ['reminder', 'note', 'note_closed', 'watch_paused', 'suggestion', 'errand'] as const;
+export const ACTIVITY_KINDS = ['reminder', 'note', 'note_closed', 'watch_paused', 'suggestion', 'errand', 'phone_removed'] as const;
 export type ActivityKind = (typeof ACTIVITY_KINDS)[number];
+
+/** Kinds no answer from the Pond makes undoable: a removed phone comes back only by pairing it again. */
+const NEVER_UNDONE: readonly ActivityKind[] = ['phone_removed'];
 
 export interface GooseActivity {
   id: string;
@@ -33,14 +37,15 @@ function readEntry(raw: unknown): GooseActivity | null {
   const id = text(r?.id);
   const summary = text(r?.summary);
   if (!r || !id || !summary) return null;
+  // A kind this app does not know still shows its line; it reads as a note, which offers nothing.
+  const kind = oneOf(r.kind, ACTIVITY_KINDS, 'note_closed');
   return {
     id,
-    // A kind this app does not know still shows its line; it reads as a note, which offers nothing.
-    kind: oneOf(r.kind, ACTIVITY_KINDS, 'note_closed'),
+    kind,
     summary,
     detail: textOrNull(r.detail),
     at: time(r.at),
-    canUndo: r.can_undo === true,
+    canUndo: r.can_undo === true && !NEVER_UNDONE.includes(kind),
     undone: r.undone === true,
   };
 }
@@ -66,5 +71,7 @@ export function activityIcon(kind: ActivityKind): IconName {
       return 'chat';
     case 'errand':
       return 'search';
+    case 'phone_removed':
+      return 'device';
   }
 }

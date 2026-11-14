@@ -1,7 +1,7 @@
 /**
  * What Goose did for the member without being asked: reminders it set, notes it wrote itself, a
- * failing watch it paused, things it looked up. The member reads it and takes back what can be
- * taken back; opening the screen marks it read.
+ * failing watch it paused, things it looked up, a phone it removed. The member reads it and takes
+ * back what can be taken back; opening the screen marks it read.
  */
 
 import React, { useEffect } from 'react';
@@ -52,6 +52,8 @@ export default function GooseActivityScreen() {
         return t('goose.activity.kind.suggestion');
       case 'errand':
         return t('goose.activity.kind.errand');
+      case 'phone_removed':
+        return t('goose.activity.kind.phone_removed');
     }
   };
 

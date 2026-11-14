@@ -5666,7 +5666,8 @@
         "note_closed": "Note closed",
         "watch_paused": "Watch paused",
         "suggestion": "Asked you",
-        "errand": "Looked into"
+        "errand": "Looked into",
+        "phone_removed": "Phone removed"
       }
     }
   },
