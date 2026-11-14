@@ -15,7 +15,7 @@
  */
 
 import React, { useEffect } from 'react';
-import { Animated as RNAnimated, Easing, Platform, StyleSheet, View } from 'react-native';
+import { Animated as RNAnimated, Easing, Platform, StyleSheet, TurboModuleRegistry, View } from 'react-native';
 import Animated, {
   type SharedValue,
   useAnimatedProps,
@@ -29,8 +29,9 @@ import { useInkTheme, useReduceMotion } from '@jarida/ink/native';
 import {
   BACK_SHEEN, BANDS, BELLY, BODY, CHEST_SHEEN, GLINTS, HEAD_DETAIL, PRIMARIES, RIPPLE, SCALLOPS, TAIL, WAKE, WAVES, WING,
   WING_LINES, easeListen, neckFrame, neckPose, partsFrame, restingParts, wavePath,
-  type GooseMood, type NeckFrame, type PartsFrame,
+  type GooseMood, type NeckFrame,
 } from '@/components/patterns/goose-motion';
+import { about, restFrame, shift, times, turn, usePalette, type Frame, type Matrix, type Palette } from '@/components/patterns/goose-paint';
 
 export type GooseState = GooseMood;
 
@@ -53,7 +54,6 @@ export interface GooseProps {
   still?: boolean;
 }
 
-type Matrix = [number, number, number, number, number, number];
 
 /** Frames a second while it swims or listens, and while it only drifts and blinks. Both divide a 60,
  * 90 or 120 Hz screen evenly; 20 on a 90 Hz Android alternated four and five refreshes, a judder. */
@@ -70,44 +70,8 @@ const AEllipse = Animated.createAnimatedComponent(Ellipse as WithMatrix<React.Co
 // Reanimated reads an animated `transform` as a React Native style transform, a list of objects,
 // and a six-number SVG matrix there crashes the draw ("expected dynamic type 'object'").
 
-/** a then b: the matrix that applies `b` first and `a` after, as SVG's transform lists compose. */
-function times(a: Matrix, b: Matrix): Matrix {
-  'worklet';
-  return [
-    a[0] * b[0] + a[2] * b[1], a[1] * b[0] + a[3] * b[1],
-    a[0] * b[2] + a[2] * b[3], a[1] * b[2] + a[3] * b[3],
-    a[0] * b[4] + a[2] * b[5] + a[4], a[1] * b[4] + a[3] * b[5] + a[5],
-  ];
-}
 
-/** A linear map [a b c d] about the point (x, y). */
-function about(a: number, b: number, c: number, d: number, x: number, y: number): Matrix {
-  'worklet';
-  return [a, b, c, d, x - a * x - c * y, y - b * x - d * y];
-}
 
-function turn(deg: number, x: number, y: number): Matrix {
-  'worklet';
-  const r = (deg * Math.PI) / 180;
-  return about(Math.cos(r), Math.sin(r), -Math.sin(r), Math.cos(r), x, y);
-}
-
-const shift = (x: number, y: number): Matrix => {
-  'worklet';
-  return [1, 0, 0, 1, x, y];
-};
-
-/** One hex colour mixed toward another, `p` of the way. Anything but #rrggbb passes through. */
-function mix(from: string, to: string, p: number): string {
-  const hex = (s: string) => (/^#[0-9a-f]{6}$/i.test(s) ? [1, 3, 5].map((i) => parseInt(s.slice(i, i + 2), 16)) : null);
-  const a = hex(from), b = hex(to);
-  if (!a || !b) return from;
-  return `#${a.map((v, i) => Math.round(v + (b[i] - v) * p).toString(16).padStart(2, '0')).join('')}`;
-}
-
-interface Palette { accent: string; light: string; deep: string; darkest: string; beak: string; beakDeep: string; ground: string }
-
-interface Frame { neck: NeckFrame; lid: number; parts: PartsFrame }
 
 /**
  * A frame given outright. The parts under it draw it as plain props, once, instead of following a
@@ -115,11 +79,6 @@ interface Frame { neck: NeckFrame; lid: number; parts: PartsFrame }
  */
 const Still = React.createContext<Frame | null>(null);
 
-/** The goose at rest in `mood`, as reduced motion draws it, worked out on the JS thread. */
-function restFrame(mood: GooseMood): Frame {
-  const pose = neckPose(0, mood, mood === 'listening' ? 1 : 0);
-  return { neck: neckFrame(pose), lid: pose.lid, parts: restingParts(mood) };
-}
 
 type MovingProps = { frame: SharedValue<Frame>; at: (f: Frame) => Matrix; children: React.ReactNode };
 
@@ -380,19 +339,6 @@ function Pond({ id, frame, p, rest }: { id: string; frame: SharedValue<Frame>; p
 
 let gooseIds = 0;
 
-/** The goose's colours, from the theme's accent. */
-function usePalette(ground: string | undefined): Palette {
-  const c = useInkTheme().color;
-  return {
-    accent: c.accent,
-    light: mix(c.accent, '#ffffff', 0.42),
-    deep: c.accentPressed,
-    darkest: mix(c.accentPressed, '#000000', 0.38),
-    beak: c.warning,
-    beakDeep: mix(c.warning, '#000000', 0.24),
-    ground: ground ?? c.surface,
-  };
-}
 
 /** The drawing itself, around whichever frame it is given. */
 function Drawing({
@@ -534,8 +480,24 @@ const afloatStyles = StyleSheet.create({
   ring: { position: 'absolute', borderWidth: 1.2 },
 });
 
-/** The goose as it moves: Android's afloat, every other platform's drawn frame by frame. */
+/**
+ * Skia's goose, where this build carries Skia's native half. A dev client built before it was added
+ * has none, and importing Skia there throws, so it keeps the SVG goose; so does the web preview.
+ */
+const GooseSkia: React.ComponentType<GooseProps> | null = (() => {
+  // eslint-disable-next-line i18next/no-literal-string -- Skia's native module, by its registered name
+  if (Platform.OS === 'web' || !TurboModuleRegistry.get('RNSkiaModule')) return null;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports, i18next/no-literal-string -- loaded only where it can load
+    return (require('@/components/patterns/goose-skia') as typeof import('@/components/patterns/goose-skia')).GooseSkia;
+  } catch {
+    return null;
+  }
+})();
+
+/** The goose as it moves: on the GPU with Skia; without it, Android's afloat and iOS's drawn by frame. */
 export const Goose = React.memo(function Goose(props: GooseProps) {
+  if (GooseSkia) return <GooseSkia {...props} />;
   return Platform.OS === 'android' ? <GooseAfloat {...props} /> : <GooseDrawn {...props} />;
 });
 

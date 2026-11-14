@@ -32,6 +32,7 @@
     "@react-navigation/bottom-tabs": "^7.4.0",
     "@react-navigation/elements": "^2.6.3",
     "@react-navigation/native": "^7.1.8",
+    "@shopify/react-native-skia": "2.6.2",
     "expo": "~57.0.26",
     "expo-asset": "~57.0.18",
     "expo-audio": "~57.0.5",
@@ -141,6 +142,7 @@
     "source-map-js": "^1.2.2"
   },
   "allowScripts": {
+    "@shopify/react-native-skia@2.6.2": true,
     "fsevents@2.3.3": true,
     "unrs-resolver@1.12.2": true
   }
