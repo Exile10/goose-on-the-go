@@ -98,7 +98,7 @@ export interface Source {
 const WEB_HOST = /^https?:\/\/([^/?#:\s]+)/i;
 
 /** Null for anything that is not a web page, which a source is never allowed to open. */
-function siteOf(url: string): string | null {
+export function siteName(url: string): string | null {
   const host = WEB_HOST.exec(url)?.[1]?.toLowerCase().replace(/^www\./, '');
   if (!host) return null;
   // eslint-disable-next-line i18next/no-literal-string -- a product name
@@ -130,7 +130,7 @@ function searchEntries(raw: unknown, titleKey: 'title' | 'name'): SearchEntry[] 
     if (!entry || typeof entry !== 'object') continue;
     const e = entry as Record<string, unknown>;
     const address = str(e.url).trim();
-    const site = siteOf(address);
+    const site = siteName(address);
     const url = site ? address : null;
     const domain = str(e.domain).trim() || site || '';
     const title = str(e[titleKey]).trim() || (titleKey === 'title' ? domain : '');
@@ -155,6 +155,15 @@ export function readSearch(data: Record<string, unknown>): SearchCard {
 
 const KEPT_SOURCES = /\bSources:\s*(.+?)\.?\s*$/s;
 
+/** The sites a stub names, the one part of a transient result the Pond keeps. */
+export function keptSites(tool: ToolCall): string[] {
+  const named = KEPT_SOURCES.exec(tool.kept ?? '')?.[1] ?? '';
+  return named
+    .split(/,\s*/)
+    .map((site) => site.trim().toLowerCase())
+    .filter((site) => /^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(site));
+}
+
 /**
  * The quiet line a saved turn shows for a result the Pond kept only as a stub,
  * as the desktop's `keptLine` words it. The sources are the stub's domains,
@@ -171,19 +180,21 @@ export function keptLine(tool: ToolCall, t: TFunction): string {
  * The pages a turn's tools read from, in the order it read them, once each.
  *
  * A web search draws its pages on its own card, so they are not listed again.
- * Wikipedia and Wolfram name one source: live, on the card; in a saved turn
- * whose card this phone never kept, only as a closing `Source: <url>` line in
- * the result.
+ * Its results may be kept only for the turn, so a saved one is a stub naming
+ * its sites, and each site is listed to open on its own. Wikipedia and Wolfram
+ * name one source: live, on the card; in a saved turn whose card this phone
+ * never kept, only as a closing `Source: <url>` line in the result.
  */
 export function sourcesOf(tools: ToolCall[] | undefined): Source[] {
   const out: Source[] = [];
   const add = (url: string, title: string) => {
-    const site = siteOf(url);
+    const site = siteName(url);
     if (!site || out.some((s) => s.url === url)) return;
     out.push({ url, site, title: title || site });
   };
   for (const tool of tools ?? []) {
     const data = tool.card?.data;
+    for (const site of keptSites(tool)) add(`https://${site}/`, '');
     if (tool.card?.type === 'search') continue;
     const fromCard = data ? str(data.source_url) : '';
     const fromText = /Source:\s*(https?:\/\/\S+)\s*$/i.exec(tool.result ?? '')?.[1] ?? '';

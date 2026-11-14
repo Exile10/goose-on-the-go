@@ -7,10 +7,10 @@
  */
 
 import React, { useCallback, useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 import { useTranslation } from 'react-i18next';
-import { InkButton, InkCard, InkChip, InkText } from '@jarida/ink/native';
+import { InkButton, InkCard, InkChip, InkText, useInkTheme } from '@jarida/ink/native';
 
 import type { SourceChips } from '@/components/patterns/markdown';
 import { PondPicture, usePictureRatio } from '@/components/patterns/pond-picture';
@@ -124,42 +124,63 @@ function SourceCard({
   );
 }
 
-/** Frame width for a picture; one alone takes more of the line than several side by side. */
-const ONE_WIDTH = 300;
-const SOME_WIDTH = 240;
-/** A very tall picture is held to this and shown whole inside it rather than cut. */
-const MAX_HEIGHT = 360;
+/** Room left at the screen's edges, narrower than the text's, so a picture reads wider than the words. */
+const GUTTER = Spacing.sm;
+/** How much of the next picture shows beside one of several, to say there are more. */
+const PEEK = 40;
+/** A picture is never wider than this, so a tablet does not draw one the size of the screen. */
+const WIDEST = 640;
+/** Of the screen's height, the most a picture takes; a taller one narrows and centres instead. */
+const TALLEST = 0.62;
+/** Under this a picture is a thumbnail stretched to fill the line, so it keeps its own size. */
+const SMALLEST = 120;
 
 /** A picture framed in its own shape once its size is known, so nothing of it is cut away. */
-function FittedPicture({ image, width: widest }: { image: ReportImage; width: number }) {
+function FittedPicture({ image, width: widest, height: tallest }: { image: ReportImage; width: number; height: number }) {
+  const theme = useInkTheme();
   const [ratio, onSize] = usePictureRatio(image.src, 4 / 3);
   // A tall picture held to the height cap narrows with it, so the frame stays its shape.
-  const width = Math.min(widest, Math.round(MAX_HEIGHT * ratio));
+  const width = Math.max(SMALLEST, Math.min(widest, Math.round(tallest * ratio)));
   const height = Math.round(width / ratio);
   return (
-    <View style={[styles.picture, { width }]}>
+    <View style={[styles.picture, { width: widest }]}>
       <PondPicture
         path={image.src}
         label={image.caption ?? image.credit}
         contentFit="contain"
-        style={[styles.frame, { width, height }]}
+        style={[styles.frame, { width, height, borderRadius: theme.radius.xl }]}
         onSize={onSize}
       />
-      <InkText size="xs" tone="tertiary" numberOfLines={2}>
+      <InkText size="xs" tone="tertiary" numberOfLines={2} style={styles.credit}>
         {image.credit}
       </InkText>
     </View>
   );
 }
 
-/** The Pond's pictures for the pages, each with its credit under it. */
-export function PagePictures({ pictures }: { pictures: ReportImage[] }) {
+/**
+ * The Pond's pictures for the pages, each with its credit under it, reaching past the text to the
+ * screen's edges: one alone centred, several in a strip that stops on each. `inset` is how far the
+ * column it sits in starts from the screen's left edge.
+ */
+export function PagePictures({ pictures, inset = 0 }: { pictures: ReportImage[]; inset?: number }) {
+  const screen = useWindowDimensions();
   if (pictures.length === 0) return null;
-  const width = pictures.length === 1 ? ONE_WIDTH : SOME_WIDTH;
+  const several = pictures.length > 1;
+  const width = Math.min(WIDEST, screen.width - GUTTER * 2 - (several ? PEEK : 0));
+  const height = Math.round(screen.height * TALLEST);
   return (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.pictures}>
+    <ScrollView
+      horizontal
+      scrollEnabled={several}
+      showsHorizontalScrollIndicator={false}
+      snapToInterval={width + Spacing.md}
+      decelerationRate="fast"
+      style={{ width: screen.width, marginLeft: -inset }}
+      contentContainerStyle={[styles.pictures, several ? null : styles.alone]}
+    >
       {pictures.map((image) => (
-        <FittedPicture key={image.key} image={image} width={width} />
+        <FittedPicture key={image.key} image={image} width={width} height={height} />
       ))}
     </ScrollView>
   );
@@ -172,7 +193,9 @@ const styles = StyleSheet.create({
   cardText: { flex: 1, gap: 2 },
   thumb: { width: 72, height: 72, borderRadius: 10 },
   cardActions: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm, marginTop: Spacing.sm },
-  pictures: { gap: Spacing.md, alignItems: 'flex-start' },
-  picture: { gap: Spacing.xs },
-  frame: { borderRadius: 12 },
+  pictures: { gap: Spacing.md, alignItems: 'flex-start', paddingHorizontal: GUTTER },
+  alone: { flexGrow: 1, justifyContent: 'center' },
+  picture: { gap: Spacing.xs, alignItems: 'center' },
+  frame: { overflow: 'hidden' },
+  credit: { alignSelf: 'stretch', paddingHorizontal: Spacing.sm },
 });

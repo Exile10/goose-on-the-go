@@ -313,6 +313,28 @@
       "playFile": "Play {{name}}",
       "stopFile": "Stop {{name}}"
     },
+    "reply": {
+      "readAloud": "Read aloud",
+      "stopReading": "Stop reading",
+      "readFailed": "Your Pond could not read this aloud. Check that its voice is set up in Models.",
+      "copy": "Copy reply",
+      "copyCode": "Copy code",
+      "copied": "Copied"
+    },
+    "trail": {
+      "sources_one": "{{count}} source",
+      "sources_other": "{{count}} sources",
+      "tools_one": "{{count}} tool",
+      "tools_other": "{{count}} tools",
+      "both": "{{sources}}, {{tools}}",
+      "hint": "Lists the pages and tools behind this answer",
+      "titleSources": "Sources",
+      "titleTools": "Tools",
+      "titleBoth": "Sources and tools",
+      "openPage": "Open {{title}}, on {{site}}",
+      "running": "Running",
+      "failed": "Did not finish"
+    },
     "tools": {
       "toolGroup": "Tools ready",
       "weather": "Weather",

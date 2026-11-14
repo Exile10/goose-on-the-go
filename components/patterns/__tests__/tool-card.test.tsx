@@ -4,7 +4,7 @@
  * A seven-day forecast came out on a phone as a card holding the place name
  * and a sun: the forecast payload was drawn as a current reading, which it
  * has no fields for. These pin the forecast as its own card, one row a day,
- * and a payload with nothing to draw as the tool's chip instead of an empty
+ * and a payload with nothing to draw folded into the chip instead of an empty
  * card. Both schemes are rendered, because the rows take their ink from the
  * theme and a hard-coded colour would vanish on one of them.
  */
@@ -16,7 +16,7 @@ import { act, create, type ReactTestInstance, type ReactTestRenderer } from 'rea
 import { InkEdge, InkProvider } from '@jarida/ink/native';
 
 import type { ToolCall } from '@/models/chat';
-import { FORECAST_ROWS, ToolTrail } from '../tool-card';
+import { FORECAST_ROWS, ToolTrail, foldedTools } from '../tool-card';
 
 jest.mock('@/services/haptics', () => ({ selectionTick: jest.fn(async () => {}) }));
 // lucide ships ES modules jest does not transform; the icon a row asked for is what matters here.
@@ -135,14 +135,21 @@ describe('the forecast card', () => {
     expect(texts(tree)).toEqual(['Nairobi, Kenya', '19°', 'Mainly clear', 'Feels like 20° · Humidity 78% · Wind 8 km/h']);
   });
 
-  it('keeps a payload with nothing to draw as the tool chip, never an empty card', () => {
-    const tree = render([tool('get_weather_forecast', { location: 'Nairobi, Kenya', forecast: [] })]);
+  it('folds a payload with nothing to draw into the chip, never an empty card', () => {
+    const empty = tool('get_weather_forecast', { location: 'Nairobi, Kenya', forecast: [] });
+    const tree = render([empty]);
     expect(tree.root.findAllByType(InkEdge)).toHaveLength(0);
-    expect(texts(tree)).toEqual(['Forecast']);
+    expect(texts(tree)).toEqual([]);
+    expect(foldedTools([empty])).toEqual([empty]);
 
-    const bare = render([tool('get_current_weather', { location: 'Nairobi, Kenya' })]);
-    expect(bare.root.findAllByType(InkEdge)).toHaveLength(0);
-    expect(texts(bare)).toEqual(['Weather']);
+    const bare = tool('get_current_weather', { location: 'Nairobi, Kenya' });
+    expect(render([bare]).root.findAllByType(InkEdge)).toHaveLength(0);
+    expect(foldedTools([bare])).toEqual([bare]);
+  });
+
+  it('keeps a drawn forecast out of the chip', () => {
+    const drawn = tool('get_weather_forecast', { location: 'Nairobi, Kenya', forecast: forecastDays(3) });
+    expect(foldedTools([drawn])).toEqual([]);
   });
 
   it('takes its ink from the theme in both schemes', () => {

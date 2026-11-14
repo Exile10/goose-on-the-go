@@ -12,7 +12,9 @@ import { Linking, Platform, ScrollView, StyleSheet, Text, View, type TextStyle }
 import * as WebBrowser from 'expo-web-browser';
 import { inkText, useInkTheme, type InkTextSpec } from '@jarida/ink/native';
 
+import { CopyButton } from '@/components/patterns/copy-button';
 import { GIcon } from '@/components/ui/g-icon';
+import i18n from '@/services/i18n';
 import {
   decodeEntities,
   htmlAsText,
@@ -80,11 +82,15 @@ function face(theme: Theme, span: Span): TextStyle {
   return { fontFamily: style.fontFamily, fontStyle: span.italic && trueItalic(theme) ? 'italic' : 'normal' };
 }
 
-function link(href: string, children: React.ReactNode, place: Place, key: number) {
+/**
+ * `words` is the link's own text. A link's words are part of the sentence, as a name is, so they
+ * stay; only a citation written as a bare number, `[1](…)`, is drawn as the number alone.
+ */
+function link(href: string, children: React.ReactNode, place: Place, key: number, words?: string) {
   const url = webLink(href);
   if (!url) return <React.Fragment key={key}>{children}</React.Fragment>;
   const n = place.sources?.numberOf(url);
-  if (n !== undefined && place.sources) {
+  if (n !== undefined && place.sources && (words === undefined || /^\s*\d*\s*$/.test(words))) {
     const { open } = place.sources;
     return (
       <Text
@@ -158,7 +164,7 @@ function inline(token: MarkedToken, place: Place, span: Span, key: number): Reac
       );
     }
     case 'link':
-      return link(token.href, spans(token.tokens, place, span), place, key);
+      return link(token.href, spans(token.tokens, place, span), place, key, token.text);
     // Shown as its link rather than fetched: a reply should not reach off the Pond on its own.
     case 'image':
       return link(token.href, token.text || token.href, place, key);
@@ -268,13 +274,20 @@ function code(token: Tokens.Code, place: Place, key: number) {
   const lang = token.lang?.split(/\s/)[0];
   const label = inkText(theme, { role: 'mono', size: 'xs', tracking: 'wide', uppercase: true, color: theme.color.textTertiary });
   const text = inkText(theme, { role: 'mono', size: 'base', leading: 'base' });
+  // A card is pressed as a whole, so only a page of its own gives the code a copy button.
+  const head = lang || place.selectable;
   return (
     <View key={key} style={[styles.code, { backgroundColor: theme.color.neutralSoft, borderRadius: theme.radius.md }]}>
-      {lang ? <Text style={[label.style, styles.lang]}>{lang}</Text> : null}
+      {head ? (
+        <View style={styles.codeHead}>
+          <Text style={label.style}>{lang ?? ''}</Text>
+          {place.selectable ? <CopyButton text={token.text} label={i18n.t('chat.reply.copyCode')} /> : null}
+        </View>
+      ) : null}
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        contentContainerStyle={[styles.codeScroll, lang ? styles.codeAfterLang : null]}
+        contentContainerStyle={[styles.codeScroll, head ? styles.codeAfterLang : null]}
       >
         <Text selectable={place.selectable} style={text.style}>
           {token.text}
@@ -447,7 +460,7 @@ const styles = StyleSheet.create({
   quote: { borderLeftWidth: 2, paddingLeft: 12, gap: 8 },
   rule: { marginVertical: 4 },
   code: { overflow: 'hidden' },
-  lang: { paddingHorizontal: 12, paddingTop: 8 },
+  codeHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingLeft: 12, paddingRight: 4, paddingTop: 4 },
   codeScroll: { padding: 12 },
   codeAfterLang: { paddingTop: 4 },
   tight: { gap: 4 },

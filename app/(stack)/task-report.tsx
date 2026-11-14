@@ -106,7 +106,7 @@ export default function TaskReportScreen() {
             </View>
           ) : null}
 
-          <PagePictures pictures={report.images} />
+          <PagePictures pictures={report.images} inset={Spacing.lg} />
 
           {report.markdown.trim() === '' ? <InkNotice tone="neutral">{t('chat.report.empty')}</InkNotice> : null}
           {report.sections.map((section, i) =>

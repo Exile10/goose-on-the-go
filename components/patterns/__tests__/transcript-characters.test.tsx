@@ -16,7 +16,7 @@ jest.mock('@/components/patterns/voice-note-mic', () => ({ clockWords: () => '' 
 jest.mock('@/components/patterns/cited-sources', () => ({ PagePictures: () => null, SourcesChipRow: () => null, useSources: () => ({}) }));
 jest.mock('@/components/patterns/message-note', () => ({ FromLine: () => null, OfferPanel: () => null, ReceiptChips: () => null }));
 jest.mock('@/components/patterns/thinking-quips', () => ({ ThinkingQuips: () => null }));
-jest.mock('@/components/patterns/tool-card', () => ({ ToolTrail: () => null }));
+jest.mock('@/components/patterns/tool-card', () => ({ ToolTrail: () => null, foldedTools: () => [] }));
 jest.mock('@/view-models/use-page-pictures', () => ({ usePagePictures: () => [] }));
 jest.mock('@/services/voice-io', () => ({ playFile: jest.fn() }));
 jest.mock('@/services/api-client', () => ({ api: {} }));
@@ -64,6 +64,15 @@ it("keeps a reply's dollars, slashes and backslashes when it holds no math", asy
   expect(text).toContain('$HOME/bin');
   expect(text).toContain('to $PATH: it costs $5 and $10, or $5-$10.');
   expect(text).toContain('C:\\Users\\jerry and /usr/local/bin, 50/50, US$5.');
+});
+
+it("keeps a cited link's words, and draws a bare-number citation as its number", async () => {
+  const urls = ['https://www.sebastiani.com/', 'https://en.wikipedia.org/wiki/Sonoma'];
+  const sources = { numberOf: (url: string) => (urls.includes(url) ? urls.indexOf(url) + 1 : undefined), open: jest.fn() };
+  const tree = await draw(
+    <Markdown source={'[Sebastiani](https://www.sebastiani.com/) is close to [Sonoma](https://en.wikipedia.org/wiki/Sonoma) [2](https://en.wikipedia.org/wiki/Sonoma).'} sources={sources} />,
+  );
+  expect(words(tree)).toBe('Sebastiani is close to Sonoma \u2009[2].');
 });
 
 it("draws a reply's escapes and entities as the characters they stand for", async () => {

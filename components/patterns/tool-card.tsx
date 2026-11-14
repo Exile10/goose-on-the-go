@@ -3,18 +3,19 @@
  *
  * Two shapes. A tool whose answer is a fact a person wants to see — the
  * weather now or for the week, the devices it found, the time, the article it
- * read, the pages and places a web search found — draws that fact, from the
- * card the tool itself described (`ui.card_type` on the live stream). A card
- * whose payload holds nothing it can draw stays a chip rather than an empty
- * frame. Everything else is a chip: the tool's name, whether it is still
- * running, and its raw answer one tap away, because that answer was written
- * for the model and is best kept out of the reader's way until asked for.
+ * read, the pages and places a web search found — draws that fact in place,
+ * from the card the tool itself described (`ui.card_type` on the live stream).
+ * A card whose payload holds nothing it can draw is folded like the rest.
+ * Everything else folds into the one chip under the answer (`answer-trail.tsx`),
+ * whose sheet lists each tool as a row: its name, whether it is still running,
+ * and its raw answer one tap away, because that answer was written for the
+ * model and is best kept out of the reader's way until asked for.
  *
- * It all lies flat on a hairline under the answer, which is what the turn is
+ * A fact lies flat on a hairline under the answer, which is what the turn is
  * for; a tool card wearing the plate would outrank it. A reopened conversation
  * has no card hints — the Pond strips them before saving — so its tools come
- * back as chips, with the text their card would have drawn from. A result the
- * Pond did not keep at all comes back as one quiet line naming its sources.
+ * back folded, with the text their card would have drawn from. A result the
+ * Pond did not keep at all says so on its row, naming its sources.
  */
 
 import React, { useState } from 'react';
@@ -46,6 +47,7 @@ import {
   type WeatherForecast,
 } from '@/models/weather-card';
 import { selectionTick } from '@/services/haptics';
+import { Spacing } from '@/constants/spacing';
 
 /** How much of a raw tool answer a chip shows when opened: the desktop's 300. */
 const RESULT_PREVIEW = 300;
@@ -386,46 +388,50 @@ const FactCard = React.memo(function FactCard({ tool }: { tool: ToolCall }) {
   );
 });
 
-// A running tool is drawn dimmed, not spun: the composer's line already says the turn is alive.
-function ToolChip({ tool, open, onToggle }: { tool: ToolCall; open: boolean; onToggle: () => void }) {
+/** A tool as the sheet under an answer lists it: what it was, how it went, and its raw answer a tap away. */
+export function ToolRow({ tool }: { tool: ToolCall }) {
   const theme = useInkTheme();
   const { t } = useTranslation();
+  const [open, setOpen] = useState(false);
   const words = toolWords(tool.name);
   const label = words ? t(words.label) : humanizeTool(tool.name);
   const running = tool.status === 'running';
   const failed = tool.status === 'error';
   const canOpen = expandable(tool);
+  const status = tool.kept
+    ? keptLine(tool, t)
+    : running
+      ? t('chat.trail.running')
+      : failed
+        ? t('chat.trail.failed')
+        : null;
+  const name = inkText(theme, { size: 'md', weight: theme.weight.semibold, leading: 'snug' });
+  const quiet = inkText(theme, { size: 'sm', color: failed ? theme.color.dangerFg : theme.color.textSecondary });
   const ink = running ? theme.color.textTertiary : theme.color.textSecondary;
-  const text = inkText(theme, { role: 'mono', size: 'xs', weight: theme.weight.medium, color: ink });
   return (
-    <GPressable
-      feedback="tint"
-      disabled={!canOpen}
-      onPress={() => {
-        void selectionTick();
-        onToggle();
-      }}
-      accessibilityRole={canOpen ? 'button' : 'text'}
-      accessibilityLabel={
-        running ? t('chat.tools.runningLabel', { tool: label }) : failed ? t('chat.tools.failedLabel', { tool: label }) : label
-      }
-      accessibilityState={canOpen ? { expanded: open } : undefined}
-      style={[
-        styles.chip,
-        {
-          borderColor: theme.color.lineStrong,
-          borderWidth: theme.edge.hairlineWidth,
-          borderRadius: theme.radius.md,
-          backgroundColor: open ? theme.color.neutralSoft : undefined,
-        },
-      ]}
-    >
-      <GIcon name={failed ? 'warn' : toolIcon(tool.name)} size={13} color={failed ? theme.color.dangerFg : ink} />
-      <Text style={text.style} numberOfLines={1}>
-        {label}
-      </Text>
-      {canOpen ? <GIcon name={open ? 'chevron' : 'chevron-right'} size={12} color={theme.color.textTertiary} /> : null}
-    </GPressable>
+    <View>
+      <Pressable
+        disabled={!canOpen}
+        onPress={() => {
+          void selectionTick();
+          setOpen((value) => !value);
+        }}
+        accessibilityRole={canOpen ? 'button' : 'text'}
+        accessibilityLabel={[label, status].filter(Boolean).join(', ')}
+        accessibilityState={canOpen ? { expanded: open } : undefined}
+        style={({ pressed }) => [styles.toolRow, pressed ? { backgroundColor: theme.color.neutralSoft } : null]}
+      >
+        <GIcon name={failed ? 'warn' : toolIcon(tool.name)} size={16} color={failed ? theme.color.dangerFg : ink} />
+        <View style={styles.toolText}>
+          <Text style={name.style} numberOfLines={1}>
+            {label}
+          </Text>
+          {status ? <Text style={quiet.style}>{status}</Text> : null}
+        </View>
+        {canOpen ? <GIcon name={open ? 'chevron' : 'chevron-right'} size={14} color={theme.color.textTertiary} /> : null}
+      </Pressable>
+      {open ? <ResultPanel tool={tool} /> : null}
+    </View>
   );
 }
 
@@ -442,22 +448,6 @@ function ResultPanel({ tool }: { tool: ToolCall }) {
     >
       <Text style={text.style} selectable>
         {body.length > RESULT_PREVIEW ? `${body.slice(0, RESULT_PREVIEW).trimEnd()}…` : body}
-      </Text>
-    </View>
-  );
-}
-
-function KeptLine({ tool }: { tool: ToolCall }) {
-  const theme = useInkTheme();
-  const { t } = useTranslation();
-  const text = inkText(theme, { size: 'xs', color: theme.color.textSecondary });
-  return (
-    <View style={styles.kept}>
-      <View style={styles.keptIcon}>
-        <GIcon name="not-kept" size={12} color={theme.color.textSecondary} />
-      </View>
-      <Text style={[text.style, styles.shrink]} selectable>
-        {keptLine(tool, t)}
       </Text>
     </View>
   );
@@ -493,31 +483,28 @@ function Steps({ steps }: { steps: string[] }) {
   );
 }
 
+/** The tools a reply folds into the chip under it: all but those that draw a fact or follow a task. */
+export function foldedTools(tools: ToolCall[]): ToolCall[] {
+  return tools.filter((tool) => !hasFact(tool) && !startedTaskId(tool));
+}
+
 /**
- * Everything under an answer, most useful first: the facts a tool drew, the
- * pages it read, then what Goose wrote while it worked and a chip for each
- * step. A chip's raw answer opens below the row at full width, not inside the
- * chip's own narrow column.
+ * What under an answer is drawn in place, most useful first: a long task the turn started, followed
+ * live, the facts its tools drew, and what Goose wrote while it worked. The rest is in the chip.
  */
 export const ToolTrail = React.memo(function ToolTrail({
   tools,
   steps,
-  done,
 }: {
   tools: ToolCall[];
   steps?: string[];
-  done: boolean;
+  done?: boolean;
 }) {
-  const [openId, setOpenId] = useState<string | null>(null);
-  // A long task the turn started is followed live in place of its chip.
   const tasks = tools.flatMap((tool) => {
     const taskId = startedTaskId(tool);
     return taskId ? [{ call: tool.id, taskId }] : [];
   });
-  const chips = tools.filter(
-    (tool) => !hasFact(tool) && !tool.kept && !tasks.some((task) => task.call === tool.id),
-  );
-  const open = chips.find((tool) => tool.id === openId && expandable(tool));
+  if (tasks.length === 0 && !tools.some(hasFact) && !steps?.length) return null;
   return (
     <View style={styles.trail}>
       {tasks.map((task) => (
@@ -527,20 +514,6 @@ export const ToolTrail = React.memo(function ToolTrail({
         <FactCard key={tool.id} tool={tool} />
       ))}
       {steps?.length ? <Steps steps={steps} /> : null}
-      {chips.length > 0 ? (
-        <View style={styles.chips}>
-          {chips.map((tool) => (
-            <ToolChip
-              key={tool.id}
-              tool={tool}
-              open={tool.id === open?.id}
-              onToggle={() => setOpenId((id) => (id === tool.id ? null : tool.id))}
-            />
-          ))}
-        </View>
-      ) : null}
-      {open ? <ResultPanel tool={open} /> : null}
-      {tools.map((tool) => (tool.kept ? <KeptLine key={tool.id} tool={tool} /> : null))}
     </View>
   );
 });
@@ -556,20 +529,11 @@ const styles = StyleSheet.create({
   forecastDay: { flex: 1 },
   forecastTemp: { minWidth: 34, textAlign: 'right' },
   forecastRain: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 3, minWidth: 48 },
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   steps: { gap: 4, alignItems: 'flex-start' },
   stepsToggle: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  chip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 9,
-    paddingVertical: 5,
-    maxWidth: '100%',
-  },
-  result: { padding: 10 },
-  kept: { flexDirection: 'row', alignItems: 'flex-start', gap: 5 },
-  keptIcon: { marginTop: 2 },
+  toolRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, paddingHorizontal: Spacing.lg, paddingVertical: Spacing.md },
+  toolText: { flex: 1, gap: 2 },
+  result: { marginHorizontal: Spacing.lg, marginBottom: Spacing.md, padding: 10 },
   sourceCard: { paddingVertical: 4 },
   sourceHead: { paddingHorizontal: 14, paddingTop: 10, paddingBottom: 2 },
   source: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 10 },

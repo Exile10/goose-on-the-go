@@ -28,23 +28,28 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Image } from 'expo-image';
 import { useTranslation } from 'react-i18next';
+import { hitSlop } from '@jarida/ink';
 import { InkBubble, inkText, useInkTheme, type BubblePosition } from '@jarida/ink/native';
 
-import { PagePictures, SourcesChipRow, useSources } from '@/components/patterns/cited-sources';
+import { TrailChip, TrailSheet, useTrail, type TrailState } from '@/components/patterns/answer-trail';
+import { ACTION_HEIGHT, CopyButton } from '@/components/patterns/copy-button';
+import { PagePictures } from '@/components/patterns/cited-sources';
 import { citedLinks, mergeSources } from '@/models/sources';
 import { Markdown } from '@/components/patterns/markdown';
 import { FromLine, OfferPanel, ReceiptChips } from '@/components/patterns/message-note';
 import { sourcesOf } from '@/constants/tools';
 import { usePagePictures } from '@/view-models/use-page-pictures';
+import { useReadAloud } from '@/view-models/use-read-aloud';
 import { ThinkingQuips } from '@/components/patterns/thinking-quips';
-import { ToolTrail } from '@/components/patterns/tool-card';
+import { ToolTrail, foldedTools } from '@/components/patterns/tool-card';
 import { GIcon } from '@/components/ui/g-icon';
 import { GPressable } from '@/components/ui/g-pressable';
 import { clockWords } from '@/components/patterns/voice-note-mic';
-import type { ChatImage, ChatVoiceNote, Message } from '@/models/chat';
+import type { ChatImage, ChatVoiceNote, Message, ToolCall } from '@/models/chat';
 import { api } from '@/services/api-client';
 import { selectionTick } from '@/services/haptics';
 import { playFile } from '@/services/voice-io';
+import { Spacing } from '@/constants/spacing';
 
 /** One picture on its own is shown large; several share a row. */
 const SINGLE = 220;
@@ -217,8 +222,9 @@ export const MessageRow = React.memo(function MessageRow({
 const PICTURE_PAGES = 6;
 
 /**
- * What Goose said: its text with each cited page a numbered chip, then once the turn is done the
- * Pond's pictures for those pages and the pages folded into one chip, then what its tools did.
+ * What Goose said: its text with each cited page numbered, then one chip folding the pages it read
+ * and the tools it ran, then once the turn is done the Pond's pictures for those pages, edge to
+ * edge, then what its tools drew.
  */
 function TheirMessage({
   message,
@@ -241,7 +247,10 @@ function TheirMessage({
       ),
     [message.content, message.tools],
   );
-  const cited = useSources(sources);
+  const trail = useTrail(sources);
+  const folded = useMemo(() => foldedTools(message.tools ?? []), [message.tools]);
+  // The pages settle once the text has, so the chip counts tools alone until then.
+  const shown = done ? trail : { ...trail, sources: [] };
   const pictures = usePagePictures(
     sources.slice(0, PICTURE_PAGES).map((s) => s.url),
     done,
@@ -251,22 +260,70 @@ function TheirMessage({
   const statusLine = inkText(theme, { role: 'mono', size: 'xs', color: theme.color.textTertiary });
   const note = message.note;
 
+  const text = message.content ? (
+    <Markdown key="text" source={message.content} sources={done ? trail.chips : undefined} />
+  ) : null;
+  const tools = message.tools?.length ? <ToolTrail key="tools" tools={message.tools} steps={message.steps} /> : null;
+  // While Goose writes, what its tools did sits above the words, so the place it is writing stays at
+  // the thread's foot by the composer however many tools it calls. Keyed, so a part moves, not remounts.
+  const parts = done
+    ? [
+        text,
+        <ReplyActions key="actions" message={message} trail={shown} tools={folded} />,
+        /* The thread's own padding (app/conversation.tsx), which the pictures reach past. */
+        <PagePictures key="pictures" pictures={pictures} inset={Spacing.lg} />,
+        tools,
+      ]
+    : [
+        <TrailChip key="chip" state={shown} tools={folded} />,
+        tools,
+        text,
+        waiting ? <ThinkingQuips key="quips" status={status} seed={turnSeed} /> : null,
+        unfinished && status ? (
+          <Text key="status" style={statusLine.style} numberOfLines={1} accessibilityLiveRegion="polite">
+            {status}
+          </Text>
+        ) : null,
+      ];
+
   return (
     <View style={styles.theirs}>
       {note?.from ? <FromLine from={note.from} /> : null}
-      {message.content ? <Markdown source={message.content} sources={done ? cited.chips : undefined} /> : null}
-      {done ? <PagePictures pictures={pictures} /> : null}
-      {done ? <SourcesChipRow state={cited} pictures={pictures} /> : null}
-      {waiting ? <ThinkingQuips status={status} seed={turnSeed} /> : null}
-      {unfinished && status ? (
-        <Text style={statusLine.style} numberOfLines={1} accessibilityLiveRegion="polite">
-          {status}
-        </Text>
-      ) : null}
-      {message.tools?.length ? <ToolTrail tools={message.tools} steps={message.steps} done={!message.pending} /> : null}
+      {parts}
+      {trail.mounted ? <TrailSheet state={shown} tools={folded} /> : null}
       {note?.receipts?.length ? <ReceiptChips receipts={note.receipts} /> : null}
       {note?.offer ? (
         <OfferPanel offer={note.offer} onAnswer={onOffer ? (take) => onOffer(message.id, take) : undefined} />
+      ) : null}
+    </View>
+  );
+}
+
+/** Under a finished reply: the chip, then reading the reply aloud and copying it as written. */
+function ReplyActions({ message, trail, tools }: { message: Message; trail: TrailState; tools: ToolCall[] }) {
+  const theme = useInkTheme();
+  const { t } = useTranslation();
+  const { reading, toggle } = useReadAloud(message.id);
+  return (
+    <View style={styles.actions}>
+      <TrailChip state={trail} tools={tools} />
+      {message.content ? (
+        <>
+          <GPressable
+            feedback="tint"
+            onPress={() => {
+              void selectionTick();
+              toggle(message.content);
+            }}
+            accessibilityRole="button"
+            accessibilityLabel={reading ? t('chat.reply.stopReading') : t('chat.reply.readAloud')}
+            hitSlop={hitSlop(ACTION_HEIGHT)}
+            style={styles.action}
+          >
+            <GIcon name={reading ? 'stop' : 'volume'} size={15} color={reading ? theme.color.accentLine : theme.color.textSecondary} />
+          </GPressable>
+          <CopyButton text={message.content} />
+        </>
       ) : null}
     </View>
   );
@@ -283,4 +340,6 @@ const styles = StyleSheet.create({
   queuedNote: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12 },
   unqueue: { width: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-end', gap: 6, maxWidth: 3 * TILE + 12 },
+  actions: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs },
+  action: { height: ACTION_HEIGHT, minWidth: 32, alignItems: 'center', justifyContent: 'center' },
 });

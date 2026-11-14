@@ -11,7 +11,7 @@ import type { TFunction } from 'i18next';
 
 import en from '@/services/i18n/locales/en.json';
 import { GREETINGS_PER_PERIOD, SUBTITLES, THINKING_QUIPS, WORKING_QUIPS, periodOf } from '@/constants/quips';
-import { bareToolName, humanizeTool, keptLine, readSearch, sourcesOf } from '@/constants/tools';
+import { bareToolName, humanizeTool, keptLine, keptSites, readSearch, sourcesOf } from '@/constants/tools';
 import i18n from '@/services/i18n';
 import type { Message } from '@/models/chat';
 import type { SessionMessage } from '@/services/types';
@@ -368,7 +368,8 @@ describe('fromHistory', () => {
     expect(answer.tools).toEqual([
       { id: 'c1', name: 'giap-knowledge__search_web', args: '{}', status: 'ok', result: undefined, kept: STUB },
     ]);
-    expect(sourcesOf(answer.tools)).toEqual([]);
+    // The stub's sites are all that is kept of the results, and each still opens.
+    expect(sourcesOf(answer.tools).map((s) => s.url)).toEqual(['https://kenyapower.co.ke/', 'https://nation.africa/']);
   });
 
   it('carries pictures as Pond paths, to be fetched with the bearer header', () => {
@@ -448,6 +449,12 @@ describe('keptLine', () => {
     expect(keptLine(tool('giap-knowledge__search_web', STUB), i18n.t)).toBe(
       "Web search: results aren't kept after the turn. Sources: kenyapower.co.ke, nation.africa.",
     );
+  });
+
+  it("keeps only the stub's site names, each a web address", () => {
+    expect(keptSites(tool('giap-knowledge__search_web', STUB))).toEqual(['kenyapower.co.ke', 'nation.africa']);
+    expect(keptSites(tool('x', 'Sources: javascript:alert(1), a b.com, OK.org.'))).toEqual(['ok.org']);
+    expect(keptSites(tool('x', 'Not kept.'))).toEqual([]);
   });
 
   it('says so without sources when the stub names none', () => {
