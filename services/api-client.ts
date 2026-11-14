@@ -85,6 +85,7 @@ import {
   readModeChange,
   readOverview,
   readPower,
+  readReliability,
   readTasks,
   readUnlocked,
 } from '@/models/pond-admin';
@@ -120,6 +121,7 @@ import type {
   AdminCacheId,
   AdminFileListing,
   AdminHealth,
+  AdminReliability,
   AdminOverview,
   AdminPower,
   AdminStatus,
@@ -2885,6 +2887,11 @@ export class PondApiClient {
 
   async adminHealth(): Promise<AdminHealth> {
     return required(readHealth(await this.get<unknown>('/api/v1/admin/health')), 'the health report');
+  }
+
+  /** Whether notices arrived and messages were answered, over the last `days` (the Pond takes 1 to 90). */
+  async adminReliability(days: number): Promise<AdminReliability> {
+    return required(readReliability(await this.get<unknown>(`/api/v1/admin/reliability?days=${Math.round(days)}`)), 'the reliability report');
   }
 
   async adminPower(): Promise<AdminPower> {

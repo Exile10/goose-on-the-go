@@ -1793,7 +1793,8 @@
     "gooseScreenshots": "Ideas from screenshots",
     "gooseMemberInterview": "Interview",
     "gooseActivity": "What Goose did",
-    "pairingLock": "Pairing lock"
+    "pairingLock": "Pairing lock",
+    "pondReliability": "Reliability"
   },
   "nav": {
     "goose": "Goose",
@@ -4096,7 +4097,8 @@
       "tasksCount_other": "{{count}} tasks",
       "health": "Disk, memory and heat",
       "power": "Power mode and restart",
-      "pairing": "Who may add a phone, and the phones asking"
+      "pairing": "Who may add a phone, and the phones asking",
+      "reliability": "Whether notices arrived and messages were answered"
     },
     "lock": {
       "title": "Unlock with the admin card",
@@ -4406,6 +4408,40 @@
       "today": "today {{time}}",
       "yesterday": "yesterday {{time}}",
       "dateTime": "{{date}} {{time}}"
+    },
+    "reliability": {
+      "lead": "Whether what your Pond sent reached a phone, and whether what people asked got a reply.",
+      "loading": "Reading the report",
+      "readFailed": "The report could not be read.",
+      "period": "Over",
+      "days7": "7 days",
+      "days30": "30 days",
+      "share": "{{part}} of {{whole}} ({{percent}}%)",
+      "present": "Present",
+      "missing": "Missing",
+      "notices": "Notices",
+      "queued": "Queued for phones",
+      "woken": "Push wakes sent",
+      "fetched": "Fetched by a phone",
+      "withinAMinute": "Fetched within a minute",
+      "afterAnHour": "Fetched after an hour",
+      "neverFetched": "Never fetched",
+      "shown": "Shown on a phone",
+      "opened": "Opened",
+      "spoken": "Said in the room instead",
+      "messages": "Messages",
+      "asked": "Sent by people",
+      "answered": "Answered",
+      "unanswered": "Left without a reply",
+      "phones": "Phones",
+      "paired": "Paired",
+      "withPush": "Can be woken by push",
+      "unseen": "Not seen lately",
+      "test": "Test devices",
+      "pond": "Pond",
+      "stops": "Times it was stopped",
+      "androidKey": "Android push key",
+      "appleKey": "Apple push key"
     }
   },
   "notifications": {

@@ -277,3 +277,17 @@ describe('power', () => {
     expect(await refusal(pond.restart(true))).toMatchObject({ status: 503, error: 'power_control_unavailable' });
   });
 });
+
+describe('the reliability report', () => {
+  it('is refused while locked, and answers for the days asked once open, with the Apple key missing', async () => {
+    const time = clock();
+    const pond = createMockPond({}, time.now);
+    expect(await refusal(pond.reliability(7))).toMatchObject({ status: 403, error: 'admin_locked' });
+    await pond.unlock('goos eina pond 2026');
+    const week = await pond.reliability(7);
+    const month = await pond.reliability(30);
+    expect(week).toMatchObject({ days: 7, apple_push_key: false, android_push_key: true });
+    expect(month.days).toBe(30);
+    expect(month.notices.queued).toBeGreaterThan(week.notices.queued);
+  });
+});

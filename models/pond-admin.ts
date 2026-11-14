@@ -11,6 +11,7 @@ import type {
   AdminFileEntry,
   AdminFileListing,
   AdminHealth,
+  AdminReliability,
   AdminKeepReason,
   AdminOverview,
   AdminPower,
@@ -281,6 +282,38 @@ export function readHealth(raw: unknown): AdminHealth | null {
 }
 
 /** True when any check is not ok, which is when the Health row carries its badge. */
+/** The reliability report, or null when it is not one. A count it leaves out reads as none. */
+export function readReliability(raw: unknown): AdminReliability | null {
+  const r = record(raw);
+  const notices = record(r?.notices);
+  const turns = record(r?.turns);
+  const phones = record(r?.phones);
+  if (!r || !notices || !turns || !phones) return null;
+  return {
+    days: count(r.days),
+    notices: {
+      queued: count(notices.queued),
+      woken: count(notices.woken),
+      fetched: count(notices.fetched),
+      fetched_within_a_minute: count(notices.fetched_within_a_minute),
+      fetched_after_an_hour: count(notices.fetched_after_an_hour),
+      shown: count(notices.shown),
+      opened: count(notices.opened),
+      spoken: count(notices.spoken),
+    },
+    turns: { asked: count(turns.asked), answered: count(turns.answered) },
+    phones: { paired: count(phones.paired), test: count(phones.test), unseen: count(phones.unseen), with_push_token: count(phones.with_push_token) },
+    stops: count(r.stops),
+    android_push_key: r.android_push_key === true,
+    apple_push_key: r.apple_push_key === true,
+  };
+}
+
+/** Whole percent of `part` in `whole`, rounded down as the Pond's own report rounds; null with no whole. */
+export function percentOf(part: number, whole: number): number | null {
+  return whole > 0 ? Math.floor((part * 100) / whole) : null;
+}
+
 export function healthNeedsAttention(health: AdminHealth | null): boolean {
   return !!health && health.checks.some((c) => c.status !== 'ok');
 }

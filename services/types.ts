@@ -2156,6 +2156,27 @@ export interface AdminTask {
 export type AdminCheckId = 'disk_space' | 'memory' | 'temperature' | 'other';
 export type AdminCheckStatus = 'ok' | 'warning' | 'critical';
 
+/** `GET /admin/reliability?days=`: whether notices arrived and messages were answered over a stretch of days. */
+export interface AdminReliability {
+  days: number;
+  notices: {
+    queued: number;
+    woken: number;
+    fetched: number;
+    fetched_within_a_minute: number;
+    fetched_after_an_hour: number;
+    shown: number;
+    opened: number;
+    spoken: number;
+  };
+  turns: { asked: number; answered: number };
+  phones: { paired: number; test: number; unseen: number; with_push_token: number };
+  /** Times the Pond was told to stop. */
+  stops: number;
+  android_push_key: boolean;
+  apple_push_key: boolean;
+}
+
 export interface AdminHealth {
   version: string;
   uptime_secs: number | null;

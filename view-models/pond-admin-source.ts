@@ -25,6 +25,7 @@ export const POND_ADMIN: PondAdminSource = {
   deleteTask: (id) => api.adminDeleteTask(id),
   deleteTaskArtifact: (taskId, artifactId) => api.adminDeleteTaskArtifact(taskId, artifactId),
   health: () => api.adminHealth(),
+  reliability: (days) => api.adminReliability(days),
   power: () => api.adminPower(),
   setPowerMode: (id) => api.adminSetPowerMode(id),
   restart: (force) => api.adminRestart(force),

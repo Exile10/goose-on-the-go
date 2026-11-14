@@ -18,6 +18,7 @@ import {
   leadReport,
   minutesLeft,
   normalizeAdminPassword,
+  percentOf,
   readAdminKey,
   readAdminStatus,
   readCaches,
@@ -27,6 +28,7 @@ import {
   readModeChange,
   readOverview,
   readPower,
+  readReliability,
   readTasks,
   readUnlocked,
   sizeWords,
@@ -510,5 +512,39 @@ describe('health', () => {
     expect(heatZones(four)).toEqual(four);
     const eight = Array.from({ length: 8 }, (_, i) => ({ zone: `z${i}`, celsius: [40, 70, 55, 80, 30, 65, 75, 50][i] }));
     expect(heatZones(eight).map((z) => z.celsius)).toEqual([80, 75, 70, 65, 55, 50]);
+  });
+});
+
+describe('the reliability report', () => {
+  const WIRE = {
+    days: 30,
+    notices: { queued: 20, woken: 14, fetched: 19, fetched_within_a_minute: 9, fetched_after_an_hour: 2, shown: 18, opened: 6, spoken: 1 },
+    turns: { asked: 40, answered: 39 },
+    phones: { paired: 3, test: 0, unseen: 1, with_push_token: 2 },
+    stops: 4,
+    android_push_key: true,
+    apple_push_key: false,
+  };
+
+  it('reads the report as the Pond sends it', () => {
+    expect(readReliability(WIRE)).toEqual(WIRE);
+  });
+
+  it('reads a count it leaves out as none, and a key it does not name as missing', () => {
+    const r = readReliability({ notices: { queued: 3 }, turns: {}, phones: {} });
+    expect(r?.notices).toMatchObject({ queued: 3, fetched: 0 });
+    expect(r?.turns).toEqual({ asked: 0, answered: 0 });
+    expect(r?.apple_push_key).toBe(false);
+  });
+
+  it('is nothing without its three parts, or for anything that is not a report', () => {
+    expect(readReliability({ notices: {}, turns: {} })).toBeNull();
+    for (const raw of GARBAGE) expect(readReliability(raw)).toBeNull();
+  });
+
+  it('rounds a share down, as the Pond does, and has none of nothing', () => {
+    expect(percentOf(9, 20)).toBe(45);
+    expect(percentOf(2, 3)).toBe(66);
+    expect(percentOf(1, 0)).toBeNull();
   });
 });
