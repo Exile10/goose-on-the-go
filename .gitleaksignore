@@ -8,3 +8,9 @@
 # An invented picture name (the Pond names a kept picture by a 32-hex hash of its page) in the
 # conversation card test; it is not a key of any kind.
 c5aa504dee55ea8f6de587123f2fb86fd188e375:view-models/__tests__/chat-history.test.ts:generic-api-key:454
+
+# Translation keys for the screenshot privacy rows, flagged because the field is named `key`.
+f8058d5d9dc6bb24b7c09b974d9f64b34d5b4621:app/(stack)/goose-screenshots.tsx:generic-api-key:27
+f8058d5d9dc6bb24b7c09b974d9f64b34d5b4621:app/(stack)/goose-screenshots.tsx:generic-api-key:28
+f8058d5d9dc6bb24b7c09b974d9f64b34d5b4621:app/(stack)/goose-screenshots.tsx:generic-api-key:29
+f8058d5d9dc6bb24b7c09b974d9f64b34d5b4621:app/(stack)/goose-screenshots.tsx:generic-api-key:30
