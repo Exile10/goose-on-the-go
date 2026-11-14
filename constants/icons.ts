@@ -11,7 +11,7 @@
  */
 
 import {
-  Activity, Archive, ArrowDown, ArrowRight, AudioLines, Bell, Bluetooth, Bot, Boxes, Brain, Calendar, Camera,
+  Activity, Archive, ArrowDown, ArrowRight, ArrowUp, AudioLines, Bell, Bluetooth, Bot, Boxes, Brain, Calendar, Camera,
   Check, ChevronDown, ChevronLeft, ChevronRight, ChevronsUpDown, CircleAlert, CircleCheck, Clock, Cloud, CloudAlert, CloudDrizzle,
   CloudFog, CloudLightning, CloudOff, CloudRain, CloudSnow, CloudSun, Copy, Cpu, Download, Droplet,
   Ear, Eye, EyeOff, FileText, HardDrive, Info, Palette, SlidersHorizontal,
@@ -35,6 +35,7 @@ export const ICONS = {
   alert: CircleAlert,
   arrow: ArrowRight,
   'arrow-down': ArrowDown,
+  'arrow-up': ArrowUp,
   bell: Bell,
   'bell-ring': BellRing,
   bluetooth: Bluetooth,

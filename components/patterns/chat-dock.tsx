@@ -10,10 +10,12 @@
  * for the reason in `chrome-puck.tsx`.
  *
  * The right-hand control is two in one place. With nothing written it is the
- * microphone, which opens voice mode; once there is something to send it is
- * send, drawn as the screen's one filled accent on Ink's edge, because it is
- * the control actually asking a question. They share a place because they are
- * never both useful at once.
+ * microphone beside the field, which opens voice mode; once there is something
+ * to send it is send, drawn as the screen's one filled accent on Ink's edge,
+ * because it is the control actually asking a question. They share a place
+ * because they are never both useful at once. Send sits inside the field, in
+ * its bottom corner, so a long draft has the whole width and send stays by the
+ * last line, where the writing ends.
  *
  * It stays live while Goose answers. A follow-up thought mid-reply is the
  * ordinary case, and a field that locked until the model finished made the
@@ -31,7 +33,7 @@
  */
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Keyboard, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Keyboard, Platform, Pressable, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
 import { Image } from 'expo-image';
 import { useTranslation } from 'react-i18next';
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
@@ -61,10 +63,16 @@ import { Spacing } from '@/constants/spacing';
 /** The controls' diameter, and the field's height on one line: the touch floor. */
 const CONTROL = 44;
 
-/** The text's own height plus the field's padding, between one line and about five. */
-function fieldHeight(content: number): number {
-  return Math.min(132, Math.max(CONTROL, Math.ceil(content) + (Platform.OS === 'ios' ? 24 : 16)));
+/** The text's own height plus the field's padding, from one line up to `tallest`. */
+function fieldHeight(content: number, tallest: number): number {
+  return Math.min(tallest, Math.max(CONTROL, Math.ceil(content) + (Platform.OS === 'ios' ? 24 : 16)));
 }
+
+/** Send's face; Ink's compact plate adds four below it and to its right. */
+const SEND = { width: 40, height: 28 };
+const PLATE = 4;
+/** Send's gap from the field's corner, which centres it on a one-line field. */
+const SEND_INSET = (CONTROL - SEND.height - PLATE) / 2;
 
 /** Past this many the Pond's turn gets heavy and the strip stops fitting a thumb. */
 export const MAX_ATTACHMENTS = 4;
@@ -113,6 +121,7 @@ export function ChatDock({
   onDraftChange,
 }: ChatDockProps) {
   const theme = useInkTheme();
+  const field = inkText(theme, { size: 'md' });
   const { t } = useTranslation();
   const [draft, setDraftState] = useState(initialDraft);
   const setDraft = useCallback(
@@ -124,13 +133,21 @@ export function ChatDock({
   );
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [menu, setMenu] = useState(false);
-  const [keyboard, setKeyboard] = useState(false);
+  // The keyboard's height, 0 while it is down.
+  const [keyboard, setKeyboard] = useState(0);
+  const { height: screen } = useWindowDimensions();
+  // A long draft stands as tall as it needs, as in a messages app, while the thread keeps a strip above
+  // it. Edge-to-edge never shrinks the window for the keyboard, so its height is taken off here.
+  const tallest = Math.max(132, Math.round((screen - keyboard) * 0.55));
   const mode = useResearchMode(conversation);
   const input = useRef<TextInput>(null);
   // The field's height follows its text both ways. Left to itself a multiline
   // field on iOS grows as lines are added and keeps that height once they are
   // gone, so the dock stood two lines tall after every long message.
-  const [lines, setLines] = useState(0);
+  // A draft brought back on mount may get no content-size event on iOS, so its own lines are the first guess.
+  const [lines, setLines] = useState(() =>
+    initialDraft ? initialDraft.split('\n').length * (StyleSheet.flatten(field.style).lineHeight ?? 22) : 0,
+  );
   // The light is drawn in the row, around the field, so it needs to know where the field is.
   const [fieldBox, setFieldBox] = useState<FieldBox | null>(null);
   const light = useAnsweringLight(Boolean(busy));
@@ -147,8 +164,8 @@ export function ChatDock({
   useEffect(() => {
     const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
     const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
-    const show = Keyboard.addListener(showEvent, () => setKeyboard(true));
-    const hide = Keyboard.addListener(hideEvent, () => setKeyboard(false));
+    const show = Keyboard.addListener(showEvent, (e) => setKeyboard(e.endCoordinates.height));
+    const hide = Keyboard.addListener(hideEvent, () => setKeyboard(0));
     return () => {
       show.remove();
       hide.remove();
@@ -203,7 +220,6 @@ export function ChatDock({
     borderColor: theme.color.lineStrong,
     borderWidth: theme.edge.hairlineWidth,
   };
-  const field = inkText(theme, { size: 'md' });
   const hint = inkText(theme, { size: 'sm', color: theme.color.textSecondary });
   const placeholder = mode.on ? t('chat.research.placeholder') : busy ? t('chat.queuePlaceholder') : t('chat.placeholder');
   // Clear of the keyboard by a full step, not half of one. Vendor keyboards
@@ -212,7 +228,7 @@ export function ChatDock({
   // above it — the input read as part of the keyboard. The note gets a band of
   // its own on top, so it never sits on the home indicator or the keys, and the
   // band is there only while the note is, so an idle composer keeps no empty chin.
-  const base = keyboard ? Spacing.lg : bottomInset + Spacing.xs;
+  const base = keyboard > 0 ? Spacing.lg : bottomInset + Spacing.xs;
   const foot = base + note.room;
   const padded = useAnimatedStyle(() => ({ paddingBottom: base + chin.get() }));
 
@@ -286,11 +302,24 @@ export function ChatDock({
           <GIcon name="plus" size={20} color={theme.color.text} />
         </GPressable>}
 
-        <View style={[styles.field, material]} onLayout={(e) => setFieldBox(e.nativeEvent.layout)}>
-          {recording ? <VoiceNoteStrip elapsedMs={voiceNote.elapsedMs} level={voiceNote.level} past={pastLine} /> : null}
+        <View
+          style={[styles.field, material]}
+          onLayout={(e) => setFieldBox(e.nativeEvent.layout)}
+        >
+          {recording ? (
+            <View style={styles.inset}>
+              <VoiceNoteStrip elapsedMs={voiceNote.elapsedMs} level={voiceNote.level} past={pastLine} />
+            </View>
+          ) : null}
           <TextInput
             ref={input}
-            style={[field.style, styles.input, { height: fieldHeight(draft ? lines : 0) }, recording && styles.hidden]}
+            style={[
+              field.style,
+              styles.input,
+              { height: fieldHeight(draft ? lines : 0, tallest) },
+              hasContent && styles.besideSend,
+              recording && styles.hidden,
+            ]}
             value={draft}
             onChangeText={setDraft}
             onContentSizeChange={(e) => setLines(e.nativeEvent.contentSize.height)}
@@ -300,27 +329,29 @@ export function ChatDock({
             maxLength={4000}
             accessibilityLabel={placeholder}
           />
+          {hasContent ? (
+            <Pressable
+              onPress={handleSend}
+              accessibilityRole="button"
+              accessibilityLabel={busy ? t('chat.queue') : t('chat.send')}
+              hitSlop={hitSlop(SEND.height + PLATE)}
+              style={styles.sendPlace}
+            >
+              {({ pressed }) => (
+                <InkEdge
+                  radius={theme.radius.pill}
+                  edge={theme.edgeCompact}
+                  state={pressed ? 'pressed' : 'rest'}
+                  contentStyle={[styles.send, { backgroundColor: theme.color.accent }]}
+                >
+                  <GIcon name="arrow-up" size={18} color={theme.color.textOnAccent} />
+                </InkEdge>
+              )}
+            </Pressable>
+          ) : null}
         </View>
 
-        {hasContent ? (
-          <Pressable
-            onPress={handleSend}
-            accessibilityRole="button"
-            accessibilityLabel={busy ? t('chat.queue') : t('chat.send')}
-            hitSlop={hitSlop(CONTROL)}
-          >
-            {({ pressed }) => (
-              <InkEdge
-                radius={theme.radius.pill}
-                edge={theme.edgeCompact}
-                state={pressed ? 'pressed' : 'rest'}
-                contentStyle={[styles.send, { backgroundColor: theme.color.accent }]}
-              >
-                <GIcon name="send" size={18} color={theme.color.textOnAccent} />
-              </InkEdge>
-            )}
-          </Pressable>
-        ) : onVoiceNote ? (
+        {hasContent ? null : onVoiceNote ? (
           <VoiceNoteMic
             size={CONTROL}
             recording={recording}
@@ -417,21 +448,23 @@ const styles = StyleSheet.create({
     flex: 1,
     minHeight: CONTROL,
     borderRadius: CONTROL / 2,
-    paddingHorizontal: Spacing.lg,
     justifyContent: 'center',
   },
   hidden: { position: 'absolute', opacity: 0, height: 0 },
   noteError: { paddingLeft: CONTROL + Spacing.sm },
+  // The field's own padding stays zero, so send's corner offsets mean the same on every Yoga.
+  inset: { paddingHorizontal: Spacing.lg },
   input: {
-    maxHeight: 132,
+    paddingHorizontal: Spacing.lg,
     paddingTop: Platform.OS === 'ios' ? 12 : 8,
     paddingBottom: Platform.OS === 'ios' ? 12 : 8,
   },
-  // Four points under the others, because the plate adds four to the edge's
-  // footprint and the three controls should read as one height.
+  // Every line stops short of send, not only the last, so no line runs under it as the draft grows.
+  besideSend: { paddingRight: SEND_INSET + SEND.width + PLATE + Spacing.sm },
+  sendPlace: { position: 'absolute', right: SEND_INSET, bottom: SEND_INSET },
   send: {
-    width: CONTROL - 4,
-    height: CONTROL - 4,
+    width: SEND.width,
+    height: SEND.height,
     alignItems: 'center',
     justifyContent: 'center',
   },
