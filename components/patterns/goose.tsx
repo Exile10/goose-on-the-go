@@ -26,7 +26,7 @@
  */
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { Animated, Easing, StyleSheet, View } from 'react-native';
+import { Animated, Easing, Platform, StyleSheet, View } from 'react-native';
 import Svg, { Circle, Ellipse, Path } from 'react-native-svg';
 import { useInkTheme, useReduceMotion } from '@jarida/ink/native';
 
@@ -149,7 +149,8 @@ function turn(frames: readonly Keyframe[]) {
  * re-rendering the views it drives.
  */
 function native(at: number) {
-  return new Animated.Value(at, { useNativeDriver: true });
+  // The web has no native animation module, and a value created native there throws on attach.
+  return new Animated.Value(at, { useNativeDriver: Platform.OS !== 'web' });
 }
 
 /** Runs `value` from 0 to 1 forever, entirely on the UI thread, and returns the stop. */
