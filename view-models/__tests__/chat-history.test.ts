@@ -503,9 +503,10 @@ describe('turnEnded', () => {
 // The wall is cut by where a conversation was begun, and opens on what was begun on this phone.
 describe('the tabs', () => {
   const rows = [
-    session({ id: 'p1', surface: 'phone' }),
+    session({ id: 'p1', surface: 'phone', started_here: true }),
     session({ id: 'goose-m1', surface: 'goose' }),
-    session({ id: 'p2', surface: 'phone' }),
+    session({ id: 'p2', surface: 'phone', started_here: true }),
+    session({ id: 'other-phone', surface: 'phone', started_here: false }),
     session({ id: 'r1', surface: 'room' }),
     session({ id: 'd1', surface: 'desktop' }),
     session({ id: 'old' }),
@@ -513,15 +514,15 @@ describe('the tabs', () => {
   ];
 
   it('asks the Pond for this phone and the Goose thread by default, and for unrecorded ones under Other screens', () => {
-    expect(TAB_SURFACES.phone).toEqual(['phone', 'goose']);
+    expect(TAB_SURFACES.phone).toEqual(['here', 'goose']);
     expect(TAB_SURFACES.room).toEqual(['room']);
-    expect(TAB_SURFACES.other).toEqual(['desktop', 'cli', 'pond', 'unknown']);
+    expect(TAB_SURFACES.other).toEqual(['desktop', 'cli', 'pond', 'unknown', 'elsewhere']);
   });
 
   it('keeps what belongs to a tab, the Goose thread first', () => {
     expect(rowsForTab(rows, 'phone', false).map((r) => r.id)).toEqual(['goose-m1', 'p1', 'p2']);
     expect(rowsForTab(rows, 'room', false).map((r) => r.id)).toEqual(['r1']);
-    expect(rowsForTab(rows, 'other', false).map((r) => r.id)).toEqual(['d1', 'old']);
+    expect(rowsForTab(rows, 'other', false).map((r) => r.id)).toEqual(['other-phone', 'd1', 'old']);
   });
 
   it('shows a schedule\'s own conversation under no tab: its report is in the Goose thread', () => {

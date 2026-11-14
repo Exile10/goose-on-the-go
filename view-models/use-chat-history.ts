@@ -62,13 +62,24 @@ export type HistoryTab = 'phone' | 'room' | 'scheduled' | 'other';
 
 export const HISTORY_TABS: readonly HistoryTab[] = ['phone', 'room', 'scheduled', 'other'];
 
-/** What each tab asks the Pond for. `unknown` is a conversation begun before the Pond recorded where. */
+/**
+ * What each tab asks the Pond for. `here` is what this phone began and `elsewhere` what another
+ * phone did; `unknown` is a conversation begun before the Pond recorded where.
+ */
 export const TAB_SURFACES: Record<HistoryTab, readonly string[]> = {
-  phone: ['phone', 'goose'],
+  phone: ['here', 'goose'],
   room: ['room'],
   scheduled: ['goose'],
-  other: ['desktop', 'cli', 'pond', 'unknown'],
+  other: ['desktop', 'cli', 'pond', 'unknown', 'elsewhere'],
 };
+
+/** Whether a row answers one of the names a tab asked the Pond for. */
+function answers(row: Pick<SessionSummary, 'surface' | 'started_here'>, wanted: readonly string[]): boolean {
+  if (!row.surface) return wanted.includes('unknown');
+  if (row.started_here && wanted.includes('here')) return true;
+  if (row.surface === 'phone' && !row.started_here && wanted.includes('elsewhere')) return true;
+  return row.surface !== 'phone' && wanted.includes(row.surface);
+}
 
 /** How much of the Goose thread is read for what the schedules reported. */
 export const SCHEDULED_LIMIT = 200;
@@ -85,10 +96,9 @@ export function ignoresSurfaces(rows: readonly Pick<SessionSummary, 'surface'>[]
  * The rows a tab shows, the Goose thread first. On a Pond that names no surfaces the whole wall
  * stays under This phone, as it was, and the other tabs are empty.
  */
-export function rowsForTab<T extends Pick<SessionSummary, 'surface'>>(rows: readonly T[], tab: HistoryTab, unsurfaced: boolean): T[] {
+export function rowsForTab<T extends Pick<SessionSummary, 'surface' | 'started_here'>>(rows: readonly T[], tab: HistoryTab, unsurfaced: boolean): T[] {
   if (unsurfaced) return tab === 'phone' ? [...rows] : [];
-  const wanted = TAB_SURFACES[tab];
-  const kept = rows.filter((row) => (row.surface ? wanted.includes(row.surface) : wanted.includes('unknown')));
+  const kept = rows.filter((row) => answers(row, TAB_SURFACES[tab]));
   return [...kept.filter((row) => row.surface === 'goose'), ...kept.filter((row) => row.surface !== 'goose')];
 }
 

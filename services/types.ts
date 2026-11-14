@@ -186,6 +186,8 @@ export interface SessionSummary {
   id: string;
   /** Absent on a conversation begun before the Pond recorded it, which `?surface=unknown` matches. */
   surface?: SessionSurface | null;
+  /** Whether this phone began it; `?surface=here` keeps those, `elsewhere` another phone's. */
+  started_here?: boolean;
   title?: string;
   /** How the conversation opened, for a history card. Absent on older servers. */
   preview?: string;
