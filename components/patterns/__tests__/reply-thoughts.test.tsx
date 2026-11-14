@@ -7,11 +7,11 @@ import { Text } from 'react-native';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { InkProvider } from '@jarida/ink/native';
 
-import { lastLine, ReplyThoughts, thoughtOf } from '../reply-thoughts';
+import { lastLine, ReplyThoughts, thoughtOf, toolPhrase } from '../reply-thoughts';
 
 jest.mock('@/services/haptics', () => ({ selectionTick: jest.fn(async () => {}) }));
 // The goose runs on Reanimated's worklets, which jest's stand-ins cannot carry; its motion has tests of its own.
-jest.mock('@/components/patterns/goose', () => ({ Goose: () => null }));
+jest.mock('@/components/patterns/goose', () => ({ Goose: () => null, GooseStill: () => null }));
 jest.mock('@/components/ui/g-icon', () => ({ GIcon: 'GIcon' }));
 jest.mock('@/components/patterns/thinking-quips', () => {
   const { Text: T } = jest.requireActual('react-native');
@@ -54,9 +54,29 @@ describe('the thinking line', () => {
     expect(texts(render({ live: false, waiting: false }))).toEqual([]);
   });
 
-  it('is one line until pressed, then the thinking and the steps in full', () => {
-    const tree = render({ thinking: ['Weigh the ', 'routes.\nPick the coast road.'], steps: ['Let me check the map.'] });
+  it('names a running tool by its whole name, read as words, with the Pond for giap', () => {
+    expect(toolPhrase('giap-knowledge__search_web')).toBe('pond knowledge search web');
+    expect(toolPhrase('Acme-Maps__find_Route')).toBe('acme maps find route');
+    const tree = render({
+      live: true,
+      waiting: true,
+      thinking: ['Look it up.'],
+      tools: [
+        { id: 'a', name: 'giap-weather__get_weather', args: '{}', status: 'ok' },
+        { id: 'b', name: 'giap-knowledge__search_web', args: '{}', status: 'running' },
+      ],
+    });
+    expect(texts(tree)).toEqual(['Using pond knowledge search web tool']);
+  });
+
+  it('shows the newest thinking while it streams', () => {
+    const tree = render({ live: true, thinking: ['Weigh the ', 'routes.\nPick the coast road.'] });
     expect(texts(tree)).toEqual(['Pick the coast road.']);
+  });
+
+  it('settles to Thoughts once done, then opens to the thinking and the steps in full', () => {
+    const tree = render({ thinking: ['Weigh the ', 'routes.\nPick the coast road.'], steps: ['Let me check the map.'] });
+    expect(texts(tree)).toEqual(['Thoughts']);
     expect(toggle(tree).props.accessibilityState).toEqual({ expanded: false, busy: false });
 
     act(() => toggle(tree).props.onPress());
@@ -65,10 +85,10 @@ describe('the thinking line', () => {
     expect(open).toContain('Let me check the map.');
 
     act(() => toggle(tree).props.onPress());
-    expect(texts(tree)).toEqual(['Pick the coast road.']);
+    expect(texts(tree)).toEqual(['Thoughts']);
   });
 
-  it('shows the newest step when there is no thinking', () => {
-    expect(texts(render({ steps: ['Let me check the weather.'] }))).toEqual(['Let me check the weather.']);
+  it('shows the newest step while it runs when there is no thinking', () => {
+    expect(texts(render({ live: true, steps: ['Let me check the weather.'] }))).toEqual(['Let me check the weather.']);
   });
 });

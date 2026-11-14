@@ -314,7 +314,9 @@
       "stopFile": "Stop {{name}}"
     },
     "thoughts": {
-      "label": "What Goose thought on the way"
+      "label": "What Goose thought on the way",
+      "done": "Thoughts",
+      "usingTool": "Using {{tool}} tool"
     },
     "replyTo": {
       "goose": "Goose said:",

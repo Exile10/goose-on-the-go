@@ -363,6 +363,7 @@ function TheirMessage({
       key="thoughts"
       thinking={message.thinking}
       steps={message.steps}
+      tools={message.tools}
       live={!done}
       waiting={!message.content}
       seed={turnSeed}

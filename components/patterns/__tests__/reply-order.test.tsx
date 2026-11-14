@@ -11,7 +11,7 @@ import type { Message } from '@/models/chat';
 
 jest.mock('expo-web-browser', () => ({ openBrowserAsync: jest.fn() }));
 // The goose runs on Reanimated's worklets, which jest's stand-ins cannot carry; its motion has tests of its own.
-jest.mock('@/components/patterns/goose', () => ({ Goose: () => null }));
+jest.mock('@/components/patterns/goose', () => ({ Goose: () => null, GooseStill: () => null }));
 // The swipe runs on gesture-handler and worklets, which jest's stand-ins cannot carry; the sheet and viewer are modals.
 jest.mock('@/components/patterns/swipe-to-reply', () => ({ SwipeToReply: ({ children }: { children: React.ReactNode }) => children }));
 jest.mock('@/components/patterns/picture-viewer', () => ({ PictureViewer: () => null }));
@@ -89,7 +89,7 @@ it('reads in order once done, with reading aloud and copying beside the chip', a
   const content = 'Run `npm test`:\n\n```bash\nnpm test\n```';
   const tree = await draw({ id: 'a', role: 'assistant', content, tools, thinking: ['Find the command.'], timestamp: 0 });
   const drawn = lines(tree);
-  expect(drawn[0]).toBe('Find the command.');
+  expect(drawn[0]).toBe('Thoughts');
   expect(drawn.indexOf('chip')).toBeGreaterThan(drawn.findIndex((l) => l.startsWith('Run')));
   expect(drawn).toContain(`copy:${content}`);
   expect(drawn.indexOf('pictures')).toBeGreaterThan(drawn.indexOf('chip'));

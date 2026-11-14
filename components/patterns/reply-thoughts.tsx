@@ -1,9 +1,10 @@
 /**
  * What Goose thought and noted on the way to an answer, tucked into one line at the top of the
  * reply. While it thinks, the line is the newest of its thinking, cut from the front so the words
- * arriving stay in view, beside the goose swimming on a pond that ripples while the turn runs. Before any thinking comes,
- * the line is a quip, so the wait still reads as alive; the quips stop once there is thinking to
- * show. A tap opens the whole of it, the thinking and then the steps, and closes it again.
+ * arriving stay in view, beside the goose bobbing on a pond that ripples while the turn runs; while
+ * a tool runs, it names the tool. Before either comes, the line is a quip, so the wait still reads
+ * as alive. Once the reply is done it settles to "Thoughts". A tap opens the whole of it, the
+ * thinking and then the steps, and closes it again.
  */
 
 import React, { useState } from 'react';
@@ -16,11 +17,25 @@ import { PondRipple } from '@/components/patterns/pond-ripple';
 import { ThinkingQuips } from '@/components/patterns/thinking-quips';
 import { GIcon } from '@/components/ui/g-icon';
 import { GPressable } from '@/components/ui/g-pressable';
+import type { ToolCall } from '@/models/chat';
 import { selectionTick } from '@/services/haptics';
 
 /** The thinking as one text: the Pond streams it in pieces, which run on from each other. */
 export function thoughtOf(thinking: string[] | undefined): string {
   return (thinking ?? []).join('').trim();
+}
+
+/**
+ * A tool as the line names it: its whole name with `_` and `-` read as spaces, in lower case for the
+ * sentence it sits in, and the Pond's own servers (`giap-…`) called the Pond.
+ */
+export function toolPhrase(name: string): string {
+  return name
+    .replace(/[_-]+/g, ' ')
+    .replace(/giap/gi, 'pond')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
 }
 
 /** The line a thought is tucked into: its newest line, without the marks of markdown. */
@@ -35,12 +50,15 @@ export function lastLine(text: string): string {
 export function ReplyThoughts({
   thinking,
   steps,
+  tools,
   live,
   waiting,
   seed,
 }: {
   thinking?: string[];
   steps?: string[];
+  /** The reply's tool calls; one still running names itself on the line. */
+  tools?: ToolCall[];
   /** The turn is still running. */
   live: boolean;
   /** Nothing of the answer has come yet, which is when a quip holds the line. */
@@ -52,7 +70,14 @@ export function ReplyThoughts({
   const [open, setOpen] = useState(false);
   const thought = thoughtOf(thinking);
   const notes = steps?.filter((step) => step.trim()) ?? [];
-  const line = lastLine(thought) || lastLine(notes[notes.length - 1] ?? '');
+  const running = live ? [...(tools ?? [])].reverse().find((tool) => tool.status === 'running') : undefined;
+  const line = !live
+    ? thought || notes.length
+      ? t('chat.thoughts.done')
+      : ''
+    : running
+      ? t('chat.thoughts.usingTool', { tool: toolPhrase(running.name) })
+      : lastLine(thought) || lastLine(notes[notes.length - 1] ?? '');
   const quipping = live && waiting && !line;
   if (!line && !quipping) return null;
 
@@ -86,7 +111,7 @@ export function ReplyThoughts({
           style={[text.style, styles.words, styles.italic]}
           numberOfLines={1}
           // While it is written, the newest words are the ones to see.
-          ellipsizeMode={live ? 'head' : 'tail'}
+          ellipsizeMode={live && !running ? 'head' : 'tail'}
         >
           {line}
         </Text>
