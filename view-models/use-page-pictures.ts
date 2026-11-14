@@ -18,8 +18,12 @@ export function usePagePictures(pages: string[], enabled: boolean): ReportImage[
     let live = true;
     let ask = asked.get(key);
     if (!ask) {
-      // A Pond that cannot answer shows no pictures; the answer itself is unaffected.
-      ask = api.pagePictures(key.split('\n')).catch(() => []);
+      // A Pond that cannot answer shows no pictures; the answer itself is unaffected. The failure is
+      // not kept, so the answer asks again when next drawn, by when the Pond may have kept them.
+      ask = api.pagePictures(key.split('\n')).catch(() => {
+        asked.delete(key);
+        return [];
+      });
       asked.set(key, ask);
     }
     void ask.then((found) => {

@@ -415,6 +415,7 @@ function logProbeFailure(url: string, reason: string, latencyMs: number): void {
 
 /** Default ceiling for an ordinary request. A Pond on the LAN is close by. */
 const REQUEST_TIMEOUT_MS = 15_000;
+const PICTURES_TIMEOUT_MS = 30_000;
 
 /**
  * Matter commissioning gets its own, far longer budget: the server allows itself
@@ -2975,7 +2976,13 @@ export class PondApiClient {
   /** Pictures the Pond keeps for the pages an answer cites or read; none from an older Pond. */
   async pagePictures(pages: string[]): Promise<ReportImage[]> {
     try {
-      return readList(await this.post<unknown>('/api/v1/report-images/for-pages', { pages }), readReportImage);
+      // The Pond fetches a picture it has not kept while asked, in up to three 8 s steps: past the usual 15 s.
+      const res = await this.request<unknown>('/api/v1/report-images/for-pages', {
+        method: 'POST',
+        body: JSON.stringify({ pages }),
+        signal: timeoutSignal(PICTURES_TIMEOUT_MS),
+      });
+      return readList(res, readReportImage);
     } catch (e) {
       if (e instanceof ApiError && (e.status === 404 || e.status === 405)) return [];
       throw e;
