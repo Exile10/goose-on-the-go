@@ -4,14 +4,13 @@
  * What a person said is a bubble, Ink's, with any pictures they sent above it.
  * What Goose said is not: it is the page's text, full width, set from the
  * markdown the model writes, the way pond-desktop sets a reply — a bubble
- * around every answer makes a long one a box to scroll inside. Below the
- * answer, what Goose did to reach it: the facts its tools drew, the pages it
- * read, and a chip for each step. While a reply has no words yet, the thinking
- * line holds its place. Once it has them, the turn can still be running — the
- * Pond can take another model pass after the words appear before it calls the
- * turn done — so the composer's glowing line keeps going until it does, with
- * the Pond's own status under the words when it gives one. Without it, a
- * message queued behind a finished-looking answer looks stuck.
+ * around every answer makes a long one a box to scroll inside. At its top,
+ * what Goose thought and noted on the way, tucked into one line beside a
+ * rippling pond; below it, what its tools drew and the pages it read. The turn
+ * can still be running once the words appear — the Pond can take another
+ * model pass before it calls the turn done — so the pond and the composer's
+ * glowing line keep going until it does. Without them, a message queued behind
+ * a finished-looking answer looks stuck.
  *
  * A message written while Goose was still answering sits at the foot of the
  * thread, where it will be asked, drawn as Ink's bubble in its sending state
@@ -44,7 +43,7 @@ import { FromLine, OfferPanel, ReceiptChips } from '@/components/patterns/messag
 import { sourcesOf } from '@/constants/tools';
 import { usePagePictures } from '@/view-models/use-page-pictures';
 import { useReadAloud } from '@/view-models/use-read-aloud';
-import { ThinkingQuips } from '@/components/patterns/thinking-quips';
+import { ReplyThoughts } from '@/components/patterns/reply-thoughts';
 import { ToolTrail, foldedTools } from '@/components/patterns/tool-card';
 import { GIcon } from '@/components/ui/g-icon';
 import { GPressable } from '@/components/ui/g-pressable';
@@ -218,8 +217,6 @@ function QueuedNote({ onRemove }: { onRemove: () => void }) {
 export interface MessageRowProps {
   message: Message;
   position: BubblePosition;
-  /** What Goose says it is doing, for the reply still being written. */
-  status: string | null;
   turnSeed: number;
   /** Written while Goose was answering, and not yet sent. */
   queued?: boolean;
@@ -229,22 +226,24 @@ export interface MessageRowProps {
   onOffer?: (id: string, take: boolean) => Promise<void> | void;
   /** Answer this message, a part of it, or one of its pictures, from the composer. */
   onReply?: (target: ReplyTarget) => void;
+  /** The reply's height, as it changes, for a thread that holds its top edge in view while it is written. */
+  onLayout?: (height: number) => void;
 }
 
 export const MessageRow = React.memo(function MessageRow({
   message,
   position,
-  status,
   turnSeed,
   queued = false,
   onUnqueue,
   onOffer,
   onReply,
+  onLayout,
 }: MessageRowProps) {
   if (message.role === 'user') {
     return <MyMessage message={message} position={position} queued={queued} onUnqueue={onUnqueue} onReply={onReply} />;
   }
-  return <TheirMessage message={message} status={status} turnSeed={turnSeed} onOffer={onOffer} onReply={onReply} />;
+  return <TheirMessage message={message} turnSeed={turnSeed} onOffer={onOffer} onReply={onReply} onLayout={onLayout} />;
 });
 
 /** What the person said: any quote it answers, their pictures, a voice note, and the bubble. */
@@ -320,18 +319,17 @@ const PICTURE_PAGES = 6;
  */
 function TheirMessage({
   message,
-  status,
   turnSeed,
   onOffer,
   onReply,
+  onLayout,
 }: {
   message: Message;
-  status: string | null;
   turnSeed: number;
   onOffer?: (id: string, take: boolean) => Promise<void> | void;
   onReply?: (target: ReplyTarget) => void;
+  onLayout?: (height: number) => void;
 }) {
-  const theme = useInkTheme();
   const done = !message.pending;
   const [viewing, setViewing] = useState<ReplyPicture | null>(null);
   const [part, setPart] = useState<string | null>(null);
@@ -354,19 +352,27 @@ function TheirMessage({
     sources.slice(0, PICTURE_PAGES).map((s) => s.url),
     done,
   );
-  const waiting = message.pending && !message.content;
-  const unfinished = Boolean(message.pending && message.content);
-  const statusLine = inkText(theme, { role: 'mono', size: 'xs', color: theme.color.textTertiary });
   const note = message.note;
 
   const text = message.content ? (
     <Markdown key="text" source={message.content} sources={done ? trail.chips : undefined} />
   ) : null;
-  const tools = message.tools?.length ? <ToolTrail key="tools" tools={message.tools} steps={message.steps} /> : null;
-  // While Goose writes, what its tools did sits above the words, so the place it is writing stays at
-  // the thread's foot by the composer however many tools it calls. Keyed, so a part moves, not remounts.
+  const tools = message.tools?.length ? <ToolTrail key="tools" tools={message.tools} /> : null;
+  const thoughts = (
+    <ReplyThoughts
+      key="thoughts"
+      thinking={message.thinking}
+      steps={message.steps}
+      live={!done}
+      waiting={!message.content}
+      seed={turnSeed}
+    />
+  );
+  // While Goose writes, what its tools did sits above the words too, under its thinking. Keyed, so a
+  // part moves, not remounts, when the reply settles.
   const parts = done
     ? [
+        thoughts,
         text,
         <ReplyActions
           key="actions"
@@ -384,23 +390,13 @@ function TheirMessage({
         />,
         tools,
       ]
-    : [
-        <TrailChip key="chip" state={shown} tools={folded} />,
-        tools,
-        text,
-        waiting ? <ThinkingQuips key="quips" status={status} seed={turnSeed} /> : null,
-        unfinished && status ? (
-          <Text key="status" style={statusLine.style} numberOfLines={1} accessibilityLiveRegion="polite">
-            {status}
-          </Text>
-        ) : null,
-      ];
+    : [thoughts, <TrailChip key="chip" state={shown} tools={folded} />, tools, text];
 
   return (
     <SwipeToReply
       onReply={answer && plain ? () => answer({ kind: 'text', from: 'goose', text: plain, part: false }) : undefined}
     >
-      <View style={styles.theirs}>
+      <View style={styles.theirs} onLayout={onLayout ? (e) => onLayout(e.nativeEvent.layout.height) : undefined}>
         {note?.from ? <FromLine from={note.from} /> : null}
         {parts}
         {trail.mounted ? <TrailSheet state={shown} tools={folded} /> : null}

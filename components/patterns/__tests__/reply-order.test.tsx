@@ -1,6 +1,6 @@
-// While Goose writes, the place it is writing is the foot of its reply, so the thread, pinned to its
-// foot, keeps it in view: what its tools did sits above the words until the reply is done. Done, the
-// reply reads in order, with reading aloud and copying beside its chip.
+// A reply opens with what Goose is thinking, one line at its top, then what its tools did, then the
+// words. A quip holds the line only until thinking comes, and the Pond's "Agent working" is never
+// drawn. Done, the reply reads in order, with reading aloud and copying beside its chip.
 
 import React from 'react';
 import { Text } from 'react-native';
@@ -56,7 +56,7 @@ const tools = [{ id: 'c1', name: 'giap-knowledge__search_web', args: '{}', statu
 async function draw(message: Message): Promise<ReactTestRenderer> {
   let tree!: ReactTestRenderer;
   await act(async () => {
-    tree = create(<MessageRow message={message} position="only" status="Reading pages" turnSeed={0} />);
+    tree = create(<MessageRow message={message} position="only" turnSeed={0} />);
   });
   return tree;
 }
@@ -69,20 +69,25 @@ function lines(tree: ReactTestRenderer): string[] {
     .map((node) => [node.props.children].flat().join(''));
 }
 
-it('keeps the words being written at the foot, under what the tools did', async () => {
-  const tree = await draw({ id: 'a', role: 'assistant', content: 'Jarida builds', pending: true, tools, timestamp: 0 });
-  expect(lines(tree)).toEqual(['chip', 'cards', 'Jarida builds', 'Reading pages']);
+it('puts a quip at the top before anything else comes, over what the tools did', async () => {
+  const tree = await draw({ id: 'a', role: 'assistant', content: '', pending: true, tools, timestamp: 0 });
+  expect(lines(tree)).toEqual(['thinking', 'chip', 'cards']);
 });
 
-it('keeps the thinking line at the foot before any words come', async () => {
-  const tree = await draw({ id: 'a', role: 'assistant', content: '', pending: true, tools, timestamp: 0 });
-  expect(lines(tree)).toEqual(['chip', 'cards', 'thinking']);
+it('swaps the quip for the newest line of thinking once it starts, and draws no status', async () => {
+  const thinking = ['The user wants the ', 'drive time.\nSonoma is about an hour ', 'from San Francisco'];
+  const waiting = await draw({ id: 'a', role: 'assistant', content: '', pending: true, tools, thinking, timestamp: 0 });
+  expect(lines(waiting)).toEqual(['Sonoma is about an hour from San Francisco', 'chip', 'cards']);
+
+  const writing = await draw({ id: 'a', role: 'assistant', content: 'About an hour', pending: true, tools, thinking, timestamp: 0 });
+  expect(lines(writing)).toEqual(['Sonoma is about an hour from San Francisco', 'chip', 'cards', 'About an hour']);
 });
 
 it('reads in order once done, with reading aloud and copying beside the chip', async () => {
   const content = 'Run `npm test`:\n\n```bash\nnpm test\n```';
-  const tree = await draw({ id: 'a', role: 'assistant', content, tools, timestamp: 0 });
+  const tree = await draw({ id: 'a', role: 'assistant', content, tools, thinking: ['Find the command.'], timestamp: 0 });
   const drawn = lines(tree);
+  expect(drawn[0]).toBe('Find the command.');
   expect(drawn.indexOf('chip')).toBeGreaterThan(drawn.findIndex((l) => l.startsWith('Run')));
   expect(drawn).toContain(`copy:${content}`);
   expect(drawn.indexOf('pictures')).toBeGreaterThan(drawn.indexOf('chip'));

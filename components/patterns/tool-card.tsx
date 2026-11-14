@@ -25,7 +25,6 @@ import * as WebBrowser from 'expo-web-browser';
 import { InkEdge, InkEyebrow, inkText, useInkTheme } from '@jarida/ink/native';
 
 import { LongTaskCard } from '@/components/patterns/long-task-card';
-import { Markdown } from '@/components/patterns/markdown';
 import { GIcon } from '@/components/ui/g-icon';
 import { GPressable } from '@/components/ui/g-pressable';
 import {
@@ -453,36 +452,6 @@ function ResultPanel({ tool }: { tool: ToolCall }) {
   );
 }
 
-/** What Goose wrote while it worked, folded to one faint line until asked for. */
-function Steps({ steps }: { steps: string[] }) {
-  const theme = useInkTheme();
-  const { t } = useTranslation();
-  const [expanded, setExpanded] = useState(false);
-  const label = inkText(theme, { role: 'mono', size: 'xs', weight: theme.weight.medium, color: theme.color.textTertiary });
-  return (
-    <View style={styles.steps}>
-      <GPressable
-        feedback="tint"
-        onPress={() => {
-          void selectionTick();
-          setExpanded((value) => !value);
-        }}
-        hitSlop={8}
-        accessibilityRole="button"
-        accessibilityLabel={t('chat.tools.steps')}
-        accessibilityState={{ expanded }}
-        style={styles.stepsToggle}
-      >
-        <Text style={label.style} numberOfLines={1}>
-          {t('chat.tools.steps')}
-        </Text>
-        <GIcon name={expanded ? 'chevron' : 'chevron-right'} size={12} color={theme.color.textTertiary} />
-      </GPressable>
-      {expanded ? steps.map((step, i) => <Markdown key={i} source={step} size="xs" tone="tertiary" />) : null}
-    </View>
-  );
-}
-
 /** The tools a reply folds into the chip under it: all but those that draw a fact or follow a task. */
 export function foldedTools(tools: ToolCall[]): ToolCall[] {
   return tools.filter((tool) => !hasFact(tool) && !startedTaskId(tool));
@@ -490,21 +459,14 @@ export function foldedTools(tools: ToolCall[]): ToolCall[] {
 
 /**
  * What under an answer is drawn in place, most useful first: a long task the turn started, followed
- * live, the facts its tools drew, and what Goose wrote while it worked. The rest is in the chip.
+ * live, then the facts its tools drew. The rest is in the chip; the steps are at the reply's top.
  */
-export const ToolTrail = React.memo(function ToolTrail({
-  tools,
-  steps,
-}: {
-  tools: ToolCall[];
-  steps?: string[];
-  done?: boolean;
-}) {
+export const ToolTrail = React.memo(function ToolTrail({ tools }: { tools: ToolCall[]; done?: boolean }) {
   const tasks = tools.flatMap((tool) => {
     const taskId = startedTaskId(tool);
     return taskId ? [{ call: tool.id, taskId }] : [];
   });
-  if (tasks.length === 0 && !tools.some(hasFact) && !steps?.length) return null;
+  if (tasks.length === 0 && !tools.some(hasFact)) return null;
   return (
     <View style={styles.trail}>
       {tasks.map((task) => (
@@ -513,7 +475,6 @@ export const ToolTrail = React.memo(function ToolTrail({
       {tools.map((tool) => (
         <FactCard key={tool.id} tool={tool} />
       ))}
-      {steps?.length ? <Steps steps={steps} /> : null}
     </View>
   );
 });
@@ -529,8 +490,6 @@ const styles = StyleSheet.create({
   forecastDay: { flex: 1 },
   forecastTemp: { minWidth: 34, textAlign: 'right' },
   forecastRain: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 3, minWidth: 48 },
-  steps: { gap: 4, alignItems: 'flex-start' },
-  stepsToggle: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   toolRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, paddingHorizontal: Spacing.lg, paddingVertical: Spacing.md },
   toolText: { flex: 1, gap: 2 },
   result: { marginHorizontal: Spacing.lg, marginBottom: Spacing.md, padding: 10 },

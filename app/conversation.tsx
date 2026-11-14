@@ -151,7 +151,7 @@ export default function ChatScreen() {
   const insets = useSafeAreaInsets();
   const { data, loading, error, actions } = useChat();
   const { hydrated } = useServer();
-  const { messages, queued, streaming, status, turnSeed, sessionId, title } = data;
+  const { messages, queued, streaming, turnSeed, sessionId, title } = data;
   const name = useGreetingName();
   const suggestions = useSuggestions(sessionId);
   const research = useResearchOffer();
@@ -258,13 +258,25 @@ export default function ChatScreen() {
 
   const listRef = useRef<FlatList<Row>>(null);
   const reduceMotion = useReduceMotion();
+  // After the person asks, the reply is read from its top: once it outgrows the screen the list
+  // holds its top edge where it is and the rest arrives below, until the reader scrolls or it ends.
+  const holdTop = useRef(false);
+  // Once the reply outgrows the screen, the row above it is the one the list keeps still, natively and
+  // in the same frame as the reply grows; held from script, the text jumped a frame at every line.
+  const [holding, setHolding] = useState<number | null>(null);
+  const listHeight = useRef(0);
+  const letGo = useCallback(() => {
+    holdTop.current = false;
+    setHolding(null);
+  }, []);
   const scrollToFoot = useCallback(() => {
+    letGo();
     setLatest(HIDDEN);
     // Before the scroll event says so: a message sent now lands in the next
     // render, which must not still be holding the place the reader just left.
     setBack(false);
     listRef.current?.scrollToOffset({ offset: 0, animated: !reduceMotion });
-  }, [reduceMotion]);
+  }, [letGo, reduceMotion]);
   const toLatest = useCallback(() => {
     void selectionTick();
     scrollToFoot();
@@ -313,6 +325,7 @@ export default function ChatScreen() {
       // What the reader just wrote is where they are now, however far back
       // they had been reading.
       scrollToFoot();
+      holdTop.current = true;
       void actions.send(text, attachments, card ? { ...options, card: { kind: card.kind, id: card.id } } : options);
       setCard(null);
     },
@@ -416,21 +429,49 @@ export default function ChatScreen() {
   }
   const clearReply = useCallback(() => setReplyTo(null), []);
 
+  // Read when the reply is measured, after the render that drew it; a dependency instead would hand
+  // every row a new callback, and redraw them all, at each word.
+  const rowsNow = useRef(rows);
+  useEffect(() => {
+    rowsNow.current = rows;
+  }, [rows]);
+  // Shorter than the screen, the reply grows up from the foot as any message does. The moment it is
+  // taller, its top edge is lined up with the screen's (`viewPosition: 1` on the inverted list) and
+  // the row above it is held from then on, so the rest of the reply arrives below.
+  const holdReplyTop = useCallback(
+    (height: number) => {
+      if (!holdTop.current || holding !== null) return;
+      if (height + REPLY_FOOT + Spacing.sm < listHeight.current) return;
+      const index = rowsNow.current.findIndex((row) => row.message.pending && row.message.role === 'assistant');
+      if (index < 0) return;
+      setHolding(index + 1);
+      // A frame later, once the list has measured the row at its new size.
+      requestAnimationFrame(() =>
+        listRef.current?.scrollToIndex({ index, viewPosition: 1, viewOffset: Spacing.sm, animated: false }),
+      );
+    },
+    [holding],
+  );
+  // A finished reply is held no longer; the next question starts the hold again from the foot.
+  useEffect(() => {
+    if (!streaming) holdTop.current = false;
+  }, [streaming]);
+
   const keyExtractor = useCallback((row: Row) => row.message.id, []);
   const renderItem = useCallback(
     ({ item }: { item: Row }) => (
       <MessageRow
         message={item.message}
         position={item.position}
-        status={item.message.pending ? status : null}
         turnSeed={turnSeed}
         queued={item.queued}
         onUnqueue={unqueue}
         onOffer={answerOffer}
         onReply={setReplyTo}
+        onLayout={item.message.pending && item.message.role === 'assistant' ? holdReplyTop : undefined}
       />
     ),
-    [status, turnSeed, unqueue, answerOffer],
+    [turnSeed, unqueue, answerOffer, holdReplyTop],
   );
 
   const started = messages.length > 0 || queued.length > 0;
@@ -484,11 +525,19 @@ export default function ChatScreen() {
               renderItem={renderItem}
               inverted
               onScroll={onScroll}
+              onScrollBeginDrag={letGo}
+              onLayout={(e) => {
+                listHeight.current = e.nativeEvent.layout.height;
+              }}
+              // The reply is the row being drawn, so it is measured; should it not be, the hold still holds.
+              onScrollToIndexFailed={() => {}}
               scrollEventThrottle={16}
               keyboardDismissMode="interactive"
               keyboardShouldPersistTaps="handled"
               contentContainerStyle={styles.listContent}
-              maintainVisibleContentPosition={holdPlace(back)}
+              maintainVisibleContentPosition={
+                streaming && holding !== null ? { minIndexForVisible: holding } : holdPlace(back)
+              }
               // The list is inverted, so its header sits under the newest message.
               ListHeaderComponent={interviewFoot}
             />
@@ -564,6 +613,9 @@ export default function ChatScreen() {
     </SafeAreaView>
   );
 }
+
+/** Under the reply in the list: its own bottom margin and the list's padding (`styles.listContent`). */
+const REPLY_FOOT = 18 + Spacing.md;
 
 const makeStyles = (c: ThemeColors) =>
   StyleSheet.create({

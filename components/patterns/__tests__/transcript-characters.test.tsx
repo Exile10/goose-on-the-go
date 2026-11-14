@@ -57,7 +57,7 @@ const TYPED = [
 
 it('draws what the person typed exactly as typed, markdown and TeX included', async () => {
   const message: Message = { id: 'u1', role: 'user', content: TYPED, timestamp: 0 };
-  const tree = await draw(<MessageRow message={message} position="only" status={null} turnSeed={0} />);
+  const tree = await draw(<MessageRow message={message} position="only" turnSeed={0} />);
   expect(words(tree)).toBe(TYPED);
 });
 

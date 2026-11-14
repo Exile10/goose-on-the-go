@@ -313,6 +313,9 @@
       "playFile": "Play {{name}}",
       "stopFile": "Stop {{name}}"
     },
+    "thoughts": {
+      "label": "What Goose thought on the way"
+    },
     "replyTo": {
       "goose": "Goose said:",
       "you": "I said:",
