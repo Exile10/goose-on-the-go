@@ -228,6 +228,7 @@ import type {
   DetectedPlace,
   PondSettings,
   RetitleResult,
+  RetitleOneResult,
   TtsApplyResult,
   ZoneChoice,
   DiskUsage,
@@ -2612,6 +2613,11 @@ export class PondApiClient {
   /** Wake the job that names conversations. It names them as it goes. */
   retitleSessions(): Promise<RetitleResult> {
     return this.post<RetitleResult>('/api/v1/sessions/retitle', {});
+  }
+
+  /** Ask the model to name one conversation now. Replaces even a hand-typed name: asking is consent. */
+  retitleSession(id: string): Promise<RetitleOneResult> {
+    return this.post<RetitleOneResult>(`/api/v1/sessions/${encodeURIComponent(id)}/retitle`, {});
   }
 
   // ── Profiles ────────────────────────────────────────────────
