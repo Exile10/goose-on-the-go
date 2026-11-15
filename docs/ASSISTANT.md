@@ -170,8 +170,10 @@ this phone's assistant".
   model), `kind=wake_test`, and every `kind=wake_refused reason=...`. The Pond logs
   `kind=wake_check heard=true phrase_only=true` for a phone's wake, and its misses only at debug.
 
-To build it: `npm run build:ear` (add `--emulator` for x86_64), then prebuild as usual. The
-`with-pond-wake` plugin stops the prebuild if a packaged ABI's library is missing.
+Prebuild builds it when a packaged ABI's library is missing, with `scripts/build-embedded-ear.sh`
+(`npm run build:ear`, add `--emulator` for x86_64, to build it by hand). Where that cannot run, as
+without the Pond checkout beside this one, the `with-pond-wake` plugin warns and packages the app
+without it: `PondWake.available()` is then false and the wake word is not offered.
 
 ## What Android does not allow
 

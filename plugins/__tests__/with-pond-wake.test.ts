@@ -65,11 +65,32 @@ describe('copyPondEarLibraries', () => {
     expect(fs.existsSync(path.join(main, 'jniLibs/x86_64'))).toBe(false);
   });
 
-  it('stops the prebuild, naming the script, when a packaged ABI is missing', () => {
+  it('builds the detector when a packaged ABI is missing', () => {
     put('arm64-v8a');
-    expect(() => copyPondEarLibraries(root, main)).toThrow(
-      'Pond wake word is missing native/pondear/jniLibs/armeabi-v7a/libpondear.so; run scripts/build-embedded-ear.sh',
-    );
+    const build = jest.fn(() => {
+      put('armeabi-v7a');
+      return true;
+    });
+    copyPondEarLibraries(root, main, build);
+    expect(build).toHaveBeenCalledWith(root);
+    expect(fs.existsSync(path.join(main, 'jniLibs/armeabi-v7a/libpondear.so'))).toBe(true);
+  });
+
+  it('packages what there is, naming the script, when this machine cannot build it', () => {
+    put('arm64-v8a');
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+    copyPondEarLibraries(root, main, () => false);
+    expect(fs.existsSync(path.join(main, 'jniLibs/arm64-v8a/libpondear.so'))).toBe(true);
+    expect(fs.existsSync(path.join(main, 'jniLibs/armeabi-v7a'))).toBe(false);
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('armeabi-v7a, so "Hey Goose" is not offered there; run scripts/build-embedded-ear.sh'));
+    warn.mockRestore();
+  });
+
+  it('builds nothing when every packaged ABI is there', () => {
+    ['arm64-v8a', 'armeabi-v7a'].forEach(put);
+    const build = jest.fn(() => true);
+    copyPondEarLibraries(root, main, build);
+    expect(build).not.toHaveBeenCalled();
   });
 });
 

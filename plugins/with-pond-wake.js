@@ -1,5 +1,6 @@
 /* global __dirname */
 const { withAndroidManifest, withDangerousMod, withMainApplication } = require('expo/config-plugins');
+const { execFileSync } = require('node:child_process');
 const fs = require('node:fs');
 const path = require('node:path');
 
@@ -35,21 +36,33 @@ function applyPondWakeManifest(manifest) {
   return manifest;
 }
 
+/** Build the detector with the repository's own script; false where this machine cannot. */
+function buildPondEar(projectRoot) {
+  try {
+    execFileSync(path.join(projectRoot, 'scripts/build-embedded-ear.sh'), [], { stdio: 'inherit' });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /**
- * Copy the detector libraries from `native/pondear/jniLibs/<abi>/` into the app's `jniLibs`.
- * A required ABI without its library stops the prebuild, as a missing pondnet.aar does: a build
- * that silently lacked it would offer a wake word that cannot hear. Exported for tests.
+ * Copy the detector libraries from `native/pondear/jniLibs/<abi>/` into the app's `jniLibs`,
+ * building them first when a packaged ABI lacks one. Where they cannot be built, the app is
+ * packaged without them: the wake word then reports itself unavailable and its setting stays
+ * hidden, rather than the whole build failing. Exported for tests.
  */
-function copyPondEarLibraries(projectRoot, appMain) {
+function copyPondEarLibraries(projectRoot, appMain, build = buildPondEar) {
   const source = path.join(projectRoot, 'native/pondear/jniLibs');
+  const missing = () => REQUIRED_ABIS.filter((abi) => !fs.existsSync(path.join(source, abi, LIBRARY)));
+  if (missing().length > 0) build(projectRoot);
+  const still = missing();
+  if (still.length > 0) {
+    console.warn(`Pond wake word: packaging without the detector for ${still.join(', ')}, so "Hey Goose" is not offered there; ${BUILD_HINT}`);
+  }
   for (const abi of [...REQUIRED_ABIS, ...OPTIONAL_ABIS]) {
     const library = path.join(source, abi, LIBRARY);
-    if (!fs.existsSync(library)) {
-      if (REQUIRED_ABIS.includes(abi)) {
-        throw new Error(`Pond wake word is missing native/pondear/jniLibs/${abi}/${LIBRARY}; ${BUILD_HINT}`);
-      }
-      continue;
-    }
+    if (!fs.existsSync(library)) continue;
     const target = path.join(appMain, 'jniLibs', abi);
     fs.mkdirSync(target, { recursive: true });
     fs.copyFileSync(library, path.join(target, LIBRARY));
