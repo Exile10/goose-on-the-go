@@ -1414,6 +1414,11 @@ export interface SystemInfo {
   /** The Pond's public-key pin, `sha256/<base64>`; null when it has no TLS identity. */
   tls_spki_sha256?: string | null;
   /**
+   * `host:port` of the Pond's public tunnel while it runs, given only to a caller with a valid
+   * token; null when none runs, absent from a Pond too old to have one.
+   */
+  tunnel_address?: string | null;
+  /**
    * The pairing protocol the Pond speaks. 3 is CPace, the only one this app
    * pairs with; a Pond that reports anything else, or nothing, is too old.
    */

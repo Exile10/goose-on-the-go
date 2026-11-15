@@ -60,8 +60,8 @@ the Pond whose My Pond key the phone keeps, so the app knows one is kept without
 prompt. The key itself is never written here.
 
 The connection profile (`models/connection.ts:2-9`) holds the Pond's host, port, its
-local URLs, an optional remote URL, and whether remote access is off or embedded along
-with the coordinator's control URL. These are addresses of a household server, not
+local URLs, an optional remote URL, an optional tunnel URL (the household's own ngrok, below),
+and whether remote access is off or embedded along with the coordinator's control URL. These are addresses of a household server, not
 credentials; no token has been written here since `services/secure-storage.ts` took over.
 
 One migration detail that belongs in the record: builds predating secure storage wrote a
@@ -196,7 +196,18 @@ A Pond notification about a ride can carry a link, and the app opens it only if 
 Uber's or a maps provider's (`ALLOWED_HOSTS` in `services/notification-link.ts`). Opening it
 hands the user to that app or site; this app sends it nothing.
 
-### 5. Nobody else
+### 5. ngrok — only when the household runs its own tunnel
+
+A household can reach its Pond from outside through its own ngrok account instead of the
+embedded network. The Pond opens the tunnel; the app never contacts ngrok's service. Once the
+Pond reports a tunnel address (an authenticated `GET /api/v1/system/info`, read only while the
+phone is home), the app saves it as the profile's tunnel URL and, away from home, connects to
+that address. The connection passes through ngrok's servers, which therefore see the phone's
+IP address, when it connects and how much it sends. They do not see the content: ngrok does not
+terminate TLS for this tunnel, and the app pins the same Pond key as at home. When the Pond
+reports no tunnel, the saved address is dropped.
+
+### 6. Nobody else
 
 Verified against the dependency list rather than asserted: there is no analytics SDK, no
 crash reporter, no advertising or attribution SDK, and no tracking library of any kind in

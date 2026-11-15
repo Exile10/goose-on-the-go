@@ -17,6 +17,7 @@
 import { api, PondApiClient } from './api-client';
 import { loadPairedProfile } from './paired-profile';
 import { configurePondTrust } from './pond-trust';
+import { remoteRoutes } from '@/models/connection';
 
 export async function pondForBackground(): Promise<PondApiClient | null> {
   if (api.signedIn) return api;
@@ -24,9 +25,9 @@ export async function pondForBackground(): Promise<PondApiClient | null> {
   if (!saved) return null;
   const { profile, identity } = saved;
   // The manager's own set, so a provider mounting alongside is not left without its remote pin.
-  const remote = profile.remoteAccess?.mode === 'embedded' && profile.remoteUrl ? [profile.remoteUrl] : [];
-  await configurePondTrust([...profile.localUrls, ...remote].map((url) => ({ url, pin: identity.pin })));
-  for (const url of profile.localUrls) {
+  await configurePondTrust([...profile.localUrls, ...remoteRoutes(profile)].map((url) => ({ url, pin: identity.pin })));
+  // The tunnel needs no embedded node, so it can stand in for the LAN when the phone is away.
+  for (const url of [...profile.localUrls, ...(profile.tunnelUrl ? [profile.tunnelUrl] : [])]) {
     const client = new PondApiClient(url);
     if (!(await client.health()).ok) continue;
     client.setToken(identity.session);

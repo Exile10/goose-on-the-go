@@ -219,7 +219,11 @@ One connection manager handles endpoint selection for the provider, REST and SSE
 Wi-Fi prefers local candidates; cellular uses tailnet. On Wi-Fi every saved local
 address is probed at once, and the tailnet joins after a 250 ms head start, or as
 soon as every local address has failed; mDNS discovery runs alongside the tailnet
-rather than ahead of it. A local answer wins whenever it comes first. Until
+rather than ahead of it. A local answer wins whenever it comes first. A Pond that runs the
+household's own ngrok tunnel has a third route: the profile's `tunnelUrl`, learned from an
+authenticated `/system/info` each time the phone reaches the Pond at home and dropped when the
+Pond reports none. It joins with the tailnet and is probed without waiting for this phone's node,
+under the same pin; the Pond's certificate on it names only the tunnel host. Until
 2026-10-05 the order was strictly sequential, so away from home a Wi-Fi network
 held remote access up for each saved address's three-second probe timeout, then
 for discovery.
