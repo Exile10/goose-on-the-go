@@ -409,7 +409,8 @@ export function ToolRow({ tool }: { tool: ToolCall }) {
   const ink = running ? theme.color.textTertiary : theme.color.textSecondary;
   return (
     <View>
-      <Pressable
+      <GPressable
+        feedback="none"
         disabled={!canOpen}
         onPress={() => {
           void selectionTick();
@@ -428,7 +429,7 @@ export function ToolRow({ tool }: { tool: ToolCall }) {
           {status ? <Text style={quiet.style}>{status}</Text> : null}
         </View>
         {canOpen ? <GIcon name={open ? 'chevron' : 'chevron-right'} size={14} color={theme.color.textTertiary} /> : null}
-      </Pressable>
+      </GPressable>
       {open ? <ResultPanel tool={tool} /> : null}
     </View>
   );

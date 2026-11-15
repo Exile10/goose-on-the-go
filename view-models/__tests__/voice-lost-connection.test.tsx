@@ -38,10 +38,14 @@ jest.mock('@/services/voice-io', () => ({
 let voice!: UseVoice;
 const send = jest.fn().mockResolvedValue('');
 
-function Harness() {
-  voice = useVoice({ send, stop: jest.fn() });
+function Harness({ onVoice }: { onVoice: (next: UseVoice) => void }) {
+  onVoice(useVoice({ send, stop: jest.fn() }));
   return null;
 }
+
+const keep = (next: UseVoice) => {
+  voice = next;
+};
 
 const flush = () => act(async () => { await new Promise((r) => setTimeout(r, 0)); });
 
@@ -64,7 +68,7 @@ beforeEach(async () => {
   mockServer = { retryNow: () => mockRetryNow() };
   jest.spyOn(console, 'warn').mockImplementation(() => undefined);
   act(() => {
-    create(<Harness />);
+    create(<Harness onVoice={keep} />);
   });
   await flush();
   expect(voice.data.state).toBe('wait');
@@ -113,7 +117,7 @@ describe('a recording nobody received', () => {
   it('works in the assistant overlay, which has no server context, and resends straight away', async () => {
     mockServer = null;
     act(() => {
-      create(<Harness />);
+      create(<Harness onVoice={keep} />);
     });
     await flush();
     mockTranscribe.mockRejectedValueOnce(new TypeError('Network request failed')).mockResolvedValueOnce('hello again');

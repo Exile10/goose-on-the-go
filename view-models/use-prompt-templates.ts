@@ -88,15 +88,24 @@ export function usePromptTemplates(): UsePromptTemplates {
 
   useEffect(() => {
     if (!hydrated) return;
-    void load(true);
+    // A microtask after the effect, not inside it: the read sets state as it starts.
+    let live = true;
+    void Promise.resolve().then(() => {
+      if (live) void load(true);
+    });
+    return () => {
+      live = false;
+    };
   }, [hydrated, load]);
 
-  // Sync draftContent whenever activeTemplate changes (unless user actively editing)
-  useEffect(() => {
-    if (activeTemplate) {
-      setDraftContent(activeTemplate.content);
-    }
-  }, [activeTemplate?.name, activeTemplate?.updated_at]);
+  // The draft follows the template whenever another one is chosen or the Pond saves a new
+  // version; reset while rendering, as React advises, rather than in an effect a render behind.
+  const templateKey = activeTemplate ? `${activeTemplate.name}@${activeTemplate.updated_at}` : null;
+  const [draftKey, setDraftKey] = useState<string | null>(null);
+  if (templateKey !== draftKey) {
+    setDraftKey(templateKey);
+    if (activeTemplate) setDraftContent(activeTemplate.content);
+  }
 
   const select = useCallback(
     (name: string) => {
