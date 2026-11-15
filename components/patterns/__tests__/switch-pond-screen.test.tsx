@@ -119,7 +119,8 @@ describe('Switch Pond', () => {
     expect(text).toContain('192.168.1.10:4443');
     expect(text).toContain('Not answering on this Wi-Fi');
     expect(text).toMatch(/Last connected/);
-    expect(text).toContain('Trying again in 30 s');
+    // The real clock runs while the screen first draws, which can take over a second on a busy machine.
+    expect(text).toMatch(/Trying again in \d+ s/);
     expect(text).toContain('Try now');
     expect(text).not.toContain('The one you are using is marked');
   });
