@@ -9,7 +9,6 @@
 
 import React, { useCallback, useState } from 'react';
 import { RefreshControl } from 'react-native';
-import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { InkSpinner } from '@jarida/ink/native';
 
@@ -36,7 +35,6 @@ type Sheet = { room: DeviceRoom | null } | null;
 
 export default function HomeManagementScreen() {
   const { t } = useTranslation();
-  const router = useRouter();
   const colors = useSettingsColors();
   const { data, loading, failed, error, actions } = useDevices();
   const { settings } = usePondSettings();
@@ -140,14 +138,6 @@ export default function HomeManagementScreen() {
           {serverUrl ? (
             <SettingsRow icon="link" tile="slate" label={t('rooms.pondAddress')} value={hostOf(serverUrl)} />
           ) : null}
-          <SettingsRow
-            icon="plus"
-            tile="purple"
-            label={t('rooms.pairDevice')}
-            action
-            accessory="next"
-            onPress={() => router.push('/(stack)/pond-pairing')}
-          />
         </SettingsGroup>
       ) : null}
 

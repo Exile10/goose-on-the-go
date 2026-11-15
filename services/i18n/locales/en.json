@@ -684,7 +684,6 @@
     "allRooms": "All",
     "unavailable": "Devices unavailable",
     "noneBody": "Devices your Pond commissions will appear here.",
-    "pairAnother": "Pair another Pond",
     "matterStarting": "Your Pond is still starting its Matter controller. New devices cannot be added yet.",
     "matterUnreachable": "Your Pond cannot reach its Matter controller. Existing devices still work.",
     "online": "{{count}} on",
@@ -2526,7 +2525,6 @@
   },
   "rooms": {
     "add": "Add a room",
-    "pairDevice": "Pair another Pond",
     "footer": "Delete a room and its devices move to Unassigned. The devices themselves stay.",
     "readOnly": "Update your Pond to add, rename or delete rooms. Until then, these are the rooms your devices name.",
     "deviceCount_one": "{{count}} device",
