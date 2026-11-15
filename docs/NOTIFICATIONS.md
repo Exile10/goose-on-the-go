@@ -43,7 +43,7 @@ does.
 | `alert` | `giap-alerts`, "Alerts" | HIGH, with vibration | a failed pairing, a failed run, low disk, remote access down, a device removed |
 | `action_required` | `giap-requests`, "Suggestions and questions" | HIGH | suggestions and reminders, a missed run to answer, a sign-in to redo |
 | `info`, and any category this app does not know | `giap-info-v2`, "Updates" | HIGH | schedule results, a long task done, a device paired, a model downloaded |
-| `reply` (the phone's own) | `giap-replies`, "Replies" | DEFAULT | a reply that finished while nobody was reading it; waits in the shade |
+| `reply` (the phone's own) | `giap-replies-v2`, "Replies" | HIGH | a reply that finished while nobody was reading it; pops up, since it is posted only when nobody is reading that conversation. `giap-replies` was DEFAULT until 2026-11-09 and is deleted |
 
 **Why only some popped up before.** The handler that presents a notice while the app is in the
 foreground answered `shouldPlaySound: false` for every notice. expo-notifications then posts the

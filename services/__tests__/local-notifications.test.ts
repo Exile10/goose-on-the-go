@@ -381,14 +381,16 @@ describe('notification channels', () => {
       importance: 4,
     });
     expect(channel(calls, 'giap-info-v2')).toEqual({ name: 'Updates', description: expect.any(String), importance: 4 });
-    expect(channel(calls, 'giap-replies')).toEqual({ name: 'Replies', description: expect.any(String), importance: 3 });
+    expect(channel(calls, 'giap-replies-v2')).toEqual({ name: 'Replies', description: expect.any(String), importance: 4 });
     expect(channel(calls, 'giap-info')).toBeUndefined();
   });
 
-  it('deletes the old DEFAULT-importance Updates channel', async () => {
+  it('deletes the old DEFAULT-importance Updates and Replies channels', async () => {
     const { configure, deleteNotificationChannelAsync } = configureOn('android');
     await configure();
     expect(deleteNotificationChannelAsync).toHaveBeenCalledWith('giap-info');
+    // DEFAULT before 2026-11-09; a channel keeps its importance, so the replies moved to a new id.
+    expect(deleteNotificationChannelAsync).toHaveBeenCalledWith('giap-replies');
   });
 
   it('posts each category on its own channel, and an unknown one as an update', async () => {
@@ -398,17 +400,16 @@ describe('notification channels', () => {
       await present({ ...base, id, category });
     }
     const channels = fake.scheduleNotificationAsync.mock.calls.map((c: unknown[]) => (c[0] as { trigger: { channelId: string } }).trigger.channelId);
-    expect(channels).toEqual(['giap-alerts', 'giap-requests', 'giap-info-v2', 'giap-replies', 'giap-info-v2', 'giap-info-v2']);
+    expect(channels).toEqual(['giap-alerts', 'giap-requests', 'giap-info-v2', 'giap-replies-v2', 'giap-info-v2', 'giap-info-v2']);
   });
 
   // With the app open, a notice is popped up only if the handler lets it sound: Android never
   // pops up a notification expo-notifications posted silent, whatever its channel.
-  it('lets every notice that pops up sound while the app is open, and keeps a reply quiet', async () => {
+  it('lets every notice sound while the app is open, a finished reply too', async () => {
     const { handler } = configureOn('android');
-    for (const category of ['alert', 'action_required', 'info', 'news', undefined]) {
+    for (const category of ['alert', 'action_required', 'info', 'reply', 'news', undefined]) {
       expect(await handler(category)).toMatchObject({ shouldPlaySound: true, shouldShowBanner: true });
     }
-    expect(await handler('reply')).toMatchObject({ shouldPlaySound: false });
   });
 
   // The stream brings the notice itself while the app is open, so the line would be a second one.
