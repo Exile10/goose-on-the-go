@@ -36,6 +36,7 @@ import { ServerProvider, useServer } from '@/providers/server-provider';
 import { ConfirmProvider } from '@/providers/confirm-provider';
 import { SnackbarProvider } from '@/providers/snackbar-provider';
 import { loadHapticsPreference } from '@/services/haptics';
+import { loadPhonePlacePreference } from '@/services/phone-place';
 import { loadReplyNoticePreference } from '@/services/reply-notices';
 import { offerHomeLocationOnce } from '@/services/home-location';
 import { usePondSettings } from '@/view-models/use-pond-settings';
@@ -104,6 +105,7 @@ export default function RootLayout() {
     );
     void loadHapticsPreference();
     void loadReplyNoticePreference();
+    void loadPhonePlacePreference();
   }, []);
 
   if (!fontsLoaded && !fontError) {

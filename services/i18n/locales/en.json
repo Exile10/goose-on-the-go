@@ -1552,6 +1552,11 @@
       "allowInSettings": "Allow location for Goose On The Go in the phone's Settings, then try again.",
       "noFix": "This phone could not find its location just now. Try again in a moment."
     },
+    "phonePlace": {
+      "label": "Tell Goose where this phone is",
+      "description": "Each message from this app carries the name of the place the phone is in, such as Westlands, Nairobi, so Goose can say where you are, not only where home is. Only the name is sent, never coordinates, and only to your Pond.",
+      "allow": "Allow location for Goose On The Go in the phone's Settings to turn this on."
+    },
     "retitle": {
       "button": "Name conversations now",
       "working": "Asking…",

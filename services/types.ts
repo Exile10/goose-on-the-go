@@ -334,6 +334,8 @@ export interface ChatStreamRequest {
    * the turn the card's content with Goose's notes on it; an older Pond ignores the field.
    */
   card?: { kind: string; id: string };
+  /** Where this phone is, by name, while the person has turned on telling Goose (`phone-place.ts`). */
+  device_place?: string;
 }
 
 /**

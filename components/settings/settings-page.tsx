@@ -41,6 +41,7 @@ import {
 import { SettingsGroup, SettingsHeader, SettingsRow, TILE_INSET, SettingsMessage } from './settings-list';
 import {
   LocationRows,
+  PhonePlaceRow,
   PhoneAssistantRow,
   PostureRow,
   PrimaryProfileRow,
@@ -210,7 +211,7 @@ function specialRows(id: SpecialId, ctx: Context): ReactElement[] {
     case 'timezone':
       return [<TimezoneRow key={id} {...props} />];
     case 'location':
-      return [<LocationRows key={id} {...props} />];
+      return [<LocationRows key={id} {...props} />, <PhonePlaceRow key={`${id}-phone`} />];
     case 'retitle':
       return [<RetitleRow key={id} />];
     case 'retentionOverrides':

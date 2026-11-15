@@ -19,6 +19,8 @@ const KEYS = {
   /** Whether this phone keeps its notification stream open in the background (Android). Not a secret. */
   stayConnected: '@goose/stay-connected',
   replyNotices: '@goose/reply-notices',
+  /** Whether this phone tells Goose where it is with each message. Not a place: on or off. */
+  phonePlace: '@goose/phone-place',
   onboardingDone: '@goose/onboarding-done',
   chatHistoryView: '@goose/chat-history-view',
   remoteOfferDismissed: '@goose/remote-offer-dismissed',
