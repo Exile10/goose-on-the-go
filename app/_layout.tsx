@@ -32,11 +32,13 @@ import { ThemeProvider, useTheme } from '@/providers/theme-provider';
 import '@/components/ui/ink-icons';
 // Initialises i18next before the first screen renders.
 import '@/services/i18n';
-import { ServerProvider } from '@/providers/server-provider';
+import { ServerProvider, useServer } from '@/providers/server-provider';
 import { ConfirmProvider } from '@/providers/confirm-provider';
 import { SnackbarProvider } from '@/providers/snackbar-provider';
 import { loadHapticsPreference } from '@/services/haptics';
 import { loadReplyNoticePreference } from '@/services/reply-notices';
+import { offerHomeLocationOnce } from '@/services/home-location';
+import { usePondSettings } from '@/view-models/use-pond-settings';
 
 /**
  * Keep the splash up until the app can draw itself.
@@ -121,6 +123,28 @@ export default function RootLayout() {
 
 
 /**
+ * Gives the Pond this phone's location when the phone reaches it at home and the Pond's location is
+ * still a guess (a town's centre from its time zone or a typed name), using a location grant the
+ * person already gave. Away from home it does nothing, and the Pond would refuse it anyway
+ * (`services/home-location.ts`). Draws nothing.
+ */
+function HomeLocationSync() {
+  const { connectionState, isScreenReal } = useServer();
+  const pond = usePondSettings();
+  const loaded = pond.settings !== null;
+  const source = pond.settings?.weather_location_source ?? '';
+  const { refresh } = pond.actions;
+  const atHome = connectionState === 'local' && isScreenReal('settings');
+  useEffect(() => {
+    if (!loaded || !atHome || source === 'manual' || source === 'device') return;
+    void offerHomeLocationOnce().then((applied) => {
+      if (applied) void refresh();
+    });
+  }, [loaded, atHome, source, refresh]);
+  return null;
+}
+
+/**
  * Sits inside ThemeProvider so Navigation and Ink derive from the same resolved
  * scheme rather than each reading the system on its own.
  */
@@ -137,6 +161,7 @@ function ThemedApp() {
         <SnackbarProvider>
           <ConfirmProvider>
             <ConnectionStatus />
+            <HomeLocationSync />
             <Stack>
               <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
               <Stack.Screen name="(stack)" options={{ headerShown: false }} />

@@ -1545,7 +1545,12 @@
       "finding": "Finding…",
       "found": "Found {{name}}.",
       "guessed": "Guessed {{name}} from your time zone.",
-      "failed": "Could not find that place."
+      "failed": "Could not find that place.",
+      "fromPhone": "Your Pond is now at {{name}}, from this phone's location.",
+      "atHome": "At home, on the same network as your Pond, this phone can give it your exact location.",
+      "allow": "Allow location for Goose On The Go to give your Pond this phone's location.",
+      "allowInSettings": "Allow location for Goose On The Go in the phone's Settings, then try again.",
+      "noFix": "This phone could not find its location just now. Try again in a moment."
     },
     "retitle": {
       "button": "Name conversations now",

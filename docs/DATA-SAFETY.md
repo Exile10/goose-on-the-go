@@ -114,6 +114,7 @@ What the app sends it, beyond the control traffic of the screens themselves:
 | Recorded speech | Voice mode, only the stretches where the user is speaking | `view-models/use-voice.ts` (`api.transcribe`), `services/api-client.ts` (`transcribe`, `POST /api/v1/transcribe`) |
 | Photos and files the user attaches | When the user picks or takes one for a message | `services/media.ts` |
 | The device's location | Once, when the user asks for a ride fare | `view-models/use-ride.ts` (`locateHere`), `services/api-client.ts` (`POST /api/v1/rides/quote`) |
+| The device's location, as the home's | At home only, on the Pond's own network: once per launch while the Pond's location is a guess and location is already allowed, or when the user taps Find my location | `services/home-location.ts`, `services/api-client.ts` (`PUT /api/v1/location/device`) |
 
 Each is described under its own heading below.
 
@@ -212,7 +213,7 @@ reports no tunnel, the saved address is dropped.
 Verified against the dependency list rather than asserted: there is no analytics SDK, no
 crash reporter, no advertising or attribution SDK, and no tracking library of any kind in
 `package.json`. There is no contacts access and no advertising identifier. Location is read
-only for a ride fare, below.
+only for a ride fare and, at home, to tell the household's own Pond where home is, below.
 
 The Android build does carry Google code that reports on itself (found 2026-11-09 in the release
 runtime classpath, listed in `assets/legal/open-source.json`): `com.google.mlkit:barcode-scanning`
@@ -261,12 +262,26 @@ duplicate should be removed before submission, keeping whichever sentence is mea
 
 ## Location
 
-`expo-location`, with only a when-in-use purpose string in `app.json`, which already says
-what it is for. `locateHere` in `view-models/use-ride.ts` asks for foreground permission and
-takes one high-accuracy fix, when the user asks for a ride fare. The coordinates go to the
-Pond as the pickup point and from there to Uber (above). They are held in memory for the ride
-screen and never written to storage. There is no background location, no geofence, and no
-continuous tracking.
+`expo-location`, with only a when-in-use purpose string in `app.json`, which says what it is
+for. It is read for two things, both in the foreground:
+
+- **A ride fare.** `locateHere` in `view-models/use-ride.ts` asks for foreground permission and
+  takes one high-accuracy fix, when the user asks for a ride fare. The coordinates go to the
+  Pond as the pickup point and from there to Uber (above). They are held in memory for the ride
+  screen and never written to storage.
+- **Where home is** (since 2026-11-09). A Pond has no GPS, so without help its location is its
+  time zone's city. `services/home-location.ts` takes one balanced-accuracy fix and names the
+  place with the phone's system geocoder (Google's on Android, Apple's on iOS, the provider that
+  already serves the phone its location), then sends both to the household's own Pond
+  (`PUT /api/v1/location/device`). It does so only while the app reaches the Pond on its local
+  network (`connectionState === 'local'`), and the Pond refuses a fix from anywhere else
+  (`not_on_home_network`), so a phone away from home never moves the household. Unasked, it
+  happens at most once per launch, only while the Pond's location is still a guess, and only
+  with a location grant the user already gave: it never prompts. Find my location in Settings
+  asks for permission and replaces whatever the Pond had. The Pond stores the place rounded to
+  about 110 m. Nothing is kept on the phone.
+
+There is no background location, no geofence, and no continuous tracking.
 
 The built apps agree (checked 2026-10-17 in prebuilt native projects): iOS's `Info.plist`
 carries `NSLocationWhenInUseUsageDescription` and no "always" key, and the Android manifest

@@ -20,11 +20,12 @@ import {
 } from '@/models/pond-settings';
 import { useConfirm } from '@/providers/confirm-provider';
 import { selectionTick, tap } from '@/services/haptics';
+import { homeLocationIsPinned } from '@/services/home-location';
 import type { PondSettings } from '@/services/types';
 import {
   llmModels,
   providerChoices,
-  useDetectLocation,
+  useFindLocation,
   useModelChoices,
   useProfileChoices,
   useResetWakeWord,
@@ -125,21 +126,32 @@ export function TimezoneRow({ settings }: SpecialProps) {
   );
 }
 
-/** The place name, which the Pond geocodes when it is saved, and a way to find it from the phone. */
+/**
+ * The place name, which the Pond geocodes when it is saved, and a way to find it from the phone:
+ * its own fix at home, a guess away (`useFindLocation`).
+ */
 export function LocationRows({ settings, vm }: SpecialProps) {
   const { t } = useTranslation();
-  const detect = useDetectLocation();
+  const detect = useFindLocation();
   const find = useCallback(async () => {
     void tap();
     const place = await detect.run(settings.weather_location_name);
     if (!place) return;
+    // The Pond saved the phone's fix itself; the record here only needs reading again.
+    if (place.kind === 'saved') {
+      await vm.actions.refresh();
+      return;
+    }
+    // Away from home the answer is only the Pond's guess: it never renames a pinned home, since
+    // the Pond would look the new name up and move home to the town's centre.
+    if (homeLocationIsPinned(settings)) return;
     if (place.name && place.name !== settings.weather_location_name) {
       await vm.actions.update('weather_location_name', place.name);
     }
     if (place.timezone && (!settings.timezone || settings.timezone === 'UTC')) {
       await vm.actions.update('timezone', place.timezone);
     }
-  }, [detect, settings.timezone, settings.weather_location_name, vm.actions]);
+  }, [detect, settings, vm.actions]);
   return (
     <>
       <TextRow

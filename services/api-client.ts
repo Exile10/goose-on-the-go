@@ -117,6 +117,7 @@ import type {
   VoiceAgentPatch,
   VoicePrints,
   VoiceTakeResult,
+  HomeLocationResult,
   VoiceRoom,
   AdminCache,
   AdminCacheId,
@@ -2572,6 +2573,15 @@ export class PondApiClient {
   }
 
   /** Where the Pond thinks this home is, from a zone or a typed place. Saves nothing. */
+  /**
+   * `PUT /location/device`: this phone's fix for the Pond's location, from the household network
+   * only (403 `not_on_home_network` otherwise). It replaces only a guessed location unless
+   * `replace` says the person asked for it.
+   */
+  setLocationFromPhone(fix: { latitude: number; longitude: number; accuracy_m: number; name?: string; replace: boolean }): Promise<HomeLocationResult> {
+    return this.put<HomeLocationResult>('/api/v1/location/device', fix);
+  }
+
   detectLocation(req: { system_zone?: string; typed_name?: string }): Promise<DetectedPlace> {
     return this.post<DetectedPlace>('/api/v1/location/detect', req);
   }

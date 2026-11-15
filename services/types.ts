@@ -1505,6 +1505,8 @@ export interface PondSettings {
   timezone: string;
   weather_enabled: boolean;
   weather_location_name: string;
+  /** Where the coordinates came from: `geocoded` (a town's centre), `manual`, `device` (a phone's fix), or empty. */
+  weather_location_source?: string;
   weather_latitude: number;
   weather_longitude: number;
 
@@ -1887,6 +1889,16 @@ export interface VoicePrintMember {
 export interface VoicePrints {
   model: { state: VoicePrintModelState; progress: number | null; credit: string };
   members: VoicePrintMember[];
+}
+
+/** `PUT /api/v1/location/device`: whether the Pond took this phone's fix, and where it now is. */
+export interface HomeLocationResult {
+  applied: boolean;
+  /** `location_known` when the Pond already had a position someone set and none was asked for. */
+  reason?: string;
+  name: string;
+  latitude: number;
+  longitude: number;
 }
 
 /**
