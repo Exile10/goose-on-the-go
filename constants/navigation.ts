@@ -45,6 +45,7 @@ export const PROFILE_NAV: NavGroup[] = [
       { id: 'remoteAccess', labelKey: 'screens.remoteAccess', icon: 'lock', tile: 'blue', route: '/(stack)/remote-access', summary: 'remoteAccess' },
       { id: 'internet', labelKey: 'screens.settingsInternet', icon: 'globe', tile: 'blue', route: '/(stack)/settings-internet', summary: 'internet' },
       { id: 'webSearch', labelKey: 'screens.webSearch', icon: 'search', tile: 'blue', route: '/(stack)/web-search', summary: 'webSearch' },
+      { id: 'ngrokTunnel', labelKey: 'screens.ngrokTunnel', icon: 'globe', tile: 'blue', route: '/(stack)/ngrok-tunnel' },
     ],
   },
   {
