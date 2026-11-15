@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <!-- Android 12 and later: the same overlay, with the app behind it blurred by the window manager,
+       which is what the panel's glass shows through (components/assist/assist-overlay.tsx). A view
+       cannot blur another app's window; only the window can. Where the phone has cross-window blur
+       off (battery saver, some low-end devices) Android draws it unblurred, as below Android 12. -->
+  <style name="Theme.GooseAssist" parent="Theme.AppCompat.DayNight.NoActionBar">
+    <item name="android:windowIsTranslucent">true</item>
+    <item name="android:windowBackground">@android:color/transparent</item>
+    <item name="android:windowNoTitle">true</item>
+    <item name="android:backgroundDimEnabled">false</item>
+    <item name="android:statusBarColor">@android:color/transparent</item>
+    <item name="android:navigationBarColor">@android:color/transparent</item>
+    <item name="android:windowBlurBehindEnabled">true</item>
+    <item name="android:windowBlurBehindRadius">48px</item>
+  </style>
+</resources>

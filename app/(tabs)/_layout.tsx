@@ -19,9 +19,7 @@
 
 import React, { useCallback, useMemo, useState } from 'react';
 import { Redirect, Tabs, useIsFocused } from 'expo-router';
-import { BlurView } from 'expo-blur';
 import { useTranslation } from 'react-i18next';
-import { alpha } from '@jarida/ink';
 import {
   InkBottomBar,
   InkProvider,
@@ -32,6 +30,7 @@ import { Image, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { GIcon } from '@/components/ui/g-icon';
+import { GlassBlur } from '@/components/ui/glass-blur';
 import {
   ChromeProvider,
   useChromeMeasure,
@@ -46,30 +45,6 @@ import { useSettingsIssues } from '@/view-models/use-settings-issues';
 import { selectionTick } from '@/services/haptics';
 import type { IconName } from '@/constants/icons';
 import type { TranslationKey } from '@/services/i18n';
-
-/**
- * How much of the bar's `surface` tint sits over the blur.
- *
- * Ink derives ~0.50 light and ~0.64 dark: the least that keeps the labels at
- * 4.5:1 over any backdrop with no blur at all. The bar is clearer than that by
- * choice, and leans on the blur (Ink's, at 60) for legibility. Raise this if
- * labels struggle over busy content.
- */
-const TINT_ALPHA = 0.3;
-
-/**
- * expo-blur's `BlurView` for Ink's `blurComponent` slot, with a lighter tint.
- *
- * A function rather than `BlurView` itself: a class component's props must
- * match the slot's exactly, and `BlurView` accepts more tints than the two Ink
- * passes.
- */
-function TabBarBlur({ style, ...props }: React.ComponentProps<typeof BlurView>) {
-  const theme = useInkTheme();
-  return (
-    <BlurView {...props} style={[style, { backgroundColor: alpha(theme.color.surface, TINT_ALPHA) }]} />
-  );
-}
 
 const DESTINATIONS: { name: string; labelKey: TranslationKey; icon: IconName | 'mark' }[] = [
   { name: 'index', labelKey: 'tabs.home', icon: 'home' },
@@ -220,7 +195,7 @@ function AppTabBar({ state, navigation }: TabBarProps) {
           // Real blur behind Ink's tint, in both schemes. Ink drops it for its
           // solid fill when Reduce Transparency is on, so that needs no second
           // path here.
-          blurComponent={TabBarBlur}
+          blurComponent={GlassBlur}
           bottomInset={insets.bottom}
           style={{
             // Two placements, one prop. Ink's shell is `alignSelf: flex-end`

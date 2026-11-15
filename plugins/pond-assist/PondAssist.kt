@@ -14,6 +14,7 @@ import android.service.voice.VoiceInteractionSessionService
 import android.speech.RecognitionService
 import android.speech.SpeechRecognizer
 import android.util.Log
+import android.view.WindowManager
 import com.facebook.react.ReactActivity
 import com.facebook.react.ReactActivityDelegate
 import com.facebook.react.ReactPackage
@@ -180,6 +181,20 @@ class AssistActivity : ReactActivity() {
 /** Whether Goose is the phone's assistant, the way to choose it, and closing the overlay. */
 class PondAssistModule(context: ReactApplicationContext) : ReactContextBaseJavaModule(context) {
   override fun getName() = "PondAssist"
+
+  /**
+   * Whether the window manager blurs what is behind the overlay now (`Theme.GooseAssist` asks
+   * for it from Android 12). Many phones never do -- the compositor has no blur, as on the
+   * Galaxy A57 -- and the rest stop in battery saver, so the panel reads this as it opens and
+   * makes its glass denser when nothing behind it is blurred.
+   */
+  @ReactMethod(isBlockingSynchronousMethod = true)
+  fun blursBehind(): Boolean {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return false
+    val blurs = reactApplicationContext.getSystemService(WindowManager::class.java).isCrossWindowBlurEnabled
+    Log.i(TAG, "kind=assist_glass blurs_behind=$blurs")
+    return blurs
+  }
 
   /**
    * Resolves whether this app holds the assistant role, or null below Android 10, where there is

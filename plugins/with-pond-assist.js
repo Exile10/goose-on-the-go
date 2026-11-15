@@ -14,7 +14,13 @@ const OURS = new Set([INTERACTION_SERVICE, SESSION_SERVICE, RECOGNITION_SERVICE]
 const BIND_VOICE_INTERACTION = 'android.permission.BIND_VOICE_INTERACTION';
 
 /** The resources copied beside the Kotlin, by their path under `res/`. */
-const RESOURCES = ['xml/goose_interaction_service.xml', 'xml/goose_recognition_service.xml', 'values/goose_assist_styles.xml'];
+const RESOURCES = [
+  'xml/goose_interaction_service.xml',
+  'xml/goose_recognition_service.xml',
+  'values/goose_assist_styles.xml',
+  // Android 12 and later: the same theme with the window blurring the app behind the overlay.
+  'values-v31/goose_assist_styles.xml',
+];
 
 const action = (name) => ({ $: { 'android:name': name } });
 const DEFAULT_CATEGORY = [{ $: { 'android:name': 'android.intent.category.DEFAULT' } }];

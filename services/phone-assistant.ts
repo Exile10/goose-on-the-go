@@ -13,6 +13,7 @@
 import { NativeModules, Platform } from 'react-native';
 
 interface AssistBridge {
+  blursBehind(): boolean;
   isAssistant(): Promise<boolean | null>;
   chooseAssistant(): Promise<boolean>;
   close(): Promise<boolean>;
@@ -55,6 +56,21 @@ export async function choosePhoneAssistant(): Promise<boolean> {
     return opened;
   } catch (e) {
     console.warn('[assistant] could not open the assistant settings', { kind: 'phone_assistant', error: String(e) });
+    return false;
+  }
+}
+
+/**
+ * Whether the phone blurs the app behind the overlay. False without a bridge, below Android 12,
+ * on a phone whose compositor has no blur, and in battery saver; a failed question is logged.
+ */
+export function overlayBlursBehind(): boolean {
+  const native = bridge();
+  if (!native) return false;
+  try {
+    return native.blursBehind();
+  } catch (e) {
+    console.warn('[assistant] could not ask whether the overlay blurs', { kind: 'phone_assistant', error: String(e) });
     return false;
   }
 }
