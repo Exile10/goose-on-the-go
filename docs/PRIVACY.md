@@ -1,6 +1,6 @@
 # Privacy policy — Goose On The Go
 
-**Status: draft. Not yet published.** Five facts below are marked `[NEEDS ANSWER]` and
+**Status: draft. Not yet published.** Six facts below are marked `[NEEDS ANSWER]` and
 cannot be settled from the app's source code. This document must not be hosted, linked
 from the app, or submitted to either store until every one of them is filled in. See
 `docs/DATA-SAFETY.md` for the evidence behind everything that is filled in, and for the
@@ -23,6 +23,10 @@ One thing you can ask for does reach a company outside your home: a ride. When y
 Goose for a ride fare, your phone reads where you are once and your Pond passes that pickup
 point to Uber, so Uber can price the ride you asked for. That is described below too.
 
+Your Pond itself reaches some services on the internet to do what you ask of it, such as the
+weather for where you live or a web search. Those are your Pond's, not this app's, and your
+Pond's own settings show and control them.
+
 The rest of this document says exactly what happens when you do turn it on, because a
 promise like the one above is only worth anything if the exceptions are stated plainly.
 
@@ -41,7 +45,7 @@ If you choose to open My Pond with your phone's security, your phone also keeps 
 My Pond in that protected storage. Only your phone's own check can read it: Face ID or a
 fingerprint on an iPhone, a fingerprint or the phone's PIN, pattern or password on Android. It is
 never included in a backup or moved to another phone, and adding a new face or fingerprint makes
-it unreadable. Forgetting My Pond on this phone, or signing out, removes it.
+it unreadable. Forgetting My Pond on this phone, or unpairing it, removes it.
 
 Your phone also keeps ordinary preferences: your Pond's address on your network, which
 screen you were last on, your settings. None of this leaves your phone.
@@ -84,7 +88,7 @@ Turning on remote access also requires approval on the Pond itself, from your ho
 We cannot enable it for you, and neither can anyone who has only your phone.
 
 **Retention:** [NEEDS ANSWER — how long connection records and device keys are kept, and
-what happens to them when a user signs out]
+what happens to them when a phone is unpaired]
 
 ## Notifications
 
@@ -104,11 +108,34 @@ talks to Google or Apple directly. We are not in that path either.
 
 ## Your voice
 
-When you open voice mode to talk to Goose, the app listens through the microphone for you
-to speak, and records what you say. Only the stretches where you are speaking are sent, to
-your Pond, which turns them into text; the copy on your phone is deleted as soon as it has
-been sent. The microphone is used only while voice mode is open. The app is not allowed to
-record in the background, and it does not.
+**Voice mode.** When you open voice mode to talk to Goose, the app listens through the
+microphone for you to speak, and records what you say. Only the stretches where you are
+speaking are sent, to your Pond, which turns them into text; the copy on your phone is deleted
+as soon as it has been sent. The microphone is used only while voice mode is open.
+
+**Goose as your phone's assistant (Android).** If you choose Goose as your phone's digital
+assistant, holding the side key opens Goose's voice orb over whatever app is open. It listens
+in the same way as voice mode, and only while the orb is showing. It is never available on the
+lock screen.
+
+**Listening for your wake word (Android, off unless you turn it on).** If you turn on
+listening for your wake word, the app listens through the microphone so that saying the phrase
+opens the voice orb. While it listens, Android shows a notification that cannot be hidden, and
+you can stop it from there. It listens only while your screen is on, your phone is unlocked and
+the Goose app is not already open, and it stops when you lock the phone.
+
+- If your household's phrase is "Hey Goose", the phone recognises it itself. What it hears
+  is checked a fraction of a second at a time and then discarded; nothing is recorded, kept or
+  sent anywhere until the orb opens.
+- For any other phrase, only your Pond can recognise it, using the pronunciations it has
+  learned from your household. So the phone picks out stretches of speech, at most eight
+  seconds each, and sends each one to your Pond, which answers only whether it heard the phrase.
+  Your Pond does not keep the recording or what was said, and does not log it. Each stretch is
+  held briefly on your phone until your Pond has answered, and is then deleted. This sends
+  speech near your phone to your Pond, and nowhere else, which the setting says before you turn
+  it on.
+
+The app does not use the microphone in the background for anything else.
 
 ## Camera, photos and files
 
@@ -125,16 +152,32 @@ smaller and saved afresh as a new picture, which leaves out its location and the
 details a camera records about it. A text file is read on your phone and sent as part of
 your message. All of it goes to your Pond, and nowhere else.
 
-## Your location, for a ride
+## Your location
 
-The app reads your location only when you ask Goose for a ride fare, and only while the app
-is open. It reads it once, precisely enough for a driver to find you. It never tracks where
-you go, and it does not read your location in the background.
+The app reads your location for three things, only while it is open, and never in the
+background. It never tracks where you go.
 
-That one reading goes to your Pond, which sends it to Uber as the pickup point, so Uber can
-price the ride and, if you confirm it, send a driver. Uber's own privacy policy covers what
-Uber does with it. The reading goes from your Pond to Uber directly; it does not pass
-through us, and your phone does not keep it after the ride.
+**A ride.** When you ask Goose for a ride fare, the app reads where you are once, precisely
+enough for a driver to find you. That reading goes to your Pond, which sends it to Uber as the
+pickup point, so Uber can price the ride and, if you confirm it, send a driver. Uber's own
+privacy policy covers what Uber does with it. The reading goes from your Pond to Uber
+directly; it does not pass through us, and your phone does not keep it after the ride.
+
+**Where home is.** Your Pond has no GPS, so on its own it only knows the city its time zone
+names. When your phone reaches your Pond on your home network, and you have already allowed
+the app to use your location, the app tells your Pond where home is, once, if your Pond's
+location is still only a guess. You can also ask for it with Find my location in the app. Your
+phone names the place using its own map service (Google's on Android, Apple's on iPhone), which
+is the same service that gives your phone its location. Your Pond keeps the place to about
+110 metres, which is enough for the weather and nearby results, and not your exact house. Your
+Pond refuses this from a phone that is not on your home network, so a phone away from home can
+never move your household.
+
+**Telling Goose where you are (off unless you turn it on).** If you turn on Tell Goose where
+this phone is, each message you send carries the name of the place your phone is in, such as
+"Westlands, Nairobi", so Goose can say where you are and not only where home is. Only the name
+is sent, never your coordinates, and only to your Pond, which uses it for that one message. The
+name is looked up at most every five minutes, while you are sending a message.
 
 ## Bluetooth
 
@@ -152,19 +195,57 @@ When this phone joins a Pond, it uses its own name (such as "Wanjiru's iPhone"),
 change first, so you can tell your devices apart in your Pond's list. That name goes to your Pond
 and nowhere else.
 
+## Security
+
+- **Your connection to your Pond** is encrypted. The first time you pair, your phone records
+  your Pond's identity, and from then on it refuses to talk to anything that cannot prove it is
+  that same Pond, at home or away.
+- **Your Pond's keys on this phone** (the session token, the token that renews it, your Pond's
+  identity, and this phone's key to My Pond if you use one) are kept in the phone's own
+  protected storage: the Keychain on iOS and encrypted storage on Android. They are not included
+  in backups.
+- **Remote access** is encrypted end to end between your phone and your Pond, and must be
+  approved on your Pond, from your home network, before it works.
+- **On your Pond**, the keys you give it for other services are stored encrypted. Your Pond can
+  also keep all of its data (conversations, memories, profiles, face templates and those keys) in
+  an encrypted volume, opened at start-up by your Pond's own security chip, with your admin card as
+  the recovery key; then storage taken out of your Pond and read elsewhere shows nothing. Until the
+  volume is set up, that data is ordinary files on your Pond, and your Pond's health check says
+  which it is. On a Pond whose security fuses have not been set, its storage moved into another
+  identical device may still open, so keep your Pond somewhere safe, as you would a computer.
+
+No system is perfectly secure. If you believe your Pond or this phone has been compromised,
+unpair this phone, remove it on your Pond's dashboard, and pair again.
+
+## Where your data is processed
+
+Your conversations, your household's data and the content of your notifications are processed
+on your Pond, in your home. They do not travel to us, or to any server of ours, in any country.
+
+The coordination service for remote access, if you turn it on, runs on servers we operate in
+[NEEDS ANSWER: the countries where the coordination service and its relays run]. The records it
+keeps are described under Remote access above.
+
 ## What we do not do
 
-- We do not use analytics, of any kind, from anyone.
+- We do not use any analytics service, and the app's own code collects no usage data.
 - We do not use crash-reporting or attribution services.
 - We do not serve advertising, and we do not use an advertising identifier.
 - We do not read your contacts.
-- We do not read your location except when you ask for a ride fare, and we never read it in
-  the background.
+- We do not read your location except for the three uses described above, and we never read it
+  in the background.
+- We do not use the microphone except while you talk to Goose, or while listening for your wake
+  word if you turn that on, which Android always shows in a notification.
 - We do not look through your photo library. The app sees only the photos you pick.
 - We do not track you across other apps or websites, and we never will.
 
-These are not intentions. There is no third-party code in the app capable of doing any of
-them.
+These are not intentions: none of them is in the app's own code. Two components from Google
+are in the app because it cannot work without them, and they report on their own operation:
+**ML Kit**, which reads QR codes on your phone, and **Firebase Cloud Messaging**, which delivers
+the app's empty wake-up notifications. Google documents that these can send Google technical
+information about how they are working, such as their performance and errors, and not what you
+do in the app. [NEEDS ANSWER: confirm on a release build what ML Kit and Firebase send, and
+whether the app can turn it off, before publishing.]
 
 ## Children
 
@@ -174,10 +255,10 @@ to each store, so this section matches it]
 ## Your choices and your rights
 
 - **Decline remote access.** The app works without it, and you can turn it down when asked.
-- **Turn it off later.** Signing out releases this phone's access to your Pond, including
+- **Turn it off later.** Unpairing releases this phone's access to your Pond, including
   its remote access. You pair again at home to come back. Turning remote access off also
   erases the map of your home network that your phone kept to reconnect quickly.
-- **Remove a Pond you cannot reach.** If your Pond does not answer when you sign out, you
+- **Remove a Pond you cannot reach.** If your Pond does not answer when you unpair, you
   can remove it from this phone instead. The phone forgets the Pond and everything it kept
   from your household; the Pond still lists the phone until you remove it on the Pond's
   dashboard.

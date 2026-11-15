@@ -43,7 +43,7 @@ one use at a time, only after a strong (Class 3) biometric or the phone's PIN, p
 (`plugins/pond-keyguard/PondKeyguard.kt`); only the sealed bytes are kept, in the app's own
 preferences. Either way it never leaves in a backup or for another phone, and can no longer be read
 once the screen lock is removed or a new face or finger is added. It goes nowhere but the paired Pond, and
-signing out forgets it.
+unpairing forgets it.
 
 `installId` deserves a note for the forms, because "persistent identifier" is a category
 reviewers look at closely. It is generated on device (`services/install-id.ts`), never
@@ -80,7 +80,7 @@ a cached network map: the household's peers, their tailnet addresses and the acc
 rules. The map holds no private keys. None of these files leave the device; the
 coordinator learns only the public keys listed below.
 
-When remote access goes off, including when this phone signs out or the Pond forgets the
+When remote access goes off, including when this phone is unpaired or the Pond forgets the
 pairing, `forgetNetworkMap` in `PondNetwork` (`plugins/pond-tls/PondNetwork.kt`,
 `plugins/pond-tls/ios/PondNetwork.swift`) erases the map through the Pond library's
 `Mobile.disable`. The node's keys stay while the pairing does.
@@ -203,6 +203,14 @@ crash reporter, no advertising or attribution SDK, and no tracking library of an
 `package.json`. There is no contacts access and no advertising identifier. Location is read
 only for a ride fare, below.
 
+The Android build does carry Google code that reports on itself (found 2026-11-09 in the release
+runtime classpath, listed in `assets/legal/open-source.json`): `com.google.mlkit:barcode-scanning`
+and `play-services-mlkit-barcode-scanning`, which `expo-camera` uses to read QR codes, and
+`firebase-messaging` for push. Both bring Google's data transport
+(`com.google.android.datatransport:transport-backend-cct`), which Google uses for those SDKs'
+own usage and performance metrics. What they send from a release build, and whether it can be
+turned off, is not yet verified; the privacy policy says so as an open item.
+
 `expo-device` establishes whether the code is running on physical hardware before attempting push
 registration, and since 2026-10-17 gives the default name this phone pairs under (its device name,
 else its model). That name is shown with Change before pairing, and goes only to the user's own
@@ -286,7 +294,7 @@ the user's own Pond.
 | Messages → Other in-app messages | Collected, for app functionality: what the user types to Goose, sent to the user's own Pond | `api-client.ts` |
 | App activity, personal info, contacts | Not collected | no such permission or code path |
 | Is data encrypted in transit? | Yes — pinned HTTPS locally, encrypted tunnel remotely | `services/api-client.ts`, `PondNetwork.kt` |
-| Can users request data deletion? | Yes — signing out releases this phone's access, and the Pond is the user's own hardware | `profile.signOutWarning` in `services/i18n/locales/en.json` |
+| Can users request data deletion? | Yes — unpairing releases this phone's access, and the Pond is the user's own hardware | `profile.signOutWarning` in `services/i18n/locales/en.json` |
 
 ### Apple — privacy nutrition labels
 
@@ -309,7 +317,7 @@ need an answer from whoever operates the infrastructure before the listing goes 
 recording a guess here would be worse than recording the gap.
 
 1. **Coordinator retention.** How long are node keys, machine keys, tailnet addresses and
-   connection logs kept, and what is the deletion path when a user signs out? The client
+   connection logs kept, and what is the deletion path when a phone is unpaired? The client
    can say what it sends; only the operator can say what is kept. The phone erases its
    own superseded node keys (2026-10-05, see above); whether the coordinator deletes the
    corresponding nodes is still open.

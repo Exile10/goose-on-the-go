@@ -1,19 +1,16 @@
 /**
- * PrivacyScreen — what happens to a household's data, what can be done from here, and what
- * this app is built from. The content is in `constants/privacy.ts`, verified against the Pond;
- * `docs/PRIVACY-SCREEN.md` keeps the evidence for each statement. The one live line is the
- * town web search sends, which the Pond reports while Nearby places is on.
+ * PrivacyScreen: a summary of what happens to a household's data, on this phone, on the Pond and
+ * beyond the home; the choices a household has; and the full privacy policy, terms of use and
+ * open-source licenses. The structure is `constants/privacy.ts`, and `docs/PRIVACY-SCREEN.md`
+ * keeps the evidence for each statement. The one live line is the town web search sends, which
+ * the Pond reports while Nearby places is on.
  */
 
+import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { InkTitle } from '@jarida/ink/native';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-} from 'react-native';
+import { View, Text, StyleSheet, ScrollView } from 'react-native';
 
 import { GIcon } from '@/components/ui/g-icon';
 import { GPressable } from '@/components/ui/g-pressable';
@@ -21,7 +18,8 @@ import { Grey, JaridaPurple } from '@/constants/colors';
 import { FontSize, face } from '@/constants/typography';
 import { Spacing } from '@/constants/spacing';
 import { Radii } from '@/constants/radii';
-import { APP_LICENSES, DATA_RIGHT_KEYS, PRIVACY_SECTIONS, type PrivacySection } from '@/constants/privacy';
+import { DATA_RIGHTS, PRIVACY_DOCUMENTS, PRIVACY_GROUPS, type PrivacySection } from '@/constants/privacy';
+import { componentCount } from '@/models/open-source';
 import { useThemedStyles } from '@/hooks/use-themed-styles';
 import type { ThemeColors } from '@/constants/colors';
 import { usePrivacy } from '@/view-models/use-privacy';
@@ -32,9 +30,12 @@ function ExpandableSection({ section, extra }: { section: PrivacySection; extra?
   const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
   return (
-    <GPressable feedback="lift"
+    <GPressable
+      feedback="lift"
       style={styles.section}
       onPress={() => setExpanded(!expanded)}
+      accessibilityRole="button"
+      accessibilityState={{ expanded }}
     >
       <View style={styles.sectionHeader}>
         <View style={{ marginRight: Spacing.md }}>
@@ -46,7 +47,14 @@ function ExpandableSection({ section, extra }: { section: PrivacySection; extra?
         </View>
       </View>
       {expanded && (
-        <Text style={styles.sectionContent}>{extra ? `${t(section.bodyKey)} ${extra}` : t(section.bodyKey)}</Text>
+        <View style={styles.sectionContent}>
+          {/* The copy keeps its paragraphs apart with a blank line; each is its own block. */}
+          {[...t(section.bodyKey).split('\n\n'), ...(extra ? [extra] : [])].map((paragraph, i) => (
+            <Text key={i} style={[styles.sectionText, i > 0 && styles.paragraphGap]}>
+              {paragraph}
+            </Text>
+          ))}
+        </View>
       )}
     </GPressable>
   );
@@ -56,46 +64,66 @@ export default function PrivacyScreen() {
   const styles = useThemedStyles(makeStyles);
   const { t } = useTranslation();
   const { data } = usePrivacy();
+  const router = useRouter();
   const townLine = data.nearbyTown ? t('webSearch.townSentence', { town: data.nearbyTown }) : null;
 
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={styles.scroll}
-      showsVerticalScrollIndicator={false}
-    >
-      {/* Privacy sections */}
-      <InkTitle level={3}>{t('privacy.policyHeading')}</InkTitle>
-      {PRIVACY_SECTIONS.map((s) => (
-        <ExpandableSection key={s.id} section={s} extra={s.id === 'network' ? townLine : null} />
+    <ScrollView style={styles.container} contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+      <Text style={styles.intro}>{t('privacy.intro')}</Text>
+
+      {/* What happens to the data, where it is handled: this phone, the Pond, beyond the home. */}
+      {PRIVACY_GROUPS.map((g) => (
+        <View key={g.id} style={styles.group}>
+          <InkTitle level={3}>{t(g.headingKey)}</InkTitle>
+          {g.sections.map((s) => (
+            <ExpandableSection key={s.id} section={s} extra={s.id === 'network' ? townLine : null} />
+          ))}
+        </View>
       ))}
 
-      {/* Data rights */}
-      <InkTitle level={3}>{t('privacy.rightsHeading')}</InkTitle>
-      <View style={styles.rightsCard}>
-        {/* Statements, not buttons. These rows used to be Pressables with a chevron and no
-            handler, offering five rights of which none worked. */}
-        {DATA_RIGHT_KEYS.map((key) => (
-          <View key={key} style={styles.rightRow}>
-            <Text style={styles.rightText}>{t(key)}</Text>
-          </View>
-        ))}
-      </View>
-
-      {/* Licenses */}
-      <InkTitle level={3}>{t('privacy.licensesHeading')}</InkTitle>
-      <View style={styles.licensesCard}>
-        {APP_LICENSES.map((l, i) => (
-          <View key={l.pkg} style={[styles.licenseRow, i < APP_LICENSES.length - 1 && styles.licenseDivider]}>
-            <Text style={styles.licenseName}>{l.name}</Text>
-            <View style={styles.licenseBadge}>
-              <Text style={styles.licenseText}>{l.license}</Text>
+      {/* Choices. Statements, not buttons: these rows used to be Pressables with a chevron and no
+          handler, offering five rights of which none worked. Each now names where it is done. */}
+      <View style={styles.group}>
+        <InkTitle level={3}>{t('privacy.rightsHeading')}</InkTitle>
+        <View style={styles.card}>
+          {DATA_RIGHTS.map((r, i) => (
+            <View key={r.key} style={[styles.rightRow, i < DATA_RIGHTS.length - 1 && styles.divider]}>
+              <View style={styles.rightIcon}>
+                <GIcon name={r.icon} size={16} color={JaridaPurple[500]} />
+              </View>
+              <Text style={styles.rightText}>{t(r.key)}</Text>
             </View>
-          </View>
-        ))}
+          ))}
+        </View>
       </View>
 
-      <View style={{ height: 32 }} />
+      {/* The full documents. The summary above is what a household needs at a glance; these are
+          what the stores and the law ask for, in full, and every open-source licence. */}
+      <View style={styles.group}>
+        <InkTitle level={3}>{t('privacy.documentsHeading')}</InkTitle>
+        <View style={styles.card}>
+          {PRIVACY_DOCUMENTS.map((d, i) => (
+            <GPressable
+              key={d.id}
+              feedback="lift"
+              style={[styles.documentRow, i < PRIVACY_DOCUMENTS.length - 1 && styles.divider]}
+              onPress={() => router.push(d.route)}
+              accessibilityRole="link"
+            >
+              <View style={{ marginRight: Spacing.md }}>
+                <GIcon name={d.icon} size={16} color={JaridaPurple[500]} />
+              </View>
+              <View style={styles.documentText}>
+                <Text style={styles.licenseName}>{t(d.titleKey)}</Text>
+                <Text style={styles.documentHint}>{t(d.hintKey, { count: componentCount() })}</Text>
+              </View>
+              <GIcon name="chevron-right" size={16} color={Grey[400]} />
+            </GPressable>
+          ))}
+        </View>
+      </View>
+
+      <View style={{ height: Spacing['2xl'] }} />
     </ScrollView>
   );
 }
@@ -104,6 +132,13 @@ const makeStyles = (c: ThemeColors) =>
   StyleSheet.create({
     container: { flex: 1, backgroundColor: c.background },
     scroll: { paddingHorizontal: Spacing.lg, paddingTop: Spacing.lg },
+    intro: {
+      ...face('body', 'regular'),
+      fontSize: FontSize.sm,
+      color: c.textSecondary,
+      lineHeight: FontSize.sm * 1.6,
+    },
+    group: { marginTop: Spacing.lg },
 
     /* Expandable sections */
     section: {
@@ -125,73 +160,60 @@ const makeStyles = (c: ThemeColors) =>
       color: c.text,
     },
     sectionContent: {
-      ...face('body', 'regular'),
-      fontSize: FontSize.sm,
-      color: c.textTertiary,
-      lineHeight: FontSize.sm * 1.6,
       marginTop: Spacing.md,
       paddingTop: Spacing.md,
       borderTopWidth: 1,
       borderTopColor: c.border,
     },
+    sectionText: {
+      ...face('body', 'regular'),
+      fontSize: FontSize.sm,
+      color: c.textSecondary,
+      lineHeight: FontSize.sm * 1.6,
+    },
+    paragraphGap: { marginTop: Spacing.sm },
 
-    /* Rights */
-    rightsCard: {
+    /* Cards of rows: choices and documents */
+    card: {
       backgroundColor: c.card,
       borderRadius: Radii.xl,
+      paddingHorizontal: Spacing.lg,
+      paddingVertical: Spacing.xs,
       borderWidth: 1,
       borderColor: c.border,
-      overflow: 'hidden',
+    },
+    divider: {
+      borderBottomWidth: 1,
+      borderBottomColor: c.border,
     },
     rightRow: {
       flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
+      alignItems: 'flex-start',
       paddingVertical: Spacing.md,
-      paddingHorizontal: Spacing.lg,
-      borderBottomWidth: 1,
-      borderBottomColor: c.border,
     },
+    rightIcon: { marginRight: Spacing.md, marginTop: 2 },
     rightText: {
       flex: 1,
       ...face('body', 'regular'),
-      fontSize: FontSize.base,
+      fontSize: FontSize.sm,
       color: c.text,
+      lineHeight: FontSize.sm * 1.6,
     },
-
-    /* Licenses */
-    licensesCard: {
-      backgroundColor: c.card,
-      borderRadius: Radii.xl,
-      padding: Spacing.lg,
-      borderWidth: 1,
-      borderColor: c.border,
-    },
-    licenseRow: {
+    documentRow: {
       flexDirection: 'row',
-      justifyContent: 'space-between',
       alignItems: 'center',
-      paddingVertical: Spacing.sm,
+      paddingVertical: Spacing.md,
     },
-    licenseDivider: {
-      borderBottomWidth: 1,
-      borderBottomColor: c.border,
-      paddingBottom: Spacing.sm,
+    documentText: { flex: 1 },
+    documentHint: {
+      ...face('body', 'regular'),
+      fontSize: FontSize.sm,
+      color: c.textSecondary,
+      marginTop: 2,
     },
     licenseName: {
       ...face('body', 'regular'),
       fontSize: FontSize.base,
       color: c.text,
-    },
-    licenseBadge: {
-      backgroundColor: c.backgroundSecondary,
-      paddingHorizontal: Spacing.sm,
-      paddingVertical: 2,
-      borderRadius: Radii.pill,
-    },
-    licenseText: {
-      ...face('mono', 'regular'),
-      fontSize: FontSize.xs,
-      color: c.textTertiary,
     },
   });
