@@ -12,7 +12,12 @@ const mockSession = { ready: jest.fn<Promise<boolean>, []>() };
 jest.mock('@/services/pond-session', () => ({ ensurePondSession: () => mockSession.ready() }));
 
 const mockClose = jest.fn(async () => undefined);
-jest.mock('@/services/phone-assistant', () => ({ closeAssist: () => mockClose() }));
+const mockLock = { locked: false, unlock: jest.fn(async () => true) };
+jest.mock('@/services/phone-assistant', () => ({
+  closeAssist: () => mockClose(),
+  phoneLocked: () => mockLock.locked,
+  unlockPhone: () => mockLock.unlock(),
+}));
 
 const mockLinking = { openURL: jest.fn(async (_url: string) => true) };
 jest.mock('expo-linking', () => ({
@@ -124,6 +129,42 @@ describe('useAssist', () => {
     act(() => view.vm.actions.voiceChanged('idle'));
     act(() => view.vm.actions.voiceChanged('idle'));
     expect(mockClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('asks as a locked phone over the lock screen, and as the member once unlocked', async () => {
+    mockLock.locked = true;
+    const view = await mount(true);
+    expect(view.vm.data.locked).toBe(true);
+    act(() => {
+      void view.vm.actions.send('what is on my calendar', [], { voice: true });
+    });
+    expect(mockChat.send).toHaveBeenLastCalledWith('what is on my calendar', [], { voice: true, locked: true });
+
+    mockLock.unlock.mockImplementationOnce(async () => {
+      mockLock.locked = false;
+      return true;
+    });
+    await act(async () => {
+      await view.vm.actions.unlock();
+    });
+    expect(view.vm.data.locked).toBe(false);
+    act(() => {
+      void view.vm.actions.send('and tomorrow', [], { voice: true });
+    });
+    expect(mockChat.send).toHaveBeenLastCalledWith('and tomorrow', [], { voice: true, locked: false });
+  });
+
+  it('opens the app from a locked phone only once it is unlocked', async () => {
+    mockLock.locked = true;
+    mockLinking.openURL.mockClear();
+    const view = await mount(true);
+    mockLock.unlock.mockResolvedValueOnce(false);
+    await act(async () => {
+      view.vm.actions.openApp();
+      await Promise.resolve();
+    });
+    expect(mockLinking.openURL).not.toHaveBeenCalled();
+    mockLock.locked = false;
   });
 
   it('carries the conversation into the app, or opens the app when there is none yet', async () => {

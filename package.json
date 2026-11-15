@@ -15,6 +15,7 @@
     "test:watch": "jest --watch",
     "audit": "node scripts/audit-check.mjs --threshold high",
     "build:network": "scripts/build-embedded-network.sh",
+    "build:ear": "scripts/build-embedded-ear.sh",
     "check:prebuild": "scripts/check-prebuild.sh",
     "bump-build": "node scripts/bump-build.mjs",
     "check-icons": "node scripts/sweep-icons.mjs"

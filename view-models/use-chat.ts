@@ -345,6 +345,7 @@ export function streamBody(
       : {}),
     voice_mode: Boolean(options.voice),
     resumable: true,
+    ...(options.locked ? { device_locked: true } : {}),
     ...(options.research ? { deep_research: true } : {}),
     ...(options.research && options.answer && options.answer !== 'auto' ? { deep_research_answer: options.answer } : {}),
     ...(options.card ? { card: { kind: options.card.kind, id: options.card.id } } : {}),
@@ -354,6 +355,8 @@ export function streamBody(
 export interface SendOptions {
   /** Spoken rather than read: a shorter answer, no reasoning passage. */
   voice?: boolean;
+  /** Asked from a locked phone (the orb over the lock screen): the Pond answers with no personal data. */
+  locked?: boolean;
   /** A research question: the Pond starts a long task on it rather than answering in the turn. */
   research?: boolean;
   /** How much the research should write; read only with `research`. */

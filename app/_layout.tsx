@@ -37,6 +37,8 @@ import { ConfirmProvider } from '@/providers/confirm-provider';
 import { SnackbarProvider } from '@/providers/snackbar-provider';
 import { loadHapticsPreference } from '@/services/haptics';
 import { loadPhonePlacePreference } from '@/services/phone-place';
+import { phoneWakeSupported } from '@/services/phone-wake';
+import { followWakePhrase, installPhoneWake } from '@/services/phone-wake-pond';
 import { loadReplyNoticePreference } from '@/services/reply-notices';
 import { offerHomeLocationOnce } from '@/services/home-location';
 import { usePondSettings } from '@/view-models/use-pond-settings';
@@ -106,6 +108,10 @@ export default function RootLayout() {
     void loadHapticsPreference();
     void loadReplyNoticePreference();
     void loadPhonePlacePreference();
+    // Android starts the wake-word service only while the app is in front, so a reboot ends it
+    // until the app opens again: this is that moment. It also starts answering the service's
+    // speech segments for a phrase only the Pond can hear.
+    installPhoneWake();
   }, []);
 
   if (!fontsLoaded && !fontError) {
@@ -147,6 +153,19 @@ function HomeLocationSync() {
 }
 
 /**
+ * Hands the phone's wake-word service the household's phrase from the Pond's settings, which the
+ * store re-reads while the app is open: a phrase changed on the dashboard or another phone reaches
+ * the service here, as well as with the Pond's next answer to a segment. Draws nothing.
+ */
+function PhoneWakeSync() {
+  const phrase = usePondSettings().settings?.voice_wake_word?.trim();
+  useEffect(() => {
+    if (phrase) followWakePhrase(phrase);
+  }, [phrase]);
+  return null;
+}
+
+/**
  * Sits inside ThemeProvider so Navigation and Ink derive from the same resolved
  * scheme rather than each reading the system on its own.
  */
@@ -164,6 +183,7 @@ function ThemedApp() {
           <ConfirmProvider>
             <ConnectionStatus />
             <HomeLocationSync />
+            {phoneWakeSupported() ? <PhoneWakeSync /> : null}
             <Stack>
               <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
               <Stack.Screen name="(stack)" options={{ headerShown: false }} />

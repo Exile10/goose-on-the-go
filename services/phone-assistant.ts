@@ -17,6 +17,8 @@ interface AssistBridge {
   isAssistant(): Promise<boolean | null>;
   chooseAssistant(): Promise<boolean>;
   close(): Promise<boolean>;
+  locked(): boolean;
+  unlock(): Promise<boolean>;
 }
 
 function bridge(): AssistBridge | null {
@@ -83,5 +85,32 @@ export async function closeAssist(): Promise<void> {
     if (!(await native.close())) console.warn('[assistant] close asked with no overlay in front', { kind: 'phone_assistant' });
   } catch (e) {
     console.warn('[assistant] the overlay could not be closed', { kind: 'phone_assistant', error: String(e) });
+  }
+}
+
+/** Whether the phone is locked now, so the overlay asks the Pond as a locked phone. False off Android. */
+export function phoneLocked(): boolean {
+  const native = bridge();
+  if (!native) return false;
+  try {
+    return native.locked();
+  } catch (e) {
+    // Unknown is treated as locked: a turn asked as locked loses nothing but personal data.
+    console.warn('[assistant] could not read whether the phone is locked', { kind: 'phone_assistant', error: String(e) });
+    return true;
+  }
+}
+
+/** Ask for the lock screen over the overlay to be dismissed. Resolves whether the phone is unlocked. */
+export async function unlockPhone(): Promise<boolean> {
+  const native = bridge();
+  if (!native) return true;
+  try {
+    const unlocked = await native.unlock();
+    console.info('[assistant] unlock asked', { kind: 'phone_assistant', unlocked });
+    return unlocked;
+  } catch (e) {
+    console.warn('[assistant] could not ask to unlock', { kind: 'phone_assistant', error: String(e) });
+    return false;
   }
 }

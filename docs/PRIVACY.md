@@ -111,22 +111,25 @@ talks to Google or Apple directly. We are not in that path either.
 **Voice mode.** When you open voice mode to talk to Goose, the app listens through the
 microphone for you to speak, and records what you say. Only the stretches where you are
 speaking are sent, to your Pond, which turns them into text; the copy on your phone is deleted
-as soon as it has been sent. The microphone is used only while voice mode is open.
+as soon as it has been sent. Apart from listening for your wake word, if you turn it on (below),
+the microphone is used only while voice mode is open.
 
 **Goose as your phone's assistant (Android).** If you choose Goose as your phone's digital
 assistant, holding the side key opens Goose's voice orb over whatever app is open. It listens
-in the same way as voice mode, and only while the orb is showing. It is never available on the
-lock screen.
+in the same way as voice mode, and only while the orb is showing. Over the lock screen, Goose
+answers only what needs nothing personal: your memories and notes, messages, calendar, cameras,
+sensor history and anything bought or booked wait until you unlock the phone.
 
 **Listening for your wake word (Android, off unless you turn it on).** If you turn on
 listening for your wake word, the app listens through the microphone so that saying the phrase
 opens the voice orb. While it listens, Android shows a notification that cannot be hidden, and
-you can stop it from there. It listens only while your screen is on, your phone is unlocked and
-the Goose app is not already open, and it stops when you lock the phone.
+you can stop it from there. It listens whenever the Goose app is not already open, the lock
+screen included.
 
 - If your household's phrase is "Hey Goose", the phone recognises it itself. What it hears
-  is checked a fraction of a second at a time and then discarded; nothing is recorded, kept or
-  sent anywhere until the orb opens.
+  is checked a fraction of a second at a time and then discarded; nothing is written or sent
+  anywhere unless the phone is unsure whether it heard the phrase, when that moment of speech
+  goes to your Pond to be checked and nowhere else.
 - For any other phrase, only your Pond can recognise it, using the pronunciations it has
   learned from your household. So the phone picks out stretches of speech, at most eight
   seconds each, and sends each one to your Pond, which answers only whether it heard the phrase.
@@ -134,6 +137,14 @@ the Goose app is not already open, and it stops when you lock the phone.
   held briefly on your phone until your Pond has answered, and is then deleted. This sends
   speech near your phone to your Pond, and nowhere else, which the setting says before you turn
   it on.
+
+If you teach Goose your voice on a phone, that phone keeps, in the app's private storage, a
+numerical summary of your voice and a score for each sentence you recorded, never the recording
+itself, so that only voices taught on it can wake it. To make that summary it uses your Pond's
+voice model, which it fetches from your Pond. Forgetting your voice, in Voice Match or by teaching
+it again, deletes it from the phone as well as from your Pond, and uninstalling the app deletes it.
+The wake test records you on the phone, scores the recording there, and deletes it; moments it is
+unsure of go to your Pond to be checked, as when it listens.
 
 The app does not use the microphone in the background for anything else.
 

@@ -12,13 +12,15 @@ scratch="$(mktemp -d "${TMPDIR:-/tmp}/gotg-prebuild.XXXXXX")"
 trap 'rm -rf "$scratch"' EXIT
 
 # The plugins read these, and none of them is tracked: Firebase config is per-developer and
-# the Pond network libraries are build outputs of scripts/build-embedded-network.sh.
-untracked=(google-services.json GoogleService-Info.plist native/pondnet/pondnet.aar native/pondnet/Pondnet.xcframework)
+# the Pond network libraries and the wake-word detector are build outputs of
+# scripts/build-embedded-network.sh and scripts/build-embedded-ear.sh.
+untracked=(google-services.json GoogleService-Info.plist native/pondnet/pondnet.aar native/pondnet/Pondnet.xcframework native/pondear/jniLibs)
 if [[ -n "${PREBUILD_REF:-}" ]]; then
   git -C "$root" archive "$PREBUILD_REF" | tar -x -C "$scratch"
 else
   rsync -a --exclude /node_modules --exclude /ios --exclude /android --exclude /.expo --exclude /.git \
     --exclude /native/pondnet/.build --exclude /native/pondnet/pondnet.aar --exclude /native/pondnet/Pondnet.xcframework \
+    --exclude /native/pondear/jniLibs --exclude /native/pondear/target \
     "$root/" "$scratch/"
 fi
 for input in "${untracked[@]}"; do

@@ -43,6 +43,7 @@ import {
   LocationRows,
   PhonePlaceRow,
   PhoneAssistantRow,
+  PhoneWakeRow,
   PostureRow,
   PrimaryProfileRow,
   ProviderRow,
@@ -259,7 +260,7 @@ function specialRows(id: SpecialId, ctx: Context): ReactElement[] {
         <SwitchRow key={id} label={t('settings.stayConnected.label')} value={ctx.stayConnected.on} onChange={ctx.stayConnected.set} />,
       ];
     case 'phoneAssistant':
-      return [<PhoneAssistantRow key={id} />];
+      return [<PhoneAssistantRow key={id} />, <PhoneWakeRow key={`${id}-wake`} />];
     case 'replyNotices':
       return [
         <SwitchRow

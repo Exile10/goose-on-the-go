@@ -60,6 +60,7 @@ const PRINTS: VoicePrints = {
 };
 
 const accepted = (take: number, heard: number, fired = true): VoiceTakeResult => ({
+  take_id: `take-${take}`,
   take,
   of: 5,
   wake: { heard: true, heard_as: 'hey goose', new_detector: fired },
@@ -163,6 +164,61 @@ it('moves on by itself, keeps the sentence when one is refused, and ends after t
   expect(m.vm.results.map((r) => r.detector)).toEqual([true, true, false, true, true]);
   expect(m.vm.enrolled).toBe(true);
   expect(finishChecklistItem).toHaveBeenCalledWith('pairing-1', 'wake');
+});
+
+it('says one missed sentence again in place of its take, and the done screen stays', async () => {
+  const m = await mount();
+  await act(async () => {
+    await m.vm.actions.start();
+  });
+  for (const [take, heard, fired] of [
+    [1, 1, true],
+    [2, 1, false],
+    [3, 2, true],
+    [4, 3, true],
+    [5, 3, false],
+  ] as const) {
+    pond.voiceTake.mockResolvedValueOnce(accepted(take, heard, fired));
+    await act(async () => {
+      await mockRecorder.handlers?.take('file:///n.wav');
+    });
+  }
+  expect(m.vm.phase).toBe('done');
+  expect(m.vm.detector?.heard).toBe(3);
+
+  await act(async () => {
+    await m.vm.actions.retake(1);
+  });
+  expect(m.vm.retaking).toBe(1);
+  pond.voiceTake.mockResolvedValueOnce({ ...accepted(5, 4, true), take_id: 'take-2-again' });
+  let outcome: string | undefined;
+  await act(async () => {
+    outcome = await mockRecorder.handlers?.take('file:///again.wav');
+  });
+  expect(pond.voiceTake).toHaveBeenLastCalledWith(expect.objectContaining({ replaces: 'take-2', prompt: m.vm.sentences[1] }));
+  expect(outcome).toBe('done');
+  expect(m.vm.phase).toBe('done');
+  expect(m.vm.retaking).toBeNull();
+  expect(m.vm.results.map((r) => r.detector)).toEqual([true, true, true, true, false]);
+  expect(m.vm.results[1].takeId).toBe('take-2-again');
+  expect(m.vm.detector?.heard).toBe(4);
+
+  // A run that has ended cannot take a retake: it stops with words that say to teach all five again.
+  expect(describeTeachError(new ApiError('x → 422', 422, null, null, { error: 'retake_not_found' }))).toBe(
+    i18n.t('teachVoice.error.retakeTooLate'),
+  );
+  expect(refusalWords(new ApiError('x → 422', 422, null, null, { error: 'retake_not_found' }), 'hey goose')).toBeNull();
+
+  // Cancelling goes back without sending anything.
+  await act(async () => {
+    await m.vm.actions.retake(4);
+  });
+  expect(m.vm.retaking).toBe(4);
+  await act(async () => {
+    m.vm.actions.cancelRetake();
+  });
+  expect(m.vm.retaking).toBeNull();
+  expect(mockRecorder.stop).toHaveBeenCalled();
 });
 
 it('clears what the Pond learned about the phrase only when it saves a new phrase', async () => {

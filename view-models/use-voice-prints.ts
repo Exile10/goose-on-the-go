@@ -12,12 +12,13 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 
 import { useServer } from '@/providers/server-provider';
 import i18n from '@/services/i18n';
+import { forgetPhoneVoice } from '@/services/phone-wake-voices';
 import type { VoicePrintMember, VoicePrints } from '@/services/types';
 import { orderMembers } from '@/models/voice-room';
 import { isMissingRoute } from './agents-source';
 import { describeApiError, logFailure } from './describe-error';
 import { MIN_POLL_MS, useLive } from './use-live';
-import { useVoiceSource } from './voice-source';
+import { POND_VOICE, useVoiceSource } from './voice-source';
 
 export const VOICE_PRINTS_MS = 60_000;
 
@@ -105,6 +106,7 @@ export function useVoicePrints(): UseVoicePrints {
     async (member: VoicePrintMember) => {
       try {
         await source.forget(member.profile_id);
+        if (source === POND_VOICE) await forgetPhoneVoice(member.profile_id);
       } catch (e) {
         logFailure('voice-match', 'forget refused', e);
         return describeApiError(e) ?? i18n.t('voiceMatch.forget.failed');

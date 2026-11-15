@@ -88,6 +88,16 @@ export function AssistOverlay() {
         ) : null}
         {data.link === 'ready' ? (
           <>
+            {data.locked ? (
+              <View style={styles.locked} accessibilityLiveRegion="polite">
+                <InkText size="sm" tone="secondary" style={styles.lockedText}>
+                  {t('assist.locked')}
+                </InkText>
+                <InkButton variant="quiet" size="sm" icon="lock" onPress={() => void actions.unlock()}>
+                  {t('assist.unlock')}
+                </InkButton>
+              </View>
+            ) : null}
             <ExchangeView exchange={data.exchange} />
             <VoiceDock
               send={actions.send}
@@ -110,4 +120,6 @@ const styles = StyleSheet.create({
   exchange: { maxHeight: 240 },
   exchangeContent: { paddingHorizontal: Spacing.lg, gap: Spacing.sm },
   unreachable: { paddingHorizontal: Spacing.lg, gap: Spacing.md },
+  locked: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, paddingHorizontal: Spacing.lg },
+  lockedText: { flex: 1 },
 });

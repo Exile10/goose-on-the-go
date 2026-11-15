@@ -1,5 +1,7 @@
 package io.jarida.pondassist
 
+import android.app.Activity
+import android.app.KeyguardManager
 import android.app.role.RoleManager
 import android.content.ActivityNotFoundException
 import android.content.Context
@@ -8,6 +10,7 @@ import android.os.Build
 import android.os.Bundle
 import android.os.RemoteException
 import android.provider.Settings
+import android.view.WindowManager
 import android.service.voice.VoiceInteractionService
 import android.service.voice.VoiceInteractionSession
 import android.service.voice.VoiceInteractionSessionService
@@ -37,13 +40,51 @@ private const val TAG = "PondAssist"
  * app. Android lists an app there when it declares a VoiceInteractionService whose
  * `android.voice_interaction` meta-data names a session service (`res/xml/goose_interaction_service.xml`).
  *
- * The service itself does nothing. A third-party assistant cannot listen for a hotword through
- * it: `HotwordDetectionService` and the always-on detector are reserved for preinstalled apps,
- * so "Hey Goose" has to come from this app's own foreground service, a later phase. What the
- * role does give is the system's assist gesture (holding the side key, or a swipe up from a
- * bottom corner), which reaches [GooseSession].
+ * A third-party assistant cannot listen for a hotword through it: `HotwordDetectionService` and
+ * the always-on detector are reserved for preinstalled apps, so "Hey Goose" comes from this app's
+ * own foreground service (`plugins/pond-wake/PondWake.kt`). What the role does give is the
+ * system's assist gesture (holding the side key, or a swipe up from a bottom corner), which reaches
+ * [GooseSession], and [showOverlay], the same session on request.
  */
-class GooseInteractionService : VoiceInteractionService()
+class GooseInteractionService : VoiceInteractionService() {
+  override fun onReady() {
+    super.onReady()
+    ready = this
+  }
+
+  override fun onShutdown() {
+    if (ready === this) ready = null
+    super.onShutdown()
+  }
+
+  companion object {
+    /** The service while Android has it bound as the phone's assistant. */
+    @Volatile private var ready: GooseInteractionService? = null
+
+    /**
+     * Open the voice orb as the assist gesture does, through [GooseSession]. Showing its own
+     * session is what the active assistant may do from the background, so this works over any
+     * app. False when Goose is not the phone's assistant now. Main thread only.
+     */
+    fun showOverlay(): Boolean {
+      val service = ready ?: return false
+      service.showSession(Bundle(), 0)
+      Log.i(TAG, "assist session requested by the wake word")
+      return true
+    }
+
+    /**
+     * Whether this app holds the assistant role, or null below Android 10, where there is no
+     * role to ask about. Not the same as [showOverlay] working: Android binds the service a
+     * moment after the app's process starts, and may unbind it briefly, while the role stays put.
+     */
+    fun holdsRole(context: Context): Boolean? {
+      if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return null
+      val roles = context.getSystemService(RoleManager::class.java)
+      return roles.isRoleAvailable(RoleManager.ROLE_ASSISTANT) && roles.isRoleHeld(RoleManager.ROLE_ASSISTANT)
+    }
+  }
+}
 
 /** Hands Android a [GooseSession] each time the assist gesture is made. */
 class GooseSessionService : VoiceInteractionSessionService() {
@@ -140,13 +181,24 @@ class GooseRecognitionService : RecognitionService() {
  * MainActivity in the app's own task. It shares the React host with MainActivity, so a running
  * app's JavaScript, its Pond connection included, is reused rather than started twice.
  *
- * Anything that can start an activity can start this one by class name, which leaves room for a
- * later wake-word service to open the same overlay.
+ * The wake word opens it the same way as the gesture, through [GooseInteractionService.showOverlay].
+ *
+ * It shows over the lock screen and turns the screen on, so "Hey Goose" works on a locked phone.
+ * There the overlay's turns ask the Pond as a locked phone (`device_locked`), which answers with
+ * no personal data or tools, until [PondAssistModule.unlock] dismisses the lock screen.
  */
 class AssistActivity : ReactActivity() {
   override fun onCreate(savedInstanceState: Bundle?) {
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+      setShowWhenLocked(true)
+      setTurnScreenOn(true)
+    } else {
+      @Suppress("DEPRECATION")
+      window.addFlags(WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON)
+    }
     // Nothing is restored: a recreated overlay starts a new conversation, as a new gesture would.
     super.onCreate(null)
+    Log.i(TAG, "assist overlay created locked=${locked(this)}")
   }
 
   override fun getMainComponentName(): String = COMPONENT
@@ -175,6 +227,9 @@ class AssistActivity : ReactActivity() {
   companion object {
     /** The name `index.ts` registers the overlay's root component under. */
     const val COMPONENT = "assist"
+
+    /** Whether the lock screen is up, so the overlay's turns must ask as a locked phone. */
+    fun locked(context: Context) = context.getSystemService(KeyguardManager::class.java).isKeyguardLocked
   }
 }
 
@@ -207,8 +262,7 @@ class PondAssistModule(context: ReactApplicationContext) : ReactContextBaseJavaM
       return
     }
     try {
-      val roles = reactApplicationContext.getSystemService(RoleManager::class.java)
-      promise.resolve(roles.isRoleAvailable(RoleManager.ROLE_ASSISTANT) && roles.isRoleHeld(RoleManager.ROLE_ASSISTANT))
+      promise.resolve(GooseInteractionService.holdsRole(reactApplicationContext))
     } catch (error: Exception) {
       promise.reject("E_ASSIST_ROLE", error.javaClass.simpleName, error)
     }
@@ -238,6 +292,49 @@ class PondAssistModule(context: ReactApplicationContext) : ReactContextBaseJavaM
       }
     }
     promise.resolve(false)
+  }
+
+  /** Whether the phone is locked now: the overlay asks the Pond as a locked phone while it is. */
+  @ReactMethod(isBlockingSynchronousMethod = true)
+  fun locked(): Boolean = AssistActivity.locked(reactApplicationContext)
+
+  /**
+   * Ask for the lock screen to be dismissed over the overlay (fingerprint, face or PIN). Resolves
+   * true once the phone is unlocked, false when the person backs out or nothing could be asked.
+   */
+  @ReactMethod
+  fun unlock(promise: Promise) {
+    UiThreadUtil.runOnUiThread {
+      val activity: Activity? = reactApplicationContext.currentActivity
+      if (!AssistActivity.locked(reactApplicationContext)) {
+        promise.resolve(true)
+        return@runOnUiThread
+      }
+      if (activity == null || Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+        Log.w(TAG, "kind=assist_unlock_unavailable activity=${activity != null} sdk=${Build.VERSION.SDK_INT}")
+        promise.resolve(false)
+        return@runOnUiThread
+      }
+      activity.getSystemService(KeyguardManager::class.java).requestDismissKeyguard(
+        activity,
+        object : KeyguardManager.KeyguardDismissCallback() {
+          override fun onDismissSucceeded() {
+            Log.i(TAG, "kind=assist_unlocked")
+            promise.resolve(true)
+          }
+
+          override fun onDismissCancelled() {
+            Log.i(TAG, "kind=assist_unlock_cancelled")
+            promise.resolve(false)
+          }
+
+          override fun onDismissError() {
+            Log.w(TAG, "kind=assist_unlock_failed")
+            promise.resolve(false)
+          }
+        },
+      )
+    }
   }
 
   /** Close the assist overlay. Resolves false when the activity in front is not the overlay. */

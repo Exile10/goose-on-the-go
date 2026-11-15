@@ -10,6 +10,10 @@
  *
  * The overlay closes itself when the conversation ends: the pipeline back at rest after it has
  * listened, which is a goodbye, a tap that stops listening, or eight seconds with nothing said.
+ *
+ * Over the lock screen, every turn is sent as a locked phone's (`device_locked`): the Pond answers
+ * with no personal data or tools, and says to unlock for what needs them. `unlock` asks for the
+ * phone's own check, after which turns are the member's again.
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -17,7 +21,7 @@ import * as Linking from 'expo-linking';
 
 import type { Message } from '@/models/chat';
 import type { VoiceState } from '@/models/voice';
-import { closeAssist } from '@/services/phone-assistant';
+import { closeAssist, phoneLocked, unlockPhone } from '@/services/phone-assistant';
 import { ensurePondSession } from '@/services/pond-session';
 import { useChatOn, type UseChat } from '@/view-models/use-chat';
 
@@ -72,6 +76,8 @@ export interface UseAssist {
   data: {
     link: AssistLink;
     exchange: Exchange;
+    /** The phone is locked: answers leave out personal data until it is unlocked. */
+    locked: boolean;
   };
   actions: {
     send: UseChat['actions']['send'];
@@ -81,6 +87,8 @@ export interface UseAssist {
     close: () => void;
     /** Carry on in the app: this conversation when there is one, else the app's front screen. */
     openApp: () => void;
+    /** Ask for the phone's own check over the lock screen. */
+    unlock: () => Promise<void>;
   };
 }
 
@@ -100,7 +108,29 @@ export function useAssist(): UseAssist {
   }, []);
 
   const chat = useChatOn({ hydrated: link === 'ready', isScreenReal: toThePond });
-  const { send, stop } = chat.actions;
+  const { stop } = chat.actions;
+  const sendTurn = chat.actions.send;
+
+  // Read when the overlay opens and after each unlock; a turn reads the ref, never a stale render.
+  const [locked, setLocked] = useState(phoneLocked);
+  const lockedRef = useRef(locked);
+  useEffect(() => {
+    lockedRef.current = locked;
+  }, [locked]);
+  useEffect(() => {
+    console.info('[assist] opened', { kind: 'assist_overlay', locked: lockedRef.current });
+  }, []);
+  const send = useCallback<UseChat['actions']['send']>(
+    (text, attachments, options) => sendTurn(text, attachments, { ...options, locked: lockedRef.current }),
+    [sendTurn],
+  );
+  const unlock = useCallback(async () => {
+    const unlocked = await unlockPhone();
+    const still = phoneLocked();
+    lockedRef.current = still;
+    setLocked(still);
+    if (!unlocked) console.info('[assist] still locked', { kind: 'assist_overlay' });
+  }, []);
   const { messages, sessionId } = chat.data;
 
   const close = useCallback(() => {
@@ -122,7 +152,9 @@ export function useAssist(): UseAssist {
   );
 
   // The overlay stops when the app's own screen covers it, which closes it (AssistActivity.onStop).
-  const openApp = useCallback(() => {
+  // The app does not open over the lock screen, so a locked phone is unlocked first.
+  const openApp = useCallback(async () => {
+    if (lockedRef.current && !(await unlockPhone())) return;
     const url = sessionId
       ? Linking.createURL('/conversation', { queryParams: { session: sessionId } })
       : Linking.createURL('/');
@@ -134,7 +166,7 @@ export function useAssist(): UseAssist {
   const exchange = useMemo(() => lastExchange(messages), [messages]);
 
   return {
-    data: { link, exchange },
-    actions: { send, stop, voiceChanged, close, openApp },
+    data: { link, exchange, locked },
+    actions: { send, stop, voiceChanged, close, openApp: () => void openApp(), unlock },
   };
 }

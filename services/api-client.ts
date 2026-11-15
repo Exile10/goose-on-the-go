@@ -1,4 +1,4 @@
-import { File } from 'expo-file-system';
+import { File, Paths } from 'expo-file-system';
 import {
   readCollection,
   readList,
@@ -116,8 +116,10 @@ import type {
   VoiceAgent,
   VoiceAgentPatch,
   VoicePrints,
+  VoiceTakeInput,
   VoiceTakeResult,
   HomeLocationResult,
+  WakeCheck,
   VoiceRoom,
   AdminCache,
   AdminCacheId,
@@ -465,6 +467,8 @@ const STREAM_IDLE_MS = 60_000;
 
 /** Transcription pads every clip to a 30s window, and the first speech call loads a model. */
 const VOICE_TIMEOUT_MS = 45_000;
+/** The speaker model is about 26 MB; over a slow Wi-Fi it takes a while. */
+const MODEL_DOWNLOAD_TIMEOUT_MS = 180_000;
 
 /** A face sample is detected, aligned and embedded on the Pond's own CPU before it answers. */
 const FACE_TIMEOUT_MS = 45_000;
@@ -1578,6 +1582,26 @@ export class PondApiClient {
     return prints;
   }
 
+  /**
+   * `GET /voice/prints/model/file`: the Pond's speaker model, written to the app's cache for the
+   * wake word's voice check; the native side checks its checksum before keeping it. 409
+   * `model_not_ready` while the Pond has not finished fetching it.
+   */
+  async downloadSpeakerModel(): Promise<string> {
+    const path = '/api/v1/voice/prints/model/file';
+    const res = await this.send(`${this.baseUrl}${path}`, {
+      headers: this.token ? { Authorization: `Bearer ${this.token}` } : {},
+    }, MODEL_DOWNLOAD_TIMEOUT_MS);
+    if (!res.ok) {
+      const body = await errorBody(res);
+      throw new ApiError(`GET ${path} → ${res.status}`, res.status, parseRetryAfter(res), detailOf(body), body);
+    }
+    const file = new File(Paths.cache, `speaker-model-${Date.now().toString(36)}.onnx`);
+    file.create({ overwrite: true });
+    file.write(new Uint8Array(await res.arrayBuffer()));
+    return file.uri;
+  }
+
   /** A 202: the Pond fetches the speaker model again. */
   retryVoicePrintModel(): Promise<void> {
     return this.post<void>('/api/v1/voice/prints/model', {});
@@ -1586,14 +1610,16 @@ export class PondApiClient {
   /**
    * One sentence read while teaching Goose a voice, as a 16 kHz mono WAV. `voiceMatch` false tunes
    * the wake phrase only and stores no print. 422 `no_speech` and `no_wake_phrase` (with `heard_as`)
-   * and 409 `model_not_ready` are refusals by name.
+   * and 409 `model_not_ready` are refusals by name. `replaces` says a missed sentence again on its
+   * own, in place of that take; 422 `retake_not_found` when the run it was in has ended.
    */
-  async voiceTake(take: { fileUri: string; prompt: string; profileId: string | null; voiceMatch: boolean }): Promise<VoiceTakeResult> {
+  async voiceTake(take: VoiceTakeInput): Promise<VoiceTakeResult> {
     const form = new FormData();
     form.append('audio', new File(take.fileUri), 'take.wav');
     form.append('prompt', take.prompt);
     if (take.profileId) form.append('profile_id', take.profileId);
     form.append('voice_match', take.voiceMatch ? 'true' : 'false');
+    if (take.replaces) form.append('replaces', take.replaces);
     const res = await this.send(`${this.baseUrl}/api/v1/voice/takes`, {
       method: 'POST',
       // No Content-Type: the runtime writes the multipart boundary itself.
@@ -1608,6 +1634,36 @@ export class PondApiClient {
     const result = readVoiceTake(await res.json());
     if (!result) throw new Error('The Pond answered a voice take with something unexpected');
     return result;
+  }
+
+  /**
+   * `POST /voice/wake/check`: whether a speech segment this phone heard opens with the household's
+   * wake phrase, matched by the Pond with its learned pronunciations. Only the verdict and the phrase
+   * come back; the Pond keeps nothing. 503 `speech_recognition_unavailable` and 413
+   * `segment_too_long` are refusals by name. The phone asks for the whole phrase (`phrase_only`): a
+   * segment it sends was already near the phrase, so a bare "goose" after other words is not enough.
+   */
+  async checkWakeSegment(fileUri: string): Promise<WakeCheck> {
+    const form = new FormData();
+    form.append('audio', new File(fileUri), 'segment.wav');
+    form.append('phrase_only', 'true');
+    const res = await this.send(`${this.baseUrl}/api/v1/voice/wake/check`, {
+      method: 'POST',
+      // No Content-Type: the runtime writes the multipart boundary itself.
+      headers: this.token ? { Authorization: `Bearer ${this.token}` } : {},
+      body: form,
+      signal: timeoutSignal(VOICE_TIMEOUT_MS),
+    });
+    if (!res.ok) {
+      const body = await errorBody(res);
+      throw new ApiError(`POST /api/v1/voice/wake/check → ${res.status}`, res.status, parseRetryAfter(res), detailOf(body), body);
+    }
+    const body: unknown = await res.json();
+    const check = body as Partial<WakeCheck> | null;
+    if (typeof check?.heard !== 'boolean' || typeof check.phrase !== 'string') {
+      throw new Error('The Pond answered a wake check with something unexpected');
+    }
+    return { heard: check.heard, phrase: check.phrase };
   }
 
   /** Forget a member's voice. Their face, profile and memories stay. */

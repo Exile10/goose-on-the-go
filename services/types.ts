@@ -336,6 +336,8 @@ export interface ChatStreamRequest {
   card?: { kind: string; id: string };
   /** Where this phone is, by name, while the person has turned on telling Goose (`phone-place.ts`). */
   device_place?: string;
+  /** Asked from a locked phone: the Pond runs the turn with no personal data or tools. */
+  device_locked?: boolean;
 }
 
 /**
@@ -1913,11 +1915,28 @@ export interface HomeLocationResult {
   longitude: number;
 }
 
+/** `POST /api/v1/voice/wake/check`: the Pond's verdict on one segment, and the phrase it matched. */
+export interface WakeCheck {
+  heard: boolean;
+  phrase: string;
+}
+
 /**
  * `POST /api/v1/voice/takes`: one sentence read while teaching Goose a voice. It tunes the wake
  * phrase, and adds to the person's voice print unless Voice Match is off for the run.
  */
+/** One teach sentence to send: `replaces` names a missed take of this run that it takes the place of. */
+export interface VoiceTakeInput {
+  fileUri: string;
+  prompt: string;
+  profileId: string | null;
+  voiceMatch: boolean;
+  replaces?: string | null;
+}
+
 export interface VoiceTakeResult {
+  /** This take's id, which a retake of its sentence names to replace it; null from an older Pond. */
+  take_id: string | null;
   /** Takes the Pond has accepted in this run, this one included. */
   take: number;
   of: number;

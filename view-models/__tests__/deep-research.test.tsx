@@ -243,6 +243,9 @@ describe('sending a research question', () => {
       deep_research: true,
     });
     expect('deep_research' in streamBody('Hello', [], {}, null)).toBe(false);
+    // A locked phone says so; any other turn sends the body an older Pond knows.
+    expect(streamBody('Hello', [], { locked: true }, null)).toMatchObject({ device_locked: true });
+    expect('device_locked' in streamBody('Hello', [], {}, null)).toBe(false);
   });
 
   it('says how much to write for a short answer or a report, and leaves it to the Pond otherwise', () => {
