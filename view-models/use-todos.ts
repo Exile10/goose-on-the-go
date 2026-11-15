@@ -83,15 +83,31 @@ export function useTodos(enabled = true) {
     [replace, source],
   );
 
-  /** Ticking a to-do Goose is not asking about is the member saying it is done, so it is the same answer. */
-  const setDone = useCallback(
+  /**
+   * Ticking a to-do Goose is not asking about is the member saying it is done, so it is the same
+   * answer. The row leaves the list it was on, so the message names it and offers to undo it.
+   */
+  const flip = useCallback(
     async (todo: Todo, isDone: boolean) => {
       const done = await hubAction('todos', () => source.editTodo(todo.id, { state: isDone ? 'done' : 'open' }));
-      if (!done) return;
-      replace(done);
-      if (isDone) void confirm();
+      if (done) replace(done);
+      return done;
     },
     [replace, source],
+  );
+
+  const setDone = useCallback(
+    async (todo: Todo, isDone: boolean): Promise<void> => {
+      const done = await flip(todo, isDone);
+      if (!done) return;
+      if (isDone) void confirm();
+      showSnackbar({
+        message: i18n.t(isDone ? 'goose.todos.doneNamed' : 'goose.todos.reopened', { text: todo.text }),
+        tone: 'success',
+        action: { label: i18n.t('goose.todos.undo'), onPress: () => void flip(done, !isDone) },
+      });
+    },
+    [flip],
   );
 
   const save = useCallback(

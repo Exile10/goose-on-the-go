@@ -5,7 +5,7 @@
  * home"). A to-do that waits on a place says so when the phone cannot watch places.
  */
 
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Linking, StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
@@ -135,7 +135,13 @@ export function OfferRow({ offer, busy, onAdd, onNo }: { offer: TodoOffer; busy:
   );
 }
 
-/** One open or done to-do as a checklist row: a tick, its words, and what brings it up. */
+/** How long a ticked to-do stays in place, ticked, before it moves to the other list. */
+export const TICK_SETTLE_MS = 450;
+
+/**
+ * One open or done to-do as a checklist row: a tick, its words, and what brings it up. A tick shows
+ * at once and the row moves only after TICK_SETTLE_MS, so the press is seen to do something.
+ */
 export function TodoRow({
   todo,
   sources,
@@ -146,13 +152,23 @@ export function TodoRow({
   todo: Todo;
   sources: HookSources | null;
   access: LocationAccess | null;
-  onToggle: () => void;
+  onToggle: () => Promise<unknown>;
   onNeedsLocation?: () => void;
 }) {
   const theme = useInkTheme();
   const { t, i18n } = useTranslation();
   const words = useHookWords();
-  const done = todo.state === 'done';
+  const [flipping, setFlipping] = useState(false);
+  const pending = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      if (pending.current) clearTimeout(pending.current);
+    };
+  }, []);
+  const done = (todo.state === 'done') !== flipping;
   const blocked = !done && needsLocation(todo) && access !== null && access !== 'granted';
   const at = nextUp(todo);
   const lines = todo.hooks.length
@@ -164,19 +180,25 @@ export function TodoRow({
     <View style={styles.todo}>
       <GPressable
         onPress={() => {
+          if (flipping) return;
           void toggle();
-          onToggle();
+          setFlipping(true);
+          pending.current = setTimeout(() => {
+            void onToggle().finally(() => {
+              if (mounted.current) setFlipping(false);
+            });
+          }, TICK_SETTLE_MS);
         }}
         accessibilityRole="checkbox"
-        accessibilityState={{ checked: done }}
-        accessibilityLabel={todo.text}
+        accessibilityState={{ checked: done, busy: flipping }}
+        accessibilityLabel={t(done ? 'goose.todos.markOpenLabel' : 'goose.todos.markDoneLabel', { text: todo.text })}
         hitSlop={8}
         style={styles.tick}
       >
         <GIcon name={done ? 'done' : 'circle'} size={24} color={done ? theme.color.accentLine : theme.color.textTertiary} />
       </GPressable>
       <GPressable onPress={() => openTodo(todo)} accessibilityRole="button" accessibilityLabel={t('goose.todos.editLabel', { text: todo.text })} style={styles.todoWords}>
-        <InkText size="md" weight="semibold" tone={done ? 'tertiary' : 'default'} numberOfLines={3}>
+        <InkText size="md" weight="semibold" tone={done ? 'tertiary' : 'default'} numberOfLines={3} style={done ? styles.struck : undefined}>
           {todo.text}
         </InkText>
         {!done
@@ -262,6 +284,7 @@ const styles = StyleSheet.create({
   todo: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.md, paddingVertical: Spacing.md },
   tick: { paddingTop: 1 },
   todoWords: { flex: 1, gap: 3 },
+  struck: { textDecorationLine: 'line-through' },
   hookLine: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   needs: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 999 },
   sheet: { gap: Spacing.md },

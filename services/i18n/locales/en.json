@@ -5070,6 +5070,11 @@
     },
     "todos": {
       "markedDone": "Marked done.",
+      "doneNamed": "Done: {{text}}",
+      "reopened": "Back on your list: {{text}}",
+      "undo": "Undo",
+      "markDoneLabel": "Mark done: {{text}}",
+      "markOpenLabel": "Mark not done: {{text}}",
       "askLater": "Goose will ask again later.",
       "dropped": "Goose will stop asking about it.",
       "saved": "Saved.",
