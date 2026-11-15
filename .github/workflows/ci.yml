@@ -82,20 +82,9 @@ jobs:
         if: ${{ !cancelled() }}
         run: npx jest --ci
 
-      # `npx eslint .` and not `npm run lint`. The two are not equivalent:
-      # `expo lint` walks a narrower set of files and reports zero errors on a
-      # tree where eslint, over 111 files, reports nine. Pointed at one of the
-      # offending files, `expo lint` reports the identical error -- so the
-      # difference is traversal, not configuration, and the narrower command is
-      # the one that would let a regression through.
-      #
-      # Those nine errors predate this workflow (eight react-hooks/
-      # set-state-in-effect in view-models and hooks, one no-undef in
-      # jest.setup.js) and are tracked in #53. continue-on-error keeps them
-      # visible in the log without making this job red from the day it is
-      # introduced, which is reliably how a new gate gets trained out of a team.
-      # Remove this line when #53 is cleared. It is a deferral, not a pardon.
+      # `npm run lint` is `eslint .`, the same command a developer runs. It was
+      # `expo lint`, which walks fewer files and once reported a clean tree that
+      # held nine errors (#53). Warnings stay advisory; errors fail the job.
       - name: Lint
         if: ${{ !cancelled() }}
-        continue-on-error: true
-        run: npx eslint .
+        run: npm run lint

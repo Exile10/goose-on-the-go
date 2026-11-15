@@ -73,6 +73,11 @@ module.exports = defineConfig([
     },
   },
   {
+    // Jest runs this before every suite. The Expo config gives test files Jest's globals, not this one.
+    files: ['jest.setup.js'],
+    languageOptions: { globals: { jest: 'readonly' } },
+  },
+  {
     files: TRANSLATED_SURFACE,
     // Tests assert on copy; they are not copy.
     ignores: ['**/__tests__/**'],

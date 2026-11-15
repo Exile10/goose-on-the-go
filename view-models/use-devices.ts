@@ -418,6 +418,20 @@ export function useDevices(): UseDevices {
   // Whether this Pond has echoed a command's key, so a command can be sent again without running twice.
   const honoursKeys = useRef(false);
   const replaying = useRef(false);
+  // `send` is made once, so the Try again it offers reads the list through a ref rather than a closure.
+  // Written in an effect, not during render: a ref set while rendering is read back by whatever
+  // renders next, which React does not promise, and the rule that forbids it is right here.
+  const devicesRef = useRef<Device[]>([]);
+  useEffect(() => {
+    devicesRef.current = devices;
+  }, [devices]);
+
+  // What the snackbar's Try again calls: the current switch and removal, set below once made.
+  const retry = useRef<Pick<UseDevices['actions'], 'setState' | 'remove'>>({
+    setState: async () => {},
+    remove: async () => {},
+  });
+
 
   const setQueue = useCallback((next: WaitingCommand[]) => {
     queue.current = next;
@@ -648,20 +662,6 @@ export function useDevices(): UseDevices {
   }, [hydrated, active, load, replay]);
 
   const refresh = useCallback(() => load(true), [load]);
-
-  // `send` is made once, so the Try again below reads the list through a ref rather than a closure.
-  // Written in an effect, not during render: a ref set while rendering is read back by whatever
-  // renders next, which React does not promise, and the rule that forbids it is right here.
-  const devicesRef = useRef<Device[]>([]);
-  useEffect(() => {
-    devicesRef.current = devices;
-  }, [devices]);
-
-  // What the snackbar's Try again calls: the current switch and removal, set below once made.
-  const retry = useRef<Pick<UseDevices['actions'], 'setState' | 'remove'>>({
-    setState: async () => {},
-    remove: async () => {},
-  });
 
   /**
    * Send a patch, and show the device's new state only once the Pond has read it back. Until then

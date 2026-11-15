@@ -64,11 +64,27 @@ class GateStore {
   /** Moves whenever this phone keeps a key, so a status asked before then cannot have it forgotten. */
   keyEpoch = 0;
   /** One biometric read at a time, however many screens under My Pond are showing the lock. */
-  readingKey = false;
+  private readingKey = false;
   /** Locked by this phone's own Lock: the lock waits for a tap, or Face ID would open it again at once. */
   lockedByHand = false;
 
   get = () => this.state;
+
+  /** This phone kept or forgot its key: a status asked before now must not overrule that. */
+  keyChanged() {
+    this.keyEpoch++;
+  }
+
+  /** Takes the one biometric read, or says no while another screen holds it. */
+  claimKeyRead(): boolean {
+    if (this.readingKey) return false;
+    this.readingKey = true;
+    return true;
+  }
+
+  releaseKeyRead() {
+    this.readingKey = false;
+  }
 
   subscribe = (listener: () => void) => {
     this.listeners.add(listener);
@@ -230,7 +246,7 @@ export function useAdminGate(): UseAdminGate {
   }, [store]);
 
   const forgetKept = useCallback(async () => {
-    store.keyEpoch++;
+    store.keyChanged();
     // Revoking also locks this phone on the Pond; unreachable, it is at least asked to lock.
     await source.forgetKey().catch(() => source.lock().catch(() => undefined));
     await forgetKeptAdminKey(pin);
@@ -364,7 +380,7 @@ export function useAdminUnlock(): UseAdminUnlock {
   /** After the card opened My Pond. Nothing here can close it again: a refused save keeps nothing. */
   const keepKey = useCallback(
     async (keepFor: string) => {
-      store.keyEpoch++;
+      store.keyChanged();
       let key: string;
       try {
         key = await source.enroll();
@@ -388,7 +404,7 @@ export function useAdminUnlock(): UseAdminUnlock {
           showSnackbar({ message: i18n.t('myPond.key.notKept') });
         }
       } finally {
-        store.keyEpoch++;
+        store.keyChanged();
       }
     },
     [forgetLocally, source, store, touch],
@@ -413,8 +429,7 @@ export function useAdminUnlock(): UseAdminUnlock {
   }, [canKeep, coolingSecs, explain, keepKey, password, pin, remember, source, store, unlocking]);
 
   const unlockWithKept = useCallback(async () => {
-    if (!pin || unlocking || coolingSecs > 0 || store.readingKey) return false;
-    store.readingKey = true;
+    if (!pin || unlocking || coolingSecs > 0 || !store.claimKeyRead()) return false;
     setUnlocking(true);
     setError(null);
     try {
@@ -448,7 +463,7 @@ export function useAdminUnlock(): UseAdminUnlock {
       }
       return false;
     } finally {
-      store.readingKey = false;
+      store.releaseKeyRead();
       setUnlocking(false);
     }
   }, [coolingSecs, explain, forgetLocally, pin, readStatus, source, store, unlocking]);

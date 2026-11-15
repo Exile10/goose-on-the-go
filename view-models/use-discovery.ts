@@ -38,10 +38,6 @@ export function useDiscovery(): UseDiscovery {
   const handle = useRef<DiscoveryHandle | null>(null);
 
   useEffect(() => {
-    setPonds([]);
-    setError(null);
-    setTimedOut(false);
-
     handle.current = startDiscovery(setPonds, setError);
     const timer = setTimeout(() => setTimedOut(true), SEARCH_TIMEOUT_MS);
 
@@ -54,7 +50,13 @@ export function useDiscovery(): UseDiscovery {
     };
   }, [attempt]);
 
-  const retry = useCallback(() => setAttempt((n) => n + 1), []);
+  // Cleared here rather than in the effect, so a new search starts from nothing in one render.
+  const retry = useCallback(() => {
+    setPonds([]);
+    setError(null);
+    setTimedOut(false);
+    setAttempt((n) => n + 1);
+  }, []);
 
   // A hub that answered is worth showing even if something else errored, so
   // results outrank a failure rather than the other way round.

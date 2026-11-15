@@ -113,7 +113,7 @@ async function mount<T>(hook: () => T) {
   };
 }
 
-const both = () => ({ tab: useMyPond(), form: useAdminUnlock() });
+const useBoth = () => ({ tab: useMyPond(), form: useAdminUnlock() });
 
 /** A key this phone kept earlier, which the Pond still holds unless told otherwise. */
 function keepKey(key = 'key-1', pin = PIN) {
@@ -191,7 +191,7 @@ async function typeCardAndUnlock(form: () => ReturnType<typeof useAdminUnlock>) 
 
 describe('keeping a key after the card', () => {
   it('enrolls and keeps one for this Pond by default', async () => {
-    const m = await mount(both);
+    const m = await mount(useBoth);
     expect(m.vm.form.canKeep).toBe(true);
     expect(m.vm.form.keysAwaitPond).toBe(false);
     expect(m.vm.form.remember).toBe(true);
@@ -208,7 +208,7 @@ describe('keeping a key after the card', () => {
   });
 
   it('keeps nothing when the member turns it off', async () => {
-    const m = await mount(both);
+    const m = await mount(useBoth);
     await act(async () => m.vm.form.setRemember(false));
     expect(await typeCardAndUnlock(() => m.vm.form)).toBe(true);
     expect(pond.adminEnroll).not.toHaveBeenCalled();
@@ -219,7 +219,7 @@ describe('keeping a key after the card', () => {
 
   it('never offers it on a phone that cannot keep one', async () => {
     keychain.canKeep.mockReturnValue(false);
-    const m = await mount(both);
+    const m = await mount(useBoth);
     expect(m.vm.form.canKeep).toBe(false);
     await typeCardAndUnlock(() => m.vm.form);
     expect(pond.adminEnroll).not.toHaveBeenCalled();
@@ -228,14 +228,14 @@ describe('keeping a key after the card', () => {
 
   it('never offers it with nothing paired', async () => {
     server.pairedPin = null;
-    const m = await mount(both);
+    const m = await mount(useBoth);
     expect(m.vm.form.canKeep).toBe(false);
     await m.unmount();
   });
 
   it('stays open and keeps nothing when the save is refused, without a word for a cancel', async () => {
     keychain.keep.mockRejectedValueOnce(new Error('User canceled the authentication'));
-    const m = await mount(both);
+    const m = await mount(useBoth);
     expect(await typeCardAndUnlock(() => m.vm.form)).toBe(true);
     expect(m.vm.tab.gate.phase).toBe('unlocked');
     expect(m.vm.form.kept).toBe(false);
@@ -247,7 +247,7 @@ describe('keeping a key after the card', () => {
   it('says so when the phone could not keep the key', async () => {
     const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
     keychain.keep.mockRejectedValueOnce(new Error('KeyStore error'));
-    const m = await mount(both);
+    const m = await mount(useBoth);
     expect(await typeCardAndUnlock(() => m.vm.form)).toBe(true);
     expect(m.vm.form.kept).toBe(false);
     expect(mockSnackbar).toHaveBeenCalledWith({ message: expect.stringContaining("couldn't keep its key") });
@@ -258,7 +258,7 @@ describe('keeping a key after the card', () => {
   it('stays open and keeps nothing when the Pond will not enroll, and says so', async () => {
     const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
     pond.adminEnroll.mockRejectedValue(new ApiError('POST → 500', 500, null));
-    const m = await mount(both);
+    const m = await mount(useBoth);
     expect(await typeCardAndUnlock(() => m.vm.form)).toBe(true);
     expect(keychain.keep).not.toHaveBeenCalled();
     expect(m.vm.tab.gate.phase).toBe('unlocked');
@@ -271,7 +271,7 @@ describe('keeping a key after the card', () => {
   it('says the Pond needs an update when it has no enroll route', async () => {
     const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
     pond.adminEnroll.mockRejectedValue(new ApiError('POST → 404', 404, null));
-    const m = await mount(both);
+    const m = await mount(useBoth);
     expect(await typeCardAndUnlock(() => m.vm.form)).toBe(true);
     expect(mockSnackbar).toHaveBeenCalledWith({ message: expect.stringContaining('needs an update on your Pond') });
     await m.unmount();
@@ -280,7 +280,7 @@ describe('keeping a key after the card', () => {
 
   it('waits for a Pond that keeps no phone keys: no switch, a line saying why, and nothing enrolled', async () => {
     live.keys = false;
-    const m = await mount(both);
+    const m = await mount(useBoth);
     expect(m.vm.form.canKeep).toBe(false);
     expect(m.vm.form.keysAwaitPond).toBe(true);
     expect(await typeCardAndUnlock(() => m.vm.form)).toBe(true);
@@ -292,7 +292,7 @@ describe('keeping a key after the card', () => {
 describe('opening with the kept key', () => {
   it('asks for the phone’s biometrics by itself on arrival, then opens with the key', async () => {
     keepKey();
-    const m = await mount(both);
+    const m = await mount(useBoth);
     expect(keychain.read).toHaveBeenCalledTimes(1);
     expect(keychain.read).toHaveBeenCalledWith(PIN, 'Unlock My Pond');
     expect(pond.adminUnlockWithKey).toHaveBeenCalledWith('key-1');
@@ -304,7 +304,7 @@ describe('opening with the kept key', () => {
   it('stays locked with nothing said when the person cancels, and does not ask again by itself', async () => {
     keepKey();
     keychain.read.mockRejectedValueOnce(new Error('User canceled the operation.'));
-    const m = await mount(both);
+    const m = await mount(useBoth);
     expect(m.vm.tab.gate.phase).toBe('locked');
     expect(m.vm.form.error).toBeNull();
     expect(m.vm.form.kept).toBe(true);
@@ -351,9 +351,9 @@ describe('opening with the kept key', () => {
   it('asks again on a later arrival, once', async () => {
     keepKey();
     keychain.read.mockRejectedValue(new Error('User canceled the operation.'));
-    const first = await mount(both);
+    const first = await mount(useBoth);
     await first.unmount();
-    const second = await mount(both);
+    const second = await mount(useBoth);
     expect(keychain.read).toHaveBeenCalledTimes(2);
     await second.unmount();
   });
@@ -361,7 +361,7 @@ describe('opening with the kept key', () => {
   it('forgets a key the phone can no longer read, and says to type the card once more', async () => {
     keepKey();
     keychain.read.mockRejectedValueOnce(new KeptAdminKeyLost());
-    const m = await mount(both);
+    const m = await mount(useBoth);
     expect(keychain.forget).toHaveBeenCalledTimes(1);
     expect(m.vm.form.kept).toBe(false);
     expect(m.vm.form.error).toMatch(/can no longer read its key/);
@@ -373,7 +373,7 @@ describe('opening with the kept key', () => {
   it('says so when the biometrics fail for another reason, and keeps the key', async () => {
     keepKey();
     keychain.read.mockRejectedValueOnce(new Error('Could not Authenticate the user: Lockout.'));
-    const m = await mount(both);
+    const m = await mount(useBoth);
     expect(keychain.forget).not.toHaveBeenCalled();
     expect(m.vm.form.kept).toBe(true);
     expect(m.vm.form.error).toMatch(/didn't open the key/);
@@ -385,7 +385,7 @@ describe('opening with the kept key', () => {
     // Replaced on the Pond since, though it still holds a key for this phone.
     live.key = 'key-2';
     const statusReads = () => pond.adminStatus.mock.calls.length;
-    const m = await mount(both);
+    const m = await mount(useBoth);
     expect(keychain.forget).toHaveBeenCalled();
     expect(m.vm.form.kept).toBe(false);
     expect(m.vm.form.error).toBe("This phone's key no longer opens My Pond. Type the admin card to open it.");
@@ -400,7 +400,7 @@ describe('opening with the kept key', () => {
       live.retry = 20;
       throw refused(429, 'admin_cooling', { retry_after: 20 }, 20);
     });
-    const m = await mount(both);
+    const m = await mount(useBoth);
     expect(m.vm.form.coolingSecs).toBe(20);
     expect(m.vm.form.kept).toBe(true);
     await act(async () => {
@@ -413,7 +413,7 @@ describe('opening with the kept key', () => {
   it('opens a Pond whose card was never made', async () => {
     keepKey();
     live.card = 'missing';
-    const m = await mount(both);
+    const m = await mount(useBoth);
     expect(pond.adminUnlockWithKey).toHaveBeenCalledWith('key-1');
     expect(m.vm.tab.gate.phase).toBe('unlocked');
     await m.unmount();
@@ -454,7 +454,7 @@ describe('the status', () => {
 
   it('never takes another Pond’s key for this one', async () => {
     keepKey('key-9', 'sha256/another-pond');
-    const m = await mount(both);
+    const m = await mount(useBoth);
     expect(m.vm.form.kept).toBe(false);
     expect(keychain.read).not.toHaveBeenCalled();
     await m.unmount();
@@ -519,7 +519,7 @@ describe('forgetting it on this phone', () => {
 describe('on the mock Pond', () => {
   it('keeps a key after the card under the mock’s own pin, and opens with it on the next arrival', async () => {
     server.real = false;
-    const first = await mount(both);
+    const first = await mount(useBoth);
     await typeCardAndUnlock(() => first.vm.form);
     expect(keychain.keep).toHaveBeenCalledWith(MOCK_POND_PIN, expect.any(String), expect.any(String));
     await act(async () => {
@@ -527,7 +527,7 @@ describe('on the mock Pond', () => {
     });
     await first.unmount();
 
-    const second = await mount(both);
+    const second = await mount(useBoth);
     expect(keychain.read).toHaveBeenCalledWith(MOCK_POND_PIN, 'Unlock My Pond');
     expect(second.vm.tab.gate.phase).toBe('unlocked');
     expect(pond.adminUnlockWithKey).not.toHaveBeenCalled();

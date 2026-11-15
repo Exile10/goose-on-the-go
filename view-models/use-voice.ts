@@ -79,10 +79,12 @@ export function isPhantom(text: string): boolean {
   if (/^[[(].*[\])]$/.test(t)) return true; // [BLANK_AUDIO], (music), [inaudible]
   // 'bye' is excluded here: checkDismissal below gives it a proper spoken farewell
   // instead of silently discarding it as noise.
+  // eslint-disable-next-line i18next/no-literal-string -- what Whisper hears in silence, matched, not shown
   return ['you', 'thank you', 'thanks', 'thanks for watching'].includes(t);
 }
 
 const EXIT_PHRASES = ['exit', 'quit'];
+/* eslint-disable i18next/no-literal-string -- spoken phrases matched against what was heard, never shown */
 const DISMISSAL_PHRASES = [
   'bye',
   'goodbye',
@@ -99,6 +101,7 @@ const DISMISSAL_PHRASES = [
   'never mind',
   'nevermind',
 ];
+/* eslint-enable i18next/no-literal-string */
 
 /**
  * Whole-utterance match (never a substring — "stop the kitchen timer" is not a
@@ -161,12 +164,12 @@ export function useVoice(chat: {
   const alive = useRef(true);
   const sendRef = useRef(chat.send);
   const recordingsRef = useRef(Boolean(chat.sendsRecordings));
-  recordingsRef.current = Boolean(chat.sendsRecordings);
   const stopRef = useRef(chat.stop);
   useEffect(() => {
     sendRef.current = chat.send;
     stopRef.current = chat.stop;
-  }, [chat.send, chat.stop]);
+    recordingsRef.current = Boolean(chat.sendsRecordings);
+  }, [chat.send, chat.stop, chat.sendsRecordings]);
 
   // A recording the Pond never received because nothing answered: Try again sends it once a
   // route answers, rather than asking the person to say it again. The assistant overlay has no

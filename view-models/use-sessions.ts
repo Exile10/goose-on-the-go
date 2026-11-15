@@ -3,12 +3,16 @@
  * Lists, renames, and deletes conversations against the real Pond server.
  */
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 
 import { useServer } from '@/providers/server-provider';
 import { ApiError, api } from '@/services/api-client';
 import type { SessionSummary } from '@/services/types';
 import i18n from '@/services/i18n';
+import { useLive } from './use-live';
+
+/** A conversation started or renamed elsewhere shows up without leaving the screen. */
+export const SESSIONS_MS = 60_000;
 
 export function useSessions() {
   // The base URL and bearer token arrive asynchronously; fetching before they
@@ -18,12 +22,15 @@ export function useSessions() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const refresh = useCallback(async () => {
-    setLoading(true);
-    setError(null);
+  /** `loud` is a read somebody asked for; one on arrival or a poll changes nothing until it lands. */
+  const load = useCallback(async (loud: boolean) => {
+    if (loud) {
+      setLoading(true);
+      setError(null);
+    }
     try {
-      const result = await api.listSessions();
-      setSessions(result);
+      setSessions(await api.listSessions());
+      setError(null);
     } catch (e) {
       setError(
         e instanceof ApiError
@@ -35,10 +42,8 @@ export function useSessions() {
     }
   }, []);
 
-  useEffect(() => {
-    if (!hydrated) return;
-    void refresh();
-  }, [hydrated, refresh]);
+  const refresh = useCallback(() => load(true), [load]);
+  useLive(() => load(false), SESSIONS_MS, hydrated);
 
   const rename = useCallback(async (id: string, title: string) => {
     try {
