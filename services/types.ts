@@ -1300,6 +1300,22 @@ export interface OAuthProvider {
   scopes: string[];
 }
 
+/** `POST /oauth/authorize`: the provider's sign-in page, and the nonce the sign-in is read back by. */
+export interface OAuthStart {
+  auth_url: string;
+  state: string;
+}
+
+/**
+ * `GET /oauth/status/{state}`: how one sign-in stands. `unknown` is a nonce the Pond no longer
+ * holds, such as one whose outcome was recorded more than five minutes ago.
+ */
+export interface OAuthSignInStatus {
+  status: 'pending' | 'completed' | 'failed' | 'unknown';
+  /** Why it failed, in the Pond's English: for a log line, not a screen. */
+  error?: string;
+}
+
 // ── Web search ────────────────────────────────────────────────
 
 /**

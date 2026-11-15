@@ -16,6 +16,7 @@ import i18n from '@/services/i18n';
 import { showSnackbar } from '@/services/snackbar';
 import type { Extension, MarketplaceExtension, SecretRequirement } from '@/services/types';
 import { describeApiError } from './describe-error';
+import { signInExtension } from './extension-sign-in';
 import { useLive } from './use-live';
 
 /** How often the list is re-read while the screen is in front. */
@@ -27,6 +28,17 @@ export const EXTENSIONS_MS = 30_000;
  */
 export function credentialFields(item: MarketplaceExtension): SecretRequirement[] {
   return item.required_secrets.filter((s) => s.kind !== 'oauth_flow' && !s.advanced && !s.host_only);
+}
+
+/** What an extension is signed in to rather than typed into, such as a Spotify account. */
+export function signInFields(item: MarketplaceExtension): SecretRequirement[] {
+  return item.required_secrets.filter((s) => s.kind === 'oauth_flow' && !s.host_only);
+}
+
+/** The Pond's `code` for a sign-in it cannot start, which a caller words rather than shows. */
+function refusalCode(e: unknown): string | null {
+  const code = e instanceof ApiError ? (e.body as { code?: unknown } | null)?.code : null;
+  return typeof code === 'string' ? code : null;
 }
 
 export interface UseExtensions {
@@ -54,6 +66,8 @@ export interface UseExtensions {
     saveSecrets: (name: string, secrets: Record<string, string>) => Promise<boolean>;
     /** Removes an installed marketplace extension, returning it to the marketplace. */
     remove: (name: string) => Promise<void>;
+    /** Signs extension `name` in to the provider `requirement` names, and says how it went. */
+    signIn: (name: string, requirement: SecretRequirement) => Promise<void>;
   };
 }
 
@@ -191,11 +205,37 @@ export function useExtensions(): UseExtensions {
     retry.current = { setEnabled, remove };
   }, [setEnabled, remove]);
 
+  const signIn = useCallback(
+    async (name: string, requirement: SecretRequirement) => {
+      const provider = requirement.display_name;
+      try {
+        const outcome = await signInExtension(requirement.key, name);
+        console.info('[extensions] sign-in', name, outcome);
+        if (outcome === 'connected') {
+          showSnackbar({ message: i18n.t('extensions.signIn.connected', { name: provider }), tone: 'success' });
+          await load(false);
+        } else {
+          const message = outcome === 'failed'
+            ? i18n.t('extensions.signIn.failed', { name: provider })
+            : i18n.t('extensions.signIn.unfinished', { name: provider });
+          showSnackbar({ message, tone: 'danger' });
+        }
+      } catch (e) {
+        console.warn('[extensions] sign-in refused', name, e instanceof ApiError ? e.status : 'network');
+        const message = refusalCode(e) === 'client_id_missing'
+          ? i18n.t('extensions.signIn.clientIdMissing', { name: provider })
+          : describeApiError(e) ?? i18n.t('errors.generic');
+        showSnackbar({ message, tone: 'danger' });
+      }
+    },
+    [load],
+  );
+
   return {
     data: { installed, available, marketplace },
     loading,
     error,
     failed,
-    actions: { refresh, setEnabled, install, saveSecrets, remove },
+    actions: { refresh, setEnabled, install, saveSecrets, remove, signIn },
   };
 }

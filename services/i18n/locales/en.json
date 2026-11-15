@@ -2419,7 +2419,16 @@
     "installConfirmTitle": "Install {{name}}?",
     "installConfirmBody": "{{name}} will run as a program on the computer your Pond runs on, and Goose will be able to use its tools.",
     "removeConfirmTitle": "Remove {{name}}?",
-    "removeConfirmBody": "{{name}} will stop running on your Pond. Credentials saved for it stay there."
+    "removeConfirmBody": "{{name}} will stop running on your Pond. Credentials saved for it stay there.",
+    "signIn": {
+      "action": "Sign in to {{name}}",
+      "signingIn": "Signing in…",
+      "note": "A phone can't finish this sign-in yet. If it doesn't connect, sign in from a browser on your Pond's computer.",
+      "connected": "{{name}} is connected.",
+      "failed": "{{name}} sign-in didn't work. Try again.",
+      "unfinished": "{{name}} sign-in didn't reach your Pond. Sign in from a browser on your Pond's computer instead.",
+      "clientIdMissing": "Your Pond needs its own {{name}} client ID before anyone can sign in. Add it on your Pond's computer."
+    }
   },
   "webSearch": {
     "loading": "Checking web search…",
