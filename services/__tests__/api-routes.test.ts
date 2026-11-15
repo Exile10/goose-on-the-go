@@ -172,6 +172,45 @@ describe('concurrent 401s', () => {
 
     expect(refreshes).toBe(1);
   });
+
+  /**
+   * The Pond rotates on every refresh and revokes the token before. A request sent with the
+   * stale token whose 401 comes back after the shared refresh has finished must retry with the
+   * new token, not start a second refresh: that would revoke the token the first request just
+   * retried with, and its 401 would unpair the phone. On 2026-11-09 one expiry became seven
+   * rotations in a second this way.
+   */
+  it('answers a late 401 with the refreshed token instead of refreshing again', async () => {
+    let refreshes = 0;
+    // The phone's token has expired: the Pond accepts only what a refresh issues.
+    let current = '';
+    setFetch(async (url: string, init?: { headers?: Headers }) => {
+      if (url.endsWith('/handshake/refresh')) {
+        refreshes++;
+        current = `fresh-${refreshes}`;
+        return reply(`{"accepted":true,"session_token":"${current}","refresh_token":"r${refreshes + 1}"}`);
+      }
+      const sent = (init?.headers?.get('Authorization') ?? '').replace('Bearer ', '');
+      // The sessions request is slow: its refusal of the stale token lands after the refresh.
+      if (url.endsWith('/api/v1/sessions') && sent === 'stale') {
+        await new Promise((r) => setTimeout(r, 20));
+      }
+      if (sent !== current) return reply('', { status: 401 });
+      return reply(url.endsWith('/devices') ? '{"devices":[]}' : '[]');
+    });
+
+    const api = new PondApiClient('https://pond.test:4000');
+    api.setToken('stale');
+    api.setRefreshToken('refresh-1');
+    const revoked = jest.fn();
+    api.setAuthRevoked(revoked);
+
+    const results = await Promise.allSettled([api.listDevices(), api.listSessions()]);
+
+    expect(results.map((r) => r.status)).toEqual(['fulfilled', 'fulfilled']);
+    expect(refreshes).toBe(1);
+    expect(revoked).not.toHaveBeenCalled();
+  });
 });
 
 /**
