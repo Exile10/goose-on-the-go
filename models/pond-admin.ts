@@ -126,6 +126,8 @@ export function readOverview(raw: unknown): AdminOverview | null {
   const counts = record(o.counts) ?? {};
   return {
     disk: readDisk(o.disk) ?? { total_bytes: 0, free_bytes: 0 },
+    // Absent from a Pond without an encrypted volume, and from one older than the field.
+    volume: readDisk(o.volume),
     data_dir_bytes: count(o.data_dir_bytes),
     areas: [...areas].map(([id, bytes]) => ({ id, bytes })).sort((a, b) => b.bytes - a.bytes),
     databases: list(o.databases).flatMap((item) => {

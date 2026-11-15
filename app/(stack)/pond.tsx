@@ -115,7 +115,7 @@ export default function MyPondScreen() {
   const router = useRouter();
   const theme = useInkTheme();
   const styles = useSettingsStyles(makeStyles);
-  const { gate, overview, parts, disk, locksIn, healthStatus, loading, refreshing, error, locking, kept, actions } = useMyPond();
+  const { gate, overview, parts, disk, volume, locksIn, healthStatus, loading, refreshing, error, locking, kept, actions } = useMyPond();
   const unlocked = gate.phase === 'unlocked';
 
   const go = useCallback(
@@ -208,6 +208,15 @@ export default function MyPondScreen() {
               <Text style={styles.small}>
                 {t('myPond.overview.used', { used: sizeWords(disk.used), pond: sizeWords(overview.data_dir_bytes) })}
               </Text>
+              {volume ? (
+                <Text style={styles.small}>
+                  {t('myPond.overview.volume', {
+                    used: sizeWords(volume.used),
+                    total: sizeWords(volume.total),
+                    free: sizeWords(volume.free),
+                  })}
+                </Text>
+              ) : null}
             </View>
           </SettingsGroup>
 

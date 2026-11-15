@@ -169,6 +169,8 @@ describe('the lock', () => {
     expect(pond.adminOverview).toHaveBeenCalledTimes(1);
     expect(pond.adminHealth).toHaveBeenCalledTimes(1);
     expect(m.vm.tab.disk).toEqual({ used: 750, total: 1000, free: 250, fraction: 0.75 });
+    // No volume in the overview: a Pond without an encrypted data volume, or one from before it.
+    expect(m.vm.tab.volume).toBeNull();
     expect(m.vm.tab.parts).toEqual([
       { id: 'models', bytes: 500 },
       { id: 'engine_caches', bytes: 0 },
@@ -191,6 +193,19 @@ describe('the lock', () => {
     expect(m.vm.tab.gate.phase).toBe('locked');
     expect(m.vm.tab.overview).toBeNull();
     await m.unmount();
+  });
+
+  it('shows the encrypted data volume apart from the disk that holds it', async () => {
+    pond.adminOverview.mockResolvedValue({ ...OVERVIEW, volume: { total_bytes: 400, free_bytes: 100 } });
+    pond.adminUnlock.mockResolvedValue({ unlocked: true, expires_at: OPEN.expires_at });
+    const m = await mount(() => ({ tab: useMyPond(), form: useAdminUnlock() }));
+    await act(async () => m.vm.form.setPassword('goos eina pond 2026'));
+    await act(async () => {
+      await m.vm.form.unlock();
+    });
+    await flush();
+    expect(m.vm.tab.disk).toEqual({ used: 750, total: 1000, free: 250, fraction: 0.75 });
+    expect(m.vm.tab.volume).toEqual({ used: 300, total: 400, free: 100, fraction: 0.75 });
   });
 
   it('sends nothing until the password is sixteen characters from the card', async () => {
