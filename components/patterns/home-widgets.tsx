@@ -135,7 +135,7 @@ export function OutsideWidget({ outdoor }: { outdoor: Outdoor }) {
 
   return (
     <View accessible accessibilityLabel={[t('home.widgets.outside'), temp, outdoor.place].filter(Boolean).join(', ')}>
-      <WidgetHeader icon="partly-sunny" title={t('home.widgets.outside')} />
+      <WidgetHeader icon={outdoor.icon} title={t('home.widgets.outside')} />
       <Text style={styles.big}>{temp}</Text>
       {outdoor.place ? (
         <Text style={styles.detail} numberOfLines={1}>

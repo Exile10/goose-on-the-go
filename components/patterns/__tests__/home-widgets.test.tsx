@@ -55,7 +55,7 @@ describe('NowPlayingWidget', () => {
 
 describe('OutsideWidget', () => {
   it('rounds to a whole degree and names the place', async () => {
-    const tree = await render(<OutsideWidget outdoor={{ temp: 18.6, place: 'Nairobi' }} />);
+    const tree = await render(<OutsideWidget outdoor={{ temp: 18.6, place: 'Nairobi', icon: 'partly-sunny' }} />);
     expect(texts(tree)).toEqual(expect.arrayContaining([i18n.t('home.widgets.temp', { temp: 19 }), 'Nairobi']));
   });
 });

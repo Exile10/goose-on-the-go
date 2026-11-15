@@ -10,6 +10,8 @@
  * soonest first -- but it is not what the card first claimed, so it is labelled a routine and
  * never an event.
  */
+import type { IconName } from '@/constants/icons';
+import { conditionIcon } from '@/models/weather-card';
 import { useRef, useState } from 'react';
 
 import { useServer } from '@/providers/server-provider';
@@ -33,6 +35,8 @@ export type Until = { unit: 'now' } | { unit: 'minutes' | 'hours' | 'days'; coun
 export interface Outdoor {
   temp: number;
   place: string | null;
+  /** The sky's icon: the condition by day or night, a plain cloud when the Pond names none. */
+  icon: IconName;
 }
 
 export interface RightNow {
@@ -127,7 +131,11 @@ export async function readOutdoor(client: Pick<RightNowReader, 'weather'> = api)
   try {
     const w = await client.weather();
     if (!w.enabled || typeof w.temp !== 'number') return null;
-    return { temp: w.temp, place: w.location_name?.trim() || null };
+    return {
+      temp: w.temp,
+      place: w.location_name?.trim() || null,
+      icon: conditionIcon(w.cond ?? '', typeof w.is_day === 'boolean' ? w.is_day : null),
+    };
   } catch {
     return null;
   }

@@ -145,9 +145,9 @@ describe('conditionIcon', () => {
     expect(conditionIcon(condition)).toBe(icon);
   });
 
-  it('draws a clear night as the moon and a partly cloudy one without the sun', () => {
+  it('draws a clear night as the moon and a partly cloudy one as the moon behind a cloud', () => {
     expect(conditionIcon('Clear sky', false)).toBe('moon');
-    expect(conditionIcon('Partly cloudy', false)).toBe('cloud');
+    expect(conditionIcon('Partly cloudy', false)).toBe('partly-night');
     expect(conditionIcon('Slight rain', false)).toBe('rain');
   });
 });

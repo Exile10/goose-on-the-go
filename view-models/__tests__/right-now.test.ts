@@ -115,7 +115,7 @@ describe('readRightNow', () => {
 
   it('reads all three cards', async () => {
     await expect(readRightNow(pond())).resolves.toEqual({
-      outdoor: { temp: 22, place: 'Nairobi' },
+      outdoor: { temp: 22, place: 'Nairobi', icon: 'cloud' },
       nowPlaying: { state: 'idle' },
       nextRoutine: { label: 'Morning briefing', nextRun: new Date('2026-09-23T04:00:00Z') },
     });
@@ -129,10 +129,21 @@ describe('readRightNow', () => {
     expect(r.outdoor).toBeNull();
   });
 
+  it("draws the sky the Pond names, by day and by night, and a plain cloud when it names none", async () => {
+    const sky = async (cond: string | undefined, is_day: boolean | undefined) =>
+      (await readRightNow(pond({ weather: async () => ({ enabled: true, temp: 15, location_name: 'Ndenderu', cond, is_day }) }))).outdoor?.icon;
+    await expect(sky('Partly cloudy', true)).resolves.toBe('partly-sunny');
+    await expect(sky('Partly cloudy', false)).resolves.toBe('partly-night');
+    await expect(sky('Clear sky', false)).resolves.toBe('moon');
+    await expect(sky('Moderate drizzle', true)).resolves.toBe('drizzle');
+    await expect(sky('Slight rain showers', true)).resolves.toBe('rain');
+    await expect(sky(undefined, undefined)).resolves.toBe('cloud');
+  });
+
   it('loses only the card whose read failed', async () => {
     const r = await readRightNow(pond({ nowPlaying: async () => { throw new ApiError('bad gateway', 502, null); } }));
     expect(r.nowPlaying).toBeNull();
-    expect(r.outdoor).toEqual({ temp: 22, place: 'Nairobi' });
+    expect(r.outdoor).toEqual({ temp: 22, place: 'Nairobi', icon: 'cloud' });
     expect(r.nextRoutine).not.toBeNull();
   });
 });
