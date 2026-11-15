@@ -89,8 +89,8 @@ function deviceTiming(entry: LogEntry, meta: Record<string, unknown>): CommandTi
     device: {
       id: meta.device,
       verb: typeof meta.verb === 'string' ? meta.verb : '',
-      value: typeof meta.value === 'string' || typeof meta.value === 'boolean' ? String(meta.value) : null,
-      failed: meta.error_code !== undefined,
+      value: ['string', 'boolean', 'number'].includes(typeof meta.value) ? String(meta.value) : null,
+      failed: meta.error_code !== undefined && meta.error_code !== null,
     },
   };
 }

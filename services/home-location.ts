@@ -31,9 +31,13 @@ export function placeName(address: Location.LocationGeocodedAddress | undefined)
 
 /**
  * The phone's position now. With `ask`, the person is asked for location permission if they have
- * not answered; without it, only an existing grant is used, so nothing prompts unasked.
+ * not answered; without it, only an existing grant is used, so nothing prompts unasked. `namer`
+ * words the geocoder's answer, so every reader of the phone's place shares this one path.
  */
-export async function readPhoneFix(ask: boolean): Promise<PhoneFix> {
+export async function readPhoneFix(
+  ask: boolean,
+  namer: (address: Location.LocationGeocodedAddress | undefined) => string | null = placeName,
+): Promise<PhoneFix> {
   try {
     const held = await Location.getForegroundPermissionsAsync();
     const permission = held.granted || !ask ? held : await Location.requestForegroundPermissionsAsync();
@@ -42,7 +46,7 @@ export async function readPhoneFix(ask: boolean): Promise<PhoneFix> {
     const { coords } = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
     let name: string | null = null;
     try {
-      name = placeName((await Location.reverseGeocodeAsync(coords))[0]);
+      name = namer((await Location.reverseGeocodeAsync(coords))[0]);
     } catch (e) {
       // The Pond keeps the name it had; the coordinates are what the weather needs.
       console.warn('[home-location] the phone could not name the place', { kind: 'home_location', error: String(e) });
@@ -81,13 +85,20 @@ export function homeLocationIsPinned(settings: { weather_location_source?: strin
 let offered = false;
 
 /**
- * Unasked, once per run of the app: send this phone's fix when the caller has found it at home and
- * the Pond's location still a guess. Uses a location grant the person already gave and never asks
- * for one; the Pond keeps a place someone set. Resolves whether the Pond took the fix.
+ * Once per run of the app: offer this phone's fix when the caller has found it at home and the
+ * Pond's location still a guess. Offered only with a location grant the person already gave, and
+ * sent only when `ask` resolves yes, since it leaves the phone; the Pond keeps a place someone set.
+ * Resolves whether the Pond took the fix.
  */
-export async function offerHomeLocationOnce(): Promise<boolean> {
+export async function offerHomeLocationOnce(ask: () => Promise<boolean>): Promise<boolean> {
   if (offered) return false;
   offered = true;
+  try {
+    if (!(await Location.getForegroundPermissionsAsync()).granted) return false;
+  } catch {
+    return false;
+  }
+  if (!(await ask())) return false;
   const fix = await readPhoneFix(false);
   if (fix.kind !== 'fix') return false;
   try {

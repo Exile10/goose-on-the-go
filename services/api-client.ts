@@ -267,6 +267,25 @@ function routeOrThrow(raw: unknown): RouteState {
   return state;
 }
 
+/** How long a turn waits for this phone's place before it is sent without one. */
+const PLACE_WAIT_MS = 1_500;
+
+/** `work`'s value if it settles within `ms` and before `signal` aborts; undefined otherwise. */
+function within<T>(work: Promise<T>, ms: number, signal?: AbortSignal): Promise<T | undefined> {
+  return new Promise((resolve) => {
+    const done = (value: T | undefined) => {
+      clearTimeout(timer);
+      signal?.removeEventListener('abort', give);
+      resolve(value);
+    };
+    const give = () => done(undefined);
+    const timer = setTimeout(give, ms);
+    if (signal?.aborted) give();
+    else signal?.addEventListener('abort', give);
+    work.then(done, give);
+  });
+}
+
 export class ApiError extends Error {
   readonly status: number;
   readonly retryAfterSecs: number | null;
@@ -1383,7 +1402,7 @@ export class PondApiClient {
     onFrame: (frame: ChatFrame) => void,
     signal?: AbortSignal,
   ): Promise<void> {
-    const place = await this.turnPlace?.();
+    const place = this.turnPlace ? await within(this.turnPlace(), PLACE_WAIT_MS, signal) : undefined;
     const res = await this.open('/api/v1/chat/stream', {
       method: 'POST',
       headers: { Accept: 'text/event-stream' },

@@ -3,7 +3,7 @@
  * what a member does with one of theirs (share it, move it, delete it, watch its price).
  */
 
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 
 import type { SavedCollection, SavedItem } from '@/models/web-watches';
 import { useServer } from '@/providers/server-provider';
@@ -25,6 +25,8 @@ export function useSavedItems() {
   const [collection, setCollection] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // The collection last asked for: a poll still out when another is chosen must not land over it.
+  const wanted = useRef<string | null>(null);
 
   /** `loud` is a read somebody asked for; one on arrival or a poll changes nothing until it lands. */
   const load = useCallback(async (loud: boolean, from: string | null) => {
@@ -34,6 +36,7 @@ export function useSavedItems() {
     }
     try {
       const [found, named] = await Promise.all([api.listSavedItems(from ?? undefined), api.savedCollections()]);
+      if (from !== wanted.current) return;
       setItems(found);
       setCollections(named);
       setError(null);
@@ -50,6 +53,7 @@ export function useSavedItems() {
   /** Another collection is read at once, rather than at the next poll. */
   const choose = useCallback(
     (next: string | null) => {
+      wanted.current = next;
       setCollection(next);
       void load(true, next);
     },

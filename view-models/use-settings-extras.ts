@@ -460,7 +460,7 @@ export function useFindLocation(): ActionState & { run: (typed: string) => Promi
         setState({ busy: false, message: i18n.t('settings.location.fromPhone', { name: result.name }), tone: 'neutral' });
         return { kind: 'saved', name: result.name };
       } catch (e) {
-        const away = e instanceof ApiError && e.status === 403;
+        const away = e instanceof ApiError && e.status === 403 && e.detail === 'not_on_home_network';
         setState({ busy: false, message: away ? i18n.t('settings.location.atHome') : describeApiError(e) ?? i18n.t('settings.location.failed'), tone: 'danger' });
         return null;
       }

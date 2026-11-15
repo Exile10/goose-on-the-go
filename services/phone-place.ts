@@ -12,6 +12,7 @@
 import * as Location from 'expo-location';
 
 import { api } from './api-client';
+import { readPhoneFix } from './home-location';
 import { Storage } from './storage';
 
 /** A place is reused for this long; walking across town takes longer. */
@@ -55,17 +56,11 @@ export async function loadPhonePlacePreference(): Promise<void> {
 export async function phonePlaceForTurn(): Promise<string | undefined> {
   if (!enabled) return undefined;
   if (cached && Date.now() - cached.at < PLACE_TTL_MS) return cached.name ?? undefined;
-  try {
-    const permission = await Location.getForegroundPermissionsAsync();
-    if (!permission.granted) return undefined;
-    const { coords } = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-    const [address] = await Location.reverseGeocodeAsync(coords);
-    cached = { name: wider(address), at: Date.now() };
-    return cached.name ?? undefined;
-  } catch (e) {
-    console.warn('[phone-place] could not find where the phone is', { kind: 'phone_place', error: String(e) });
-    return undefined;
-  }
+  const fix = await readPhoneFix(false, wider);
+  // Only a named place is kept: an unnamed one is asked for again with the next turn.
+  if (fix.kind !== 'fix' || !fix.name) return undefined;
+  cached = { name: fix.name, at: Date.now() };
+  return fix.name;
 }
 
 /** The locality and the town it is in ("Westlands, Nairobi"), or the one there is. */
