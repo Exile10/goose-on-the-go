@@ -97,8 +97,8 @@
     "seeAllDevices": "See all devices",
     "lineDevicesOn_one": "1 device on",
     "lineDevicesOn_other": "{{count}} devices on",
-    "lineOutdoorPlace": "{{temp}}° in {{place}}",
-    "lineOutdoor": "{{temp}}° outside",
+    "lineOutdoorPlace": "{{temp}}°C in {{place}}",
+    "lineOutdoor": "{{temp}}°C outside",
     "ideas": {
       "title": "From your Pond",
       "hide": "Show less",
