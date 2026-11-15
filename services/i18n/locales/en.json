@@ -281,6 +281,8 @@
       "farewellExit": "Goodbye.",
       "farewellPause": "Talk to you later.",
       "hearFailed": "Your Pond could not make that out. Tap to try again.",
+      "lostConnection": "The connection to your Pond dropped before it heard you. Tap to send it again.",
+      "stillUnreachable": "Your Pond still isn\u2019t answering. Tap to try again.",
       "speakFailed": "Your Pond could not say that out loud. The answer is above.",
       "idle": "Tap the orb to talk",
       "listening": "Listening",
