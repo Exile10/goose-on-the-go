@@ -111,6 +111,7 @@ describe('openRouteFromData', () => {
 
   it('reads the devices and chat routes', () => {
     expect(openRouteFromData({ open: 'devices' })).toEqual({ open: 'devices' });
+    expect(openRouteFromData({ open: 'reminders', reminder_id: 'r-1' })).toEqual({ open: 'reminders' });
     expect(openRouteFromData({ open: 'chat', proposal_id: 'p-1', rationale: 'why' })).toEqual({ open: 'chat' });
   });
 
@@ -164,6 +165,7 @@ describe('screenPath', () => {
     expect(screenPath({ open: 'devices' })).toBe('/(tabs)/devices');
     expect(screenPath({ open: 'chat' })).toBe('/(tabs)/chat');
     expect(screenPath({ open: 'models' })).toBe('/(stack)/models');
+    expect(screenPath({ open: 'reminders' })).toBe('/(stack)/reminders');
     expect(screenPath({ open: 'extensions' })).toBe('/(stack)/extensions');
     expect(screenPath({ open: 'remote_access' })).toBe('/(stack)/remote-access');
     expect(screenPath({ open: 'my_pond' })).toBe('/(stack)/pond');

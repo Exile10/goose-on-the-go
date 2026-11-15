@@ -118,6 +118,7 @@ export type OpenRoute =
   | { open: 'conversation'; sessionId: string }
   | { open: 'watch'; watchId?: string }
   | { open: 'todos'; todoId?: string }
+  | { open: 'reminders' }
   | { open: 'news'; storyId?: string; digestId?: string }
   | { open: 'cart'; cartId?: string }
   | { open: 'ideas'; ideaId?: string }
@@ -179,6 +180,8 @@ export function openRouteFromData(data: unknown): OpenRoute | null {
     }
     // My Goose's hub: a reminder or a check-in, a story or the digest, a price that moved. A
     // malformed id drops the id, not the screen.
+    case 'reminders':
+      return { open: 'reminders' };
     case 'todos': {
       const todoId = pondId(data.todo_id);
       return todoId ? { open: 'todos', todoId } : { open: 'todos' };
@@ -245,6 +248,7 @@ type ScreenHref =
   | '/(stack)/web-watches'
   | { pathname: '/(stack)/web-watch'; params: { id: string } }
   | '/(stack)/goose-todos'
+  | '/(stack)/reminders'
   | '/(stack)/goose-news'
   | { pathname: '/(stack)/goose-story'; params: { id: string } }
   | '/(stack)/goose-cart'
@@ -282,6 +286,8 @@ export function screenPath(route: OpenRoute): ScreenHref {
       return route.watchId ? { pathname: '/(stack)/web-watch', params: { id: route.watchId } } : '/(stack)/web-watches';
     case 'todos':
       return '/(stack)/goose-todos';
+    case 'reminders':
+      return '/(stack)/reminders';
     case 'news':
       return route.storyId ? { pathname: '/(stack)/goose-story', params: { id: route.storyId } } : '/(stack)/goose-news';
     case 'cart':
