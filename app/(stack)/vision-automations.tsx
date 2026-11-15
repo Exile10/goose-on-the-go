@@ -12,7 +12,7 @@ import React, { useCallback, useState } from 'react';
 import { RefreshControl, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { InkButton, InkEmptyState, InkSpinner, InkText } from '@jarida/ink/native';
+import { InkButton, InkEmptyState, InkSpinner, InkText } from '@/components/ui/ink';
 
 import { ContentUnavailable } from '@/components/patterns/content-unavailable';
 import { isUnavailable } from '@/models/content-state';

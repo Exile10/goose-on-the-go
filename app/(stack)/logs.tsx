@@ -39,7 +39,7 @@ import {
   InkNotice,
   InkSpinner,
   InkText,
-} from '@jarida/ink/native';
+} from '@/components/ui/ink';
 
 import { GIcon } from '@/components/ui/g-icon';
 import { TelemetryCard, TurnsSheet } from '@/components/patterns/conversation-telemetry';

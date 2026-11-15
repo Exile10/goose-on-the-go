@@ -12,7 +12,7 @@ import { RefreshControl, ScrollView, StyleSheet, Text, View, type NativeScrollEv
 import { router, useIsFocused } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { InkButton, InkCard, InkSpinner, InkText, inkText, useInkTheme } from '@jarida/ink/native';
+import { InkButton, InkCard, InkSpinner, InkText, inkText, useInkTheme } from '@/components/ui/ink';
 
 import { ContentUnavailable } from '@/components/patterns/content-unavailable';
 import { Goose } from '@/components/patterns/goose';

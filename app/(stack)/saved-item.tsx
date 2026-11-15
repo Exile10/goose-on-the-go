@@ -9,7 +9,7 @@ import { ScrollView, StyleSheet, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import { useTranslation } from 'react-i18next';
-import { InkButton, InkCard, InkEyebrow, InkNotice, InkSpinner, InkSwitch, InkText } from '@jarida/ink/native';
+import { InkButton, InkCard, InkEyebrow, InkNotice, InkSpinner, InkSwitch, InkText } from '@/components/ui/ink';
 
 import { Markdown } from '@/components/patterns/markdown';
 import type { ThemeColors } from '@/constants/colors';

@@ -10,7 +10,7 @@
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { InkBadge, InkCard, InkText } from '@jarida/ink/native';
+import { InkBadge, InkCard, InkText } from '@/components/ui/ink';
 
 import { LabelledSwitch } from '@/components/patterns/labelled-switch';
 import { GPressable } from '@/components/ui/g-pressable';

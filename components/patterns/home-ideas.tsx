@@ -13,7 +13,7 @@ import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { InkButton, InkText, inkText, useInkTheme } from '@jarida/ink/native';
+import { InkButton, InkText, inkText, useInkTheme } from '@/components/ui/ink';
 
 import { Markdown } from '@/components/patterns/markdown';
 

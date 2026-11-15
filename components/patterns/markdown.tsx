@@ -10,7 +10,7 @@
 import React, { useMemo } from 'react';
 import { Linking, Platform, ScrollView, StyleSheet, Text, View, type TextStyle } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
-import { inkText, useInkTheme, type InkTextSpec } from '@jarida/ink/native';
+import { inkText, useInkTheme, type InkTextSpec } from '@/components/ui/ink';
 
 import { CopyButton } from '@/components/patterns/copy-button';
 import { GIcon } from '@/components/ui/g-icon';

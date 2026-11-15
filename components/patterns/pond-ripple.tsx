@@ -9,7 +9,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { Animated, Easing, StyleSheet, View } from 'react-native';
-import { useInkTheme, useReduceMotion } from '@jarida/ink/native';
+import { useInkTheme, useReduceMotion } from '@/components/ui/ink';
 
 import { GooseStill } from '@/components/patterns/goose';
 

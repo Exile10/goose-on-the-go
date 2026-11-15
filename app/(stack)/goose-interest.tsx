@@ -9,7 +9,7 @@ import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { InkEmptyState, InkMenu, InkSpinner, InkText, inkText, useInkTheme } from '@jarida/ink/native';
+import { InkEmptyState, InkMenu, InkSpinner, InkText, inkText, useInkTheme } from '@/components/ui/ink';
 
 import { HubPicture } from '@/components/goose/hub-picture';
 import { RoundButton, SectionHead, useAgo } from '@/components/goose/hub-parts';

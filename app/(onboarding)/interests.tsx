@@ -9,7 +9,7 @@ import { StyleSheet, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
-import { InkSpinner, useInkTheme } from '@jarida/ink/native';
+import { InkSpinner, useInkTheme } from '@/components/ui/ink';
 
 import { InterviewChat } from '@/components/goose/interview-chat';
 import { Spacing } from '@/constants/spacing';

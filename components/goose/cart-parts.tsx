@@ -7,7 +7,7 @@ import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import Svg, { Circle, Path } from 'react-native-svg';
 import { useTranslation } from 'react-i18next';
-import { InkText, useInkTheme } from '@jarida/ink/native';
+import { InkText, useInkTheme } from '@/components/ui/ink';
 
 import { GIcon } from '@/components/ui/g-icon';
 import { atLowest, atTarget, priceMove, sparkline, sparklinePath, type CartItem } from '@/models/cart';

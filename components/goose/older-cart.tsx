@@ -10,7 +10,7 @@ import React from 'react';
 import { Image, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { InkButton, InkCard, InkEmptyState, InkNotice, InkSpinner, InkText, InkTitle, useInkTheme } from '@jarida/ink/native';
+import { InkButton, InkCard, InkEmptyState, InkNotice, InkSpinner, InkText, InkTitle, useInkTheme } from '@/components/ui/ink';
 
 import { LowestBadge, cartRange } from '@/components/patterns/goose-shelves';
 import { GPressable } from '@/components/ui/g-pressable';

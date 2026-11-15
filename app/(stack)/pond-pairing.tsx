@@ -8,7 +8,7 @@
  */
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { InkButton, InkSpinner, InkFormField, InkInput, InkTitle } from '@jarida/ink/native';
+import { InkButton, InkSpinner, InkFormField, InkInput, InkTitle } from '@/components/ui/ink';
 import {
   ScrollView,
   StyleSheet,

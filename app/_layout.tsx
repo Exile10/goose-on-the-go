@@ -21,7 +21,7 @@ import {
   JetBrainsMono_600SemiBold,
   JetBrainsMono_700Bold,
 } from '@expo-google-fonts/jetbrains-mono';
-import { InkProvider } from '@jarida/ink/native';
+import { InkProvider } from '@/components/ui/ink';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ConnectionStatus } from '@/components/patterns/connection-status';

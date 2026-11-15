@@ -10,7 +10,7 @@
 import React, { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { inkText, useInkTheme } from '@jarida/ink/native';
+import { inkText, useInkTheme } from '@/components/ui/ink';
 
 import { Markdown } from '@/components/patterns/markdown';
 import { PondRipple } from '@/components/patterns/pond-ripple';

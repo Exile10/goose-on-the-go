@@ -6,7 +6,7 @@
 import React, { useCallback, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { InkButton, InkCheckbox, InkDots, InkRow, InkText } from '@jarida/ink/native';
+import { InkButton, InkCheckbox, InkDots, InkRow, InkText } from '@/components/ui/ink';
 
 import { GPressable } from '@/components/ui/g-pressable';
 import { Spacing } from '@/constants/spacing';

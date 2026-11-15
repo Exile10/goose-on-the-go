@@ -17,7 +17,7 @@ import {
   InkTextArea,
   InkTitle,
   useInkTheme,
-} from '@jarida/ink/native';
+} from '@/components/ui/ink';
 
 import { ContentUnavailable } from '@/components/patterns/content-unavailable';
 import { Spacing } from '@/constants/spacing';

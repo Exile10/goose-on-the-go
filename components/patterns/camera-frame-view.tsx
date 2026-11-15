@@ -11,7 +11,7 @@ import React from 'react';
 import { StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 import { Image } from 'expo-image';
 import { useTranslation } from 'react-i18next';
-import { InkBadge } from '@jarida/ink/native';
+import { InkBadge } from '@/components/ui/ink';
 
 import { GIcon } from '@/components/ui/g-icon';
 import { useSettingsColors, useSettingsStyles, type SettingsColors, type SettingsMetrics, type SettingsType } from '@/components/settings/settings-theme';

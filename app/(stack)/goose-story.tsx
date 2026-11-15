@@ -11,7 +11,7 @@ import { Linking, ScrollView, Share, StyleSheet, Text, View } from 'react-native
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { InkButton, InkSpinner, InkText, inkText, useInkTheme } from '@jarida/ink/native';
+import { InkButton, InkSpinner, InkText, inkText, useInkTheme } from '@/components/ui/ink';
 
 import { HubPicture } from '@/components/goose/hub-picture';
 import { RoundButton } from '@/components/goose/hub-parts';

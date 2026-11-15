@@ -5,7 +5,7 @@
 
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { InkButton, InkEmptyState, InkSpinner, InkText } from '@jarida/ink/native';
+import { InkButton, InkEmptyState, InkSpinner, InkText } from '@/components/ui/ink';
 
 import { SentenceRow } from '@/components/goose/about-parts';
 import { InsetGroup } from '@/components/goose/following';

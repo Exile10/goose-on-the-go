@@ -15,7 +15,7 @@ import {
   InkEmptyState,
   InkText,
   InkTitle,
-} from '@jarida/ink/native';
+} from '@/components/ui/ink';
 import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';

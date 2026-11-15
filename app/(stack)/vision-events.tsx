@@ -12,7 +12,7 @@ import React, { useCallback, useMemo, useState } from 'react';
 import { FlatList, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { InkButton, InkChip, InkEmptyState, InkNotice, InkSpinner, InkText, useInkTheme } from '@jarida/ink/native';
+import { InkButton, InkChip, InkEmptyState, InkNotice, InkSpinner, InkText, useInkTheme } from '@/components/ui/ink';
 
 import { ContentUnavailable } from '@/components/patterns/content-unavailable';
 import { VisionEventRow } from '@/components/patterns/vision-event-row';

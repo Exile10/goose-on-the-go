@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactElement } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { GPressable } from '@/components/ui/g-pressable';
+import { StyleSheet, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useRouter, useSegments } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -90,11 +91,11 @@ export function ConnectionStatus({ placement = 'banner', screen }: ConnectionSta
         {detail ? <Text style={styles.detail}>{detail}</Text> : null}
       </View>
       {status.phase === 'pairing' ? (
-        <Pressable accessibilityRole="button" hitSlop={Spacing.md} onPress={() => router.push('/(stack)/pond-pairing')}>
+        <GPressable feedback="none" accessibilityRole="button" hitSlop={Spacing.md} onPress={() => router.push('/(stack)/pond-pairing')}>
           <Text style={styles.action}>{t('connection.actionPair')}</Text>
-        </Pressable>
+        </GPressable>
       ) : status.retryable ? (
-        <Pressable
+        <GPressable feedback="none"
           accessibilityRole="button"
           accessibilityState={{ disabled: status.checking }}
           disabled={status.checking}
@@ -102,7 +103,7 @@ export function ConnectionStatus({ placement = 'banner', screen }: ConnectionSta
           onPress={status.tryNow}
         >
           <Text style={[styles.action, status.checking && styles.actionIdle]}>{t('connection.tryNow')}</Text>
-        </Pressable>
+        </GPressable>
       ) : null}
     </View>
   );

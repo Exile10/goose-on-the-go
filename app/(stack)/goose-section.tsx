@@ -7,7 +7,7 @@ import React, { useMemo } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { InkEmptyState, InkSpinner, InkText, useInkTheme } from '@jarida/ink/native';
+import { InkEmptyState, InkSpinner, InkText, useInkTheme } from '@/components/ui/ink';
 
 import { GroupRow, InsetGroup } from '@/components/goose/following';
 import { ScreenScroll, SectionHead, useAgo } from '@/components/goose/hub-parts';

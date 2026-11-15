@@ -8,7 +8,7 @@ import React, { useEffect, useState } from 'react';
 import { Linking, StyleSheet, View } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { InkButton, InkInput, InkNotice, InkSelect, InkSpinner, InkSwitch, InkText, useInkTheme } from '@jarida/ink/native';
+import { InkButton, InkInput, InkNotice, InkSelect, InkSpinner, InkSwitch, InkText, useInkTheme } from '@/components/ui/ink';
 
 import { InsetGroup, GroupRow } from '@/components/goose/following';
 import { Labelled } from '@/components/goose/labelled';

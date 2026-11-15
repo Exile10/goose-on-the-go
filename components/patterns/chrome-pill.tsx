@@ -11,7 +11,7 @@
 import React from 'react';
 import { StyleSheet, Text, type StyleProp, type ViewStyle } from 'react-native';
 import { glassLift } from '@jarida/ink';
-import { inkText, useInkTheme } from '@jarida/ink/native';
+import { inkText, useInkTheme } from '@/components/ui/ink';
 
 import { PUCK_SIZE } from '@/components/patterns/chrome-puck';
 import { GPressable } from '@/components/ui/g-pressable';

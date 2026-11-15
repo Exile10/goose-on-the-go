@@ -1,12 +1,13 @@
 // The household's agents, the Pond's suggestions, and where each start-up copy (prefill) stands. Rebuild
 // all asks first, because every agent is slower until its copy is back.
 
+import { GPressable } from '@/components/ui/g-pressable';
 import React, { useCallback } from 'react';
-import { Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import { RefreshControl, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
-import { InkBadge, InkButton, InkCard, InkSpinner, InkText, InkTitle, inkText, useInkTheme } from '@jarida/ink/native';
+import { InkBadge, InkButton, InkCard, InkSpinner, InkText, InkTitle, inkText, useInkTheme } from '@/components/ui/ink';
 
 import { AgentsBuildingCard } from '@/components/patterns/agents-building';
 import { SettingsGroup, SettingsHeader, SettingsMessage, SettingsRow } from '@/components/settings/settings-list';
@@ -128,7 +129,7 @@ function BuiltInRow({
       // A row that opens a page is one control: its Rebuild is on that page, not a button inside this one.
       trailing={
         !onOpen && canRebuild(prefill) ? (
-          <Pressable
+          <GPressable feedback="none"
             onPress={onRebuild}
             disabled={busy}
             hitSlop={12}
@@ -137,7 +138,7 @@ function BuiltInRow({
             style={({ pressed }) => [styles.iconButton, pressed && { backgroundColor: colors.pressed }, busy && styles.dim]}
           >
             <GIcon name="refresh" size={18} color={colors.accent} />
-          </Pressable>
+          </GPressable>
         ) : null
       }
     />

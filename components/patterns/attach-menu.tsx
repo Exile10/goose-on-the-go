@@ -21,10 +21,10 @@
  */
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Animated, Modal, Platform, Pressable, StyleSheet, View } from 'react-native';
+import { Animated, Modal, Platform, StyleSheet, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { glassLift } from '@jarida/ink';
-import { InkText, useInkTheme, useReduceMotion } from '@jarida/ink/native';
+import { InkText, useInkTheme, useReduceMotion } from '@/components/ui/ink';
 
 import { GIcon } from '@/components/ui/g-icon';
 import { GPressable } from '@/components/ui/g-pressable';
@@ -131,7 +131,7 @@ export function AttachMenu({
       onRequestClose={onClose}
       onDismiss={release}
     >
-      <Pressable
+      <GPressable feedback="none" haptic="none"
         style={StyleSheet.absoluteFill}
         onPress={onClose}
         accessible={false}

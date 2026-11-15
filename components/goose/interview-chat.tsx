@@ -10,7 +10,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { InkBubble, InkButton, InkCheckbox, InkChoice, InkInput, InkMeter, InkSpinner, InkText, InkTyping, inkText, useInkTheme } from '@jarida/ink/native';
+import { InkBubble, InkButton, InkCheckbox, InkChoice, InkInput, InkMeter, InkSpinner, InkText, InkTyping, inkText, useInkTheme } from '@/components/ui/ink';
 
 import { GKeyboardView, useFocusedInputReveal } from '@/components/ui/g-keyboard-view';
 import { Spacing } from '@/constants/spacing';

@@ -7,7 +7,7 @@
 
 import React, { useCallback, useRef, useState } from 'react';
 import { FlatList, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { InkSpinner } from '@jarida/ink/native';
+import { InkSpinner } from '@/components/ui/ink';
 import { useRouter } from 'expo-router';
 
 import { GIcon } from '@/components/ui/g-icon';

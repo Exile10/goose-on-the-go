@@ -24,11 +24,11 @@
  */
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { Image } from 'expo-image';
 import { useTranslation } from 'react-i18next';
 import { hitSlop } from '@jarida/ink';
-import { InkBubble, inkText, useInkTheme, type BubblePosition } from '@jarida/ink/native';
+import { InkBubble, inkText, useInkTheme, type BubblePosition } from '@/components/ui/ink';
 
 import { TrailChip, TrailSheet, useTrail, type TrailState } from '@/components/patterns/answer-trail';
 import { ACTION_HEIGHT, CopyButton } from '@/components/patterns/copy-button';
@@ -285,11 +285,11 @@ function MyMessage({
           </View>
         ) : null}
         {words ? (
-          <Pressable disabled={!answer} onLongPress={() => setPart(words)} delayLongPress={350}>
+          <GPressable feedback="none" disabled={!answer} onLongPress={() => setPart(words)} delayLongPress={350}>
             <InkBubble mine position={position} status={queued ? 'sending' : 'sent'}>
               {words}
             </InkBubble>
-          </Pressable>
+          </GPressable>
         ) : null}
         {queued && onUnqueue ? <QueuedNote onRemove={() => onUnqueue(message.id)} /> : null}
       </View>

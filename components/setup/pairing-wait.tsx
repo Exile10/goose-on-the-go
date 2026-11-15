@@ -6,7 +6,7 @@
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { InkButton, InkNotice, InkSpinner, InkText } from '@jarida/ink/native';
+import { InkButton, InkNotice, InkSpinner, InkText } from '@/components/ui/ink';
 
 import { Spacing } from '@/constants/spacing';
 import type { HeldPairing } from '@/models/pairing-lock';

@@ -7,7 +7,7 @@
 import React from 'react';
 import { router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { InkButton } from '@jarida/ink/native';
+import { InkButton } from '@/components/ui/ink';
 
 import { cardParams, type CardKind } from '@/models/cards';
 import { selectionTick } from '@/services/haptics';

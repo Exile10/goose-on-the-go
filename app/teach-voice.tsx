@@ -11,12 +11,13 @@
  * leaves without asking, and Home keeps its setup card.
  */
 
+import { GPressable } from '@/components/ui/g-pressable';
 import React, { useCallback, useEffect, useRef } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { InkButton, InkCard, InkNotice, InkSpinner, InkText, InkTitle, inkText, useInkTheme } from '@jarida/ink/native';
+import { InkButton, InkCard, InkNotice, InkSpinner, InkText, InkTitle, inkText, useInkTheme } from '@/components/ui/ink';
 
 import { ProgressBar } from '@/components/settings/model-rows';
 import { SwitchRow } from '@/components/settings/setting-controls';
@@ -86,7 +87,7 @@ export default function TeachVoiceScreen() {
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.color.bg }]} edges={['top', 'bottom']}>
       <View style={styles.top}>
-        <Pressable
+        <GPressable feedback="none"
           onPress={close}
           hitSlop={8}
           accessibilityRole="button"
@@ -98,7 +99,7 @@ export default function TeachVoiceScreen() {
           ]}
         >
           <GIcon name="x" size={20} color={theme.color.text} />
-        </Pressable>
+        </GPressable>
       </View>
       {vm.phase === 'intro' ? (
         <Intro vm={vm} member={member} handed={handed} from={params.from} onLater={later} onChangePhrase={() => router.push('/(stack)/wake-word')} />

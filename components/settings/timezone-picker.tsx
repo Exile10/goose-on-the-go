@@ -3,11 +3,12 @@
  * The phone's zone is offered first, since it is nearly always the answer.
  */
 
+import { GPressable } from '@/components/ui/g-pressable';
 import React, { useCallback, useMemo, useState } from 'react';
-import { FlatList, Pressable, RefreshControl, Text, View } from 'react-native';
+import { FlatList, RefreshControl, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { InkSearchField, InkSpinner } from '@jarida/ink/native';
+import { InkSearchField, InkSpinner } from '@/components/ui/ink';
 
 import { ContentUnavailable } from '@/components/patterns/content-unavailable';
 import { isUnavailable } from '@/models/content-state';
@@ -50,7 +51,7 @@ export function TimezonePickerScreen() {
   const renderZone = ({ item, index }: { item: ZoneChoice; index: number }) => {
     const selected = item.zone === current;
     return (
-      <Pressable
+      <GPressable feedback="none" haptic="selection"
         onPress={() => choose(item.zone)}
         accessibilityRole="button"
         accessibilityState={{ selected }}
@@ -68,7 +69,7 @@ export function TimezonePickerScreen() {
           <Text style={styles.detail}>{`${item.zone.replace(/_/g, ' ')} · ${item.offset}`}</Text>
         </View>
         {selected ? <GIcon name="check" size={18} color={colors.accent} /> : null}
-      </Pressable>
+      </GPressable>
     );
   };
 

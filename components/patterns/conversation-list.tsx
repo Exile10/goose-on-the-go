@@ -36,7 +36,7 @@ import {
   type SectionListRenderItemInfo,
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { InkSkeleton, InkTitle, inkText, useInkTheme } from '@jarida/ink/native';
+import { InkSkeleton, InkTitle, inkText, useInkTheme } from '@/components/ui/ink';
 
 import {
   AnsweringMark,

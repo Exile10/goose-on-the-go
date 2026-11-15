@@ -11,7 +11,7 @@ import { useTranslation } from 'react-i18next';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import Animated, { interpolate, useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 import { scheduleOnRN } from 'react-native-worklets';
-import { useInkTheme, useReduceMotion } from '@jarida/ink/native';
+import { useInkTheme, useReduceMotion } from '@/components/ui/ink';
 
 import { GIcon } from '@/components/ui/g-icon';
 import { selectionTick } from '@/services/haptics';

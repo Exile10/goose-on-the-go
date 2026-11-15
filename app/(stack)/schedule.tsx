@@ -16,7 +16,7 @@ import React, { useEffect, useState } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { RefreshControl, ScrollView, StyleSheet } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { InkSegmented } from '@jarida/ink/native';
+import { InkSegmented } from '@/components/ui/ink';
 
 import { AutomationsTab } from '@/components/patterns/automations-tab';
 import { ScheduleTab } from '@/components/patterns/schedule-tab';

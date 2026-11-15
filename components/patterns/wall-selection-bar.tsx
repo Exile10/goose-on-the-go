@@ -18,7 +18,7 @@ import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { glassLift } from '@jarida/ink';
-import { inkText, useInkTheme } from '@jarida/ink/native';
+import { inkText, useInkTheme } from '@/components/ui/ink';
 
 import { DeleteOrKeep } from '@/components/patterns/conversation-card';
 import { PUCK_SIZE } from '@/components/patterns/chrome-puck';

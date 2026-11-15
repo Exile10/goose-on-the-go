@@ -9,8 +9,8 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Linking, StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { InkButton, InkDatePicker, InkSheet, InkText, InkTimePicker, useInkTheme } from '@jarida/ink/native';
-import type { CivilDate, CivilTime } from '@jarida/ink/native';
+import { InkButton, InkDatePicker, InkSheet, InkText, InkTimePicker, useInkTheme } from '@/components/ui/ink';
+import type { CivilDate, CivilTime } from '@/components/ui/ink';
 
 import { GIcon } from '@/components/ui/g-icon';
 import { GPressable } from '@/components/ui/g-pressable';

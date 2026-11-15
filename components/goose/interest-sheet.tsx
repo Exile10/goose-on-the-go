@@ -6,7 +6,7 @@
 import React, { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { InkButton, InkInput, InkSegmented, InkSelect, InkSheet } from '@jarida/ink/native';
+import { InkButton, InkInput, InkSegmented, InkSelect, InkSheet } from '@/components/ui/ink';
 
 import { Spacing } from '@/constants/spacing';
 import { CATEGORIES, DEPTHS, NEWS_CHOICES, categoryKey, depthKey, newsKey, type Interest, type InterestCategory, type InterestDepth, type InterestNews } from '@/models/interests';

@@ -8,7 +8,7 @@ import React, { useEffect } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { InkCard, InkChip, InkEmptyState, InkNotice, InkSpinner, InkText } from '@jarida/ink/native';
+import { InkCard, InkChip, InkEmptyState, InkNotice, InkSpinner, InkText } from '@/components/ui/ink';
 
 import { GPressable } from '@/components/ui/g-pressable';
 import type { ThemeColors } from '@/constants/colors';

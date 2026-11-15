@@ -6,7 +6,7 @@
 
 import React, { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { InkEmptyState, InkSpinner, InkText } from '@jarida/ink/native';
+import { InkEmptyState, InkSpinner, InkText } from '@/components/ui/ink';
 
 import { ListSection, SentenceRow } from '@/components/goose/about-parts';
 import { InsetGroup } from '@/components/goose/following';

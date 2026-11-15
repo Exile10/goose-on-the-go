@@ -7,7 +7,7 @@
 import React from 'react';
 import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import { Image } from 'expo-image';
-import { useInkTheme } from '@jarida/ink/native';
+import { useInkTheme } from '@/components/ui/ink';
 
 import { PondPicture } from '@/components/patterns/pond-picture';
 import { GIcon } from '@/components/ui/g-icon';

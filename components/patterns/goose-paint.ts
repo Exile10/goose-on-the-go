@@ -3,7 +3,7 @@
  * the affine matrices its parts move by, in SVG's order [a b c d e f], and its resting frame.
  */
 
-import { useInkTheme } from '@jarida/ink/native';
+import { useInkTheme } from '@/components/ui/ink';
 
 import { neckFrame, neckPose, restingParts, type GooseMood, type NeckFrame, type PartsFrame } from '@/components/patterns/goose-motion';
 

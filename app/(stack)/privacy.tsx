@@ -9,7 +9,7 @@
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { InkTitle } from '@jarida/ink/native';
+import { InkTitle } from '@/components/ui/ink';
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
 
 import { GIcon } from '@/components/ui/g-icon';

@@ -20,27 +20,47 @@
  * wrong reading of the setting: an opacity change is not the vestibular
  * problem, and a control that stops answering is a worse outcome than one that
  * answers without moving.
+ *
+ * It answers under the thumb as well: a press gives the `haptic` feel, a tap unless the press
+ * selects (`selection`), flips something (`toggle`) or must stay silent (`none`). Ink's own
+ * controls feel the same through `components/ui/ink.tsx`, so a handler here needs no `tap()`.
  */
 
 import React from 'react';
-import { Pressable, type PressableProps, type StyleProp, type ViewStyle } from 'react-native';
-import { useInkTheme, useReduceMotion } from '@jarida/ink/native';
+// The one place a raw Pressable is allowed: the lint rule sends every other press here.
+import { Pressable, type GestureResponderEvent, type PressableProps, type StyleProp, type ViewStyle } from 'react-native';
+import { useInkTheme, useReduceMotion } from '@/components/ui/ink';
+import { selectionTick, tap, toggle } from '@/services/haptics';
+
+const FEELS = { tap, selection: selectionTick, toggle } as const;
 
 export interface GPressableProps extends PressableProps {
-  /** `lift` for anything that paints its own face; `tint` for the rest. */
-  feedback?: 'tint' | 'lift';
+  /** `lift` for anything that paints its own face; `tint` for the rest; `none` where the press
+   *  styles itself (`style` as a function of `pressed`). */
+  feedback?: 'tint' | 'lift' | 'none';
+  /** How a press feels in the hand: `tap` by default, `none` for a press that must stay silent. */
+  haptic?: keyof typeof FEELS | 'none';
 }
 
-export function GPressable({ feedback = 'tint', style, children, ...rest }: GPressableProps) {
+export function GPressable({ feedback = 'tint', haptic = 'tap', style, children, onPress, ...rest }: GPressableProps) {
   const theme = useInkTheme();
   const reduced = useReduceMotion();
 
   return (
     <Pressable
       {...rest}
+      onPress={
+        onPress && haptic !== 'none'
+          ? (e: GestureResponderEvent) => {
+              // After the handler, so a feel it gives itself is the one felt.
+              onPress(e);
+              void FEELS[haptic]();
+            }
+          : onPress
+      }
       style={(state) => {
         const base = (typeof style === 'function' ? style(state) : style) as StyleProp<ViewStyle>;
-        if (!state.pressed) return base;
+        if (!state.pressed || feedback === 'none') return base;
         const response: ViewStyle =
           feedback === 'lift'
             ? reduced

@@ -8,7 +8,7 @@ import React, { useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { InkSearchField, InkText, useInkTheme } from '@jarida/ink/native';
+import { InkSearchField, InkText, useInkTheme } from '@/components/ui/ink';
 
 import { GroupRow, InsetGroup } from '@/components/goose/following';
 import { IdeaRow } from '@/components/goose/idea-card';

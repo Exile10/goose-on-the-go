@@ -17,7 +17,7 @@
 import React from 'react';
 import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import { glassLift } from '@jarida/ink';
-import { useInkTheme } from '@jarida/ink/native';
+import { useInkTheme } from '@/components/ui/ink';
 
 import { GIcon } from '@/components/ui/g-icon';
 import { GPressable } from '@/components/ui/g-pressable';

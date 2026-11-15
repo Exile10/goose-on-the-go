@@ -10,7 +10,7 @@ import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { router, useIsFocused } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { InkNotice, InkSpinner, InkTitle } from '@jarida/ink/native';
+import { InkNotice, InkSpinner, InkTitle } from '@/components/ui/ink';
 
 import { Goose } from '@/components/patterns/goose';
 import {

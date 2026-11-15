@@ -3,12 +3,13 @@
  * answers "what is on" by itself. GIAP has no login, so the card is the member the Pond names.
  */
 
+import { GPressable } from '@/components/ui/g-pressable';
 import React, { useCallback, useMemo, useState } from 'react';
-import { Keyboard, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
+import { Keyboard, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { InkButton, InkEdge, InkSearchField, InkTitle } from '@jarida/ink/native';
+import { InkButton, InkEdge, InkSearchField, InkTitle } from '@/components/ui/ink';
 
 import { IssueRows } from '@/components/settings/issue-page';
 import { PAGE_GUTTER } from '@/components/settings/settings-scroll';
@@ -62,7 +63,7 @@ function AccountRow({ onPress }: { onPress: () => void }) {
 
   // The one raised card on the screen: a press drives its face down onto the plate.
   return (
-    <Pressable
+    <GPressable feedback="none"
       onPress={onPress}
       onPressIn={() => setPressed(true)}
       onPressOut={() => setPressed(false)}
@@ -84,7 +85,7 @@ function AccountRow({ onPress }: { onPress: () => void }) {
       </View>
       <GIcon name="chevron-right" size={18} color={colors.textTertiary} strokeWidth={2.5} />
       </InkEdge>
-    </Pressable>
+    </GPressable>
   );
 }
 

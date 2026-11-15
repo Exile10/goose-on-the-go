@@ -4,9 +4,10 @@
  * plate, because Ink spends the raised edge on what is chosen, about twice a screen.
  */
 
+import { GPressable } from '@/components/ui/g-pressable';
 import React, { Children, isValidElement, type ReactNode } from 'react';
-import { Pressable, Text, View, type StyleProp, type ViewStyle } from 'react-native';
-import { InkEdge, InkTitle } from '@jarida/ink/native';
+import { Text, View, type StyleProp, type ViewStyle } from 'react-native';
+import { InkEdge, InkTitle } from '@/components/ui/ink';
 
 import { GIcon } from '@/components/ui/g-icon';
 import { Brand, TileColors, type TileColor } from '@/constants/colors';
@@ -174,7 +175,7 @@ export function SettingsRow({
 
   if (!onPress) return body;
   return (
-    <Pressable
+    <GPressable feedback="none"
       onPress={onPress}
       disabled={disabled}
       accessibilityRole={accessibilityRole ?? 'button'}
@@ -185,7 +186,7 @@ export function SettingsRow({
       style={({ pressed }) => (pressed ? { backgroundColor: colors.pressed } : null)}
     >
       {body}
-    </Pressable>
+    </GPressable>
   );
 }
 

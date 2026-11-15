@@ -9,7 +9,7 @@ import React from 'react';
 import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { InkButton, InkCard, InkEmptyState, InkText, InkTitle, useInkTheme } from '@jarida/ink/native';
+import { InkButton, InkCard, InkEmptyState, InkText, InkTitle, useInkTheme } from '@/components/ui/ink';
 
 import { GlyphRow } from '@/components/patterns/goose-shelves';
 import { GIcon } from '@/components/ui/g-icon';

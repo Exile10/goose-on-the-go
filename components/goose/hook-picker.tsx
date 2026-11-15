@@ -7,8 +7,8 @@
 import React, { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { InkButton, InkChip, InkDatePicker, InkSegmented, InkText, InkTimePicker } from '@jarida/ink/native';
-import type { CivilDate, CivilTime } from '@jarida/ink/native';
+import { InkButton, InkChip, InkDatePicker, InkSegmented, InkText, InkTimePicker } from '@/components/ui/ink';
+import type { CivilDate, CivilTime } from '@/components/ui/ink';
 
 import { Spacing } from '@/constants/spacing';
 import { clockText } from '@/models/news';

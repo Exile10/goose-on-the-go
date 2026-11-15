@@ -10,7 +10,7 @@
 import React, { useCallback, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { InkButton, InkNotice, InkSheet, InkText } from '@jarida/ink/native';
+import { InkButton, InkNotice, InkSheet, InkText } from '@/components/ui/ink';
 
 import { SettingsGroup, SettingsRow } from '@/components/settings/settings-list';
 import { Spacing } from '@/constants/spacing';

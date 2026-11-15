@@ -6,7 +6,7 @@
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { InkSwitch, InkText, InkTimePicker } from '@jarida/ink/native';
+import { InkSwitch, InkText, InkTimePicker } from '@/components/ui/ink';
 
 import { GroupRow, InsetGroup } from '@/components/goose/following';
 import { ScreenScroll, SectionHead } from '@/components/goose/hub-parts';

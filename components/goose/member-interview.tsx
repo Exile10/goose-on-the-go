@@ -8,7 +8,7 @@ import React, { useRef, useState } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { InkButton, InkCheckbox, InkChoice, InkInput, InkMeter, InkSpinner, InkSwitch, InkText, InkTextArea, inkText, useInkTheme } from '@jarida/ink/native';
+import { InkButton, InkCheckbox, InkChoice, InkInput, InkMeter, InkSpinner, InkSwitch, InkText, InkTextArea, inkText, useInkTheme } from '@/components/ui/ink';
 
 import { ContentUnavailable } from '@/components/patterns/content-unavailable';
 import { GIcon } from '@/components/ui/g-icon';

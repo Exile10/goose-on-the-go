@@ -5,7 +5,7 @@ import React, { useCallback, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { InkButton, InkCard, InkChip, InkEyebrow, InkNotice, InkSpinner, InkText, inkText, useInkTheme } from '@jarida/ink/native';
+import { InkButton, InkCard, InkChip, InkEyebrow, InkNotice, InkSpinner, InkText, inkText, useInkTheme } from '@/components/ui/ink';
 
 import { PagePictures, SourcesChipRow, useSources } from '@/components/patterns/cited-sources';
 import { Markdown } from '@/components/patterns/markdown';

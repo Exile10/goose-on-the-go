@@ -26,7 +26,7 @@ import {
   type SkRect,
 } from '@shopify/react-native-skia';
 import { useDerivedValue, useFrameCallback, useSharedValue, type SharedValue } from 'react-native-reanimated';
-import { useReduceMotion } from '@jarida/ink/native';
+import { useReduceMotion } from '@/components/ui/ink';
 
 import {
   BACK_SHEEN,

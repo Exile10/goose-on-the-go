@@ -8,7 +8,7 @@ import React from 'react';
 import { StyleSheet } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { InkSpinner, InkTitle } from '@jarida/ink/native';
+import { InkSpinner, InkTitle } from '@/components/ui/ink';
 
 import { HubMyGoose } from '@/components/goose/hub-my-goose';
 import { OlderMyGoose } from '@/components/goose/older-my-goose';

@@ -6,12 +6,12 @@
  */
 
 import React, { useCallback, useMemo, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import { hitSlop } from '@jarida/ink';
-import { InkSheet, inkText, useInkTheme } from '@jarida/ink/native';
+import { InkSheet, inkText, useInkTheme } from '@/components/ui/ink';
 
 import type { SourceChips } from '@/components/patterns/markdown';
 import { ToolRow } from '@/components/patterns/tool-card';
@@ -117,7 +117,8 @@ function SourceRow({ source, number, focused }: { source: CitedSource; number: n
   const title = inkText(theme, { size: 'md', weight: theme.weight.semibold, leading: 'snug' });
   const badge = inkText(theme, { role: 'mono', size: 'xs', weight: theme.weight.semibold, color: theme.color.accentLine });
   return (
-    <Pressable
+    <GPressable
+      feedback="none"
       onPress={() => void WebBrowser.openBrowserAsync(source.url)}
       accessibilityRole="link"
       accessibilityLabel={t('chat.trail.openPage', { title: source.title, site })}
@@ -140,7 +141,7 @@ function SourceRow({ source, number, focused }: { source: CitedSource; number: n
         )}
       </View>
       <GIcon name="external" size={14} color={theme.color.textTertiary} />
-    </Pressable>
+    </GPressable>
   );
 }
 

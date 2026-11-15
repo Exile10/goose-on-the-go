@@ -7,7 +7,7 @@
 import React, { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { InkButton, InkCard, InkInput, InkSpinner, InkText, useInkTheme } from '@jarida/ink/native';
+import { InkButton, InkCard, InkInput, InkSpinner, InkText, useInkTheme } from '@/components/ui/ink';
 
 import { openConnector } from '@/components/goose/connector-strip';
 import { GroupHeading, GroupRow, InsetGroup } from '@/components/goose/following';

@@ -6,7 +6,7 @@
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { InkSpinner, InkText, useInkTheme } from '@jarida/ink/native';
+import { InkSpinner, InkText, useInkTheme } from '@/components/ui/ink';
 
 import { openCatalogItem } from '@/components/goose/hub-my-goose';
 import { ScreenScroll, SectionHead } from '@/components/goose/hub-parts';

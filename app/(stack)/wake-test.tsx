@@ -12,7 +12,7 @@ import { ScrollView, StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { InkButton, InkCard, InkNotice, InkSpinner, InkText, InkTitle } from '@jarida/ink/native';
+import { InkButton, InkCard, InkNotice, InkSpinner, InkText, InkTitle } from '@/components/ui/ink';
 
 import type { ThemeColors } from '@/constants/colors';
 import { Spacing } from '@/constants/spacing';

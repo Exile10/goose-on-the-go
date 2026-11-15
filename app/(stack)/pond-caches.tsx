@@ -3,7 +3,7 @@
 import React, { useCallback } from 'react';
 import { RefreshControl, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { InkButton, InkEdge, InkSpinner, inkText, useInkTheme } from '@jarida/ink/native';
+import { InkButton, InkEdge, InkSpinner, inkText, useInkTheme } from '@/components/ui/ink';
 
 import { DangerQuietButton } from '@/components/pond/danger-quiet-button';
 import { AdminLockView } from '@/components/pond/admin-lock';

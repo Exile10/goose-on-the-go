@@ -3,7 +3,7 @@
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { InkFormField, InkInput, InkNotice, InkRadioGroup, InkSpinner, InkText, InkTextArea, InkTitle } from '@jarida/ink/native';
+import { InkFormField, InkInput, InkNotice, InkRadioGroup, InkSpinner, InkText, InkTextArea, InkTitle } from '@/components/ui/ink';
 
 import { SettingsGroup } from '@/components/settings/settings-list';
 import { VoicePickerView } from '@/components/settings/voice-picker';

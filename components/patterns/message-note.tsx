@@ -8,7 +8,7 @@ import React, { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { toneColors } from '@jarida/ink';
-import { InkButton, inkText, useInkTheme } from '@jarida/ink/native';
+import { InkButton, inkText, useInkTheme } from '@/components/ui/ink';
 
 import { GIcon } from '@/components/ui/g-icon';
 import type { NoteFrom, Offer, Receipt } from '@/models/message-note';

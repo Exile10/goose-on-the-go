@@ -2,8 +2,9 @@
  * Settings rows that read more than one field, or a list from elsewhere on the Pond.
  */
 
+import { GPressable } from '@/components/ui/g-pressable';
 import React, { useCallback, useState } from 'react';
-import { Platform, Pressable, Text } from 'react-native';
+import { Platform, Text } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
@@ -63,7 +64,7 @@ function ActionRow({ label, busyLabel, busy, message, tone, onPress }: {
   const styles = useSettingsStyles(makeStyles);
   const colors = useSettingsColors();
   return (
-    <Pressable
+    <GPressable feedback="none"
       onPress={onPress}
       disabled={busy}
       accessibilityRole="button"
@@ -76,7 +77,7 @@ function ActionRow({ label, busyLabel, busy, message, tone, onPress }: {
           {message}
         </Text>
       ) : null}
-    </Pressable>
+    </GPressable>
   );
 }
 
@@ -102,9 +103,9 @@ export function WakeWordResetRow({ settings, vm }: SpecialProps) {
       error={reset.message}
       trailing={
         count > 0 ? (
-          <Pressable onPress={() => void confirmClear()} disabled={reset.busy} hitSlop={8} accessibilityRole="button">
+          <GPressable feedback="none" onPress={() => void confirmClear()} disabled={reset.busy} hitSlop={8} accessibilityRole="button">
             <Text style={[styles.inlineAction, { color: colors.danger }]}>{t('settings.wake.clear')}</Text>
-          </Pressable>
+          </GPressable>
         ) : null
       }
     />

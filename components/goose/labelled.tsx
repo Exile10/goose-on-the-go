@@ -5,7 +5,7 @@
 
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
-import { InkText } from '@jarida/ink/native';
+import { InkText } from '@/components/ui/ink';
 
 export function Labelled({ label, hint, children }: { label: string; hint?: string | null; children: React.ReactNode }) {
   return (

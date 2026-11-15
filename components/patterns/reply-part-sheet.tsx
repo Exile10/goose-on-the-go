@@ -8,7 +8,7 @@
 import React, { useEffect, useState } from 'react';
 import { Keyboard, Platform, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { InkButton, InkSheet, inkText, useInkTheme } from '@jarida/ink/native';
+import { InkButton, InkSheet, inkText, useInkTheme } from '@/components/ui/ink';
 
 export function ReplyPartSheet({
   text,

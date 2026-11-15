@@ -10,7 +10,7 @@
 
 import React, { useEffect } from 'react';
 import { useFonts } from 'expo-font';
-import { InkProvider } from '@jarida/ink/native';
+import { InkProvider } from '@/components/ui/ink';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AssistOverlay } from '@/components/assist/assist-overlay';

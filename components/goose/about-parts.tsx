@@ -6,7 +6,7 @@
 import React, { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { InkButton, InkChip, InkNotice, InkSheet, InkText, InkTextArea, useInkTheme } from '@jarida/ink/native';
+import { InkButton, InkChip, InkNotice, InkSheet, InkText, InkTextArea, useInkTheme } from '@/components/ui/ink';
 
 import { DangerQuietButton } from '@/components/pond/danger-quiet-button';
 import { GIcon } from '@/components/ui/g-icon';

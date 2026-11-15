@@ -11,7 +11,7 @@
 import React, { useCallback } from 'react';
 import { RefreshControl, StyleSheet, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { InkButton, InkCard, InkInput, InkNotice, InkSpinner, InkText, InkTitle } from '@jarida/ink/native';
+import { InkButton, InkCard, InkInput, InkNotice, InkSpinner, InkText, InkTitle } from '@/components/ui/ink';
 
 import { ContentUnavailable } from '@/components/patterns/content-unavailable';
 import { isUnavailable } from '@/models/content-state';

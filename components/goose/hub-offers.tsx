@@ -8,7 +8,7 @@ import React, { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { InkCard, InkEmptyState, InkSpinner, InkText, useInkTheme } from '@jarida/ink/native';
+import { InkCard, InkEmptyState, InkSpinner, InkText, useInkTheme } from '@/components/ui/ink';
 
 import { ContentUnavailable } from '@/components/patterns/content-unavailable';
 import { Spacing } from '@/constants/spacing';

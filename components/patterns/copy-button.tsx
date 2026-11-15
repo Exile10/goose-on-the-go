@@ -7,7 +7,7 @@ import React, { useEffect, useState } from 'react';
 import { StyleSheet, type StyleProp, type ViewStyle } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { hitSlop } from '@jarida/ink';
-import { useInkTheme } from '@jarida/ink/native';
+import { useInkTheme } from '@/components/ui/ink';
 
 import { GIcon } from '@/components/ui/g-icon';
 import { GPressable } from '@/components/ui/g-pressable';

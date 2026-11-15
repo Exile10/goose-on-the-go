@@ -8,7 +8,7 @@ import React, { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { InkButton, InkCard, InkSpinner, InkText, inkText, useInkTheme } from '@jarida/ink/native';
+import { InkButton, InkCard, InkSpinner, InkText, inkText, useInkTheme } from '@/components/ui/ink';
 
 import { GroupHeading, GroupRow, InsetGroup } from '@/components/goose/following';
 import { RoundButton, ScreenScroll } from '@/components/goose/hub-parts';

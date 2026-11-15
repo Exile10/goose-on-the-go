@@ -21,7 +21,7 @@
  */
 
 import React, { useEffect, useState } from 'react';
-import { Animated, BackHandler, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, BackHandler, StyleSheet, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { glassLift } from '@jarida/ink';
 import {
@@ -32,7 +32,7 @@ import {
   useInkTheme,
   useReduceMotion,
   type InkSegmentedOption,
-} from '@jarida/ink/native';
+} from '@/components/ui/ink';
 
 import { GIcon } from '@/components/ui/g-icon';
 import { GPressable } from '@/components/ui/g-pressable';
@@ -132,7 +132,7 @@ export function WallMenu({
 
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents={open ? 'box-none' : 'none'}>
-      <Pressable
+      <GPressable feedback="none" haptic="none"
         style={StyleSheet.absoluteFill}
         onPress={onClose}
         accessible={false}

@@ -4,7 +4,7 @@ import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { InkButton, InkCard, InkText, InkTitle } from '@jarida/ink/native';
+import { InkButton, InkCard, InkText, InkTitle } from '@/components/ui/ink';
 
 import { ProgressBar } from '@/components/settings/model-rows';
 import { Spacing } from '@/constants/spacing';

@@ -24,7 +24,7 @@ import Animated, {
   useSharedValue,
 } from 'react-native-reanimated';
 import Svg, { ClipPath, Defs, Ellipse, G, LinearGradient, Path, RadialGradient, Rect, Stop } from 'react-native-svg';
-import { useInkTheme, useReduceMotion } from '@jarida/ink/native';
+import { useInkTheme, useReduceMotion } from '@/components/ui/ink';
 
 import {
   BACK_SHEEN, BANDS, BELLY, BODY, CHEST_SHEEN, GLINTS, HEAD_DETAIL, PRIMARIES, RIPPLE, SCALLOPS, TAIL, WAKE, WAVES, WING,

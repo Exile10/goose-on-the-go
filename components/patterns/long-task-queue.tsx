@@ -4,7 +4,7 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { InkButton, InkSegmented, inkText, useInkTheme } from '@jarida/ink/native';
+import { InkButton, InkSegmented, inkText, useInkTheme } from '@/components/ui/ink';
 
 import { confirm, reject, selectionTick } from '@/services/haptics';
 import type { LongTask } from '@/services/types';

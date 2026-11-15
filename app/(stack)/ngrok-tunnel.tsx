@@ -23,7 +23,7 @@ import {
   InkTitle,
   inkText,
   useInkTheme,
-} from '@jarida/ink/native';
+} from '@/components/ui/ink';
 
 import { ContentUnavailable } from '@/components/patterns/content-unavailable';
 import { GKeyboardScrollView } from '@/components/ui/g-keyboard-view';

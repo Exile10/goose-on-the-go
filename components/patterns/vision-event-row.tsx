@@ -10,7 +10,7 @@
 import React, { useMemo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { InkBadge, inkText, useInkTheme } from '@jarida/ink/native';
+import { InkBadge, inkText, useInkTheme } from '@/components/ui/ink';
 
 import { PondPicture } from '@/components/patterns/pond-picture';
 import { GPressable } from '@/components/ui/g-pressable';

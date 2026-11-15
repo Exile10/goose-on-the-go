@@ -7,7 +7,7 @@
 import React from 'react';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { InkEmptyState, InkSpinner } from '@jarida/ink/native';
+import { InkEmptyState, InkSpinner } from '@/components/ui/ink';
 
 import { ScreenScroll } from '@/components/goose/hub-parts';
 import { IdeaPanel } from '@/components/goose/idea-card';

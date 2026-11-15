@@ -7,7 +7,7 @@
 import React from 'react';
 import { RefreshControl, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { InkText, inkText, useInkTheme } from '@jarida/ink/native';
+import { InkText, inkText, useInkTheme } from '@/components/ui/ink';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { GIcon } from '@/components/ui/g-icon';

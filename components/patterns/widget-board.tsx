@@ -24,7 +24,7 @@ import { useTranslation } from 'react-i18next';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import Animated, { Easing, LinearTransition, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { scheduleOnRN } from 'react-native-worklets';
-import { InkEdge, inkText, useInkTheme } from '@jarida/ink/native';
+import { InkEdge, inkText, useInkTheme } from '@/components/ui/ink';
 
 import { GIcon } from '@/components/ui/g-icon';
 import type { IconName } from '@/constants/icons';

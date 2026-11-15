@@ -11,10 +11,11 @@
  * while voice mode is open, and closing it stops everything.
  */
 
+import { GPressable } from '@/components/ui/g-pressable';
 import React, { useEffect } from 'react';
-import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Linking, StyleSheet, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { inkText, useInkTheme } from '@jarida/ink/native';
+import { inkText, useInkTheme } from '@/components/ui/ink';
 
 import { ChromePuck } from '@/components/patterns/chrome-puck';
 import { VoiceOrb } from '@/components/patterns/voice-orb';
@@ -83,7 +84,7 @@ export function VoiceDock({ send, stop, sendsRecordings, onClose, bottomInset, o
           Settings, so the caption that says so is the control that goes there.
           Every other caption is a status line and stays inert. */}
       {micBlocked ? (
-        <Pressable
+        <GPressable feedback="none"
           accessibilityRole="button"
           accessibilityHint={t('chat.voice.micBlockedHint')}
           onPress={() => void Linking.openSettings()}
@@ -95,7 +96,7 @@ export function VoiceDock({ send, stop, sendsRecordings, onClose, bottomInset, o
           >
             {error}
           </Text>
-        </Pressable>
+        </GPressable>
       ) : (
         <Text
           style={[caption.style, styles.caption]}

@@ -10,7 +10,7 @@ import React, { useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { InkButton, InkCard, InkChip, InkMenu, InkSheet, InkText, InkTextArea, inkText, useInkTheme, type InkMenuItem } from '@jarida/ink/native';
+import { InkButton, InkCard, InkChip, InkMenu, InkSheet, InkText, InkTextArea, inkText, useInkTheme, type InkMenuItem } from '@/components/ui/ink';
 
 import { GIcon } from '@/components/ui/g-icon';
 import { GPressable } from '@/components/ui/g-pressable';

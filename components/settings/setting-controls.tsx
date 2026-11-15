@@ -3,11 +3,12 @@
  * its change as soon as it is made; there is no Save button on a settings page.
  */
 
+import { GPressable } from '@/components/ui/g-pressable';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { ScrollView, Text, TextInput, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
-import { InkMenu, InkSheet, InkSwitch } from '@jarida/ink/native';
+import { InkMenu, InkSheet, InkSwitch } from '@/components/ui/ink';
 
 import { GIcon } from '@/components/ui/g-icon';
 import { Spacing } from '@/constants/spacing';
@@ -115,7 +116,7 @@ export function RadioRow({
   const styles = useSettingsStyles(makeStyles);
   const colors = useSettingsColors();
   return (
-    <Pressable
+    <GPressable feedback="none" haptic="selection"
       onPress={onSelect}
       disabled={disabled}
       accessibilityRole="radio"
@@ -129,7 +130,7 @@ export function RadioRow({
         <Text style={styles.radioLabel}>{label}</Text>
         {description ? <Text style={styles.radioHint}>{description}</Text> : null}
       </View>
-    </Pressable>
+    </GPressable>
   );
 }
 
@@ -377,7 +378,7 @@ function StepButton({ icon, label, disabled, onPress }: { icon: 'minus' | 'plus'
   const styles = useSettingsStyles(makeStyles);
   const colors = useSettingsColors();
   return (
-    <Pressable
+    <GPressable feedback="none"
       onPress={onPress}
       disabled={disabled}
       hitSlop={6}
@@ -387,7 +388,7 @@ function StepButton({ icon, label, disabled, onPress }: { icon: 'minus' | 'plus'
       style={({ pressed }) => [styles.stepButton, pressed && { backgroundColor: colors.pressed }, disabled && styles.dim]}
     >
       <GIcon name={icon} size={16} color={colors.text} strokeWidth={2.25} />
-    </Pressable>
+    </GPressable>
   );
 }
 
@@ -470,7 +471,7 @@ export function TimeRow({ value, onCommit, ...row }: Common & { value: string; o
           {times.map((time) => {
             const selected = time === shown;
             return (
-              <Pressable
+              <GPressable feedback="none" haptic="selection"
                 key={time}
                 accessibilityRole="button"
                 accessibilityState={{ selected }}
@@ -485,7 +486,7 @@ export function TimeRow({ value, onCommit, ...row }: Common & { value: string; o
               >
                 <Text style={[styles.sheetText, selected && styles.sheetChosen]}>{time}</Text>
                 {selected ? <GIcon name="check" size={18} color={colors.accent} /> : null}
-              </Pressable>
+              </GPressable>
             );
           })}
         </ScrollView>
@@ -535,9 +536,9 @@ function ListItemRow({ item, removeLabel, onRemove }: { item: string; removeLabe
     <SettingsRow
       label={item}
       trailing={
-        <Pressable onPress={onRemove} hitSlop={10} accessibilityRole="button" accessibilityLabel={removeLabel}>
+        <GPressable feedback="none" onPress={onRemove} hitSlop={10} accessibilityRole="button" accessibilityLabel={removeLabel}>
           <GIcon name="x" size={18} color={colors.textTertiary} />
-        </Pressable>
+        </GPressable>
       }
     />
   );

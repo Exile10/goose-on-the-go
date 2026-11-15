@@ -5,7 +5,7 @@
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { InkEmptyState, InkSpinner, InkText, useInkTheme } from '@jarida/ink/native';
+import { InkEmptyState, InkSpinner, InkText, useInkTheme } from '@/components/ui/ink';
 
 import { ScreenScroll, SectionHead, useAgo } from '@/components/goose/hub-parts';
 import { StoryRow } from '@/components/goose/news-cards';

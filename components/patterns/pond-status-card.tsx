@@ -11,7 +11,7 @@ import React from 'react';
 import { StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { InkButton, InkCard, InkEyebrow, InkText } from '@jarida/ink/native';
+import { InkButton, InkCard, InkEyebrow, InkText } from '@/components/ui/ink';
 
 import { GIcon } from '@/components/ui/g-icon';
 import { useThemedStyles } from '@/hooks/use-themed-styles';

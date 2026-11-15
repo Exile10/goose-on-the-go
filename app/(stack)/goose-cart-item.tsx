@@ -8,7 +8,7 @@ import React, { useState } from 'react';
 import { Linking, StyleSheet, Text, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { InkButton, InkCard, InkChip, InkInput, InkRadioGroup, InkSpinner, InkText, inkText, useInkTheme } from '@jarida/ink/native';
+import { InkButton, InkCard, InkChip, InkInput, InkRadioGroup, InkSpinner, InkText, inkText, useInkTheme } from '@/components/ui/ink';
 
 import { PriceMove, Sparkline } from '@/components/goose/cart-parts';
 import { HubPicture } from '@/components/goose/hub-picture';

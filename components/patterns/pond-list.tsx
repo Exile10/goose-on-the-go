@@ -9,7 +9,7 @@
 import React from 'react';
 import { StyleSheet, Text, View  } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { InkBadge, InkEmptyState, InkGroup, InkRow, InkText } from '@jarida/ink/native';
+import { InkBadge, InkEmptyState, InkGroup, InkRow, InkText } from '@/components/ui/ink';
 
 import { GIcon } from '@/components/ui/g-icon';
 import { GPressable } from '@/components/ui/g-pressable';

@@ -8,7 +8,7 @@ import { BackHandler, StyleSheet, View } from 'react-native';
 import { Stack, useFocusEffect } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { InkButton, InkEmptyState, InkNotice, InkSpinner, InkText, InkTitle } from '@jarida/ink/native';
+import { InkButton, InkEmptyState, InkNotice, InkSpinner, InkText, InkTitle } from '@/components/ui/ink';
 
 import { WifiList } from '@/components/setup/wifi-list';
 import { GKeyboardScrollView } from '@/components/ui/g-keyboard-view';

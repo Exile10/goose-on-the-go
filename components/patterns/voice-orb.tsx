@@ -28,11 +28,12 @@
  * and the colour is what says which state the orb is in.
  */
 
+import { GPressable } from '@/components/ui/g-pressable';
 import React, { useEffect, useId, useMemo, useRef, useState } from 'react';
-import { Animated, Easing, Platform, Pressable, StyleSheet, View } from 'react-native';
+import { Animated, Easing, Platform, StyleSheet, View } from 'react-native';
 import Svg, { Circle, Defs, Ellipse, RadialGradient, Stop } from 'react-native-svg';
 import { alpha } from '@jarida/ink';
-import { useInkTheme, useReduceMotion } from '@jarida/ink/native';
+import { useInkTheme, useReduceMotion } from '@/components/ui/ink';
 
 import type { VoiceState } from '@/models/voice';
 
@@ -699,7 +700,7 @@ export const VoiceOrb = React.memo(function VoiceOrb({
   }
 
   return (
-    <Pressable
+    <GPressable feedback="none"
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
@@ -710,7 +711,7 @@ export const VoiceOrb = React.memo(function VoiceOrb({
       ]}
     >
       {art}
-    </Pressable>
+    </GPressable>
   );
 });
 

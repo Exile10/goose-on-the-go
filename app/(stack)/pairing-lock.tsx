@@ -7,7 +7,7 @@
 import React, { useState } from 'react';
 import { RefreshControl, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { InkButton, InkSpinner } from '@jarida/ink/native';
+import { InkButton, InkSpinner } from '@/components/ui/ink';
 
 import { ContentUnavailable } from '@/components/patterns/content-unavailable';
 import { DigitsField } from '@/components/setup/claim-fields';

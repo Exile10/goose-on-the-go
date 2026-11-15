@@ -12,7 +12,7 @@ import React, { useCallback, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { Redirect, useRouter } from 'expo-router';
 
-import { InkSwitch, InkNotice } from '@jarida/ink/native';
+import { InkSwitch, InkNotice } from '@/components/ui/ink';
 
 import { GIcon } from '@/components/ui/g-icon';
 import { GPressable } from '@/components/ui/g-pressable';

@@ -6,7 +6,7 @@
 
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { InkEdge, InkText, inkText, useInkTheme } from '@jarida/ink/native';
+import { InkEdge, InkText, inkText, useInkTheme } from '@/components/ui/ink';
 
 import { GIcon } from '@/components/ui/g-icon';
 import { GPressable } from '@/components/ui/g-pressable';

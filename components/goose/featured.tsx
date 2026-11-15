@@ -5,7 +5,7 @@
 
 import React from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
-import { InkCard, InkText, useInkTheme } from '@jarida/ink/native';
+import { InkCard, InkText, useInkTheme } from '@/components/ui/ink';
 
 import { GIcon } from '@/components/ui/g-icon';
 import { GPressable } from '@/components/ui/g-pressable';

@@ -3,12 +3,13 @@
  * now, with its latest frame, and which kinds of event the pond records.
  */
 
+import { GPressable } from '@/components/ui/g-pressable';
 import React, { type ReactElement } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
-import { InkEdge, InkSkeleton } from '@jarida/ink/native';
+import { InkEdge, InkSkeleton } from '@/components/ui/ink';
 
 import { ContentUnavailable } from '@/components/patterns/content-unavailable';
 import { isUnavailable } from '@/models/content-state';
@@ -73,7 +74,7 @@ export function VisionStatusCard() {
                 </Text>
               ))}
               {sentence.privacy ? (
-                <Pressable
+                <GPressable feedback="none"
                   accessibilityRole="link"
                   hitSlop={8}
                   onPress={() => {
@@ -84,7 +85,7 @@ export function VisionStatusCard() {
                 >
                   <Text style={styles.linkText}>{t('vision.openPrivacy')}</Text>
                   <GIcon name="chevron-right" size={16} color={colors.accent} strokeWidth={2.5} />
-                </Pressable>
+                </GPressable>
               ) : null}
             </>
           ) : (

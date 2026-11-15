@@ -7,7 +7,7 @@ import React, { useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { router, useLocalSearchParams, useNavigation } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { InkButton, InkSegmented, InkSwitch, InkText, InkTextArea, useInkTheme } from '@jarida/ink/native';
+import { InkButton, InkSegmented, InkSwitch, InkText, InkTextArea, useInkTheme } from '@/components/ui/ink';
 
 import { RoundButton, ScreenScroll, SectionHead } from '@/components/goose/hub-parts';
 import { HookPicker } from '@/components/goose/hook-picker';

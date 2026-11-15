@@ -15,19 +15,12 @@
  * the two drivers never share a node.
  */
 
+import { GPressable } from '@/components/ui/g-pressable';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import {
-  Animated,
-  Easing,
-  Keyboard,
-  Platform,
-  Pressable,
-  StyleSheet,
-  TextInput,
-} from 'react-native';
+import {Animated, Easing, Keyboard, Platform, StyleSheet, TextInput} from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { glassLift, hitSlop } from '@jarida/ink';
-import { inkText, useInkTheme, useReduceMotion } from '@jarida/ink/native';
+import { inkText, useInkTheme, useReduceMotion } from '@/components/ui/ink';
 
 import { ChromePuck, PUCK_SIZE } from '@/components/patterns/chrome-puck';
 import { WALL_GUTTER } from '@/components/patterns/conversation-wall';
@@ -164,7 +157,7 @@ export function WallDock({
           glassLift(theme),
         ]}
       >
-        <Pressable
+        <GPressable feedback="none"
           onPress={openSearch}
           accessibilityRole={open ? undefined : 'button'}
           accessibilityLabel={open ? undefined : t('chat.history.search')}
@@ -175,7 +168,7 @@ export function WallDock({
           style={styles.glyph}
         >
           <GIcon name="search" size={20} color={theme.color.text} />
-        </Pressable>
+        </GPressable>
         <Animated.View
           style={[styles.entry, { opacity: entryOpacity }]}
           pointerEvents={open ? 'auto' : 'none'}
@@ -200,7 +193,7 @@ export function WallDock({
             }}
             style={[field.style, styles.input]}
           />
-          <Pressable
+          <GPressable feedback="none"
             onPress={close}
             accessibilityRole="button"
             accessibilityLabel={t('chat.history.closeSearch')}
@@ -208,7 +201,7 @@ export function WallDock({
             style={styles.close}
           >
             <GIcon name="x" size={18} color={theme.color.textSecondary} />
-          </Pressable>
+          </GPressable>
         </Animated.View>
       </Animated.View>
 

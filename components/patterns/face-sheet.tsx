@@ -14,7 +14,7 @@
 import React, { useCallback, useState } from 'react';
 import { Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { InkBadge, InkButton, InkEdge, InkNotice, InkSheet } from '@jarida/ink/native';
+import { InkBadge, InkButton, InkEdge, InkNotice, InkSheet } from '@/components/ui/ink';
 
 import { CameraFrameView } from '@/components/patterns/camera-frame-view';
 import { SettingsGroup, SettingsRow } from '@/components/settings/settings-list';

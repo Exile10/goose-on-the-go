@@ -34,7 +34,7 @@ import {
   InkText,
   InkTextArea,
   type InkRadioOption,
-} from '@jarida/ink/native';
+} from '@/components/ui/ink';
 
 import { sourceKey } from '@/components/patterns/automation-card';
 import { describeSignal, fractionFromPercent, measureOfSignal, percentText, type Measure } from '@/models/vision';

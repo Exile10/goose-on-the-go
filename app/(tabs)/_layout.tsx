@@ -25,7 +25,7 @@ import {
   InkProvider,
   useInkTheme,
   type InkNavDestination,
-} from '@jarida/ink/native';
+} from '@/components/ui/ink';
 import { Image, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 

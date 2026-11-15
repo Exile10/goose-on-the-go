@@ -8,7 +8,7 @@ import React from 'react';
 import { Image, ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
-import { InkBadge, InkButton, InkCard, InkLink, InkText, InkTitle, inkText, useInkTheme } from '@jarida/ink/native';
+import { InkBadge, InkButton, InkCard, InkLink, InkText, InkTitle, inkText, useInkTheme } from '@/components/ui/ink';
 
 import { GIcon } from '@/components/ui/g-icon';
 import { GPressable } from '@/components/ui/g-pressable';

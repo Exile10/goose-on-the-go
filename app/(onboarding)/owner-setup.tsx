@@ -10,7 +10,7 @@ import { BackHandler, ScrollView, StyleSheet, View } from 'react-native';
 import { Redirect, Stack, useFocusEffect, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { InkButton, InkEmptyState, InkEyebrow, InkMeter, InkNotice, InkSpinner } from '@jarida/ink/native';
+import { InkButton, InkEmptyState, InkEyebrow, InkMeter, InkNotice, InkSpinner } from '@/components/ui/ink';
 
 import { ModelStep } from '@/components/setup/model-step';
 import { SetupFooter, SetupWarmup } from '@/components/setup/setup-chrome';

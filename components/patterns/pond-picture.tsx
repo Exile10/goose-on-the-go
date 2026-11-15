@@ -9,7 +9,7 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import { Image } from 'expo-image';
-import { useInkTheme } from '@jarida/ink/native';
+import { useInkTheme } from '@/components/ui/ink';
 
 import { GIcon } from '@/components/ui/g-icon';
 import type { IconName } from '@/constants/icons';

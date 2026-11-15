@@ -14,7 +14,7 @@ import {
   InkSelect,
   InkText,
   InkTitle,
-} from '@jarida/ink/native';
+} from '@/components/ui/ink';
 
 import { Spacing } from '@/constants/spacing';
 import { SETUP_LANGUAGES, type PromptStyle } from '@/models/owner-setup';

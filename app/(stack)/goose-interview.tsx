@@ -6,7 +6,7 @@
 import React from 'react';
 import { View } from 'react-native';
 import { router } from 'expo-router';
-import { useInkTheme } from '@jarida/ink/native';
+import { useInkTheme } from '@/components/ui/ink';
 
 import { InterviewChat } from '@/components/goose/interview-chat';
 import { useInterestsInterview } from '@/view-models/use-interests-interview';

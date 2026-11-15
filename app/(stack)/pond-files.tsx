@@ -1,10 +1,10 @@
 // The Pond's data folder, one folder at a time, largest first. What the Pond keeps says why.
 
 import React, { useCallback, useEffect, useRef } from 'react';
-import { BackHandler, Pressable, RefreshControl, Text, View } from 'react-native';
+import { BackHandler, RefreshControl, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { Stack, useFocusEffect } from 'expo-router';
-import { InkButton, InkSpinner, useInkTheme } from '@jarida/ink/native';
+import { InkButton, InkSpinner, useInkTheme } from '@/components/ui/ink';
 
 import { BackButton } from '@/components/navigation/back-button';
 import { AdminLockView } from '@/components/pond/admin-lock';
@@ -75,7 +75,7 @@ function EntryRow({
     // from screen readers, and on the web it is a button inside a button.
     <View style={styles.entry}>
       {folder ? (
-        <Pressable
+        <GPressable feedback="none"
           onPress={() => onOpen(entry)}
           accessibilityRole="button"
           accessibilityLabel={t('myPond.files.open', { name: entry.name })}
@@ -83,7 +83,7 @@ function EntryRow({
           style={({ pressed }) => [styles.row, entry.deletable && styles.rowBeforeDelete, pressed && { backgroundColor: colors.pressed }]}
         >
           {body}
-        </Pressable>
+        </GPressable>
       ) : (
         <View style={[styles.row, entry.deletable && styles.rowBeforeDelete]}>{body}</View>
       )}

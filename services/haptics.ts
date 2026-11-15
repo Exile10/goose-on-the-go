@@ -49,19 +49,39 @@ async function run(fn: () => Promise<void>): Promise<void> {
   }
 }
 
+/**
+ * One press, one feel. Ink's controls and `GPressable` give a press its feel after the handler
+ * runs, and many handlers give their own first (a `selectionTick` where a tap would be wrong), so
+ * a second press feel this soon after the first is the same press, and is dropped: the handler's
+ * choice stands, and a handler with none gets the control's.
+ */
+export const PRESS_WINDOW_MS = 80;
+let lastPressAt = -Infinity;
+
+function press(fn: () => Promise<void>, now: number = Date.now()): Promise<void> {
+  if (now - lastPressAt < PRESS_WINDOW_MS) return Promise.resolve();
+  lastPressAt = now;
+  return run(fn);
+}
+
+/** Forget the last press, for a test. */
+export function resetPressWindow(): void {
+  lastPressAt = -Infinity;
+}
+
 /** Moving between tabs, filters, or segments. The lightest thing there is. */
 export function selectionTick(): Promise<void> {
-  return run(() => Haptics.selectionAsync());
+  return press(() => Haptics.selectionAsync());
 }
 
 /** A button doing something ordinary. */
 export function tap(): Promise<void> {
-  return run(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light));
+  return press(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light));
 }
 
 /** A control whose result is physical: a switch, a slider detent. */
 export function toggle(): Promise<void> {
-  return run(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium));
+  return press(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium));
 }
 
 /** Something completed and the reader can move on. */

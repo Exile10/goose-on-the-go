@@ -26,7 +26,7 @@ import {
   inkText,
   useInkTheme,
   useReduceMotion,
-} from '@jarida/ink/native';
+} from '@/components/ui/ink';
 
 import { Goose } from '@/components/patterns/goose';
 import {

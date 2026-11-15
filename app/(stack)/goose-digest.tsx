@@ -8,7 +8,7 @@ import React from 'react';
 import { Linking, StyleSheet, Text, View } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { InkButton, InkSpinner, InkText, inkText, useInkTheme } from '@jarida/ink/native';
+import { InkButton, InkSpinner, InkText, inkText, useInkTheme } from '@/components/ui/ink';
 
 import { ListenButton } from '@/components/goose/digest-card';
 import { HubPicture } from '@/components/goose/hub-picture';

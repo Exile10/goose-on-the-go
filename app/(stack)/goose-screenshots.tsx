@@ -6,7 +6,7 @@
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { InkButton, InkNotice, InkSpinner, InkSwitch, InkText } from '@jarida/ink/native';
+import { InkButton, InkNotice, InkSpinner, InkSwitch, InkText } from '@/components/ui/ink';
 
 import { ListSection, SentenceRow } from '@/components/goose/about-parts';
 import { InsetGroup } from '@/components/goose/following';

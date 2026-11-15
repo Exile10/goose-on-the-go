@@ -8,7 +8,7 @@
 import React, { useState } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { InkAccordion, InkButton, InkEmptyState, InkNotice, InkSpinner, InkText, InkTitle } from '@jarida/ink/native';
+import { InkAccordion, InkButton, InkEmptyState, InkNotice, InkSpinner, InkText, InkTitle } from '@/components/ui/ink';
 
 import { Markdown } from '@/components/patterns/markdown';
 import type { ThemeColors } from '@/constants/colors';

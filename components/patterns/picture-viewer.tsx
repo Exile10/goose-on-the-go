@@ -9,7 +9,7 @@ import { Keyboard, Modal, ScrollView, StyleSheet, Text, View, useWindowDimension
 import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
-import { InkButton, inkText, useInkTheme } from '@jarida/ink/native';
+import { InkButton, inkText, useInkTheme } from '@/components/ui/ink';
 
 import { GIcon } from '@/components/ui/g-icon';
 import { GPressable } from '@/components/ui/g-pressable';

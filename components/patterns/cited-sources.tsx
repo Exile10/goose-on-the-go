@@ -10,7 +10,7 @@ import React, { useCallback, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 import { useTranslation } from 'react-i18next';
-import { InkButton, InkCard, InkChip, InkText, useInkTheme } from '@jarida/ink/native';
+import { InkButton, InkCard, InkChip, InkText, useInkTheme } from '@/components/ui/ink';
 
 import type { SourceChips } from '@/components/patterns/markdown';
 import { PondPicture, usePictureRatio } from '@/components/patterns/pond-picture';

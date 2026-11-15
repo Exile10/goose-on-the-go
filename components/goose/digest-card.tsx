@@ -7,7 +7,7 @@ import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { InkButton, InkCard, InkText } from '@jarida/ink/native';
+import { InkButton, InkCard, InkText } from '@/components/ui/ink';
 
 import { GPressable } from '@/components/ui/g-pressable';
 import { Spacing } from '@/constants/spacing';

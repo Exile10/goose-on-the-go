@@ -8,7 +8,7 @@
  */
 
 import { alpha } from '@jarida/ink';
-import { useInkTheme } from '@jarida/ink/native';
+import { useInkTheme } from '@/components/ui/ink';
 import { BlurView } from 'expo-blur';
 import React from 'react';
 

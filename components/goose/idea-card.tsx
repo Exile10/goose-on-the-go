@@ -7,7 +7,7 @@
 import React from 'react';
 import { Linking, StyleSheet, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { InkButton, InkCard, InkSpinner, InkText, useInkTheme } from '@jarida/ink/native';
+import { InkButton, InkCard, InkSpinner, InkText, useInkTheme } from '@/components/ui/ink';
 
 import { GIcon } from '@/components/ui/g-icon';
 import { GPressable } from '@/components/ui/g-pressable';

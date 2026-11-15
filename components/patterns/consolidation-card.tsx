@@ -8,7 +8,7 @@
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { InkButton, InkCard, InkMeter, InkNotice, InkText } from '@jarida/ink/native';
+import { InkButton, InkCard, InkMeter, InkNotice, InkText } from '@/components/ui/ink';
 
 import { CONSOLIDATION_STAGES, type ConsolidationProgress } from '@/models/memory';
 import i18n from '@/services/i18n';

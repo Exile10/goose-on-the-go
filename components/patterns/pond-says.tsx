@@ -25,7 +25,7 @@ import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { InkTitle, useInkTheme } from '@jarida/ink/native';
+import { InkTitle, useInkTheme } from '@/components/ui/ink';
 
 import { GPressable } from '@/components/ui/g-pressable';
 import { selectionTick } from '@/services/haptics';
