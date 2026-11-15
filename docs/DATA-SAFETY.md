@@ -114,7 +114,7 @@ What the app sends it, beyond the control traffic of the screens themselves:
 | Recorded speech | Voice mode, only the stretches where the user is speaking | `view-models/use-voice.ts` (`api.transcribe`), `services/api-client.ts` (`transcribe`, `POST /api/v1/transcribe`) |
 | Photos and files the user attaches | When the user picks or takes one for a message | `services/media.ts` |
 | The device's location | Once, when the user asks for a ride fare | `view-models/use-ride.ts` (`locateHere`), `services/api-client.ts` (`POST /api/v1/rides/quote`) |
-| The device's location, as the home's | At home only, on the Pond's own network: once per launch while the Pond's location is a guess and location is already allowed, or when the user taps Find my location | `services/home-location.ts`, `services/api-client.ts` (`PUT /api/v1/location/device`) |
+| The device's location, as the home's | At home only, on the Pond's own network: when the user takes the offer shown once per launch while the Pond's location is a guess and location is already allowed, or taps Find my location | `services/home-location.ts`, `services/api-client.ts` (`PUT /api/v1/location/device`) |
 | The name of the place the device is in | With each message, only while the user has turned on Tell Goose where this phone is | `services/phone-place.ts`, `services/api-client.ts` (`streamChat`, `device_place`) |
 
 Each is described under its own heading below.
@@ -214,8 +214,8 @@ reports no tunnel, the saved address is dropped.
 Verified against the dependency list rather than asserted: there is no analytics SDK, no
 crash reporter, no advertising or attribution SDK, and no tracking library of any kind in
 `package.json`. There is no contacts access and no advertising identifier. Location is read
-only for a ride fare, at home to tell the household's own Pond where home is, and, if the user turns it on,
-to name the place the phone is in, below.
+only for a ride fare, at home to tell the household's own Pond where home is, if the user turns it on
+to name the place the phone is in, and to watch the places the user saves for reminders, below.
 
 The Android build does carry Google code that reports on itself (found 2026-11-09 in the release
 runtime classpath, listed in `assets/legal/open-source.json`): `com.google.mlkit:barcode-scanning`
@@ -265,7 +265,7 @@ duplicate should be removed before submission, keeping whichever sentence is mea
 ## Location
 
 `expo-location`, with only a when-in-use purpose string in `app.json`, which says what it is
-for. It is read for three things, all in the foreground:
+for. It is read for three things in the foreground, and one in the background:
 
 - **A ride fare.** `locateHere` in `view-models/use-ride.ts` asks for foreground permission and
   takes one high-accuracy fix, when the user asks for a ride fare. The coordinates go to the
@@ -277,9 +277,10 @@ for. It is read for three things, all in the foreground:
   already serves the phone its location), then sends both to the household's own Pond
   (`PUT /api/v1/location/device`). It does so only while the app reaches the Pond on its local
   network (`connectionState === 'local'`), and the Pond refuses a fix from anywhere else
-  (`not_on_home_network`), so a phone away from home never moves the household. Unasked, it
-  happens at most once per launch, only while the Pond's location is still a guess, and only
-  with a location grant the user already gave: it never prompts. Find my location in Settings
+  (`not_on_home_network`), so a phone away from home never moves the household. Unasked, the app
+  only offers it, in a snackbar at most once per launch, while the Pond's location is still a guess
+  and with a location grant the user already gave; nothing is read or sent unless the user takes
+  the offer (`app/_layout.tsx`, `HomeLocationSync`). Find my location in Settings
   asks for permission and replaces whatever the Pond had. The Pond stores the place rounded to
   about 110 m. Nothing is kept on the phone.
 - **Where the phone is**, by name. Tell Goose where this phone is (Settings, off until the user
@@ -289,8 +290,14 @@ for. It is read for three things, all in the foreground:
   message is being sent, names it with the phone's system geocoder, and drops the coordinates:
   only the name reaches the household's own Pond, which keeps it for that turn. The switch is
   remembered on the phone; the place is held in memory only.
+- **Places saved for reminders**, in the background. A to-do or reminder can wait on a place the
+  user saves, such as home; saving one sends its position to the Pond (`addPlace`,
+  `POST /me/places`). With the background permission the user grants, `services/geofence.ts`
+  registers those places with the OS's own geofencing (`startGeofencingAsync`) and, on arriving or
+  leaving, tells the Pond only which place and which way (`POST /me/places/{id}/event`). The
+  position itself never leaves the phone that way.
 
-There is no background location, no geofence, and no continuous tracking.
+There is no other background location and no continuous tracking.
 
 The built apps agree (checked 2026-10-17 in prebuilt native projects): iOS's `Info.plist`
 carries `NSLocationWhenInUseUsageDescription` and no "always" key, and the Android manifest

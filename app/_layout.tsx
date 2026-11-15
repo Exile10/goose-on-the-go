@@ -4,6 +4,7 @@
  */
 
 import { useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider as NavThemeProvider } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { loadAsync as loadFontsAsync, useFonts } from 'expo-font';
@@ -41,7 +42,8 @@ import { phoneWakeSupported } from '@/services/phone-wake';
 import { followWakePhrase, installPhoneWake } from '@/services/phone-wake-pond';
 import { loadReplyNoticePreference } from '@/services/reply-notices';
 import { offerHomeLocationOnce } from '@/services/home-location';
-import { usePondSettings } from '@/view-models/use-pond-settings';
+import { showSnackbar } from '@/services/snackbar';
+import { usePondSettings, type UsePondSettings } from '@/view-models/use-pond-settings';
 
 /**
  * Keep the splash up until the app can draw itself.
@@ -131,24 +133,42 @@ export default function RootLayout() {
 
 
 /**
- * Gives the Pond this phone's location when the phone reaches it at home and the Pond's location is
- * still a guess (a town's centre from its time zone or a typed name), using a location grant the
- * person already gave. Away from home it does nothing, and the Pond would refuse it anyway
- * (`services/home-location.ts`). Draws nothing.
+ * The Pond's settings, read once for everything at the root that follows them: one poll, not one
+ * per follower. Draws nothing of its own.
  */
-function HomeLocationSync() {
-  const { connectionState, isScreenReal } = useServer();
+function PondSettingsSync() {
   const pond = usePondSettings();
+  return (
+    <>
+      <HomeLocationSync pond={pond} />
+      {phoneWakeSupported() ? <PhoneWakeSync phrase={pond.settings?.voice_wake_word} /> : null}
+    </>
+  );
+}
+
+/**
+ * Offers to give the Pond this phone's location when the phone reaches it at home and the Pond's
+ * location is still a guess (a town's centre from its time zone or a typed name), where location is
+ * already allowed. Nothing leaves the phone until the person takes the offer. Away from home it does
+ * nothing, and the Pond would refuse it anyway (`services/home-location.ts`). Draws nothing.
+ */
+function HomeLocationSync({ pond }: { pond: UsePondSettings }) {
+  const { t } = useTranslation();
+  const { connectionState, isScreenReal } = useServer();
   const loaded = pond.settings !== null;
   const source = pond.settings?.weather_location_source ?? '';
   const { refresh } = pond.actions;
   const atHome = connectionState === 'local' && isScreenReal('settings');
   useEffect(() => {
     if (!loaded || !atHome || source === 'manual' || source === 'device') return;
-    void offerHomeLocationOnce().then((applied) => {
+    const ask = () =>
+      new Promise<boolean>((resolve) => {
+        showSnackbar({ message: t('settings.location.offer'), action: { label: t('settings.location.offerUse'), onPress: () => resolve(true) } });
+      });
+    void offerHomeLocationOnce(ask).then((applied) => {
       if (applied) void refresh();
     });
-  }, [loaded, atHome, source, refresh]);
+  }, [loaded, atHome, source, refresh, t]);
   return null;
 }
 
@@ -157,11 +177,11 @@ function HomeLocationSync() {
  * store re-reads while the app is open: a phrase changed on the dashboard or another phone reaches
  * the service here, as well as with the Pond's next answer to a segment. Draws nothing.
  */
-function PhoneWakeSync() {
-  const phrase = usePondSettings().settings?.voice_wake_word?.trim();
+function PhoneWakeSync({ phrase }: { phrase: string | undefined }) {
+  const trimmed = phrase?.trim();
   useEffect(() => {
-    if (phrase) followWakePhrase(phrase);
-  }, [phrase]);
+    if (trimmed) followWakePhrase(trimmed);
+  }, [trimmed]);
   return null;
 }
 
@@ -182,8 +202,7 @@ function ThemedApp() {
         <SnackbarProvider>
           <ConfirmProvider>
             <ConnectionStatus />
-            <HomeLocationSync />
-            {phoneWakeSupported() ? <PhoneWakeSync /> : null}
+            <PondSettingsSync />
             <Stack>
               <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
               <Stack.Screen name="(stack)" options={{ headerShown: false }} />

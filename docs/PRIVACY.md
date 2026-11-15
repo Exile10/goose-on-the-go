@@ -165,8 +165,9 @@ your message. All of it goes to your Pond, and nowhere else.
 
 ## Your location
 
-The app reads your location for three things, only while it is open, and never in the
-background. It never tracks where you go.
+The app reads your location for four things. Three happen only while it is open. The fourth,
+watching the places you save for reminders, happens in the background once you allow it, and only
+on your phone. It never tracks where you go.
 
 **A ride.** When you ask Goose for a ride fare, the app reads where you are once, precisely
 enough for a driver to find you. That reading goes to your Pond, which sends it to Uber as the
@@ -176,10 +177,10 @@ directly; it does not pass through us, and your phone does not keep it after the
 
 **Where home is.** Your Pond has no GPS, so on its own it only knows the city its time zone
 names. When your phone reaches your Pond on your home network, and you have already allowed
-the app to use your location, the app tells your Pond where home is, once, if your Pond's
-location is still only a guess. You can also ask for it with Find my location in the app. Your
-phone names the place using its own map service (Google's on Android, Apple's on iPhone), which
-is the same service that gives your phone its location. Your Pond keeps the place to about
+the app to use your location, the app offers to tell your Pond where home is if your Pond's
+location is still only a guess, and does so only if you accept. You can also ask for it with Find
+my location in the app. Your phone names the place using its own map service (Google's on
+Android, Apple's on iPhone), which is the same service that gives your phone its location. Your Pond keeps the place to about
 110 metres, which is enough for the weather and nearby results, and not your exact house. Your
 Pond refuses this from a phone that is not on your home network, so a phone away from home can
 never move your household.
@@ -189,6 +190,13 @@ this phone is, each message you send carries the name of the place your phone is
 "Westlands, Nairobi", so Goose can say where you are and not only where home is. Only the name
 is sent, never your coordinates, and only to your Pond, which uses it for that one message. The
 name is looked up at most every five minutes, while you are sending a message.
+
+**Places you save for reminders.** When you save a place for a reminder, such as home or the
+office, its position goes to your Pond, which keeps it with your reminders. If you then allow the
+app to use your location all the time, your phone watches those places in the background, using
+its own geofencing, so it can remind you when you arrive or leave. Your Pond hears only which
+saved place it was and whether you arrived or left; where you are never leaves your phone. You can
+stop this at any time by turning off location for the app in your phone's settings.
 
 ## Bluetooth
 
@@ -243,8 +251,8 @@ keeps are described under Remote access above.
 - We do not use crash-reporting or attribution services.
 - We do not serve advertising, and we do not use an advertising identifier.
 - We do not read your contacts.
-- We do not read your location except for the three uses described above, and we never read it
-  in the background.
+- We do not read your location except for the four uses described above, and in the background
+  only to watch the places you saved for reminders, on your phone.
 - We do not use the microphone except while you talk to Goose, or while listening for your wake
   word if you turn that on, which Android always shows in a notification.
 - We do not look through your photo library. The app sees only the photos you pick.

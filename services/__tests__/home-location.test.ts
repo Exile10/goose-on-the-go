@@ -54,14 +54,36 @@ it('keeps the fix when the phone cannot name the place', async () => {
   await expect(readPhoneFix(false)).resolves.toMatchObject({ kind: 'fix', name: null });
 });
 
-it('offers unasked once per run, with a grant already given, never replacing a set place', async () => {
+it('offers once per run, with a grant already given, and sends only on a yes, never replacing a set place', async () => {
   mockLocation.getForegroundPermissionsAsync.mockResolvedValue(granted);
   mockSet.mockResolvedValue({ applied: true, name: 'Ndenderu', latitude: -1.193, longitude: 36.744 });
-  await expect(offerHomeLocationOnce()).resolves.toBe(true);
+  const yes = jest.fn().mockResolvedValue(true);
+  await expect(offerHomeLocationOnce(yes)).resolves.toBe(true);
+  expect(yes).toHaveBeenCalledTimes(1);
   expect(mockSet).toHaveBeenCalledWith({ latitude: -1.193421, longitude: 36.744088, accuracy_m: 14, name: 'Ndenderu', replace: false });
-  await expect(offerHomeLocationOnce()).resolves.toBe(false);
+  await expect(offerHomeLocationOnce(yes)).resolves.toBe(false);
+  expect(yes).toHaveBeenCalledTimes(1);
   expect(mockSet).toHaveBeenCalledTimes(1);
   expect(mockLocation.requestForegroundPermissionsAsync).not.toHaveBeenCalled();
+});
+
+it('reads and sends nothing when the offer is not taken, or location was never allowed', async () => {
+  // The once-per-run flag is the module's own: a fresh copy for each case.
+  const fresh = () => {
+    let offer!: typeof offerHomeLocationOnce;
+    jest.isolateModules(() => {
+      offer = (jest.requireActual('@/services/home-location') as typeof import('@/services/home-location')).offerHomeLocationOnce;
+    });
+    return offer;
+  };
+  mockLocation.getForegroundPermissionsAsync.mockResolvedValue(granted);
+  await expect(fresh()(async () => false)).resolves.toBe(false);
+  mockLocation.getForegroundPermissionsAsync.mockResolvedValue({ granted: false, canAskAgain: true });
+  const ask = jest.fn();
+  await expect(fresh()(ask)).resolves.toBe(false);
+  expect(ask).not.toHaveBeenCalled();
+  expect(mockLocation.getCurrentPositionAsync).not.toHaveBeenCalled();
+  expect(mockSet).not.toHaveBeenCalled();
 });
 
 describe('a pinned home', () => {
