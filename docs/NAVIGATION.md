@@ -316,11 +316,25 @@ Five more stack screens aren't in the hub:
   (`pond://setup`), and hands either back through `services/pairing-handoff.ts`.
   It has no header at all; the viewfinder carries its own dismiss.
 
-Every other stack screen gets its header, and its back control, from
-`app/(stack)/_layout.tsx`: these screens are pushed through the root stack, so
-the nested navigator has one entry in its own history and would draw no back
-button of its own. The header reads `useTheme()` directly, because a navigator
-header is the one surface `useThemedStyles` cannot reach.
+Every other stack screen gets its header, and its back control
+(`components/navigation/back-button.tsx`), from `app/(stack)/_layout.tsx`: these
+screens are pushed through the root stack, so the nested navigator has one entry
+in its own history and would draw no back button of its own. The header reads
+`useTheme()` directly, because a navigator header is the one surface
+`useThemedStyles` cannot reach.
+
+The same fact decides how a screen keeps history of its own. Back removes the
+whole nested stack from the root one, so a screen's own `beforeRemove` (and
+`usePreventRemove`) never fires. Files, which opens folders in place, catches
+each way back where it starts: it passes `onPress` to the header's
+`BackButton`, and listens for the phone's back with `BackHandler` while it is
+focused, stepping up a folder until it reaches the data directory.
+
+Navigation hooks and providers come from `expo-router` or
+`expo-router/react-navigation`, never from `@react-navigation/*`: expo-router
+mounts its own build of React Navigation, so the separate package's hooks find
+no navigator (`usePreventRemove` from it closed the app as Files opened). A lint
+rule enforces it.
 
 ## My Pond
 
