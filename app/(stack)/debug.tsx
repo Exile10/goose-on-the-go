@@ -31,6 +31,7 @@ import { holderOf, MODEL_ROLES, titleOf } from '@/models/model-library';
 import {
   describeCommand,
   describeLine,
+  deviceCommandLabel,
   formatDuration,
   modelLabel,
   type CommandTiming,
@@ -129,16 +130,21 @@ function TimingColumns({ cells, heading = false }: { cells: [string, string, str
   );
 }
 
-function TimingTable({ timings }: { timings: CommandTiming[] }) {
+function TimingTable({ timings, deviceNames }: { timings: CommandTiming[]; deviceNames: ReadonlyMap<string, string> }) {
   const { t } = useTranslation();
   return (
     <View>
-      <TimingColumns heading cells={[t('debug.timing.firstWord'), t('debug.timing.finished'), t('debug.timing.took')]} />
+      <TimingColumns heading cells={[t('debug.timing.command'), t('debug.timing.finished'), t('debug.timing.took')]} />
       {timings.map((timing) => (
         <TimingColumns
           key={timing.id}
           cells={[
-            timing.firstTokenMs !== null ? formatDuration(timing.firstTokenMs) : '–',
+            // What the command was: a device and what it was told, or a reply and its first word.
+            timing.device
+              ? deviceCommandLabel(timing.device, deviceNames, t)
+              : timing.firstTokenMs !== null
+                ? t('debug.timing.reply', { time: formatDuration(timing.firstTokenMs) })
+                : t('debug.timing.replyNoTime'),
             clockTime(timing.timestamp),
             formatDuration(timing.totalMs),
           ]}
@@ -296,16 +302,24 @@ function DebugScreenContent() {
 
       {/* The Pond's own telemetry for the latest conversation, which the log cannot show: the
           tools a turn used, behind a tap. */}
-      <SettingsGroup title={t('debug.timings.title')} footer={t('debug.timings.footer')}>
-        {latest ? <TelemetryCard latest={latest} onOpen={openTurns} /> : <SettingsRow label={t('debug.timings.none')} />}
-      </SettingsGroup>
+      {/* On its own, not in a group: the card is raised and pressable, and a group's edge drawn
+          around it showed under it as an overlap. */}
+      <Text style={styles.sectionTitle}>{t('debug.timings.title')}</Text>
+      {latest ? (
+        <TelemetryCard latest={latest} onOpen={openTurns} />
+      ) : (
+        <View style={styles.card}>
+          <Text style={styles.hint}>{t('debug.timings.none')}</Text>
+        </View>
+      )}
+      <Text style={styles.footer}>{t('debug.timings.footer')}</Text>
 
       <Text style={styles.sectionTitle}>{t('debug.timing.title')}</Text>
       <View style={styles.card}>
         {debug.data.timings.length === 0 ? (
           <Text style={styles.hint}>{t('debug.timing.empty')}</Text>
         ) : (
-          <TimingTable timings={debug.data.timings} />
+          <TimingTable timings={debug.data.timings} deviceNames={debug.data.deviceNames} />
         )}
       </View>
 
@@ -412,7 +426,7 @@ const makeStyles = (c: ThemeColors) =>
     },
     timingCell: { flex: 1, fontFamily: FontFamily.mono, fontSize: FontSize.sm, color: c.text },
 
-    logHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+    logHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: Spacing.md },
     logHeadRight: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
     streamState: { fontFamily: FontFamily.body, fontSize: FontSize.sm, color: c.textTertiary },
     streamLive: { color: Semantic.success },

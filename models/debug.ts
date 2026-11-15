@@ -2,8 +2,9 @@
  * The Debug screen's reading of the Pond's live log (issue #165).
  *
  * Per-command timing needs no route of its own: each answered turn already logs a `turn_end`
- * line whose metadata carries how long it took. Warm-up turns the Pond runs for itself, with a
- * `prewarm-` session, are nobody's command and are left out.
+ * line whose metadata carries how long it took, and each device the Pond drives a
+ * `matter_device_command` line. Warm-up turns the Pond runs for itself, with a `prewarm-`
+ * session, are nobody's command and are left out.
  */
 
 import type { TFunction } from 'i18next';
@@ -25,6 +26,18 @@ export interface CommandTiming {
   /** Time to the first token, when the turn reported it. */
   firstTokenMs: number | null;
   completionTokens: number | null;
+  /** Set when the command drove a device rather than answered a message. */
+  device: DeviceCommand | null;
+}
+
+/** A device the Pond drove: which one, what it was told, and whether it took. */
+export interface DeviceCommand {
+  id: string;
+  /** `on`, `off`, `toggle` and so on: the Pond's verb, as it logged it. */
+  verb: string;
+  /** What it was told, as the Pond logged it (`true`, `40`); null from a Pond that logs no value. */
+  value: string | null;
+  failed: boolean;
 }
 
 function metadataOf(entry: LogEntry): Record<string, unknown> | null {
@@ -45,9 +58,10 @@ export function traceKind(entry: LogEntry): string | null {
   return typeof kind === 'string' ? kind : null;
 }
 
-/** How long a command took, from its `turn_end` line; null for any other line. */
+/** How long a command took, from its `turn_end` or `matter_device_command` line; null for any other. */
 export function commandTiming(entry: LogEntry): CommandTiming | null {
   const meta = metadataOf(entry);
+  if (meta?.kind === 'matter_device_command') return deviceTiming(entry, meta);
   if (meta?.kind !== 'turn_end') return null;
   if (typeof meta.session_id === 'string' && meta.session_id.startsWith('prewarm-')) return null;
   const totalMs = numberOr(meta.total_latency_ms);
@@ -58,7 +72,40 @@ export function commandTiming(entry: LogEntry): CommandTiming | null {
     totalMs,
     firstTokenMs: numberOr(meta.ttft_ms),
     completionTokens: numberOr(meta.completion_tokens),
+    device: null,
   };
+}
+
+/** A failed command is logged with an `error_code`; one that worked has none. */
+function deviceTiming(entry: LogEntry, meta: Record<string, unknown>): CommandTiming | null {
+  const totalMs = numberOr(meta.duration_ms);
+  if (totalMs === null || typeof meta.device !== 'string' || !meta.device) return null;
+  return {
+    id: entry.id,
+    timestamp: entry.timestamp,
+    totalMs,
+    firstTokenMs: null,
+    completionTokens: null,
+    device: {
+      id: meta.device,
+      verb: typeof meta.verb === 'string' ? meta.verb : '',
+      value: typeof meta.value === 'string' || typeof meta.value === 'boolean' ? String(meta.value) : null,
+      failed: meta.error_code !== undefined,
+    },
+  };
+}
+
+/** `Kitchen light on`, by the name the household gave it, or its id when the Pond has none. */
+export function deviceCommandLabel(device: DeviceCommand, names: ReadonlyMap<string, string>, t: TFunction): string {
+  const name = names.get(device.id)?.trim() || device.id;
+  // `power` says only that it was switched; its value says which way.
+  const verb =
+    device.verb === 'power' && device.value === 'true'
+      ? t('debug.timing.on')
+      : device.verb === 'power' && device.value === 'false'
+        ? t('debug.timing.off')
+        : device.verb.replace(/[_:]+/g, ' ').trim();
+  return t(device.failed ? 'debug.timing.deviceFailed' : 'debug.timing.device', { device: name, verb });
 }
 
 /**
