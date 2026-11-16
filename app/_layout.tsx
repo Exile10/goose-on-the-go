@@ -26,6 +26,7 @@ import { InkProvider } from '@/components/ui/ink';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ConnectionStatus } from '@/components/patterns/connection-status';
+import { NowListening } from '@/components/patterns/now-listening';
 import { NotificationsProvider } from '@/providers/notifications-provider';
 import { ThemeProvider, useTheme } from '@/providers/theme-provider';
 // Registers the app's icons with Ink. Imported for the side effect: on native
@@ -202,6 +203,7 @@ function ThemedApp() {
         <SnackbarProvider>
           <ConfirmProvider>
             <ConnectionStatus />
+            <NowListening />
             <PondSettingsSync />
             <Stack>
               <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
