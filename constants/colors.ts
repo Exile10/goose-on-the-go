@@ -3,7 +3,7 @@
  * Source: Jarida Brand Heuristics + Goose In A Pond design bundle
  */
 
-import { createTheme } from '@jarida/ink';
+import { ACCENT_NAMES, createTheme, type AccentName } from '@jarida/ink';
 
 export const JaridaPurple = {
   50: '#F4ECFF',
@@ -156,8 +156,8 @@ export interface ThemeColors {
  * different colour, worst in dark, where the stack header was grey above a
  * purple page. Deriving them means a screen and the Ink components on it agree.
  */
-function fromInk(scheme: 'light' | 'dark'): ThemeColors {
-  const c = createTheme({ scheme, accent: 'Purple' }).color;
+function fromInk(scheme: 'light' | 'dark', accent: AccentName): ThemeColors {
+  const c = createTheme({ scheme, accent }).color;
   return {
     background: c.bg,
     backgroundSecondary: c.content,
@@ -190,9 +190,33 @@ function fromInk(scheme: 'light' | 'dark'): ThemeColors {
   };
 }
 
-export const LightColors: ThemeColors = fromInk('light');
+/** The accents the member can choose, the same five the Pond's dashboard offers. */
+export const THEME_ACCENTS: readonly AccentName[] = ACCENT_NAMES;
+export type ThemeAccent = AccentName;
 
-export const DarkColors: ThemeColors = fromInk('dark');
+/** Ink lists its brand accent, Purple, first: the app's colour until the member picks another. */
+export const DEFAULT_THEME_ACCENT: ThemeAccent = ACCENT_NAMES[0];
+
+export const LightColors: ThemeColors = fromInk('light', DEFAULT_THEME_ACCENT);
+
+export const DarkColors: ThemeColors = fromInk('dark', DEFAULT_THEME_ACCENT);
+
+export function isThemeAccent(value: string | null): value is ThemeAccent {
+  return value !== null && (ACCENT_NAMES as string[]).includes(value);
+}
+
+const built = new Map<string, ThemeColors>();
+
+/** The app's colours for a scheme and an accent, built once each. */
+export function themeColors(scheme: 'light' | 'dark', accent: ThemeAccent): ThemeColors {
+  const key = `${scheme}:${accent}`;
+  let colors = built.get(key);
+  if (!colors) {
+    colors = fromInk(scheme, accent);
+    built.set(key, colors);
+  }
+  return colors;
+}
 
 export const Colors = {
   light: LightColors,

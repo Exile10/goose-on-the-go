@@ -190,13 +190,13 @@ function PhoneWakeSync({ phrase }: { phrase: string | undefined }) {
  * scheme rather than each reading the system on its own.
  */
 function ThemedApp() {
-  const { isDark } = useTheme();
+  const { isDark, accent } = useTheme();
   // Ink cannot measure the notch or the home indicator itself; told once here,
   // every sheet, toast and bar clears them.
   const insets = useSafeAreaInsets();
   return (
     <NavThemeProvider value={isDark ? DarkTheme : DefaultTheme}>
-      <InkProvider scheme={isDark ? 'dark' : 'light'} accent="Purple" insets={insets}>
+      <InkProvider scheme={isDark ? 'dark' : 'light'} accent={accent} insets={insets}>
         {/* Inside Ink because the dialog and the snackbar draw with its theme; around every screen
             so any of them can ask. */}
         <SnackbarProvider>
