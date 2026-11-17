@@ -6,6 +6,7 @@ import type { TranslationKey } from '@/services/i18n';
 import type { AnchorKindWire, AnchorStopWire, DeliverableRejectWire, RejectReasonWire } from '@/services/types';
 
 import { count, list, oneOf, readAll, record, strings, text, textOrNull, time, webUrl } from './me-read';
+import { readQuestion, type Question } from './questions';
 import type { CitedSource } from './sources';
 
 export type AnchorKind = AnchorKindWire;
@@ -14,7 +15,6 @@ export type DeliverableKind = 'dossier' | 'plan' | 'shortlist' | 'digest' | 'che
 export type DeliverableState = 'queued' | 'making' | 'ready' | 'unsure' | 'rejected' | 'archived';
 export type RejectReason = RejectReasonWire;
 export type SpecialistId = 'trip' | 'work' | 'hunt' | 'budget';
-export type QuestionPurpose = 'anchor' | 'interest' | 'profile' | 'ledger';
 
 export const ANCHOR_KINDS: readonly AnchorKind[] = ['event', 'trip', 'purchase', 'project', 'interest', 'standing'];
 /** The kinds a member may add by hand: the everyday anchor is the Pond's own. */
@@ -23,7 +23,6 @@ const ANCHOR_STATES: readonly AnchorState[] = ['candidate', 'active', 'ended', '
 const DELIVERABLE_KINDS: readonly DeliverableKind[] = ['dossier', 'plan', 'shortlist', 'digest', 'checklist'];
 const DELIVERABLE_STATES: readonly DeliverableState[] = ['queued', 'making', 'ready', 'unsure', 'rejected', 'archived'];
 const SPECIALISTS: readonly SpecialistId[] = ['trip', 'work', 'hunt', 'budget'];
-const PURPOSES: readonly QuestionPurpose[] = ['anchor', 'interest', 'profile', 'ledger'];
 /** The reason chips, the same on every surface and in this order. */
 export const REASONS: readonly RejectReason[] = ['too_generic', 'not_relevant', 'wrong_facts', 'already_know', 'bad_timing'];
 
@@ -63,14 +62,6 @@ export interface DeliverableSummary {
   /** What the last refresh changed, or empty. */
   changed: string;
   unseen: boolean;
-}
-
-export interface Question {
-  id: string;
-  text: string;
-  /** Never "Other": the screen offers that as free text. */
-  options: string[];
-  multi: boolean;
 }
 
 export interface Anchor {
@@ -123,14 +114,6 @@ export interface Deliverable extends DeliverableSummary {
   job: EngineJobNow | null;
 }
 
-export interface QuestionBatch {
-  id: string;
-  purpose: QuestionPurpose;
-  anchorId: string | null;
-  title: string;
-  questions: Question[];
-}
-
 function readFacts(raw: unknown): AnchorFact[] {
   return list(raw).flatMap((f) => {
     const r = record(f);
@@ -157,16 +140,6 @@ function readJob(raw: unknown): EngineJobNow | null {
     rounds: count(r.rounds),
     steps: readAll(r.steps, 'steps', readStep),
   };
-}
-
-export function readQuestion(raw: unknown): Question | null {
-  const r = record(raw);
-  const id = text(r?.id);
-  const words = text(r?.text);
-  if (!r || !id || !words) return null;
-  // "Other" is the screen's; an option that names it would be offered twice.
-  const options = strings(r.options).filter((o) => o.toLowerCase() !== 'other');
-  return { id, text: words, options, multi: r.multi === true };
 }
 
 function readSummary(r: Record<string, unknown>): DeliverableSummary | null {
@@ -261,19 +234,6 @@ export function readDeliverable(raw: unknown): Deliverable | null {
     updatedAt: time(r.updated_at),
     job: readJob(r.job),
   };
-}
-
-export function readQuestionBatch(raw: unknown): QuestionBatch | null {
-  const r = record(raw);
-  const id = text(r?.id);
-  if (!r || !id) return null;
-  const questions = readAll(r.questions, 'questions', readQuestion);
-  if (questions.length === 0) return null;
-  return { id, purpose: oneOf(r.purpose, PURPOSES, 'profile'), anchorId: textOrNull(r.anchor_id), title: text(r.title), questions };
-}
-
-export function readQuestionBatches(raw: unknown): QuestionBatch[] {
-  return readAll(raw, 'batches', readQuestionBatch);
 }
 
 /** Finished work the member can read: ready, or shown marked unsure with the critic's objections. */

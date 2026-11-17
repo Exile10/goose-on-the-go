@@ -2577,6 +2577,11 @@ export interface QuestionAnswerWire {
   text?: string;
 }
 
+/** `POST /me/questions/batches/{id}/answer`: one entry for each question the member answered. */
+export interface QuestionBatchAnswerWire {
+  answers: (QuestionAnswerWire & { question_id: string })[];
+}
+
 export type FactCategoryWire =
   | 'identity' | 'home' | 'work' | 'people' | 'plan' | 'hunt' | 'interest' | 'food' | 'health' | 'style'
   | 'routine' | 'avoid' | 'other';

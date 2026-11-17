@@ -1,15 +1,15 @@
-// Goose's question batches: each question answered with its options, or with the member's own words
-// under "Other", or skipped (pond docs/architecture/my-goose-hub.md, part 1a). The screen offers
-// "Other" itself; the Pond never lists it.
+// Goose's question batches (pond docs/architecture/structured-questions.md): every question in a
+// batch is answered with its options or the member's own words under "Other", and the batch goes in
+// one request; Done tells Goose to go ahead with what it has. The screen offers "Other" itself.
 
-import { useCallback, useMemo, useRef, useState, useEffect } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import type { Question, QuestionBatch } from '@/models/anchors';
-import { api } from '@/services/api-client';
+import type { AnswerLine, AskedQuestion, Question, QuestionBatch } from '@/models/questions';
+import { ApiError, api } from '@/services/api-client';
 import { confirm } from '@/services/haptics';
 import i18n from '@/services/i18n';
 import { showSnackbar } from '@/services/snackbar';
-import type { QuestionAnswerWire } from '@/services/types';
+import type { QuestionAnswerWire, QuestionBatchAnswerWire } from '@/services/types';
 import { hubAction, useHubRead } from './hub-read';
 
 /** Questions arrive when Goose starts on a plan; a read every couple of minutes while in front. */
@@ -17,6 +17,7 @@ export const QUESTIONS_MS = 2 * 60_000;
 
 /** What the member has chosen so far for one question. */
 export interface AnswerDraft {
+  /** Option labels. */
   choices: string[];
   /** "Other" is chosen; its words are `text`. */
   other: boolean;
@@ -25,15 +26,17 @@ export interface AnswerDraft {
 
 export const EMPTY_DRAFT: AnswerDraft = { choices: [], other: false, text: '' };
 
+export type Drafts = Record<string, AnswerDraft>;
+
 /** One option picked: a single-answer question keeps only it, a multi one toggles it. */
-export function pick(question: Pick<Question, 'multi'>, draft: AnswerDraft, option: string): AnswerDraft {
+export function pick(question: Pick<AskedQuestion, 'multi'>, draft: AnswerDraft, option: string): AnswerDraft {
   if (!question.multi) return { ...draft, choices: [option], other: false };
   const has = draft.choices.includes(option);
   return { ...draft, choices: has ? draft.choices.filter((c) => c !== option) : [...draft.choices, option] };
 }
 
 /** "Other" chosen or let go: in a single-answer question it stands in for the options. */
-export function pickOther(question: Pick<Question, 'multi'>, draft: AnswerDraft, on: boolean): AnswerDraft {
+export function pickOther(question: Pick<AskedQuestion, 'multi'>, draft: AnswerDraft, on: boolean): AnswerDraft {
   if (!question.multi && on) return { ...draft, choices: [], other: true };
   return { ...draft, other: on };
 }
@@ -48,6 +51,75 @@ export function answerBody(draft: AnswerDraft): QuestionAnswerWire {
   const words = draft.other ? draft.text.trim() : '';
   return { choices: [...draft.choices], ...(words ? { text: words } : {}) };
 }
+
+/** A batch can go once any question in it has an answer; the rest stay Goose's to assume. */
+export function canSubmit(questions: readonly Question[], drafts: Drafts): boolean {
+  return questions.some((q) => canAnswer(drafts[q.id] ?? EMPTY_DRAFT));
+}
+
+/** `POST /batches/{id}/answer`'s body: the questions answered, in the batch's order. */
+export function batchAnswerBody(questions: readonly Question[], drafts: Drafts): QuestionBatchAnswerWire {
+  return {
+    answers: questions.flatMap((q) => {
+      const draft = drafts[q.id] ?? EMPTY_DRAFT;
+      return canAnswer(draft) ? [{ question_id: q.id, ...answerBody(draft) }] : [];
+    }),
+  };
+}
+
+/** What a sent batch shows in place of its questions. */
+export function answerLines(questions: readonly Question[], drafts: Drafts): AnswerLine[] {
+  return questions.flatMap((q) => {
+    const draft = drafts[q.id] ?? EMPTY_DRAFT;
+    if (!canAnswer(draft)) return [];
+    const words = answerBody(draft).text;
+    const parts = [...draft.choices, ...(words ? [i18n.t('goose.questions.otherSaid', { words })] : [])];
+    return [{ header: q.header || q.text, answer: parts.join(', ') }];
+  });
+}
+
+/**
+ * Sends a batch's answers. A Pond from before batches has no batch route, so there each answer
+ * goes on its own, as that Pond takes them.
+ */
+export async function sendAnswers(batch: Pick<QuestionBatch, 'id' | 'questions'>, drafts: Drafts): Promise<void> {
+  const body = batchAnswerBody(batch.questions, drafts);
+  try {
+    await api.answerQuestionBatch(batch.id, body);
+  } catch (e) {
+    if (!(e instanceof ApiError) || (e.status !== 404 && e.status !== 405)) throw e;
+    for (const answer of body.answers) {
+      const { question_id: id, ...rest } = answer;
+      await api.answerQuestion(id, rest);
+    }
+  }
+}
+
+/** The member's choices across the questions on screen, held until they are sent. */
+export function useDrafts() {
+  const [drafts, setDrafts] = useState<Drafts>({});
+  const latest = useRef(drafts);
+  useEffect(() => {
+    latest.current = drafts;
+  });
+
+  const draftOf = useCallback((id: string) => drafts[id] ?? EMPTY_DRAFT, [drafts]);
+  const change = useCallback((id: string, next: (d: AnswerDraft) => AnswerDraft) => setDrafts((all) => ({ ...all, [id]: next(all[id] ?? EMPTY_DRAFT) })), []);
+  const choose = useCallback((question: Question, option: string) => change(question.id, (d) => pick(question, d, option)), [change]);
+  const chooseOther = useCallback((question: Question, on: boolean) => change(question.id, (d) => pickOther(question, d, on)), [change]);
+  const setOtherText = useCallback((question: Question, text: string) => change(question.id, (d) => ({ ...d, other: true, text })), [change]);
+  const clear = useCallback((ids: readonly string[]) => {
+    setDrafts((all) => {
+      const rest = { ...all };
+      for (const id of ids) delete rest[id];
+      return rest;
+    });
+  }, []);
+
+  return { drafts, latest, draftOf, choose, chooseOther, setOtherText, clear };
+}
+
+export type UseDrafts = ReturnType<typeof useDrafts>;
 
 export interface QuestionFilter {
   /** Only the batches about this plan. */
@@ -66,76 +138,72 @@ export function batchesFor(batches: readonly QuestionBatch[], filter: QuestionFi
   return [...batches];
 }
 
-/** The batches with one question taken out, and a batch left with none taken out too. */
-export function withoutQuestion(batches: readonly QuestionBatch[], questionId: string): QuestionBatch[] {
-  return batches.map((b) => ({ ...b, questions: b.questions.filter((q) => q.id !== questionId) })).filter((b) => b.questions.length > 0);
-}
+export type QuestionsBusy = { id: string; what: 'send' | 'enough' } | null;
 
 export function useQuestions(filter?: QuestionFilter, enabled = true) {
   const read = useHubRead<QuestionBatch[]>('questions', () => api.questions(), [], QUESTIONS_MS, enabled);
   const { data, setData } = read;
-  const [drafts, setDrafts] = useState<Record<string, AnswerDraft>>({});
-  const [busy, setBusy] = useState<string | null>(null);
-  const latestDrafts = useRef(drafts);
-  useEffect(() => {
-    latestDrafts.current = drafts;
-  });
+  const drafts = useDrafts();
+  const { latest, clear } = drafts;
+  const [busy, setBusy] = useState<QuestionsBusy>(null);
 
   const anchorId = filter?.anchorId ?? null;
   const batchId = filter?.batchId ?? null;
   const batches = useMemo(() => batchesFor(data, { anchorId, batchId }), [data, anchorId, batchId]);
 
-  const draftOf = useCallback((id: string) => drafts[id] ?? EMPTY_DRAFT, [drafts]);
-  const change = useCallback((id: string, next: (d: AnswerDraft) => AnswerDraft) => setDrafts((all) => ({ ...all, [id]: next(all[id] ?? EMPTY_DRAFT) })), []);
-
-  const choose = useCallback((question: Question, option: string) => change(question.id, (d) => pick(question, d, option)), [change]);
-  const chooseOther = useCallback((question: Question, on: boolean) => change(question.id, (d) => pickOther(question, d, on)), [change]);
-  const setOtherText = useCallback((question: Question, text: string) => change(question.id, (d) => ({ ...d, other: true, text })), [change]);
-
   const settle = useCallback(
-    (question: Question) => {
-      setData((all) => withoutQuestion(all, question.id));
-      setDrafts((all) => {
-        const rest = { ...all };
-        delete rest[question.id];
-        return rest;
-      });
+    (batch: QuestionBatch) => {
+      setData((all) => all.filter((b) => b.id !== batch.id));
+      clear(batch.questions.map((q) => q.id));
     },
-    [setData],
+    [setData, clear],
   );
 
-  /** Resolves whether the Pond took the answer. */
-  const answer = useCallback(
-    async (question: Question): Promise<boolean> => {
-      const draft = latestDrafts.current[question.id] ?? EMPTY_DRAFT;
-      if (!canAnswer(draft)) return false;
-      setBusy(question.id);
-      const done = await hubAction('questions', () => api.answerQuestion(question.id, answerBody(draft)).then(() => true));
+  /** Resolves whether the Pond took the answers. */
+  const submit = useCallback(
+    async (batch: QuestionBatch): Promise<boolean> => {
+      const now = latest.current;
+      if (!canSubmit(batch.questions, now)) return false;
+      setBusy({ id: batch.id, what: 'send' });
+      const done = await hubAction('questions', () => sendAnswers(batch, now).then(() => true));
       setBusy(null);
       if (!done) return false;
-      settle(question);
+      settle(batch);
       void confirm();
-      showSnackbar({ message: i18n.t('goose.questions.thanks'), tone: 'success' });
+      // A waiting chat turn carries on in its chat, where the answers arrive as the member's message.
+      const said = batch.purpose === 'chat' && batch.state === 'waiting' ? 'goose.questions.thanksChat' : 'goose.questions.thanks';
+      showSnackbar({ message: i18n.t(said), tone: 'success' });
       return true;
     },
-    [settle],
+    [latest, settle],
   );
 
-  const skip = useCallback(
-    async (question: Question): Promise<boolean> => {
-      setBusy(question.id);
-      const done = await hubAction('questions', () => api.skipQuestion(question.id).then(() => true));
+  /** Done: Goose stops asking this chain and goes ahead with what it has. */
+  const enough = useCallback(
+    async (batch: QuestionBatch): Promise<boolean> => {
+      setBusy({ id: batch.id, what: 'enough' });
+      const done = await hubAction('questions', () => api.enoughQuestions(batch.id).then(() => true));
       setBusy(null);
       if (!done) return false;
-      settle(question);
+      settle(batch);
+      showSnackbar({ message: i18n.t('goose.questions.enoughSaid'), tone: 'success' });
       return true;
     },
     [settle],
   );
 
   const count = batches.reduce((n, b) => n + b.questions.length, 0);
+  const canSend = useCallback((batch: QuestionBatch) => canSubmit(batch.questions, drafts.drafts), [drafts.drafts]);
 
-  return { ...read, batches, count, busy, draftOf, actions: { reload: read.reload, choose, chooseOther, setOtherText, answer, skip } };
+  return {
+    ...read,
+    batches,
+    count,
+    busy,
+    canSend,
+    draftOf: drafts.draftOf,
+    actions: { reload: read.reload, choose: drafts.choose, chooseOther: drafts.chooseOther, setOtherText: drafts.setOtherText, submit, enough },
+  };
 }
 
 export type UseQuestions = ReturnType<typeof useQuestions>;

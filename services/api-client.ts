@@ -78,11 +78,10 @@ import {
   readAnchor,
   readAnchors,
   readDeliverable,
-  readQuestionBatches,
   type Anchor,
   type Deliverable,
-  type QuestionBatch,
 } from '@/models/anchors';
+import { readQuestionBatches, type QuestionBatch } from '@/models/questions';
 import { readFactSheet, readRules, readSheetFact, type DontRule, type FactSheet, type SheetFact } from '@/models/fact-sheet';
 import { readEngineJobs, readIntentions, type EngineJob, type Intention } from '@/models/engine-log';
 import { readLedger, readLedgerEntry, readSpecialists, type Ledger, type LedgerEntry, type Specialist } from '@/models/specialists';
@@ -203,6 +202,7 @@ import type {
   LedgerPatchWire,
   NewAnchorWire,
   QuestionAnswerWire,
+  QuestionBatchAnswerWire,
   DeviceStatePatch,
   EventCategory,
   Extension,
@@ -3661,8 +3661,20 @@ export class PondApiClient {
     return { name: reportFileName(res.headers.get('Content-Disposition'), 'markdown'), body: await res.text() };
   }
 
-  async questions(): Promise<QuestionBatch[]> {
-    return readQuestionBatches(await this.get<unknown>('/api/v1/me/questions'));
+  /** Open and waiting batches, newest first; `sessionId` narrows them to one chat's. */
+  async questions(sessionId?: string): Promise<QuestionBatch[]> {
+    const query = sessionId ? `?session_id=${encodeURIComponent(sessionId)}` : '';
+    return readQuestionBatches(await this.get<unknown>(`/api/v1/me/questions${query}`));
+  }
+
+  /** Every answer in one request; resumes a chat turn still waiting on them. */
+  async answerQuestionBatch(id: string, body: QuestionBatchAnswerWire): Promise<void> {
+    await this.post<unknown>(`/api/v1/me/questions/batches/${encodeURIComponent(id)}/answer`, body);
+  }
+
+  /** The member's Done: Goose goes ahead with what it has. */
+  async enoughQuestions(id: string): Promise<void> {
+    await this.post<unknown>(`/api/v1/me/questions/batches/${encodeURIComponent(id)}/enough`, {});
   }
 
   /** 422 for no choice and no words, or two choices where one is asked; 409 once it is closed. */
