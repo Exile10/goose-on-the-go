@@ -74,6 +74,19 @@ import {
   type PairingRequest,
 } from '@/models/pairing-lock';
 import { readScreenshots, type Screenshots } from '@/models/screenshots';
+import {
+  readAnchor,
+  readAnchors,
+  readDeliverable,
+  readQuestionBatches,
+  type Anchor,
+  type Deliverable,
+  type QuestionBatch,
+} from '@/models/anchors';
+import { readFactSheet, readRules, readSheetFact, type DontRule, type FactSheet, type SheetFact } from '@/models/fact-sheet';
+import { readEngineJobs, readIntentions, type EngineJob, type Intention } from '@/models/engine-log';
+import { readLedger, readLedgerEntry, readSpecialists, type Ledger, type LedgerEntry, type Specialist } from '@/models/specialists';
+import { readCaptures, readCaptureSettings, type CaptureSettings, type Captures } from '@/models/captures';
 import { readCatalog, type CatalogItem } from '@/models/catalog';
 import { readLongTask, readLongTaskReport, readResearchAvailability, reportFileName } from '@/models/long-tasks';
 import {
@@ -167,6 +180,16 @@ import type {
   StoryVoteWire,
   TodoAnswerWire,
   TodoWriteWire,
+  AnchorPatchWire,
+  AnchorStopWire,
+  CaptureSettingsWire,
+  CaptureWire,
+  DeliverableRejectWire,
+  FactCategoryWire,
+  FactPatchWire,
+  LedgerPatchWire,
+  NewAnchorWire,
+  QuestionAnswerWire,
   DeviceStatePatch,
   EventCategory,
   Extension,
@@ -3533,6 +3556,175 @@ export class PondApiClient {
 
   async catalog(): Promise<CatalogItem[]> {
     return readCatalog(await this.get<unknown>('/api/v1/me/catalog'));
+  }
+
+  // The idea engine: plans, what Goose makes for them, its questions, the fact sheet, the
+  // don't-list, the specialists, the ledger, the heartbeat's jobs and the pictures sent to it. A
+  // Pond serves each part its `/me/hub` names; a member an anchor is shared with is refused (403)
+  // everything but reading it and answering its questions.
+
+  async anchors(): Promise<Anchor[]> {
+    return readAnchors(await this.get<unknown>('/api/v1/me/anchors'));
+  }
+
+  async anchor(id: string): Promise<Anchor> {
+    return required(readAnchor(await this.get<unknown>(`/api/v1/me/anchors/${encodeURIComponent(id)}`)), 'the plan');
+  }
+
+  /** 201 for a new one, or 200 with the one the member already has under that title. */
+  async addAnchor(body: NewAnchorWire): Promise<Anchor> {
+    return required(readAnchor(await this.post<unknown>('/api/v1/me/anchors', body)), 'the plan');
+  }
+
+  async editAnchor(id: string, body: AnchorPatchWire): Promise<Anchor> {
+    return required(readAnchor(await this.patch<unknown>(`/api/v1/me/anchors/${encodeURIComponent(id)}`, body)), 'the plan');
+  }
+
+  async confirmAnchor(id: string): Promise<Anchor> {
+    return required(readAnchor(await this.post<unknown>(`/api/v1/me/anchors/${encodeURIComponent(id)}/confirm`, {})), 'the plan');
+  }
+
+  /** A candidate fades; 409 for one already confirmed. */
+  async dismissAnchor(id: string): Promise<void> {
+    await this.post<unknown>(`/api/v1/me/anchors/${encodeURIComponent(id)}/dismiss`, {});
+  }
+
+  async stopAnchor(id: string, body: AnchorStopWire): Promise<void> {
+    await this.post<unknown>(`/api/v1/me/anchors/${encodeURIComponent(id)}/stop`, body);
+  }
+
+  async shareAnchor(id: string, profileIds: string[]): Promise<Anchor> {
+    return required(readAnchor(await this.put<unknown>(`/api/v1/me/anchors/${encodeURIComponent(id)}/shares`, { profile_ids: profileIds })), 'the plan');
+  }
+
+  async deliverable(id: string): Promise<Deliverable> {
+    return required(readDeliverable(await this.get<unknown>(`/api/v1/me/deliverables/${encodeURIComponent(id)}`)), 'what Goose made');
+  }
+
+  /** 202: a job is queued, or the open one moved ahead. 409 once it was rejected or its plan is over. */
+  async refreshDeliverable(id: string): Promise<void> {
+    await this.post<unknown>(`/api/v1/me/deliverables/${encodeURIComponent(id)}/refresh`, {});
+  }
+
+  async rejectDeliverable(id: string, body: DeliverableRejectWire): Promise<void> {
+    await this.post<unknown>(`/api/v1/me/deliverables/${encodeURIComponent(id)}/reject`, body);
+  }
+
+  async deliverableSeen(id: string): Promise<void> {
+    await this.post<unknown>(`/api/v1/me/deliverables/${encodeURIComponent(id)}/seen`, {});
+  }
+
+  /** The body as a Markdown file to share; a 404 before anything is written. */
+  async deliverableFile(id: string): Promise<{ name: string; body: string }> {
+    const res = await this.open(`/api/v1/me/deliverables/${encodeURIComponent(id)}/file`, { signal: timeoutSignal(REQUEST_TIMEOUT_MS) });
+    return { name: reportFileName(res.headers.get('Content-Disposition'), 'markdown'), body: await res.text() };
+  }
+
+  async questions(): Promise<QuestionBatch[]> {
+    return readQuestionBatches(await this.get<unknown>('/api/v1/me/questions'));
+  }
+
+  /** 422 for no choice and no words, or two choices where one is asked; 409 once it is closed. */
+  async answerQuestion(id: string, body: QuestionAnswerWire): Promise<void> {
+    await this.post<unknown>(`/api/v1/me/questions/${encodeURIComponent(id)}/answer`, body);
+  }
+
+  async skipQuestion(id: string): Promise<void> {
+    await this.post<unknown>(`/api/v1/me/questions/${encodeURIComponent(id)}/skip`, {});
+  }
+
+  async engineJobs(limit = 30): Promise<EngineJob[]> {
+    return readEngineJobs(await this.get<unknown>(`/api/v1/me/engine/jobs?limit=${Math.max(1, Math.min(100, Math.round(limit)))}`));
+  }
+
+  async facts(): Promise<FactSheet> {
+    return readFactSheet(await this.get<unknown>('/api/v1/me/facts'));
+  }
+
+  /** The line is the member's own; the answer is the whole sheet. */
+  async addFact(category: FactCategoryWire, fact: string): Promise<FactSheet> {
+    return readFactSheet(await this.post<unknown>('/api/v1/me/facts', { category, fact }));
+  }
+
+  /** 409 when another line already says that. */
+  async editFact(id: string, change: FactPatchWire): Promise<SheetFact> {
+    return required(readSheetFact(await this.patch<unknown>(`/api/v1/me/facts/${encodeURIComponent(id)}`, change)), 'the line');
+  }
+
+  async deleteFact(id: string): Promise<void> {
+    await this.del<unknown>(`/api/v1/me/facts/${encodeURIComponent(id)}`);
+  }
+
+  async rebuildFacts(): Promise<void> {
+    await this.post<unknown>('/api/v1/me/facts/rebuild', {});
+  }
+
+  async dontList(): Promise<DontRule[]> {
+    return readRules(await this.get<unknown>('/api/v1/me/dont'));
+  }
+
+  async addDont(rule: string, strength: 'never' | 'avoid' = 'never'): Promise<DontRule[]> {
+    return readRules(await this.post<unknown>('/api/v1/me/dont', { rule, strength }));
+  }
+
+  /** The list left after, or null from a Pond that answers 204. */
+  async deleteDont(id: string): Promise<DontRule[] | null> {
+    const res = await this.del<unknown>(`/api/v1/me/dont/${encodeURIComponent(id)}`);
+    return res ? readRules(res) : null;
+  }
+
+  async specialists(): Promise<Specialist[]> {
+    return readSpecialists(await this.get<unknown>('/api/v1/me/agents'));
+  }
+
+  /** Off answers an offer with "declined", which is never offered again. */
+  async setSpecialist(id: string, on: boolean): Promise<Specialist[]> {
+    return readSpecialists(await this.put<unknown>(`/api/v1/me/agents/${encodeURIComponent(id)}`, { on }));
+  }
+
+  /** 409 while Budget is not on. */
+  async ledger(month?: string): Promise<Ledger> {
+    const query = month && /^\d{4}-\d{2}$/.test(month) ? `?month=${month}` : '';
+    return readLedger(await this.get<unknown>(`/api/v1/me/ledger${query}`));
+  }
+
+  async editLedgerEntry(id: string, change: LedgerPatchWire): Promise<LedgerEntry> {
+    return required(readLedgerEntry(await this.patch<unknown>(`/api/v1/me/ledger/${encodeURIComponent(id)}`, change)), 'the entry');
+  }
+
+  async deleteLedgerEntry(id: string): Promise<void> {
+    await this.del<unknown>(`/api/v1/me/ledger/${encodeURIComponent(id)}`);
+  }
+
+  async intentions(state: 'waiting' | 'settled' = 'waiting'): Promise<Intention[]> {
+    return readIntentions(await this.get<unknown>(`/api/v1/me/intentions?state=${state}`));
+  }
+
+  /** A waiting one is withdrawn; 409 for one carried out or expired. */
+  async withdrawIntention(id: string): Promise<void> {
+    await this.del<unknown>(`/api/v1/me/intentions/${encodeURIComponent(id)}`);
+  }
+
+  async captures(): Promise<Captures> {
+    return readCaptures(await this.get<unknown>('/api/v1/me/captures'));
+  }
+
+  async setCaptureSettings(change: CaptureSettingsWire): Promise<CaptureSettings> {
+    return readCaptureSettings(await this.put<unknown>('/api/v1/me/captures/settings', change));
+  }
+
+  /** One picture for the Pond to read once; answers how many wait. A 429 means the Pond is full. */
+  async sendCapture(body: CaptureWire): Promise<number> {
+    const res = await this.post<{ pending?: unknown }>('/api/v1/me/captures', body);
+    return typeof res?.pending === 'number' ? res.pending : 0;
+  }
+
+  async deleteCapture(id: string): Promise<void> {
+    await this.del<unknown>(`/api/v1/me/captures/${encodeURIComponent(id)}`);
+  }
+
+  async deleteAllCaptures(): Promise<void> {
+    await this.del<unknown>('/api/v1/me/captures');
   }
 
   // ── Verb helpers ────────────────────────────────────────────

@@ -2,10 +2,11 @@
  * HomeScreen — whether the Pond wants anything from you, and what is happening at home.
  *
  * Under the greeting, everything is a widget on one board, in the order this phone's owner chose:
- * by default the suggestions and questions first, because they are the part that needs a person.
- * Each widget is something the Pond actually told us, and a widget with nothing true to say is not
- * drawn. Only a waiting suggestion is raised and only the music is filled; the rest sit on
- * hairlines, so the board can hold more of them without every one shouting.
+ * by default what Goose finished for you, the plans it offers, its questions and its suggestions
+ * first, because they are the part that needs a person. Each widget is something the Pond actually
+ * told us, and a widget with nothing true to say is not drawn. Only what waits on an answer is
+ * raised and only the music is filled; the rest sit on hairlines, so the board can hold more of
+ * them without every one shouting.
  */
 
 import React, { useCallback, useMemo, useRef, useState } from 'react';
@@ -35,6 +36,7 @@ import { PondGettingReady } from '@/components/patterns/pond-getting-ready';
 import { PondStatusCard } from '@/components/patterns/pond-status-card';
 import { RemoteAccessOffer } from '@/components/patterns/remote-access-offer';
 import { AskRow, HomeIdeas } from '@/components/patterns/home-ideas';
+import { PlansWidget, QuestionsWidget, ReadyWidget } from '@/components/patterns/home-engine';
 import { GlanceStrip, type Figure } from '@/components/patterns/glance-strip';
 import { PondSays } from '@/components/patterns/pond-says';
 import {
@@ -47,6 +49,7 @@ import {
 } from '@/components/patterns/home-widgets';
 import { WIDGET_GAP, WidgetBoard, type BoardWidget } from '@/components/patterns/widget-board';
 import { useHomeIdeas } from '@/view-models/use-home-ideas';
+import { useHomeEngine } from '@/view-models/use-home-engine';
 import type { OfferedPrompt } from '@/view-models/use-suggestions';
 import { useHomeLayout, type HomeWidgetKey } from '@/view-models/use-home-layout';
 import { useContentState } from '@/view-models/use-content-state';
@@ -133,6 +136,8 @@ export default function HomeScreen() {
   const rightNow = useRightNow().data;
   // One read of the Pond's ideas for the whole screen; the widgets take their parts.
   const ideas = useHomeIdeas();
+  // What Goose made, offers and asks: read only from a Pond whose hub serves it.
+  const engine = useHomeEngine();
   const layout = useHomeLayout();
   const router = useRouter();
   const chrome = useChromeScroll();
@@ -176,9 +181,11 @@ export default function HomeScreen() {
   });
   const devicesState = useContentState({ loading: devices.loading, failed: devices.failed, hasContent: shownDevices.length > 0 });
   // Home's pull reads both of the Pond's lists on it: recent conversations and the devices.
+  const { reload: reloadAnchors } = engine.anchors;
+  const { reload: reloadQuestions } = engine.questions;
   const reloadHome = useCallback(
-    () => Promise.all([recent.actions.refresh(), devices.actions.refresh()]),
-    [recent.actions, devices.actions],
+    () => Promise.all([recent.actions.refresh(), devices.actions.refresh(), reloadAnchors(), reloadQuestions()]),
+    [recent.actions, devices.actions, reloadAnchors, reloadQuestions],
   );
   const pull = usePullToRefresh(reloadHome);
 
@@ -191,6 +198,54 @@ export default function HomeScreen() {
   // Built in the saved order; a widget with nothing to say is left out rather than drawn empty.
   const widgets = useMemo(() => {
     const all: Record<HomeWidgetKey, BoardWidget | null> = {
+      ready:
+        engine.ready.length > 0
+          ? {
+              key: 'ready',
+              span: 2,
+              frame: 'raised',
+              title: t('home.ready.title'),
+              icon: 'sparkle',
+              node: (
+                <ReadyWidget
+                  ready={engine.ready}
+                  onOpen={(work) => router.push({ pathname: '/(stack)/goose-deliverable', params: { id: work.deliverable.id } })}
+                  onSeeAll={() => router.push('/(stack)/goose-plans')}
+                />
+              ),
+            }
+          : null,
+      plans:
+        engine.offered.length > 0
+          ? {
+              key: 'plans',
+              span: 2,
+              frame: 'raised',
+              title: t('home.plans.title'),
+              icon: 'light',
+              node: (
+                <PlansWidget
+                  offered={engine.offered}
+                  busy={engine.anchors.busy}
+                  onYes={(anchor) => void engine.anchors.actions.confirm(anchor)}
+                  onNo={(anchor) => void engine.anchors.actions.dismiss(anchor)}
+                  onOpen={(anchor) => router.push({ pathname: '/(stack)/goose-anchor', params: { id: anchor.id } })}
+                  onSeeAll={() => router.push('/(stack)/goose-plans')}
+                />
+              ),
+            }
+          : null,
+      questions:
+        engine.questions.batches.length > 0
+          ? {
+              key: 'questions',
+              span: 2,
+              frame: 'raised',
+              title: t('home.questions.title'),
+              icon: 'chat',
+              node: <QuestionsWidget vm={engine.questions} onSeeAll={() => router.push('/(stack)/goose-questions')} />,
+            }
+          : null,
       ideas: hasIdeas
         ? {
             key: 'ideas',
@@ -317,7 +372,7 @@ export default function HomeScreen() {
       },
     };
     return layout.order.map((key) => all[key]).filter((w): w is BoardWidget => w !== null);
-  }, [layout.order, hasIdeas, ideas, rightNow, now, recent, recentState, devices, shownDevices, devicesState, devicesKnown, handleDeviceToggle, ask, router, t]);
+  }, [layout.order, engine, hasIdeas, ideas, rightNow, now, recent, recentState, devices, shownDevices, devicesState, devicesKnown, handleDeviceToggle, ask, router, t]);
 
   const shown = widgets.map((w) => w.key);
 
@@ -364,7 +419,7 @@ export default function HomeScreen() {
 
         {/* Suggestions are the From your Pond widget's alone; the line says only what it cannot. */}
         {offline || ideas.data.proposals.length > 0 ? null : (
-          <PondSays reminderCount={ideas.data.reminderCount} quiet={ideas.quiet} />
+          <PondSays reminderCount={ideas.data.reminderCount} quiet={ideas.quiet && engine.quiet} />
         )}
 
         {offline ? null : <GlanceStrip figures={figures} />}

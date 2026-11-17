@@ -26,6 +26,11 @@ describe('mergeOrder', () => {
     const saved = HOME_WIDGETS.filter((k) => k !== 'music');
     const merged = mergeOrder(saved);
     expect(merged.indexOf('music')).toBe(merged.indexOf('ask') + 1);
-    expect(mergeOrder(HOME_WIDGETS.filter((k) => k !== 'ideas'))[0]).toBe('ideas');
+    expect(mergeOrder(HOME_WIDGETS.filter((k) => k !== 'ready'))[0]).toBe('ready');
+  });
+
+  it('leads an order saved before the idea engine with what is ready, the plans and the questions', () => {
+    const before = ['devices', 'ideas', 'ask', 'music', 'next', 'outside', 'remember', 'conversations'];
+    expect(mergeOrder(before).slice(0, 4)).toEqual(['ready', 'plans', 'questions', 'devices']);
   });
 });
