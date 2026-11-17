@@ -39,9 +39,11 @@ export interface MeHub {
   engine_log: boolean;
   /** The kinds of card this Pond can send to chat; empty on a Pond that sends none. */
   cards: CardKind[];
+  /** Idea cards, `/me/idea-cards*`. */
+  ideaCards: boolean;
 }
 
-export type HubPart = Exclude<keyof MeHub, 'version' | 'cards'>;
+export type HubPart = Exclude<keyof MeHub, 'version' | 'cards' | 'ideaCards'>;
 
 export const HUB_PARTS: readonly HubPart[] = [
   'interests',
@@ -74,5 +76,6 @@ export function readHub(raw: unknown): MeHub | null {
   const hub = { version } as MeHub;
   for (const part of HUB_PARTS) hub[part] = r[part] === true;
   hub.cards = readCardKinds(r.cards);
+  hub.ideaCards = r.idea_cards === true;
   return hub;
 }

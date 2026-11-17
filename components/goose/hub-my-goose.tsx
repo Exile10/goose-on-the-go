@@ -40,6 +40,8 @@ import { selectionTick, tap } from '@/services/haptics';
 import { Storage } from '@/services/storage';
 import { useContentState } from '@/view-models/use-content-state';
 import { useGooseActivity } from '@/view-models/use-goose-activity';
+import { useIdeaCards } from '@/view-models/use-idea-cards';
+import { ideaKindKey } from '@/models/idea-cards';
 import { useMyGooseHub, type UseMyGooseHub } from '@/view-models/use-my-goose';
 import { useListen, useStoryActions } from '@/view-models/use-news';
 import { usePullToRefresh } from '@/view-models/use-pull-to-refresh';
@@ -235,6 +237,46 @@ function YouAndGoose({ hub, g }: { hub: MeHub; g: UseMyGooseHub }) {
           <GroupRow key={row.key} first={i === 0} icon={row.icon} label={row.label} detail={row.detail} onPress={() => go(row.href)} />
         ))}
       </InsetGroup>
+    </View>
+  );
+}
+
+/** Idea cards: the new ones first, then the saved, each opening the cards screen. */
+function IdeaCards() {
+  const { t } = useTranslation();
+  const styles = useThemedStyles(makeStyles);
+  const cards = useIdeaCards();
+  const rows = [...cards.fresh, ...cards.saved];
+  if (cards.loading && rows.length === 0) return null;
+  const open = () => go('/(stack)/goose-cards');
+  return (
+    <View style={styles.section}>
+      <SectionHead
+        fact={cards.making ? t('goose.ideaCards.making') : null}
+        title={t('goose.ideaCards.title')}
+        subtitle={t('goose.ideaCards.subtitle')}
+        onOpen={open}
+        trailing={<RoundButton icon="refresh" label={t('goose.ideaCards.refreshLabel')} onPress={() => void (cards.making ? undefined : cards.actions.refresh())} />}
+      />
+      {rows.length ? (
+        <InsetGroup>
+          {rows.slice(0, SHOWN_ROWS).map((card, i) => (
+            <GroupRow
+              key={card.id}
+              first={i === 0}
+              icon={card.state === 'saved' ? 'archive' : 'light'}
+              label={card.title}
+              detail={`${t(card.state === 'saved' ? 'goose.ideaCards.rowSaved' : 'goose.ideaCards.rowNew')}, ${t(ideaKindKey(card.kind))}`}
+              onPress={open}
+            />
+          ))}
+        </InsetGroup>
+      ) : (
+        <InkText size="md" tone="secondary">
+          {t('goose.ideaCards.empty')}
+        </InkText>
+      )}
+      {rows.length > SHOWN_ROWS ? <MoreLink label={t('goose.ideaCards.seeAll')} onPress={open} /> : null}
     </View>
   );
 }
@@ -752,6 +794,7 @@ export function HubMyGoose({ hub }: { hub: MeHub }) {
         {state === 'unreachable' || state === 'failed' ? <ContentUnavailable state={state} onRetry={reload} /> : null}
         {g.newMember ? <InterviewInvite hub={hub} /> : null}
         {hub.todos ? <Asking g={g} /> : null}
+        {hub.ideaCards ? <IdeaCards /> : null}
         {hub.anchors ? <Plans g={g} /> : null}
         {hub.news ? <News g={g} /> : null}
         {hub.ideas ? <Ideas g={g} /> : null}

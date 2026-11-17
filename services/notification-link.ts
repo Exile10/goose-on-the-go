@@ -127,6 +127,7 @@ export type OpenRoute =
   | { open: 'anchor'; anchorId?: string }
   | { open: 'deliverable'; deliverableId?: string }
   | { open: 'questions'; batchId?: string; anchorId?: string }
+  | { open: 'idea_cards' }
   /** Never named by the Pond: where a tapped specialist offer opens. */
   | { open: 'specialists' };
 
@@ -227,6 +228,11 @@ export function openRouteFromData(data: unknown): OpenRoute | null {
       if (anchorId) route.anchorId = anchorId;
       return route;
     }
+    // A pushed idea card: the set it belongs to, where it can be done, saved or waved off. `cards`
+    // is an earlier spelling of the hint, kept since no other link uses it.
+    case 'idea_cards':
+    case 'cards':
+      return { open: 'idea_cards' };
     default:
       return null;
   }
@@ -302,7 +308,8 @@ type ScreenHref =
   | { pathname: '/(stack)/goose-anchor'; params: { id: string } }
   | { pathname: '/(stack)/goose-deliverable'; params: { id: string } }
   | { pathname: '/(stack)/goose-questions'; params: { batch?: string; anchor?: string } }
-  | '/(stack)/goose-specialists';
+  | '/(stack)/goose-specialists'
+  | '/(stack)/goose-cards';
 
 /**
  * The expo-router location a route opens. A schedule notification names the
@@ -357,5 +364,7 @@ export function screenPath(route: OpenRoute): ScreenHref {
       };
     case 'specialists':
       return '/(stack)/goose-specialists';
+    case 'idea_cards':
+      return '/(stack)/goose-cards';
   }
 }

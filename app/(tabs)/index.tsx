@@ -37,6 +37,7 @@ import { PondStatusCard } from '@/components/patterns/pond-status-card';
 import { RemoteAccessOffer } from '@/components/patterns/remote-access-offer';
 import { AskRow, HomeIdeas } from '@/components/patterns/home-ideas';
 import { PlansWidget, QuestionsWidget, ReadyWidget } from '@/components/patterns/home-engine';
+import { IdeaCardSetView } from '@/components/goose/idea-cards';
 import { GlanceStrip, type Figure } from '@/components/patterns/glance-strip';
 import { PondSays } from '@/components/patterns/pond-says';
 import {
@@ -69,6 +70,9 @@ import { Spacing } from '@/constants/spacing';
 
 /** The devices widget is a glance, not the full list — that is the Devices tab. Three rows of two. */
 const HOME_GRID_LIMIT = 6;
+
+/** Home leads with a few ideas; the rest are on the cards screen. */
+const HOME_CARD_LIMIT = 3;
 
 /** How often the greeting and the countdowns catch up with the clock. */
 const CLOCK_MS = 60_000;
@@ -183,9 +187,10 @@ export default function HomeScreen() {
   // Home's pull reads both of the Pond's lists on it: recent conversations and the devices.
   const { reload: reloadAnchors } = engine.anchors;
   const { reload: reloadQuestions } = engine.questions;
+  const { reload: reloadCards } = engine.cards;
   const reloadHome = useCallback(
-    () => Promise.all([recent.actions.refresh(), devices.actions.refresh(), reloadAnchors(), reloadQuestions()]),
-    [recent.actions, devices.actions, reloadAnchors, reloadQuestions],
+    () => Promise.all([recent.actions.refresh(), devices.actions.refresh(), reloadAnchors(), reloadQuestions(), reloadCards()]),
+    [recent.actions, devices.actions, reloadAnchors, reloadQuestions, reloadCards],
   );
   const pull = usePullToRefresh(reloadHome);
 
@@ -417,6 +422,12 @@ export default function HomeScreen() {
           </GPressable>
         </View>
 
+        {offline || !engine.cardsOn ? null : (
+          <View style={styles.ideaCards}>
+            <IdeaCardSetView vm={engine.cards} limit={HOME_CARD_LIMIT} onSeeAll={() => router.push('/(stack)/goose-cards')} />
+          </View>
+        )}
+
         {/* Suggestions are the From your Pond widget's alone; the line says only what it cannot. */}
         {offline || ideas.data.proposals.length > 0 ? null : (
           <PondSays reminderCount={ideas.data.reminderCount} quiet={ideas.quiet && engine.quiet} />
@@ -507,6 +518,7 @@ const makeStyles = (c: ThemeColors) =>
 
 
   cards: { gap: WIDGET_GAP },
+  ideaCards: { marginBottom: Spacing['2xl'] },
   // The column spaces Home's cards; the card's own margin is for screens that do not.
   flush: { marginBottom: 0 },
 

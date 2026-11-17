@@ -1930,7 +1930,8 @@
     "gooseSpecialists": "Specialists",
     "gooseLedger": "Budget",
     "gooseWork": "What Goose is working on",
-    "gooseCaptures": "Pictures you send Goose"
+    "gooseCaptures": "Pictures you send Goose",
+    "gooseCards": "Ideas for you"
   },
   "nav": {
     "goose": "Goose",
@@ -6307,6 +6308,58 @@
       "deniedAndroid": "This phone doesn't let Goose see your photos, so nothing is sent on its own. To change it, open Settings, then Apps, then Goose On The Go, then Permissions, and allow Photos.",
       "openSettings": "Open Settings",
       "limited": "This phone shares only the photos you selected with Goose, so screenshots outside them stay on the phone. Choose Full Access in Settings to send them all."
+    },
+    "ideaCards": {
+      "title": "Ideas for you",
+      "subtitle": "Short ideas Goose found for you, each with where it came from",
+      "kind": {
+        "do": "Something to do",
+        "nextStep": "Next step",
+        "reminder": "Reminder",
+        "ask": "Ask Goose"
+      },
+      "source": {
+        "memory": "From what you said",
+        "fact": "From your facts",
+        "plan": "From your plan",
+        "interest": "From your interests",
+        "todo": "From your to-dos",
+        "web": "From the web"
+      },
+      "doIt": "Do it",
+      "save": "Save",
+      "saved": "Saved",
+      "notThis": "Not this",
+      "goDeeper": "Go deeper",
+      "refresh": "New ideas",
+      "refreshLabel": "Ask Goose for new ideas",
+      "making": "Goose is finding new ideas",
+      "empty": "No ideas yet. Ask Goose for some.",
+      "loading": "Reading your ideas",
+      "found": "What Goose found",
+      "next": "What Goose would do next",
+      "caveats": "What Goose is unsure of",
+      "sources": "Sources",
+      "openLabel": "Open the idea {{title}}",
+      "sourceLabel": "Open {{title}}",
+      "dismissTitle": "Not this idea",
+      "dismissBody": "Goose will offer fewer like it.",
+      "dismissConfirm": "Not this",
+      "dismissed": "Goose will offer fewer like that",
+      "savedNote": "Saved. It stays until you take it off.",
+      "unsavedNote": "No longer saved",
+      "done": "Done",
+      "todoAdded": "Added to your to-dos",
+      "reminderAdded": "Reminder set",
+      "watchStarted": "Goose is watching it",
+      "deeperStarted": "Goose is working on it",
+      "refreshing": "Goose is finding new ideas",
+      "inPlan": "For {{title}}",
+      "more_one": "{{count}} more idea",
+      "more_other": "{{count}} more ideas",
+      "rowNew": "New",
+      "rowSaved": "Saved",
+      "seeAll": "All ideas"
     }
   },
   "pairingLock": {

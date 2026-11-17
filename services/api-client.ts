@@ -88,6 +88,18 @@ import { readEngineJobs, readIntentions, type EngineJob, type Intention } from '
 import { readLedger, readLedgerEntry, readSpecialists, type Ledger, type LedgerEntry, type Specialist } from '@/models/specialists';
 import { readCaptures, readCaptureSettings, type CaptureSettings, type Captures } from '@/models/captures';
 import { readCatalog, type CatalogItem } from '@/models/catalog';
+import {
+  readIdeaCard,
+  readIdeaCardDeeper,
+  readIdeaCardDone,
+  readIdeaCardSet,
+  readSetState,
+  type IdeaCard,
+  type IdeaCardDeeper,
+  type IdeaCardDone,
+  type IdeaCardSet,
+  type IdeaSetState,
+} from '@/models/idea-cards';
 import { readLongTask, readLongTaskReport, readResearchAvailability, reportFileName } from '@/models/long-tasks';
 import {
   readAdminKey,
@@ -185,6 +197,7 @@ import type {
   CaptureSettingsWire,
   CaptureWire,
   DeliverableRejectWire,
+  IdeaCardDismissWire,
   FactCategoryWire,
   FactPatchWire,
   LedgerPatchWire,
@@ -3612,6 +3625,34 @@ export class PondApiClient {
 
   async deliverableSeen(id: string): Promise<void> {
     await this.post<unknown>(`/api/v1/me/deliverables/${encodeURIComponent(id)}/seen`, {});
+  }
+
+  // Idea cards (pond docs/architecture/idea-cards.md, section 4): served when `/me/hub` says so.
+
+  async ideaCards(): Promise<IdeaCardSet> {
+    return readIdeaCardSet(await this.get<unknown>('/api/v1/me/idea-cards'));
+  }
+
+  /** 202 with the set's state; a set already on its way is not started twice. */
+  async refreshIdeaCards(): Promise<IdeaSetState> {
+    return readSetState(await this.post<unknown>('/api/v1/me/idea-cards/refresh', {}));
+  }
+
+  async doIdeaCard(id: string): Promise<IdeaCardDone> {
+    return readIdeaCardDone(await this.post<unknown>(`/api/v1/me/idea-cards/${encodeURIComponent(id)}/do`, {}));
+  }
+
+  async saveIdeaCard(id: string, saved: boolean): Promise<IdeaCard> {
+    return required(readIdeaCard(await this.post<unknown>(`/api/v1/me/idea-cards/${encodeURIComponent(id)}/${saved ? 'save' : 'unsave'}`, {})), 'the idea');
+  }
+
+  async dismissIdeaCard(id: string, body: IdeaCardDismissWire): Promise<void> {
+    await this.post<unknown>(`/api/v1/me/idea-cards/${encodeURIComponent(id)}/dismiss`, body);
+  }
+
+  /** Finds or makes the card's plan and queues its first piece of work. */
+  async deeperIdeaCard(id: string): Promise<IdeaCardDeeper> {
+    return readIdeaCardDeeper(await this.post<unknown>(`/api/v1/me/idea-cards/${encodeURIComponent(id)}/deeper`, {}));
   }
 
   /** The body as a Markdown file to share; a 404 before anything is written. */

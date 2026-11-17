@@ -805,6 +805,7 @@ export function createMockHub({ fresh = false, clock = Date.now }: MockHubOption
         intentions: false,
         engine_log: false,
         cards: [],
+        ideaCards: false,
       };
     },
     async interests() {

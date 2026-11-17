@@ -28,6 +28,7 @@ describe('reading /me/hub', () => {
       intentions: false,
       engine_log: false,
       cards: [],
+      ideaCards: false,
     });
   });
 
