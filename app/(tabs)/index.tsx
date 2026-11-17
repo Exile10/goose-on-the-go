@@ -2,17 +2,18 @@
  * HomeScreen — whether the Pond wants anything from you, and what is happening at home.
  *
  * Under the greeting, everything is a widget on one board, in the order this phone's owner chose:
- * by default what Goose finished for you, the plans it offers, its questions and its suggestions
- * first, because they are the part that needs a person. Each widget is something the Pond actually
- * told us, and a widget with nothing true to say is not drawn. Only what waits on an answer is
- * raised and only the music is filled; the rest sit on hairlines, so the board can hold more of
- * them without every one shouting.
+ * by default what Goose finished for you, the plans it offers and its suggestions first, because
+ * they are the part that needs a person; Goose's questions sit above the board, beside the idea
+ * cards. Each widget is something the Pond actually told us, and a widget with nothing true to say
+ * is not drawn. Only what waits on an answer is raised and only the music is filled; the rest sit
+ * on hairlines, so the board can hold more of them without every one shouting.
  */
 
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
   InkButton,
   InkCard,
+  InkEdge,
   InkEmptyState,
   InkText,
   InkTitle,
@@ -240,17 +241,6 @@ export default function HomeScreen() {
               ),
             }
           : null,
-      questions:
-        engine.questions.batches.length > 0
-          ? {
-              key: 'questions',
-              span: 2,
-              frame: 'raised',
-              title: t('home.questions.title'),
-              icon: 'chat',
-              node: <QuestionsWidget vm={engine.questions} onSeeAll={() => router.push('/(stack)/goose-questions')} />,
-            }
-          : null,
       ideas: hasIdeas
         ? {
             key: 'ideas',
@@ -428,6 +418,18 @@ export default function HomeScreen() {
           </View>
         )}
 
+        {/* Beside the ideas, since both wait on the member; a batch asked in chat leads back to it. */}
+        {offline || engine.questions.batches.length === 0 ? null : (
+          <InkEdge raised style={styles.questions} contentStyle={styles.questionsBody}>
+            <QuestionsWidget
+              vm={engine.questions}
+              onSeeAll={() => router.push('/(stack)/goose-questions')}
+              onOpenPlan={(id) => router.push({ pathname: '/(stack)/goose-anchor', params: { id } })}
+              onOpenChat={(session, title) => router.push({ pathname: '/conversation', params: { session, title } })}
+            />
+          </InkEdge>
+        )}
+
         {/* Suggestions are the From your Pond widget's alone; the line says only what it cannot. */}
         {offline || ideas.data.proposals.length > 0 ? null : (
           <PondSays reminderCount={ideas.data.reminderCount} quiet={ideas.quiet && engine.quiet} />
@@ -519,6 +521,8 @@ const makeStyles = (c: ThemeColors) =>
 
   cards: { gap: WIDGET_GAP },
   ideaCards: { marginBottom: Spacing['2xl'] },
+  questions: { marginBottom: Spacing['2xl'] },
+  questionsBody: { padding: Spacing.lg },
   // The column spaces Home's cards; the card's own margin is for screens that do not.
   flush: { marginBottom: 0 },
 
