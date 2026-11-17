@@ -7,6 +7,7 @@ import type { IdeaCardDismissWire } from '@/services/types';
 
 import { list, oneOf, readAll, record, text, textOrNull, time, webUrl } from './me-read';
 import type { RejectReason } from './anchors';
+import { readAskedQuestion, type AskedQuestion } from './questions';
 
 export type IdeaCardKind = 'do' | 'next_step' | 'reminder' | 'ask';
 export type IdeaCardState = 'new' | 'saved' | 'done' | 'dismissed';
@@ -32,6 +33,8 @@ export interface IdeaAction {
   text: string | null;
   due: string | null;
   url: string | null;
+  /** An ask card's one structured question; the chosen option becomes the chat message. */
+  question: AskedQuestion | null;
 }
 
 export interface IdeaSource {
@@ -95,7 +98,7 @@ function readAction(raw: unknown): IdeaAction | null {
   // An unknown kind is one the phone cannot carry out, so the card offers no Do it.
   const kind = ACTION_KINDS.find((k) => k === r?.kind);
   if (!r || !kind) return null;
-  return { kind, label: text(r.label), prompt: textOrNull(r.prompt), text: textOrNull(r.text), due: textOrNull(r.due), url: webUrl(r.url) };
+  return { kind, label: text(r.label), prompt: textOrNull(r.prompt), text: textOrNull(r.text), due: textOrNull(r.due), url: webUrl(r.url), question: readAskedQuestion(r.question) };
 }
 
 function readSource(raw: unknown): IdeaSource | null {
@@ -166,6 +169,11 @@ export function readIdeaCardDone(raw: unknown): IdeaCardDone {
 export function dismissBody(reasons: readonly RejectReason[], words: string): IdeaCardDismissWire {
   const said = words.trim();
   return { reasons: [...reasons], ...(said ? { text: said } : {}) };
+}
+
+/** What an ask card's chosen options send as the member's chat message. */
+export function askMessage(labels: readonly string[]): string {
+  return labels.map((l) => l.trim()).filter(Boolean).join(', ');
 }
 
 /** A set is on its way: the phone reads again soon, and says so. */

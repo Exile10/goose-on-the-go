@@ -47,6 +47,7 @@ import { useListen, useStoryActions } from '@/view-models/use-news';
 import { usePullToRefresh } from '@/view-models/use-pull-to-refresh';
 import { usePriceWords } from './cart-parts';
 import { DigestCard } from './digest-card';
+import { QuestionBatchList } from './engine-parts';
 import { GroupHeading, GroupRow, InsetGroup } from './following';
 import { MoreLink, RoundButton, SectionHead, useAgo } from './hub-parts';
 import { HubSentence } from './hub-sentence';
@@ -281,8 +282,33 @@ function IdeaCards() {
   );
 }
 
+/** Goose's open and waiting questions, each batch under its plan's or chat's title, answered here. */
+function Questions({ g }: { g: UseMyGooseHub }) {
+  const { t } = useTranslation();
+  const styles = useThemedStyles(makeStyles);
+  const vm = g.questions;
+  if (vm.batches.length === 0) return null;
+  return (
+    <View style={styles.section}>
+      <SectionHead
+        fact={t('goose.plans.questions', { count: vm.count })}
+        title={t('home.questions.title')}
+        subtitle={t('goose.questions.lead')}
+        onOpen={() => go('/(stack)/goose-questions')}
+      />
+      <InkCard>
+        <QuestionBatchList
+          vm={vm}
+          onOpenPlan={(id) => go({ pathname: '/(stack)/goose-anchor', params: { id } })}
+          onOpenChat={(session, title) => go({ pathname: '/conversation', params: { session, title } })}
+        />
+      </InkCard>
+    </View>
+  );
+}
+
 /**
- * Plans and things you follow: what is ready to read, what Goose offered, what it asks, then the
+ * Plans and things you follow: what is ready to read, what Goose offered, then the
  * plans themselves, a few rows that open each, and the way to all of them.
  */
 function Plans({ g }: { g: UseMyGooseHub }) {
@@ -304,7 +330,7 @@ function Plans({ g }: { g: UseMyGooseHub }) {
         onOpen={() => go('/(stack)/goose-plans')}
         trailing={<RoundButton icon="plus" label={t('goose.plans.add')} onPress={() => go({ pathname: '/(stack)/goose-plans', params: { add: '1' } })} />}
       />
-      {ready.length || offered.length || asked ? (
+      {ready.length || offered.length ? (
         <InsetGroup>
           {ready.slice(0, SHOWN_ROWS).map((work, i) => (
             <GroupRow
@@ -326,15 +352,6 @@ function Plans({ g }: { g: UseMyGooseHub }) {
               onPress={() => go({ pathname: '/(stack)/goose-anchor', params: { id: anchor.id } })}
             />
           ))}
-          {asked ? (
-            <GroupRow
-              first={ready.length === 0 && offered.length === 0}
-              icon="chat"
-              label={t('home.questions.title')}
-              detail={t('goose.plans.questions', { count: asked })}
-              onPress={() => go('/(stack)/goose-questions')}
-            />
-          ) : null}
         </InsetGroup>
       ) : null}
       {shown.length ? (
@@ -795,6 +812,7 @@ export function HubMyGoose({ hub }: { hub: MeHub }) {
         {g.newMember ? <InterviewInvite hub={hub} /> : null}
         {hub.todos ? <Asking g={g} /> : null}
         {hub.ideaCards ? <IdeaCards /> : null}
+        {hub.questions ? <Questions g={g} /> : null}
         {hub.anchors ? <Plans g={g} /> : null}
         {hub.news ? <News g={g} /> : null}
         {hub.ideas ? <Ideas g={g} /> : null}

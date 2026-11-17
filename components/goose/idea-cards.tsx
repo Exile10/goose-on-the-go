@@ -16,10 +16,13 @@ import { Spacing } from '@/constants/spacing';
 import type { RejectReason } from '@/models/anchors';
 import { factLine, ideaKindKey, sourceKindKey, type IdeaCard } from '@/models/idea-cards';
 import { selectionTick } from '@/services/haptics';
+import type { Question } from '@/models/questions';
 import type { UseIdeaCards } from '@/view-models/use-idea-cards';
+import { EMPTY_DRAFT, pick, type AnswerDraft } from '@/view-models/use-questions';
 import { ReasonChips, toggleReason } from './engine-parts';
 import { RoundButton, useAgo } from './hub-parts';
 import { Labelled } from './labelled';
+import { QuestionPage } from './question-card';
 
 type Theme = ReturnType<typeof useInkTheme>;
 
@@ -27,17 +30,23 @@ export interface IdeaCardViewProps {
   card: IdeaCard;
   busy: 'do' | 'deeper' | 'save' | 'dismiss' | null;
   onDo: () => void;
+  /** An ask card's chosen options, sent to chat as the member's message. */
+  onAnswer?: (labels: string[]) => void;
+  /** An ask card's "Other": the member answers in the composer. */
+  onAskOther?: () => void;
   onDeeper: () => void;
   onSave: () => void;
   onNotThis: () => void;
   onOpen: () => void;
 }
 
-export function IdeaCardView({ card, busy, onDo, onDeeper, onSave, onNotThis, onOpen }: IdeaCardViewProps) {
+export function IdeaCardView({ card, busy, onDo, onAnswer, onAskOther, onDeeper, onSave, onNotThis, onOpen }: IdeaCardViewProps) {
   const theme = useInkTheme();
   const styles = makeStyles(theme);
   const { t } = useTranslation();
+  const [asking, setAsking] = useState(false);
   const action = card.action;
+  const question = action?.question ?? null;
   // A go-deeper action is the Go deeper button itself, so the card offers it once.
   const doable = action !== null && action.kind !== 'go_deeper';
   const facts = [
@@ -67,9 +76,17 @@ export function IdeaCardView({ card, busy, onDo, onDeeper, onSave, onNotThis, on
             </View>
           ))}
         </GPressable>
+        {asking && question ? (
+          <AskQuestion
+            question={{ ...question, id: card.id }}
+            busy={busy === 'do'}
+            onAnswer={(labels) => onAnswer?.(labels)}
+            onOther={() => onAskOther?.()}
+          />
+        ) : null}
         <View style={styles.buttons}>
-          {action && doable ? (
-            <InkButton variant="primary" size="sm" loading={busy === 'do'} disabled={busy !== null} onPress={onDo}>
+          {action && doable && !(asking && question) ? (
+            <InkButton variant="primary" size="sm" loading={busy === 'do'} disabled={busy !== null} onPress={question ? () => setAsking(true) : onDo}>
               {action.label || t('goose.ideaCards.doIt')}
             </InkButton>
           ) : null}
@@ -87,6 +104,38 @@ export function IdeaCardView({ card, busy, onDo, onDeeper, onSave, onNotThis, on
     </InkCard>
   );
 }
+
+/** An ask card's question, inline: one choice sends at once, several wait for Send. */
+function AskQuestion({ question, busy, onAnswer, onOther }: { question: Question; busy: boolean; onAnswer: (labels: string[]) => void; onOther: () => void }) {
+  const { t } = useTranslation();
+  const [draft, setDraft] = useState<AnswerDraft>(EMPTY_DRAFT);
+  return (
+    <View style={askStyles.ask}>
+      <QuestionPage
+        question={question}
+        draft={draft}
+        onChoose={(_, option) => {
+          const next = pick(question, draft, option);
+          setDraft(next);
+          if (!question.multi) onAnswer(next.choices);
+        }}
+        onOther={onOther}
+        onOtherText={() => undefined}
+        onOtherPress={onOther}
+      />
+      {question.multi ? (
+        <InkButton variant="primary" size="sm" style={askStyles.send} loading={busy} disabled={busy || draft.choices.length === 0} onPress={() => onAnswer(draft.choices)}>
+          {t('goose.questions.send')}
+        </InkButton>
+      ) : null}
+    </View>
+  );
+}
+
+const askStyles = StyleSheet.create({
+  ask: { gap: Spacing.sm },
+  send: { alignSelf: 'flex-end' },
+});
 
 /** The card opened: what Goose found, would do next and is unsure of, and the pages behind it. */
 export function IdeaCardSheet({ card, onClose }: { card: IdeaCard | null; onClose: () => void }) {
@@ -232,6 +281,8 @@ export function IdeaCardSetView({ vm, cards, limit, onSeeAll }: { vm: UseIdeaCar
           card={card}
           busy={vm.busy?.id === card.id ? vm.busy.what : null}
           onDo={() => void vm.actions.doIt(card)}
+          onAnswer={(labels) => void vm.actions.answerAsk(card, labels)}
+          onAskOther={vm.actions.askOther}
           onDeeper={() => void vm.actions.deeper(card)}
           onSave={() => void vm.actions.toggleSave(card)}
           onNotThis={() => setDismissing(card)}

@@ -9,7 +9,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { InkText, inkText, useInkTheme } from '@/components/ui/ink';
 
-import { CandidateBlock, QuestionCard } from '@/components/goose/engine-parts';
+import { CandidateBlock, QuestionBatchBlock, type BatchLinks } from '@/components/goose/engine-parts';
 import { GIcon } from '@/components/ui/g-icon';
 import { GPressable } from '@/components/ui/g-pressable';
 import type { Anchor, ReadyWork } from '@/models/anchors';
@@ -98,10 +98,8 @@ export function PlansWidget({
   );
 }
 
-/** The first open batch, answerable here; the rest wait on Goose's questions screen. */
-export function QuestionsWidget({ vm, onSeeAll }: { vm: UseQuestions; onSeeAll: () => void }) {
-  const theme = useInkTheme();
-  const styles = makeStyles(theme);
+/** The newest open batch, answerable here; the rest wait on Goose's questions screen. */
+export function QuestionsWidget({ vm, onSeeAll, onOpenPlan, onOpenChat }: { vm: UseQuestions; onSeeAll: () => void } & BatchLinks) {
   const { t } = useTranslation();
   const batch = vm.batches[0];
   if (!batch) return null;
@@ -109,21 +107,7 @@ export function QuestionsWidget({ vm, onSeeAll }: { vm: UseQuestions; onSeeAll: 
   return (
     <View>
       <WidgetHeader icon="chat" title={t('home.questions.title')} action={{ label: t('home.questions.seeAll'), name: t('screens.gooseQuestions'), onPress: onSeeAll }} />
-      {batch.title ? <Text style={styles.title}>{batch.title}</Text> : null}
-      {batch.questions.map((question, i) => (
-        <View key={question.id} style={[styles.question, i > 0 && styles.divided]}>
-          <QuestionCard
-            question={question}
-            draft={vm.draftOf(question.id)}
-            busy={vm.busy === question.id}
-            onChoose={(option) => vm.actions.choose(question, option)}
-            onOther={(on) => vm.actions.chooseOther(question, on)}
-            onOtherText={(text) => vm.actions.setOtherText(question, text)}
-            onAnswer={() => void vm.actions.answer(question)}
-            onSkip={() => void vm.actions.skip(question)}
-          />
-        </View>
-      ))}
+      <QuestionBatchBlock vm={vm} batch={batch} onOpenPlan={onOpenPlan} onOpenChat={onOpenChat} />
       {hidden > 0 ? <MoreLine label={t('home.questions.more', { count: hidden })} onPress={onSeeAll} /> : null}
     </View>
   );
@@ -143,7 +127,6 @@ function MoreLine({ label, onPress }: { label: string; onPress: () => void }) {
 const makeStyles = (theme: Theme) =>
   StyleSheet.create({
     item: { flexDirection: 'row', alignItems: 'center', gap: theme.space[3], paddingVertical: theme.space[1] },
-    question: { paddingVertical: theme.space[1] },
     words: { flex: 1, gap: 2 },
     divided: { borderTopWidth: theme.edge.hairlineWidth, borderTopColor: theme.color.line, marginTop: theme.space[3], paddingTop: theme.space[3] },
     eyebrow: inkText(theme, { size: 'xs', weight: theme.weight.semibold, color: theme.color.accentLine }).style,
