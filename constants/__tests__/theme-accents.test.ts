@@ -1,7 +1,9 @@
 // The accent the member picks under Appearance: every colour the app draws with is built from the
 // scheme and that accent, so choosing one recolours the whole app, not only Ink's own controls.
 
-import { DEFAULT_THEME_ACCENT, LightColors, THEME_ACCENTS, isThemeAccent, themeColors } from '@/constants/colors';
+import { createTheme } from '@jarida/ink';
+
+import { DEFAULT_THEME_ACCENT, LightColors, THEME_ACCENTS, inkTheme, isThemeAccent, themeColors } from '@/constants/colors';
 
 it('offers the same five accents as the Pond dashboard, Purple first and by default', () => {
   expect(THEME_ACCENTS).toEqual(['Purple', 'Blue', 'Teal', 'Coral', 'Magenta']);
@@ -28,4 +30,13 @@ it('reads back only an accent it knows', () => {
   expect(isThemeAccent('Teal')).toBe(true);
   expect(isThemeAccent('teal')).toBe(false);
   expect(isThemeAccent(null)).toBe(false);
+});
+
+it('draws a raised control\'s edge in the accent, keeping the brand ink for Purple', () => {
+  expect(inkTheme('light', 'Purple').color.ink).toBe(createTheme({ scheme: 'light', accent: 'Purple' }).color.ink);
+  expect(inkTheme('dark', 'Purple').color.ink).toBe(createTheme({ scheme: 'dark', accent: 'Purple' }).color.ink);
+  expect(inkTheme('light', 'Teal').color.ink).toBe('#0F766E');
+  const darkTeal = inkTheme('dark', 'Teal').color.ink;
+  expect(darkTeal).not.toBe(createTheme({ scheme: 'dark', accent: 'Teal' }).color.ink);
+  expect(darkTeal).toMatch(/^#[0-9A-F]{6}$/);
 });

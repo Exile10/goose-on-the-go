@@ -3,7 +3,7 @@
  * Source: Jarida Brand Heuristics + Goose In A Pond design bundle
  */
 
-import { ACCENT_NAMES, createTheme, type AccentName } from '@jarida/ink';
+import { ACCENT_NAMES, createTheme, type AccentName, type InkTheme } from '@jarida/ink';
 
 export const JaridaPurple = {
   50: '#F4ECFF',
@@ -222,3 +222,22 @@ export const Colors = {
   light: LightColors,
   dark: DarkColors,
 } as const;
+
+function mixHex(a: string, b: string, weight: number): string {
+  const channel = (hex: string, i: number) => Number.parseInt(hex.slice(1 + i * 2, 3 + i * 2), 16);
+  const mixed = [0, 1, 2].map((i) => Math.round(channel(a, i) * (1 - weight) + channel(b, i) * weight));
+  return `#${mixed.map((v) => v.toString(16).padStart(2, '0')).join('').toUpperCase()}`;
+}
+
+/**
+ * Ink's theme for a scheme and accent, with its `ink` (the colour of every raised control's offset
+ * edge) following the accent. Ink keeps `ink` at the brand purple whatever the accent, so a Teal app
+ * drew purple edges under its teal buttons. Purple keeps the brand's own values; another accent
+ * takes the same relation to its fill: its pressed shade in light, a lighter tint of it in dark.
+ */
+export function inkTheme(scheme: 'light' | 'dark', accent: ThemeAccent): InkTheme {
+  const theme = createTheme({ scheme, accent });
+  if (accent === DEFAULT_THEME_ACCENT) return theme;
+  const ink = scheme === 'dark' ? mixHex(theme.color.accent, '#FFFFFF', 0.45) : theme.color.accentPressed;
+  return { ...theme, color: { ...theme.color, ink } };
+}
