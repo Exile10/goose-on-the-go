@@ -2565,6 +2565,12 @@ export interface DeliverableRejectWire {
   text?: string;
 }
 
+/** `POST /me/idea-cards/{id}/dismiss`: the same chips as everywhere, and the member's words. */
+export interface IdeaCardDismissWire {
+  reasons: RejectReasonWire[];
+  text?: string;
+}
+
 /** A choice is one of the question's options; `text` is the member's "Other". */
 export interface QuestionAnswerWire {
   choices: string[];
