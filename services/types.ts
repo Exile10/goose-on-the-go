@@ -372,6 +372,10 @@ export interface ChatFrame {
   transient?: boolean;
   /** `tool_result`: what the call set or failed to set, as the saved reply's note will hold it. */
   receipt?: MessageReceipt;
+  /** `question_answered`: the batch a message typed while a turn waited on it answered. */
+  batch_id?: string;
+  /** The `done` frame of such a message's stream: it answered a question and started no turn. */
+  question_answered?: boolean;
   run_id?: string;
   session_id?: string;
   epoch?: number | string;

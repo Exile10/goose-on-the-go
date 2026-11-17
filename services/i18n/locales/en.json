@@ -6153,7 +6153,9 @@
       "lost": "Couldn't reach these questions on your Pond.",
       "waiting": "Goose stopped waiting in the chat. Answer here and it carries on there.",
       "answered": "Your answers",
-      "otherSaid": "Other: \"{{words}}\""
+      "otherSaid": "Other: \"{{words}}\"",
+      "closed": "These questions were already answered or closed",
+      "refused": "Goose couldn't take that answer. Check it and send again."
     },
     "facts": {
       "loading": "Reading what Goose works from",

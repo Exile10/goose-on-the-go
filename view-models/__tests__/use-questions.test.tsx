@@ -8,7 +8,7 @@ import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 
 import { readQuestionBatches, type Question } from '@/models/questions';
 import { ApiError, api } from '@/services/api-client';
-import { resetSnackbar } from '@/services/snackbar';
+import { currentSnackbar, resetSnackbar } from '@/services/snackbar';
 import { answerBody, answerLines, batchAnswerBody, canAnswer, canSubmit, EMPTY_DRAFT, pick, pickOther, useQuestions, type QuestionFilter, type UseQuestions } from '@/view-models/use-questions';
 
 jest.mock('@/services/pond-trust', () => ({ assertPondTrust: jest.fn().mockResolvedValue(undefined) }));
@@ -241,6 +241,27 @@ describe('the questions view-model', () => {
     expect(pond.answerQuestion).not.toHaveBeenCalled();
     expect(m.vm.batches).toHaveLength(2);
     expect(m.vm.draftOf('q3').choices).toEqual(['More']);
+    await m.unmount();
+  });
+
+  it('takes a batch no longer open off the list and reads again, and keeps one whose answer was refused', async () => {
+    const m = await mount();
+    const q3 = m.vm.batches[1].questions[0];
+    await act(async () => m.vm.actions.choose(q3, 'More'));
+    pond.answerQuestionBatch.mockRejectedValueOnce(new ApiError('POST → 422', 422, null));
+    await act(async () => {
+      await m.vm.actions.submit(m.vm.batches[1]);
+    });
+    expect(m.vm.batches.map((b) => b.id)).toEqual(['b1', 'b2']);
+    expect(currentSnackbar()?.message).toBe("Goose couldn't take that answer. Check it and send again.");
+    pond.answerQuestionBatch.mockRejectedValueOnce(new ApiError('POST → 409', 409, null));
+    pond.questions.mockResolvedValue(held().slice(0, 1));
+    await act(async () => {
+      await m.vm.actions.submit(m.vm.batches[1]);
+    });
+    expect(pond.questions).toHaveBeenCalledTimes(2);
+    expect(m.vm.batches.map((b) => b.id)).toEqual(['b1']);
+    expect(currentSnackbar()?.message).toBe('These questions were already answered or closed');
     await m.unmount();
   });
 

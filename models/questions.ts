@@ -182,6 +182,28 @@ export function isAskTool(name: string): boolean {
   return name === ASK_TOOL;
 }
 
+/** The frame fields the ask watch reads; the chat stream's own type lives with the client. */
+interface AskFrame {
+  type?: string;
+  tool?: string;
+  id?: string;
+}
+
+/**
+ * The `ask` calls a stream is waiting on: one is added by its `tool_call` and goes with its
+ * `tool_result`. While any is held, the Pond is silent by design for up to 10 minutes.
+ */
+export function watchAsks(held: ReadonlySet<string>, frame: AskFrame): ReadonlySet<string> {
+  if (!frame.id) return held;
+  if (frame.type === 'tool_call' && frame.tool && isAskTool(frame.tool) && !held.has(frame.id)) return new Set([...held, frame.id]);
+  if (frame.type === 'tool_result' && held.has(frame.id)) {
+    const next = new Set(held);
+    next.delete(frame.id);
+    return next;
+  }
+  return held;
+}
+
 /** The options in the order a card lists them: Goose's pick first. */
 export function shownOptions(question: AskedQuestion): ShownOption[] {
   const all = question.options.map((option, i) => ({ option, recommended: i === question.recommended }));
@@ -202,6 +224,20 @@ export function matchBatch(batches: readonly QuestionBatch[], asked: readonly As
     if (all && (!best || batch.questions.length > best.questions.length)) best = batch;
   }
   return best;
+}
+
+/** How a finished `ask` call ended, from the text the tool returned to the model. */
+export type AskResult = { kind: 'answers'; lines: AnswerLine[] } | { kind: 'enough' } | { kind: 'waiting' } | { kind: 'other' };
+
+const ENOUGH = /^the member wants you to go ahead with what you have/i;
+const WAITING = /^not answered yet/i;
+
+export function readAskResult(result: string | undefined, asked: readonly AskedQuestion[]): AskResult {
+  const words = (result ?? '').trim();
+  if (ENOUGH.test(words)) return { kind: 'enough' };
+  if (WAITING.test(words)) return { kind: 'waiting' };
+  const lines = readAnswerLines(words, asked);
+  return lines.length > 0 ? { kind: 'answers', lines } : { kind: 'other' };
 }
 
 /** One answered question as a card shows it in place of the questions. */

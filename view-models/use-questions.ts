@@ -10,7 +10,8 @@ import { confirm } from '@/services/haptics';
 import i18n from '@/services/i18n';
 import { showSnackbar } from '@/services/snackbar';
 import type { QuestionAnswerWire, QuestionBatchAnswerWire } from '@/services/types';
-import { hubAction, useHubRead } from './hub-read';
+import { describeApiError, logFailure } from './describe-error';
+import { useHubRead } from './hub-read';
 
 /** Questions arrive when Goose starts on a plan; a read every couple of minutes while in front. */
 export const QUESTIONS_MS = 2 * 60_000;
@@ -95,6 +96,28 @@ export async function sendAnswers(batch: Pick<QuestionBatch, 'id' | 'questions'>
   }
 }
 
+export type AnswerOutcome = 'ok' | 'closed' | 'failed';
+
+/**
+ * Sends or ends a batch, saying what went wrong if it did. A 409 is a batch no longer open
+ * (answered elsewhere, or expired), which the caller refreshes; a 422 is an answer the Pond refused.
+ */
+export async function answerAction(run: () => Promise<void>): Promise<AnswerOutcome> {
+  try {
+    await run();
+    return 'ok';
+  } catch (e) {
+    if (e instanceof ApiError && e.status === 409) {
+      showSnackbar({ message: i18n.t('goose.questions.closed'), tone: 'neutral' });
+      return 'closed';
+    }
+    logFailure('questions', 'answer failed', e);
+    const said = e instanceof ApiError && e.status === 422 ? i18n.t('goose.questions.refused') : (describeApiError(e) ?? i18n.t('goose.errors.action'));
+    showSnackbar({ message: said, tone: 'danger' });
+    return 'failed';
+  }
+}
+
 /** The member's choices across the questions on screen, held until they are sent. */
 export function useDrafts() {
   const [drafts, setDrafts] = useState<Drafts>({});
@@ -142,7 +165,7 @@ export type QuestionsBusy = { id: string; what: 'send' | 'enough' } | null;
 
 export function useQuestions(filter?: QuestionFilter, enabled = true) {
   const read = useHubRead<QuestionBatch[]>('questions', () => api.questions(), [], QUESTIONS_MS, enabled);
-  const { data, setData } = read;
+  const { data, setData, reload } = read;
   const drafts = useDrafts();
   const { latest, clear } = drafts;
   const [busy, setBusy] = useState<QuestionsBusy>(null);
@@ -165,9 +188,13 @@ export function useQuestions(filter?: QuestionFilter, enabled = true) {
       const now = latest.current;
       if (!canSubmit(batch.questions, now)) return false;
       setBusy({ id: batch.id, what: 'send' });
-      const done = await hubAction('questions', () => sendAnswers(batch, now).then(() => true));
+      const outcome = await answerAction(() => sendAnswers(batch, now));
       setBusy(null);
-      if (!done) return false;
+      if (outcome === 'closed') {
+        settle(batch);
+        void reload();
+      }
+      if (outcome !== 'ok') return false;
       settle(batch);
       void confirm();
       // A waiting chat turn carries on in its chat, where the answers arrive as the member's message.
@@ -175,21 +202,25 @@ export function useQuestions(filter?: QuestionFilter, enabled = true) {
       showSnackbar({ message: i18n.t(said), tone: 'success' });
       return true;
     },
-    [latest, settle],
+    [latest, settle, reload],
   );
 
   /** Done: Goose stops asking this chain and goes ahead with what it has. */
   const enough = useCallback(
     async (batch: QuestionBatch): Promise<boolean> => {
       setBusy({ id: batch.id, what: 'enough' });
-      const done = await hubAction('questions', () => api.enoughQuestions(batch.id).then(() => true));
+      const outcome = await answerAction(() => api.enoughQuestions(batch.id));
       setBusy(null);
-      if (!done) return false;
+      if (outcome === 'closed') {
+        settle(batch);
+        void reload();
+      }
+      if (outcome !== 'ok') return false;
       settle(batch);
       showSnackbar({ message: i18n.t('goose.questions.enoughSaid'), tone: 'success' });
       return true;
     },
-    [settle],
+    [settle, reload],
   );
 
   const count = batches.reduce((n, b) => n + b.questions.length, 0);

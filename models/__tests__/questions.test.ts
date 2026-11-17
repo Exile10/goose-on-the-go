@@ -4,7 +4,7 @@
  * nothing a surface cannot draw or answer.
  */
 
-import { matchBatch, readAnswerLines, readAskInput, readOption, readPreview, readQuestion, readQuestionBatches, shownOptions, type QuestionBatch } from '@/models/questions';
+import { matchBatch, readAnswerLines, readAskInput, readAskResult, watchAsks, readOption, readPreview, readQuestion, readQuestionBatches, shownOptions, type QuestionBatch } from '@/models/questions';
 
 describe('an option', () => {
   it('reads a plain string as its label alone', () => {
@@ -159,5 +159,38 @@ describe('a chat ask call', () => {
     ]);
     expect(readAnswerLines("Not answered yet; the questions wait in My Goose. Say you'll carry on when they answer.", asked)).toEqual([]);
     expect(readAnswerLines(undefined, asked)).toEqual([]);
+  });
+});
+
+describe('how a finished ask call ended', () => {
+  const asked = readAskInput({ questions: [{ header: 'Dates', text: 'When?', options: ['A', 'B'] }, { header: 'Budget', text: 'How much?', options: ['A', 'B'] }] });
+
+  it('reads answer lines, the go-ahead, and the waiting note, each as its own', () => {
+    expect(readAskResult('Dates: 12-15 Dec\nBudget: Other: "about 30k"', asked)).toEqual({
+      kind: 'answers',
+      lines: [
+        { header: 'Dates', answer: '12-15 Dec' },
+        { header: 'Budget', answer: 'Other: "about 30k"' },
+      ],
+    });
+    expect(readAskResult('The member wants you to go ahead with what you have.', asked)).toEqual({ kind: 'enough' });
+    expect(readAskResult("Not answered yet; the questions wait in My Goose. Say you'll carry on when they answer.", asked)).toEqual({ kind: 'waiting' });
+    expect(readAskResult('Refused: asked already.', asked)).toEqual({ kind: 'other' });
+    expect(readAskResult(undefined, asked)).toEqual({ kind: 'other' });
+  });
+});
+
+describe('the ask calls a stream waits on', () => {
+  it('holds an ask call from its tool_call to its tool_result, and nothing else', () => {
+    let held: ReadonlySet<string> = new Set();
+    held = watchAsks(held, { type: 'tool_call', tool: 'giap-weather__get_current_weather', id: 'w1' });
+    expect(held.size).toBe(0);
+    held = watchAsks(held, { type: 'tool_call', tool: 'giap-questions__ask', id: 'a1' });
+    expect([...held]).toEqual(['a1']);
+    expect(watchAsks(held, { type: 'tool_call', tool: 'giap-questions__ask', id: 'a1' })).toBe(held);
+    held = watchAsks(held, { type: 'tool_result', tool: 'giap-weather__get_current_weather', id: 'w1' });
+    expect([...held]).toEqual(['a1']);
+    held = watchAsks(held, { type: 'tool_result', tool: 'giap-questions__ask', id: 'a1' });
+    expect(held.size).toBe(0);
   });
 });
