@@ -8,7 +8,7 @@ import React from 'react';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { router } from 'expo-router';
 
-import { factLines, readIdeaCardSet, type IdeaCard } from '@/models/idea-cards';
+import { askMessage, factLines, readIdeaCard, readIdeaCardSet, type IdeaCard } from '@/models/idea-cards';
 import { readHub } from '@/models/hub';
 import { ApiError, api } from '@/services/api-client';
 import { currentSnackbar, resetSnackbar } from '@/services/snackbar';
@@ -129,6 +129,48 @@ describe('reading cards', () => {
   });
 });
 
+const askWire = {
+  id: 'c5',
+  kind: 'ask',
+  title: 'When is the Diani trip?',
+  why: { text: 'Goose needs the dates to book', source: { kind: 'plan', label: 'Diani trip' } },
+  sources: [{ kind: 'plan', title: 'Diani trip' }],
+  action: {
+    kind: 'chat',
+    label: 'Answer',
+    prompt: 'Diani dates',
+    question: {
+      header: 'Dates',
+      text: 'When do you go?',
+      options: [{ label: '12-15 Dec', description: 'School holidays', preview: { kind: 'draft', text: 'Day 1' } }, '19-22 Dec', 'Other'],
+      recommended: 1,
+      multi: false,
+    },
+  },
+  state: 'new',
+};
+
+describe('an ask card', () => {
+  it('carries its structured question, read as questions are, strings and Other included', () => {
+    const question = readIdeaCard(askWire)?.action?.question;
+    expect(question).toMatchObject({ header: 'Dates', text: 'When do you go?', recommended: 1, multi: false });
+    expect(question?.options).toEqual([
+      { label: '12-15 Dec', description: 'School holidays', preview: { kind: 'draft', text: 'Day 1' } },
+      { label: '19-22 Dec', description: '', preview: null },
+    ]);
+  });
+
+  it('has no question when the action carries none, or one with no words', () => {
+    expect(readIdeaCardSet(wire).cards[1].action?.question).toBeNull();
+    expect(readIdeaCard({ ...askWire, action: { ...askWire.action, question: { header: 'Dates', options: ['A', 'B'] } } })?.action?.question).toBeNull();
+  });
+
+  it('words the chosen options as one message', () => {
+    expect(askMessage(['Snorkel', ' Kitesurf '])).toBe('Snorkel, Kitesurf');
+    expect(askMessage(['  '])).toBe('');
+  });
+});
+
 describe('the cards view-model', () => {
   it('loads new and saved cards and the set state', async () => {
     const m = await mounted();
@@ -167,6 +209,44 @@ describe('the cards view-model', () => {
     expect(pond.doIdeaCard).toHaveBeenCalledWith('c2');
     expect(m.vm.cards.map((c) => c.id)).toEqual(['c1']);
     expect(push).toHaveBeenCalledWith({ pathname: '/conversation', params: { ask: 'Make me a packing list for Diani' } });
+    await m.unmount();
+  });
+
+  it('answers an ask card: done on the Pond, and the chosen options, not the prompt, go to chat', async () => {
+    pond.ideaCards.mockResolvedValue(readIdeaCardSet({ ...wire, cards: [...wire.cards, askWire] }));
+    const m = await mounted();
+    const card = m.vm.cards.find((c) => c.id === 'c5')!;
+    pond.doIdeaCard.mockResolvedValue({ card: null, result: { kind: 'chat', prompt: 'Diani dates', anchorId: null, watchId: null } });
+    await act(async () => {
+      await m.vm.actions.answerAsk(card, ['19-22 Dec']);
+    });
+    expect(pond.doIdeaCard).toHaveBeenCalledWith('c5');
+    expect(m.vm.cards.map((c) => c.id)).not.toContain('c5');
+    expect(push).toHaveBeenCalledWith({ pathname: '/conversation', params: { ask: '19-22 Dec' } });
+    await m.unmount();
+  });
+
+  it('keeps an ask card and opens nothing when the Pond refuses, and sends nothing with no choice', async () => {
+    pond.ideaCards.mockResolvedValue(readIdeaCardSet({ ...wire, cards: [...wire.cards, askWire] }));
+    const m = await mounted();
+    const card = m.vm.cards.find((c) => c.id === 'c5')!;
+    await act(async () => {
+      await m.vm.actions.answerAsk(card, []);
+    });
+    expect(pond.doIdeaCard).not.toHaveBeenCalled();
+    pond.doIdeaCard.mockRejectedValue(new ApiError('POST → 409', 409, null));
+    await act(async () => {
+      await m.vm.actions.answerAsk(card, ['12-15 Dec']);
+    });
+    expect(m.vm.cards.map((c) => c.id)).toContain('c5');
+    expect(push).not.toHaveBeenCalled();
+    await m.unmount();
+  });
+
+  it('opens the composer for an ask card’s Other', async () => {
+    const m = await mounted();
+    act(() => m.vm.actions.askOther());
+    expect(push).toHaveBeenCalledWith('/conversation');
     await m.unmount();
   });
 

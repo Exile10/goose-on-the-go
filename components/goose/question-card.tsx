@@ -74,12 +74,14 @@ export function QuestionPager({ questions, draftOf, onChoose, onOther, onOtherTe
   );
 }
 
-interface QuestionPageProps {
+export interface QuestionPageProps {
   question: Question;
   draft: AnswerDraft;
   onChoose: (question: Question, option: string) => void;
   onOther: (question: Question, on: boolean) => void;
   onOtherText: (question: Question, text: string) => void;
+  /** Where "Other" is answered somewhere else, such as an idea card's composer, in place of the field. */
+  onOtherPress?: () => void;
 }
 
 /** The option whose preview shows: the one last touched, else the chosen one, else Goose's pick. */
@@ -89,7 +91,8 @@ export function previewOf(question: Question, draft: AnswerDraft, touched: strin
   return option?.preview ?? null;
 }
 
-function QuestionPage({ question, draft, onChoose, onOther, onOtherText }: QuestionPageProps) {
+/** One question: its header, words, options with Goose's pick first, Other, and the focused preview. */
+export function QuestionPage({ question, draft, onChoose, onOther, onOtherText, onOtherPress }: QuestionPageProps) {
   const { t } = useTranslation();
   const [touched, setTouched] = useState<string | null>(null);
   const shown = shownOptions(question);
@@ -116,7 +119,7 @@ function QuestionPage({ question, draft, onChoose, onOther, onOtherText }: Quest
               <OptionWords option={option} recommended={recommended} />
             </InkCheckbox>
           ))}
-          <InkCheckbox label={t('goose.questions.other')} checked={draft.other} onChange={(on) => onOther(question, on)}>
+          <InkCheckbox label={t('goose.questions.other')} checked={draft.other} onChange={(on) => (onOtherPress ? onOtherPress() : onOther(question, on))}>
             <InkText weight="semibold">{t('goose.questions.other')}</InkText>
           </InkCheckbox>
         </View>
@@ -133,15 +136,17 @@ function QuestionPage({ question, draft, onChoose, onOther, onOtherText }: Quest
             { value: OTHER, label: t('goose.questions.other') },
           ]}
           onChange={(value) => {
-            if (value === OTHER) onOther(question, true);
-            else {
+            if (value === OTHER) {
+              if (onOtherPress) onOtherPress();
+              else onOther(question, true);
+            } else {
               const option = question.options[Number(value)];
               if (option) choose(option);
             }
           }}
         />
       )}
-      {draft.other ? <InkInput label={t('goose.questions.other')} value={draft.text} onChange={(text) => onOtherText(question, text)} placeholder={t('goose.questions.otherPlaceholder')} /> : null}
+      {draft.other && !onOtherPress ? <InkInput label={t('goose.questions.other')} value={draft.text} onChange={(text) => onOtherText(question, text)} placeholder={t('goose.questions.otherPlaceholder')} /> : null}
       {preview ? <PreviewView preview={preview} caption={question.header || question.text} /> : null}
     </View>
   );
