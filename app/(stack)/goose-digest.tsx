@@ -111,7 +111,7 @@ export default function GooseDigestScreen() {
 
 const styles = StyleSheet.create({
   top: { gap: Spacing.sm },
-  actions: { flexDirection: 'row', gap: Spacing.sm, marginTop: Spacing.xs },
+  actions: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm, marginTop: Spacing.xs },
   section: { gap: Spacing.md },
   figure: { gap: 6 },
   picture: { width: '100%', aspectRatio: 16 / 9 },
