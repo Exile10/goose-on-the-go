@@ -123,7 +123,12 @@ export type OpenRoute =
   | { open: 'cart'; cartId?: string }
   | { open: 'ideas'; ideaId?: string }
   | { open: 'goose_activity' }
-  | { open: 'pairing'; requestId?: string };
+  | { open: 'pairing'; requestId?: string }
+  | { open: 'anchor'; anchorId?: string }
+  | { open: 'deliverable'; deliverableId?: string }
+  | { open: 'questions'; batchId?: string; anchorId?: string }
+  /** Never named by the Pond: where a tapped specialist offer opens. */
+  | { open: 'specialists' };
 
 /** A Pond id: a UUID, optionally prefixed (`timer-...`). Nothing that could be a path. */
 const POND_ID = /^[A-Za-z0-9_-]{1,128}$/;
@@ -204,9 +209,47 @@ export function openRouteFromData(data: unknown): OpenRoute | null {
     // What Goose did by itself: the list, where the newest entry is the one the notice is about.
     case 'goose_activity':
       return { open: 'goose_activity' };
+    // The idea engine: a plan, a piece of work made for one, or Goose's questions. Without a valid
+    // id the plans, or every open question, are still the right place to land.
+    case 'anchor': {
+      const anchorId = pondId(data.anchor_id);
+      return anchorId ? { open: 'anchor', anchorId } : { open: 'anchor' };
+    }
+    case 'deliverable': {
+      const deliverableId = pondId(data.deliverable_id);
+      return deliverableId ? { open: 'deliverable', deliverableId } : { open: 'deliverable' };
+    }
+    case 'questions': {
+      const route: OpenRoute = { open: 'questions' };
+      const batchId = pondId(data.batch_id);
+      const anchorId = pondId(data.anchor_id);
+      if (batchId) route.batchId = batchId;
+      if (anchorId) route.anchorId = anchorId;
+      return route;
+    }
     default:
       return null;
   }
+}
+
+/**
+ * Goose offering a specialist, answered from the notification (`agent_offer`, with Turn on). Only
+ * the specialists the Pond ships are accepted. Null for anything else.
+ */
+export interface AgentOffer {
+  action: 'agent_offer';
+  agent: 'budget' | 'trip' | 'work' | 'hunt';
+  label: string;
+}
+
+const OFFERED_AGENTS: readonly AgentOffer['agent'][] = ['budget', 'trip', 'work', 'hunt'];
+
+export function agentOfferFromData(data: unknown): AgentOffer | null {
+  if (!isRecord(data) || data.action !== 'agent_offer') return null;
+  const agent = OFFERED_AGENTS.find((a) => a === data.agent);
+  if (!agent) return null;
+  const label = typeof data.label === 'string' ? data.label.trim().slice(0, 30) : '';
+  return { action: 'agent_offer', agent, label };
 }
 
 /**
@@ -254,7 +297,12 @@ type ScreenHref =
   | '/(stack)/goose-cart'
   | { pathname: '/(stack)/goose-cart-item'; params: { id: string } }
   | '/(stack)/goose-ideas'
-  | '/(stack)/pairing-lock';
+  | '/(stack)/pairing-lock'
+  | '/(stack)/goose-plans'
+  | { pathname: '/(stack)/goose-anchor'; params: { id: string } }
+  | { pathname: '/(stack)/goose-deliverable'; params: { id: string } }
+  | { pathname: '/(stack)/goose-questions'; params: { batch?: string; anchor?: string } }
+  | '/(stack)/goose-specialists';
 
 /**
  * The expo-router location a route opens. A schedule notification names the
@@ -298,5 +346,16 @@ export function screenPath(route: OpenRoute): ScreenHref {
       return '/(stack)/goose-activity';
     case 'pairing':
       return '/(stack)/pairing-lock';
+    case 'anchor':
+      return route.anchorId ? { pathname: '/(stack)/goose-anchor', params: { id: route.anchorId } } : '/(stack)/goose-plans';
+    case 'deliverable':
+      return route.deliverableId ? { pathname: '/(stack)/goose-deliverable', params: { id: route.deliverableId } } : '/(stack)/goose-plans';
+    case 'questions':
+      return {
+        pathname: '/(stack)/goose-questions',
+        params: { ...(route.batchId ? { batch: route.batchId } : {}), ...(route.anchorId ? { anchor: route.anchorId } : {}) },
+      };
+    case 'specialists':
+      return '/(stack)/goose-specialists';
   }
 }

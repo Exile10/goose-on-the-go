@@ -1552,7 +1552,6 @@ export interface PondSettings {
   memory_extraction_enabled: boolean;
   memory_extraction_max_facts: number;
   memory_extraction_interval_secs: number;
-  suggestion_generation_enabled: boolean;
   memory_cleanup_enabled: boolean;
   memory_cleanup_interval_hours: number;
   memory_prune_threshold: number;
@@ -2498,9 +2497,116 @@ export interface TodoWriteWire {
   state?: 'open' | 'done' | 'dropped';
   /** Replaces every hook the to-do had. */
   hooks?: HookWriteWire[];
+  /** At most 40 characters; null or empty is no list. */
+  list?: string | null;
+  priority?: TodoPriorityWire;
+  /** Replaces the whole list: a step is ticked by sending every step again. */
+  steps?: TodoStepWire[];
+  /** Null clears it. */
+  goose_can?: GooseCanWire | null;
+  anchor_id?: string | null;
+}
+
+export type TodoPriorityWire = 'low' | 'normal' | 'high';
+
+export interface TodoStepWire {
+  text: string;
+  done: boolean;
+}
+
+export interface GooseCanWire {
+  label: string;
+  kind: 'research' | 'chat' | 'watch';
+  prompt: string;
 }
 
 export type TodoAnswerWire = 'done' | 'not_yet' | 'drop';
+
+// ── The idea engine (pond docs/architecture/idea-engine.md, section 11) ──
+
+/** Why a member waves something off; the same chips on every surface. */
+export type RejectReasonWire = 'too_generic' | 'not_relevant' | 'wrong_facts' | 'already_know' | 'bad_timing';
+
+export type AnchorKindWire = 'event' | 'trip' | 'purchase' | 'project' | 'interest' | 'standing';
+
+export interface AnchorFactWire {
+  label: string;
+  value: string;
+  source: string;
+}
+
+export interface NewAnchorWire {
+  kind: Exclude<AnchorKindWire, 'standing'>;
+  title: string;
+  starts_at?: string;
+  ends_at?: string;
+  place?: string;
+  notes?: string;
+}
+
+/** A date or place sent as null is cleared; `facts` replaces the whole list. */
+export interface AnchorPatchWire {
+  title?: string;
+  starts_at?: string | null;
+  ends_at?: string | null;
+  place?: string | null;
+  facts?: AnchorFactWire[];
+}
+
+export interface AnchorStopWire {
+  reasons: RejectReasonWire[];
+  text?: string;
+  never?: boolean;
+}
+
+export interface DeliverableRejectWire {
+  verb: 'not_this' | 'never';
+  reasons: RejectReasonWire[];
+  text?: string;
+}
+
+/** A choice is one of the question's options; `text` is the member's "Other". */
+export interface QuestionAnswerWire {
+  choices: string[];
+  text?: string;
+}
+
+export type FactCategoryWire =
+  | 'identity' | 'home' | 'work' | 'people' | 'plan' | 'hunt' | 'interest' | 'food' | 'health' | 'style'
+  | 'routine' | 'avoid' | 'other';
+
+export interface FactPatchWire {
+  fact?: string;
+  category?: FactCategoryWire;
+  pinned?: boolean;
+}
+
+export type LedgerCategoryWire =
+  | 'groceries' | 'eating_out' | 'transport' | 'bills' | 'rent' | 'health' | 'shopping' | 'travel'
+  | 'entertainment' | 'transfers' | 'other';
+
+/** An amount is a decimal string in the currency's major unit; `note` and `anchor_id` sent as null are cleared. */
+export interface LedgerPatchWire {
+  payee?: string;
+  amount?: string;
+  category?: LedgerCategoryWire;
+  occurred_on?: string;
+  note?: string | null;
+  anchor_id?: string | null;
+}
+
+export interface CaptureSettingsWire {
+  screenshots?: boolean;
+  albums?: string[];
+}
+
+export interface CaptureWire {
+  image: string;
+  mime_type: string;
+  kind: 'screenshot' | 'photo';
+  album?: string;
+  taken_at?: string;
+}
 
 /** A dated mention lifted from a chat, offered as a to-do. */
 export interface TodoOfferWire {
