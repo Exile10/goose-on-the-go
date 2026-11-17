@@ -477,7 +477,9 @@
       "doingTaskStart": "Starting a long task",
       "taskStatus": "Long task",
       "doingTaskStatus": "Checking a long task",
-      "taskCancel": "Stopped a long task"
+      "taskCancel": "Stopped a long task",
+      "ask": "Questions for you",
+      "doingAsk": "Asking you"
     },
     "quips": {
       "thinking": {
