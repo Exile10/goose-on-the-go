@@ -165,7 +165,10 @@ export function readQuestion(raw: unknown): Question | null {
   const words = text(r?.text);
   if (!r || !id || !words) return null;
   // "Other" is the screen's; an option that names it would be offered twice.
-  const options = strings(r.options).filter((o) => o.toLowerCase() !== 'other');
+  const rawOptions = Array.isArray(r.options) ? r.options : [];
+  const options = rawOptions
+    .map((o) => (typeof o === 'string' ? o.trim() : text(record(o)?.label)))
+    .filter((o): o is string => Boolean(o) && o.toLowerCase() !== 'other');
   return { id, text: words, options, multi: r.multi === true };
 }
 

@@ -103,12 +103,15 @@ export function QuestionCard({ question, draft, busy, onChoose, onOther, onOther
           </View>
         </View>
       ) : (
-        <InkRadioGroup
-          label={question.text}
-          value={picked}
-          options={[...question.options.map((option, i) => ({ value: String(i), label: option })), { value: OTHER, label: t('goose.questions.other') }]}
-          onChange={(value) => (value === OTHER ? onOther(true) : onChoose(question.options[Number(value)] ?? ''))}
-        />
+        <View style={styles.question}>
+          <InkText weight="semibold">{question.text}</InkText>
+          <InkRadioGroup
+            label={question.text}
+            value={picked}
+            options={[...question.options.map((option, i) => ({ value: String(i), label: option })), { value: OTHER, label: t('goose.questions.other') }]}
+            onChange={(value) => (value === OTHER ? onOther(true) : onChoose(question.options[Number(value)] ?? ''))}
+          />
+        </View>
       )}
       {draft.other ? <InkInput label={t('goose.questions.other')} value={draft.text} onChange={onOtherText} placeholder={t('goose.questions.otherPlaceholder')} /> : null}
       <View style={styles.actions}>

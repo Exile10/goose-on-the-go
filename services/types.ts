@@ -407,6 +407,8 @@ export interface Suggestion {
   answered_by: string;
   /** Written from a memory by the Pond's idle pass, rather than a template. */
   composed: boolean;
+  /** Deep operational instructions for the chat agent when this suggestion is tapped. */
+  agent_notes?: string;
 }
 
 export interface SuggestionList {
@@ -1398,6 +1400,14 @@ export interface WeatherResponse {
   cond?: string;
   /** Day or night where the Pond is; absent from a Pond older than this field. */
   is_day?: boolean;
+  icon?: string;
+  hi?: number;
+  lo?: number;
+  hum?: number;
+  wind?: number;
+  sunrise?: string;
+  sunset?: string;
+  forecast?: { d: string; i: string; t: number }[];
 }
 
 /**
@@ -1407,10 +1417,18 @@ export interface WeatherResponse {
  */
 export interface NowPlayingResponse {
   connected: boolean;
+  service?: string;
+  player?: string | null;
   playing?: boolean;
   track?: string;
   artist?: string;
+  album_art?: string | null;
+  progress_ms?: number;
+  duration_ms?: number;
+  link?: string | null;
+  can?: { pause?: boolean; resume?: boolean; next?: boolean; previous?: boolean };
   error?: string;
+  message?: string;
 }
 
 /**

@@ -128,6 +128,17 @@ export function useIdeaCards(enabled = true) {
     [setData],
   );
 
+  const create = useCallback(
+    async (body: { title: string; why?: string; notes?: string; kind?: string }) => {
+      const created = await hubAction('ideaCards', () => api.createIdeaCard(body));
+      if (!created) return null;
+      setData((d) => ({ ...d, cards: [created, ...d.cards.filter((c) => c.id !== created.id)] }));
+      showSnackbar({ message: 'Idea added — Goose will learn from it too.', tone: 'success' });
+      return created;
+    },
+    [setData],
+  );
+
   const cards = read.data.cards;
   return {
     ...read,
@@ -137,7 +148,7 @@ export function useIdeaCards(enabled = true) {
     making: isMaking(read.data.set.state),
     busy,
     refreshing,
-    actions: { reload: read.reload, refresh, doIt, deeper, toggleSave, dismiss },
+    actions: { reload: read.reload, refresh, doIt, deeper, toggleSave, dismiss, create },
   };
 }
 
