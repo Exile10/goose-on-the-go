@@ -12,8 +12,15 @@ import { IdeaCardView } from '../idea-cards';
 
 jest.mock('expo-router', () => ({ router: { push: jest.fn() } }));
 jest.mock('expo-web-browser', () => ({ openBrowserAsync: jest.fn() }));
-jest.mock('@/services/haptics', () => ({ selectionTick: jest.fn().mockResolvedValue(undefined), confirm: jest.fn().mockResolvedValue(undefined) }));
+jest.mock('@/services/haptics', () => ({
+  selectionTick: jest.fn().mockResolvedValue(undefined),
+  confirm: jest.fn().mockResolvedValue(undefined),
+  tap: jest.fn().mockResolvedValue(undefined),
+  toggle: jest.fn().mockResolvedValue(undefined),
+}));
 jest.mock('@/components/ui/g-icon', () => ({ GIcon: () => null }));
+jest.mock('@/components/patterns/pond-picture', () => ({ PondPicture: () => null }));
+jest.mock('@/view-models/use-page-pictures', () => ({ usePagePictures: () => [] }));
 
 const card = readIdeaCard({
   id: 'c1',
@@ -76,12 +83,96 @@ describe('a collapsed idea card', () => {
   });
 
   it('offers Go deeper once for a go-deeper action, and draws no field it lacks', () => {
-    const deeper: IdeaCard = { ...card, when: null, where: null, cost: null, effort: null, action: { kind: 'go_deeper', label: '', prompt: null, text: null, due: null, url: null } };
+    const deeper: IdeaCard = { ...card, when: null, where: null, cost: null, effort: null, action: { kind: 'go_deeper', label: '', prompt: null, text: null, due: null, url: null, question: null } };
     const tree = render(deeper);
     const shown = words(tree.root);
     expect(shown.split('Go deeper').length - 1).toBe(1);
     expect(shown).not.toContain('Karura Forest,');
     expect(shown).not.toContain('KSh 600 entry');
+    act(() => tree.unmount());
+  });
+});
+
+const ask = (multi: boolean) =>
+  readIdeaCard({
+    id: 'c5',
+    kind: 'ask',
+    title: 'When is the Diani trip?',
+    why: { text: 'Goose needs the dates to book', source: { kind: 'plan', label: 'Diani trip' } },
+    sources: [{ kind: 'plan', title: 'Diani trip' }],
+    action: {
+      kind: 'chat',
+      label: 'Answer',
+      prompt: 'Diani dates',
+      question: { header: 'Dates', text: 'When do you go?', options: [{ label: '12-15 Dec', description: 'School holidays' }, { label: '19-22 Dec', description: 'Christmas' }], recommended: 1, multi },
+    },
+    state: 'new',
+  })!;
+
+function renderAsk(shown: IdeaCard) {
+  const props = { onDo: jest.fn(), onAnswer: jest.fn(), onAskOther: jest.fn() };
+  let tree!: ReactTestRenderer;
+  act(() => {
+    tree = create(
+      <InkProvider scheme="light">
+        <IdeaCardView card={shown} busy={null} {...props} onDeeper={jest.fn()} onSave={jest.fn()} onNotThis={jest.fn()} onOpen={jest.fn()} />
+      </InkProvider>,
+    );
+  });
+  return { tree, ...props };
+}
+
+function press(tree: ReactTestRenderer, label: string) {
+  const target = tree.root.findAll((n) => typeof n.props.onPress === 'function' && words(n).includes(label)).pop();
+  if (!target) throw new Error(`nothing to press: ${label}`);
+  act(() => target.props.onPress());
+}
+
+describe('an ask card', () => {
+  // Ink's icons have no native renderer under Jest, and say so each time one is drawn.
+  beforeEach(() => jest.spyOn(console, 'warn').mockImplementation(() => undefined));
+  afterEach(() => jest.restoreAllMocks());
+
+  it('shows its question inline on Do it, and sends the one option picked', () => {
+    const { tree, onDo, onAnswer } = renderAsk(ask(false));
+    expect(words(tree.root)).not.toContain('When do you go?');
+    press(tree, 'Answer');
+    expect(onDo).not.toHaveBeenCalled();
+    const shown = words(tree.root);
+    expect(shown).toContain('When do you go?');
+    expect(shown).toContain('Recommended');
+    expect(shown.indexOf('19-22 Dec')).toBeLessThan(shown.indexOf('12-15 Dec'));
+    press(tree, '12-15 Dec');
+    expect(onAnswer).toHaveBeenCalledWith(['12-15 Dec']);
+    act(() => tree.unmount());
+  });
+
+  it('opens the composer for Other', () => {
+    const { tree, onAnswer, onAskOther } = renderAsk(ask(false));
+    press(tree, 'Answer');
+    press(tree, 'Other');
+    expect(onAskOther).toHaveBeenCalledTimes(1);
+    expect(onAnswer).not.toHaveBeenCalled();
+    act(() => tree.unmount());
+  });
+
+  it('collects several options when the question allows, and sends them together', () => {
+    const { tree, onAnswer } = renderAsk(ask(true));
+    press(tree, 'Answer');
+    press(tree, '12-15 Dec');
+    press(tree, '19-22 Dec');
+    expect(onAnswer).not.toHaveBeenCalled();
+    press(tree, 'Send');
+    expect(onAnswer).toHaveBeenCalledWith(['12-15 Dec', '19-22 Dec']);
+    act(() => tree.unmount());
+  });
+
+  it('does as before when the action carries no question', () => {
+    const plain: IdeaCard = { ...ask(false), action: { ...ask(false).action!, question: null } };
+    const { tree, onDo, onAnswer } = renderAsk(plain);
+    press(tree, 'Answer');
+    expect(onDo).toHaveBeenCalledTimes(1);
+    expect(onAnswer).not.toHaveBeenCalled();
     act(() => tree.unmount());
   });
 });

@@ -4,7 +4,7 @@
 import { useCallback, useState } from 'react';
 import { router } from 'expo-router';
 
-import { EMPTY_SET, dismissBody, isMaking, type IdeaCard, type IdeaCardDone, type IdeaCardSet } from '@/models/idea-cards';
+import { EMPTY_SET, askMessage, dismissBody, isMaking, type IdeaCard, type IdeaCardDone, type IdeaCardSet } from '@/models/idea-cards';
 import type { RejectReason } from '@/models/anchors';
 import { api } from '@/services/api-client';
 import { confirm } from '@/services/haptics';
@@ -74,6 +74,29 @@ export function useIdeaCards(enabled = true) {
     },
     [without],
   );
+
+  /**
+   * An ask card's question answered: the card is done on the Pond like any Do it, and the chosen
+   * options, not the action's prompt, go to chat as the member's own message.
+   */
+  const answerAsk = useCallback(
+    async (card: IdeaCard, labels: readonly string[]): Promise<boolean> => {
+      const message = askMessage(labels);
+      if (!message) return false;
+      setBusy({ id: card.id, what: 'do' });
+      const done = await hubAction('ideaCards', () => api.doIdeaCard(card.id));
+      setBusy(null);
+      if (!done) return false;
+      without(card.id);
+      void confirm();
+      router.push({ pathname: '/conversation', params: { ask: message } });
+      return true;
+    },
+    [without],
+  );
+
+  /** "Other" on an ask card: the member says it in their own words, in a new chat. */
+  const askOther = useCallback(() => router.push('/conversation'), []);
 
   /** "Go deeper" on any card: the Pond finds or makes its plan, and the plan opens. */
   const deeper = useCallback(
@@ -148,7 +171,7 @@ export function useIdeaCards(enabled = true) {
     making: isMaking(read.data.set.state),
     busy,
     refreshing,
-    actions: { reload: read.reload, refresh, doIt, deeper, toggleSave, dismiss, create },
+    actions: { reload: read.reload, refresh, doIt, answerAsk, askOther, deeper, toggleSave, dismiss, create },
   };
 }
 

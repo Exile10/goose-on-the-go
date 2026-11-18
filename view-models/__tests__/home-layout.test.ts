@@ -29,8 +29,13 @@ describe('mergeOrder', () => {
     expect(mergeOrder(HOME_WIDGETS.filter((k) => k !== 'ready'))[0]).toBe('ready');
   });
 
-  it('leads an order saved before the idea engine with what is ready, the plans and the questions', () => {
+  it('leads an order saved before the idea engine with what is ready and the plans', () => {
     const before = ['devices', 'ideas', 'ask', 'music', 'next', 'outside', 'remember', 'conversations'];
-    expect(mergeOrder(before).slice(0, 4)).toEqual(['ready', 'plans', 'questions', 'devices']);
+    expect(mergeOrder(before).slice(0, 3)).toEqual(['ready', 'plans', 'devices']);
+  });
+
+  it('drops the questions from an order saved while they were on the board', () => {
+    const saved = ['ready', 'plans', 'questions', 'ideas', 'ask', 'music', 'next', 'outside', 'remember', 'conversations', 'devices'];
+    expect(mergeOrder(saved)).not.toContain('questions');
   });
 });

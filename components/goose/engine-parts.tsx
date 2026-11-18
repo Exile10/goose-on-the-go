@@ -1,6 +1,6 @@
 /**
  * What the plan, the finished-work and the questions screens share, and Home borrows: the reason
- * chips, one of Goose's questions with its options and an "Other" field, the running job's steps,
+ * chips, a batch of Goose's questions answerable in place, the running job's steps,
  * a plan's facts, a row for a piece of work, and the sheets that stop a plan or wave work off.
  */
 
@@ -10,10 +10,7 @@ import { useTranslation } from 'react-i18next';
 import {
   InkButton,
   InkChip,
-  InkChoice,
   InkEyebrow,
-  InkInput,
-  InkRadioGroup,
   InkSegmented,
   InkSheet,
   InkSwitch,
@@ -36,10 +33,11 @@ import {
   type AnchorFact,
   type DeliverableSummary,
   type EngineJobNow,
-  type Question,
   type RejectReason,
 } from '@/models/anchors';
-import { canAnswer, type AnswerDraft, type UseQuestions } from '@/view-models/use-questions';
+import type { QuestionBatch } from '@/models/questions';
+import type { UseQuestions } from '@/view-models/use-questions';
+import { QuestionPager } from './question-card';
 import type { RejectVerb } from '@/view-models/use-deliverable';
 import { RoundButton } from './hub-parts';
 import { GroupRow } from './following';
@@ -62,68 +60,6 @@ export function ReasonChips({ selected, onToggle }: { selected: readonly RejectR
 /** A reason added or taken away, for a sheet's own state. */
 export function toggleReason(reasons: readonly RejectReason[], reason: RejectReason): RejectReason[] {
   return reasons.includes(reason) ? reasons.filter((r) => r !== reason) : [...reasons, reason];
-}
-
-// The radio's values are positions, so an option worded like "other" never collides with Other.
-const OTHER = 'other';
-
-export interface QuestionCardProps {
-  question: Question;
-  draft: AnswerDraft;
-  busy: boolean;
-  onChoose: (option: string) => void;
-  onOther: (on: boolean) => void;
-  onOtherText: (text: string) => void;
-  onAnswer: () => void;
-  onSkip: () => void;
-}
-
-/** One question: its options as a radio group (or choices when several fit), "Other" with a field, Send and Skip. */
-export function QuestionCard({ question, draft, busy, onChoose, onOther, onOtherText, onAnswer, onSkip }: QuestionCardProps) {
-  const { t } = useTranslation();
-  const ready = canAnswer(draft);
-  const picked = draft.other ? OTHER : String(question.options.findIndex((o) => draft.choices.includes(o)));
-  return (
-    <View style={styles.question}>
-      {question.multi ? (
-        <View style={styles.question}>
-          <InkText weight="semibold">{question.text}</InkText>
-          <InkText size="sm" tone="secondary">
-            {t('goose.questions.pickSeveral')}
-          </InkText>
-          <View style={styles.chips}>
-            {question.options.map((option) => (
-              <InkChoice key={option} selected={draft.choices.includes(option)} onSelect={() => onChoose(option)}>
-                {option}
-              </InkChoice>
-            ))}
-            <InkChoice selected={draft.other} onSelect={() => onOther(!draft.other)}>
-              {t('goose.questions.other')}
-            </InkChoice>
-          </View>
-        </View>
-      ) : (
-        <View style={styles.question}>
-          <InkText weight="semibold">{question.text}</InkText>
-          <InkRadioGroup
-            label={question.text}
-            value={picked}
-            options={[...question.options.map((option, i) => ({ value: String(i), label: option })), { value: OTHER, label: t('goose.questions.other') }]}
-            onChange={(value) => (value === OTHER ? onOther(true) : onChoose(question.options[Number(value)] ?? ''))}
-          />
-        </View>
-      )}
-      {draft.other ? <InkInput label={t('goose.questions.other')} value={draft.text} onChange={onOtherText} placeholder={t('goose.questions.otherPlaceholder')} /> : null}
-      <View style={styles.actions}>
-        <InkButton variant="quiet" disabled={busy} onPress={onSkip}>
-          {t('goose.questions.skip')}
-        </InkButton>
-        <InkButton variant="primary" loading={busy} disabled={!ready || busy} onPress={onAnswer}>
-          {t('goose.questions.answer')}
-        </InkButton>
-      </View>
-    </View>
-  );
 }
 
 /** A plan Goose offered: what it is, why Goose thinks it matters, and the member's yes or not now. */
@@ -163,34 +99,57 @@ export function CandidateBlock({ anchor, busy, onYes, onNo, onOpen }: { anchor: 
   );
 }
 
-/** Every batch the view-model holds, each under its title, its questions answerable in place. */
-export function QuestionBatchList({ vm, titles = true, onOpenPlan }: { vm: UseQuestions; titles?: boolean; onOpenPlan?: (anchorId: string) => void }) {
+export interface BatchLinks {
+  onOpenPlan?: (anchorId: string) => void;
+  onOpenChat?: (sessionId: string, title: string) => void;
+}
+
+/** One batch answerable in place, under its plan's or chat's title, with the way back to either. */
+export function QuestionBatchBlock({ vm, batch, title = true, onOpenPlan, onOpenChat }: { vm: UseQuestions; batch: QuestionBatch; title?: boolean } & BatchLinks) {
   const { t } = useTranslation();
+  const busy = vm.busy?.id === batch.id ? vm.busy.what : null;
+  return (
+    <View style={styles.block}>
+      {title && batch.title ? <InkText weight="bold">{batch.title}</InkText> : null}
+      {batch.state === 'waiting' ? (
+        <InkText size="sm" tone="secondary">
+          {t('goose.questions.waiting')}
+        </InkText>
+      ) : null}
+      <QuestionPager
+        key={batch.id}
+        questions={batch.questions}
+        draftOf={vm.draftOf}
+        onChoose={vm.actions.choose}
+        onOther={vm.actions.chooseOther}
+        onOtherText={vm.actions.setOtherText}
+        onSubmit={() => void vm.actions.submit(batch)}
+        onEnough={() => void vm.actions.enough(batch)}
+        busy={busy}
+        canSend={vm.canSend(batch)}
+      />
+      {onOpenPlan && batch.anchorId ? (
+        <InkButton variant="quiet" icon="calendar" onPress={() => onOpenPlan(batch.anchorId!)} style={styles.left}>
+          {t('goose.questions.openPlan')}
+        </InkButton>
+      ) : null}
+      {onOpenChat && batch.purpose === 'chat' && batch.sessionId ? (
+        <InkButton variant="quiet" icon="chat" onPress={() => onOpenChat(batch.sessionId!, batch.title)} style={styles.left}>
+          {t('goose.questions.openChat')}
+        </InkButton>
+      ) : null}
+    </View>
+  );
+}
+
+/** Every batch the view-model holds, each answerable in place. */
+export function QuestionBatchList({ vm, titles = true, onOpenPlan, onOpenChat }: { vm: UseQuestions; titles?: boolean } & BatchLinks) {
   const theme = useInkTheme();
   return (
     <View style={styles.batches}>
-      {vm.batches.map((batch) => (
-        <View key={batch.id} style={styles.block}>
-          {titles && batch.title ? <InkText weight="bold">{batch.title}</InkText> : null}
-          {batch.questions.map((question, i) => (
-            <View key={question.id} style={i > 0 ? [styles.divided, { borderTopColor: theme.color.line }] : null}>
-              <QuestionCard
-                question={question}
-                draft={vm.draftOf(question.id)}
-                busy={vm.busy === question.id}
-                onChoose={(option) => vm.actions.choose(question, option)}
-                onOther={(on) => vm.actions.chooseOther(question, on)}
-                onOtherText={(text) => vm.actions.setOtherText(question, text)}
-                onAnswer={() => void vm.actions.answer(question)}
-                onSkip={() => void vm.actions.skip(question)}
-              />
-            </View>
-          ))}
-          {onOpenPlan && batch.anchorId ? (
-            <InkButton variant="quiet" icon="calendar" onPress={() => onOpenPlan(batch.anchorId!)} style={styles.left}>
-              {t('goose.questions.openPlan')}
-            </InkButton>
-          ) : null}
+      {vm.batches.map((batch, i) => (
+        <View key={batch.id} style={i > 0 ? [styles.divided, { borderTopColor: theme.color.line }] : null}>
+          <QuestionBatchBlock vm={vm} batch={batch} title={titles} onOpenPlan={onOpenPlan} onOpenChat={onOpenChat} />
         </View>
       ))}
     </View>

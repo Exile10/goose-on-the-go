@@ -1,6 +1,6 @@
 /**
- * Goose's questions: every open batch, or the one a notification named, or a plan's. Each question
- * is answered with its options or the member's own words under Other, or skipped.
+ * Goose's questions: every open or waiting batch, or the one a notification named, or a plan's. A
+ * batch is answered whole, with options or the member's own words under Other, or ended with Done.
  */
 
 import React from 'react';
@@ -33,7 +33,11 @@ export default function GooseQuestionsScreen() {
       {state === 'loading' ? <InkSpinner label={t('goose.questions.loading')} /> : null}
       {isUnavailable(state) ? <ContentUnavailable state={state} reason={questions.error} onRetry={questions.actions.reload} /> : null}
       {state === 'empty' ? <InkEmptyState icon="done" title={t('goose.questions.empty')} /> : null}
-      <QuestionBatchList vm={questions} onOpenPlan={anchorId ? undefined : (id) => router.push({ pathname: '/(stack)/goose-anchor', params: { id } })} />
+      <QuestionBatchList
+        vm={questions}
+        onOpenPlan={anchorId ? undefined : (id) => router.push({ pathname: '/(stack)/goose-anchor', params: { id } })}
+        onOpenChat={(session, title) => router.push({ pathname: '/conversation', params: { session, title } })}
+      />
     </ScreenScroll>
   );
 }

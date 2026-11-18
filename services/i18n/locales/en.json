@@ -477,7 +477,9 @@
       "doingTaskStart": "Starting a long task",
       "taskStatus": "Long task",
       "doingTaskStatus": "Checking a long task",
-      "taskCancel": "Stopped a long task"
+      "taskCancel": "Stopped a long task",
+      "ask": "Questions for you",
+      "doingAsk": "Asking you"
     },
     "quips": {
       "thinking": {
@@ -6136,11 +6138,26 @@
       "lead": "Answer what you can. Goose works with what it has and keeps your answers for later.",
       "other": "Other",
       "otherPlaceholder": "Your own answer",
-      "answer": "Send",
-      "skip": "Skip",
-      "thanks": "Goose has your answer",
+      "send": "Send",
+      "enough": "Done",
+      "enoughSaid": "Goose will go ahead with what it has",
+      "thanks": "Goose has your answers",
+      "thanksChat": "Goose has your answers and carries on in the chat",
       "openPlan": "Open the plan",
-      "pickSeveral": "Pick any that fit"
+      "openChat": "Open the chat",
+      "openPlace": "Open the page",
+      "pickSeveral": "Pick any that fit",
+      "recommended": "Recommended",
+      "back": "Back",
+      "next": "Next",
+      "page": "{{at}} of {{count}}",
+      "gettingReady": "Getting these ready to send",
+      "lost": "Couldn't reach these questions on your Pond.",
+      "waiting": "Goose stopped waiting in the chat. Answer here and it carries on there.",
+      "answered": "Your answers",
+      "otherSaid": "Other: \"{{words}}\"",
+      "closed": "These questions were already answered or closed",
+      "refused": "Goose couldn't take that answer. Check it and send again."
     },
     "facts": {
       "loading": "Reading what Goose works from",

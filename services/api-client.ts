@@ -78,11 +78,10 @@ import {
   readAnchor,
   readAnchors,
   readDeliverable,
-  readQuestionBatches,
   type Anchor,
   type Deliverable,
-  type QuestionBatch,
 } from '@/models/anchors';
+import { readQuestionBatches, watchAsks, type QuestionBatch } from '@/models/questions';
 import { readFactSheet, readRules, readSheetFact, type DontRule, type FactSheet, type SheetFact } from '@/models/fact-sheet';
 import { readEngineJobs, readIntentions, type EngineJob, type Intention } from '@/models/engine-log';
 import { readLedger, readLedgerEntry, readSpecialists, type Ledger, type LedgerEntry, type Specialist } from '@/models/specialists';
@@ -203,6 +202,7 @@ import type {
   LedgerPatchWire,
   NewAnchorWire,
   QuestionAnswerWire,
+  QuestionBatchAnswerWire,
   DeviceStatePatch,
   EventCategory,
   Extension,
@@ -519,6 +519,24 @@ const CHAT_TIMEOUT_MS = 180_000;
  * for long, and a minute of nothing means the connection has gone.
  */
 const STREAM_IDLE_MS = 60_000;
+
+/**
+ * A turn waiting on Goose's questions: the Pond holds the stream silent for up to 10 minutes
+ * before the `ask` tool gives up, so the guard waits that long and a little more.
+ */
+export const ASK_WAIT_IDLE_MS = 11 * 60_000;
+
+/** A chat stream's frames, watched for an `ask` call, and the stall guard that follows them. */
+function askAwareStream(onFrame: (frame: ChatFrame) => void, waiting: ReadonlySet<string> = new Set()): { onFrame: (frame: ChatFrame) => void; idleMs: () => number } {
+  let asks = waiting;
+  return {
+    onFrame: (frame) => {
+      asks = watchAsks(asks, frame);
+      onFrame(frame);
+    },
+    idleMs: () => (asks.size > 0 ? ASK_WAIT_IDLE_MS : STREAM_IDLE_MS),
+  };
+}
 
 /** Transcription pads every clip to a 30s window, and the first speech call loads a model. */
 const VOICE_TIMEOUT_MS = 45_000;
@@ -1445,7 +1463,8 @@ export class PondApiClient {
       body: JSON.stringify(place ? { ...body, device_place: place } : body),
       signal,
     });
-    await readSse(res, (event) => deliver(event, onFrame), { idleMs: STREAM_IDLE_MS });
+    const stream = askAwareStream(onFrame);
+    await readSse(res, (event) => deliver(event, stream.onFrame), { idleMs: stream.idleMs });
   }
 
   /**
@@ -1453,7 +1472,8 @@ export class PondApiClient {
    *
    * `afterSeq` is exclusive. A 410 means the Pond restarted and the run is gone,
    * a 404 that it finished long enough ago to be forgotten; either way the
-   * answer, if there is one, is in the session's saved messages.
+   * answer, if there is one, is in the session's saved messages. `waitingAsks`
+   * are the `ask` calls seen before the drop, which keep the stall guard patient.
    */
   async reattachRun(
     runId: string,
@@ -1461,6 +1481,7 @@ export class PondApiClient {
     epoch: number | string | undefined,
     onFrame: (frame: ChatFrame) => void,
     signal?: AbortSignal,
+    waitingAsks?: ReadonlySet<string>,
   ): Promise<void> {
     const q = new URLSearchParams({ after_seq: String(afterSeq) });
     if (epoch !== undefined) q.set('epoch', String(epoch));
@@ -1468,7 +1489,8 @@ export class PondApiClient {
       `/api/v1/chat/runs/${encodeURIComponent(runId)}/events?${q.toString()}`,
       { headers: { Accept: 'text/event-stream' }, signal },
     );
-    await readSse(res, (event) => deliver(event, onFrame), { idleMs: STREAM_IDLE_MS });
+    const stream = askAwareStream(onFrame, waitingAsks);
+    await readSse(res, (event) => deliver(event, stream.onFrame), { idleMs: stream.idleMs });
   }
 
   /**
@@ -3775,8 +3797,20 @@ export class PondApiClient {
     return { name: reportFileName(res.headers.get('Content-Disposition'), 'markdown'), body: await res.text() };
   }
 
-  async questions(): Promise<QuestionBatch[]> {
-    return readQuestionBatches(await this.get<unknown>('/api/v1/me/questions'));
+  /** Open and waiting batches, newest first; `sessionId` narrows them to one chat's. */
+  async questions(sessionId?: string): Promise<QuestionBatch[]> {
+    const query = sessionId ? `?session_id=${encodeURIComponent(sessionId)}` : '';
+    return readQuestionBatches(await this.get<unknown>(`/api/v1/me/questions${query}`));
+  }
+
+  /** Every answer in one request; resumes a chat turn still waiting on them. */
+  async answerQuestionBatch(id: string, body: QuestionBatchAnswerWire): Promise<void> {
+    await this.post<unknown>(`/api/v1/me/questions/batches/${encodeURIComponent(id)}/answer`, body);
+  }
+
+  /** The member's Done: Goose goes ahead with what it has. */
+  async enoughQuestions(id: string): Promise<void> {
+    await this.post<unknown>(`/api/v1/me/questions/batches/${encodeURIComponent(id)}/enough`, {});
   }
 
   /** 422 for no choice and no words, or two choices where one is asked; 409 once it is closed. */
