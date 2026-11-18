@@ -153,7 +153,24 @@ export default function Welcome() {
           <InkTitle level={3}>{t('onboarding.joinTitle')}</InkTitle>
           <InkText tone="secondary">{t('onboarding.joinBody')}</InkText>
           {joinable.length > 0 ? (
-            <PondList title={t('onboarding.joinFound')} ponds={joinable} phase={network} error={nearby.error} onSelect={onJoin} />
+            <>
+              <PondList title={t('onboarding.joinFound')} ponds={joinable} phase={network} error={nearby.error} onSelect={onJoin} />
+              {joinable.map((pond) => {
+                const blePond = nearby.actions.bleFor(pond);
+                if (!blePond) return null;
+                return (
+                  <InkButton
+                    key={`ble-${pond.id}`}
+                    variant="quiet"
+                    block
+                    icon="bluetooth"
+                    onPress={() => find.actions.pickBle(blePond)}
+                  >
+                    {`Join ${pond.name} over Bluetooth`}
+                  </InkButton>
+                );
+              })}
+            </>
           ) : null}
           <InkButton variant="quiet" block icon="plus" onPress={() => openPairing({ kind: 'address' })}>
             {t('onboarding.manual')}
