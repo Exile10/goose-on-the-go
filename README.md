@@ -190,7 +190,10 @@ tool calls as they happen. It is an independent project; the AAIF does not host 
 <table>
   <tr>
     <td align="center" width="260">
-      <a href="https://spiral.xyz"><strong>spiral.xyz</strong></a>
+      <a href="https://spiral.xyz">
+        <img src="docs/images/sponsors/spiral-logo.svg" alt="spiral.xyz" width="64" /><br/>
+        <strong>spiral.xyz</strong>
+      </a>
       <br/>
       <sub>A Block initiative for the public good, funding open-source bitcoin and AI</sub>
     </td>
