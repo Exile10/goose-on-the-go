@@ -11,7 +11,8 @@ import { useEffect, useState } from 'react';
 import type { ConnectionPhase } from '@/models/connection';
 import { pondOfflineReason } from '@/models/pond-status';
 import { useServer } from '@/providers/server-provider';
-import { askCoordinator, renewStatusGrant } from '@/services/pond-status';
+import { startPondOfflineWatch } from '@/services/pond-offline-watch';
+import { askCoordinator, renewStatusGrant, storedGrant } from '@/services/pond-status';
 import { pondOfflineWords } from '@/view-models/connection-words';
 
 /** How often the coordinator is asked again while the Pond stays unreachable. */
@@ -49,7 +50,10 @@ export function usePondOfflineReason(phase: ConnectionPhase): string | null {
     const now = Date.now();
     if (lastRenewal && lastRenewal.pin === pairedPin && now - lastRenewal.at < RENEW_EVERY_MS) return;
     lastRenewal = { pin: pairedPin, at: now };
-    void renewStatusGrant(pairedPin);
+    // With a grant kept, the background watch can ask the coordinator while the app is closed.
+    void renewStatusGrant(pairedPin).then(async () => {
+      if (await storedGrant(pairedPin)) await startPondOfflineWatch();
+    });
   }, [phase, pairedPin]);
 
   useEffect(() => {
