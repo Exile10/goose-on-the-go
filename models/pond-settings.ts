@@ -100,6 +100,7 @@ export type SpecialId =
   | 'llmProvider'
   | 'primaryProfile'
   | 'theme'
+  | 'accent'
   | 'haptics'
   | 'posture'
   | 'visionStatus'
@@ -224,7 +225,6 @@ export const SAMPLE_SETTINGS: PondSettings = {
   memory_extraction_enabled: true,
   memory_extraction_max_facts: 3,
   memory_extraction_interval_secs: 60,
-  suggestion_generation_enabled: true,
   memory_cleanup_enabled: true,
   memory_cleanup_interval_hours: 6,
   memory_prune_threshold: 0.05,
@@ -268,10 +268,10 @@ export const SAMPLE_SETTINGS: PondSettings = {
   proactive_review_enabled: false,
   suggestions_muted: [],
   session_titling_enabled: true,
-  thinking_mode: 'auto',
+  thinking_mode: 'on',
   reasoning_effort: 'brief',
-  show_thinking: false,
-  persist_thinking: false,
+  show_thinking: true,
+  persist_thinking: true,
   review_mode: 'off',
   review_max_rounds: 1,
   review_pass_threshold: 3,

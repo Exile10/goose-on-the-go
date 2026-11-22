@@ -8,7 +8,7 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 import { AppState, Linking } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 
-import { mergeNearby, pruneSightings, type BleSightingLike, type NearbyPond } from '@/models/nearby-pond';
+import { bleTargetFor, mergeNearby, pruneSightings, type BleSightingLike, type NearbyPond } from '@/models/nearby-pond';
 import { bleAvailable, bleState, onBleState, requestBlePermission, scanForPonds, type BleState } from '@/services/ble';
 import type { DiscoveredPond } from '@/services/discovery';
 import { useDiscovery, type DiscoveryPhase } from './use-discovery';
@@ -33,6 +33,8 @@ export interface UseNearbyPonds {
     fixBluetooth: () => void;
     /** Start the Bluetooth scan again, after a connection stopped it. */
     rescan: () => void;
+    /** Matching BLE target for a set-up Pond discovered on the network, if heard over Bluetooth. */
+    bleFor: (pond: DiscoveredPond) => NearbyPond | null;
   };
 }
 
@@ -174,10 +176,15 @@ export function useNearbyPonds(): UseNearbyPonds {
     restart.current?.();
   }, [ble]);
 
+  const bleFor = useCallback(
+    (pond: DiscoveredPond) => bleTargetFor(pond.setupId, sightings, { url: pond.url, pin: pond.pin, hostname: pond.hostname }),
+    [sightings],
+  );
+
   return {
     data: { fresh, joinable, ble, network: phase },
     loading: ble === 'starting' || phase === 'searching',
     error: discovery.error,
-    actions: { retry, fixBluetooth, rescan },
+    actions: { retry, fixBluetooth, rescan, bleFor },
   };
 }
