@@ -47,6 +47,8 @@ export interface NearbyPond {
   hostname: string | null;
   /** When it was last heard, in ms. */
   seenAt: number;
+  /** True when the Pond is already set up on the network and also heard over BLE. */
+  claimed?: boolean;
 }
 
 export interface BleSightingLike {
@@ -106,6 +108,32 @@ export function mergeNearby(
   }
   // Strongest signal first; network-only Ponds after, by id, so the list does not jump about.
   return [...byId.values()].sort((a, b) => (b.rssi ?? -999) - (a.rssi ?? -999) || a.id.localeCompare(b.id));
+}
+
+/** Finds the loudest matching BLE sighting for a set-up Pond's `setupId`. */
+export function bleTargetFor(
+  setupId: string | null | undefined,
+  ble: ReadonlyMap<string, BleSightingLike & { seenAt: number }>,
+  fallback?: { url?: string; pin?: string; hostname?: string },
+): NearbyPond | null {
+  const target = setupId?.toLowerCase();
+  if (!target || !/^[0-9a-f]{4}$/.test(target)) return null;
+  let best: (BleSightingLike & { seenAt: number }) | null = null;
+  for (const s of ble.values()) {
+    if (cardIdOf(s) !== target) continue;
+    if (!best || s.rssi > best.rssi) best = s;
+  }
+  if (!best) return null;
+  return {
+    id: target,
+    peripheral: best.peripheral,
+    rssi: best.rssi,
+    url: fallback?.url ?? null,
+    pin: fallback?.pin ?? null,
+    hostname: fallback?.hostname ?? null,
+    seenAt: best.seenAt,
+    claimed: true,
+  };
 }
 
 /**

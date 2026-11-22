@@ -162,7 +162,7 @@ describe('openRouteFromData', () => {
 
 describe('screenPath', () => {
   it('maps each route to its screen', () => {
-    expect(screenPath({ open: 'devices' })).toBe('/(tabs)/devices');
+    expect(screenPath({ open: 'devices' })).toBe('/(stack)/devices');
     expect(screenPath({ open: 'chat' })).toBe('/(tabs)/chat');
     expect(screenPath({ open: 'models' })).toBe('/(stack)/models');
     expect(screenPath({ open: 'reminders' })).toBe('/(stack)/reminders');
@@ -222,5 +222,13 @@ describe('a phone asking to pair', () => {
   it('keeps the page and drops a request id that is not a Pond id', () => {
     expect(openRouteFromData({ action: 'pairing_request', request_id: 'a/b', open: 'devices' })).toEqual({ open: 'pairing' });
     expect(openRouteFromData({ open: 'devices' })).toEqual({ open: 'devices' });
+  });
+});
+
+describe('an idea card notice', () => {
+  it('opens the cards under either spelling, and ignores any id it carries', () => {
+    expect(openRouteFromData({ open: 'idea_cards' })).toEqual({ open: 'idea_cards' });
+    expect(openRouteFromData({ open: 'cards', card_id: '../x' })).toEqual({ open: 'idea_cards' });
+    expect(screenPath({ open: 'idea_cards' })).toBe('/(stack)/goose-cards');
   });
 });

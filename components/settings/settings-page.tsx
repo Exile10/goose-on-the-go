@@ -372,3 +372,4 @@ export function SettingsPageScreen({ page: id }: { page: SettingsPageId }) {
     </SettingsScroll>
   );
 }
+

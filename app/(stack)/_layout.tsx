@@ -11,8 +11,9 @@ import { Stack } from 'expo-router';
 import React, { type ReactElement } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
+import { useReduceMotion } from '@/components/ui/ink';
 
-import { BackButton } from '@/components/navigation/back-button';
+import { BackButton, BackTitle, StackHeader } from '@/components/navigation/back-button';
 import { ConnectionStatus } from '@/components/patterns/connection-status';
 import { useTheme } from '@/providers/theme-provider';
 import { face } from '@/constants/typography';
@@ -34,22 +35,29 @@ function ScreenWithStatus({ route, children }: { route: { name: string }; childr
 export default function StackLayout() {
   const { colors } = useTheme();
   const { t } = useTranslation();
+  const reduced = useReduceMotion();
+  const modalRise = reduced ? 'none' : ('fade_from_bottom' as const);
 
   return (
     <Stack
       screenLayout={ScreenWithStatus}
       screenOptions={{
         headerShown: true,
-        headerStyle: { backgroundColor: colors.card },
+        header: (props) => <StackHeader {...props} />,
+        headerStyle: { backgroundColor: colors.background },
         headerTintColor: colors.textBrand,
+        headerTitleAlign: 'center',
         headerTitleStyle: {
           color: colors.text,
           ...face('display', 'bold'),
         },
+        headerTitle: ({ children }) => <BackTitle>{children}</BackTitle>,
         headerShadowVisible: false,
         headerBackButtonDisplayMode: 'minimal',
         headerLeft: () => <BackButton />,
         contentStyle: { backgroundColor: colors.background },
+        animation: reduced ? 'none' : 'slide_from_right',
+        animationDuration: 220,
       }}
     >
       <Stack.Screen name="settings-assistant" options={{ title: t('screens.settingsAssistant') }} />
@@ -112,6 +120,9 @@ export default function StackLayout() {
       <Stack.Screen name="goose-cart-item" options={{ title: t('screens.gooseCartItem') }} />
       <Stack.Screen name="goose-connectors" options={{ title: t('screens.gooseConnectors') }} />
       <Stack.Screen name="goose-connector" options={{ title: t('screens.gooseConnector') }} />
+      <Stack.Screen name="devices" options={{ title: t('tabs.devices') }} />
+      <Stack.Screen name="weather" options={{ title: 'Weather', animation: modalRise }} />
+      <Stack.Screen name="music" options={{ title: 'Now Playing', animation: modalRise }} />
       <Stack.Screen name="goose-interests" options={{ title: t('screens.gooseInterests') }} />
       <Stack.Screen name="goose-interview" options={{ title: t('screens.gooseInterview') }} />
       <Stack.Screen name="goose-member-interview" options={{ title: t('screens.gooseMemberInterview') }} />
@@ -122,6 +133,16 @@ export default function StackLayout() {
       <Stack.Screen name="goose-activity" options={{ title: t('screens.gooseActivity') }} />
       <Stack.Screen name="goose-screenshots" options={{ title: t('screens.gooseScreenshots') }} />
       <Stack.Screen name="goose-catalog" options={{ title: t('screens.gooseCatalog') }} />
+      <Stack.Screen name="goose-plans" options={{ title: t('screens.goosePlans') }} />
+      <Stack.Screen name="goose-cards" options={{ title: t('screens.gooseCards') }} />
+      <Stack.Screen name="goose-anchor" options={{ title: t('screens.gooseAnchor') }} />
+      <Stack.Screen name="goose-deliverable" options={{ title: t('screens.gooseDeliverable') }} />
+      <Stack.Screen name="goose-questions" options={{ title: t('screens.gooseQuestions') }} />
+      <Stack.Screen name="goose-facts" options={{ title: t('screens.gooseFacts') }} />
+      <Stack.Screen name="goose-specialists" options={{ title: t('screens.gooseSpecialists') }} />
+      <Stack.Screen name="goose-ledger" options={{ title: t('screens.gooseLedger') }} />
+      <Stack.Screen name="goose-work" options={{ title: t('screens.gooseWork') }} />
+      <Stack.Screen name="goose-captures" options={{ title: t('screens.gooseCaptures') }} />
       <Stack.Screen name="ride" options={{ title: t('screens.ride') }} />
       <Stack.Screen name="agents" options={{ title: t('screens.agents') }} />
       <Stack.Screen name="task-report" options={{ title: t('screens.taskReport') }} />
@@ -151,6 +172,7 @@ export default function StackLayout() {
       <Stack.Screen name="debug" options={{ title: t('screens.debug') }} />
       <Stack.Screen name="commission-device" options={{ title: t('screens.commissionDevice') }} />
       <Stack.Screen name="switch-pond" options={{ title: t('screens.switchPond') }} />
+      <Stack.Screen name="pond-connections" options={{ title: t('screens.pondWifi') }} />
       <Stack.Screen
         name="connect-desktop"
         options={{

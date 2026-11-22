@@ -26,7 +26,6 @@ import { Storage } from '@/services/storage';
 
 export type ColorScheme = 'light' | 'dark';
 export type ThemePreference = 'system' | 'light' | 'dark';
-
 interface ThemeContextValue {
   colors: ThemeColors;
   colorScheme: ColorScheme;
@@ -54,7 +53,7 @@ export function ThemeProvider({ children }: PropsWithChildren) {
 
   useEffect(() => {
     let active = true;
-    void Promise.all([Storage.get('themePreference'), Storage.get('themeAccent')])
+    void Promise.all([Storage.get('themePreference'), Storage.get('accentPreference')])
       .then(([stored, storedAccent]) => {
         if (!active) return;
         if (isPreference(stored)) setPreferenceState(stored);
@@ -75,7 +74,7 @@ export function ThemeProvider({ children }: PropsWithChildren) {
 
   const setAccent = useCallback((next: ThemeAccent) => {
     setAccentState(next);
-    void Storage.set('themeAccent', next);
+    void Storage.set('accentPreference', next);
   }, []);
 
   // RN 0.85's useColorScheme may return 'unspecified'; collapse to light/dark.

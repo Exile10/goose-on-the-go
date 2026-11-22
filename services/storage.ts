@@ -15,7 +15,7 @@ const KEYS = {
   devScreenModes: '@goose/dev-screen-modes',
   themePreference: '@goose/theme-preference',
   /** The accent colour the whole app is drawn in. A preference of this phone, never sent to the Pond. */
-  themeAccent: '@goose/theme-accent',
+  accentPreference: '@goose/accent-preference',
   /** Whether this phone plays haptic feedback. A preference of the phone, not of the Pond. */
   hapticsEnabled: '@goose/haptics-enabled',
   /** Whether this phone keeps its notification stream open in the background (Android). Not a secret. */
@@ -77,6 +77,8 @@ const FAMILIES = {
   setupChecklist: '@goose/setup-checklist/',
   /** Home's offer of the setup interview, put away, by member: Assistant notes still offers it. */
   interviewOffer: '@goose/interview-offer/',
+  /** Which library pictures were sent to a Pond, by Pond address, so none is sent twice. Ids only. */
+  captureSync: '@goose/capture-sync/',
 } as const;
 
 type StorageFamily = keyof typeof FAMILIES;

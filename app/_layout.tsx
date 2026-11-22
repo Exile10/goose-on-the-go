@@ -22,7 +22,7 @@ import {
   JetBrainsMono_600SemiBold,
   JetBrainsMono_700Bold,
 } from '@expo-google-fonts/jetbrains-mono';
-import { InkProvider } from '@/components/ui/ink';
+import { InkProvider, useReduceMotion } from '@/components/ui/ink';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ConnectionStatus } from '@/components/patterns/connection-status';
@@ -45,6 +45,11 @@ import { loadReplyNoticePreference } from '@/services/reply-notices';
 import { offerHomeLocationOnce } from '@/services/home-location';
 import { showSnackbar } from '@/services/snackbar';
 import { usePondSettings, type UsePondSettings } from '@/view-models/use-pond-settings';
+import { useCaptureSync } from '@/view-models/use-capture-sync';
+import { installMediaLibraryCapture } from '@/services/media-library-capture';
+
+// Before any screen or the capture sync reads the library; installing it asks the member nothing.
+installMediaLibraryCapture();
 
 /**
  * Keep the splash up until the app can draw itself.
@@ -158,10 +163,13 @@ function HomeLocationSync({ pond }: { pond: UsePondSettings }) {
   const { connectionState, isScreenReal } = useServer();
   const loaded = pond.settings !== null;
   const source = pond.settings?.weather_location_source ?? '';
+  const hasLocation =
+    (pond.settings?.weather_latitude != null && pond.settings?.weather_longitude != null) ||
+    Boolean(pond.settings?.weather_location_name?.trim());
   const { refresh } = pond.actions;
   const atHome = connectionState === 'local' && isScreenReal('settings');
   useEffect(() => {
-    if (!loaded || !atHome || source === 'manual' || source === 'device') return;
+    if (!loaded || !atHome || source === 'manual' || source === 'device' || hasLocation) return;
     const ask = () =>
       new Promise<boolean>((resolve) => {
         showSnackbar({ message: t('settings.location.offer'), action: { label: t('settings.location.offerUse'), onPress: () => resolve(true) } });
@@ -169,7 +177,7 @@ function HomeLocationSync({ pond }: { pond: UsePondSettings }) {
     void offerHomeLocationOnce(ask).then((applied) => {
       if (applied) void refresh();
     });
-  }, [loaded, atHome, source, refresh, t]);
+  }, [loaded, atHome, source, hasLocation, refresh, t]);
   return null;
 }
 
@@ -184,6 +192,62 @@ function PhoneWakeSync({ phrase }: { phrase: string | undefined }) {
     if (trimmed) followWakePhrase(trimmed);
   }, [trimmed]);
   return null;
+}
+
+/**
+ * Sends new screenshots, and new photos from the albums the member chose, when the app comes to the
+ * front, on a Pond that serves captures and in a build that can read the library. Draws nothing.
+ */
+function CaptureSync() {
+  useCaptureSync();
+  return null;
+}
+
+function RootStack() {
+  const reduced = useReduceMotion();
+  return (
+    <Stack
+      screenOptions={{
+        animation: reduced ? 'none' : 'fade_from_bottom',
+        animationDuration: 220,
+      }}
+    >
+      <Stack.Screen name="(tabs)" options={{ headerShown: false, animation: 'fade' }} />
+      <Stack.Screen
+        name="(stack)"
+        options={{ headerShown: false, animation: reduced ? 'none' : 'slide_from_right' }}
+      />
+      <Stack.Screen name="(onboarding)" options={{ headerShown: false, animation: 'fade' }} />
+      {/* Over the tabs rather than inside one, so a conversation has the
+          whole screen: no bar under the composer. It draws its own header. */}
+      <Stack.Screen
+        name="conversation"
+        options={{
+          headerShown: false,
+          animation: reduced ? 'none' : 'fade_from_bottom',
+          animationDuration: 240,
+        }}
+      />
+      {/* Over everything, with its own close control: five sentences need the whole screen. */}
+      <Stack.Screen
+        name="teach-voice"
+        options={{
+          headerShown: false,
+          presentation: 'fullScreenModal',
+          gestureEnabled: false,
+          animation: reduced ? 'none' : 'slide_from_bottom',
+        }}
+      />
+      <Stack.Screen
+        name="modal"
+        options={{
+          presentation: 'modal',
+          title: 'Modal',
+          animation: reduced ? 'none' : 'slide_from_bottom',
+        }}
+      />
+    </Stack>
+  );
 }
 
 /**
@@ -207,17 +271,8 @@ function ThemedApp() {
           <ConfirmProvider>
             <ConnectionStatus />
             <PondSettingsSync />
-            <Stack>
-              <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-              <Stack.Screen name="(stack)" options={{ headerShown: false }} />
-              <Stack.Screen name="(onboarding)" options={{ headerShown: false }} />
-              {/* Over the tabs rather than inside one, so a conversation has the
-                  whole screen: no bar under the composer. It draws its own header. */}
-              <Stack.Screen name="conversation" options={{ headerShown: false }} />
-              {/* Over everything, with its own close control: five sentences need the whole screen. */}
-              <Stack.Screen name="teach-voice" options={{ headerShown: false, presentation: 'fullScreenModal', gestureEnabled: false }} />
-              <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
-            </Stack>
+            <CaptureSync />
+            <RootStack />
             <StatusBar style={isDark ? 'light' : 'dark'} />
           </ConfirmProvider>
         </SnackbarProvider>

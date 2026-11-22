@@ -23,8 +23,8 @@ Everything here is read through `services/api-client.ts`; no screen fetches on i
 |---|---|
 | Name and avatar initial | the member, above. The initial is taken by code point, so a name starting outside the Basic Multilingual Plane is not cut in half. With no member, a home icon. |
 | Which Pond | `GET /api/v1/system/info` → `hostname`. This works for existing pairings, with no re-pair needed. |
-| Devices | `GET /api/v1/devices`, the same count the Devices tab shows |
-| Rooms | the Devices tab's own `groupByRoom`, not counting Unassigned, which is a fallback rather than a room anyone named |
+| Devices | `GET /api/v1/devices`, the same count the Devices screen shows |
+| Rooms | the Devices screen's own `groupByRoom`, not counting Unassigned, which is a fallback rather than a room anyone named |
 | Routines | `GET /api/v1/schedules` |
 | Users | `GET /api/v1/profiles` |
 
