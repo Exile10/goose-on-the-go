@@ -64,6 +64,7 @@ export interface UseFindPond {
   };
   actions: {
     pick: (pond: NearbyPond) => void;
+    pickBle: (pond: NearbyPond) => void;
     submit: (code: string) => void;
     /** Have the picked Pond say a six-digit code, then type that instead of the card's. */
     askSpoken: () => void;
@@ -103,10 +104,10 @@ export function useFindPond(fresh: NearbyPond[], rescan?: () => void): UseFindPo
   }, [listed]);
 
   const driverFor = useCallback(
-    (pond: NearbyPond): ClaimDriver => {
-      if (driver.current?.pondId === pond.id) return driver.current.claim;
+    (pond: NearbyPond, forceBle = false): ClaimDriver => {
+      if (!forceBle && driver.current?.pondId === pond.id) return driver.current.claim;
       driver.current?.claim.close();
-      const claim = prefersNetwork(pond)
+      const claim = !forceBle && prefersNetwork(pond)
         ? networkClaim(pond, { stage: stagePairing, pair, requestSpokenCode, cancel: cancelPairing })
         : bleClaim(pond, { connect: connectPond, hold: holdSetup });
       driver.current = { pondId: pond.id, claim };
@@ -159,10 +160,21 @@ export function useFindPond(fresh: NearbyPond[], rescan?: () => void): UseFindPo
       setChosen(pond);
       setPhase({ kind: 'claiming', pondId: pond.id });
       stopCooling();
-      const run = driverFor(pond);
+      let run = driverFor(pond);
       try {
         const clientId = await getInstallId();
-        const resp = await run.claim({ credential, code, clientId, deviceName: phoneName.trim() || defaultPhoneName(Device.deviceName, Device.modelName) });
+        const request = { credential, code, clientId, deviceName: phoneName.trim() || defaultPhoneName(Device.deviceName, Device.modelName) };
+        let resp;
+        try {
+          resp = await run.claim(request);
+        } catch (firstErr) {
+          if (run.transport === 'network' && !(firstErr instanceof ApiError) && pond.peripheral) {
+            run = driverFor(pond, true);
+            resp = await run.claim(request);
+          } else {
+            throw firstErr;
+          }
+        }
         if (!resp.accepted && resp.held) {
           if (await reachHeld(pond, run)) {
             waitingRef.current = true;
@@ -258,7 +270,7 @@ export function useFindPond(fresh: NearbyPond[], rescan?: () => void): UseFindPo
   }, [cancelPairing]);
 
   const pick = useCallback(
-    (pond: NearbyPond) => {
+    (pond: NearbyPond, forceBle = false) => {
       dropWait();
       setSpoken({ asking: false, error: null });
       setChosen(pond);
@@ -266,9 +278,10 @@ export function useFindPond(fresh: NearbyPond[], rescan?: () => void): UseFindPo
         void claim(pond, 'setup', card.current.code);
         return;
       }
-      const run = driverFor(pond);
+      const run = driverFor(pond, forceBle);
       if (run.transport === 'network') {
-        setPhase({ kind: 'entering', pondId: pond.id, credential: 'setup', spoken: false });
+        if (pond.claimed) setClaimedIds((ids) => (ids.includes(pond.id) ? ids : [...ids, pond.id]));
+        setPhase({ kind: 'entering', pondId: pond.id, credential: pond.claimed ? 'pairing' : 'setup', spoken: false });
         return;
       }
       // Over Bluetooth a Pond that lost its network advertises too; only hello says whose it is.
@@ -360,8 +373,10 @@ export function useFindPond(fresh: NearbyPond[], rescan?: () => void): UseFindPo
     setPhase({ kind: 'entering', pondId: phase.pondId, credential: 'pairing', spoken: false });
   }, [phase, dropWait]);
 
+  const pickBle = useCallback((pond: NearbyPond) => pick(pond, true), [pick]);
+
   return {
     data: { ponds: listed, phase, claimedIds, phoneName, coolingSecs, spoken },
-    actions: { pick, submit, askSpoken, useCard, setPhoneName, cancel, heldPaired, askAgain },
+    actions: { pick, pickBle, submit, askSpoken, useCard, setPhoneName, cancel, heldPaired, askAgain },
   };
 }

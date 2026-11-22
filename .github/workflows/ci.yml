@@ -7,11 +7,10 @@
 # that it lints -- was run locally and reported by the person asking for the
 # review, which is the arrangement a reviewer is there to avoid.
 #
-# On enforcement, so nobody reads more into a green tick than it carries: this
-# repository is private and the org is on the free plan, where branch protection
-# and rulesets are both unavailable. These checks report; they cannot block a
-# merge. That removes the reviewer's dependence on the author's own account of
-# the branch. It does not yet stop a red branch from landing.
+# On enforcement, so nobody reads more into a green tick than it carries: main has
+# no branch protection, so these checks report; they cannot block a merge. That
+# removes the reviewer's dependence on the author's own account of the branch. It
+# does not yet stop a red branch from landing.
 
 name: CI
 
@@ -30,8 +29,7 @@ on:
     paths-ignore: *docs-only
   workflow_dispatch:
 
-# Minutes for a private repository come out of the org quota, so a run that has
-# already been superseded by another push is pure waste.
+# A run that a later push has already superseded only holds up the queue.
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true

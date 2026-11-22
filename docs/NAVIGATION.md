@@ -8,15 +8,15 @@
 ## Bottom Tabs (5)
 
 Ink's `InkBottomBar`, floating over the screens rather than beside them, and
-leaving on scroll. Labels come from `tabs.*` in the catalogue; icon names are
-registry keys, so `device` is singular.
+leaving on scroll. Labels come from `tabs.*` in the catalogue, Schedule's from
+`screens.schedule`; icon names are registry keys.
 
 | Tab | Screen | Icon | Purpose |
 |-----|--------|------|---------|
 | Home | Dashboard | home | Greeting, status, devices, shortcuts, recent |
 | Chat | Conversations wall → conversation | chat | Every conversation the Pond holds; open one or start one |
 | My Goose | What the Goose holds for you | the brand mark | Suggestions to decide, watches, news briefs, the cart of kept listings, ideas |
-| Devices | Device Grid | device | Room-grouped smart home control |
+| Schedule | Schedules & Automations | schedule | Routines on a clock and automations that fire on an event |
 | You | Profile Hub | profile | Settings, integrations, data |
 
 The bar is absolutely positioned, so a tab screen's own list has to clear it —
@@ -309,7 +309,7 @@ Five more stack screens aren't in the hub:
   first run opened only when nothing was paired, so a phone whose Pond had gone
   could not set up its replacement. There is one stored Pond, not a list; pairing
   another replaces it.
-- **Add a device** (`/(stack)/commission-device`) — from the Devices tab and Home.
+- **Add a device** (`/(stack)/commission-device`) — from Devices and Home.
 - **Wake word** (`/(stack)/wake-word`) — from Settings > Voice and Settings > Listening, the Voice agent, and Teach Goose your voice's intro: the phrase, saved through the shared settings store, and a way into Teach Goose your voice. Home's "Finish setting up" card opens Teach Goose your voice itself.
 - **Connect Desktop** (`/(stack)/connect-desktop`) — the QR scanner opened from
   Pond Pairing. It reads the pairing QR and a Pond's printed setup card
@@ -418,7 +418,7 @@ them:
 | `open` | Screen | Sent for |
 |---|---|---|
 | `schedule` (with `schedule_id`, `run_id`) | `/(stack)/schedule`, going on to that schedule | a schedule result |
-| `devices` | `/(tabs)/devices` | pairing, a Matter device, and a device removed |
+| `devices` | `/(stack)/devices` | pairing, a Matter device, and a device removed |
 | `devices` with `action: "pairing_request"` | `/(stack)/pairing-lock` | a phone asking a locked Pond to pair |
 | `chat` | `/(tabs)/chat` | a suggestion |
 | `models` | `/(stack)/models` | a model download finished or failed, the disk running low or recovering, a start with speech or voice down |
